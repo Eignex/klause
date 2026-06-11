@@ -3,6 +3,9 @@ import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.solver.presolve.PresolveContext
+import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FloatInterval
 import com.eignex.klause.solver.FloatMetadata
@@ -132,12 +135,19 @@ internal class FlatZincCompiler(
         // compileSolve may pin a synthetic int/bool var (for `solve minimize <par-int>`),
         // so resolve it before snapshotting var counts into Problem.
         val solveDirective = compileSolve()
+        // Construction-time SAC probes from the ambient presolve config (solution-preserving, so
+        // resolved under EMPTY); holes imply bounds.
+        val presolve = KlauseConfig.current.presolve
+        val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
         val problem = Problem(
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
             floatMetadata = floatMetadata,
+            probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
+            probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
+            probeIntHoles = holes,
         )
         return FlatZincProgram(
             problem = problem,

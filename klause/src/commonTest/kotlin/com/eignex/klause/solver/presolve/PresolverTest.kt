@@ -27,15 +27,42 @@ class PresolverTest {
     }
 
     @Test
-    fun `parse handles aliases comma-lists and order`() {
-        assertEquals(PresolveConfig.DEFAULT.passes, PresolveConfig.parse(null).passes)
-        assertEquals(PresolveConfig.DEFAULT.passes, PresolveConfig.parse("default").passes)
-        assertEquals(emptyList(), PresolveConfig.parse("none").passes)
+    fun `parse handles aliases and comma-lists`() {
+        val ctx = PresolveContext.EMPTY
+        // null / default / auto → all auto: the three problem passes run for a non-sensitive query.
+        val autoProblem = listOf(
+            PresolvePass.STRENGTHEN_COEFFICIENTS,
+            PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
+            PresolvePass.BREAK_SYMMETRIES,
+        )
+        assertEquals(autoProblem, PresolveConfig.parse(null).problemPasses(ctx))
+        assertEquals(autoProblem, PresolveConfig.parse("default").problemPasses(ctx))
+        assertEquals(autoProblem, PresolveConfig.parse("auto").problemPasses(ctx))
+        // none → nothing runs.
+        assertEquals(emptyList(), PresolveConfig.parse("none").problemPasses(ctx))
+        // comma-list forces exactly those on, everything else off (application = enum order).
         assertEquals(
-            listOf(PresolvePass.ELIMINATE_AFFINE_SINGLETONS, PresolvePass.STRENGTHEN_COEFFICIENTS),
-            PresolveConfig.parse("affine, strengthen").passes,
+            listOf(PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.ELIMINATE_AFFINE_SINGLETONS),
+            PresolveConfig.parse("affine, strengthen").problemPasses(ctx),
         )
         assertFailsWith<IllegalStateException> { PresolveConfig.parse("bogus") }
+    }
+
+    @Test
+    fun `auto resolution is intent-aware and SAC is opt-in`() {
+        val auto = PresolveConfig.AUTO
+        // Symmetry breaking is solution-set-altering: auto-on for solve, auto-off when the query
+        // needs the full solution set (enumeration / counting / sampling).
+        assertTrue(PresolvePass.BREAK_SYMMETRIES in auto.problemPasses(PresolveContext.EMPTY))
+        assertTrue(
+            PresolvePass.BREAK_SYMMETRIES !in
+                auto.problemPasses(PresolveContext(solutionSetSensitive = true)),
+        )
+        // Construction-time SAC probes are expensive → auto-off; explicit `all` turns them on.
+        assertEquals(false, auto.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY))
+        assertEquals(true, PresolveConfig.parse("all").resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY))
+        // withoutSymmetry forces it off even under a non-sensitive query.
+        assertTrue(PresolvePass.BREAK_SYMMETRIES !in auto.withoutSymmetry().problemPasses(PresolveContext.EMPTY))
     }
 
     @Test
@@ -96,7 +123,7 @@ class PresolverTest {
             listOf(Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
         val ctx = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)))
-        val pre = Presolver.run(problem, PresolveConfig(listOf(PresolvePass.ELIMINATE_AFFINE_SINGLETONS)), ctx)
+        val pre = Presolver.run(problem, PresolveConfig.parse("affine"), ctx)
         // Nothing eliminated -> identity problem, identity reconstruct.
         assertSame(problem, pre.problem)
     }

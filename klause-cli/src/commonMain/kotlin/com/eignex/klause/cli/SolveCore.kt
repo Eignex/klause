@@ -25,6 +25,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.presolve.PresolveConfig
 
 /**
@@ -43,10 +44,13 @@ internal object SolveCore {
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. Symmetry breaking is dropped for a pure-LS engine (its
         // ordering constraints hurt local search); solutions are reconstructed at render time.
-        val config = PresolveConfig.parse(common.presolve).let {
-            if (engine in pureLsEngines) it.withoutSymmetry() else it
-        }
-        val solvable = rawSolvable.presolved(config)
+        val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolve
+        val config = if (engine in pureLsEngines) base.withoutSymmetry() else base
+        // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
+        // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
+        // unless we're optimizing (a single optimum, where symmetry breaking is sound).
+        val solutionSetSensitive = !rawSolvable.optimize && (common.allSolutions || (common.solutionCap ?: 1L) > 1L)
+        val solvable = rawSolvable.presolved(config, solutionSetSensitive)
         output.begin(solvable.optimize, solvable.maximize)
 
         // MiniZinc-standard `-p N` (parallelism): N > 1 means a portfolio of N workers. An
