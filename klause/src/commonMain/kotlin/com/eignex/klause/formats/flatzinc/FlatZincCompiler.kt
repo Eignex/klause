@@ -137,7 +137,7 @@ internal class FlatZincCompiler(
         val solveDirective = compileSolve()
         // Construction-time SAC probes from the ambient presolve config (solution-preserving, so
         // resolved under EMPTY); holes imply bounds.
-        val presolve = KlauseConfig.current.presolve
+        val presolve = KlauseConfig.current.presolveConfig()
         val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
         val problem = Problem(
             numBoolVars = numBoolVars,

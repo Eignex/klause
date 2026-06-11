@@ -44,7 +44,7 @@ internal object SolveCore {
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. Symmetry breaking is dropped for a pure-LS engine (its
         // ordering constraints hurt local search); solutions are reconstructed at render time.
-        val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolve
+        val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolveConfig()
         val config = if (engine in pureLsEngines) base.withoutSymmetry() else base
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),

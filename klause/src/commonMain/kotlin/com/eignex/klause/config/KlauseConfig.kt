@@ -1,6 +1,7 @@
 package com.eignex.klause.config
 
 import com.eignex.klause.solver.presolve.PresolveConfig
+import com.eignex.klause.solver.presolve.PresolvePass
 
 /** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries
  *  with no explicit range). Wide enough to absorb typical CP arithmetic without overflow in
@@ -71,12 +72,42 @@ data class KlauseConfig(
      *  bounds are multiplied by this and rounded to integers). Env: `KLAUSE_FLOAT_SCALE`. */
     val floatScale: Long = DEFAULT_FLOAT_SCALE,
 
-    /** Which presolve passes run, as a tri-state per-pass config (each pass on / off / auto).
-     *  Covers the problem-level passes and the construction-time SAC probes; defaults to
-     *  [PresolveConfig.AUTO] (every pass auto-resolved). The CLI `--presolve` flag and the
-     *  `klause.presolve` property override it. */
-    val presolve: PresolveConfig = PresolveConfig.AUTO,
+    // Presolve passes, one tri-state knob each: `true` forces the pass on, `false` off, and `null`
+    // (the default) leaves it to automatic resolution. Assembled into a [PresolveConfig] via
+    // [presolveConfig]; the CLI `--presolve` flag / `klause.presolve` property override these.
+
+    /** GCD coefficient strengthening. `null` = auto (on). */
+    val presolveStrengthenCoefficients: Boolean? = null,
+
+    /** Affine singleton elimination. `null` = auto (on). */
+    val presolveAffineSingletons: Boolean? = null,
+
+    /** Interchangeable-variable symmetry breaking. `null` = auto (on for decision/optimization,
+     *  off for solution-set-sensitive queries — enumeration / counting / sampling). */
+    val presolveBreakSymmetries: Boolean? = null,
+
+    /** Construction-time failed-literal SAC. `null` = auto (off — opt-in). */
+    val presolveProbeFailedLiterals: Boolean? = null,
+
+    /** Construction-time bound SAC. `null` = auto (off — opt-in). */
+    val presolveProbeIntBounds: Boolean? = null,
+
+    /** Construction-time interior-hole SAC (implies bound SAC). `null` = auto (off — opt-in). */
+    val presolveProbeIntHoles: Boolean? = null,
 ) {
+    /** Bundle the per-pass presolve knobs into a [PresolveConfig]; `null` knobs are left out
+     *  (auto-resolved), explicit values become forced on/off settings. */
+    fun presolveConfig(): PresolveConfig = PresolveConfig(
+        buildMap {
+            presolveStrengthenCoefficients?.let { put(PresolvePass.STRENGTHEN_COEFFICIENTS, it) }
+            presolveAffineSingletons?.let { put(PresolvePass.ELIMINATE_AFFINE_SINGLETONS, it) }
+            presolveBreakSymmetries?.let { put(PresolvePass.BREAK_SYMMETRIES, it) }
+            presolveProbeFailedLiterals?.let { put(PresolvePass.PROBE_FAILED_LITERALS, it) }
+            presolveProbeIntBounds?.let { put(PresolvePass.PROBE_INT_BOUNDS, it) }
+            presolveProbeIntHoles?.let { put(PresolvePass.PROBE_INT_HOLES, it) }
+        },
+    )
+
     /** Default configuration values. */
     companion object {
         /** Built-in defaults. */
