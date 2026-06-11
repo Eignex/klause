@@ -58,65 +58,100 @@ object Presolve {
     }
 
     /**
-     * Affine variable elimination (#318), contained slice. Eliminates an integer variable `x`
-     * defined by a two-term equality `c_x·x + c_y·y = b` with `|c_x| = 1` **when `x` occurs in no
-     * other factor** — then `x` is functionally determined (`x = c_x·b − c_x·c_y·y`) and need not
-     * be searched. The equality is dropped and replaced by bounds on `y` that keep `x` inside its
-     * declared domain; `x` stays in the variable space (now unconstrained) and is rebuilt from the
-     * solution via [AffineElimination.reconstruct].
+     * Affine variable elimination (#318/#335). Eliminates an integer variable `x` defined by a
+     * two-term equality `c_x·x + c_y·y = b` with `|c_x| = 1`, i.e. `x = A·y + B` where `A = −c_x·c_y`
+     * and `B = c_x·b`. The defining equality is dropped, the affine relation is folded into every
+     * other factor that mentions `x`, and bounds on `y` are added so `x` stays inside its declared
+     * domain; `x` becomes unconstrained and is rebuilt from the solution via
+     * [AffineElimination.reconstruct].
      *
-     * The fully general substitution (rewriting `x` out of arbitrary factors) needs a `Factor`
-     * variable-remap seam that does not yet exist; this slice deliberately only touches variables
-     * that no other factor references, so no factor is rewritten. Feasible-set-preserving over the
-     * remaining variables.
+     * `x` is eliminated only when every other factor mentioning it is a [Linear]: the affine
+     * relation folds exactly into a weighted sum, but a global constraint (AllDifferent, Element, …)
+     * needs `x` as a genuine variable and cannot absorb `A·y + B` for non-unit `A` / non-zero `B`.
+     * The #318 contained slice (`x` in no other factor) is the zero-fold special case.
      *
-     * Variables in [objectiveIntVars] are never eliminated: an objective references their value
-     * directly, and the engine optimises over the presolved problem where an eliminated variable
-     * would be unconstrained, so removing one would make the bound meaningless.
+     * Variables in [objectiveIntVars] are never eliminated: the objective reads them directly and
+     * the engine optimises over the presolved problem where an eliminated variable is unconstrained.
      */
     fun eliminateAffineSingletons(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): AffineElimination {
         if (problem.numIntVars == 0) return AffineElimination(problem, emptyList())
-        val occ = IntArray(problem.numIntVars)
-        for (factor in problem.factors) for (v in factor.intVars) occ[v]++
+        var factors = problem.factors.toList()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
-        val kept = ArrayList<Factor>(problem.factors.size)
-        for (factor in problem.factors) {
-            val xi = if (factor is Linear) eliminableIndex(factor, occ, eliminated, objectiveIntVars) else -1
-            if (factor !is Linear || xi < 0) {
-                kept.add(factor)
-                continue
-            }
-            val x = factor.vars[xi]
-            val cx = factor.coeffs[xi]
-            val y = factor.vars[1 - xi]
-            val cy = factor.coeffs[1 - xi]
-            eliminated[x] = true
-            subs.add(AffineSub(x, cx, cy, y, factor.bound))
-            kept.addAll(domainBoundsOnY(problem.intDomains[x], cx, cy, y, factor.bound))
+        while (true) {
+            val cand = findAffineCandidate(factors, eliminated, objectiveIntVars) ?: break
+            factors = foldOutVariable(factors, cand, problem.intDomains[cand.x])
+            eliminated[cand.x] = true
+            subs.add(AffineSub(cand.x, cand.cx, cand.cy, cand.y, cand.bound))
         }
         if (subs.isEmpty()) return AffineElimination(problem, emptyList())
-        return AffineElimination(rebuildProblem(problem, kept), subs)
+        return AffineElimination(rebuildProblem(problem, factors), subs)
     }
 
-    /** Index (0 or 1) of an eliminable variable in a 2-term `EQ` Linear, or -1. Eliminable: unit
-     *  coefficient, occurs only in this factor, and neither it nor its partner already eliminated. */
-    private fun eliminableIndex(
-        factor: Linear,
-        occ: IntArray,
+    /** A 2-term `EQ` [Linear] at [defIdx] defining `x` (unit coefficient), with all of `x`'s other
+     *  occurrences foldable (Linear). */
+    private class AffineCandidate(val defIdx: Int, val x: Int, val cx: Int, val y: Int, val cy: Int, val bound: Int)
+
+    private fun findAffineCandidate(
+        factors: List<Factor>,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
-    ): Int {
-        if (factor.op != LinearOp.EQ || factor.vars.size != 2) return -1
-        for (xi in 0..1) {
-            val x = factor.vars[xi]
-            val y = factor.vars[1 - xi]
-            val unit = factor.coeffs[xi] == 1 || factor.coeffs[xi] == -1
-            if (unit && occ[x] == 1 && !eliminated[x] && !eliminated[y] && x != y && x !in objectiveIntVars) {
-                return xi
+    ): AffineCandidate? {
+        for (di in factors.indices) {
+            val f = factors[di]
+            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) continue
+            for (xi in 0..1) {
+                val x = f.vars[xi]
+                val y = f.vars[1 - xi]
+                val cx = f.coeffs[xi]
+                val eliminable = (cx == 1 || cx == -1) && !eliminated[x] && !eliminated[y] &&
+                    x != y && x !in objectiveIntVars && otherOccurrencesAllLinear(factors, di, x)
+                if (eliminable) return AffineCandidate(di, x, cx, y, f.coeffs[1 - xi], f.bound)
             }
         }
-        return -1
+        return null
+    }
+
+    /** Whether every factor other than [defIdx] that mentions [x] is a [Linear] (foldable). */
+    private fun otherOccurrencesAllLinear(factors: List<Factor>, defIdx: Int, x: Int): Boolean {
+        for (i in factors.indices) {
+            if (i != defIdx && x in factors[i].intVars && factors[i] !is Linear) return false
+        }
+        return true
+    }
+
+    /** Drop the defining equality, fold `x = A·y + B` into every other Linear mentioning `x`, and
+     *  add bounds on `y` that keep `x` within [domX]. */
+    private fun foldOutVariable(factors: List<Factor>, c: AffineCandidate, domX: IntDomain): List<Factor> {
+        val a = -c.cx * c.cy
+        val b = c.cx * c.bound
+        val out = ArrayList<Factor>(factors.size + 1)
+        for (i in factors.indices) {
+            if (i == c.defIdx) continue
+            val f = factors[i]
+            out.add(if (f is Linear && c.x in f.vars) foldAffineIntoLinear(f, c.x, c.y, a, b) else f)
+        }
+        out.addAll(domainBoundsOnY(domX, c.cx, c.cy, c.y, c.bound))
+        return out
+    }
+
+    /** [l] with `x` replaced by `A·y + B`: drop `x`'s term, add `A·coeff_x` to `y`, shift the bound
+     *  by `−B·coeff_x`. The [Linear] constructor re-coalesces `y` with any existing `y` term. */
+    private fun foldAffineIntoLinear(l: Linear, x: Int, y: Int, a: Int, b: Int): Linear {
+        val ix = l.vars.indexOf(x)
+        val cX = l.coeffs[ix]
+        val newVars = IntArray(l.vars.size)
+        val newCoeffs = IntArray(l.vars.size)
+        var w = 0
+        for (j in l.vars.indices) {
+            if (j == ix) continue
+            newVars[w] = l.vars[j]
+            newCoeffs[w] = l.coeffs[j]
+            w++
+        }
+        newVars[w] = y
+        newCoeffs[w] = cX * a
+        return Linear(newCoeffs, newVars, l.op, l.bound - cX * b)
     }
 
     /** Bounds on `y` enforcing that `x = c_x·b − c_x·c_y·y` stays within `x`'s domain [domX]. */
@@ -331,12 +366,14 @@ class AffineElimination internal constructor(
     val problem: Problem,
     private val subs: List<AffineSub>,
 ) {
-    /** Recover the eliminated variables in a solution [sample] of [problem]. Each eliminated `x`
-     *  reads its single defining `y`, which is never itself eliminated, so the order is irrelevant. */
+    /** Recover the eliminated variables in a solution [sample] of [problem]. Processed in reverse
+     *  elimination order: an eliminated `x` may depend on a `y` eliminated later (a chain), and a
+     *  later elimination never depends on an earlier one (the candidate scan skips already-eliminated
+     *  partners), so reverse order guarantees every `y` is reconstructed before the `x` that reads it. */
     fun reconstruct(sample: Sample): Sample {
         if (subs.isEmpty()) return sample
         val ints = sample.ints.copyOf()
-        for (s in subs) ints[s.x] = s.cx * s.bound - s.cx * s.cy * ints[s.y]
+        for (s in subs.asReversed()) ints[s.x] = s.cx * s.bound - s.cx * s.cy * ints[s.y]
         return Sample(sample.bools, ints)
     }
 }

@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -10,8 +11,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Affine singleton elimination (#318). Checks that the reduced problem has the same SAT/UNSAT
- * verdict as the original and that a reconstructed solution is genuinely feasible in the original.
+ * Affine variable elimination (#318/#335). Checks that the reduced problem has the same SAT/UNSAT
+ * verdict as the original and that a reconstructed solution is genuinely feasible in the original —
+ * including folding the affine relation into other linear factors and chained eliminations.
  */
 class AffineEliminationTest {
 
@@ -66,17 +68,48 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate when x appears in another factor`() {
+    fun `folds x into another linear factor`() {
+        // x (0) = 2y+1 from x-2y=1, and x also appears in x <= 8 → folds to 2y+1 <= 8.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 3)),
             factors = listOf(
                 Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 8), // x used here too
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 8), // x used here too — now folded
             ),
         )
-        checkRoundTrip("x-used-twice", problem, expectEliminated = false, expectSat = true)
+        checkRoundTrip("fold-into-linear", problem, expectEliminated = true, expectSat = true)
+    }
+
+    @Test
+    fun `does not eliminate when x appears in a non-linear factor`() {
+        // x (0) appears in an AllDifferent — an affine expression can't be folded into a global.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 3), IntDomain(0, 5)),
+            factors = listOf(
+                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1), // x = 2y+1
+                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 6), // x in a global
+            ),
+        )
+        checkRoundTrip("x-in-global", problem, expectEliminated = false, expectSat = true)
+    }
+
+    @Test
+    fun `chained eliminations reconstruct correctly`() {
+        // x = 2y+1 and y = z+1: eliminate x, then y (its defining EQ's partner folds), then z stays.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 10), IntDomain(0, 4)),
+            factors = listOf(
+                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 1),
+            ),
+        )
+        checkRoundTrip("chain", problem, expectEliminated = true, expectSat = true)
     }
 
     @Test
