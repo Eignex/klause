@@ -52,6 +52,9 @@ class AllDifferent(
     override fun structuralKey(): String =
         "alldiff:$domainMin:$domainSize:" + vars.sorted().joinToString(",") + ":" + presents.sorted().joinToString(",")
 
+    /** Distinctness ignores which values are used — invariant under any value relabeling (#366). */
+    override fun isValueAnonymous(): Boolean = true
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         AllDifferent(vars.remapVars(intMap), domainMin, domainSize, presents.remapLits(boolMap))
 

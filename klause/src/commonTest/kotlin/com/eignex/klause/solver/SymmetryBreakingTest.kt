@@ -64,6 +64,19 @@ class SymmetryBreakingTest {
     private fun pos(v: Int) = Lit.make(v, true)
 
     @Test
+    fun `value symmetry pins an interchangeable-value variable`() {
+        // x0,x1: AllDifferent over {0,1,2}. x2 ∈ {3,4} appears in no factor, so its two values are an
+        // interchangeable-value orbit (value-anonymous problem) — pinned to the orbit minimum (3).
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(3, 4)),
+            listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)),
+        )
+        checkSound("value-sym", problem, expectReduced = true)
+    }
+
+    @Test
     fun `interchangeable matrix rows are lex-ordered`() {
         // Two rows: x0 + 2·x1 ≤ 3 and x2 + 2·x3 ≤ 3. The rows are interchangeable as blocks, but the
         // cells within a row are NOT (different coefficients) — so this is block/row symmetry, broken

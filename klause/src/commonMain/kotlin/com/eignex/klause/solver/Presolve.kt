@@ -413,7 +413,8 @@ object Presolve {
         // isomorphic factors), ordered by lex-leader. Only when verified detection is available.
         val brokenInts = intGroups.flatMap { it.toList() }.toHashSet()
         val blockLex = if (verified == null) emptyList() else verifiedBlockLex(problem, objectiveIntVars, brokenInts)
-        if (intGroups.isEmpty() && boolGroups.isEmpty() && blockLex.isEmpty()) return problem
+        val valuePins = breakValueSymmetry(problem, objectiveIntVars)
+        if (intGroups.isEmpty() && boolGroups.isEmpty() && blockLex.isEmpty() && valuePins.isEmpty()) return problem
         val extra = ArrayList<Factor>()
         for (group in intGroups) {
             for (j in 0 until group.size - 1) {
@@ -426,7 +427,59 @@ object Presolve {
             }
         }
         extra.addAll(blockLex)
+        extra.addAll(valuePins)
         return rebuildProblem(problem, problem.factors.toList() + extra)
+    }
+
+    /**
+     * Value symmetry breaking (#366). When every factor is value-anonymous ([Factor.isValueAnonymous]
+     * — AllDifferent and the like, where distinctness ignores which values are used), any permutation
+     * of values that maps every domain to itself is a symmetry. Values with the same domain-incidence
+     * (the set of variables whose domain contains them) are therefore mutually interchangeable. For
+     * each such orbit this pins one variable whose domain lies entirely within the orbit to the
+     * orbit's minimum value — a sound break (a solution can always be relabeled within the orbit so
+     * that variable takes the minimum). Returns the pinning constraints.
+     *
+     * This is the value analog of [breakSymmetries]; the stronger Law–Lee value precedence (which
+     * orders first-occurrences across all variables) needs auxiliary variables and is a follow-up.
+     */
+    private fun breakValueSymmetry(problem: Problem, objectiveIntVars: Set<Int>): List<Factor> {
+        if (problem.numIntVars == 0) return emptyList()
+        if (problem.factors.any { !it.isValueAnonymous() }) return emptyList()
+        var lo = Int.MAX_VALUE
+        var hi = Int.MIN_VALUE
+        for (d in problem.intDomains) {
+            if (d.min < lo) lo = d.min
+            if (d.max > hi) hi = d.max
+        }
+        if (lo > hi) return emptyList()
+        // Orbit values by domain-incidence signature: same set of containing variables ⇒ interchangeable.
+        val orbits = HashMap<String, MutableList<Int>>()
+        for (value in lo..hi) {
+            val incidence = StringBuilder()
+            for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) incidence.append(x).append(',')
+            if (incidence.isNotEmpty()) orbits.getOrPut(incidence.toString()) { ArrayList() }.add(value)
+        }
+        val extra = ArrayList<Factor>()
+        for (values in orbits.values) {
+            if (values.size < 2) continue
+            val orbitSet = values.toHashSet()
+            val minValue = values.min()
+            for (x in 0 until problem.numIntVars) {
+                if (x in objectiveIntVars) continue
+                if (domainWithin(problem.intDomains[x], orbitSet)) {
+                    extra.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.EQ, minValue))
+                    break
+                }
+            }
+        }
+        return extra
+    }
+
+    /** Whether every value in [d] lies in [values]. */
+    private fun domainWithin(d: IntDomain, values: Set<Int>): Boolean {
+        for (v in d.min..d.max) if (v in d && v !in values) return false
+        return true
     }
 
     /**
