@@ -65,10 +65,12 @@ object Presolve {
      * domain; `x` becomes unconstrained and is rebuilt from the solution via
      * [AffineElimination.reconstruct].
      *
-     * `x` is eliminated only when every other factor mentioning it is a [Linear]: the affine
-     * relation folds exactly into a weighted sum, but a global constraint (AllDifferent, Element, …)
-     * needs `x` as a genuine variable and cannot absorb `A·y + B` for non-unit `A` / non-zero `B`.
-     * The #318 contained slice (`x` in no other factor) is the zero-fold special case.
+     * For the **alias** case `x = y` (`A = 1`, `B = 0`) the substitution `x → y` is a plain variable
+     * rename, applied to *every* factor via [Factor.remap] regardless of type (#364). Otherwise the
+     * relation can only fold into a weighted sum, so `x` is eliminated only when its other
+     * occurrences are all [Linear] — a global constraint (AllDifferent, Element, …) needs `x` as a
+     * genuine variable and cannot absorb `A·y + B` for non-unit `A` / non-zero `B`. The #318
+     * contained slice (`x` in no other factor) is the zero-fold special case.
      *
      * Variables in [objectiveIntVars] are never eliminated: the objective reads them directly and
      * the engine optimises over the presolved problem where an eliminated variable is unconstrained.
@@ -80,7 +82,7 @@ object Presolve {
         val subs = ArrayList<AffineSub>()
         while (true) {
             val cand = findAffineCandidate(factors, eliminated, objectiveIntVars) ?: break
-            factors = foldOutVariable(factors, cand, problem.intDomains[cand.x])
+            factors = foldOutVariable(problem, factors, cand)
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.cx, cand.cy, cand.y, cand.bound))
         }
@@ -88,8 +90,9 @@ object Presolve {
         return AffineElimination(rebuildProblem(problem, factors), subs)
     }
 
-    /** A 2-term `EQ` [Linear] at [defIdx] defining `x` (unit coefficient), with all of `x`'s other
-     *  occurrences foldable (Linear). */
+    /** A 2-term `EQ` [Linear] at [defIdx] defining `x` (unit coefficient). The other occurrences of
+     *  `x` are either all foldable (Linear) or — for the alias case `x = y` — substituted via
+     *  [Factor.remap] into any factor type. */
     private class AffineCandidate(val defIdx: Int, val x: Int, val cx: Int, val y: Int, val cy: Int, val bound: Int)
 
     private fun findAffineCandidate(
@@ -104,9 +107,13 @@ object Presolve {
                 val x = f.vars[xi]
                 val y = f.vars[1 - xi]
                 val cx = f.coeffs[xi]
-                val eliminable = (cx == 1 || cx == -1) && !eliminated[x] && !eliminated[y] &&
-                    x != y && x !in objectiveIntVars && otherOccurrencesAllLinear(factors, di, x)
-                if (eliminable) return AffineCandidate(di, x, cx, y, f.coeffs[1 - xi], f.bound)
+                if (cx != 1 && cx != -1 || eliminated[x] || eliminated[y] || x == y || x in objectiveIntVars) continue
+                // x = A·y + B; the alias case (A=1, B=0, i.e. x = y) substitutes into ANY factor via
+                // remap, otherwise x must occur only in foldable Linear factors.
+                val isAlias = -cx * f.coeffs[1 - xi] == 1 && cx * f.bound == 0
+                if (isAlias || otherOccurrencesAllLinear(factors, di, x)) {
+                    return AffineCandidate(di, x, cx, y, f.coeffs[1 - xi], f.bound)
+                }
             }
         }
         return null
@@ -120,18 +127,27 @@ object Presolve {
         return true
     }
 
-    /** Drop the defining equality, fold `x = A·y + B` into every other Linear mentioning `x`, and
-     *  add bounds on `y` that keep `x` within [domX]. */
-    private fun foldOutVariable(factors: List<Factor>, c: AffineCandidate, domX: IntDomain): List<Factor> {
+    /** Drop the defining equality and remove `x`: for the alias case `x = y`, substitute `x → y`
+     *  into every other factor via [Factor.remap] (any factor type); otherwise fold `x = A·y + B`
+     *  into every other Linear mentioning `x`. In both cases bounds on `y` keep `x` within its
+     *  domain. */
+    private fun foldOutVariable(problem: Problem, factors: List<Factor>, c: AffineCandidate): List<Factor> {
         val a = -c.cx * c.cy
         val b = c.cx * c.bound
         val out = ArrayList<Factor>(factors.size + 1)
-        for (i in factors.indices) {
-            if (i == c.defIdx) continue
-            val f = factors[i]
-            out.add(if (f is Linear && c.x in f.vars) foldAffineIntoLinear(f, c.x, c.y, a, b) else f)
+        if (a == 1 && b == 0) {
+            val boolMap = IntArray(problem.numBoolVars) { it }
+            val intMap = IntArray(problem.numIntVars) { it }
+            intMap[c.x] = c.y
+            for (i in factors.indices) if (i != c.defIdx) out.add(factors[i].remap(boolMap, intMap))
+        } else {
+            for (i in factors.indices) {
+                if (i == c.defIdx) continue
+                val f = factors[i]
+                out.add(if (f is Linear && c.x in f.vars) foldAffineIntoLinear(f, c.x, c.y, a, b) else f)
+            }
         }
-        out.addAll(domainBoundsOnY(domX, c.cx, c.cy, c.y, c.bound))
+        out.addAll(domainBoundsOnY(problem.intDomains[c.x], c.cx, c.cy, c.y, c.bound))
         return out
     }
 
