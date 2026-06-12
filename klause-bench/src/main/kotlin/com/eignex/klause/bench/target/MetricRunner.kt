@@ -1,13 +1,14 @@
 package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.ProblemRef
-import com.eignex.klause.bench.metric.AnytimeMetric
 import com.eignex.klause.bench.metric.CompileAuditMetric
 import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.CoverageMetric
-import com.eignex.klause.bench.metric.ParityMetric
+import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.PortfolioCreditMetric
+import com.eignex.klause.bench.metric.Reference
 import com.eignex.klause.bench.metric.SearchEffortMetric
+import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.TimeMetric
 import com.eignex.klause.bench.metric.TuningMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
@@ -16,22 +17,11 @@ import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileScope
 import com.eignex.klause.bench.tools.Profiler
-import com.eignex.klause.portfolio.EngineMix
-
-/**
- * The klause-side search config for a parity run, set from the `engine=` / `processors=` / `fixed=`
- * filters (only the parity metric reads it). [fixed] follows the model's search annotation on a
- * single thread (engine/processors ignored); otherwise [engine] over [processors] workers — a
- * [com.eignex.klause.portfolio.PortfolioScenario] (`processors == 1` ⇒ the single-core sequential
- * portfolio). These map directly onto the portfolio's engine × threads axes, so the competition
- * tracks are just filter combinations (see the bench README recipes) rather than a baked-in enum.
- */
-internal data class ParitySearch(val engine: EngineMix, val processors: Int, val fixed: Boolean)
 
 /**
  * Runs a [MetricKind] over a concrete set of [ProblemRef]s. The single dispatch point shared
  * by predefined [Target]s and the ad-hoc selection CLI — so both reach every metric the same
- * way. Differential metrics (parity/anytime) take a reference backend; the rest ignore it.
+ * way. The [SolveMetric] takes a single backend (`backend=`); the rest ignore it.
  *
  * When [profile] is set the run is recorded with the in-harness JFR [Profiler]. `scope=ALL`
  * wraps the whole run (resolve + solve); `scope=SOLVE` wraps only the measurement, so the
@@ -47,12 +37,12 @@ internal object MetricRunner {
         budget: Budget,
         reference: Backend?,
         profile: ProfileConfig? = null,
-        parity: ParitySearch? = null,
+        search: KlauseSearch? = null,
     ) {
         if (profile != null && profile.scope == ProfileScope.ALL) {
-            Profiler.record(profile) { dispatch(metric, refs, budget, reference, parity, solveProfile = null) }
+            Profiler.record(profile) { dispatch(metric, refs, budget, reference, search, solveProfile = null) }
         } else {
-            dispatch(metric, refs, budget, reference, parity, solveProfile = profile)
+            dispatch(metric, refs, budget, reference, search, solveProfile = profile)
         }
     }
 
@@ -63,30 +53,16 @@ internal object MetricRunner {
         refs: List<ProblemRef>,
         budget: Budget,
         reference: Backend?,
-        parity: ParitySearch?,
+        search: KlauseSearch?,
         solveProfile: ProfileConfig?,
     ) {
         fun <T> solve(block: () -> T): T = if (solveProfile != null) Profiler.record(solveProfile, block) else block()
         when (metric) {
-            MetricKind.PARITY -> {
+            MetricKind.SOLVE -> {
                 val resolved = BenchLoad.resolveRefs(refs)
-                val ps = parity
-                    ?: ParitySearch(EngineMix.MIXED, Runtime.getRuntime().availableProcessors(), fixed = false)
-                solve {
-                    ParityMetric.run(
-                        resolved,
-                        budget,
-                        reference ?: Backend.CHOCO,
-                        ps.engine,
-                        ps.processors,
-                        ps.fixed,
-                    )
-                }
-            }
-
-            MetricKind.ANYTIME -> {
-                val resolved = BenchLoad.resolveRefs(refs)
-                solve { AnytimeMetric.run(resolved, budget, reference ?: Backend.ORTOOLS) }
+                // backend=choco|ortools|yuck runs that reference solo; otherwise klause (engine/processors/fixed).
+                val ref = reference?.takeIf { it in Reference.backends }
+                solve { SolveMetric.run(resolved, budget, ref, search ?: KlauseSearch()) }
             }
 
             MetricKind.TUNING -> {

@@ -9,8 +9,7 @@ internal enum class MetricKind {
     UNIFORMNESS,
     COMPLETENESS,
     VERIFY,
-    PARITY,
-    ANYTIME,
+    SOLVE,
     COVERAGE,
     AUDIT,
     TUNING,
@@ -23,7 +22,7 @@ internal enum class MetricKind {
  * Presets are saved shorthands for a `bench <metric> [filters]` invocation — the general form
  * always works, so a preset only earns its place by carrying non-obvious config (a tuned
  * budget, a curated multi-suite mix). Per-suite / per-reference variants are *not* presets;
- * spell them with filters, e.g. `bench parity suite=smtlib-core reference=ortools`.
+ * spell them with filters, e.g. `bench solve suite=smtlib-core backend=ortools`.
  */
 internal data class Target(
     val id: String,
@@ -31,8 +30,7 @@ internal data class Target(
     val suiteIds: List<String>,
     val metric: MetricKind,
     val budget: Budget = Budget(),
-    /** Reference solver for differential metrics (PARITY / ANYTIME). `null` = the metric's
-     *  own default (Choco for parity, OR-Tools for anytime). */
+    /** Backend for the [MetricKind.SOLVE] metric (`choco`/`ortools`/`yuck`); `null` = klause. */
     val reference: Backend? = null,
 )
 
@@ -53,13 +51,6 @@ internal object Targets {
      * be `bench <metric> suite=core` is not kept: spell it with the `suite=core` token instead.
      */
     val all: List<Target> = listOf(
-        Target(
-            "anytime",
-            "Anytime optimization (klause-LS vs OR-Tools) over the MiniZinc smoke set",
-            listOf("mzn-smoke"),
-            MetricKind.ANYTIME,
-            Budget(timeoutMillis = 5_000),
-        ),
         Target(
             "tune-mixed",
             "Tune klause solver configs over a mixed sat+opt workload (rank by avg dense rank)",

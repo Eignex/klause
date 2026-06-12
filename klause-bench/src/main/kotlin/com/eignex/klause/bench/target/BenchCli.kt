@@ -3,6 +3,7 @@ package com.eignex.klause.bench.target
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.source.CorpusSelection
@@ -25,13 +26,13 @@ import com.eignex.klause.portfolio.EngineMix
  * (which ones), with an optional **reference** solver and **budget**. That is exactly the
  * primary form:
  *
- *   `bench <metric> [filters…]`   e.g. `bench parity suite=smtlib-core reference=ortools`
+ *   `bench <metric> [filters…]`   e.g. `bench solve suite=smtlib-core backend=ortools`
  *
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
  * `category=SAT,OPT` `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N`
- * `reference=choco|ortools|yuck` `timeout=<ms>` `engine=backtrack|ls|mixed` `processors=N`
- * `fixed=true` (parity klause search) `profile=cpu|wall|alloc` `profile-scope=solve|all`
- * `profile-top=N`.
+ * `backend=choco|ortools|yuck` (the `solve` solver; default klause) `timeout=<ms>`
+ * `engine=backtrack|ls|mixed` `processors=N` `fixed=true` (klause search for `solve`)
+ * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
  *  - `<preset-id>` — run a saved [Target] preset (see `list`); a preset is just a named
@@ -99,20 +100,25 @@ object BenchCli {
             return
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
-        val reference = f["reference"]?.let { Backend.valueOf(it.uppercase().replace("-", "")) }
+        // `backend=` selects the single solver the `solve` metric runs (alias: `reference=`).
+        // Only the reference names (choco/ortools/yuck) map to a backend; anything else (incl.
+        // `klause`/unset) leaves it null, i.e. klause via the engine/processors/fixed filters.
+        val backend = (f["backend"] ?: f["reference"])?.let {
+            runCatching { Backend.valueOf(it.uppercase().replace("-", "")) }.getOrNull()
+        }
         val profile = parseProfile(f)
-        val parity = parseParitySearch(f)
+        val search = parseKlauseSearch(f)
         println("=== run: $metricName over ${refs.size} instance(s) ===")
-        MetricRunner.run(metric, refs, budget, reference, profile, parity)
+        MetricRunner.run(metric, refs, budget, backend, profile, search)
     }
 
-    /** The klause-side search for a parity run, from `engine=` / `processors=` / `fixed=true`. Returns
+    /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=true`. Returns
      *  null when none are set (the metric default: mixed engine over the host core count). These map
      *  onto the portfolio's engine × threads axes; the competition tracks are filter combinations (see
      *  the README recipes). `engine`/`processors` mirror the CLI's `--engine` / `-p`/`--parallel`. */
-    private fun parseParitySearch(f: Map<String, String>): ParitySearch? {
+    private fun parseKlauseSearch(f: Map<String, String>): KlauseSearch? {
         if (f["engine"] == null && f["processors"] == null && f["fixed"] == null) return null
-        return ParitySearch(
+        return KlauseSearch(
             engine = f["engine"]?.let(::parseEngine) ?: EngineMix.MIXED,
             processors = f["processors"]?.toIntOrNull() ?: Runtime.getRuntime().availableProcessors(),
             fixed = f["fixed"]?.toBoolean() ?: false,
@@ -234,17 +240,20 @@ object BenchCli {
             |  bench coverage:xcsp3|smtlib          parse/solve rates over a whole format library
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
-            |         tag=… name=<glob> per-family=N max=N seed=N reference=choco|ortools|yuck timeout=<ms>
-            |         engine=backtrack|ls|mixed processors=N fixed=true (parity klause search)
+            |         tag=… name=<glob> per-family=N max=N seed=N backend=choco|ortools|yuck timeout=<ms>
+            |         engine=backtrack|ls|mixed processors=N fixed=true (klause search for solve)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
             |  bench verify suite=core
-            |  bench parity suite=mzn-bench kind=cop per-family=1
-            |  bench parity suite=smtlib-core reference=ortools
-            |  bench parity suite=mzn-bench processors=1     (1-thread, klause's own search)
-            |  bench parity suite=mzn-bench fixed=true        (both follow the model annotation)
+            |  bench solve suite=mzn-bench kind=cop per-family=1               (klause, mixed ×cores)
+            |  bench solve suite=mzn-bench backend=choco timeout=300000        (Choco baseline)
+            |  bench solve suite=mzn-bench backend=yuck timeout=300000         (Yuck baseline)
+            |  bench solve suite=mzn-bench engine=backtrack processors=8       (klause parallel, backtrack-only)
+            |  bench solve suite=mzn-bench fixed=true                          (klause follows the model annotation)
             |  bench search suite=slack-alldiff timeout=30000 profile=cpu
+            |
+            |To compare solvers, run `solve` once per backend (each writes build/solve-<solver>.json) and diff offline.
             """.trimMargin(),
         )
     }
