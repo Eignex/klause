@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
@@ -36,11 +37,13 @@ import kotlin.time.TimeSource
  *  - once an incumbent exists: the segment's objective improvement, normalised by the largest
  *    improvement seen so far (drives anytime convergence).
  *
- * **Limitation (engine seam):** the backtrack engine has no pause/resume — each segment runs a
- * fresh search, so a backtrack arm re-learns clauses every time it is scheduled. Slices therefore
- * grow ([sliceGrowth]) so early segments sample the arms cheaply while later segments amortise
- * learning. A clause-preserving resumable session would remove the re-learning cost (see
- * `Session` "Future" notes) and is the natural follow-up.
+ * **Resumable backtrack arms (#381):** a backtrack arm exposes a [ResumableSearch]
+ * ([PortfolioWorker.newResumableSearch]); [minimize] holds one handle per such arm and *resumes* it
+ * each time the bandit reschedules it, so the arm continues its exact search — live learned clauses,
+ * DFS trail, heuristics, incumbent and LP warm-start caches all intact — instead of cold-restarting
+ * and re-deriving its clauses every segment. Local-search arms have no handle (null), so they keep
+ * running a fresh slice warm-started from the shared incumbent, as before. Slices still grow
+ * ([sliceGrowth]) so early segments sample the arms cheaply while later segments dig deeper.
  */
 class SequentialPortfolio(
     /** The arms raced one-at-a-time; each carries its own engine, params, and objective form. */
@@ -119,6 +122,18 @@ class SequentialPortfolio(
         var slice = baseSliceMillis
         var segment = 0
         val readBound = { bound }
+        // One resumable handle per backtrack arm, opened lazily on the arm's first segment and resumed
+        // on every later one (#381). LS arms stay null and run a fresh warm-started slice each time.
+        val handles = arrayOfNulls<ResumableSearch>(workers.size)
+
+        // Fold a strictly-improving incumbent into the shared bound + fire the telemetry callback.
+        fun accept(r: MinimizeResult.WithSample) {
+            if (r.objectiveValue < bound) {
+                bound = r.objectiveValue
+                best = r.sample
+                onIncumbent?.invoke(r)
+            }
+        }
 
         while (!cancellation()) {
             // Round-robin warmup: force every arm once (at the short warmup slice) before the
@@ -128,14 +143,18 @@ class SequentialPortfolio(
             val sliceMs = if (warming) warmupSliceMillis else slice
             val hadIncumbent = best != null
             val before = bound
+            val worker = workers[arm]
+            val handle = handles[arm] ?: worker.newResumableSearch(readBound)?.also { handles[arm] = it }
             var terminal: MinimizeResult? = null
-            runCatching {
-                for (r in workers[arm].improvements(readBound, sliceToken(cancellation, sliceMs), warmStart = best)) {
-                    terminal = r
-                    if (r is MinimizeResult.WithSample && r.objectiveValue < bound) {
-                        bound = r.objectiveValue
-                        best = r.sample
-                        onIncumbent?.invoke(r)
+            if (handle != null) {
+                // Resume the arm's search for this slice; a terminal verdict means it finished, null
+                // means the slice elapsed (search paused, state retained for the next reschedule).
+                terminal = runCatching { handle.runSlice(cancellation, sliceMs) { accept(it) } }.getOrNull()
+            } else {
+                runCatching {
+                    for (r in worker.improvements(readBound, sliceToken(cancellation, sliceMs), warmStart = best)) {
+                        terminal = r
+                        if (r is MinimizeResult.WithSample) accept(r)
                     }
                 }
             }

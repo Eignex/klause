@@ -2,8 +2,11 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ResumableOptimizer
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -55,6 +58,8 @@ import com.eignex.kumulant.math.splitmix64
 import kotlin.math.ceil
 import kotlin.math.round
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * Complete depth-first search over a [Problem]'s assignment space, driven by propagation
@@ -74,7 +79,15 @@ import kotlin.random.Random
  */
 class BacktrackSolver(override val problem: Problem) :
     Solver<BacktrackParams>,
-    Optimizer<BacktrackParams> {
+    Optimizer<BacktrackParams>,
+    ResumableOptimizer<BacktrackParams> {
+
+    /** Open an explicit-state, pausable branch-and-bound over [objective] (#381). See [ResumableSearch].
+     *  The handle reuses this solver's search primitives; [params] should carry the
+     *  [BacktrackParams.objectiveBoundSupplier] for external bound sharing (its [BacktrackParams.cancellation]
+     *  is superseded per slice). */
+    override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
+        ResumableMinimize(objective, params)
 
     override fun solve(params: BacktrackParams): SolveResult {
         val sink = SolveStatsSink(backend = "backtrack")
@@ -492,6 +505,522 @@ class BacktrackSolver(override val problem: Problem) :
                 },
             )
         }
+
+    /**
+     * Explicit-state, pausable branch-and-bound (#381). This is the same B&B as [improvementsConfigured]
+     * — it reuses every search primitive ([advance], [backjumpAndLearn], [makeNode], the LP machinery via
+     * the same `pruneIf`/`pruneLearned` closures) and the same incumbent / restart / phase logic — but
+     * with the entire search state held as **object fields** instead of a `sequence{}` coroutine frame.
+     * That lets [runSlice] return at a time-slice boundary and a later call resume the exact search
+     * mid-tree, with the live [PropagationSession] (learned clauses + trail), heuristics, incumbent and
+     * LP warm-start caches all intact — so a single-threaded portfolio arm never cold-restarts.
+     *
+     * The inner DFS loop is a sequence of atomic steps gated by a top-of-loop slice check, so returning
+     * at that check (with [runActive] still set) and re-entering from the top is a faithful resume; the
+     * outer loop only re-initialises a run at an actual restart boundary ([runActive] cleared).
+     */
+    private inner class ResumableMinimize(
+        private val objective: LinearObjective,
+        params0: BacktrackParams,
+    ) : ResumableSearch {
+        // lpAuto resolves the LP-relaxation family structurally, exactly as [improvements]. The slice
+        // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
+        private val params: BacktrackParams =
+            (if (params0.lpAuto) LpAutoConfig.recommend(problem, params0) else params0)
+                .copy(cancellation = Cancellation { sliceCancelled() }, minHammingDistance = 0, recentWindow = 0)
+
+        // --- Slice control (no coroutine): a re-armable deadline + the current global token. ---
+        private var globalToken: Cancellation = Cancellation.Never
+        private var sliceEnd: TimeSource.Monotonic.ValueTimeMark? = null
+        private fun sliceCancelled(): Boolean = globalToken() || (sliceEnd?.hasPassedNow() ?: false)
+
+        // --- Incumbent + objective-bound propagation state (was improvementsConfigured locals). ---
+        private var best: Sample? = null
+        private var bestObj: Double = Double.POSITIVE_INFINITY
+        private val singleObj = objective.singleIntObjective()
+        private var objVarBest: Int? = null
+        private val externalShared = params.objectiveBoundSupplier != null
+        private val sink = SolveStatsSink(backend = "backtrack")
+
+        // --- LP-relaxation family state (built once; persists across slices = rolling warm starts). ---
+        private val lpRelaxer = if (params.lpBounding) {
+            CpToLpRelaxation(
+                problem, objective,
+                generateCuts = params.lpCuts, circuitArcs = params.lpCircuit,
+                elementHull = params.lpElement, tableHull = params.lpTable,
+            )
+        } else {
+            null
+        }
+        private val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
+            buildList {
+                if (params.lpCuts) {
+                    add(AllDifferentSeparator())
+                    add(GccSeparator())
+                    add(KnapsackCoverSeparator())
+                    add(CliqueCutSeparator())
+                    val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
+                    add(AssignmentObjectiveCut(coef))
+                }
+                if (params.lpCircuit) add(CircuitSeparator())
+            }
+        } else {
+            emptyList()
+        }
+        private val lpGlobalCuts: List<Cut> =
+            if (params.lpCutPool && lpRelaxer != null && lpSeparators.isNotEmpty()) {
+                harvestRootCuts(lpRelaxer, PropagationSession(problem), lpSeparators)
+            } else {
+                emptyList()
+            }
+        private val lagBound = if (params.lagrangian) {
+            LagrangianBound(problem, objective).takeIf { it.applicable }
+        } else {
+            null
+        }
+        private var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
+        private val energeticBound = if (params.energeticReasoning) {
+            CumulativeEnergeticBound(problem).takeIf { it.applicable }
+        } else {
+            null
+        }
+        private var lpCheckCounter = 0
+        private var energeticCheckCounter = 0
+        private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
+        private val lpBasisByDepth = ArrayList<Basis?>()
+        private var lpHotTableau: DualSimplex? = null
+        private val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+        private var lpBackjump: Learned? = null
+
+        private val pruneIf: (PropagationSession) -> Boolean = { session ->
+            lpBackjump = null
+            // Fields captured into stable locals so the null-guards below smart-cast (a `val` property
+            // read across a lambda boundary does not on its own).
+            val lpRelaxerL = lpRelaxer
+            val lagBoundL = lagBound
+            val energeticBoundL = energeticBound
+            val lpNogoodsL = lpNogoods
+            val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
+            val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
+            when {
+                linearLowerBound(objective, session) >= effectiveBound -> true
+
+                energeticBoundL != null && ++energeticCheckCounter % params.energeticEvery == 0 &&
+                    energeticBoundL.isInfeasible(session) -> {
+                    sink.observeEnergeticPrune()
+                    if (lpNogoodsL != null) energeticBoundL.explain(session)?.let { lpNogoodsL.add(it) }
+                    true
+                }
+
+                lagBoundL != null && run {
+                    val res = lagBoundL.computeBound(session, effectiveBound, lagMultipliers, params.lagrangianIterations)
+                    if (res != null) {
+                        lagMultipliers = res.multipliers
+                        if (res.prune) sink.observeLagrangianPrune()
+                        res.prune
+                    } else {
+                        false
+                    }
+                } -> true
+
+                lpRelaxerL != null &&
+                    session.decisionLevel <= params.lpBoundMaxDepth &&
+                    ++lpCheckCounter % params.lpBoundEvery == 0 -> {
+                    val depth = session.decisionLevel
+                    val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
+                        lpBasisByDepth[depth - 1]
+                    } else {
+                        null
+                    }
+                    val outcome = lpBoundAndFix(
+                        lpRelaxerL, session, effectiveBound, sink, warm, params, lpSeparators, lpHints,
+                        objectiveVar = singleObj?.varId ?: -1,
+                        objectiveAscending = singleObj?.ascending ?: true,
+                        globalCuts = lpGlobalCuts, seedTableau = lpHotTableau,
+                    )
+                    if (outcome.basis != null) {
+                        while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
+                        lpBasisByDepth[depth] = outcome.basis
+                    }
+                    if (outcome.tableau != null) lpHotTableau = outcome.tableau
+                    val explanation = outcome.explanation
+                    if (explanation != null) {
+                        val analyzed = session.analyzeConflictClause(explanation) as? Learned
+                        if (analyzed != null && analyzed.asserting) lpBackjump = analyzed else lpNogoods?.add(explanation)
+                    }
+                    outcome.prune
+                }
+
+                else -> false
+            }
+        }
+        private val pruneLearned: () -> Learned? = { lpBackjump }
+
+        // --- Engine / DFS state (was driveSearch locals), all promoted to fields so a slice can pause. ---
+        private val session = PropagationSession(problem)
+        private val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
+        private val touchedSeedLevels = if (numSeed > 0) HashSet<Int>() else null
+        private val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
+        private val rng = Random(baseSeed)
+        private var decisionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
+        private val relearnCounts = MutableLongIntMap()
+        private val relearnTripped: (Learned) -> Boolean = { learned ->
+            var h = 0L
+            for (lit in learned.literals) h += splitmix64(lit.toLong())
+            val n = relearnCounts.addTo(h, 1)
+            if (n > 1) sink.observeRelearn()
+            n > RELEARN_FALLBACK_THRESHOLD
+        }
+        private val boolPhaseTracking = params.phaseSaving || params.targetPhasing
+        private val boolPhase: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
+        private val boolPhaseSet: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
+        private val intPhase: IntArray? = if (params.phaseSaving) IntArray(problem.numIntVars) else null
+        private val intPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numIntVars) else null
+        private val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
+        private val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
+        private var bestTrailSize = -1
+        private var rephaseMode = REPHASE_TARGET
+        private var conflictsSinceRephase = 0L
+        private val onConflictTick: () -> Unit = tick@{
+            if (boolTarget == null) return@tick
+            conflictsSinceRephase++
+            if (conflictsSinceRephase >= params.rephaseInterval) {
+                conflictsSinceRephase = 0
+                rephaseMode = (rephaseMode + 1) % REPHASE_MODE_COUNT
+            }
+        }
+        private var pendingBlock: Sample? = null
+        private var lastObjBoundAsserted: Int? = null
+        private val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
+        private var restartRequested = false
+        private val vivifyEnabled = params.vivification && params.assumptions.isEmpty
+        private var vivifyCursor = 0
+        private var lubyIdx = 1L
+
+        private val trail: MutableList<TrailNode> = ArrayList()
+        private var descend = true
+        private var decisionsThisRun = 0L
+        private var perRunBudget = Long.MAX_VALUE
+        private var cancelCheckCountdown = 0
+        private var runActive = false
+        private var started = false
+
+        /** Terminal verdict once the search completes; null while still pending. */
+        private var done: MinimizeResult? = null
+        override val isDone: Boolean get() = done != null
+
+        // Root-unsat (bake / seed) is decided once at construction: the search is over before it starts.
+        init {
+            if (problem.baked is PropagationResult.Unsat) {
+                done = terminalExhausted()
+            } else {
+                if (params.variableHeuristic.tracksUnassign) {
+                    val heuristic = params.variableHeuristic
+                    val numBool = problem.numBoolVars
+                    session.unassignListener = { enc ->
+                        heuristic.onUnassign(if (enc < numBool) VarRef.Bool(enc) else VarRef.IntVar(enc - numBool))
+                    }
+                }
+                val seedResult = session.seed(params.assumptions)
+                if (seedResult is PropagationResult.Unsat) {
+                    if (touchedSeedLevels != null) {
+                        for (l in seedResult.conflictLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                    }
+                    done = terminalExhausted()
+                } else {
+                    // Import any nogoods already in the shared pool (cross-arm); the session persists for
+                    // the whole search, so this arm's own clauses are never lost between slices.
+                    params.clauseExchange?.onSearchStart(session)
+                }
+            }
+        }
+
+        override fun runSlice(
+            global: Cancellation,
+            sliceMillis: Long,
+            onIncumbent: (MinimizeResult.WithSample) -> Unit,
+        ): MinimizeResult? {
+            done?.let { return it }
+            globalToken = global
+            sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
+            return runLoop(onIncumbent)
+        }
+
+        override fun close() {
+            runCatching { sink.stop() }
+        }
+
+        private fun terminalExhausted(): MinimizeResult {
+            sink.stop()
+            val stats = sink.snapshot()
+            val b = best
+            return when {
+                externalShared && b != null ->
+                    MinimizeResult.BestFound(b, bestObj, TerminationReason.SearchExhausted, stats)
+
+                externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
+
+                b != null -> MinimizeResult.Optimal(b, bestObj, stats)
+
+                else -> MinimizeResult.Infeasible(stats = stats)
+            }
+        }
+
+        private fun terminalBudget(): MinimizeResult {
+            sink.stop()
+            sink.timedOut = true
+            val stats = sink.snapshot()
+            val b = best
+            return if (b != null) {
+                MinimizeResult.BestFound(b, bestObj, TerminationReason.BudgetExhausted, stats)
+            } else {
+                MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+            }
+        }
+
+        /** Assert the incumbent bound on the objective var at the root; true iff that empties the root
+         *  (optimum proven). Mirrors driveSearch's local `assertObjectiveBoundAtRoot`. */
+        private fun assertObjectiveBoundAtRoot(): Boolean {
+            val objectiveVar = singleObj?.varId ?: return false
+            val b = objVarBest ?: return false
+            val ascending = singleObj.ascending
+            val threshold = if (ascending) b - 1 else b + 1
+            if (threshold == lastObjBoundAsserted) return false
+            lastObjBoundAsserted = threshold
+            return session.assertObjectiveBound(objectiveVar, threshold, atMost = ascending) is PropagationResult.Unsat
+        }
+
+        private fun runLoop(onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+            if (!started) {
+                started = true
+                sink.start()
+                // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
+                // prunes and reduced-cost fixing bite from the first node.
+                if (params.lpProbe) {
+                    val seed = lpRoundingProbe(objective)
+                    if (seed != null) acceptIncumbent(seed, objective.evaluate(seed), onIncumbent)
+                }
+            }
+            outer@ while (true) {
+                if (!runActive) {
+                    perRunBudget = if (glucose != null) {
+                        Long.MAX_VALUE
+                    } else {
+                        params.lubyRestartBase?.let { base ->
+                            val limit = lubyN(lubyIdx)
+                            if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
+                        } ?: Long.MAX_VALUE
+                    }
+                    decisionsThisRun = 0
+                    descend = true
+                    runActive = true
+                }
+                inner@ while (true) {
+                    if (cancelCheckCountdown-- <= 0) {
+                        if (sliceCancelled()) {
+                            // Slice boundary (or global stop): retain every field and return. A later
+                            // runSlice re-enters here (runActive stays set) and continues mid-tree.
+                            params.clauseExchange?.onSearchEnd(session)
+                            return null
+                        }
+                        cancelCheckCountdown = CANCEL_CHECK_INTERVAL
+                    }
+                    if (decisionsThisRun >= perRunBudget || restartRequested) {
+                        val term = doRestart()
+                        if (term != null) {
+                            done = term
+                            return term
+                        }
+                        runActive = false
+                        continue@outer
+                    }
+                    if (descend) {
+                        val varRef = params.variableHeuristic.pick(session, rng)
+                        if (varRef == null) {
+                            val snap = snapshotAssignment(session)
+                            params.variableHeuristic.onSolution(snap)
+                            params.valueHeuristic.onSolution(snap)
+                            acceptIncumbent(snap, objective.evaluate(snap), onIncumbent)
+                            pendingBlock = snap
+                            descend = false
+                            continue@inner
+                        }
+                        val values = params.valueHeuristic.values(session, varRef, rng)
+                        val phased = applyPhase(
+                            varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
+                            boolTarget, boolTargetSet, rephaseMode, rng,
+                        )
+                        val ordered = lpHints?.order(varRef, phased) ?: phased
+                        val node = makeNode(varRef, ordered)
+                        val decsBefore = decisionsLeft
+                        val out = advance(
+                            node, session, params, pruneIf,
+                            { decisionsLeft }, { decisionsLeft-- },
+                            sink, relearnTripped, onConflictTick, pruneLearned,
+                        )
+                        decisionsThisRun += decsBefore - decisionsLeft
+                        when (out) {
+                            AdvanceOutcome.Success -> {
+                                capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                                trail.add(node)
+                                sink.observeNode(trail.size)
+                                if (boolTarget != null && boolTargetSet != null && trail.size > bestTrailSize) {
+                                    bestTrailSize = trail.size
+                                    captureTargetPhase(session, boolTarget, boolTargetSet)
+                                }
+                            }
+
+                            AdvanceOutcome.Exhausted -> {
+                                descend = false
+                                continue@inner
+                            }
+
+                            AdvanceOutcome.BudgetCapped -> {
+                                done = terminalBudget()
+                                return done
+                            }
+
+                            is AdvanceOutcome.Backjump -> {
+                                if (touchedSeedLevels != null) {
+                                    for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                                }
+                                if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
+                                    restartRequested = true
+                                }
+                                when (
+                                    backjumpAndLearn(
+                                        out.learned, trail, session, params,
+                                        boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false,
+                                    )
+                                ) {
+                                    BackjumpTerm.Resume -> { descend = true; continue@inner }
+                                    BackjumpTerm.Exhausted -> { done = terminalExhausted(); return done }
+                                    BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                                }
+                            }
+                        }
+                    } else {
+                        val rootBlock = pendingBlock
+                        if (rootBlock != null) {
+                            pendingBlock = null
+                            while (trail.isNotEmpty()) {
+                                session.popLast()
+                                trail.removeAt(trail.size - 1)
+                            }
+                            val nogood = session.assignmentNogood(rootBlock.bools, rootBlock.ints)
+                            if (nogood.isNotEmpty()) {
+                                val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                                if (res is PropagationResult.Unsat) {
+                                    done = terminalExhausted()
+                                    return done
+                                }
+                            }
+                            if (assertObjectiveBoundAtRoot()) {
+                                done = terminalExhausted()
+                                return done
+                            }
+                            descend = true
+                            continue@inner
+                        }
+                        if (trail.isEmpty()) {
+                            done = terminalExhausted()
+                            return done
+                        }
+                        val top = trail.last()
+                        session.popLast()
+                        val decsBefore = decisionsLeft
+                        val out = advance(
+                            top, session, params, pruneIf,
+                            { decisionsLeft }, { decisionsLeft-- },
+                            sink, relearnTripped, onConflictTick, pruneLearned,
+                        )
+                        decisionsThisRun += decsBefore - decisionsLeft
+                        when (out) {
+                            AdvanceOutcome.Success -> {
+                                capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                                descend = true
+                            }
+
+                            AdvanceOutcome.Exhausted -> {
+                                trail.removeAt(trail.size - 1)
+                            }
+
+                            AdvanceOutcome.BudgetCapped -> {
+                                done = terminalBudget()
+                                return done
+                            }
+
+                            is AdvanceOutcome.Backjump -> {
+                                if (touchedSeedLevels != null) {
+                                    for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                                }
+                                if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
+                                    restartRequested = true
+                                }
+                                when (
+                                    backjumpAndLearn(
+                                        out.learned, trail, session, params,
+                                        boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true,
+                                    )
+                                ) {
+                                    BackjumpTerm.Resume -> { descend = true; continue@inner }
+                                    BackjumpTerm.Exhausted -> { done = terminalExhausted(); return done }
+                                    BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /** Record a new incumbent when it strictly improves the best objective; fires telemetry and the
+         *  per-improvement callback exactly as [improvementsConfigured]. */
+        private fun acceptIncumbent(sample: Sample, o: Double, onIncumbent: (MinimizeResult.WithSample) -> Unit) {
+            if (o >= bestObj) return
+            bestObj = o
+            best = sample
+            if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
+            params.onEvent?.invoke(SearchEvent.Incumbent(o))
+            onIncumbent(MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted))
+        }
+
+        /** Restart housekeeping (pop to root, apply blocking nogood + LP nogoods, cross-arm exchange,
+         *  assert the incumbent bound, rotate heuristics, forget, vivify). Returns a terminal verdict
+         *  when a root contradiction proves exhaustion, else null. Mirrors driveSearch's restart block. */
+        private fun doRestart(): MinimizeResult? {
+            restartRequested = false
+            while (trail.isNotEmpty()) {
+                session.popLast()
+                trail.removeAt(trail.size - 1)
+            }
+            val restartBlock = pendingBlock
+            if (restartBlock != null) {
+                pendingBlock = null
+                if (restartBlock.bools.isNotEmpty() || restartBlock.ints.isNotEmpty()) {
+                    val nogood = session.assignmentNogood(restartBlock.bools, restartBlock.ints)
+                    val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                    if (res is PropagationResult.Unsat) return terminalExhausted()
+                }
+            }
+            if (lpNogoods != null) {
+                for (nogood in lpNogoods.drain()) {
+                    val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                    if (res is PropagationResult.Unsat) return terminalExhausted()
+                }
+            }
+            params.clauseExchange?.onRestart(session)
+            if (assertObjectiveBoundAtRoot()) return terminalExhausted()
+            params.variableHeuristic.onRestart()
+            params.valueHeuristic.onRestart()
+            forgetIfOverCap(session, params)
+            if (vivifyEnabled) vivifyCursor = vivify(session, params, vivifyCursor)
+            lubyIdx++
+            sink.observeRestart()
+            params.onEvent?.invoke(SearchEvent.Restart(lubyIdx - 1, decisionsThisRun))
+            return null
+        }
+    }
 
     /**
      * Sound lower bound on a [LinearObjective] given the current partial assignment in
