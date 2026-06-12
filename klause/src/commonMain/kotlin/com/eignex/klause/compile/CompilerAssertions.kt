@@ -46,7 +46,6 @@ import com.eignex.klause.ast.TableConstraint
 import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
@@ -199,14 +198,8 @@ internal fun Lowering.expandTable(t: TableConstraint): BoolExpr {
 }
 
 /**
- * Lower a [FloatLinearConstraint] in two parallel ways:
- *
- *  1. Bucket each referenced float variable using its declared `FloatSpec.buckets`
- *     and emit a scaled-integer [Linear] factor — this is what every existing
- *     backend solves over.
- *  2. Append a [RealLinearConstraint] (over float-var
- *     ids) to the metadata buffer so a native-real backend (Z3) can solve it
- *     directly in real arithmetic.
+ * Lower a [FloatLinearConstraint] by bucketing each referenced float variable using its declared
+ * `FloatSpec.buckets` and emitting a scaled-integer [Linear] factor — what the engines solve over.
  *
  * Scaling math (per float var `v` with interval `[lo, hi]` and `N` buckets, step
  * `step = (hi - lo) / (N - 1)`): substitute `v = lo + b · step` and rearrange to
@@ -215,10 +208,6 @@ internal fun Lowering.expandTable(t: TableConstraint): BoolExpr {
  */
 internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
     val n = c.varNames.size
-    val realIds = IntArray(n) { i ->
-        floatVarIdByName[c.varNames[i]]
-            ?: error("Float variable '${c.varNames[i]}' not declared")
-    }
     val realOp = when (c.op) {
         IntCmpOp.LE,
         IntCmpOp.LT,
@@ -232,15 +221,6 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
 
         IntCmpOp.NE -> LinearOp.NE
     }
-    val strict = c.op == IntCmpOp.LT || c.op == IntCmpOp.GT
-    floatMetaConstraints += RealLinearConstraint(
-        coeffs = c.coeffs.copyOf(),
-        floatVarIds = realIds,
-        op = realOp,
-        bound = c.bound,
-        strict = strict,
-    )
-
     // Bucketed-int rewrite for the factor list. Reuses the same SCALE
     // historically used by [com.eignex.klause.schema.FloatExpr.multiHandleBucketCompare].
     val scale = 1_000_000.0

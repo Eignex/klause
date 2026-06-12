@@ -2,7 +2,6 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
@@ -602,13 +601,6 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
         factors.add(ReifiedLinear(Lit.variable(aux), scaledCoeffs, vars, op, scaledBound.toInt()))
     } else {
         factors.add(Linear(scaledCoeffs, vars, op, scaledBound.toInt()))
-        // Record the original real-valued form so native-real backends (Z3) can solve over
-        // reals instead of the bucketed scaled-int factor. Reified variants stay int-only —
-        // there's no FloatMetadata channel for them yet.
-        val floatIds = IntArray(coefs.size) { i ->
-            floatVarIndex[varRefs[i].varId] ?: failHere("float var index missing")
-        }
-        realConstraints.add(RealLinearConstraint(coefs, floatIds, op, bound))
     }
 }
 

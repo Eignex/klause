@@ -5,11 +5,9 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FloatMetadata
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.DomWdeg
 import com.eignex.klause.solver.backtrack.DomainMaxRegret
@@ -39,7 +37,6 @@ import com.eignex.klause.solver.factor.GaussianXor
 import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.PresolvePass
-import com.eignex.klause.util.FloatInterval
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -85,18 +82,6 @@ internal class FlatZincCompiler(
     internal val factors = ArrayList<Factor>()
     internal var numBoolVars: Int = 0
 
-    /**
-     * Float-var-index assigned in allocation order — keyed by the float var's backing int
-     * id. Populated by [allocFloat]. Builds [FloatMetadata] at
-     * compile time so backends with native real support (Z3) can recover the real-valued
-     * view instead of solving over the bucketed ints.
-     */
-    internal val floatVarIndex = HashMap<Int, Int>()
-    internal val floatIntervals = ArrayList<FloatInterval>()
-    internal val floatBucketCounts = ArrayList<Int>()
-    internal val floatIntVarIds = ArrayList<Int>()
-    internal val realConstraints = ArrayList<RealLinearConstraint>()
-
     /** Enum-typed int vars: declared label list per var name. Populated from
      *  `klause_enum_labels([...])` annotations on the var decl. */
     internal val enumLabelsByVar = HashMap<String, List<String>>()
@@ -124,16 +109,6 @@ internal class FlatZincCompiler(
             factors.add(GaussianXor(xors))
             xorSearchParams(xors)
         }
-        val floatMetadata = if (floatIntervals.isEmpty()) {
-            null
-        } else {
-            FloatMetadata(
-                intervals = floatIntervals.toTypedArray(),
-                bucketCounts = floatBucketCounts.toIntArray(),
-                intVarByFloatVar = floatIntVarIds.toIntArray(),
-                constraints = realConstraints.toList(),
-            )
-        }
         // compileSolve may pin a synthetic int/bool var (for `solve minimize <par-int>`),
         // so resolve it before snapshotting var counts into Problem.
         val solveDirective = compileSolve()
@@ -146,7 +121,6 @@ internal class FlatZincCompiler(
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
-            floatMetadata = floatMetadata,
             probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
             probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
             probeIntHoles = holes,
@@ -611,11 +585,6 @@ internal class FlatZincCompiler(
         intDomains.add(IntDomain(0, floatBuckets - 1))
         intVars[name] = id
         floatVars[name] = FloatBucketing(id, lo, hi, floatBuckets)
-        // Assign a float-var-index for FloatMetadata in allocation order.
-        floatVarIndex[id] = floatIntervals.size
-        floatIntervals.add(FloatInterval(lo, hi))
-        floatBucketCounts.add(floatBuckets)
-        floatIntVarIds.add(id)
         return id
     }
 
