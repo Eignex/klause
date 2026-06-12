@@ -38,37 +38,32 @@ internal object MetricRunner {
         profile: ProfileConfig? = null,
         search: KlauseSearch? = null,
     ) {
+        // SOLVE runs solvers as subprocesses (klause-cli / minizinc), which JFR on the bench JVM
+        // can't see — so it profiles the klause engine IN-PROCESS itself (see SolveMetric); pass the
+        // config straight through rather than wrapping the subprocess plumbing.
+        if (metric == MetricKind.SOLVE) {
+            SolveMetric.run(
+                BenchLoad.resolveRefs(refs),
+                budget,
+                backend ?: SolverInvocation.KLAUSE,
+                search ?: KlauseSearch(),
+                profile,
+            )
+            return
+        }
         if (profile != null && profile.scope == ProfileScope.ALL) {
-            Profiler.record(profile) { dispatch(metric, refs, budget, backend, search, solveProfile = null) }
+            Profiler.record(profile) { dispatch(metric, refs, budget, solveProfile = null) }
         } else {
-            dispatch(metric, refs, budget, backend, search, solveProfile = profile)
+            dispatch(metric, refs, budget, solveProfile = profile)
         }
     }
 
     /** [solveProfile], when set, profiles just the measurement of each metric — resolution has
      *  already happened by then, so parsing/setup is discounted. */
-    private fun dispatch(
-        metric: MetricKind,
-        refs: List<ProblemRef>,
-        budget: Budget,
-        backend: String?,
-        search: KlauseSearch?,
-        solveProfile: ProfileConfig?,
-    ) {
+    private fun dispatch(metric: MetricKind, refs: List<ProblemRef>, budget: Budget, solveProfile: ProfileConfig?) {
         fun <T> solve(block: () -> T): T = if (solveProfile != null) Profiler.record(solveProfile, block) else block()
         when (metric) {
-            MetricKind.SOLVE -> {
-                val resolved = BenchLoad.resolveRefs(refs)
-                // backend=<minizinc solver id> (choco/gecode/yuck/…) runs that reference; default klause.
-                solve {
-                    SolveMetric.run(
-                        resolved,
-                        budget,
-                        backend ?: SolverInvocation.KLAUSE,
-                        search ?: KlauseSearch(),
-                    )
-                }
-            }
+            MetricKind.SOLVE -> error("SOLVE is handled in run() (in-process profiling path)")
 
             MetricKind.TUNING -> {
                 val resolved = BenchLoad.resolveRefs(refs)
