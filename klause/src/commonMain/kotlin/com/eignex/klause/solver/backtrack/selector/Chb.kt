@@ -24,9 +24,9 @@ import kotlin.random.Random
  *
  * Picks the unpinned variable with the highest `Q`. Ties broken by variable-id order (bools
  * precede ints). Scores persist across [onRestart] — like VSIDS, the learned ordering is the
- * point. Uses the same combined-id [IndexedMaxHeap] and pinned-skip pick machinery as
- * [Vsids], so it drops into the [BacktrackParams.variableHeuristic] slot with no engine
- * changes.
+ * point. Uses the same combined-id [IndexedMaxHeap] and pinned-skip pick machinery as [Vsids], so
+ * it drops into the [com.eignex.klause.solver.backtrack.BacktrackParams.variableHeuristic] slot with
+ * no engine changes.
  *
  * Hook mapping (exactly the hooks VSIDS already consumes):
  *  - [onConflict] — advances the conflict counter, decays α, and bumps every variable in the
