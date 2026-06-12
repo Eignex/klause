@@ -52,12 +52,13 @@ interface ResumableSearch : AutoCloseable {
 
 /**
  * An [Optimizer] that can hand out a [ResumableSearch] over a given objective — i.e. one whose B&B
- * search state can be paused and resumed across slices. [BacktrackSolver] implements this; local
- * search does not (it restarts cheaply from a warm-started incumbent instead).
+ * search state can be paused and resumed across slices. [com.eignex.klause.solver.backtrack.BacktrackSolver]
+ * implements this; local search does not (it restarts cheaply from a warm-started incumbent instead).
  */
 interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
     /** Open a fresh [ResumableSearch] minimising [objective] under [params]. The returned handle owns
-     *  its own slice cancellation; any [SolverParams.cancellation] on [params] is superseded per slice
-     *  by [ResumableSearch.runSlice]'s `global` token. */
+     *  its own slice cancellation; any cancellation token already on [params] (see
+     *  [SolverParams.withCancellation]) is superseded per slice by [ResumableSearch.runSlice]'s `global`
+     *  token. */
     fun resumable(objective: LinearObjective, params: P): ResumableSearch
 }
