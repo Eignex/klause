@@ -51,15 +51,14 @@ class IntHandle(
 }
 
 /**
- * Float variable represented as a native real-valued solver variable with bounds
- * `[min, max]`. Arithmetic and comparison operators build a [FloatExpr] that lowers
+ * Float variable with bounds `[min, max]`, always bucketed onto bounded integers at
+ * solve-time. Arithmetic and comparison operators build a [FloatExpr] that lowers
  * to a [FloatLinearConstraint] AST node at compile-time; the compiler converts that
  * into a `com.eignex.klause.solver.factor.FloatLinear` factor in the [com.eignex.klause.solver.Problem].
  *
  * The historical `buckets` parameter is preserved for source compatibility but is no
  * longer used at the schema layer — bucketing is now a per-backend concern handled by
- * `com.eignex.klause.solver.FloatLowering` at solve-time. Backends with native float
- * support (Z3) ignore the lowering entirely.
+ * `com.eignex.klause.solver.FloatLowering` at solve-time.
  */
 class FloatHandle(
     /** Name of the underlying float variable. */
