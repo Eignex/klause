@@ -30,31 +30,11 @@ class ReifiedCardinality(override val auxBoolVar: Int, literals: IntArray, min: 
     private fun degreeFor(n: Long, aux: Boolean, softCap: Int): Int =
         reifiedDegree(aux, holds(n)) { residual(n, softCap) }
 
-    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val aux = state.assignment.boolValue(auxBoolVar)
-        val n = state.longPayload[factorId]
-        val cap = state.violationSoftCap
-        return if (boolVar == auxBoolVar) {
-            degreeFor(n, !aux, cap) - degreeFor(n, aux, cap)
-        } else {
-            val change = signedFlipDelta(state, signedByVar, boolVar, current = true)
-            degreeFor(n + change, aux, cap) - degreeFor(n, aux, cap)
-        }
-    }
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        reifiedBoolDelta(state, factorId, boolVar, auxBoolVar, signedByVar, ::degreeFor)
 
-    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val oldN = state.longPayload[factorId]
-        val cap = state.violationSoftCap
-        if (boolVar == auxBoolVar) {
-            val newAux = state.assignment.boolValue(auxBoolVar)
-            return degreeFor(oldN, newAux, cap) - degreeFor(oldN, !newAux, cap)
-        }
-        val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
-        val newN = oldN + change
-        state.longPayload[factorId] = newN
-        val aux = state.assignment.boolValue(auxBoolVar)
-        return degreeFor(newN, aux, cap) - degreeFor(oldN, aux, cap)
-    }
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        reifiedBoolApply(state, factorId, boolVar, auxBoolVar, signedByVar, ::degreeFor)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         var trueCount = 0
@@ -194,57 +174,6 @@ class ReifiedCardinality(override val auxBoolVar: Int, literals: IntArray, min: 
 
     /** Recover the pre-flip count and aux value from the now-committed state, then walk
      *  each touched variable once applying the change in its break/make contribution. */
-    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val newN = state.longPayload[factorId]
-        val newAux = state.assignment.boolValue(auxBoolVar)
-        val oldAux: Boolean
-        val oldN: Long
-        if (flippedVar == auxBoolVar) {
-            oldAux = !newAux
-            oldN = newN
-        } else {
-            oldAux = newAux
-            val signedFlipped = signedByVar[flippedVar]
-            if (signedFlipped == 0) return // body lit whose occurrences cancel — nothing changed
-            val flippedPost = state.assignment.boolValue(flippedVar)
-            val changeV = if (flippedPost) signedFlipped else -signedFlipped
-            oldN = newN - changeV
-        }
-        val cap = state.violationSoftCap
-        val oldDeg = degreeFor(oldN, oldAux, cap)
-        val newDeg = degreeFor(newN, newAux, cap)
-        for (u in boolVars) {
-            // Graded Δ each var's flip would produce (the value deltaIfBoolFlipped returns),
-            // evaluated against the pre- and post-flip (count, aux) — break/make track its sign.
-            val preDelta: Int
-            val postDelta: Int
-            if (u == auxBoolVar) {
-                preDelta = degreeFor(oldN, !oldAux, cap) - oldDeg
-                postDelta = degreeFor(newN, !newAux, cap) - newDeg
-            } else {
-                val signedU = signedByVar[u]
-                if (signedU == 0) {
-                    preDelta = 0
-                    postDelta = 0
-                } else {
-                    val uPost = state.assignment.boolValue(u)
-                    val uPre = if (u == flippedVar) !uPost else uPost
-                    val preChangeU = if (uPre) -signedU else signedU
-                    val postChangeU = if (uPost) -signedU else signedU
-                    preDelta = degreeFor(oldN + preChangeU, oldAux, cap) - oldDeg
-                    postDelta = degreeFor(newN + postChangeU, newAux, cap) - newDeg
-                }
-            }
-            val preBreak = preDelta > 0
-            val preMake = preDelta < 0
-            val postBreak = postDelta > 0
-            val postMake = postDelta < 0
-            if (preBreak != postBreak) {
-                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
-            }
-            if (preMake != postMake) {
-                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
-            }
-        }
-    }
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) =
+        reifiedBoolUpdateBreakMake(state, factorId, flippedVar, auxBoolVar, signedByVar, boolVars, ::degreeFor)
 }
