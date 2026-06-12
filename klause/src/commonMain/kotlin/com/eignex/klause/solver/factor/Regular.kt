@@ -15,7 +15,7 @@ import com.eignex.klause.util.IntHashSet
  * and accepting set [accepting]. A transition value of `0` denotes rejection (the
  * "dead state").
  *
- * Decomposed propagation: when every `seq[i]` is singleton, simulate the run and verify
+ * Decomposed propagation: when every `seq(i)` is singleton, simulate the run and verify
  * acceptance.
  */
 class Regular(

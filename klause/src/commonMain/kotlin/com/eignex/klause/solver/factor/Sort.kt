@@ -10,11 +10,11 @@ import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * `sort(xs, ys)` — [ys] is the non-decreasing sorted permutation of [xs] (same multiset
- * of values). Two constraints together: pairwise `ys[i] ≤ ys[i+1]` AND the multisets of
+ * of values). Two constraints together: pairwise `ys(i) ≤ ys(i+1)` AND the multisets of
  * `xs` and `ys` are equal.
  *
  * Propagation: chain bound-tightening on `ys` (non-decreasing) and matching bounds
- * between `ys[0]` ↔ `min(xs)` / `ys[n-1]` ↔ `max(xs)`.
+ * between `ys(0)` ↔ `min(xs)` / `ys(n-1)` ↔ `max(xs)`.
  */
 class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 

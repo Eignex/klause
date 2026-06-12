@@ -10,7 +10,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntIntMap
 
 /**
- * `min ≤ (#true literals) ≤ max`. Payload at `intPayload[factorId]` is the count of true
+ * `min ≤ (#true literals) ≤ max`. Payload at `intPayload(factorId)` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
 class Cardinality(

@@ -11,7 +11,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntIntMap
 
 /**
- * `auxBoolVar ↔ (Σ weights`i` * lit_i ⟨op⟩ bound)`. Payload at `intPayload[factorId]` is the
+ * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
  * current weighted sum.
  */
 class ReifiedPseudoBoolean(

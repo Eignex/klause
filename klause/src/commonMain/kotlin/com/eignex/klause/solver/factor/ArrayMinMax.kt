@@ -11,7 +11,7 @@ import com.eignex.klause.solver.propagation.PropagationState
  * xs)` / `array_int_minimum(result, xs)`. Mode selected by [max].
  *
  * Propagation tightens [result] against the bound of [xs] and pushes back from [result]
- * to every `xs[i]` (for max: every `xs[i].max <= result.max`; for min the dual). LS keeps
+ * to every `xs(i)` (for max: every `xs(i).max <= result.max`; for min the dual). LS keeps
  * a payload holding the index of the current best operand and its value, with a fallback
  * full scan when the best slot changes.
  */

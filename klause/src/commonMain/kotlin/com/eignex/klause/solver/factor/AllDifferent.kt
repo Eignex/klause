@@ -146,7 +146,7 @@ class AllDifferent(
     /** Clash excess contributed by a single value held by [count] vars: `max(0, count - 1)`. */
     private fun excessOf(count: Int): Int = if (count > 1) count - 1 else 0
 
-    /** Count of indices where `vars[i] == intVar` AND position `i` is currently present.
+    /** Count of indices where `vars(i) == intVar` AND position `i` is currently present.
      *  Falls back to [occurrencesByVar] in the non-opt case for the precomputed O(1) lookup. */
     private fun presentOccurrences(state: LocalSearchState, intVar: Int): Int {
         if (presents.isEmpty()) return occurrencesByVar[intVar]

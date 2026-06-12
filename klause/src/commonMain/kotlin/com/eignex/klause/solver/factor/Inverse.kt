@@ -8,19 +8,19 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
- * `inverse(f, g)` with optional offsets: `f[i] = j  ⇔  g[j - gOffset + fOffset] = i`.
+ * `inverse(f, g)` with optional offsets: `f(i) = j  ⇔  g(j - gOffset + fOffset) = i`.
  *
- * The canonical 0-based form is `f[i] = j ⇔ g[j] = i`. MiniZinc emits with index offsets
+ * The canonical 0-based form is `f(i) = j ⇔ g(j) = i`. MiniZinc emits with index offsets
  * matching its 1-based default; the offsets are encoded into the factor so the dispatch
  * doesn't have to allocate channel vars.
  *
- * Propagation: pin-forcing channels — whenever `f[i]` becomes singleton with value `j`,
- * force `g[j']` to `i'` where the indices apply the offset; vice versa.
+ * Propagation: pin-forcing channels — whenever `f(i)` becomes singleton with value `j`,
+ * force `g(j')` to `i'` where the indices apply the offset; vice versa.
  */
 class Inverse(
-    /** Forward mapping variable ids: `f[i]` is the image of `i`. */
+    /** Forward mapping variable ids: `f(i)` is the image of `i`. */
     val f: IntArray,
-    /** Inverse mapping variable ids: `g[j]` is the preimage of `j`. */
+    /** Inverse mapping variable ids: `g(j)` is the preimage of `j`. */
     val g: IntArray,
     /** Index offset for the [f] domain. */
     val fOffset: Int = 0,
@@ -48,7 +48,7 @@ class Inverse(
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var bad = 0
-        // For each f[i]: read its value j, look up g[j - gOff] and require it equals i + fOff.
+        // For each f(i): read its value j, look up g(j - gOff) and require it equals i + fOff.
         for (i in f.indices) {
             val j = state.assignment.intValue(f[i])
             val gIdx = fValueToGIndex(j)
