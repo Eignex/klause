@@ -120,7 +120,12 @@ private object YuckReference : Reference {
         budget: Budget,
         search: BacktrackParams?,
         processors: Int,
-    ) = timedFromImprovements(YuckSolver(problem).improvements(objective, params(budget)))
+    ): RefTimed {
+        // Yuck runs a batch subprocess, so it stamps each incumbent's true emit time internally
+        // rather than relying on drain-time stamping (which would collapse to ~0ms).
+        val t = YuckSolver(problem).minimizeTimed(objective, params(budget))
+        return RefTimed(t.value, t.timeToBestMillis, t.proven)
+    }
 }
 
 private object OrToolsReference : Reference {
