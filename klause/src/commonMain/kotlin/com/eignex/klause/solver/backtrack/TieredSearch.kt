@@ -47,7 +47,7 @@ class SearchTier(
     /** Variable selection within the tier. */
     val varSelect: TierVarSelect,
     /** Value ordering for variables this tier owns. */
-    val valueHeuristic: ValueHeuristic,
+    val valueHeuristic: ValueSelector,
 )
 
 /**
@@ -62,8 +62,8 @@ class TieredVariableHeuristic(
     /** The search phases, in exploration order. */
     val tiers: List<SearchTier>,
     /** Completes the variables no tier owns once every tier is assigned. */
-    val fallback: VariableHeuristic,
-) : VariableHeuristic {
+    val fallback: VariableSelector,
+) : VariableSelector {
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         for (tier in tiers) {
@@ -167,10 +167,10 @@ class TieredValueHeuristic(
     /** The search phases, in ownership-priority order. */
     val tiers: List<SearchTier>,
     /** Orders values for the variables no tier owns. */
-    val fallback: ValueHeuristic,
+    val fallback: ValueSelector,
     numBoolVars: Int,
     numIntVars: Int,
-) : ValueHeuristic {
+) : ValueSelector {
 
     // var id → owning tier index + 1; 0 = unowned (fallback). First-listed tier wins
     // when arrays overlap.
@@ -184,7 +184,7 @@ class TieredValueHeuristic(
         }
     }
 
-    private fun heuristicFor(varRef: VarRef): ValueHeuristic {
+    private fun heuristicFor(varRef: VarRef): ValueSelector {
         val owner = when (varRef) {
             is VarRef.Bool -> if (varRef.varId < boolOwner.size) boolOwner[varRef.varId] else 0
             is VarRef.IntVar -> if (varRef.varId < intOwner.size) intOwner[varRef.varId] else 0

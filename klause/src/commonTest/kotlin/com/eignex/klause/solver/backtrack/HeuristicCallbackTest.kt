@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Lock down the [VariableHeuristic] / [ValueHeuristic] notification contract: every
+ * Lock down the [VariableSelector] / [ValueSelector] notification contract: every
  * propagation conflict fires `onConflict`, every successful pin fires `onCommit`, and
  * every Luby restart fires `onRestart`. Activity-based heuristics (VSIDS, dom/wdeg,
  * last-conflict) hang off these hooks; if they break the next heuristic-driven CP
@@ -22,8 +22,8 @@ import kotlin.test.assertTrue
 class HeuristicCallbackTest {
 
     private class CountingHeuristics :
-        VariableHeuristic,
-        ValueHeuristic {
+        VariableSelector,
+        ValueSelector {
         var commitCount: Int = 0
         var conflictCount: Int = 0
         var restartCount: Int = 0

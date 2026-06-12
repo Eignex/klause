@@ -29,8 +29,8 @@ import com.eignex.klause.solver.backtrack.SolutionGuided
 import com.eignex.klause.solver.backtrack.TierVarSelect
 import com.eignex.klause.solver.backtrack.TieredValueHeuristic
 import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
-import com.eignex.klause.solver.backtrack.ValueHeuristic
-import com.eignex.klause.solver.backtrack.VariableHeuristic
+import com.eignex.klause.solver.backtrack.ValueSelector
+import com.eignex.klause.solver.backtrack.VariableSelector
 import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.GaussianXor
@@ -310,7 +310,7 @@ internal class FlatZincCompiler(
         else -> null
     }
 
-    internal fun mapVariableStrategy(name: String): VariableHeuristic? = when (name) {
+    internal fun mapVariableStrategy(name: String): VariableSelector? = when (name) {
         "input_order" -> InputOrder
         "first_fail", "most_constrained" -> SmallestDomain
         "dom_w_deg" -> DomWdeg()
@@ -322,7 +322,7 @@ internal class FlatZincCompiler(
         else -> null
     }
 
-    internal fun mapValueStrategy(name: String): ValueHeuristic? = when (name) {
+    internal fun mapValueStrategy(name: String): ValueSelector? = when (name) {
         "indomain_min", "indomain" -> IndomainMin
         "indomain_max" -> IndomainMax
         "indomain_middle" -> IndomainMiddle
