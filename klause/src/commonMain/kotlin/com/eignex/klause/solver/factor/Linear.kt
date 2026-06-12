@@ -31,19 +31,7 @@ enum class LinearOp {
  * variable, the integer value that on its own would put the sum on the right side of `bound`,
  * clamped to the variable's domain.
  */
-class Linear private constructor(
-    terms: CoalescedTerms,
-    /** Relation between the weighted sum and `bound`. */
-    val op: LinearOp,
-    /** Right-hand-side bound. */
-    val bound: Int,
-) : Factor {
-
-    /** Integer variable ids, parallel to [coeffs]; each variable appears at most once. */
-    val vars: IntArray = terms.vars
-
-    /** Coefficients, parallel to [vars]. */
-    val coeffs: IntArray = terms.coeffs
+class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int) : LinearSumFactor(terms, op, bound) {
 
     /**
      * `Σ coeffs(i) * vars(i) ⟨op⟩ bound`. Duplicate variables are coalesced (their coefficients
@@ -52,33 +40,15 @@ class Linear private constructor(
     constructor(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(coalesceLinearTerms(vars, coeffs), op, bound)
 
-    init {
-        require(coeffs.isNotEmpty()) { "Linear must have at least one term" }
-    }
-
     override fun structuralKey(): String =
         "lin:$op:$bound:" + vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${coeffs[it]}" }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
 
     override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = vars
 
-    private val coeffLookup: CoeffLookup = CoeffLookup.build(vars, coeffs)
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !holds(state.longPayload[factorId])
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0L
-        for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
-        state.longPayload[factorId] = sum
-    }
-
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violates(state.longPayload[factorId])
-
-    /** Graded violation: the residual amount by which the sum misses `bound` — `|sum-bound|`
-     *  for EQ, `max(0, sum-bound)` for LE, `max(0, bound-sum)` for GE. NE has no natural
-     *  magnitude, so it stays binary (1 when `sum == bound`). This is the descent gradient
-     *  CBLS needs on tight arithmetic: a move shrinking the residual scores a real improvement
-     *  even when it doesn't flip the satisfied/violated status. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         degree(state.longPayload[factorId], state.violationSoftCap)
 
@@ -133,7 +103,7 @@ class Linear private constructor(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val sum = state.longPayload[factorId]
-        if (!violates(sum)) return
+        if (holds(sum)) return
         if (op == LinearOp.NE) {
             // sum == bound; bump any non-zero-coeff variable by ±1 within its domain. Each
             // single shift changes sum by ±|c_i| ≠ 0 → breaks the equality.
@@ -154,7 +124,7 @@ class Linear private constructor(
             if (c == 0) continue
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c.toLong() * cur
-            val target = snapTarget(c, sumWithout) ?: continue
+            val target = snapTarget(c, sumWithout, wantHolds = true) ?: continue
             val clamped = state.problem.intDomains[v].clampLong(target)
             if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
@@ -265,21 +235,6 @@ class Linear private constructor(
             if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
     }
-
-    /** Violated iff the relation does not hold. Graded magnitude comes from [linearDegree];
-     *  both delegate to the shared [linearHolds] / [linearResidual] math (issue #100) so the
-     *  `Long` running sum is interpreted in exactly one place. */
-    private fun violates(sum: Long): Boolean = !linearHolds(sum, op, bound)
-
-    private fun degree(sum: Long, softCap: Int): Int = linearDegree(sum, op, bound, softCap)
-
-    private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
-
-    /** Repair snap toward satisfaction. `NE` is handled explicitly in [proposeRepairMoves]
-     *  (it early-returns before this loop), so the `wantHolds = true` path never hits the
-     *  `NE` branch here. */
-    private fun snapTarget(coeff: Int, sumWithout: Long): Long? =
-        snapLinearTarget(op, bound, coeff, sumWithout, wantHolds = true)
 
     private companion object {
         /** Cap on randomly-sampled (a, b) pairs in [proposeEqPairShifts]. Total proposals

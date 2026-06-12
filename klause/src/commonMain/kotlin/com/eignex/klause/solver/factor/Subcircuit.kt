@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -35,8 +34,8 @@ import kotlin.math.abs
  */
 class Subcircuit(
     /** Successor variable id per node; `succ(i) = i` excludes node i, the rest form one cycle. */
-    val succ: IntArray,
-) : Factor {
+    succ: IntArray,
+) : SuccessorCycleFactor(succ) {
 
     init {
         require(succ.isNotEmpty()) { "Subcircuit needs at least one var, got ${succ.size}" }
@@ -44,42 +43,11 @@ class Subcircuit(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Subcircuit(succ.remapVars(intMap))
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = succ
-
-    private val n: Int = succ.size
-    private val positionOfVar: Map<Int, Int> = succ.withIndex().associate { (i, v) -> v to i }
-
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        state.intPayload[factorId] = computeCost(state, replaceAt = -1, replaceWith = 0)
-    }
-
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
-
-    /** Graded violation: the [computeCost] distance to a valid sub-circuit — exposed as a
-     *  magnitude (not a binary flag) so CBLS gets a descent gradient on routing structure. */
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = state.intPayload[factorId]
-
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val pos = positionOfVar[intVar] ?: return 0
-        val oldCost = state.intPayload[factorId]
-        val newCost = computeCost(state, replaceAt = pos, replaceWith = newValue)
-        return newCost - oldCost
-    }
-
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        if (positionOfVar[intVar] == null) return 0
-        val oldCost = state.intPayload[factorId]
-        val newCost = computeCost(state, replaceAt = -1, replaceWith = 0)
-        state.intPayload[factorId] = newCost
-        return newCost - oldCost
-    }
-
     /**
      * Graded cost for the subcircuit. 0 iff included set forms a single cycle (or is empty).
      * O(n).
      */
-    private fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int {
+    override fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int {
         val effective = IntArray(n) { i ->
             if (i == replaceAt) replaceWith else state.assignment.intValue(succ[i])
         }
@@ -111,45 +79,25 @@ class Subcircuit(
             // Empty subcircuit is valid; only oob counts as a violation.
             return numOob
         }
-        // Cycle decomposition restricted to included nodes (use successor only when in
-        // range, not self-loop, and successor is also included — otherwise dead-end).
-        val unvisited = 0
-        val onStack = 1
-        val done = 2
-        val markers = IntArray(n)
-        val enterStep = IntArray(n)
-        var globalStep = 0
-        var numCycles = 0
-        var nodesInCycles = 0
-        for (start in 0 until n) {
-            if (!included[start] || markers[start] != unvisited) continue
-            var cur = start
-            while (cur >= 0 && markers[cur] == unvisited && included[cur]) {
-                markers[cur] = onStack
-                enterStep[cur] = globalStep++
-                val s = effective[cur]
-                cur = if (s in 0 until n && s != cur && included[s]) s else -1
+        // Cycle decomposition restricted to included nodes: an out-edge exists only when the
+        // successor is in range, not a self-loop, and itself included — otherwise a dead-end.
+        // Excluded nodes (next = -1) are walked as their own singleton paths and contribute no
+        // cycles, so the scan matches an included-only traversal.
+        val next = IntArray(n) { i ->
+            if (!included[i]) {
+                -1
+            } else {
+                val s = effective[i]
+                if (s in 0 until n && s != i && included[s]) s else -1
             }
-            if (cur >= 0 && markers[cur] == onStack) {
-                numCycles++
-                nodesInCycles += globalStep - enterStep[cur]
-            }
-            for (i in 0 until n) if (markers[i] == onStack) markers[i] = done
         }
-        return abs(numCycles - 1) + (numIncluded - nodesInCycles) + numPointToExcluded + numOob
+        val scan = cycleScan(next)
+        return abs(scan.numCycles - 1) + (numIncluded - scan.nodesInCycles) + numPointToExcluded + numOob
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // 1. Tighten domains to [0, n).
-        for (i in succ.indices) {
-            val v = succ[i]
-            val d = state.intDomains[v]
-            val newLo = maxOf(d.min, 0)
-            val newHi = minOf(d.max, n - 1)
-            if (newLo > newHi) return false
-            if (newLo != d.min && !state.tightenIntMin(v, newLo)) return false
-            if (newHi != d.max && !state.tightenIntMax(v, newHi)) return false
-        }
+        if (!tightenSuccToRange(state)) return false
         if (n == 1) return true // single node: self-loop is the only choice, no constraint.
         // Every prune below is global (Hamiltonian-over-included reasoning depends on the joint
         // state of all succ vars), so union the antecedents once.
@@ -171,18 +119,7 @@ class Subcircuit(
         }
         // 3. Shave every claimed value off the other vars' domain endpoints (pigeonhole + the
         //    excluded-target rule fold together: both forbid pointing at a claimed index).
-        for (i in succ.indices) {
-            val v = succ[i]
-            val d = state.intDomains[v]
-            if (d.min == d.max) continue
-            var newMin = d.min
-            while (newMin < d.max && claimed[newMin] != -1 && claimed[newMin] != i) newMin++
-            var newMax = d.max
-            while (newMax > newMin && claimed[newMax] != -1 && claimed[newMax] != i) newMax--
-            if (newMin > newMax) return false
-            if (newMin != d.min && !state.tightenIntMin(v, newMin, ant)) return false
-            if (newMax != d.max && !state.tightenIntMax(v, newMax, ant)) return false
-        }
+        if (!shaveClaimedFromEndpoints(state, claimed, ant)) return false
         // 4. Count definitely-included nodes: a node whose domain excludes its own index can never
         //    self-loop, so it must lie on the cycle. Re-read domains — step 3 may have tightened.
         var includedCount = 0

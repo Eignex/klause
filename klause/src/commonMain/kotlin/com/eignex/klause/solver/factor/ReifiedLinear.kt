@@ -15,73 +15,33 @@ import com.eignex.klause.solver.propagation.PropagationState
  * is the current weighted sum, mirrored from [Linear].
  */
 class ReifiedLinear private constructor(
-    /** Reification literal: true iff the linear relation holds. */
-    val auxBoolVar: Int,
+    override val auxBoolVar: Int,
     terms: CoalescedTerms,
-    /** Relation between the weighted sum and [bound]. */
-    val op: LinearOp,
-    /** Right-hand-side bound. */
-    val bound: Int,
-) : Factor {
-
-    /** Integer variable ids, parallel to [coeffs]; each variable appears at most once. */
-    val vars: IntArray = terms.vars
-
-    /** Coefficients, parallel to [vars]. */
-    val coeffs: IntArray = terms.coeffs
+    op: LinearOp,
+    bound: Int,
+) : LinearSumFactor(terms, op, bound),
+    ReifiedFactor {
 
     /**
-     * `auxBoolVar ↔ (Σ coeffs[i] * vars[i] ⟨op⟩ bound)`. Duplicate variables are coalesced
+     * `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced
      * (their coefficients summed) so the local-search payload stays consistent regardless of
      * caller (issue #84).
      */
     constructor(auxBoolVar: Int, coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound)
 
-    init {
-        require(coeffs.isNotEmpty()) { "ReifiedLinear must have at least one term" }
-    }
-
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedLinear(boolMap[auxBoolVar], coeffs, vars.remapVars(intMap), op, bound)
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
-    override val intVars: IntArray = vars
 
-    private val coeffLookup: CoeffLookup = CoeffLookup.build(vars, coeffs)
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0L
-        for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
-        state.longPayload[factorId] = sum
-    }
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
+        residual(state.longPayload[factorId], softCap)
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val aux = state.assignment.boolValue(auxBoolVar)
-        val holds = holds(state.longPayload[factorId])
-        return aux != holds
-    }
-
-    /** Graded violation. When the indicator demands the linear hold (`aux = true`) but it
-     *  doesn't, the degree is the *linear residual* — how far the sum is from satisfying the
-     *  comparison — giving CBLS a gradient on the sum's variables (this is what makes the
-     *  element decomposition's `idxMatch → bodyHolds` channels navigable). When `aux = false`
-     *  but the linear holds, the natural one-step repair is to flip the indicator, so the
-     *  degree is 1 (pushing the sum out of the satisfied region is rarely the right move). */
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar), state.violationSoftCap)
-
-    private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int {
-        val h = holds(sum)
-        return when {
-            aux == h -> 0
-
-            // indicator wants it to hold; grade by how far off (shared residual)
-            aux -> linearResidual(sum, op, bound, softCap)
-
-            else -> 1 // indicator wants it false but it holds; flip the aux
-        }
-    }
+    private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
+        reifiedDegree(aux, holds(sum)) { residual(sum, softCap) }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val sum = state.longPayload[factorId]
@@ -243,13 +203,6 @@ class ReifiedLinear private constructor(
             }
         }
     }
-
-    private fun holds(sum: Long): Boolean = linearHolds(sum, op, bound)
-
-    private fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
-
-    private fun snapTarget(coeff: Int, sumWithout: Long, wantHolds: Boolean): Long? =
-        snapLinearTarget(op, bound, coeff, sumWithout, wantHolds)
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 

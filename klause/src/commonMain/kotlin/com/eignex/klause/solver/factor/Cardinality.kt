@@ -1,38 +1,24 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.util.IntIntMap
 
 /**
- * `min ≤ (#true literals) ≤ max`. Payload at `intPayload(factorId)` is the count of true
+ * `min ≤ (#true literals) ≤ max`. Payload at `longPayload(factorId)` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
-class Cardinality(
-    /** The literals being counted. */
-    val literals: IntArray,
-    /** Inclusive lower bound on the number of true literals. */
-    val min: Int,
-    /** Inclusive upper bound on the number of true literals. */
-    val max: Int,
-) : Factor {
-
-    init {
-        require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
-        require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
-    }
+class Cardinality(literals: IntArray, min: Int, max: Int) :
+    CardinalitySumFactor(literals, min, max, excludedVar = -1) {
 
     override fun structuralKey(): String = "card:$min:$max:" + literals.sorted().joinToString(",")
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cardinality(literals.remapLits(boolMap), min, max)
 
     override val boolVars: IntArray = literals.litVars()
-    override val intVars: IntArray = EmptyIntArray
 
     /**
      * Number of literals to watch on the at-least-min side (0 if min == 0, else min+1).
@@ -52,71 +38,29 @@ class Cardinality(
             }
         }
 
-    /** Pre-computed map from a Boolean var id to the sum of polarity signs across every
-     *  occurrence in [literals]. Each entry is `+1` for a positive literal occurrence,
-     *  `-1` for a negative occurrence, summed if the var appears multiple times. The
-     *  delta of flipping `boolVar` from `pre` to `!pre` is then
-     *     `(if (pre then -1 else 1)) * signedOccurrencesByVar[boolVar]`
-     *  computed in O(1) instead of scanning every literal in the factor. */
-    private val signedOccurrencesByVar: IntIntMap = run {
-        val signs = HashMap<Int, Int>()
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            val sign = if (Lit.isPositive(lit)) 1 else -1
-            signs[v] = (signs[v] ?: 0) + sign
-        }
-        IntIntMap.build(
-            keys = signs.keys.toIntArray(),
-            values = signs.values.toIntArray(),
-            absent = 0,
-        )
-    }
-
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        var count = 0
-        for (lit in literals) {
-            if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
-        }
-        state.intPayload[factorId] = count
-    }
-
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val n = state.intPayload[factorId]
-        return n < min || n > max
-    }
-
-    /** Graded violation: how many true-literal flips away from the `[min, max]` window the
-     *  current true-count is — `max(0, min − n) + max(0, n − max)`, compressed. Gives CBLS a
-     *  gradient toward the cardinality bound instead of a flat boolean. */
-    private fun cardDegree(n: Int): Int = (if (n < min) min - n else 0) + (if (n > max) n - max else 0)
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !holds(state.longPayload[factorId])
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        compressViolation(cardDegree(state.intPayload[factorId]).toLong(), state.violationSoftCap)
+        degree(state.longPayload[factorId], state.violationSoftCap)
 
-    /** Compressed Δ violation-degree if [u] (currently [uVal]) were flipped while the true-count
-     *  is [n] — exactly what [deltaIfBoolFlipped] returns. Shared by the break/make updater so
-     *  the incremental counts track the graded delta sign. */
-    private fun signedDelta(n: Int, u: Int, uVal: Boolean, softCap: Int): Int {
-        val signedU = signedOccurrencesByVar[u]
+    // Compressed Δ violation-degree if `u` (currently `uVal`) were flipped at true-count `n` —
+    // exactly what deltaIfBoolFlipped returns. Shared by the break/make updater.
+    private fun signedDelta(n: Long, u: Int, uVal: Boolean, softCap: Int): Int {
+        val signedU = signedByVar[u]
         if (signedU == 0) return 0
         val changeU = if (uVal) -signedU else signedU
-        return compressViolation(cardDegree(n + changeU).toLong(), softCap) -
-            compressViolation(cardDegree(n).toLong(), softCap)
+        return degree(n + changeU, softCap) - degree(n, softCap)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
-        signedDelta(state.intPayload[factorId], boolVar, state.assignment.boolValue(boolVar), state.violationSoftCap)
+        signedDelta(state.longPayload[factorId], boolVar, state.assignment.boolValue(boolVar), state.violationSoftCap)
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val post = state.assignment.boolValue(boolVar)
-        val signed = signedOccurrencesByVar[boolVar]
-        if (signed == 0) return 0
-        val change = if (post) signed else -signed
-        val oldN = state.intPayload[factorId]
+        val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
+        val oldN = state.longPayload[factorId]
         val newN = oldN + change
-        state.intPayload[factorId] = newN
-        return compressViolation(cardDegree(newN).toLong(), state.violationSoftCap) -
-            compressViolation(cardDegree(oldN).toLong(), state.violationSoftCap)
+        state.longPayload[factorId] = newN
+        return degree(newN, state.violationSoftCap) - degree(oldN, state.violationSoftCap)
     }
 
     /**
@@ -430,8 +374,8 @@ class Cardinality(
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        val n = state.intPayload[factorId]
-        if (n in min..max) return
+        val n = state.longPayload[factorId]
+        if (holds(n)) return
         val wantIncrease = n < min
         if (boolVars.size == literals.size) {
             // Each var appears in exactly one literal — flip helps iff the lit is currently false.
@@ -517,14 +461,14 @@ class Cardinality(
         }
     }
 
-    /** Cached max |`signedOccurrencesByVar[v]`| across `boolVars`. Bounds the change `n` can
+    /** Cached max |`signedByVar[v]`| across `boolVars`. Bounds the change `n` can
      *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out: when both
      *  the pre- and post-flip `n` are far enough from the [min] / [max] boundaries that no
      *  single subsequent flip could cross either side, no break/make state needs to change. */
     private val maxAbsSigned: Int = run {
         var m = 0
         for (v in boolVars) {
-            val s = signedOccurrencesByVar[v]
+            val s = signedByVar[v]
             val a = if (s < 0) -s else s
             if (a > m) m = a
         }
@@ -538,9 +482,9 @@ class Cardinality(
      *  max - maxAbsSigned]` interior — in that region no further flip can move `n` outside
      *  `[min, max]`, so every var's contribution is 0 in both pre and post states. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val signedFlipped = signedOccurrencesByVar[flippedVar]
+        val signedFlipped = signedByVar[flippedVar]
         if (signedFlipped == 0) return
-        val newN = state.intPayload[factorId]
+        val newN = state.longPayload[factorId]
         val flippedPost = state.assignment.boolValue(flippedVar)
         val changeV = if (flippedPost) signedFlipped else -signedFlipped
         val oldN = newN - changeV
@@ -555,7 +499,7 @@ class Cardinality(
             return
         }
         for (u in boolVars) {
-            val signedU = signedOccurrencesByVar[u]
+            val signedU = signedByVar[u]
             if (signedU == 0) continue
             val uPost = state.assignment.boolValue(u)
             val uPre = if (u == flippedVar) !uPost else uPost

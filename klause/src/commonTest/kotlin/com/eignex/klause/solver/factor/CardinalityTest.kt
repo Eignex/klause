@@ -21,7 +21,7 @@ class CardinalityTest {
         state.assignment.setBool(1, true)
         state.recompute()
         assertTrue(amo.isViolated(state, 0))
-        assertEquals(2, state.intPayload[0])
+        assertEquals(2L, state.longPayload[0])
     }
 
     @Test

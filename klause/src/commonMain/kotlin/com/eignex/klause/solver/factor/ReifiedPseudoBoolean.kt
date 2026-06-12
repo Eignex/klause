@@ -1,76 +1,33 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.PbOp
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.util.IntIntMap
 
 /**
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
  * current weighted sum.
  */
-class ReifiedPseudoBoolean(
-    /** Reification literal: true iff the pseudo-Boolean relation holds. */
-    val auxBoolVar: Int,
-    /** Weights, parallel to [literals]. */
-    val weights: IntArray,
-    /** Boolean literals contributing their weight when true. */
-    val literals: IntArray,
-    /** Relation between the weighted sum and [bound]. */
-    val op: PbOp,
-    /** Right-hand-side bound. */
-    val bound: Int,
-) : Factor {
-
-    init {
-        require(weights.size == literals.size) { "weights/literals length mismatch" }
-        require(weights.isNotEmpty()) { "ReifiedPseudoBoolean must have at least one term" }
-    }
+class ReifiedPseudoBoolean(override val auxBoolVar: Int, weights: IntArray, literals: IntArray, op: PbOp, bound: Int) :
+    PseudoBooleanSumFactor(weights, literals, op, bound, excludedVar = auxBoolVar),
+    ReifiedFactor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
-    override val intVars: IntArray = EmptyIntArray
 
-    /** Per-var signed weight (excluding [auxBoolVar]); aux flips don't shift the body sum. */
-    private val signedWeightByVar: IntIntMap = buildSignedWeightByVar(weights, literals, exclude = auxBoolVar)
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0L
-        for (i in literals.indices) {
-            if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
-                sum += weights[i].toLong()
-            }
-        }
-        state.longPayload[factorId] = sum
-    }
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
+        residual(state.longPayload[factorId], softCap)
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val aux = state.assignment.boolValue(auxBoolVar)
-        return aux != predHolds(state.longPayload[factorId])
-    }
-
-    /** Graded violation for the reification `aux ↔ (sum op bound)`: `0` when they agree; when
-     *  the indicator wants the relation to hold but it doesn't, the compressed weighted-sum
-     *  residual (so body moves that shrink the gap score); when the indicator wants it false
-     *  but it holds, `1` (a single aux flip repairs). Mirrors the [ReifiedLinear] gradient. */
-    private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int {
-        val h = predHolds(sum)
-        return when {
-            aux == h -> 0
-            aux -> compressViolation(distanceToInRange(sum), softCap)
-            else -> 1
-        }
-    }
-
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeFor(state.longPayload[factorId], state.assignment.boolValue(auxBoolVar), state.violationSoftCap)
+    private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
+        reifiedDegree(aux, holds(sum)) { residual(sum, softCap) }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
@@ -79,7 +36,7 @@ class ReifiedPseudoBoolean(
         return if (boolVar == auxBoolVar) {
             degreeFor(sum, !aux, cap) - degreeFor(sum, aux, cap)
         } else {
-            val change = changeOnFlip(state, boolVar, current = true)
+            val change = signedFlipDelta(state, signedByVar, boolVar, current = true)
             degreeFor(sum + change, aux, cap) - degreeFor(sum, aux, cap)
         }
     }
@@ -91,7 +48,7 @@ class ReifiedPseudoBoolean(
             val newAux = state.assignment.boolValue(auxBoolVar)
             return degreeFor(oldSum, newAux, cap) - degreeFor(oldSum, !newAux, cap)
         }
-        val change = changeOnFlip(state, boolVar, current = false)
+        val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
         val newSum = oldSum + change
         state.longPayload[factorId] = newSum
         val aux = state.assignment.boolValue(auxBoolVar)
@@ -219,7 +176,7 @@ class ReifiedPseudoBoolean(
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.longPayload[factorId]
-        if (aux == predHolds(sum)) return
+        if (aux == holds(sum)) return
         sink.addBoolFlip(auxBoolVar)
         val auxFlip = BoolFlip(auxBoolVar)
         val wantHolds = aux
@@ -243,20 +200,7 @@ class ReifiedPseudoBoolean(
         }
     }
 
-    private fun predHolds(sum: Long): Boolean = pbHolds(sum, op, bound)
-
     private fun distanceToInRange(sum: Long): Long = pbDistance(sum, op, bound)
-
-    private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
-        val signed = signedWeightByVar[boolVar]
-        if (signed == 0) return 0
-        val pre = if (current) {
-            state.assignment.boolValue(boolVar)
-        } else {
-            !state.assignment.boolValue(boolVar)
-        }
-        return if (pre) -signed else signed
-    }
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
@@ -270,7 +214,7 @@ class ReifiedPseudoBoolean(
             oldSum = newSum
         } else {
             oldAux = newAux
-            val signedFlipped = signedWeightByVar[flippedVar]
+            val signedFlipped = signedByVar[flippedVar]
             if (signedFlipped == 0) return
             val flippedPost = state.assignment.boolValue(flippedVar)
             val changeV = if (flippedPost) signedFlipped else -signedFlipped
@@ -288,7 +232,7 @@ class ReifiedPseudoBoolean(
                 preDelta = degreeFor(oldSum, !oldAux, cap) - oldDeg
                 postDelta = degreeFor(newSum, !newAux, cap) - newDeg
             } else {
-                val signedU = signedWeightByVar[u]
+                val signedU = signedByVar[u]
                 if (signedU == 0) {
                     preDelta = 0
                     postDelta = 0
