@@ -115,9 +115,12 @@ bench solve suite=mzn-bench fixed=true backend=choco timeout=300000 # Choco, sam
 
 `profile=cpu|wall|alloc` records the run with Java Flight Recorder, prints a flat top-method table, and leaves `build/bench-prof.jfr` for JMC / `jfr print`. `profile-scope=solve` (default) starts the recording only after the selection is resolved, so parse/compile/fetch are discounted; `profile-scope=all` covers the whole run. Sampling is statistical (1 ms), so pair it with a long-running selection.
 
+`solve` is special: it normally runs solvers as subprocesses (klause-cli / minizinc), which JFR on the bench JVM can't see. So `solve … profile=…` switches to **in-process profiling** — it runs the klause engine itself inside this JVM under the recorder, capturing the real `BacktrackSolver` / `LocalSearchSolver` hot paths. This needs a single klause engine: pass `engine=cp` (backtrack) or `engine=ls` (local search); the portfolio and external references aren't profilable. No JSON/cache is written in this mode — it measures the solver, not the figures.
+
 ```
 bench search suite=slack-alldiff timeout=30000 profile=cpu
-bench solve suite=xcsp3-core profile=cpu profile-scope=all
+bench solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000
+bench solve suite=mzn-bench name=mario engine=ls profile=alloc timeout=30000
 ```
 
 For a deeper whole-JVM native profile, the gradle hook is still available: `-PasyncProfiler=/path/to/libasyncProfiler.so [-PprofFormat=traces=30] [-PprofOut=…]`.

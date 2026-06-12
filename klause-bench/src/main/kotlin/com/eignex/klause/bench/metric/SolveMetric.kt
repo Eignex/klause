@@ -4,6 +4,13 @@ import com.eignex.klause.bench.report.EnvInfo
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.bench.tools.ProfileConfig
+import com.eignex.klause.bench.tools.Profiler
+import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.backtrack.BacktrackPresets
+import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.time.Instant
@@ -59,13 +66,23 @@ internal object SolveMetric {
     private const val SOLVE_SEED = 3L
 
     /** Run [solverId] (`"klause"` or a registered MiniZinc reference id) over [entries]. [search]
-     *  applies to klause (engine/processors/annotation); references take only processors + free. */
+     *  applies to klause (engine/processors/annotation); references take only processors + free.
+     *
+     *  When [profile] is set, the run switches to **profiling mode**: the klause engine is run
+     *  IN-PROCESS under JFR (subprocess solves can't be sampled from the bench JVM), so the profile
+     *  captures the actual `BacktrackSolver`/`LocalSearchSolver` hot paths. No JSON/cache is written
+     *  in this mode — it measures the solver, not figures. */
     fun run(
         entries: List<ResolvedProblem>,
         budget: Budget = Budget(),
         solverId: String = SolverInvocation.KLAUSE,
         search: KlauseSearch = KlauseSearch(),
+        profile: ProfileConfig? = null,
     ) {
+        if (profile != null) {
+            profileEngine(entries, budget, solverId, search, profile)
+            return
+        }
         val settings = SolverInvocation.Settings(
             engine = if (solverId == SolverInvocation.KLAUSE) search.engine else null,
             processors = search.processors,
@@ -110,6 +127,52 @@ internal object SolveMetric {
         val feas = rows.count { it.feasible == true }
         val prov = rows.count { it.proven }
         println("\n$feas/${rows.size} feasible, $prov proved  (raw output in $outDir/)")
+    }
+
+    /** Profiling mode: run the klause engine IN-PROCESS under JFR so the profile captures the
+     *  actual solver. Only klause + a single engine (`cp` → [BacktrackSolver], `ls` →
+     *  [LocalSearchSolver]) is profilable — references are external, and the portfolio mixes
+     *  engines. Pair with one (or few) instances at a real `timeout=` for a meaningful sample set. */
+    private fun profileEngine(
+        entries: List<ResolvedProblem>,
+        budget: Budget,
+        solverId: String,
+        search: KlauseSearch,
+        profile: ProfileConfig,
+    ) {
+        if (solverId != SolverInvocation.KLAUSE) {
+            println("profile= profiles the klause engine in-process; '$solverId' is external")
+            return
+        }
+        if (search.engine !in setOf("cp", "ls")) {
+            println("profile= needs a single klause engine (engine=cp|ls); got '${search.engine}'")
+            return
+        }
+        println()
+        println("=== profiling klause-${search.engine} in-process (${profile.event}); ${entries.size} instance(s) ===")
+        Profiler.record(profile) {
+            for (entry in entries) {
+                val deadline = System.currentTimeMillis() + budget.timeoutMillis
+                val cancel = Cancellation { System.currentTimeMillis() > deadline }
+                runCatching { solveInProcess(entry, search, cancel) }
+            }
+        }
+    }
+
+    /** A single in-process klause solve for the profiler (cp → backtrack, ls → local search). */
+    private fun solveInProcess(entry: ResolvedProblem, search: KlauseSearch, cancel: Cancellation) {
+        when (search.engine) {
+            "ls" -> LocalSearchSolver(entry.problem).solve(
+                LocalSearchParams(randomSeed = SOLVE_SEED, cancellation = cancel, lsObjective = entry.lsObjective),
+            )
+
+            else -> {
+                val params = (entry.searchParams?.takeIf { search.fixed })?.copy(cancellation = cancel)
+                    ?: BacktrackPresets.conflictDriven(randomSeed = SOLVE_SEED, cancellation = cancel)
+                val solver = BacktrackSolver(entry.problem)
+                entry.objective?.let { solver.minimize(it, params) } ?: solver.solve(params)
+            }
+        }
     }
 
     private fun row(entry: ResolvedProblem, kind: String, solver: String, r: SolverInvocation.Result): SolveRow {
