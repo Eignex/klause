@@ -2,28 +2,28 @@ package com.eignex.klause.bench.runner
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Expected
-import com.eignex.klause.choco.ChocoParams
-import com.eignex.klause.choco.ChocoSolver
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.BacktrackPresets
+import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Exercises the MiniZinc pipeline end-to-end: compile `.mzn`→`.fzn` via the `minizinc` CLI,
- * parse in-process, and solve with the Choco reference. Asserts the reference reaches each
- * model's recorded feasibility and that every solution it returns validates under klause's
- * own constraint checker — i.e. the Choco translation is faithful. Independent of klause's
- * own solver verdicts (the solve metric measures those separately).
+ * Exercises the MiniZinc pipeline end-to-end: compile `.mzn`→`.fzn` via the `minizinc` CLI, parse
+ * in-process, and solve the resulting klause [Problem] with klause's backtracker. Asserts the
+ * satisfiable smoke models are reached and that the returned assignment validates under klause's
+ * own constraint checker — i.e. the FlatZinc→Problem translation is faithful and solvable.
  *
  * Skips silently when `minizinc` isn't on PATH so bare CI images stay green.
  */
 class MiniZincRunnerTest {
 
     @Test
-    fun `choco reference solves the minizinc smoke set`() {
+    fun `klause solves the minizinc smoke set`() {
         if (!minizincOnPath()) {
             println("[mzn-runner] minizinc not on PATH — skipping")
             return
@@ -33,10 +33,15 @@ class MiniZincRunnerTest {
             val resolved = runner.resolve(ref)
             assertTrue(resolved.problem.numIntVars + resolved.problem.numBoolVars > 0, "${ref.name}: empty problem")
             if (resolved.objective != null) continue // optimization measured by the solve metric, not here
-            val r = ChocoSolver(resolved.problem).solve(ChocoParams(timeoutMillis = 30_000))
+            val deadline = System.currentTimeMillis() + 30_000
+            val params = BacktrackPresets.conflictDriven(
+                randomSeed = 0L,
+                cancellation = Cancellation { System.currentTimeMillis() > deadline },
+            )
+            val r = BacktrackSolver(resolved.problem).solve(params)
             if (ref.expected == Expected.Sat) {
-                assertTrue(r is SolveResult.Sat, "${ref.name}: choco failed to find expected solution ($r)")
-                assertTrue(satisfies(resolved.problem, r), "${ref.name}: choco solution violates klause constraints")
+                assertTrue(r is SolveResult.Sat, "${ref.name}: klause failed to find expected solution ($r)")
+                assertTrue(satisfies(resolved.problem, r), "${ref.name}: solution violates klause constraints")
             }
         }
     }

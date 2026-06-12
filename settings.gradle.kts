@@ -13,4 +13,4 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":klause", ":klause-logicng", ":klause-choco", ":klause-ortools", ":klause-yuck", ":klause-bench", ":klause-cli")
+include(":klause", ":klause-bench", ":klause-cli")
