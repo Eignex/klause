@@ -140,7 +140,7 @@ internal object SolveMetric {
         } else {
             val rt = runCatching {
                 ref.minimizeTimed(
-                    entry.problem,
+                    entry,
                     obj,
                     budget,
                     referenceSearch(entry, search.fixed),
@@ -177,7 +177,7 @@ internal object SolveMetric {
             if (ref == null) {
                 klauseSolve(entry, budget, search)
             } else {
-                ref.solve(entry.problem, budget, referenceSearch(entry, search.fixed), refProcessors(search))
+                ref.solve(entry, budget, referenceSearch(entry, search.fixed), refProcessors(search))
             }
         }.getOrElse { return errorRow(entry, "satisfy", solver, it) }
         val ms = System.currentTimeMillis() - t0
