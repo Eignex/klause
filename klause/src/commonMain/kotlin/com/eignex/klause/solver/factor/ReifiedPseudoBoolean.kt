@@ -29,31 +29,11 @@ class ReifiedPseudoBoolean(override val auxBoolVar: Int, weights: IntArray, lite
     private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
         reifiedDegree(aux, holds(sum)) { residual(sum, softCap) }
 
-    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val aux = state.assignment.boolValue(auxBoolVar)
-        val sum = state.longPayload[factorId]
-        val cap = state.violationSoftCap
-        return if (boolVar == auxBoolVar) {
-            degreeFor(sum, !aux, cap) - degreeFor(sum, aux, cap)
-        } else {
-            val change = signedFlipDelta(state, signedByVar, boolVar, current = true)
-            degreeFor(sum + change, aux, cap) - degreeFor(sum, aux, cap)
-        }
-    }
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        reifiedBoolDelta(state, factorId, boolVar, auxBoolVar, signedByVar, ::degreeFor)
 
-    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val oldSum = state.longPayload[factorId]
-        val cap = state.violationSoftCap
-        if (boolVar == auxBoolVar) {
-            val newAux = state.assignment.boolValue(auxBoolVar)
-            return degreeFor(oldSum, newAux, cap) - degreeFor(oldSum, !newAux, cap)
-        }
-        val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
-        val newSum = oldSum + change
-        state.longPayload[factorId] = newSum
-        val aux = state.assignment.boolValue(auxBoolVar)
-        return degreeFor(newSum, aux, cap) - degreeFor(oldSum, aux, cap)
-    }
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        reifiedBoolApply(state, factorId, boolVar, auxBoolVar, signedByVar, ::degreeFor)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val range = pbSumRange(state, weights, literals)
@@ -204,57 +184,6 @@ class ReifiedPseudoBoolean(override val auxBoolVar: Int, weights: IntArray, lite
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val newSum = state.longPayload[factorId]
-        val newAux = state.assignment.boolValue(auxBoolVar)
-        val oldAux: Boolean
-        val oldSum: Long
-        if (flippedVar == auxBoolVar) {
-            oldAux = !newAux
-            oldSum = newSum
-        } else {
-            oldAux = newAux
-            val signedFlipped = signedByVar[flippedVar]
-            if (signedFlipped == 0) return
-            val flippedPost = state.assignment.boolValue(flippedVar)
-            val changeV = if (flippedPost) signedFlipped else -signedFlipped
-            oldSum = newSum - changeV
-        }
-        val cap = state.violationSoftCap
-        val oldDeg = degreeFor(oldSum, oldAux, cap)
-        val newDeg = degreeFor(newSum, newAux, cap)
-        for (u in boolVars) {
-            // Graded Δ each var's flip would produce (the value deltaIfBoolFlipped returns),
-            // evaluated against the pre- and post-flip (sum, aux) — break/make track its sign.
-            val preDelta: Int
-            val postDelta: Int
-            if (u == auxBoolVar) {
-                preDelta = degreeFor(oldSum, !oldAux, cap) - oldDeg
-                postDelta = degreeFor(newSum, !newAux, cap) - newDeg
-            } else {
-                val signedU = signedByVar[u]
-                if (signedU == 0) {
-                    preDelta = 0
-                    postDelta = 0
-                } else {
-                    val uPost = state.assignment.boolValue(u)
-                    val uPre = if (u == flippedVar) !uPost else uPost
-                    val preChangeU = if (uPre) -signedU else signedU
-                    val postChangeU = if (uPost) -signedU else signedU
-                    preDelta = degreeFor(oldSum + preChangeU, oldAux, cap) - oldDeg
-                    postDelta = degreeFor(newSum + postChangeU, newAux, cap) - newDeg
-                }
-            }
-            val preBreak = preDelta > 0
-            val preMake = preDelta < 0
-            val postBreak = postDelta > 0
-            val postMake = postDelta < 0
-            if (preBreak != postBreak) {
-                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
-            }
-            if (preMake != postMake) {
-                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
-            }
-        }
-    }
+    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) =
+        reifiedBoolUpdateBreakMake(state, factorId, flippedVar, auxBoolVar, signedByVar, boolVars, ::degreeFor)
 }

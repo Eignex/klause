@@ -196,3 +196,118 @@ internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTer
     }
     return CoalescedTerms(outVars, outCoeffs)
 }
+
+/* ------------------------------------------------------------------ *
+ *  Bool-literal-bodied reified LS machinery, shared by the two
+ *  `auxBoolVar ↔ (predicate over bool literals)` factors —
+ *  ReifiedCardinality and ReifiedPseudoBoolean. The running body total
+ *  lives in longPayload(factorId); [degreeAt] is the factor's reified
+ *  gradient at a (possibly hypothetical) total.
+ * ------------------------------------------------------------------ */
+
+// Δ-degree of flipping [boolVar]: an aux flip toggles the indicator side; a body flip shifts the
+// total by its signed contribution from [signedByVar].
+internal inline fun reifiedBoolDelta(
+    state: LocalSearchState,
+    factorId: Int,
+    boolVar: Int,
+    auxBoolVar: Int,
+    signedByVar: IntIntMap,
+    degreeAt: (total: Long, aux: Boolean, softCap: Int) -> Int,
+): Int {
+    val aux = state.assignment.boolValue(auxBoolVar)
+    val total = state.longPayload[factorId]
+    val cap = state.violationSoftCap
+    return if (boolVar == auxBoolVar) {
+        degreeAt(total, !aux, cap) - degreeAt(total, aux, cap)
+    } else {
+        val change = signedFlipDelta(state, signedByVar, boolVar, current = true)
+        degreeAt(total + change, aux, cap) - degreeAt(total, aux, cap)
+    }
+}
+
+// Apply form: commits the new total to longPayload(factorId) for a body flip (aux flips leave the
+// total unchanged) and returns the Δ-degree.
+internal inline fun reifiedBoolApply(
+    state: LocalSearchState,
+    factorId: Int,
+    boolVar: Int,
+    auxBoolVar: Int,
+    signedByVar: IntIntMap,
+    degreeAt: (total: Long, aux: Boolean, softCap: Int) -> Int,
+): Int {
+    val oldTotal = state.longPayload[factorId]
+    val cap = state.violationSoftCap
+    if (boolVar == auxBoolVar) {
+        val newAux = state.assignment.boolValue(auxBoolVar)
+        return degreeAt(oldTotal, newAux, cap) - degreeAt(oldTotal, !newAux, cap)
+    }
+    val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
+    val newTotal = oldTotal + change
+    state.longPayload[factorId] = newTotal
+    val aux = state.assignment.boolValue(auxBoolVar)
+    return degreeAt(newTotal, aux, cap) - degreeAt(oldTotal, aux, cap)
+}
+
+// Incremental break/make maintenance after [flippedVar] flipped: recover the pre-flip (total, aux),
+// then for each var in [boolVars] update its break/make contribution by the sign of the Δ-degree
+// its own flip would produce (the value reifiedBoolDelta returns), pre vs post.
+internal inline fun reifiedBoolUpdateBreakMake(
+    state: LocalSearchState,
+    factorId: Int,
+    flippedVar: Int,
+    auxBoolVar: Int,
+    signedByVar: IntIntMap,
+    boolVars: IntArray,
+    degreeAt: (total: Long, aux: Boolean, softCap: Int) -> Int,
+) {
+    val newTotal = state.longPayload[factorId]
+    val newAux = state.assignment.boolValue(auxBoolVar)
+    val oldAux: Boolean
+    val oldTotal: Long
+    if (flippedVar == auxBoolVar) {
+        oldAux = !newAux
+        oldTotal = newTotal
+    } else {
+        oldAux = newAux
+        val signedFlipped = signedByVar[flippedVar]
+        if (signedFlipped == 0) return
+        val flippedPost = state.assignment.boolValue(flippedVar)
+        val changeV = if (flippedPost) signedFlipped else -signedFlipped
+        oldTotal = newTotal - changeV
+    }
+    val cap = state.violationSoftCap
+    val oldDeg = degreeAt(oldTotal, oldAux, cap)
+    val newDeg = degreeAt(newTotal, newAux, cap)
+    for (u in boolVars) {
+        val preDelta: Int
+        val postDelta: Int
+        if (u == auxBoolVar) {
+            preDelta = degreeAt(oldTotal, !oldAux, cap) - oldDeg
+            postDelta = degreeAt(newTotal, !newAux, cap) - newDeg
+        } else {
+            val signedU = signedByVar[u]
+            if (signedU == 0) {
+                preDelta = 0
+                postDelta = 0
+            } else {
+                val uPost = state.assignment.boolValue(u)
+                val uPre = if (u == flippedVar) !uPost else uPost
+                val preChangeU = if (uPre) -signedU else signedU
+                val postChangeU = if (uPost) -signedU else signedU
+                preDelta = degreeAt(oldTotal + preChangeU, oldAux, cap) - oldDeg
+                postDelta = degreeAt(newTotal + postChangeU, newAux, cap) - newDeg
+            }
+        }
+        val preBreak = preDelta > 0
+        val preMake = preDelta < 0
+        val postBreak = postDelta > 0
+        val postMake = postDelta < 0
+        if (preBreak != postBreak) {
+            if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
+        }
+        if (preMake != postMake) {
+            if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
+        }
+    }
+}
