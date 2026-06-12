@@ -54,7 +54,7 @@ object BenchCli {
             target.metric,
             Catalog.problems(*target.suiteIds.toTypedArray()),
             target.budget,
-            target.reference?.name?.lowercase(),
+            target.backend,
         )
     }
 

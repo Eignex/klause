@@ -96,6 +96,6 @@ MiniZinc-mode-only flags:
 ## Dependencies
 
 `:klause` (parsers and all three engines live there) and kotlinx-coroutines
-(bridges the suspend Portfolio API from the synchronous CLI). Other adapter
-modules (`klause-logicng`, `klause-choco`, `klause-ortools`)
-are library/bench side doors and are not wired into the CLI.
+(bridges the suspend Portfolio API from the synchronous CLI). The CLI has no
+other module dependencies; bench runs external reference solvers via
+`minizinc --solver`, not via in-process adapters.

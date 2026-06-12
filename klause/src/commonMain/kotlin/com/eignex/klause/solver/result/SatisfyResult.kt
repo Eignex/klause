@@ -29,7 +29,7 @@ sealed interface SatisfyResult {
 
     /** Subset of the input assumptions that's jointly infeasible against the problem's
      *  hard constraints. Sound (always unsat) but not necessarily minimal. For
-     *  backends that can't extract a sub-core (LogicNG, local-search) this is the full
+     *  backends that can't extract a sub-core (local-search) this is the full
      *  input [Assumptions] verbatim. */
     data class UnsatUnderAssumptions(
         /** The assumption subset that caused infeasibility. */

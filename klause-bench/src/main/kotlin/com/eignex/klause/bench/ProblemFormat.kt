@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.format
+package com.eignex.klause.bench
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.formats.dimacs.Dimacs

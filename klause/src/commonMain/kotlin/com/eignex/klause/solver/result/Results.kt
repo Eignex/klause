@@ -5,8 +5,7 @@ import com.eignex.klause.solver.Sample
  * Why a solver / optimiser returned without a definitive verdict. Lets callers tell
  * "ran out of decisions" apart from "wall-clock timeout" apart from "the embedding
  * application cancelled the call" — all of which previously collapsed onto a `null`
- * return or a bare `Unknown`. Backends that don't distinguish (e.g. LogicNG only knows
- * "timeout") pick the closest fit.
+ * return or a bare `Unknown`. Backends that don't distinguish these pick the closest fit.
  */
 enum class TerminationReason {
     /** Solver-specific budget (maxFlips, maxDecisions, maxAttempts) hit. */
@@ -72,7 +71,7 @@ sealed interface SampleResult {
 /**
  * Result of [com.eignex.klause.solver.Optimizer.minimize]. Replaces `Sample?` with an explicit verdict so
  * "best-effort feasible at objective o" can't be confused with "proven optimal."
- * Only complete backends (`BacktrackSolver`, `BruteForceSolver`, LogicNG) can
+ * Only complete backends (`BacktrackSolver`, `BruteForceSolver`) can
  * ever return [Optimal] or [Infeasible]; the local-search backend returns [BestFound]
  * or [Unknown].
  *

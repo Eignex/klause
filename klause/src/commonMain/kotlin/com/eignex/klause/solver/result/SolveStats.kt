@@ -30,8 +30,8 @@ import kotlin.time.TimeSource.Monotonic
  *    capturing whether the search tree is deep-and-thin or shallow-and-wide.
  *  - **engine fingerprint**: [wallMs] (system clock) and [timedOut] (budget exhausted
  *    before a definitive verdict).
- *  - **backend tag**: [backend] — short identifier (e.g. `"backtrack"`, `"ls"`,
- *    `"logicng"`) so multi-engine sweeps can attribute numbers without ambiguity.
+ *  - **backend tag**: [backend] — short identifier (e.g. `"backtrack"`, `"ls"`) so multi-engine
+ *    sweeps can attribute numbers without ambiguity.
  */
 @Serializable
 data class SolveStats(
