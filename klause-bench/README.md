@@ -136,7 +136,33 @@ Vendored problems live in `smoke-corpus/` — small, fast instances meant to exe
 
 ## Reference solvers
 
-`klause-choco`, `klause-ortools`, and `klause-yuck` map a klause `Problem` into Choco, OR-Tools CP-SAT, and Yuck and solve it in-process (Yuck via a provisioned subprocess). They cover the common factor set and raise an explicit unsupported-factor error rather than silently dropping a constraint, so a reference can never quietly disagree by omission.
+The reference path depends on the instance's format:
+
+- **MiniZinc instances** run the reference **end-to-end via `minizinc --solver <id>`** on the original `.mzn`(+`.dzn`) — the competition setup, where the solver compiles the model with **its own** globals library and uses its native propagators. This is the faithful baseline. Yuck is registered out of the box; Choco needs its solver config installed.
+- **Non-MiniZinc formats** (XCSP3 / OPB / DIMACS / SMT — no `.mzn` to hand to `minizinc`) fall back to the in-process adapters `klause-choco` / `klause-ortools` / `klause-yuck`, which map a klause `Problem` into the reference and solve it in-process. They raise an explicit unsupported-factor error rather than silently dropping a constraint.
+
+The in-process adapters re-derive the reference from klause's **already-decomposed** `Problem`, so on MiniZinc models they would inherit klause's lowering (e.g. a `subcircuit` that klause turned into clauses, or an internal `GaussianXor`) instead of the solver's native global — which is exactly why the MiniZinc path bypasses them.
+
+## Running the parity sweep
+
+The parity sweep measures klause against the reference solvers on the MiniZinc Challenge corpus. The method is fixed so every run is comparable:
+
+1. **One backend per `bench solve` invocation** — there is no in-session comparison (a crash or warmup can't contaminate another solver's number). Each run writes `build/solve-<solver>.json`; comparison is done **offline** by diffing the saved files (`parity-runs/analyze.sh <klause.json> <reference.json>`).
+2. **Curated selection, not random sampling** — a fixed set chosen to span distinct global constraints, so a small set still exercises the breadth that matters. The MiniZinc Challenge itself is ~95% optimization, so the set is COP-heavy by design.
+   - **8 COP**: `elitserien` (alldifferent, global_cardinality, inverse, member, regular), `gfd-schedule` (cumulative, at_most, nvalue), `cargo` (cumulative, diffn), `is` (among, circuit, table), `nfc` (network_flow), `mario` (path, subcircuit), `evilshop` (cumulative, disjunctive), `zephyrus` (arg_sort, lex_less).
+   - **2 CSP**: `multi-knapsack` (knapsack), `oocsp_racks` (global_cardinality, increasing, element).
+   - Spell it with the `name=` OR filter: `name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus` (the `is/*` glob anchors the family so it doesn't substring-match e.g. `opt-cryptanalysis`).
+3. **Tracks** (each a `solve` filter combination; see the recipes above). klause: `parallel` (`engine=backtrack processors=8`), `open` (`processors=8`), `free` (`processors=1`), `fixed` (`fixed=true`), `ls` (`engine=ls`). References: Choco for the complete tracks, Yuck for `ls`.
+4. **Budgets**: complete tracks **300000 ms**, the LS track **180000 ms**.
+
+```
+# LS track: klause local search vs Yuck, 180s, on the curated set
+bench solve suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus engine=ls       timeout=180000
+bench solve suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus backend=yuck    timeout=180000
+# then: parity-runs/analyze.sh parity-runs/cop-klause-ls.json parity-runs/cop-yuck.json
+```
+
+The `parity-runs/` scripts (`run-sweep.sh` full, `run-ls.sh` LS-only, `analyze.sh`) drive this with `-PbenchHeap=32g` and save per-run logs+JSON; they are local scratch (not committed). To stop a background sweep, kill the `run-*.sh` bash loop **first** (else it spawns the next leg), then the forked `BenchCli` JVM by PID.
 
 ## Verifying a change
 
