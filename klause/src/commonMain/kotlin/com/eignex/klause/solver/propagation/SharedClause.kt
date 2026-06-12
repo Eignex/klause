@@ -54,6 +54,22 @@ class SharedClause internal constructor(
  * (the default) means no sharing — a standalone solve is unaffected.
  */
 interface ClauseExchange {
-    /** Import + export at a level-0 restart of [session]. Called once per restart. */
+    /** Incremental import + export at a level-0 restart of a *continuous* search: import the nogoods
+     *  published since this arm last looked and export its new glue. The session persists across the
+     *  restart, so clauses the arm already holds are not re-imported. */
     fun onRestart(session: PropagationSession)
+
+    /** Full (re)import at the post-seed root before the first DFS run (#381). Unlike [onRestart] this
+     *  fires on a *fresh* session — a single-threaded portfolio rebuilds the session every scheduled
+     *  segment, so its learned DB is empty and the arm must re-import the whole pool, **including its
+     *  own** clauses from earlier segments (which a persistent session would still hold). The session
+     *  is at the post-seed root, so imported literals are free. Default no-op for non-pooled exchanges. */
+    fun onSearchStart(session: PropagationSession) {}
+
+    /** Export-only hook fired when a search ends without a clean restart boundary — a slice-truncated
+     *  ([com.eignex.klause.solver.backtrack.BacktrackParams.cancellation]) segment of a single-threaded
+     *  portfolio. The trail may not be at root, so this must not import (an imported clause's literals
+     *  could be all-false mid-search); exporting the learned DB is level-independent. Default no-op for
+     *  exchanges that publish only at restarts. */
+    fun onSearchEnd(session: PropagationSession) {}
 }

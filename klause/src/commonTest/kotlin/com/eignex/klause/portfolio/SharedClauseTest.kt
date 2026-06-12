@@ -87,6 +87,49 @@ class SharedClauseTest {
         assertEquals(before, a.session.learnedClauseCount, "A does not re-import its own clause")
     }
 
+    @Test
+    fun `onSearchStart re-imports the arm's own clauses into a rebuilt session`() {
+        // Models a single-threaded portfolio segment boundary (#381): one arm learns and exports a
+        // clause, its session is discarded, and the next segment's fresh session must get it back —
+        // the per-arm `seen`/`cursor` would otherwise suppress re-importing the arm's own clauses.
+        val problem = twoIntVars()
+        val pool = SharedClausePool()
+        val exchange = PoolClauseExchange(pool) // the SAME instance persists across segments
+
+        val seg1 = PropagationSession(problem)
+        exchange.onSearchStart(seg1) // empty pool → nothing imported
+        seg1.addLearnedClause(
+            Clause(intArrayOf(seg1.boundGeLit(0, 3, true), seg1.boundLeLit(1, 2, true))),
+            lbd = 2,
+        )
+        exchange.onSearchEnd(seg1) // export the arm's clause to the pool
+
+        // Segment 2: a brand-new session with an empty DB. onSearchStart must re-import the own nogood.
+        val seg2 = PropagationSession(problem)
+        assertEquals(0, seg2.learnedClauseCount)
+        exchange.onSearchStart(seg2)
+        assertEquals(1, seg2.learnedClauseCount, "the rebuilt segment re-imports the arm's own nogood")
+    }
+
+    @Test
+    fun `onSearchEnd exports but never imports`() {
+        val problem = twoIntVars()
+        val pool = SharedClausePool()
+        // A peer publishes a clause to the pool.
+        val peerSession = PropagationSession(problem)
+        peerSession.addLearnedClause(
+            Clause(intArrayOf(peerSession.boundGeLit(0, 4, true), peerSession.boundLeLit(1, 1, true))),
+            lbd = 2,
+        )
+        PoolClauseExchange(pool).onSearchEnd(peerSession)
+
+        // An arm ending a slice mid-search must NOT import the peer's pooled clause: off-root imports
+        // are unsafe (the literals may be all-false), so onSearchEnd is export-only.
+        val armSession = PropagationSession(problem)
+        PoolClauseExchange(pool).onSearchEnd(armSession)
+        assertEquals(0, armSession.learnedClauseCount, "onSearchEnd never imports")
+    }
+
     private class PortfolioExchangeFixture(problem: Problem, pool: SharedClausePool) {
         val session = PropagationSession(problem)
         val exchange = PoolClauseExchange(pool)

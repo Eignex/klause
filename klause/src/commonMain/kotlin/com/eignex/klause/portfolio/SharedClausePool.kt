@@ -75,6 +75,24 @@ internal class PoolClauseExchange(
         for (c in drained.clauses) {
             if (seen.add(c.key)) session.importClause(c)
         }
+        export(session)
+    }
+
+    override fun onSearchStart(session: PropagationSession) {
+        // Fresh session (a single-threaded portfolio rebuilds the arm's session every segment): its
+        // learned DB is empty, so re-import the whole pool — including this arm's own clauses from
+        // earlier segments, which the persistent-session `seen`/`cursor` would otherwise suppress.
+        // Resetting both makes the import unconditional; the pool de-dups any re-export by key (#381).
+        cursor = 0
+        seen.clear()
+        onRestart(session)
+    }
+
+    override fun onSearchEnd(session: PropagationSession) = export(session)
+
+    /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
+     *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
+    private fun export(session: PropagationSession) {
         val fresh = session.exportGlueClauses(maxLbd, maxLen).filter { seen.add(it.key) }
         if (fresh.isNotEmpty()) pool.publish(fresh)
     }
