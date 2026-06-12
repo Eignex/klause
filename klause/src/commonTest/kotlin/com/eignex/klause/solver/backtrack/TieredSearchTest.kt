@@ -3,6 +3,12 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.selector.IndomainMax
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
+import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 import kotlin.test.Test

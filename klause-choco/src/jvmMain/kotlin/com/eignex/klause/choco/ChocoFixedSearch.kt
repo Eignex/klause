@@ -1,15 +1,19 @@
 package com.eignex.klause.choco
 
 import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.IndomainMax
-import com.eignex.klause.solver.backtrack.IndomainMedian
-import com.eignex.klause.solver.backtrack.IndomainMiddle
-import com.eignex.klause.solver.backtrack.IndomainMin
-import com.eignex.klause.solver.backtrack.IndomainRandom
-import com.eignex.klause.solver.backtrack.IndomainSplit
 import com.eignex.klause.solver.backtrack.SearchTier
 import com.eignex.klause.solver.backtrack.TierVarSelect
 import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
+import com.eignex.klause.solver.backtrack.selector.IndomainMax
+import com.eignex.klause.solver.backtrack.selector.IndomainMedian
+import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.IndomainRandom
+import com.eignex.klause.solver.backtrack.selector.IndomainSplit
+import com.eignex.klause.solver.backtrack.selector.LargestDomain
+import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
+import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
 import org.chocosolver.solver.search.strategy.Search
 import org.chocosolver.solver.search.strategy.assignments.DecisionOperator
 import org.chocosolver.solver.search.strategy.assignments.DecisionOperatorFactory

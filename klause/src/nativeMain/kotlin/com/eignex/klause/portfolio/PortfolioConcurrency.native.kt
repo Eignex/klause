@@ -8,10 +8,10 @@ package com.eignex.klause.portfolio
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
-import kotlinx.cinterop.ExperimentalForeignApi
-import platform.posix.usleep
 import kotlin.native.concurrent.TransferMode
 import kotlin.native.concurrent.Worker
+import kotlinx.cinterop.ExperimentalForeignApi
+import platform.posix.usleep
 
 /**
  * Native actual: one [Worker] per task (kotlin/native's new memory model lets workers share the

@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioWorker
+import kotlin.system.exitProcess
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.toKString
@@ -18,7 +19,6 @@ import platform.posix.ftell
 import platform.posix.getenv
 import platform.posix.rewind
 import platform.posix.stderr
-import kotlin.system.exitProcess
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun cliProp(name: String): String? = getenv(name.uppercase().replace('.', '_'))?.toKString()

@@ -7,6 +7,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.backtrack.selector.ValueSelector
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.lp.AllDifferentSeparator
 import com.eignex.klause.solver.lp.AssignmentObjectiveCut

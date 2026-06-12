@@ -5,7 +5,8 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.backtrack.selector.RandomVariable
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import java.util.Locale
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
@@ -71,7 +72,7 @@ private fun runImpl() {
         val problem = Dimacs.parse(cnf)
         val params = BacktrackParams(
             randomSeed = seed,
-            variableHeuristic = if (useVsids) Vsids() else com.eignex.klause.solver.backtrack.RandomVariable,
+            variableHeuristic = if (useVsids) Vsids() else RandomVariable,
             lubyRestartBase = lubyBase,
             phaseSaving = phaseSaving,
             maxLearnedClauses = 20_000,

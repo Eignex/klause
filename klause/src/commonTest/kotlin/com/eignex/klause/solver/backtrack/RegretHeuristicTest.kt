@@ -3,6 +3,10 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.selector.IndomainBest
+import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.backtrack.selector.MaxRegret
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective

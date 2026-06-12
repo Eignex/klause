@@ -6,11 +6,11 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.IndomainMiddle
-import com.eignex.klause.solver.backtrack.InputOrder
 import com.eignex.klause.solver.backtrack.SearchTier
 import com.eignex.klause.solver.backtrack.TierVarSelect
 import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
+import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
+import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear

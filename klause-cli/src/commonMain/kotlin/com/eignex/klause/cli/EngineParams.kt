@@ -4,17 +4,17 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.Chb
-import com.eignex.klause.solver.backtrack.IndomainMax
-import com.eignex.klause.solver.backtrack.IndomainMiddle
-import com.eignex.klause.solver.backtrack.IndomainMin
-import com.eignex.klause.solver.backtrack.IndomainRandom
-import com.eignex.klause.solver.backtrack.InputOrder
-import com.eignex.klause.solver.backtrack.RandomVariable
-import com.eignex.klause.solver.backtrack.SmallestDomain
-import com.eignex.klause.solver.backtrack.ValueSelector
-import com.eignex.klause.solver.backtrack.VariableSelector
-import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.backtrack.selector.Chb
+import com.eignex.klause.solver.backtrack.selector.IndomainMax
+import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.IndomainRandom
+import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.backtrack.selector.RandomVariable
+import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.ValueSelector
+import com.eignex.klause.solver.backtrack.selector.VariableSelector
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 
 /**
