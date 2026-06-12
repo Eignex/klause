@@ -132,7 +132,15 @@ private fun ceilDiv(a: Long, b: Long): Long {
  * dual certification, and determinant-growth control by periodic refactorization (today an overflow
  * throws [LpOverflowException] instead).
  */
-internal class DualSimplex(private val model: LpModel) {
+internal class DualSimplex(
+    private val model: LpModel,
+    /**
+     * Consecutive degenerate pivots tolerated before the anti-cycling Bland fallback latches; a
+     * negative value (the default) uses the size-derived heuristic in [runDualSimplex]. Exposed
+     * only so the anti-cycling regression test can force the fallback on a small instance.
+     */
+    private val stallLimitOverride: Int = -1,
+) {
     private val m = model.m
     private val numVars = model.numVars
     private val rhsCol = numVars // last column of N holds det(B)·B⁻¹·b
@@ -383,6 +391,13 @@ internal class DualSimplex(private val model: LpModel) {
 
     /** True when the last [solve] started from a seeded tableau (observability for tests). */
     var lastSolveSeeded: Boolean = false
+        private set
+
+    /**
+     * True when the last [solve] engaged the Bland anti-cycling fallback. Observability for the
+     * regression test that guards termination on degenerate inputs; see [runDualSimplex].
+     */
+    var lastUsedBland: Boolean = false
         private set
 
     /**
@@ -713,18 +728,28 @@ internal class DualSimplex(private val model: LpModel) {
     }
 
     private fun runDualSimplex(): LpSolution {
-        // Bland's rule guarantees termination; the cap only catches an implementation bug.
+        // The Bland fallback below provably terminates, so the cap is only a backstop. Reaching it
+        // means the exact solve was abandoned; like an overflow it surfaces as [LpOverflowException]
+        // so the branch-and-bound caller keeps the node with no LP bound (sound — a missing bound
+        // only loses pruning) instead of aborting the whole solve.
         val maxIter = 1000L + 100L * (numVars + m)
         var iter = 0L
         var pivots = 0
         // Pricing: Dantzig (largest primal infeasibility) chooses the leaving variable by default,
         // which takes far fewer pivots than smallest-index Bland; but Dantzig can cycle under
-        // degeneracy, so a stall detector switches to Bland — which provably terminates — once the
-        // infeasibility count stops improving for [stallLimit] iterations.
-        val stallLimit = 2 * (m + numVars) + 32
-        var bestInfeas = Int.MAX_VALUE
-        var sinceImprove = 0
+        // degeneracy. A cycle is necessarily an unbroken run of *degenerate* pivots — ones that take
+        // a zero-length dual step and so leave the (monotone) dual objective unchanged; any pivot
+        // that does move the objective strictly raises it, so a basis it leaves can never recur. A
+        // dual pivot is degenerate exactly when the entering column's reduced cost is zero, so we
+        // count consecutive degenerate pivots and latch Bland — which provably terminates — once
+        // they pass [stallLimit]. Counting *consecutive degenerate* pivots, rather than (as before)
+        // a global-best infeasibility count that reset the stall counter on every new low, is what
+        // makes the fallback actually latch on a long degenerate run instead of being reset out from
+        // under itself and running to the cap (issue #379).
+        val stallLimit = if (stallLimitOverride >= 0) stallLimitOverride else 2 * (m + numVars) + 32
+        var degeneratePivots = 0
         var useBland = false
+        lastUsedBland = false
         // Basic values and reduced costs are computed once and then maintained incrementally:
         // both are linear functionals of the tableau rows (beta over the rhs/at-upper columns,
         // reduced costs over the virtual cost row), so each transforms under exactly the same
@@ -734,20 +759,21 @@ internal class DualSimplex(private val model: LpModel) {
         val reduced = computeReducedCostsScaled()
         val colScratch = LongArray(m) // pre-pivot entering column, for the beta update
         while (true) {
-            check(iter++ <= maxIter) { "dual simplex exceeded $maxIter iterations (cycling bug?)" }
+            if (iter++ > maxIter) {
+                // Unreachable once Bland latches; degrade gracefully instead of aborting the solve.
+                throw LpOverflowException("dual simplex exceeded $maxIter iterations")
+            }
 
             // --- Leaving variable: largest infeasibility (Dantzig), or smallest index under Bland. ---
             var r = -1
             var leavingVar = Int.MAX_VALUE
             var belowLower = false
             var bestViol = 0L // largest |violation| numerator over |d| seen so far (Dantzig)
-            var infeas = 0
             for (i in 0 until m) {
                 val v = basicVar[i]
                 val low = compareFracToValue(beta[i], d, 0L) < 0 // x_v < 0 (its shifted lower bound)
                 val high = model.hasUpper[v] && compareFracToValue(beta[i], d, model.upper[v]) > 0
                 if (!low && !high) continue
-                infeas++
                 if (useBland) {
                     if (v < leavingVar) {
                         leavingVar = v
@@ -772,13 +798,6 @@ internal class DualSimplex(private val model: LpModel) {
                 }
             }
             if (r == -1) return buildSolution(beta, reduced, LpStatus.OPTIMAL, pivots)
-            // Stall detection: if the infeasibility count is not shrinking, fall back to Bland.
-            if (infeas < bestInfeas) {
-                bestInfeas = infeas
-                sinceImprove = 0
-            } else if (++sinceImprove > stallLimit) {
-                useBland = true
-            }
 
             // --- Entering variable: dual ratio test, min |d_j / α_j|, Bland tie-break. ---
             val pivotRow = nMat[r]
@@ -812,6 +831,19 @@ internal class DualSimplex(private val model: LpModel) {
             // row [r] (basic variable past bound [belowLower], no column able to repair it) is the
             // Farkas dual ray — record its support as the infeasibility certificate.
             if (q == -1) return buildSolution(beta, reduced, LpStatus.INFEASIBLE, pivots, r, belowLower)
+
+            // Anti-cycling: a degenerate pivot — zero reduced cost on the entering column, hence a
+            // zero-length dual step — makes no objective progress, and an unbroken run of them is
+            // the only way to cycle. Latch the provably-terminating Bland rule once they pass the
+            // limit; a non-degenerate pivot (real objective progress) resets the run.
+            if (bestRatioNum == 0L) {
+                if (++degeneratePivots > stallLimit) {
+                    useBland = true
+                    lastUsedBland = true
+                }
+            } else {
+                degeneratePivots = 0
+            }
 
             // Capture what the incremental updates need before the tableau mutates: the entering
             // column (pivot() rewrites it), the pivot element/determinant, and the two scalars the

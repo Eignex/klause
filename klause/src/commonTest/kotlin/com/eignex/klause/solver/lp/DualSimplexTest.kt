@@ -187,7 +187,36 @@ class DualSimplexTest {
     }
 
     @Test
-    fun `randomized parity with double oracle`() {
+    fun `bland fallback latches on a degenerate LP and still solves`() {
+        // A zero-objective feasibility LP: every reduced cost is 0, so every dual pivot is
+        // degenerate — exactly the run that used to reset the old global-best stall counter forever
+        // and march to the iteration cap (issue #379). Forcing the stall limit to 0 must latch the
+        // Bland fallback on the first pivot, and the solve must still terminate at a feasible
+        // (objective-0) optimum rather than throw.
+        val b = LpBuilder()
+        val xs = IntArray(5) { b.addVar(0, 5, cost = 0) }
+        for (i in 0 until 4) b.addRow(mapOf(xs[i] to 1L, xs[i + 1] to 1L), Relation.GE, 3)
+        val simplex = DualSimplex(b.build(Sense.MINIMIZE), stallLimitOverride = 0)
+        val sol = simplex.solve()
+
+        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertTrue(simplex.lastUsedBland, "Bland fallback should have engaged on the degenerate run")
+        assertEquals(0.0, sol.objectiveValue, eps)
+    }
+
+    @Test
+    fun `randomized parity with double oracle`() = runRandomizedParity(stallLimitOverride = -1)
+
+    @Test
+    fun `randomized parity under forced Bland fallback`() {
+        // Re-run the whole random battery with the stall limit pinned to 0, so every degenerate
+        // pivot routes through the Bland leaving rule. This guards that the anti-cycling fallback
+        // terminates *correctly* — landing on the exact oracle optimum — not merely that it
+        // terminates (issue #379).
+        runRandomizedParity(stallLimitOverride = 0)
+    }
+
+    private fun runRandomizedParity(stallLimitOverride: Int) {
         // 120 instances cover the LE/GE/EQ × sign × bound combinations while staying fast on the
         // single-threaded JS/wasm targets, where this loop dominates the suite's wall time.
         val rng = Random(20260608)
@@ -222,7 +251,7 @@ class DualSimplexTest {
                 rows.add(Triple(ax.toDouble(), ay.toDouble(), rc to rhs.toDouble()))
             }
 
-            val sol = DualSimplex(b.build(Sense.MINIMIZE)).solve()
+            val sol = DualSimplex(b.build(Sense.MINIMIZE), stallLimitOverride).solve()
             val expected = oracle(0.0, hiX.toDouble(), 0.0, hiY.toDouble(), cx.toDouble(), cy.toDouble(), rows)
 
             if (expected == null) {
