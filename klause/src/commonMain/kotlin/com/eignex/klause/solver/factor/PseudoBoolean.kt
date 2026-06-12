@@ -39,14 +39,7 @@ class PseudoBoolean(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         PseudoBoolean(weights, literals.remapLits(boolMap), op, bound)
 
-    override val boolVars: IntArray = run {
-        val seen = LinkedHashSet<Int>()
-        for (lit in literals) seen.add(Lit.variable(lit))
-        val out = IntArray(seen.size)
-        var i = 0
-        for (v in seen) out[i++] = v
-        out
-    }
+    override val boolVars: IntArray = literals.litVars()
     override val intVars: IntArray = EmptyIntArray
 
     /** Sum of `weight`i` * sign(literals`i`)` per Boolean variable. Flipping `v` shifts

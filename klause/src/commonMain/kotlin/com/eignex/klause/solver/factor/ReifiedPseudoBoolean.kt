@@ -35,15 +35,7 @@ class ReifiedPseudoBoolean(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
 
-    override val boolVars: IntArray = run {
-        val unique = LinkedHashSet<Int>()
-        unique.add(auxBoolVar)
-        for (lit in literals) unique.add(Lit.variable(lit))
-        val out = IntArray(unique.size)
-        var i = 0
-        for (v in unique) out[i++] = v
-        out
-    }
+    override val boolVars: IntArray = literals.litVars(auxBoolVar)
     override val intVars: IntArray = EmptyIntArray
 
     /** Per-var signed weight (excluding [auxBoolVar]); aux flips don't shift the body sum. */

@@ -30,14 +30,7 @@ class Clause(val literals: IntArray) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
 
-    override val boolVars: IntArray = run {
-        val seen = LinkedHashSet<Int>()
-        for (lit in literals) seen.add(Lit.variable(lit))
-        val out = IntArray(seen.size)
-        var i = 0
-        for (v in seen) out[i++] = v
-        out
-    }
+    override val boolVars: IntArray = literals.litVars()
     override val intVars: IntArray = EmptyIntArray
 
     /** Initial two-watched-literal wakeup positions. Unit clauses watch their single

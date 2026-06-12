@@ -30,14 +30,7 @@ class Xor(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Xor(literals.remapLits(boolMap), targetParity)
 
-    override val boolVars: IntArray = run {
-        val unique = LinkedHashSet<Int>()
-        for (lit in literals) unique.add(Lit.variable(lit))
-        val out = IntArray(unique.size)
-        var i = 0
-        for (v in unique) out[i++] = v
-        out
-    }
+    override val boolVars: IntArray = literals.litVars()
     override val intVars: IntArray = EmptyIntArray
 
     /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`.
