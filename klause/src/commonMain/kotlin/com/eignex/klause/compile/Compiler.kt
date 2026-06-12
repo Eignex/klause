@@ -54,11 +54,9 @@ import com.eignex.klause.ast.XorExpr
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FloatMetadata
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.RealLinearConstraint
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.LinearOp
@@ -90,17 +88,15 @@ internal class Lowering(val config: KlauseConfig) {
     val intDomains = mutableListOf<IntDomain>()
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
-    // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per
-    // float-var name (so the schema can decode `sample.ints[id]` back to a Double).
-    // `floatMetaIntervals` / `floatMetaIntVarIds` / `floatMetaBuckets` are the parallel
-    // arrays that get packaged into the Problem's optional [FloatMetadata] for backends
-    // that solve over reals natively.
+    // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per float-var
+    // name (so the schema can decode `sample.ints[id]` back to a Double). `floatMetaIntervals` /
+    // `floatMetaIntVarIds` / `floatMetaBuckets` are the parallel per-float-var arrays the
+    // float-linear lowering reads to build the scaled-integer factor.
     val floatDecoders = mutableMapOf<String, FloatSpec>()
     val floatMetaIntervals = mutableListOf<FloatInterval>()
     val floatMetaIntVarIds = mutableListOf<Int>()
     val floatMetaBuckets = mutableListOf<Int>()
     val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
-    val floatMetaConstraints = mutableListOf<RealLinearConstraint>()
 
     /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
      *  `SetVarLayout`: for set var `S` over universe `[e_0, …, e_{n-1}]`,
@@ -467,10 +463,9 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             }
 
             is FloatSpec -> {
-                // Floats are bucketed inline so [Problem.factors] stays pure int+bool.
-                // The original real-valued view (interval, bucket count, int-var
-                // backing) lands in [Problem.floatMetadata] so native-real backends
-                // (Z3) can use it.
+                // Floats are bucketed inline so [Problem.factors] stays pure int+bool;
+                // floatMetaIntervals / floatMetaBuckets / floatMetaIntVarIds record the per-var
+                // bucket params the float-linear lowering reads to build the scaled-integer factor.
                 val intId = newIntVar(IntDomain(0, entry.buckets - 1))
                 bindIntName(name, intId)
                 floatDecoders[name] = entry
@@ -494,18 +489,6 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
     // contribute dead-value symmetry. Gated by config so it can be turned off.
     if (config.pinAbsentOptVars) emitOptVarPins(def)
 
-    val metadata: FloatMetadata? =
-        if (floatMetaIntervals.isEmpty()) {
-            null
-        } else {
-            FloatMetadata(
-                intervals = floatMetaIntervals.toTypedArray(),
-                bucketCounts = floatMetaBuckets.toIntArray(),
-                intVarByFloatVar = floatMetaIntVarIds.toIntArray(),
-                constraints = floatMetaConstraints.toList(),
-            )
-        }
-
     // Construction-time SAC probes are resolved from the presolve config (solution-preserving, so
     // intent-independent — resolved under EMPTY). Holes imply bounds.
     val presolve = config.presolveConfig()
@@ -516,7 +499,6 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             numIntVars = numIntVars,
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
-            floatMetadata = metadata,
             probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
             probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
             probeIntHoles = holes,

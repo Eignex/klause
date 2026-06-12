@@ -252,27 +252,6 @@ class FlatZincParseTest {
     }
 
     @Test
-    fun `FZN float vars populate floatMetadata sidecar`() {
-        val src = """
-            var 0.0..10.0: x;
-            var -5.0..5.0: y;
-            constraint float_lin_le([1.0, 2.0], [x, y], 7.5);
-            solve satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src)
-        val md = assertNotNull(program.problem.floatMetadata)
-        assertEquals(2, md.numFloatVars)
-        assertEquals(0.0, md.intervals[0].lo)
-        assertEquals(10.0, md.intervals[0].hi)
-        assertEquals(-5.0, md.intervals[1].lo)
-        assertEquals(1, md.constraints.size)
-        val rc = md.constraints[0]
-        assertEquals(7.5, rc.bound)
-        assertEquals(listOf(1.0, 2.0), rc.coeffs.toList())
-        assertEquals(listOf(0, 1), rc.floatVarIds.toList())
-    }
-
-    @Test
     fun `set var lowers to indicator bool decomposition`() {
         val src = """
             var set of 1..5: s;

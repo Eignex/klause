@@ -15,9 +15,7 @@ import kotlin.random.Random
  * factors mentioning that specific variable.
  *
  * Float variables, when the schema or front-end uses them, are bucketed to integer
- * variables in the factor system (so [factors] stays pure int+bool). The optional
- * [floatMetadata] sidecar carries the original real-valued view for backends that
- * can solve over reals natively (currently Z3). All other backends ignore it.
+ * variables in the factor system (so [factors] stays pure int+bool).
  */
 class Problem(
     /** Number of Boolean variables; ids occupy `[0, numBoolVars)`. */
@@ -28,8 +26,6 @@ class Problem(
     intDomains: Array<IntDomain>,
     /** The constraints over the variables. */
     val factors: Array<Factor>,
-    /** Optional real-valued sidecar for native-float backends; ignored by others. */
-    val floatMetadata: FloatMetadata? = null,
     /**
      * Opt-in failed-literal probing at bake time. When `true`, every free bool variable is
      * tested with both polarities: if pinning one polarity propagates Unsat, the other
@@ -108,7 +104,6 @@ class Problem(
         numIntVars: Int,
         intDomains: Array<IntDomain>,
         factors: List<Factor>,
-        floatMetadata: FloatMetadata? = null,
         probeFailedLiterals: Boolean = false,
         probeIntBounds: Boolean = false,
         probeIntHoles: Boolean = false,
@@ -120,7 +115,6 @@ class Problem(
         numIntVars = numIntVars,
         intDomains = intDomains,
         factors = Array(factors.size) { factors[it] },
-        floatMetadata = floatMetadata,
         probeFailedLiterals = probeFailedLiterals,
         probeIntBounds = probeIntBounds,
         probeIntHoles = probeIntHoles,

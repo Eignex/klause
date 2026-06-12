@@ -370,11 +370,8 @@ data class IntCompare(
  * Built by [com.eignex.klause.schema.FloatExpr] / [com.eignex.klause.schema.FloatHandle]
  * comparison operators. The compiler does two things with it:
  *
- *  1. Bucket each float variable to an int variable in the factor system and emit a
- *     scaled-integer [com.eignex.klause.solver.factor.Linear] factor — what every
- *     existing backend solves over.
- *  2. Record the original real-valued form on [com.eignex.klause.solver.FloatMetadata]
- *     so a native-real backend (Z3) can solve over reals directly.
+ * It buckets each float variable to an int variable in the factor system and emits a
+ * scaled-integer [com.eignex.klause.solver.factor.Linear] factor — what every backend solves over.
  *
  * The AST node lives in [BoolExpr] so the constraint pipeline can carry it through
  * `And` / `Or` / `Implies` etc. before the compiler intercepts it at lowering time.
