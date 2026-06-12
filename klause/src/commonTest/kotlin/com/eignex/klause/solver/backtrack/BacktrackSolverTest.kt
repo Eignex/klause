@@ -6,6 +6,12 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.selector.DomWdeg
+import com.eignex.klause.solver.backtrack.selector.LastConflict
+import com.eignex.klause.solver.backtrack.selector.RandomVariable
+import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.VarRef
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative

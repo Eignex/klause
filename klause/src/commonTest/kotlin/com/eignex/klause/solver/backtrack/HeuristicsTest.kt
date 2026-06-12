@@ -5,6 +5,14 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.selector.Chb
+import com.eignex.klause.solver.backtrack.selector.DomainMaxRegret
+import com.eignex.klause.solver.backtrack.selector.IndomainMedian
+import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
+import com.eignex.klause.solver.backtrack.selector.IndomainSplit
+import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
+import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession

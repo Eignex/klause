@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.factor.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals

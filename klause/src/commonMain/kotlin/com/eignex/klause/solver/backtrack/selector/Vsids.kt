@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.backtrack
+package com.eignex.klause.solver.backtrack.selector
 
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationResult.Unsat

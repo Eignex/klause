@@ -4,6 +4,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.selector.ActivityBasedSearch
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession

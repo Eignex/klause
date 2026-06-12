@@ -1,6 +1,9 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.backtrack.selector.ValueSelector
+import com.eignex.klause.solver.backtrack.selector.VarRef
+import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit

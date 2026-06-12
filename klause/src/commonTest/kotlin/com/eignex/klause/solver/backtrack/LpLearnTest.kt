@@ -3,6 +3,8 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp

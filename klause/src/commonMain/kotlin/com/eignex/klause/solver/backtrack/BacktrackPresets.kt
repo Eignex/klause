@@ -1,6 +1,10 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.LastConflict
+import com.eignex.klause.solver.backtrack.selector.SolutionGuided
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.result.SearchEvent
 
 /**

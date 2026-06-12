@@ -9,10 +9,10 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.IndomainMin
-import com.eignex.klause.solver.backtrack.RegressionVariableHeuristic
-import com.eignex.klause.solver.backtrack.SolutionGuided
-import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.RegressionVariableHeuristic
+import com.eignex.klause.solver.backtrack.selector.SolutionGuided
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import kotlinx.serialization.Serializable

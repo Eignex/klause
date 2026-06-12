@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.backtrack
+package com.eignex.klause.solver.backtrack.selector
 
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample

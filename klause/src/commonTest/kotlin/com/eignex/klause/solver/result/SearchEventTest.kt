@@ -4,8 +4,8 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.IndomainMin
-import com.eignex.klause.solver.backtrack.InputOrder
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

@@ -5,6 +5,13 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.backtrack.selector.IndomainMax
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.IndomainRandom
+import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.backtrack.selector.RandomVariable
+import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1

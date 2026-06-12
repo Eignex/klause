@@ -3,6 +3,16 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.backtrack.selector.IndomainMax
+import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.IndomainRandom
+import com.eignex.klause.solver.backtrack.selector.IndomainSet
+import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.backtrack.selector.RandomVariable
+import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.ValueSelector
+import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.propagation.ClauseExchange
 import com.eignex.klause.solver.result.SearchEvent
 

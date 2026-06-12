@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.backtrack
+package com.eignex.klause.solver.backtrack.selector
 
 /**
  * Which variable [BacktrackSolver] is branching on. Independent of value selection so var

@@ -1,6 +1,15 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.backtrack.selector.LargestDomain
+import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
+import com.eignex.klause.solver.backtrack.selector.MaxRegret
+import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
+import com.eignex.klause.solver.backtrack.selector.ValueSelector
+import com.eignex.klause.solver.backtrack.selector.VarRef
+import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random

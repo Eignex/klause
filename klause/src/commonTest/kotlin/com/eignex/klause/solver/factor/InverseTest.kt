@@ -7,7 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.Vsids
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals

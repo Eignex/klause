@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.lp.LpRelaxation
 import com.eignex.klause.solver.lp.LpSolution
 import kotlin.math.abs

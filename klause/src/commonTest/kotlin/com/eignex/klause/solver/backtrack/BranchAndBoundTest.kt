@@ -3,6 +3,8 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.selector.IndomainMin
+import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
