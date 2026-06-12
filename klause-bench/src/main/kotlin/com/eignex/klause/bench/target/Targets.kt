@@ -4,10 +4,8 @@ import com.eignex.klause.bench.runner.Budget
 
 /** Which measurement a target runs. */
 internal enum class MetricKind {
-    TIME,
     UNIFORMNESS,
     COMPLETENESS,
-    VERIFY,
     SOLVE,
     COVERAGE,
     AUDIT,

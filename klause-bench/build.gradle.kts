@@ -167,14 +167,6 @@ tasks.register("dumpSchema", JavaExec::class) {
     }
 }
 
-tasks.register<Copy>("saveBaseline") {
-    group = "tools"
-    description = "Copy the latest bench-time.json over bench-baseline.json."
-    from(layout.buildDirectory.file("bench-time.json"))
-    into(layout.projectDirectory)
-    rename { "bench-baseline.json" }
-}
-
 tasks.withType<Test> {
     maxHeapSize = "4g"
 }

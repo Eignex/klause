@@ -9,7 +9,6 @@ import com.eignex.klause.bench.metric.PortfolioCreditMetric
 import com.eignex.klause.bench.metric.SearchEffortMetric
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
-import com.eignex.klause.bench.metric.TimeMetric
 import com.eignex.klause.bench.metric.TuningMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
 import com.eignex.klause.bench.runner.Budget
@@ -89,12 +88,13 @@ internal object MetricRunner {
 
             MetricKind.AUDIT -> solve { CompileAuditMetric.run(refs) }
 
-            MetricKind.VERIFY, MetricKind.TIME, MetricKind.UNIFORMNESS, MetricKind.COMPLETENESS -> {
+            MetricKind.UNIFORMNESS, MetricKind.COMPLETENESS -> {
+                // loadAndVerifyRefs still runs the cross-engine agreement + sample-validity gate as a
+                // side effect (the old `verify` metric's check); it survives here as the loader that
+                // hands these sampling metrics their feasible-expected subset.
                 val corpus = BenchLoad.loadAndVerifyRefs(refs)
                 solve {
                     when (metric) {
-                        MetricKind.VERIFY -> println("\nverification passed for ${corpus.verifyEntries.size} entries")
-                        MetricKind.TIME -> TimeMetric.run(corpus.benchEntries)
                         MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
                         MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
                         else -> error("unreachable")

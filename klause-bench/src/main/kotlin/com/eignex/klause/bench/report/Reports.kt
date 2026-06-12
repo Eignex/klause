@@ -39,13 +39,6 @@ object Reports {
         val out = proc.inputStream.bufferedReader().readText().trim()
         if (proc.waitFor() == 0 && out.isNotEmpty()) out else null
     }.getOrNull()
-
-    internal fun formatNs(ns: Long): String = when {
-        ns < 1_000 -> "${ns}ns"
-        ns < 1_000_000 -> "${ns / 1_000}µs"
-        ns < 1_000_000_000 -> "${ns / 1_000_000}ms"
-        else -> "${ns / 1_000_000_000}s"
-    }
 }
 
 /** Environment metadata captured in every bench output JSON so results stay interpretable. */
@@ -67,27 +60,3 @@ internal data class EnvInfo(
         )
     }
 }
-
-// --- Time metric ---
-
-@Serializable
-internal data class CellResult(
-    val backend: String,
-    val solveNsMedian: Long,
-    val sampleNsMedian: Long,
-    val enumNsMedian: Long,
-)
-
-@Serializable
-internal data class EntryResult(val name: String, val expectedSat: Boolean, val backends: List<CellResult>)
-
-@Serializable
-internal data class BenchResults(
-    val timestamp: String,
-    val gitSha: String?,
-    val env: EnvInfo,
-    val repetitions: Int,
-    val sampleCount: Int,
-    val warmupReps: Int,
-    val entries: List<EntryResult>,
-)
