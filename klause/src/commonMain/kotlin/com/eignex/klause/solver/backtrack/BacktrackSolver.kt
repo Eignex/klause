@@ -1350,6 +1350,11 @@ class BacktrackSolver(override val problem: Problem) :
         val vivifyEnabled = params.vivification && params.assumptions.isEmpty
         var vivifyCursor = 0
         var lubyIdx = 1L
+        // Cross-arm clause exchange (portfolio): import nogoods learned by prior segments/arms before
+        // the first DFS run, so a re-scheduled backtrack arm starts warm instead of cold-relearning
+        // every slice (#381). The session sits at the post-seed root here — the same state a restart
+        // pops back to — so imported literals are free and register without an immediate unit/conflict.
+        params.clauseExchange?.onSearchStart(session)
         outer@ while (true) {
             val perRunBudget: Long = if (glucose != null) {
                 Long.MAX_VALUE // adaptive restarts drive the schedule; the Luby budget is off
@@ -1369,6 +1374,9 @@ class BacktrackSolver(override val problem: Problem) :
             inner@ while (true) {
                 if (cancelCheckCountdown-- <= 0) {
                     if (params.cancellation()) {
+                        // Slice truncated: publish this segment's trailing glue clauses so the next
+                        // segment (this arm or a sibling) imports them at its start (#381).
+                        params.clauseExchange?.onSearchEnd(session)
                         yield(SearchOutcome.BudgetCapped)
                         return@sequence
                     }
@@ -1496,6 +1504,7 @@ class BacktrackSolver(override val problem: Problem) :
                         }
 
                         AdvanceOutcome.BudgetCapped -> {
+                            params.clauseExchange?.onSearchEnd(session)
                             yield(SearchOutcome.BudgetCapped)
                             return@sequence
                         }
@@ -1605,6 +1614,7 @@ class BacktrackSolver(override val problem: Problem) :
                         }
 
                         AdvanceOutcome.BudgetCapped -> {
+                            params.clauseExchange?.onSearchEnd(session)
                             yield(SearchOutcome.BudgetCapped)
                             return@sequence
                         }
