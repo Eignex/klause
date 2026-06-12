@@ -201,16 +201,24 @@ internal object Solvers {
     val KLAUSE_PORTFOLIO = SolverConfig("portfolio", Backend.KLAUSE_PORTFOLIO)
 
     /**
-     * Presolve config for the bench. Defaults to NONE so enumeration / solve / completeness
-     * metrics compare the same solution sets as the reference solvers; set `-Dklause.presolve`
-     * (none | default | all | comma-list) to measure the shipped presolve on e.g. the time metric.
+     * Effective presolve config: the per-metric [metricDefault], overridable by `-Dklause.presolve`
+     * (none | default | all | comma-list). Default NONE so solution-set-sensitive metrics (verify /
+     * uniformness / completeness) compare the same solution sets as the references; the time metric
+     * opts into [PresolveConfig.DEFAULT] to measure the shipped presolve (#341).
      */
-    private fun benchPresolve(): PresolveConfig =
-        System.getProperty("klause.presolve")?.let { PresolveConfig.parse(it) } ?: PresolveConfig.NONE
+    private fun effectivePresolve(metricDefault: PresolveConfig): PresolveConfig =
+        System.getProperty("klause.presolve")?.let { PresolveConfig.parse(it) } ?: metricDefault
 
-    /** Build a bound solver for [problem], applying the bench presolve config (default NONE). */
-    fun build(config: SolverConfig, problem: Problem): InProcessSolver {
-        val pre = Presolver.run(problem, benchPresolve(), PresolveContext.EMPTY)
+    /** Build a bound solver for [problem]. [presolve] is the metric's presolve default (NONE unless
+     *  it opts in); [context] should be objective-aware ([PresolveContext.of]) on COP runs so the
+     *  objective variable is never eliminated and symmetry is not broken over it. */
+    fun build(
+        config: SolverConfig,
+        problem: Problem,
+        presolve: PresolveConfig = PresolveConfig.NONE,
+        context: PresolveContext = PresolveContext.EMPTY,
+    ): InProcessSolver {
+        val pre = Presolver.run(problem, effectivePresolve(presolve), context)
         val inner = when (config.backend) {
             Backend.KLAUSE_LS -> LocalSearchBench(pre.problem)
             Backend.KLAUSE_COMPLETE -> BacktrackBench(pre.problem)
@@ -221,15 +229,19 @@ internal object Solvers {
     }
 
     /** The default in-process portfolio: klause LS + backtrack, plus brute force only when the
-     *  space fits.
+     *  space fits. [presolve]/[context] as in [build] (default NONE / EMPTY).
      *
      *  Set `-Dklause.bench.portfolio=true` to also include the unified [Backend.KLAUSE_PORTFOLIO]
      *  parallel pool as a backend (#64) — opt-in because it spawns a multi-thread pool per
      *  instance, which would dominate wall-clock on every metric if always on. With it on,
      *  `bench time|completeness|verify` benchmark the portfolio as a solver alongside
      *  the single engines. */
-    fun defaultPortfolio(problem: Problem): List<InProcessSolver> {
-        val pre = Presolver.run(problem, benchPresolve(), PresolveContext.EMPTY)
+    fun defaultPortfolio(
+        problem: Problem,
+        presolve: PresolveConfig = PresolveConfig.NONE,
+        context: PresolveContext = PresolveContext.EMPTY,
+    ): List<InProcessSolver> {
+        val pre = Presolver.run(problem, effectivePresolve(presolve), context)
         fun wrap(inner: InProcessSolver): InProcessSolver =
             if (pre.problem === problem) inner else ReconstructingInProcess(problem, inner, pre.reconstruct)
         return buildList {
