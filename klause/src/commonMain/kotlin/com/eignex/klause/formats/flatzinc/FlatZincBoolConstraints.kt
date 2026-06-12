@@ -40,8 +40,7 @@ internal fun FlatZincCompiler.emitBoolEq(c: FznConstraint, negate: Boolean) {
 
 internal fun FlatZincCompiler.emitBoolXor(c: FznConstraint) {
     require(c.args.size == 3)
-    // bool_xor(a, b, c) means a ⊕ b = c → a ⊕ b ⊕ c = 0 ... actually it's a XOR b ↔ c.
-    // Equivalent to xor of all three with target parity 0.
+    // bool_xor(a, b, c): a ⊕ b ↔ c, i.e. a ⊕ b ⊕ c = 0 — xor of all three with target parity 0.
     val lits = intArrayOf(resolveBoolLit(c.args[0]), resolveBoolLit(c.args[1]), resolveBoolLit(c.args[2]))
     factors.add(Xor(lits, targetParity = 0))
 }

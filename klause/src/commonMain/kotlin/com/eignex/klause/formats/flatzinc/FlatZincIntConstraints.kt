@@ -74,9 +74,8 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
 }
 
 internal fun FlatZincCompiler.emitBoolLinear(c: FznConstraint) {
-    // bool_lin_le(coefs, bools, k) — translate to PseudoBoolean if all coefs ≥ 0,
-    // otherwise to a Linear over channelled int vars (we'd need bool2int channels).
-    // For now: treat all coefs as PB weights; refuse if any is negative.
+    // bool_lin_*(coefs, bools, k): a PseudoBoolean over the bool literals. Negative coefficients
+    // would need bool2int channels (a Linear over channelled ints), unsupported — reject them.
     require(c.args.size == 3)
     val coefs = evalIntConstArray(c.args[0])
     val bools = evalBoolVarArray(c.args[1])

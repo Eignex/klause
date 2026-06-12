@@ -137,10 +137,8 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
     } else {
         (a as FloatRef.Const).value
     }
-    // Build a synthetic float_lin_* invocation: 1·a − 1·b op 0  ⇒
-    // sign · var + (-sign) · other = -constPart on var side.
-    // Simpler: use the existing emitFloatLinear by constructing scaled coefficients/bound
-    // directly, without round-tripping through FznExpr.
+    // Encode `1·a − 1·b op 0` as scaled coefficients/bound directly (the emitFloatLinear scaling),
+    // without round-tripping through FznExpr.
     val step = if (varSide.buckets > 1) (varSide.hi - varSide.lo) / (varSide.buckets - 1) else 0.0
     val coefVar = (sign * step * floatScale).roundToLong()
     var scaledBound = (-sign * constPart * floatScale).roundToLong() -
