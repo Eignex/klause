@@ -77,6 +77,24 @@ class SequentialPortfolioTest {
     }
 
     @Test
+    fun `aggressive re-seeding does not disrupt proving the optimum`() {
+        // The re-seed guard (#3): even with reseedStaleThreshold = 1 (drop a resumable arm's handle the
+        // first non-improving segment), a fast optimality proof must still come back as Optimal at the
+        // true value — the terminal-verdict and incumbent-exists guards keep re-seed from corrupting it.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
+        val r = SequentialPortfolio.exp3(btArms(problem, 3, obj), reseedStaleThreshold = 1).use { it.minimize() }
+        assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
+    }
+
+    @Test
     fun `ucb1 policy factory also proves the optimum`() {
         val problem = Problem(
             numBoolVars = 0,
