@@ -35,6 +35,7 @@ internal class MiniZincRunner(
             ref,
             program.problem,
             objective,
+            maximize = program.solve is SolveDirective.Maximize,
             lsObjective = program.lsObjective,
             definitionalSweep = program.definitionalSweep,
             searchParams = program.defaultBacktrackParams,

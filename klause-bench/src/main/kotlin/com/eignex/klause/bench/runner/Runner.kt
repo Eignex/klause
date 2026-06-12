@@ -16,6 +16,9 @@ internal data class ResolvedProblem(
     internal val ref: ProblemRef,
     internal val problem: Problem,
     internal val objective: LinearObjective? = null,
+    /** True when the model's objective is a maximization (so "better" = higher). MiniZinc sets it;
+     *  other formats leave it false (klause minimises internally). */
+    internal val maximize: Boolean = false,
     /** Local-search-only gradient view of [objective] for decomposed objectives, when the model
      *  provides one (see `LocalSearchParams.lsObjective`). Null ⇒ LS descends [objective]. */
     val lsObjective: IncrementalObjective? = null,
