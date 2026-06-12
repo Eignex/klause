@@ -7,12 +7,6 @@ import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
-import com.eignex.klause.bench.tools.BanditProbe
-import com.eignex.klause.bench.tools.CblsDiag
-import com.eignex.klause.bench.tools.CpSeedProbe
-import com.eignex.klause.bench.tools.FormatCoverage
-import com.eignex.klause.bench.tools.LsConfigProbe
-import com.eignex.klause.bench.tools.MeasureBacktrack
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
@@ -37,10 +31,6 @@ import com.eignex.klause.bench.tools.ProfileScope
  *    `bench <metric> [filters]` that carries a tuned budget / curated suite mix.
  *  - `preview <metric> [filters…]` — print the instances a run would cover, without running.
  *  - `list` — presets + suites; `list <suite>` — problems in a suite.
- *  - `diag:*` / `coverage:*` — diagnostics and whole-library format-coverage reports
- *    (parse/solve rates over the XCSP3 / SMT-LIB libraries; the colon-suffixed `coverage:xcsp3`
- *    / `coverage:smtlib` are distinct from the bare `coverage` metric, which measures
- *    native-predicate coverage of a model).
  */
 object BenchCli {
     /** CLI entry point dispatching bench subcommands. */
@@ -50,20 +40,6 @@ object BenchCli {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
 
             "preview" -> adHoc(args.drop(1), preview = true)
-
-            "diag:backtrack" -> MeasureBacktrack.run()
-
-            "diag:cbls" -> CblsDiag.main(args.drop(1).toTypedArray())
-
-            "diag:lsconfig" -> LsConfigProbe.main(args.drop(1).toTypedArray())
-
-            "diag:cpseed" -> CpSeedProbe.main(args.drop(1).toTypedArray())
-
-            "diag:bandit" -> BanditProbe.main(args.drop(1).toTypedArray())
-
-            "coverage:xcsp3" -> FormatCoverage.xcsp3()
-
-            "coverage:smtlib" -> FormatCoverage.smtlib()
 
             // `bench <metric> [filters]` is the primary form; fall back to a preset id.
             else -> if (metricOrNull(cmd) != null) adHoc(args.toList(), preview = false) else runTarget(cmd)
@@ -237,11 +213,9 @@ object BenchCli {
             |  bench <preset-id>                     run a saved preset (see Presets above)
             |  bench preview <metric> [filters…]     show what a run would cover
             |  bench list [<suite>]                  list presets+suites, or problems in a suite
-            |  bench diag:backtrack | diag:cbls <x>  diagnostics
-            |  bench coverage:xcsp3|smtlib          parse/solve rates over a whole format library
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
-            |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=choco|ortools|yuck timeout=<ms>
+            |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
             |         engine=backtrack|ls|mixed processors=N fixed=true (klause search for solve)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
