@@ -5,19 +5,19 @@ The benchmarking harness for klause. It separates four orthogonal axes — **for
 A run is fully described by a **metric over a selection of problems**, plus an optional reference solver and budget. That is the only command form:
 
 ```
-bench <metric> [filters…]      e.g.  bench solve suite=smtlib-core backend=ortools
+bench <metric> [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 ```
 
 Presets (`target/Targets.kt`) are named shorthands for a `bench <metric>` line that carries non-obvious config (a tuned budget or a curated suite mix) — nothing else.
 
-The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. There is no in-session comparison and no in-process reference adapter: run `solve` once per backend (each writes its own `build/solve-<solver>.json`, cached in `build/bench-cache/`) and diff offline with `parity-runs/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by the non-solve metrics: `time`/`verify`/`uniformness`/`completeness`/`search`.)
+The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. There is no in-session comparison and no in-process reference adapter: run `solve` once per backend (each writes its own `build/solve-<solver>.json`, cached in `build/bench-cache/`) and diff offline with `parity-runs/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: freeze a baseline `solve` JSON and compare a fresh run against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by `uniformness`/`completeness`/`search`.)
 
 ## Quick start
 
 ```
 ./gradlew :klause-bench:bench --args="list"                       suites, presets, metrics, usage
 ./gradlew :klause-bench:bench --args="solve suite=core"           klause solves the in-process core
-./gradlew :klause-bench:bench --args="verify suite=core"          cross-backend agreement gate
+./gradlew :klause-bench:bench --args="solve suite=core backend=choco"  a reference baseline to diff against
 ./gradlew :klause-bench:bench --args="coverage suite=mzn-smoke"   percent native-predicate coverage
 ```
 
@@ -48,9 +48,7 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 
 ## Metrics
 
-- **time** — wall-time for solve/sample/enumerate per backend, plus a propagation microbench. Writes `build/bench-time.json` and flags regressions vs `bench-baseline.json` (`:klause-bench:saveBaseline` freezes the current run as the baseline).
-- **verify** — cross-backend SAT/UNSAT agreement + sample-validity gate. The correctness gate.
-- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Records per-instance objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics, to `build/solve-<solver>.json`; the raw per-instance output is saved under `build/solve-<solver>/`. Run once per backend and diff offline. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
+- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Records per-instance objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics, to `build/solve-<solver>.json`; the raw per-instance output is saved under `build/solve-<solver>/`. Run once per backend and diff offline (`parity-runs/compare.sh`), which also serves as the wall-time regression check against a frozen baseline JSON. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
 - **search** — complete backtracker under a fixed CDCL config; reports nodes/conflicts/learned + solve-rate. A/B a learning or explanation change by holding the suite fixed and comparing conflicts (the `slack-alldiff` Golomb suite is the Hall-prone workload).
 - **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
 - **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.
@@ -65,10 +63,7 @@ Metrics write JSON (and Markdown where useful) under `build/`.
 bench solve suite=mzn-bench per-family=1 max=50 seed=1                 # klause (default), sampled slice
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=choco   # Choco baseline, same selection
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck baseline
-# each writes build/solve-<solver>.json — diff them offline to compare
-
-# timing microbench with more reps
-bench time suite=core -Dklause.bench.repetitions=11 -Dklause.bench.warmupReps=5
+# each writes build/solve-<solver>.json — diff them offline with parity-runs/compare.sh
 
 # search-effort A/B on your own selection
 bench search suite=core category=UNSAT timeout=30000

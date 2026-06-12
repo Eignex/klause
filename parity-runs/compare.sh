@@ -10,7 +10,11 @@
 #          no later (time-to-best tiebreak); for satisfaction, A feasible where B is not.
 #   loss = the reverse.  tie = same value/feasibility, no time edge.
 #   UNSOUND = A strictly beats B's PROVEN optimum (impossible — a bug to investigate).
-# Also reports the "solve 100% of B's" superset: instances B solved that A did not.
+# Also reports the "solve 100% of B's" superset: instances B solved that A did not, and the
+# time-to-best aggregate over instances both solvers timed (A/B totals + ratio).
+#
+# This doubles as a regression check: freeze a baseline `solve` JSON, then compare a fresh run
+# against it — the verdict counts catch quality regressions and the time aggregate catches slowdowns.
 set -eu
 A="$1"; B="$2"
 
@@ -47,10 +51,14 @@ jq -rn --slurpfile a "$A" --slurpfile b "$B" '
   | ($rows|map(select(.verdict=="tie"))|length) as $t
   | ($rows|map(select(.verdict=="UNSOUND"))|length) as $u
   | ($rows|map(select((.bf==true or .bo!=null) and (.af!=true and .ao==null)))|map(.name)) as $missed
+  | ($rows|map(select(.at!=null and .bt!=null))) as $timed
+  | ($timed|map(.at)|add // 0) as $atot
+  | ($timed|map(.bt)|add // 0) as $btot
   | "=== \($as)  vs  \($bs)   (\($n) shared instances) ===",
     ($rows[] | "  \(.verdict|ascii_upcase|.[0:4]) [\(.name)]\(if .max then " (max)" else "" end) "
        + "A=\(.ao // .af)@\(.at // "-")ms  B=\(.bo // .bf)@\(.bt // "-")ms\(if .bp then " (B proved)" else "" end)"),
     "",
     "A wins \($w)/\($n)  (loss \($l), tie \($t), unsound \($u))",
-    "B-solved instances A missed: \($missed|length)\(if ($missed|length)>0 then "  -> " + ($missed|join(", ")) else "" end)"
+    "B-solved instances A missed: \($missed|length)\(if ($missed|length)>0 then "  -> " + ($missed|join(", ")) else "" end)",
+    "time-to-best over both-timed (\($timed|length)): A=\($atot)ms B=\($btot)ms\(if $btot>0 then "  (\(($atot/$btot*100|round)/100)×)" else "" end)"
 '

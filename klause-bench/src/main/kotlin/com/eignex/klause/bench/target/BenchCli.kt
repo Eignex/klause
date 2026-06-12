@@ -220,7 +220,6 @@ object BenchCli {
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
-            |  bench verify suite=core
             |  bench solve suite=mzn-bench kind=cop per-family=1               (klause, mixed ×cores)
             |  bench solve suite=mzn-bench backend=choco timeout=300000        (Choco baseline)
             |  bench solve suite=mzn-bench backend=yuck timeout=300000         (Yuck baseline)
