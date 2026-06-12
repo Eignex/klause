@@ -1,7 +1,7 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.bench.solver.InProcessSolver
-import com.eignex.klause.bench.solver.Solvers
+import com.eignex.klause.bench.InProcessSolver
+import com.eignex.klause.bench.Solvers
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult

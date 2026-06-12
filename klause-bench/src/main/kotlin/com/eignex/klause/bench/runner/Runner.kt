@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.runner
 
+import com.eignex.klause.bench.Formats
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
-import com.eignex.klause.bench.format.Formats
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams

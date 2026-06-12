@@ -1,4 +1,4 @@
-package com.eignex.klause.bench.solver
+package com.eignex.klause.bench
 
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind

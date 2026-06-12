@@ -1,6 +1,6 @@
 package com.eignex.klause.bench.catalog
 
-import com.eignex.klause.bench.format.OpbFormat
+import com.eignex.klause.bench.OpbFormat
 import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.solver.factor.PseudoBoolean

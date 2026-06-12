@@ -29,8 +29,8 @@ Two native engines, both implementing Solver and Optimizer:
   sampling and large-domain problems where complete search doesn't
   finish in budget.
 
-Optional adapter modules send the same problem to external solvers when
-useful: klause-logicng for bit-blasted SAT. Side doors, not the core.
+For benchmarking, external reference solvers (Choco, Gecode, Yuck) are run
+end-to-end via `minizinc --solver` — see `klause-bench`. Side doors, not the core.
 
 Sampling is first-class. Drawing samples with replacement and enumerating
 without replacement are core operations. Most CP libraries solve once and

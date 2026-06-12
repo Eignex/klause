@@ -17,7 +17,7 @@ import com.eignex.klause.solver.result.TerminationReason
  *  - The current assumption stack: [push] / [pop] add or remove pinned variables;
  *    every solve / sample / enumerate call sees the merged stack on top of whatever
  *    `params.assumptions` already carries. Backends whose params don't model
- *    assumptions (BruteForce, LogicNG) silently drop the stack — push/pop still
+ *    assumptions (BruteForce) silently drop the stack — push/pop still
  *    works in the Session but has no effect on those engines.
  *  - Future: learned clauses / no-goods (LCG), warm-start last solution, kumulant
  *    heuristic posteriors. These slot in as additional fields on per-backend Session
@@ -106,7 +106,7 @@ interface Session<P : SolverParams> : AutoCloseable {
     }
 
     /** Release any per-session native resources. Default is a no-op; backends that
-     *  hold native handles (LogicNG factories) override. */
+     *  hold native resources override. */
     override fun close() {}
 }
 

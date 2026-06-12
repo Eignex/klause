@@ -5,7 +5,7 @@ package com.eignex.klause.util
  * variables in `Problem.floatDomains`.
  *
  * Soundness note: this is a *user-facing* interval declaring the bucketing bounds. All
- * backends bucket floats onto bounded integers (bit-blaster, LogicNG, and LocalSearch /
+ * backends bucket floats onto bounded integers (bit-blaster and LocalSearch /
  * Backtrack via a lowering pass), approximating this interval with finite resolution, and
  * may produce solutions within rounding error of the bound.
  */

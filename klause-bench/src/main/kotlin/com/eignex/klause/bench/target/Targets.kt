@@ -1,7 +1,6 @@
 package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.runner.Budget
-import com.eignex.klause.bench.solver.Backend
 
 /** Which measurement a target runs. */
 internal enum class MetricKind {
@@ -21,8 +20,8 @@ internal enum class MetricKind {
  * A named preset: a set of catalog suites bound to a [metric] (plus a [budget]/[reference]).
  * Presets are saved shorthands for a `bench <metric> [filters]` invocation — the general form
  * always works, so a preset only earns its place by carrying non-obvious config (a tuned
- * budget, a curated multi-suite mix). Per-suite / per-reference variants are *not* presets;
- * spell them with filters, e.g. `bench solve suite=smtlib-core backend=ortools`.
+ * budget, a curated multi-suite mix). Per-suite / per-backend variants are *not* presets;
+ * spell them with filters, e.g. `bench solve suite=smtlib-core backend=choco`.
  */
 internal data class Target(
     val id: String,
@@ -30,8 +29,9 @@ internal data class Target(
     val suiteIds: List<String>,
     val metric: MetricKind,
     val budget: Budget = Budget(),
-    /** Backend for the [MetricKind.SOLVE] metric (`choco`/`ortools`/`yuck`); `null` = klause. */
-    val reference: Backend? = null,
+    /** Solver id for the [MetricKind.SOLVE] metric (a registered MiniZinc solver, e.g. `choco`);
+     *  `null` = klause. */
+    val backend: String? = null,
 )
 
 internal object Targets {

@@ -98,8 +98,7 @@ class GapFactorBitBlastTest {
     )
 
     // Circuit / Subcircuit synthesise free position vars that aren't pinned by a problem
-    // sample, so the brute-force SatCheck oracle can't validate them — they're round-tripped
-    // through a real SAT solver in klause-logicng's GapFactorLogicNgTest instead.
+    // sample, so the brute-force SatCheck oracle can't validate them here.
 
     @Test fun `lex less bit-blast accepts a feasible local-search sample`() = feasibleSampleIsSat(
         "lex less",

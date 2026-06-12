@@ -33,7 +33,7 @@ interface SolverParams {
     fun withAssumptions(@Suppress("UNUSED_PARAMETER") assumptions: Assumptions): SolverParams = this
 
     /** Inject a cooperative cancellation token. Backends that support cancellation
-     *  override to return a copy with the token wired in; others (LogicNG, Brute)
+     *  override to return a copy with the token wired in; others (Brute)
      *  default to no-op. */
     fun withCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
 }
@@ -42,7 +42,7 @@ interface SolverParams {
  * Outcome of a single-shot [Solver.solve] call.
  *
  *  - [Sat] — the engine found a satisfying assignment.
- *  - [Unsat] — the engine proved no assignment exists. Only complete backends (LogicNG,
+ *  - [Unsat] — the engine proved no assignment exists. Only complete backends (
  *    `BruteForceSolver`, `BacktrackSolver`) return this; the local-search engine
  *    returns [Unknown] when its budget is exhausted.
  *  - [Unknown] — the engine returned without a definitive answer (LS budget exhausted,
@@ -99,7 +99,7 @@ sealed interface SolveResult {
  *  - [samples] — *with replacement*. Each yield is an independent draw; the same
  *    assignment may reappear. Dedup fields on [P] (where present) are ignored.
  *  - [enumerate] — *without replacement* for complete backends ([BacktrackSolver],
- *    `BruteForceSolver`, LogicNG): distinct satisfying assignments, with optional
+ *    `BruteForceSolver`): distinct satisfying assignments, with optional
  *    rolling-window post-filter via `params.minHammingDistance` / `params.recentWindow`.
  *    Stochastic backends (`LocalSearchSolver`) cannot enumerate; their `enumerate` is
  *    an alias for [samples] and may yield duplicates.
