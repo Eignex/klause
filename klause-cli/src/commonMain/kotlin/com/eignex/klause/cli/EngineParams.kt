@@ -12,8 +12,8 @@ import com.eignex.klause.solver.backtrack.IndomainRandom
 import com.eignex.klause.solver.backtrack.InputOrder
 import com.eignex.klause.solver.backtrack.RandomVariable
 import com.eignex.klause.solver.backtrack.SmallestDomain
-import com.eignex.klause.solver.backtrack.ValueHeuristic
-import com.eignex.klause.solver.backtrack.VariableHeuristic
+import com.eignex.klause.solver.backtrack.ValueSelector
+import com.eignex.klause.solver.backtrack.VariableSelector
 import com.eignex.klause.solver.backtrack.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 
@@ -61,7 +61,7 @@ internal class EngineParams(pairs: List<String>) {
         }
     }
 
-    fun varHeuristic(key: String): VariableHeuristic? = map.remove(key)?.let {
+    fun varHeuristic(key: String): VariableSelector? = map.remove(key)?.let {
         when (it.lowercase()) {
             "vsids" -> Vsids()
             "chb" -> Chb()
@@ -72,7 +72,7 @@ internal class EngineParams(pairs: List<String>) {
         }
     }
 
-    fun valHeuristic(key: String): ValueHeuristic? = map.remove(key)?.let {
+    fun valHeuristic(key: String): ValueSelector? = map.remove(key)?.let {
         when (it.lowercase()) {
             "random" -> IndomainRandom
             "min" -> IndomainMin

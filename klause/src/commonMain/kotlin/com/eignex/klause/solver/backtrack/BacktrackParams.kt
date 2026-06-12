@@ -38,8 +38,8 @@ data class BacktrackParams(
     val maxInstructions: Long? = null,
     val randomSeed: Long? = null,
     val assumptions: Assumptions = Assumptions.None,
-    val variableHeuristic: VariableHeuristic = RandomVariable,
-    val valueHeuristic: ValueHeuristic = IndomainRandom,
+    val variableHeuristic: VariableSelector = RandomVariable,
+    val valueHeuristic: ValueSelector = IndomainRandom,
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
     /**

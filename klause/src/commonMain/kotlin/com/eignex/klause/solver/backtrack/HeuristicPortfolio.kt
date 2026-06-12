@@ -9,7 +9,7 @@ import kotlin.random.Random
 
 /**
  * Restart-level heuristic portfolio with bandit-driven arm selection. Composes a fixed set
- * of `(VariableHeuristic, ValueHeuristic)` configurations into one logical "search strategy
+ * of `(VariableSelector, ValueSelector)` configurations into one logical "search strategy
  * picker" that learns which configuration works best on the current instance and switches
  * between them at every Luby restart.
  *
@@ -63,11 +63,11 @@ internal class HeuristicPortfolio(
     }
 
     /** One strategy in the portfolio's palette. */
-    data class Arm(val label: String, val variableHeuristic: VariableHeuristic, val valueHeuristic: ValueHeuristic)
+    data class Arm(val label: String, val variableHeuristic: VariableSelector, val valueHeuristic: ValueSelector)
 
     /** Statistics passed to [rewardFn] at the end of every Luby-restart-bounded run. */
     data class RunStats(
-        /** Number of [VariableHeuristic.onConflict] events during the run. */
+        /** Number of [VariableSelector.onConflict] events during the run. */
         val conflicts: Int,
         /** Number of SAT leaves found during the run (`onSolution` events). */
         val solutionsFound: Int,
@@ -83,8 +83,8 @@ internal class HeuristicPortfolio(
     /** Index of [current] within [arms]. Inspectable for telemetry. */
     val currentArmIndex: Int get() = currentArm
 
-    /** Drop-in [VariableHeuristic] slot for [BacktrackParams.variableHeuristic]. */
-    val variableHeuristic: VariableHeuristic = object : VariableHeuristic {
+    /** Drop-in [VariableSelector] slot for [BacktrackParams.variableHeuristic]. */
+    val variableHeuristic: VariableSelector = object : VariableSelector {
         override fun pick(session: PropagationSession, rng: Random) = current.variableHeuristic.pick(session, rng)
         override fun onConflict(varRef: VarRef) {
             conflicts++
@@ -109,8 +109,8 @@ internal class HeuristicPortfolio(
         }
     }
 
-    /** Drop-in [ValueHeuristic] slot for [BacktrackParams.valueHeuristic]. */
-    val valueHeuristic: ValueHeuristic = object : ValueHeuristic {
+    /** Drop-in [ValueSelector] slot for [BacktrackParams.valueHeuristic]. */
+    val valueHeuristic: ValueSelector = object : ValueSelector {
         override fun values(session: PropagationSession, varRef: VarRef, rng: Random) =
             current.valueHeuristic.values(session, varRef, rng)
         override fun onConflict(varRef: VarRef, value: Int) = current.valueHeuristic.onConflict(varRef, value)

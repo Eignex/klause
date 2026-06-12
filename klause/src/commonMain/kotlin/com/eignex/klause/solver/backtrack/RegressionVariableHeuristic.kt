@@ -39,7 +39,7 @@ import kotlin.random.Random
 class RegressionVariableHeuristic private constructor(
     private val bandit: RegressionContextualBandit<*>,
     private val scoreCap: Int,
-) : VariableHeuristic {
+) : VariableSelector {
 
     // Pending attribution for the previous decision (rewarded at the next pick, once its outcome
     // is observable). Null between runs / before the first decision.

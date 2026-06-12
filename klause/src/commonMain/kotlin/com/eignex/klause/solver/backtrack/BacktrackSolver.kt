@@ -1133,7 +1133,7 @@ class BacktrackSolver(override val problem: Problem) :
 
     /**
      * A trail frame for one variable being explored. The value iterator is supplied by the
-     * caller's [ValueHeuristic] at node creation; [applyNext] pulls the next value, pushes
+     * caller's [ValueSelector] at node creation; [applyNext] pulls the next value, pushes
      * it into the session, and reports back both the value (so the engine can fire
      * heuristic callbacks scoped to the attempted pair) and the session's propagation
      * response. Returns `null` when the value iterator is exhausted.

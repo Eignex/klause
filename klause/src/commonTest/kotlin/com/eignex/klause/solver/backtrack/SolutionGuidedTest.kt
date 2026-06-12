@@ -102,7 +102,7 @@ class SolutionGuidedTest {
     fun `solution-guided receives onSolution from engine`() {
         // Track that the heuristic's onSolution is called via a recording wrapper.
         val recorded = ArrayList<Sample>()
-        val spy = object : ValueHeuristic {
+        val spy = object : ValueSelector {
             override fun values(session: PropagationSession, varRef: VarRef, rng: Random) =
                 IndomainMin.values(session, varRef, rng)
             override fun onSolution(snapshot: Sample) {
