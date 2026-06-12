@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  * parse in-process, and solve with the Choco reference. Asserts the reference reaches each
  * model's recorded feasibility and that every solution it returns validates under klause's
  * own constraint checker — i.e. the Choco translation is faithful. Independent of klause's
- * own solver verdicts (which parity compares separately).
+ * own solver verdicts (the solve metric measures those separately).
  *
  * Skips silently when `minizinc` isn't on PATH so bare CI images stay green.
  */
@@ -32,7 +32,7 @@ class MiniZincRunnerTest {
         for (ref in Catalog.suite("mzn-smoke").problems) {
             val resolved = runner.resolve(ref)
             assertTrue(resolved.problem.numIntVars + resolved.problem.numBoolVars > 0, "${ref.name}: empty problem")
-            if (resolved.objective != null) continue // optimization handled by parity, not here
+            if (resolved.objective != null) continue // optimization measured by the solve metric, not here
             val r = ChocoSolver(resolved.problem).solve(ChocoParams(timeoutMillis = 30_000))
             if (ref.expected == Expected.Sat) {
                 assertTrue(r is SolveResult.Sat, "${ref.name}: choco failed to find expected solution ($r)")

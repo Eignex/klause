@@ -5,18 +5,18 @@ The benchmarking harness for klause. It separates four orthogonal axes — **for
 A run is fully described by a **metric over a selection of problems**, plus an optional reference solver and budget. That is the only command form:
 
 ```
-bench <metric> [filters…]      e.g.  bench parity suite=smtlib-core reference=ortools
+bench <metric> [filters…]      e.g.  bench solve suite=smtlib-core backend=ortools
 ```
 
 Presets (`target/Targets.kt`) are named shorthands for a `bench <metric>` line that carries non-obvious config (a tuned budget or a curated suite mix) — nothing else.
 
-No external solver binaries are used for klause itself; the `minizinc` CLI only compiles models to FlatZinc, and everything is solved in-process. References for differential metrics are the `klause-choco` (complete), `klause-ortools` (CP-SAT, anytime), and `klause-yuck` (local search) adapters.
+No external solver binaries are used for klause itself; the `minizinc` CLI only compiles models to FlatZinc, and everything is solved in-process. The `solve` metric runs **one** solver per invocation — klause, or one of the in-process reference adapters `klause-choco` (complete), `klause-ortools` (CP-SAT), `klause-yuck` (local search). There is no in-session comparison: to compare solvers, run `solve` once per backend (each writes its own `build/solve-<solver>.json`) and diff the saved files offline — so one solver's crash or warmup never contaminates another's baseline.
 
 ## Quick start
 
 ```
 ./gradlew :klause-bench:bench --args="list"                       suites, presets, metrics, usage
-./gradlew :klause-bench:bench --args="parity suite=core"          klause vs Choco on the in-process core
+./gradlew :klause-bench:bench --args="solve suite=core"           klause solves the in-process core
 ./gradlew :klause-bench:bench --args="verify suite=core"          cross-backend agreement gate
 ./gradlew :klause-bench:bench --args="coverage suite=mzn-smoke"   percent native-predicate coverage
 ```
@@ -43,34 +43,31 @@ bench coverage:xcsp3|smtlib          parse/solve rates over a whole format libra
 | `category=SAT,UNSAT,CSP,OPTIMIZATION,…` | keep only these categories |
 | `tag=…` / `name=<glob>` | tag membership / substring-or-`*`-glob on the instance name |
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
-| `reference=choco\|ortools\|yuck` | reference solver for parity/anytime |
+| `backend=choco\|ortools\|yuck` | the single solver `solve` runs (default klause); alias `reference=` |
 | `timeout=<ms>` | per-instance budget for metrics that honor it |
-| `engine=backtrack\|ls\|mixed` `processors=N` `fixed=true` | klause's search for a parity run (below); `engine`/`processors` mirror the CLI's `--engine` / `-p`, `fixed` follows the model annotation |
+| `engine=backtrack\|ls\|mixed` `processors=N` `fixed=true` | klause's search for a `solve` run (below); `engine`/`processors` mirror the CLI's `--engine` / `-p`, `fixed` follows the model annotation |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
 ## Metrics
 
 - **time** — wall-time for solve/sample/enumerate per backend, plus a propagation microbench. Writes `build/bench-time.json` and flags regressions vs `bench-baseline.json` (`:klause-bench:saveBaseline` freezes the current run as the baseline).
 - **verify** — cross-backend SAT/UNSAT agreement + sample-validity gate. The correctness gate.
-- **parity** — klause vs a reference on the same problem, both checked against the recorded `Expected` oracle.
-- **anytime** — klause-LS vs a reference: time-to-first, time-to-best, best objective, solutions seen.
+- **solve** — run one backend (`backend=`, default klause) over the selection; records per-instance objective + time-to-best (optimization) or feasibility (satisfaction) + whether it was proved, to `build/solve-<solver>.json`. Run once per backend and diff offline.
 - **search** — complete backtracker under a fixed CDCL config; reports nodes/conflicts/learned + solve-rate. A/B a learning or explanation change by holding the suite fixed and comparing conflicts (the `slack-alldiff` Golomb suite is the Hall-prone workload).
 - **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
 - **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.
 - **tuning** / **credit** — rank solver configs by avg dense rank; per-worker portfolio attribution.
 
-Parity defaults to Choco, anytime to OR-Tools; override with `reference=`. Metrics write JSON (and Markdown where useful) under `build/`.
+Metrics write JSON (and Markdown where useful) under `build/`.
 
 ## Recipes
 
 ```
-# parity against each reference (Yuck needs `:klause-yuck:installYuck` first)
-bench parity suite=core category=UNSAT reference=ortools
-bench parity suite=mzn-smoke reference=yuck
-bench parity suite=mzn-bench per-family=1 max=50 seed=1     # sampled slice of the fetched corpus
-
-# anytime optimization vs a reference, with a budget
-bench anytime reference=choco timeout=10000
+# solve a corpus with each backend, one invocation each (Yuck needs `:klause-yuck:installYuck`)
+bench solve suite=mzn-bench per-family=1 max=50 seed=1                 # klause (default), sampled slice
+bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=choco   # Choco baseline, same selection
+bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck baseline
+# each writes build/solve-<solver>.json — diff them offline to compare
 
 # timing microbench with more reps
 bench time suite=core -Dklause.bench.repetitions=11 -Dklause.bench.warmupReps=5
@@ -82,34 +79,36 @@ bench search suite=core category=UNSAT timeout=30000
 bench audit suite=mzn-smoke
 ```
 
-### Parity search: competition tracks as filter combinations
+### Solve: klause competition tracks as filter combinations
 
-Parity solves the klause side with `engine` (`backtrack`/`ls`/`mixed`) over `processors` workers — the
-portfolio's two axes, mirroring the CLI's `--engine` / `-p`. `processors=1` is the single-core
-sequential portfolio. The MiniZinc / XCSP competition tracks are just combinations of these, so there
-are no baked-in track names — spell each as a recipe (all compose with `kind=cop|csp` and `timeout=`):
+When `solve` runs klause (no `backend=`), the klause side is `engine` (`backtrack`/`ls`/`mixed`) over
+`processors` workers — the portfolio's two axes, mirroring the CLI's `--engine` / `-p`. `processors=1`
+is the single-core sequential portfolio. The MiniZinc / XCSP competition tracks are just combinations
+of these, so there are no baked-in track names — spell each as a recipe (all compose with
+`kind=cop|csp` and `timeout=`):
 
 ```
 # open (default): multi-thread, mixed engines
-bench parity suite=mzn-bench timeout=300000
+bench solve suite=mzn-bench timeout=300000
 
 # free: 1 thread, klause's own search (the single-core sequential portfolio)
-bench parity suite=mzn-bench processors=1 timeout=300000
+bench solve suite=mzn-bench processors=1 timeout=300000
 
-# parallel: multi-thread, a single engine
-bench parity suite=mzn-bench engine=backtrack timeout=300000
+# parallel: multi-thread, a single engine (backtrack-only)
+bench solve suite=mzn-bench engine=backtrack processors=8 timeout=300000
 
 # local search only
-bench parity suite=mzn-bench engine=ls timeout=300000
+bench solve suite=mzn-bench engine=ls timeout=300000
 ```
 
 The one exception is the **fixed** track — follow the model's `int_search` annotation — which has no
-filter combination, so it's a flag of its own. The reference mirrors the annotation too (a true
-two-sided fixed comparison, sound now that the Choco LCG fixed-search bug is worked around); models
-without an annotation fall back to free search, and the run reports how many followed vs fell back.
+filter combination, so it's a flag of its own; models without an annotation fall back to free search.
+When the baseline backend is Choco, `fixed=true` mirrors the annotation onto Choco too (sound now that
+the LCG fixed-search bug is worked around).
 
 ```
-bench parity suite=mzn-bench fixed=true timeout=300000
+bench solve suite=mzn-bench fixed=true timeout=300000               # klause
+bench solve suite=mzn-bench fixed=true backend=choco timeout=300000 # Choco, same annotation
 ```
 
 (drop the `./gradlew :klause-bench:bench --args="…"` wrapper for brevity above.)
@@ -120,7 +119,7 @@ bench parity suite=mzn-bench fixed=true timeout=300000
 
 ```
 bench search suite=slack-alldiff timeout=30000 profile=cpu
-bench parity suite=xcsp3-core profile=cpu profile-scope=all
+bench solve suite=xcsp3-core profile=cpu profile-scope=all
 ```
 
 For a deeper whole-JVM native profile, the gradle hook is still available: `-PasyncProfiler=/path/to/libasyncProfiler.so [-PprofFormat=traces=30] [-PprofOut=…]`.
@@ -144,5 +143,5 @@ Vendored problems live in `smoke-corpus/` — small, fast instances meant to exe
 ```
 ./gradlew :klause-bench:test                              unit, parser, and selection tests
 ./gradlew :klause-bench:bench --args="verify suite=core"  cross-backend agreement gate
-./gradlew :klause-bench:bench --args="parity suite=core"  klause vs Choco, vs recorded Expected
+./gradlew :klause-bench:bench --args="solve suite=core"   klause solves the in-process core
 ```

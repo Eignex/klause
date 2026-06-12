@@ -19,8 +19,8 @@ internal data class LoadedCorpus(val verifyEntries: List<ResolvedProblem>, val b
  */
 internal object BenchLoad {
     /** Resolve every problem in the given suites with the appropriate runner (MiniZinc compile
-     *  or in-process), without the cross-backend verify gate. Used by differential metrics
-     *  (parity) that *are* the comparison. */
+     *  or in-process), without the cross-backend verify gate. Used by the solve metric, which
+     *  measures one solver rather than gating it against another. */
     @Suppress("SpreadOperator")
     fun resolve(suiteIds: List<String>): List<ResolvedProblem> =
         Catalog.problems(*suiteIds.toTypedArray()).map { Runners.resolve(it) }

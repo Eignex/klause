@@ -14,9 +14,10 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.yuck.YuckParams
 import com.eignex.klause.yuck.YuckSolver
 
-/** A reference optimisation result with its time-to-best — the parity tiebreaker needs both the
- *  objective and *when* it was reached (better value OR same value sooner). [timeToBestMs] is null
- *  when no incumbent was found; [proven] is true only when the reference closed the search. */
+/** A reference optimisation result with its time-to-best — the solve metric records both the
+ *  objective and *when* it was reached, so offline comparison can score better value OR same value
+ *  sooner. [timeToBestMs] is null when no incumbent was found; [proven] is true only when the
+ *  reference closed the search. */
 internal data class RefTimed(val value: Double?, val timeToBestMs: Long?, val proven: Boolean)
 
 /**
@@ -35,8 +36,8 @@ internal interface Reference {
      *  single-process, ignore it). */
     fun solve(problem: Problem, budget: Budget, search: BacktrackParams? = null, processors: Int = 1): SolveResult
 
-    /** Minimise [objective], capturing the best value AND its time-to-best (see [RefTimed]) so parity
-     *  can break value-ties on speed. */
+    /** Minimise [objective], capturing the best value AND its time-to-best (see [RefTimed]) so an
+     *  offline comparison can break value-ties on speed. */
     fun minimizeTimed(
         problem: Problem,
         objective: LinearObjective,
@@ -44,10 +45,6 @@ internal interface Reference {
         search: BacktrackParams? = null,
         processors: Int = 1,
     ): RefTimed
-
-    /** Anytime incumbent stream for the anytime metric. OR-Tools yields each new incumbent
-     *  over time; Choco (complete) yields its single optimum. */
-    fun improvements(problem: Problem, objective: LinearObjective, budget: Budget): Sequence<MinimizeResult>
 
     companion object {
         /** The reference backends a metric may diff against. */
@@ -91,8 +88,6 @@ private object ChocoReference : Reference {
         val t = ChocoSolver(problem).minimizeTimed(objective, params(budget, search, processors))
         return RefTimed(t.value, t.timeToBestMillis, t.proven)
     }
-    override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
-        ChocoSolver(problem).improvements(objective, params(budget))
 }
 
 /** Drain an incumbent [stream] (budget-bounded), stamping each new best with the wall-clock elapsed
@@ -111,9 +106,9 @@ private fun timedFromImprovements(stream: Sequence<MinimizeResult>): RefTimed {
     return RefTimed(value, ms, proven)
 }
 
-/** Yuck local-search reference (temporary, LS parity sweep). Unlike the complete references it
- *  cannot prove UNSAT or optimality — "not found within budget" maps to `Unknown`, so parity
- *  rows diff feasibility/quality, not completeness. */
+/** Yuck local-search reference (temporary, LS baseline sweep). Unlike the complete references it
+ *  cannot prove UNSAT or optimality — "not found within budget" maps to `Unknown`, so its rows
+ *  carry feasibility/quality, not completeness. */
 private object YuckReference : Reference {
     override val name = "yuck"
     private fun params(b: Budget) = YuckParams(timeoutMillis = b.timeoutMillis)
@@ -126,8 +121,6 @@ private object YuckReference : Reference {
         search: BacktrackParams?,
         processors: Int,
     ) = timedFromImprovements(YuckSolver(problem).improvements(objective, params(budget)))
-    override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
-        YuckSolver(problem).improvements(objective, params(budget))
 }
 
 private object OrToolsReference : Reference {
@@ -142,6 +135,4 @@ private object OrToolsReference : Reference {
         search: BacktrackParams?,
         processors: Int,
     ) = timedFromImprovements(OrToolsSolver(problem).improvements(objective, params(budget)))
-    override fun improvements(problem: Problem, objective: LinearObjective, budget: Budget) =
-        OrToolsSolver(problem).improvements(objective, params(budget))
 }

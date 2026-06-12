@@ -61,9 +61,9 @@ enum class Backend {
     YUCK,
 
     /** klause unified parallel [Portfolio] (mixed LS + backtrack workers) run *as a solver* —
-     *  the same engine the anytime metric drives, exposed here so the time / completeness /
-     *  parity / verify metrics can benchmark the portfolio itself. Worker counts come from
-     *  `-Dklause.portfolio.ls` / `-Dklause.portfolio.bt` (defaults 4 / 2). */
+     *  exposed here so the time / completeness / solve / verify metrics can benchmark the portfolio
+     *  itself. The pool width comes from `-Dklause.portfolio.processors` (default: host core count);
+     *  the LS:backtrack split is the scenario's kind-derived decision, not a per-engine knob. */
     KLAUSE_PORTFOLIO,
 }
 
@@ -201,17 +201,17 @@ private class YuckBench(override val problem: Problem, private val params: YuckP
 
 /**
  * The unified parallel [Portfolio] exposed as a bench backend (#64): the same mixed LS +
- * backtrack engine the anytime metric drives, now selectable for the time / completeness /
- * parity / verify metrics so the portfolio can be benchmarked *as a solver* across the catalog.
+ * backtrack engine, now selectable for the time / completeness / solve / verify metrics so the
+ * portfolio can be benchmarked *as a solver* across the catalog.
  *
  * The pool width comes from `-Dklause.portfolio.processors` (default: host core count) — the same
- * one-knob model parity uses; the LS:backtrack split is the scenario's (kind-derived) decision, not a
+ * one-knob model the solve metric uses; the LS:backtrack split is the scenario's (kind-derived) decision, not a
  * per-engine count. The portfolio + sessions are built once and reused across calls (matching the
  * single-engine benches).
  *
  * **Scope:** [solve] and the bounded [samples] / [enumerated] are the intended use. The lazy
  * sequence views are materialised to a bounded cap (`SEQUENCE_CAP`) because LS workers stream
- * unbounded — the portfolio is a solve / time / parity backend, not an enumeration or
+ * unbounded — the portfolio is a solve / time backend, not an enumeration or
  * uniformness oracle.
  */
 private class PortfolioBench(
@@ -271,7 +271,7 @@ internal object Solvers {
     val KLAUSE_PORTFOLIO = SolverConfig("portfolio", Backend.KLAUSE_PORTFOLIO)
 
     /**
-     * Presolve config for the bench. Defaults to NONE so enumeration / parity / completeness
+     * Presolve config for the bench. Defaults to NONE so enumeration / solve / completeness
      * metrics compare the same solution sets as the reference solvers; set `-Dklause.presolve`
      * (none | default | all | comma-list) to measure the shipped presolve on e.g. the time metric.
      */
@@ -300,7 +300,7 @@ internal object Solvers {
      *  Set `-Dklause.bench.portfolio=true` to also include the unified [Backend.KLAUSE_PORTFOLIO]
      *  parallel pool as a backend (#64) — opt-in because it spawns a multi-thread pool per
      *  instance, which would dominate wall-clock on every metric if always on. With it on,
-     *  `bench run time|completeness|parity|verify` benchmark the portfolio as a solver alongside
+     *  `bench time|completeness|solve|verify` benchmark the portfolio as a solver alongside
      *  the single engines. */
     fun defaultPortfolio(problem: Problem): List<InProcessSolver> {
         val pre = Presolver.run(problem, benchPresolve(), PresolveContext.EMPTY)
