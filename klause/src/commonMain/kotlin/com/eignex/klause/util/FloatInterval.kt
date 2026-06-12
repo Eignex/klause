@@ -4,11 +4,10 @@ package com.eignex.klause.util
  * Closed real interval `[lo, hi]` over IEEE-754 doubles. Used as the domain for float
  * variables in `Problem.floatDomains`.
  *
- * Soundness note: this is a *user-facing* interval. Native-float backends (Z3 today,
- * future native interval-CP) reason within the exact rational/real semantics this
- * declares. Backends that bucket floats onto bounded integers (bit-blaster, LogicNG,
- * and currently LocalSearch / Backtrack via a lowering pass) approximate this interval
- * with finite resolution and may produce solutions within rounding error of the bound.
+ * Soundness note: this is a *user-facing* interval declaring the bucketing bounds. All
+ * backends bucket floats onto bounded integers (bit-blaster, LogicNG, and LocalSearch /
+ * Backtrack via a lowering pass), approximating this interval with finite resolution, and
+ * may produce solutions within rounding error of the bound.
  */
 data class FloatInterval(
     /** Inclusive lower bound. */

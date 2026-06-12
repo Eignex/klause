@@ -33,7 +33,7 @@ interface SolverParams {
     fun withAssumptions(@Suppress("UNUSED_PARAMETER") assumptions: Assumptions): SolverParams = this
 
     /** Inject a cooperative cancellation token. Backends that support cancellation
-     *  override to return a copy with the token wired in; others (LogicNG, Z3, Brute)
+     *  override to return a copy with the token wired in; others (LogicNG, Brute)
      *  default to no-op. */
     fun withCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
 }
@@ -43,7 +43,7 @@ interface SolverParams {
  *
  *  - [Sat] — the engine found a satisfying assignment.
  *  - [Unsat] — the engine proved no assignment exists. Only complete backends (LogicNG,
- *    Z3, `BruteForceSolver`, `BacktrackSolver`) return this; the local-search engine
+ *    `BruteForceSolver`, `BacktrackSolver`) return this; the local-search engine
  *    returns [Unknown] when its budget is exhausted.
  *  - [Unknown] — the engine returned without a definitive answer (LS budget exhausted,
  *    timeout, etc.).
@@ -62,7 +62,7 @@ sealed interface SolveResult {
 
     /**
      * Proven infeasible. [core] is an optional jointly-unsat subset of factor ids; backends
-     * that compute one populate it (Z3 via tracked assertions), backends that don't leave
+     * that compute one populate it, backends that don't leave
      * it `null`. `Unsat()` (no core) is a valid construction.
      */
     data class Unsat(
@@ -99,7 +99,7 @@ sealed interface SolveResult {
  *  - [samples] — *with replacement*. Each yield is an independent draw; the same
  *    assignment may reappear. Dedup fields on [P] (where present) are ignored.
  *  - [enumerate] — *without replacement* for complete backends ([BacktrackSolver],
- *    `BruteForceSolver`, LogicNG, Z3): distinct satisfying assignments, with optional
+ *    `BruteForceSolver`, LogicNG): distinct satisfying assignments, with optional
  *    rolling-window post-filter via `params.minHammingDistance` / `params.recentWindow`.
  *    Stochastic backends (`LocalSearchSolver`) cannot enumerate; their `enumerate` is
  *    an alias for [samples] and may yield duplicates.
@@ -196,7 +196,7 @@ interface Solver<P : SolverParams> {
  *
  * The objective is **statically** the native integer-linear form — the one every front-end
  * produces — so backends enable their objective machinery (LP relaxation bounding, branch-and-bound
- * bounds, native `mkAdd` translation in Z3) from params alone, with no runtime objective-type
+ * bounds) from params alone, with no runtime objective-type
  * dispatch. The local-search engines additionally accept a per-move gradient view of the same
  * objective via `LocalSearchParams.lsObjective` (see
  * [com.eignex.klause.solver.objective.IncrementalObjective]).

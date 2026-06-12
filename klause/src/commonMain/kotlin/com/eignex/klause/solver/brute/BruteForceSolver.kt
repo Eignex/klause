@@ -61,7 +61,7 @@ data class BruteForceParams(
  *
  * As an [Optimizer] the implementation is the obvious "walk every assignment, return the
  * one with the lowest objective". Trivially correct and useful as a ground-truth oracle
- * for stochastic / SMT-based optimisation backends on small problems.
+ * for stochastic optimisation backends on small problems.
  */
 class BruteForceSolver(override val problem: Problem) :
     Solver<BruteForceParams>,
