@@ -1,131 +1,59 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.util.IntIntMap
 
 /**
  * `auxBoolVar ↔ (#true literals in [min, max])`. Created by the compiler when a
  * [com.eignex.klause.ast.CardinalityExpr] / `AtMost` / `AtLeast` appears non-top-level so the
- * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload(factorId)`
+ * Tseitin lowering can treat its truth as a Boolean literal. Payload at `longPayload(factorId)`
  * is the count of true literals, mirrored from [Cardinality].
  */
-class ReifiedCardinality(
-    /** Reification literal: true iff the cardinality bound holds. */
-    val auxBoolVar: Int,
-    /** The literals being counted. */
-    val literals: IntArray,
-    /** Inclusive lower bound on the true count. */
-    val min: Int,
-    /** Inclusive upper bound on the true count. */
-    val max: Int,
-) : Factor {
-
-    init {
-        require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
-        require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
-    }
+class ReifiedCardinality(override val auxBoolVar: Int, literals: IntArray, min: Int, max: Int) :
+    CardinalitySumFactor(literals, min, max, excludedVar = auxBoolVar),
+    ReifiedFactor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
-    override val intVars: IntArray = EmptyIntArray
 
-    /** Net polarity-signed occurrence count per Boolean variable in [literals] (excluding
-     *  [auxBoolVar] — aux flips don't affect the body count). `+1` per positive
-     *  occurrence, `-1` per negative; vars whose occurrences cancel exactly have entry 0
-     *  and don't shift the count when flipped. */
-    private val signedOccurrencesByVar: IntIntMap = run {
-        val signs = HashMap<Int, Int>()
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == auxBoolVar) continue
-            val sign = if (Lit.isPositive(lit)) 1 else -1
-            signs[v] = (signs[v] ?: 0) + sign
-        }
-        IntIntMap.build(
-            keys = signs.keys.toIntArray(),
-            values = signs.values.toIntArray(),
-            absent = 0,
-        )
-    }
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        var count = 0
-        for (lit in literals) {
-            if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
-        }
-        state.intPayload[factorId] = count
-    }
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
+        residual(state.longPayload[factorId], softCap)
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val aux = state.assignment.boolValue(auxBoolVar)
-        val holds = inRange(state.intPayload[factorId])
-        return aux != holds
-    }
-
-    /** Graded violation for `aux ↔ (count ∈ [min, max])`: `0` when they agree; when the
-     *  indicator wants the count in range but it isn't, the compressed distance to the window
-     *  `max(0, min − n) + max(0, n − max)` (so body flips that close the gap score); when the
-     *  indicator wants it out of range but it's in, `1`. Mirrors the [ReifiedLinear] gradient. */
-    private fun degreeFor(n: Int, aux: Boolean, softCap: Int): Int {
-        val h = inRange(n)
-        return when {
-            aux == h -> 0
-            aux -> compressViolation(((if (n < min) min - n else 0) + (if (n > max) n - max else 0)).toLong(), softCap)
-            else -> 1
-        }
-    }
-
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeFor(state.intPayload[factorId], state.assignment.boolValue(auxBoolVar), state.violationSoftCap)
+    private fun degreeFor(n: Long, aux: Boolean, softCap: Int): Int =
+        reifiedDegree(aux, holds(n)) { residual(n, softCap) }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val n = state.intPayload[factorId]
+        val n = state.longPayload[factorId]
         val cap = state.violationSoftCap
         return if (boolVar == auxBoolVar) {
             degreeFor(n, !aux, cap) - degreeFor(n, aux, cap)
         } else {
-            val change = changeOnFlip(state, boolVar, current = true)
+            val change = signedFlipDelta(state, signedByVar, boolVar, current = true)
             degreeFor(n + change, aux, cap) - degreeFor(n, aux, cap)
         }
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val oldN = state.intPayload[factorId]
+        val oldN = state.longPayload[factorId]
         val cap = state.violationSoftCap
         if (boolVar == auxBoolVar) {
             val newAux = state.assignment.boolValue(auxBoolVar)
             return degreeFor(oldN, newAux, cap) - degreeFor(oldN, !newAux, cap)
         }
-        val change = changeOnFlip(state, boolVar, current = false)
+        val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
         val newN = oldN + change
-        state.intPayload[factorId] = newN
+        state.longPayload[factorId] = newN
         val aux = state.assignment.boolValue(auxBoolVar)
         return degreeFor(newN, aux, cap) - degreeFor(oldN, aux, cap)
-    }
-
-    /**
-     * Δ to payload count from flipping `boolVar`. With `current = true` the assignment still
-     * holds the pre-flip value (used by [deltaIfBoolFlipped]); with `current = false` the
-     * assignment has been updated (used by [applyBoolFlip]). O(1) via [signedOccurrencesByVar].
-     */
-    private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
-        val signed = signedOccurrencesByVar[boolVar]
-        if (signed == 0) return 0
-        val pre = if (current) {
-            state.assignment.boolValue(boolVar)
-        } else {
-            !state.assignment.boolValue(boolVar)
-        }
-        return if (pre) -signed else signed
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -233,8 +161,8 @@ class ReifiedCardinality(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val n = state.intPayload[factorId]
-        if (aux == inRange(n)) return
+        val n = state.longPayload[factorId]
+        if (aux == holds(n)) return
         sink.addBoolFlip(auxBoolVar)
         val auxFlip = BoolFlip(auxBoolVar)
         val wantInRange = aux
@@ -244,17 +172,15 @@ class ReifiedCardinality(
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val newN = n + if (isTrue) -1 else 1
             // Same-aux body flip: drives count toward the predicate matching current aux.
-            if (wantInRange == inRange(newN)) sink.addBoolFlip(v)
+            if (wantInRange == holds(newN)) sink.addBoolFlip(v)
             // Toggle-driven sub-region exploration: pair aux flip with a body flip that
             // drives count toward the *opposite* predicate, so strategies can atomically
             // transition to the other reification side.
-            if (wantInRange != inRange(newN)) {
+            if (wantInRange != holds(newN)) {
                 sink.addCompound(listOf(auxFlip, BoolFlip(v)))
             }
         }
     }
-
-    private fun inRange(count: Int): Boolean = count in min..max
 
     /** Clause-form nogood for any pin failure: every currently-pinned constraint literal's
      *  false-form, plus the aux literal when pinned. The current pinning collectively
@@ -269,16 +195,16 @@ class ReifiedCardinality(
     /** Recover the pre-flip count and aux value from the now-committed state, then walk
      *  each touched variable once applying the change in its break/make contribution. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val newN = state.intPayload[factorId]
+        val newN = state.longPayload[factorId]
         val newAux = state.assignment.boolValue(auxBoolVar)
         val oldAux: Boolean
-        val oldN: Int
+        val oldN: Long
         if (flippedVar == auxBoolVar) {
             oldAux = !newAux
             oldN = newN
         } else {
             oldAux = newAux
-            val signedFlipped = signedOccurrencesByVar[flippedVar]
+            val signedFlipped = signedByVar[flippedVar]
             if (signedFlipped == 0) return // body lit whose occurrences cancel — nothing changed
             val flippedPost = state.assignment.boolValue(flippedVar)
             val changeV = if (flippedPost) signedFlipped else -signedFlipped
@@ -296,7 +222,7 @@ class ReifiedCardinality(
                 preDelta = degreeFor(oldN, !oldAux, cap) - oldDeg
                 postDelta = degreeFor(newN, !newAux, cap) - newDeg
             } else {
-                val signedU = signedOccurrencesByVar[u]
+                val signedU = signedByVar[u]
                 if (signedU == 0) {
                     preDelta = 0
                     postDelta = 0

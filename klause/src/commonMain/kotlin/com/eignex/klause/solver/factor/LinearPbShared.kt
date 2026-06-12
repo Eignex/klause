@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.PbOp
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 
@@ -130,6 +131,19 @@ internal fun buildSignedWeightByVar(weights: IntArray, literals: IntArray, exclu
         values = signs.values.toIntArray(),
         absent = 0,
     )
+}
+
+internal fun signedFlipDelta(state: LocalSearchState, signedByVar: IntIntMap, boolVar: Int, current: Boolean): Int {
+    val signed = signedByVar[boolVar]
+    if (signed == 0) return 0
+    val pre = if (current) state.assignment.boolValue(boolVar) else !state.assignment.boolValue(boolVar)
+    return if (pre) -signed else signed
+}
+
+internal inline fun reifiedDegree(aux: Boolean, holds: Boolean, violatedDegree: () -> Int): Int = when {
+    aux == holds -> 0
+    aux -> violatedDegree()
+    else -> 1
 }
 
 /* ------------------------------------------------------------------ *

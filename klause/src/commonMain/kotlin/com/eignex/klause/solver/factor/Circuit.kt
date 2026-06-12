@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -44,8 +43,8 @@ import kotlin.math.abs
  */
 class Circuit(
     /** Successor variable id per node; the assignment must form one Hamiltonian cycle. */
-    val succ: IntArray,
-) : Factor {
+    succ: IntArray,
+) : SuccessorCycleFactor(succ) {
 
     init {
         require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }
@@ -53,47 +52,12 @@ class Circuit(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Circuit(succ.remapVars(intMap))
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = succ
-
-    private val n: Int = succ.size
-
-    /** Reverse map var-id → position in [succ], for delta-from-IntVar paths. */
-    private val positionOfVar: Map<Int, Int> = succ.withIndex().associate { (i, v) -> v to i }
-
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        state.intPayload[factorId] = computeCost(state, replaceAt = -1, replaceWith = 0)
-    }
-
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
-
-    /** Graded violation: the [computeCost] distance to a single Hamiltonian cycle
-     *  (`|numCycles−1| + unreached-nodes + self-loops + out-of-bounds`). Exposing this magnitude
-     *  — rather than a binary flag — gives CBLS a gradient that rewards moves merging cycles
-     *  and reaching more nodes, the signal successor-encoded routing (e.g. cvrp) needs. */
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = state.intPayload[factorId]
-
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val pos = positionOfVar[intVar] ?: return 0
-        val oldCost = state.intPayload[factorId]
-        val newCost = computeCost(state, replaceAt = pos, replaceWith = newValue)
-        return newCost - oldCost
-    }
-
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        if (positionOfVar[intVar] == null) return 0
-        val oldCost = state.intPayload[factorId]
-        val newCost = computeCost(state, replaceAt = -1, replaceWith = 0)
-        state.intPayload[factorId] = newCost
-        return newCost - oldCost
-    }
-
     /**
      * Graded cost: `|numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`.
      * Returns 0 iff the assignment (with optional override `succ[replaceAt] = replaceWith`)
      * is a single Hamiltonian cycle of length `n`. O(n).
      */
-    private fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int {
+    override fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int {
         if (n == 1) {
             val v = if (replaceAt == 0) replaceWith else state.assignment.intValue(succ[0])
             return if (v == 0) 0 else 1
@@ -114,35 +78,10 @@ class Circuit(
                 next[i] = s
             }
         }
-        // Functional-graph cycle decomposition. Each valid node has one out-edge; nodes
-        // with next[i] = -1 are sinks. Walk from each unvisited start, track entry step
-        // so a revisit can identify whether we closed a cycle (re-entered current path)
-        // or merged into a previously-explored region (no new cycle).
-        val unvisited = 0
-        val onStack = 1
-        val done = 2
-        val markers = IntArray(n) // 0 = unvisited
-        val enterStep = IntArray(n)
-        var globalStep = 0
-        var numCycles = 0
-        var nodesInCycles = 0
-        for (start in 0 until n) {
-            if (markers[start] != unvisited) continue
-            var cur = start
-            while (cur >= 0 && markers[cur] == unvisited) {
-                markers[cur] = onStack
-                enterStep[cur] = globalStep++
-                cur = next[cur]
-            }
-            if (cur >= 0 && markers[cur] == onStack) {
-                // Returned to a node on the current path → cycle from `cur` to end-of-path.
-                numCycles++
-                nodesInCycles += globalStep - enterStep[cur]
-            }
-            // Settle path nodes as done so they're never revisited.
-            for (i in 0 until n) if (markers[i] == onStack) markers[i] = done
-        }
-        return abs(numCycles - 1) + (n - nodesInCycles) + numSelfLoops + numOob
+        // Functional-graph cycle decomposition: each valid node has one out-edge, nodes
+        // with next(i) = -1 are sinks.
+        val scan = cycleScan(next)
+        return abs(scan.numCycles - 1) + (n - scan.nodesInCycles) + numSelfLoops + numOob
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -150,15 +89,7 @@ class Circuit(
         // succ vars (Hamiltonian-cycle reasoning is global). Union once at entry.
         val ant = state.composeIntVarAtomAntecedents(succ)
         // 1. Tighten each succ[i] to the domain [0, n). Structural; antecedent null.
-        for (i in succ.indices) {
-            val v = succ[i]
-            val d = state.intDomains[v]
-            val newLo = maxOf(d.min, 0)
-            val newHi = minOf(d.max, n - 1)
-            if (newLo > newHi) return false
-            if (newLo != d.min && !state.tightenIntMin(v, newLo)) return false
-            if (newHi != d.max && !state.tightenIntMax(v, newHi)) return false
-        }
+        if (!tightenSuccToRange(state)) return false
         if (n == 1) {
             val v = succ[0]
             val d = state.intDomains[v]
@@ -191,18 +122,7 @@ class Circuit(
             }
         }
         // 4. Pigeonhole: shave singleton-taken values from non-singleton endpoints.
-        for (i in succ.indices) {
-            val v = succ[i]
-            val d = state.intDomains[v]
-            if (d.min == d.max) continue
-            var newMin = d.min
-            while (newMin < d.max && pred[newMin] != -1 && pred[newMin] != i) newMin++
-            var newMax = d.max
-            while (newMax > newMin && pred[newMax] != -1 && pred[newMax] != i) newMax--
-            if (newMin > newMax) return false
-            if (newMin != d.min && !state.tightenIntMin(v, newMin, ant)) return false
-            if (newMax != d.max && !state.tightenIntMax(v, newMax, ant)) return false
-        }
+        if (!shaveClaimedFromEndpoints(state, pred, ant)) return false
         // 5. Cycle-detect on singletons: walk the singleton-successor graph from each
         //    unvisited node. If a closed cycle has length < n, it's a sub-cycle that
         //    can never be extended into a Hamiltonian — fail. This also catches

@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.ast.PbOp
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
@@ -10,27 +9,13 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntIntMap
 
 /**
  * `Σ weights`i` * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
  * true, 0 when false). Payload at `intPayload[factorId]` is the current weighted sum.
  */
-class PseudoBoolean(
-    /** Weights, parallel to [literals]. */
-    val weights: IntArray,
-    /** Boolean literals contributing their weight when true. */
-    val literals: IntArray,
-    /** Relation between the weighted sum and [bound]. */
-    val op: PbOp,
-    /** Right-hand-side bound. */
-    val bound: Int,
-) : Factor {
-
-    init {
-        require(weights.size == literals.size) { "weights/literals length mismatch" }
-        require(weights.isNotEmpty()) { "PseudoBoolean must have at least one term" }
-    }
+class PseudoBoolean(weights: IntArray, literals: IntArray, op: PbOp, bound: Int) :
+    PseudoBooleanSumFactor(weights, literals, op, bound, excludedVar = -1) {
 
     override fun structuralKey(): String = "pb:$op:$bound:" + literals.indices.sortedBy { literals[it] }.joinToString(
         ",",
@@ -40,44 +25,24 @@ class PseudoBoolean(
         PseudoBoolean(weights, literals.remapLits(boolMap), op, bound)
 
     override val boolVars: IntArray = literals.litVars()
-    override val intVars: IntArray = EmptyIntArray
 
-    /** Sum of `weight`i` * sign(literals`i`)` per Boolean variable. Flipping `v` shifts
-     *  the running sum by `(if v_was_true then -signed[v] else +signed[v])`, computed in
-     *  O(1) instead of scanning every literal in the factor. */
-    private val signedWeightByVar: IntIntMap = buildSignedWeightByVar(weights, literals)
-
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0L
-        for (i in literals.indices) {
-            if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
-                sum += weights[i].toLong()
-            }
-        }
-        state.longPayload[factorId] = sum
-    }
-
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = violates(state.longPayload[factorId])
-
-    /** Graded violation: the weighted-sum residual `distance(sum)`, compressed — gives CBLS a
-     *  gradient toward the bound instead of a flat boolean. */
-    private fun degreeOf(sum: Long, softCap: Int): Int = compressViolation(distance(sum), softCap)
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !holds(state.longPayload[factorId])
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degreeOf(state.longPayload[factorId], state.violationSoftCap)
+        degree(state.longPayload[factorId], state.violationSoftCap)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val change = changeOnFlip(state, boolVar, current = true)
+        val change = signedFlipDelta(state, signedByVar, boolVar, current = true)
         val sum = state.longPayload[factorId]
-        return degreeOf(sum + change, state.violationSoftCap) - degreeOf(sum, state.violationSoftCap)
+        return degree(sum + change, state.violationSoftCap) - degree(sum, state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val change = changeOnFlip(state, boolVar, current = false)
+        val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
         val oldSum = state.longPayload[factorId]
         val newSum = oldSum + change
         state.longPayload[factorId] = newSum
-        return degreeOf(newSum, state.violationSoftCap) - degreeOf(oldSum, state.violationSoftCap)
+        return degree(newSum, state.violationSoftCap) - degree(oldSum, state.violationSoftCap)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
@@ -93,7 +58,7 @@ class PseudoBoolean(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val sum = state.longPayload[factorId]
-        if (!violates(sum)) return
+        if (holds(sum)) return
         val curDist = distance(sum)
         for (i in literals.indices) {
             val lit = literals[i]
@@ -175,39 +140,22 @@ class PseudoBoolean(
         }
     }
 
-    private fun violates(sum: Long): Boolean = !pbHolds(sum, op, bound)
-
     private fun distance(sum: Long): Long = pbDistance(sum, op, bound)
-
-    private fun changeOnFlip(state: LocalSearchState, boolVar: Int, current: Boolean): Int {
-        val signed = signedWeightByVar[boolVar]
-        if (signed == 0) return 0
-        // If we want the delta against the *current* value of `boolVar`: flipping from
-        // true → false contributes `-signed`; false → true contributes `+signed`. If we
-        // want the delta from the *pre*-flip value (i.e. the engine has already committed
-        // the flip), the polarity inverts.
-        val pre = if (current) {
-            state.assignment.boolValue(boolVar)
-        } else {
-            !state.assignment.boolValue(boolVar)
-        }
-        return if (pre) -signed else signed
-    }
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
     /** O(arity) — replaces the engine's two `deltaIfBoolFlipped`-driven passes (each itself
      *  O(arity)) with a single per-var diff. Computes pre- vs post-flip break/make
-     *  contributions from [signedWeightByVar] and applies only the changes. */
+     *  contributions from [signedByVar] and applies only the changes. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val signedFlipped = signedWeightByVar[flippedVar]
+        val signedFlipped = signedByVar[flippedVar]
         if (signedFlipped == 0) return
         val newSum = state.longPayload[factorId]
         val flippedPost = state.assignment.boolValue(flippedVar)
         val changeV = if (flippedPost) signedFlipped else -signedFlipped
         val oldSum = newSum - changeV
         for (u in boolVars) {
-            val signedU = signedWeightByVar[u]
+            val signedU = signedByVar[u]
             if (signedU == 0) continue
             val uPost = state.assignment.boolValue(u)
             val uPre = if (u == flippedVar) !uPost else uPost
@@ -215,10 +163,10 @@ class PseudoBoolean(
             val newChangeU = if (uPost) -signedU else signedU
             // Break/make track the sign of the graded Δ each var's flip would produce (the same
             // value deltaIfBoolFlipped returns), evaluated against the pre- and post-flip sums.
-            val preDelta = degreeOf(oldSum + oldChangeU, state.violationSoftCap) -
-                degreeOf(oldSum, state.violationSoftCap)
-            val postDelta = degreeOf(newSum + newChangeU, state.violationSoftCap) -
-                degreeOf(newSum, state.violationSoftCap)
+            val preDelta = degree(oldSum + oldChangeU, state.violationSoftCap) -
+                degree(oldSum, state.violationSoftCap)
+            val postDelta = degree(newSum + newChangeU, state.violationSoftCap) -
+                degree(newSum, state.violationSoftCap)
             val preBreak = preDelta > 0
             val preMake = preDelta < 0
             val postBreak = postDelta > 0
