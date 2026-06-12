@@ -10,7 +10,7 @@ bench <metric> [filters…]      e.g.  bench solve suite=smtlib-core backend=ort
 
 Presets (`target/Targets.kt`) are named shorthands for a `bench <metric>` line that carries non-obvious config (a tuned budget or a curated suite mix) — nothing else.
 
-No external solver binaries are used for klause itself; the `minizinc` CLI only compiles models to FlatZinc, and everything is solved in-process. The `solve` metric runs **one** solver per invocation — klause, or one of the in-process reference adapters `klause-choco` (complete), `klause-ortools` (CP-SAT), `klause-yuck` (local search). There is no in-session comparison: to compare solvers, run `solve` once per backend (each writes its own `build/solve-<solver>.json`) and diff the saved files offline — so one solver's crash or warmup never contaminates another's baseline.
+The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. There is no in-session comparison and no in-process reference adapter: run `solve` once per backend (each writes its own `build/solve-<solver>.json`, cached in `build/bench-cache/`) and diff offline with `parity-runs/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by the non-solve metrics: `time`/`verify`/`uniformness`/`completeness`/`search`.)
 
 ## Quick start
 
@@ -63,7 +63,7 @@ Metrics write JSON (and Markdown where useful) under `build/`.
 ## Recipes
 
 ```
-# solve a corpus with each backend, one invocation each (Yuck needs `:klause-yuck:installYuck`)
+# solve a corpus with each backend, one invocation each (klause needs `:klause-cli:installJvmDist`)
 bench solve suite=mzn-bench per-family=1 max=50 seed=1                 # klause (default), sampled slice
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=choco   # Choco baseline, same selection
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck baseline
@@ -139,9 +139,9 @@ Vendored problems live in `smoke-corpus/` — small, fast instances meant to exe
 The reference path depends on the instance's format:
 
 - **MiniZinc instances** run the reference **end-to-end via `minizinc --solver <id>`** on the original `.mzn`(+`.dzn`) — the competition setup, where the solver compiles the model with **its own** globals library and uses its native propagators. This is the faithful baseline. Yuck is registered out of the box; Choco is provisioned with `./gradlew :klause-bench:installChoco` (fetches the choco-parsers FlatZinc jar + Choco's `mzn_lib` globals and registers `choco.msc` under `~/.minizinc/solvers`, so `minizinc --solver choco` runs Choco with its own native globals).
-- **Non-MiniZinc formats** (XCSP3 / OPB / DIMACS / SMT — no `.mzn` to hand to `minizinc`) fall back to the in-process adapters `klause-choco` / `klause-ortools` / `klause-yuck`, which map a klause `Problem` into the reference and solve it in-process. They raise an explicit unsupported-factor error rather than silently dropping a constraint.
+- **Non-MiniZinc formats** (XCSP3 / SMT-LIB / FlatZinc — no `.mzn` to hand to `minizinc`) are solved by **klause only**, via `klause-cli` on the original file. There is no external reference for these (the in-process Choco/OR-Tools/Yuck/LogicNG adapter modules were removed in the subprocess refactor).
 
-The in-process adapters re-derive the reference from klause's **already-decomposed** `Problem`, so on MiniZinc models they would inherit klause's lowering (e.g. a `subcircuit` that klause turned into clauses, or an internal `GaussianXor`) instead of the solver's native global — which is exactly why the MiniZinc path bypasses them.
+Running references end-to-end via `minizinc --solver` is deliberate: an in-process adapter would re-derive the reference from klause's **already-decomposed** `Problem` and inherit klause's lowering (e.g. a `subcircuit` turned into clauses, or an internal `GaussianXor`) instead of the solver's native global — distorting the baseline.
 
 ## Running the parity sweep
 

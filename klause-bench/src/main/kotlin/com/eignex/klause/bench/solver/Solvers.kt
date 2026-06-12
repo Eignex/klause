@@ -1,11 +1,5 @@
 package com.eignex.klause.bench.solver
 
-import com.eignex.klause.choco.ChocoParams
-import com.eignex.klause.choco.ChocoSolver
-import com.eignex.klause.logicng.LogicNGParams
-import com.eignex.klause.logicng.LogicNGSolver
-import com.eignex.klause.ortools.OrToolsParams
-import com.eignex.klause.ortools.OrToolsSolver
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
@@ -25,8 +19,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.Presolver
-import com.eignex.klause.yuck.YuckParams
-import com.eignex.klause.yuck.YuckSolver
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -43,22 +35,8 @@ enum class Backend {
     /** klause complete CSP backtracking engine (proofs, optima, enumeration). */
     KLAUSE_COMPLETE,
 
-    /** LogicNG bit-blasted SAT side-door. */
-    LOGICNG,
-
     /** Exhaustive enumeration; only viable when the assignment space is tiny. */
     BRUTE_FORCE,
-
-    /** Choco Solver, complete-search reference adapter (`klause-choco`). */
-    CHOCO,
-
-    /** OR-Tools CP-SAT, anytime / local-search reference adapter (`klause-ortools`). */
-    ORTOOLS,
-
-    /** Yuck, local-search reference adapter (`klause-yuck`) — temporary, for the LS parity
-     *  sweep. Runs an external Yuck subprocess (Yuck is not on Maven Central); provision it
-     *  with `./gradlew :klause-yuck:installYuck` or `-Dklause.yuck.home`. */
-    YUCK,
 
     /** klause unified parallel [Portfolio] (mixed LS + backtrack workers) run *as a solver* —
      *  exposed here so the time / completeness / solve / verify metrics can benchmark the portfolio
@@ -120,17 +98,6 @@ private class LocalSearchBench(
     override fun samplesSequence() = s.samples(params)
 }
 
-private class LogicNGBench(override val problem: Problem, private val params: LogicNGParams = LogicNGParams()) :
-    InProcessSolver {
-    private val s = LogicNGSolver(problem)
-    override val name = "logicng"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
-    override fun enumerateSequence() = s.enumerate(params)
-    override fun samplesSequence() = s.samples(params)
-}
-
 private class BacktrackBench(
     override val problem: Problem,
     base: BacktrackParams = BacktrackParams(maxDecisions = 100_000L, randomSeed = 0L),
@@ -159,39 +126,6 @@ private class BruteForceBench(
 ) : InProcessSolver {
     private val s = BruteForceSolver(problem)
     override val name = "brute-force"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
-    override fun enumerateSequence() = s.enumerate(params)
-    override fun samplesSequence() = s.samples(params)
-}
-
-private class ChocoBench(override val problem: Problem, private val params: ChocoParams = ChocoParams()) :
-    InProcessSolver {
-    private val s = ChocoSolver(problem)
-    override val name = "choco"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
-    override fun enumerateSequence() = s.enumerate(params)
-    override fun samplesSequence() = s.samples(params)
-}
-
-private class OrToolsBench(override val problem: Problem, private val params: OrToolsParams = OrToolsParams()) :
-    InProcessSolver {
-    private val s = OrToolsSolver(problem)
-    override val name = "ortools"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
-    override fun enumerateSequence() = s.enumerate(params)
-    override fun samplesSequence() = s.samples(params)
-}
-
-private class YuckBench(override val problem: Problem, private val params: YuckParams = YuckParams()) :
-    InProcessSolver {
-    private val s = YuckSolver(problem)
-    override val name = "yuck"
     override fun solve() = s.solve(params)
     override fun samples(n: Int) = s.samples(params).take(n).toList()
     override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
@@ -263,11 +197,7 @@ private class PortfolioBench(
 internal object Solvers {
     val KLAUSE_LS = SolverConfig("local-search", Backend.KLAUSE_LS)
     val KLAUSE_COMPLETE = SolverConfig("backtrack", Backend.KLAUSE_COMPLETE)
-    val LOGICNG = SolverConfig("logicng", Backend.LOGICNG)
     val BRUTE_FORCE = SolverConfig("brute-force", Backend.BRUTE_FORCE)
-    val CHOCO = SolverConfig("choco", Backend.CHOCO)
-    val ORTOOLS = SolverConfig("ortools", Backend.ORTOOLS)
-    val YUCK = SolverConfig("yuck", Backend.YUCK)
     val KLAUSE_PORTFOLIO = SolverConfig("portfolio", Backend.KLAUSE_PORTFOLIO)
 
     /**
@@ -284,23 +214,19 @@ internal object Solvers {
         val inner = when (config.backend) {
             Backend.KLAUSE_LS -> LocalSearchBench(pre.problem)
             Backend.KLAUSE_COMPLETE -> BacktrackBench(pre.problem)
-            Backend.LOGICNG -> LogicNGBench(pre.problem)
             Backend.BRUTE_FORCE -> BruteForceBench(pre.problem)
-            Backend.CHOCO -> ChocoBench(pre.problem)
-            Backend.ORTOOLS -> OrToolsBench(pre.problem)
-            Backend.YUCK -> YuckBench(pre.problem)
             Backend.KLAUSE_PORTFOLIO -> PortfolioBench(pre.problem)
         }
         return if (pre.problem === problem) inner else ReconstructingInProcess(problem, inner, pre.reconstruct)
     }
 
-    /** The default in-process portfolio: LS + backtrack + LogicNG, plus brute force only when
-     *  the space fits.
+    /** The default in-process portfolio: klause LS + backtrack, plus brute force only when the
+     *  space fits.
      *
      *  Set `-Dklause.bench.portfolio=true` to also include the unified [Backend.KLAUSE_PORTFOLIO]
      *  parallel pool as a backend (#64) — opt-in because it spawns a multi-thread pool per
      *  instance, which would dominate wall-clock on every metric if always on. With it on,
-     *  `bench time|completeness|solve|verify` benchmark the portfolio as a solver alongside
+     *  `bench time|completeness|verify` benchmark the portfolio as a solver alongside
      *  the single engines. */
     fun defaultPortfolio(problem: Problem): List<InProcessSolver> {
         val pre = Presolver.run(problem, benchPresolve(), PresolveContext.EMPTY)
@@ -309,7 +235,6 @@ internal object Solvers {
         return buildList {
             add(wrap(LocalSearchBench(pre.problem)))
             add(wrap(BacktrackBench(pre.problem)))
-            add(wrap(LogicNGBench(pre.problem)))
             if (BruteForceSolver.fits(pre.problem)) add(wrap(BruteForceBench(pre.problem)))
             if (System.getProperty("klause.bench.portfolio")?.toBoolean() == true) {
                 add(wrap(PortfolioBench(pre.problem)))
