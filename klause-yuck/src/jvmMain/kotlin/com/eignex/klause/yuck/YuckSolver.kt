@@ -54,6 +54,28 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
     override fun minimize(objective: LinearObjective, params: YuckParams): MinimizeResult =
         improvements(objective, params).last()
 
+    /** Best objective and the wall-clock millis (from subprocess start) at which Yuck emitted it.
+     *  [value] / [timeToBestMillis] are null when no incumbent was found; [proven] is true when
+     *  Yuck exhausted the search (`==========`). The timestamp is captured as each intermediate
+     *  solution is read off the subprocess — Yuck runs a batch subprocess, so the streaming
+     *  `improvements()` view cannot carry true per-incumbent timing. */
+    data class TimedMin(val value: Double?, val timeToBestMillis: Long?, val proven: Boolean)
+
+    /** Minimise [objective], returning the best value with the wall-clock time at which Yuck
+     *  emitted it (see [TimedMin]) — the time-to-best source for the differential bench metrics. */
+    fun minimizeTimed(objective: LinearObjective, params: YuckParams): TimedMin {
+        val run = execute(FznModel.emit(problem, objective), params, intermediate = true)
+        if (run.solutions.isEmpty()) return TimedMin(null, null, proven = run.unsatisfiable || run.complete)
+        // Yuck emits improving incumbents in order, so the last solution is the best; its emit
+        // timestamp is the true time-to-best.
+        val best = run.solutions.last()
+        return TimedMin(
+            value = objectiveValueOf(best, objective),
+            timeToBestMillis = run.solutionTimestampsMs.lastOrNull(),
+            proven = run.complete,
+        )
+    }
+
     override fun improvements(objective: LinearObjective, params: YuckParams): Sequence<MinimizeResult> {
         val run = execute(FznModel.emit(problem, objective), params, intermediate = true)
         val incumbents = run.solutions.map { solution ->
@@ -94,6 +116,9 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
     /** One Yuck subprocess run over a FlatZinc model: solutions in emission order plus status markers. */
     private class RunResult(
         val solutions: List<Map<String, String>>,
+        /** Wall-clock millis from subprocess start at which each solution was emitted (parallel to
+         *  [solutions]) — captured as the output is read, so it reflects true time-to-incumbent. */
+        val solutionTimestampsMs: List<Long>,
         val unsatisfiable: Boolean,
         /** `==========` seen — search space exhausted (optimum proven / no further solutions). */
         val complete: Boolean,
@@ -139,13 +164,16 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
         drain.start()
 
         val solutions = ArrayList<Map<String, String>>()
+        val timestampsMs = ArrayList<Long>()
         val current = HashMap<String, String>()
         var unsatisfiable = false
         var complete = false
+        val startNanos = System.nanoTime()
         process.inputStream.bufferedReader().forEachLine { line ->
             when {
                 line == SOLUTION_SEPARATOR -> {
                     solutions.add(HashMap(current))
+                    timestampsMs.add((System.nanoTime() - startNanos) / NANOS_PER_MILLI)
                     current.clear()
                 }
 
@@ -170,7 +198,7 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
         check(process.exitValue() == 0 || solutions.isNotEmpty() || unsatisfiable) {
             "yuck failed (exit ${process.exitValue()}): ${stderr.toString().take(STDERR_REPORT_CAP)}"
         }
-        return RunResult(solutions, unsatisfiable, complete)
+        return RunResult(solutions, timestampsMs, unsatisfiable, complete)
     }
 
     private companion object {
@@ -179,6 +207,7 @@ class YuckSolver(override val problem: Problem) : Optimizer<YuckParams> {
         const val UNSATISFIABLE = "=====UNSATISFIABLE====="
         const val UNKNOWN = "=====UNKNOWN====="
         const val MILLIS_PER_SECOND = 1000L
+        const val NANOS_PER_MILLI = 1_000_000L
         const val DEFAULT_WAIT_MILLIS = 86_400_000L
         const val GRACE_MILLIS = 30_000L
         const val STDERR_REPORT_CAP = 2000
