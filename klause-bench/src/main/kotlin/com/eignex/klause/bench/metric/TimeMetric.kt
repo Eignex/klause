@@ -8,6 +8,8 @@ import com.eignex.klause.bench.report.EntryResult
 import com.eignex.klause.bench.report.EnvInfo
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.solver.presolve.PresolveConfig
+import com.eignex.klause.solver.presolve.PresolveContext
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.time.Instant
@@ -46,8 +48,14 @@ object TimeMetric {
         val results = mutableListOf<EntryResult>()
         val regressions = mutableListOf<String>()
         for (entry in entries) {
+            // The time metric measures the SHIPPED presolve (#341): DEFAULT config with an
+            // objective-aware context so a COP objective variable is never presolved away.
             val timings = bench(
-                entry.problem.let { Solvers.defaultPortfolio(it) },
+                Solvers.defaultPortfolio(
+                    entry.problem,
+                    PresolveConfig.DEFAULT,
+                    PresolveContext.of(entry.objective),
+                ),
                 repetitions,
                 sampleCount,
                 warmupReps,
