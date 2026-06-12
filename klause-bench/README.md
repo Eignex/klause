@@ -138,7 +138,7 @@ Vendored problems live in `smoke-corpus/` — small, fast instances meant to exe
 
 The reference path depends on the instance's format:
 
-- **MiniZinc instances** run the reference **end-to-end via `minizinc --solver <id>`** on the original `.mzn`(+`.dzn`) — the competition setup, where the solver compiles the model with **its own** globals library and uses its native propagators. This is the faithful baseline. Yuck is registered out of the box; Choco needs its solver config installed.
+- **MiniZinc instances** run the reference **end-to-end via `minizinc --solver <id>`** on the original `.mzn`(+`.dzn`) — the competition setup, where the solver compiles the model with **its own** globals library and uses its native propagators. This is the faithful baseline. Yuck is registered out of the box; Choco is provisioned with `./gradlew :klause-bench:installChoco` (fetches the choco-parsers FlatZinc jar + Choco's `mzn_lib` globals and registers `choco.msc` under `~/.minizinc/solvers`, so `minizinc --solver choco` runs Choco with its own native globals).
 - **Non-MiniZinc formats** (XCSP3 / OPB / DIMACS / SMT — no `.mzn` to hand to `minizinc`) fall back to the in-process adapters `klause-choco` / `klause-ortools` / `klause-yuck`, which map a klause `Problem` into the reference and solve it in-process. They raise an explicit unsupported-factor error rather than silently dropping a constraint.
 
 The in-process adapters re-derive the reference from klause's **already-decomposed** `Problem`, so on MiniZinc models they would inherit klause's lowering (e.g. a `subcircuit` that klause turned into clauses, or an internal `GaussianXor`) instead of the solver's native global — which is exactly why the MiniZinc path bypasses them.
