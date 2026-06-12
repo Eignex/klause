@@ -232,309 +232,79 @@ class BacktrackSolver(override val problem: Problem) :
      */
     override fun improvements(objective: LinearObjective, baseParams: BacktrackParams): Sequence<MinimizeResult> =
         sequence {
-            val params = if (baseParams.lpAuto) LpAutoConfig.recommend(problem, baseParams) else baseParams
-            yieldAll(improvementsConfigured(objective, params))
+            // The single B&B orchestration ([ResumableMinimize]), driven lazily: one incumbent surfaced
+            // per step, then the terminal verdict. lpAuto is resolved inside the search. `pausable = false`
+            // makes a fired cancellation a hard terminal stop (no resume) — a one-shot stream's contract.
+            val search = ResumableMinimize(objective, baseParams, pausable = false)
+            while (true) {
+                when (val event = search.runUntilEvent()) {
+                    is StepEvent.Incumbent -> yield(event.result)
+
+                    is StepEvent.Terminal -> {
+                        yield(event.result)
+                        break
+                    }
+
+                    StepEvent.Paused -> break // unreachable when pausable = false
+                }
+            }
         }
 
-    /** [improvements] after the [BacktrackParams.lpAuto] resolution. */
-    private fun improvementsConfigured(objective: LinearObjective, params: BacktrackParams): Sequence<MinimizeResult> =
-        sequence {
-            var best: Sample? = null
-            var bestObj = Double.POSITIVE_INFINITY
-            // Objective-bound propagation for single-variable objectives (every FlatZinc goal):
-            // track the objective variable's value in the current incumbent so the engine can
-            // assert `objVar ≤/≥ best ∓ 1` at the root and let the defining constraint propagate.
-            val singleObj = objective.singleIntObjective()
-            var objVarBest: Int? = null
-            val sink = SolveStatsSink(backend = "backtrack")
-            // LP-relaxation bounding (#20): build the relaxer once; it reads live bounds per node.
-            val lpRelaxer = if (params.lpBounding) {
-                CpToLpRelaxation(
-                    problem,
-                    objective,
-                    generateCuts = params.lpCuts,
-                    circuitArcs = params.lpCircuit,
-                    elementHull = params.lpElement,
-                    tableHull = params.lpTable,
-                )
-            } else {
-                null
-            }
-            val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
-                buildList {
-                    if (params.lpCuts) {
-                        add(AllDifferentSeparator())
-                        add(GccSeparator())
-                        add(KnapsackCoverSeparator())
-                        add(CliqueCutSeparator())
-                        // Objective-weighted AllDifferent (assignment) cut — the Lagrangian-augmented LP path.
-                        val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
-                        add(AssignmentObjectiveCut(coef))
-                    }
-                    // Genuine subtour-elimination cuts over the circuit arc relaxation.
-                    if (params.lpCircuit) add(CircuitSeparator())
-                }
-            } else {
-                emptyList()
-            }
-            // Persistent global cut pool: harvest the structural separators' cuts at the root once;
-            // they are globally valid, so they are re-added to every node's relaxation below.
-            val lpGlobalCuts: List<Cut> = if (params.lpCutPool && lpRelaxer != null && lpSeparators.isNotEmpty()) {
-                harvestRootCuts(lpRelaxer, PropagationSession(problem), lpSeparators)
-            } else {
-                emptyList()
-            }
-            // Lagrangian bound (#23): built once; multipliers persist across nodes (rolling warm start).
-            val lagBound = if (params.lagrangian) {
-                LagrangianBound(problem, objective).takeIf { it.applicable }
-            } else {
-                null
-            }
-            var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
-            // Energetic-reasoning Cumulative feasibility check (#22/#23); objective-independent prune.
-            val energeticBound = if (params.energeticReasoning) {
-                CumulativeEnergeticBound(problem).takeIf { it.applicable }
-            } else {
-                null
-            }
-            var lpCheckCounter = 0
-            var energeticCheckCounter = 0
-            // LP-learned nogoods (#247): infeasible-node Farkas clauses, collected here by the prune
-            // closure and flushed into the clause DB at each restart (where they are no longer all-false).
-            val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
-            // Warm-start cache: the most recent LP basis seen at each decision depth. A child at depth D
-            // re-optimises from depth D-1's basis (dual-feasible after the branch's bound tightening).
-            val lpBasisByDepth = ArrayList<Basis?>()
-            // The most recently solved pre-cut node tableau: the cheapest warm start of all — the
-            // child seeds from it by patching the few changed columns/rhs entries through the slack
-            // block instead of re-pivoting the basis (falls back to the per-depth basis when
-            // incompatible).
-            var lpHotTableau: DualSimplex? = null
-            // LP-guided value ordering (#246): the node LP records its fractional primal here.
-            val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
-            // Immediate LP backjump (#280): when a node's LP is infeasible and its Farkas certificate
-            // resolves to an asserting 1UIP clause, [pruneIf] stashes it here and [advance] turns the
-            // prune into a non-chronological backjump-and-learn instead of a one-level chronological pop.
-            var lpBackjump: Learned? = null
-            val pruneIf: (PropagationSession) -> Boolean = { session ->
-                lpBackjump = null
-                // Effective bound = min(local incumbent, external supplier). External bound
-                // sharing lets a parallel CP portfolio tighten every worker's pruning past
-                // their local incumbent as soon as any worker finds a better one.
-                val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
-                val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
-                when {
-                    // Cheap separable bound first — a fast filter that often prunes without an LP solve.
-                    linearLowerBound(objective, session) >= effectiveBound -> true
-
-                    // Energetic-reasoning feasibility: prune if a Cumulative is over-subscribed.
-                    // Gated by the frequency policy — the window scan is O(windows² · tasks) with
-                    // no incremental state, so task-heavy models run it on a cadence.
-                    energeticBound != null && ++energeticCheckCounter % params.energeticEvery == 0 &&
-                        energeticBound.isInfeasible(session) -> {
-                        sink.observeEnergeticPrune()
-                        if (lpNogoods != null) energeticBound.explain(session)?.let { lpNogoods.add(it) }
-                        true
-                    }
-
-                    // Lagrangian bound (cheaper than the LP); updates persisted multipliers as a side
-                    // effect and prunes when its bound reaches the incumbent or the subproblem is infeasible.
-                    lagBound != null && run {
-                        val res = lagBound.computeBound(
-                            session,
-                            effectiveBound,
-                            lagMultipliers,
-                            params.lagrangianIterations,
-                        )
-                        if (res != null) {
-                            lagMultipliers = res.multipliers
-                            if (res.prune) sink.observeLagrangianPrune()
-                            res.prune
-                        } else {
-                            false
-                        }
-                    } -> true
-
-                    // Then the LP relaxation, gated by the depth/frequency policy (the solve is the
-                    // expensive part of a node, so it does not run at every node).
-                    lpRelaxer != null &&
-                        session.decisionLevel <= params.lpBoundMaxDepth &&
-                        ++lpCheckCounter % params.lpBoundEvery == 0 -> {
-                        val depth = session.decisionLevel
-                        val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
-                            lpBasisByDepth[depth - 1]
-                        } else {
-                            null
-                        }
-                        val outcome = lpBoundAndFix(
-                            lpRelaxer,
-                            session,
-                            effectiveBound,
-                            sink,
-                            warm,
-                            params,
-                            lpSeparators,
-                            lpHints,
-                            objectiveVar = singleObj?.varId ?: -1,
-                            objectiveAscending = singleObj?.ascending ?: true,
-                            globalCuts = lpGlobalCuts,
-                            seedTableau = lpHotTableau,
-                        )
-                        if (outcome.basis != null) {
-                            while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
-                            lpBasisByDepth[depth] = outcome.basis
-                        }
-                        if (outcome.tableau != null) lpHotTableau = outcome.tableau
-                        val explanation = outcome.explanation
-                        if (explanation != null) {
-                            // Try to resolve the Farkas certificate to an asserting 1UIP clause and
-                            // backjump immediately (#280). Only an asserting clause can be asserted as
-                            // a unit after the jump; otherwise fall back to the restart-flush pool
-                            // (#247), which needs the trail at root for the bound atoms to be free.
-                            val analyzed = session.analyzeConflictClause(explanation) as? Learned
-                            if (analyzed != null && analyzed.asserting) {
-                                lpBackjump = analyzed
-                            } else {
-                                lpNogoods?.add(explanation)
-                            }
-                        }
-                        outcome.prune
-                    }
-
-                    else -> false
-                }
-            }
-            // Restarts stay off unless the caller asks: a restart pops to root and re-traverses
-            // the bound-pruned tree (the objective bound is a predicate, not a learned clause),
-            // which can keep an optimality proof from terminating in budget. With an explicit
-            // lubyRestartBase the caller is choosing anytime diversification over proof speed —
-            // each incumbent leaves a permanent blocking nogood, so restarts no longer revisit
-            // solved leaves.
-            sink.start()
-            // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes
-            // and reduced-cost fixing bite from the first node. Sound — the probe returns only a fully
-            // propagated, feasible assignment.
-            if (params.lpProbe) {
-                val seed = lpRoundingProbe(objective)
-                if (seed != null) {
-                    val o = objective.evaluate(seed)
-                    if (o < bestObj) {
-                        bestObj = o
-                        best = seed
-                        if (singleObj != null) objVarBest = seed.ints[singleObj.varId]
-                        params.onEvent?.invoke(SearchEvent.Incumbent(o))
-                        yield(MinimizeResult.BestFound(seed, o, TerminationReason.BudgetExhausted))
-                    }
-                }
-            }
-            for (outcome in driveSearch(
-                params.copy(minHammingDistance = 0, recentWindow = 0),
-                pruneIf = pruneIf,
-                pruneLearned = { lpBackjump },
-                sink = sink,
-                objectiveVar = singleObj?.varId ?: -1,
-                objectiveAscending = singleObj?.ascending ?: true,
-                objectiveBest = { objVarBest },
-                lpNogoods = lpNogoods,
-                lpHints = lpHints,
-            )) {
-                when (outcome) {
-                    is SearchOutcome.Found -> {
-                        val o = objective.evaluate(outcome.sample)
-                        if (o < bestObj) {
-                            bestObj = o
-                            best = outcome.sample
-                            if (singleObj != null) objVarBest = outcome.sample.ints[singleObj.varId]
-                            params.onEvent?.invoke(SearchEvent.Incumbent(o))
-                            // Yield each new incumbent eagerly — consumers can react to it
-                            // before search continues toward the bound. The reason here is
-                            // a hint ("more might come"); the terminal yield carries the
-                            // real verdict.
-                            yield(MinimizeResult.BestFound(outcome.sample, o, TerminationReason.BudgetExhausted))
-                        }
-                    }
-
-                    is SearchOutcome.Exhausted -> {
-                        // When an external bound supplier is active, the engine has pruned
-                        // subtrees against bounds that may be tighter than the local incumbent.
-                        // Its terminal verdict can therefore no longer claim local-Optimal nor
-                        // global-Infeasible soundly — the unpruned space proves a property
-                        // relative to the shared bound, not absolutely. Downgrade to BestFound
-                        // (when a local incumbent exists) or Unknown (when none does); the
-                        // calling portfolio can upgrade to Optimal/Infeasible after combining
-                        // every worker's verdict.
-                        val externalShared = params.objectiveBoundSupplier != null
-                        sink.stop()
-                        val stats = sink.snapshot()
-                        yield(
-                            when {
-                                externalShared && best != null ->
-                                    MinimizeResult.BestFound(best, bestObj, TerminationReason.SearchExhausted, stats)
-
-                                externalShared ->
-                                    MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
-
-                                best != null -> MinimizeResult.Optimal(best, bestObj, stats)
-
-                                else -> MinimizeResult.Infeasible(outcome.core, stats)
-                            },
-                        )
-                        return@sequence
-                    }
-
-                    SearchOutcome.BudgetCapped -> {
-                        sink.stop()
-                        sink.timedOut = true
-                        val stats = sink.snapshot()
-                        yield(
-                            if (best != null) {
-                                MinimizeResult.BestFound(best, bestObj, TerminationReason.BudgetExhausted, stats)
-                            } else {
-                                MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
-                            },
-                        )
-                        return@sequence
-                    }
-                }
-            }
-            // Sequence drained without a terminal outcome — treat as exhausted.
-            sink.stop()
-            yield(
-                if (best != null) {
-                    MinimizeResult.Optimal(best, bestObj, sink.snapshot())
-                } else {
-                    MinimizeResult.Infeasible(stats = sink.snapshot())
-                },
-            )
-        }
+    /** One step of [ResumableMinimize.runUntilEvent]: a new incumbent, the terminal verdict, or a
+     *  slice-boundary pause (only in pausable mode). */
+    private sealed interface StepEvent {
+        data class Incumbent(val result: MinimizeResult.WithSample) : StepEvent
+        data class Terminal(val result: MinimizeResult) : StepEvent
+        data object Paused : StepEvent
+    }
 
     /**
-     * Explicit-state, pausable branch-and-bound (#381). This is the same B&B as [improvementsConfigured]
-     * — it reuses every search primitive ([advance], [backjumpAndLearn], [makeNode], the LP machinery via
-     * the same `pruneIf`/`pruneLearned` closures) and the same incumbent / restart / phase logic — but
-     * with the entire search state held as **object fields** instead of a `sequence{}` coroutine frame.
-     * That lets [runSlice] return at a time-slice boundary and a later call resume the exact search
-     * mid-tree, with the live [PropagationSession] (learned clauses + trail), heuristics, incumbent and
-     * LP warm-start caches all intact — so a single-threaded portfolio arm never cold-restarts.
+     * Explicit-state branch-and-bound — the **single** B&B orchestration in this solver. It holds the
+     * entire search state as **object fields** (not a `sequence{}` coroutine frame): the live
+     * [PropagationSession] (learned clauses + DFS trail), heuristics, incumbent, phase saving and LP
+     * warm-start caches. [runUntilEvent] advances the search to the next event (incumbent / terminal /
+     * pause) and returns; because the inner DFS loop is a sequence of atomic steps gated by a top-of-loop
+     * check, returning there and re-entering from the top is a faithful resume given the retained fields
+     * ([runActive] keeps a mid-run resume from re-initialising the run).
      *
-     * The inner DFS loop is a sequence of atomic steps gated by a top-of-loop slice check, so returning
-     * at that check (with [runActive] still set) and re-entering from the top is a faithful resume; the
-     * outer loop only re-initialises a run at an actual restart boundary ([runActive] cleared).
+     * Two callers drive it, differing only in [pausable]:
+     *  - [improvements] streams it lazily — one [StepEvent.Incumbent] yielded per call, then the terminal;
+     *    a fired cancellation is a hard stop.
+     *  - [runSlice] runs it one time slice at a time for [com.eignex.klause.portfolio.SequentialPortfolio]
+     *    (#381): a fired slice deadline pauses ([StepEvent.Paused]); a later call resumes mid-tree so the
+     *    arm never cold-restarts.
      */
-    private inner class ResumableMinimize(private val objective: LinearObjective, params0: BacktrackParams) :
-        ResumableSearch {
+    private inner class ResumableMinimize(
+        private val objective: LinearObjective,
+        params0: BacktrackParams,
+        // true: a fired cancellation is a slice boundary the caller may resume past ([runSlice]); false:
+        // it is a hard terminal stop ([improvements] one-shot). The single difference between the two
+        // ways this one engine is driven.
+        private val pausable: Boolean = true,
+    ) : ResumableSearch {
         // lpAuto resolves the LP-relaxation family structurally, exactly as [improvements]. The slice
         // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
-        private val params: BacktrackParams =
-            (if (params0.lpAuto) LpAutoConfig.recommend(problem, params0) else params0)
-                .copy(cancellation = Cancellation { sliceCancelled() }, minHammingDistance = 0, recentWindow = 0)
+        private val resolvedParams0 = if (params0.lpAuto) LpAutoConfig.recommend(problem, params0) else params0
+
+        // The caller's own token (drives the non-pausable one-shot path); superseded by the slice in
+        // pausable mode.
+        private val baseCancellation: Cancellation = resolvedParams0.cancellation
+        private val params: BacktrackParams = resolvedParams0
+            .copy(cancellation = Cancellation { sliceCancelled() }, minHammingDistance = 0, recentWindow = 0)
 
         // --- Slice control (no coroutine): a re-armable deadline + the current global token. ---
         private var globalToken: Cancellation = Cancellation.Never
         private var sliceEnd: TimeSource.Monotonic.ValueTimeMark? = null
-        private fun sliceCancelled(): Boolean = globalToken() || (sliceEnd?.hasPassedNow() ?: false)
+        private fun sliceCancelled(): Boolean = if (pausable) {
+            globalToken() || (sliceEnd?.hasPassedNow() ?: false)
+        } else {
+            baseCancellation()
+        }
 
-        // --- Incumbent + objective-bound propagation state (was improvementsConfigured locals). ---
+        /** Root-level infeasibility core (bake / seed), carried into the Infeasible terminal. */
+        private var rootCore: UnsatCore? = null
+
+        // --- Incumbent + objective-bound propagation state. ---
         private var best: Sample? = null
         private var bestObj: Double = Double.POSITIVE_INFINITY
         private val singleObj = objective.singleIntObjective()
@@ -725,7 +495,9 @@ class BacktrackSolver(override val problem: Problem) :
 
         // Root-unsat (bake / seed) is decided once at construction: the search is over before it starts.
         init {
-            if (problem.baked is PropagationResult.Unsat) {
+            val baked = problem.baked
+            if (baked is PropagationResult.Unsat) {
+                rootCore = coreOf(baked)
                 done = terminalExhausted()
             } else {
                 if (params.variableHeuristic.tracksUnassign) {
@@ -740,6 +512,7 @@ class BacktrackSolver(override val problem: Problem) :
                     if (touchedSeedLevels != null) {
                         for (l in seedResult.conflictLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
                     }
+                    rootCore = coreOf(seedResult)
                     done = terminalExhausted()
                 } else {
                     // Import any nogoods already in the shared pool (cross-arm); the session persists for
@@ -757,7 +530,13 @@ class BacktrackSolver(override val problem: Problem) :
             done?.let { return it }
             globalToken = global
             sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
-            return runLoop(onIncumbent)
+            while (true) {
+                when (val e = runUntilEvent()) {
+                    is StepEvent.Incumbent -> onIncumbent(e.result)
+                    is StepEvent.Terminal -> return e.result
+                    StepEvent.Paused -> return null
+                }
+            }
         }
 
         override fun close() {
@@ -776,7 +555,7 @@ class BacktrackSolver(override val problem: Problem) :
 
                 b != null -> MinimizeResult.Optimal(b, bestObj, stats)
 
-                else -> MinimizeResult.Infeasible(stats = stats)
+                else -> MinimizeResult.Infeasible(rootCore, stats)
             }
         }
 
@@ -804,7 +583,12 @@ class BacktrackSolver(override val problem: Problem) :
             return session.assertObjectiveBound(objectiveVar, threshold, atMost = ascending) is PropagationResult.Unsat
         }
 
-        private fun runLoop(onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+        /** Advance the search to the next reportable event (a new incumbent, the terminal verdict, or —
+         *  in pausable mode — a slice-boundary pause), retaining all state so the next call resumes.
+         *  Visible to the enclosing solver (which streams it from [improvements]); the class itself is
+         *  private, so nothing leaks. */
+        fun runUntilEvent(): StepEvent {
+            done?.let { return StepEvent.Terminal(it) }
             if (!started) {
                 started = true
                 sink.start()
@@ -812,7 +596,7 @@ class BacktrackSolver(override val problem: Problem) :
                 // prunes and reduced-cost fixing bite from the first node.
                 if (params.lpProbe) {
                     val seed = lpRoundingProbe(objective)
-                    if (seed != null) acceptIncumbent(seed, objective.evaluate(seed), onIncumbent)
+                    if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }
             }
             outer@ while (true) {
@@ -832,10 +616,14 @@ class BacktrackSolver(override val problem: Problem) :
                 inner@ while (true) {
                     if (cancelCheckCountdown-- <= 0) {
                         if (sliceCancelled()) {
-                            // Slice boundary (or global stop): retain every field and return. A later
-                            // runSlice re-enters here (runActive stays set) and continues mid-tree.
+                            // Cancellation fired: publish trailing glue clauses, then either pause (a slice
+                            // boundary the caller can resume past — every field is retained, and a later
+                            // runUntilEvent re-enters here since runActive stays set) or stop terminally.
                             params.clauseExchange?.onSearchEnd(session)
-                            return null
+                            if (pausable) return StepEvent.Paused
+                            val t = terminalBudget()
+                            done = t
+                            return StepEvent.Terminal(t)
                         }
                         cancelCheckCountdown = CANCEL_CHECK_INTERVAL
                     }
@@ -843,7 +631,7 @@ class BacktrackSolver(override val problem: Problem) :
                         val term = doRestart()
                         if (term != null) {
                             done = term
-                            return term
+                            return StepEvent.Terminal(term)
                         }
                         runActive = false
                         continue@outer
@@ -854,9 +642,11 @@ class BacktrackSolver(override val problem: Problem) :
                             val snap = snapshotAssignment(session)
                             params.variableHeuristic.onSolution(snap)
                             params.valueHeuristic.onSolution(snap)
-                            acceptIncumbent(snap, objective.evaluate(snap), onIncumbent)
+                            // Always block this leaf and backtrack; surface it as an event only when it
+                            // strictly improves the incumbent.
                             pendingBlock = snap
                             descend = false
+                            recordIfImproving(snap, objective.evaluate(snap))?.let { return it }
                             continue@inner
                         }
                         val values = params.valueHeuristic.values(session, varRef, rng)
@@ -890,8 +680,9 @@ class BacktrackSolver(override val problem: Problem) :
                             }
 
                             AdvanceOutcome.BudgetCapped -> {
-                                done = terminalBudget()
-                                return done
+                                val t = terminalBudget()
+                                done = t
+                                return StepEvent.Terminal(t)
                             }
 
                             is AdvanceOutcome.Backjump -> {
@@ -913,8 +704,9 @@ class BacktrackSolver(override val problem: Problem) :
                                     }
 
                                     BackjumpTerm.Exhausted -> {
-                                        done = terminalExhausted()
-                                        return done
+                                        val t = terminalExhausted()
+                                        done = t
+                                        return StepEvent.Terminal(t)
                                     }
 
                                     BackjumpTerm.Stuck -> {
@@ -936,20 +728,23 @@ class BacktrackSolver(override val problem: Problem) :
                             if (nogood.isNotEmpty()) {
                                 val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
                                 if (res is PropagationResult.Unsat) {
-                                    done = terminalExhausted()
-                                    return done
+                                    val t = terminalExhausted()
+                                    done = t
+                                    return StepEvent.Terminal(t)
                                 }
                             }
                             if (assertObjectiveBoundAtRoot()) {
-                                done = terminalExhausted()
-                                return done
+                                val t = terminalExhausted()
+                                done = t
+                                return StepEvent.Terminal(t)
                             }
                             descend = true
                             continue@inner
                         }
                         if (trail.isEmpty()) {
-                            done = terminalExhausted()
-                            return done
+                            val t = terminalExhausted()
+                            done = t
+                            return StepEvent.Terminal(t)
                         }
                         val top = trail.last()
                         session.popLast()
@@ -971,8 +766,9 @@ class BacktrackSolver(override val problem: Problem) :
                             }
 
                             AdvanceOutcome.BudgetCapped -> {
-                                done = terminalBudget()
-                                return done
+                                val t = terminalBudget()
+                                done = t
+                                return StepEvent.Terminal(t)
                             }
 
                             is AdvanceOutcome.Backjump -> {
@@ -994,8 +790,9 @@ class BacktrackSolver(override val problem: Problem) :
                                     }
 
                                     BackjumpTerm.Exhausted -> {
-                                        done = terminalExhausted()
-                                        return done
+                                        val t = terminalExhausted()
+                                        done = t
+                                        return StepEvent.Terminal(t)
                                     }
 
                                     BackjumpTerm.Stuck -> {
@@ -1010,15 +807,15 @@ class BacktrackSolver(override val problem: Problem) :
             }
         }
 
-        /** Record a new incumbent when it strictly improves the best objective; fires telemetry and the
-         *  per-improvement callback exactly as [improvementsConfigured]. */
-        private fun acceptIncumbent(sample: Sample, o: Double, onIncumbent: (MinimizeResult.WithSample) -> Unit) {
-            if (o >= bestObj) return
+        /** Fold [sample] (objective [o]) into the incumbent when it strictly improves the best; fires
+         *  inline telemetry and returns the event to surface, or null when it isn't an improvement. */
+        private fun recordIfImproving(sample: Sample, o: Double): StepEvent.Incumbent? {
+            if (o >= bestObj) return null
             bestObj = o
             best = sample
             if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
             params.onEvent?.invoke(SearchEvent.Incumbent(o))
-            onIncumbent(MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted))
+            return StepEvent.Incumbent(MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted))
         }
 
         /** Restart housekeeping (pop to root, apply blocking nogood + LP nogoods, cross-arm exchange,
