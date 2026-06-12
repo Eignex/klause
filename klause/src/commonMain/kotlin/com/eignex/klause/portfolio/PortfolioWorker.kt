@@ -1,6 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.ResumableOptimizer
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
@@ -24,11 +26,21 @@ class PortfolioWorker private constructor(
     private val solveFn: (Cancellation) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, Cancellation) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
+    private val resumableFn: ((readBound: () -> Double) -> ResumableSearch)?,
     private val closeFn: () -> Unit,
 ) : AutoCloseable {
 
     /** Solve once, honouring [cancel] (set when a sibling wins the race). */
     fun solve(cancel: Cancellation): SolveResult = solveFn(cancel)
+
+    /**
+     * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine
+     * can't be paused/resumed (local search — it restarts cheaply from a warm-started incumbent
+     * instead). [readBound] exposes the portfolio's shared best objective so the resumable backtrack
+     * search prunes on it, exactly like [improvements]'s `withBound` seam. The single-threaded
+     * [SequentialPortfolio] holds one handle per backtrack arm and resumes it each segment, so the arm
+     * never cold-restarts between slices (#381). */
+    fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound)
 
     /** Stream improving incumbents against this worker's *own* objective representation (the one
      *  it was built with — see [of]). [readBound] exposes the portfolio's shared best objective
@@ -82,6 +94,19 @@ class PortfolioWorker private constructor(
             // backend overrides it covariantly to return its own P; the cast is sound.
             @Suppress("UNCHECKED_CAST")
             fun withCancel(c: Cancellation): P = params.withCancellation(c) as P
+            // A pause/resume handle is available only for an optimising worker over a ResumableOptimizer
+            // engine (backtrack). The handle owns its own per-slice cancellation, so only the bound
+            // supplier is wired here; warm-start is irrelevant (the live session carries the search).
+            val resumableOpt = session.solver as? ResumableOptimizer<P>
+            val resumableFn: ((() -> Double) -> ResumableSearch)? =
+                if (objective != null && resumableOpt != null) {
+                    { readBound ->
+                        val p = withBound?.invoke(params, readBound) ?: params
+                        resumableOpt.resumable(objective, p)
+                    }
+                } else {
+                    null
+                }
             return PortfolioWorker(
                 label = label,
                 solveFn = { c -> session.solve(withCancel(c)) },
@@ -95,6 +120,7 @@ class PortfolioWorker private constructor(
                     session.improvements(obj, p)
                 },
                 samplesFn = { c -> session.samples(withCancel(c)) },
+                resumableFn = resumableFn,
                 closeFn = { session.close() },
             )
         }
