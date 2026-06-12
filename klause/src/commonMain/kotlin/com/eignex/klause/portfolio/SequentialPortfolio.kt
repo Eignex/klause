@@ -44,6 +44,13 @@ import kotlin.time.TimeSource
  * and re-deriving its clauses every segment. Local-search arms have no handle (null), so they keep
  * running a fresh slice warm-started from the shared incumbent, as before. Slices still grow
  * ([sliceGrowth]) so early segments sample the arms cheaply while later segments dig deeper.
+ *
+ * **Re-seeding plateaued arms ([reseedStaleThreshold]):** pure resume keeps one persistent DFS trail,
+ * which converges fast but loses the bound-guided re-exploration the pre-resume per-segment cold
+ * restart gave (each fresh search re-descended under a tighter bound). To recover it without giving up
+ * convergence, a resumable arm that fails to improve the incumbent for several consecutive segments has
+ * its handle discarded and rebuilt fresh on the next schedule — re-descending from the root under the
+ * now-tighter bound, with the pool's learned clauses re-imported.
  */
 class SequentialPortfolio(
     /** The arms raced one-at-a-time; each carries its own engine, params, and objective form. */
@@ -59,6 +66,18 @@ class SequentialPortfolio(
     /** Round-robin warmup slice: each arm is forced once for this long before the bandit takes
      *  over, so a short deadline can't leave a winning arm at zero budget (EXP3 starvation). */
     private val warmupSliceMillis: Long = 1_000,
+    /**
+     * Diversification for resumable backtrack arms (#3 follow-up to #381): after this many consecutive
+     * scheduled segments in which a resumable arm fails to improve the shared incumbent, its search
+     * handle is discarded so the next schedule opens a **fresh** one. The fresh search re-descends from
+     * the root under the now-tighter shared bound and re-imports the pool's learned clauses — recovering
+     * the bound-guided re-exploration the pre-resume per-segment cold restart gave (which resume's single
+     * persistent trail had traded away, regressing value on plateau-prone instances like `cargo`), while
+     * keeping resume's fast initial convergence (it only fires after a plateau) and clause retention.
+     * `0` disables re-seeding (pure resume). Only resumable (backtrack) arms are affected; LS arms
+     * already run a fresh warm-started slice each segment.
+     */
+    private val reseedStaleThreshold: Int = 3,
 ) : PortfolioExecutor {
 
     init {
@@ -66,6 +85,7 @@ class SequentialPortfolio(
         require(baseSliceMillis > 0 && maxSliceMillis >= baseSliceMillis) { "invalid slice bounds" }
         require(sliceGrowth >= 1.0) { "sliceGrowth must be ≥ 1.0" }
         require(warmupSliceMillis > 0) { "warmupSliceMillis must be > 0" }
+        require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
     }
 
     /** A per-segment cancellation that fires when the global token fires or the slice elapses. */
@@ -125,6 +145,8 @@ class SequentialPortfolio(
         // One resumable handle per backtrack arm, opened lazily on the arm's first segment and resumed
         // on every later one (#381). LS arms stay null and run a fresh warm-started slice each time.
         val handles = arrayOfNulls<ResumableSearch>(workers.size)
+        // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
+        val staleSegments = IntArray(workers.size)
 
         // Fold a strictly-improving incumbent into the shared bound + fire the telemetry callback.
         fun accept(r: MinimizeResult.WithSample) {
@@ -160,14 +182,30 @@ class SequentialPortfolio(
             }
             terminal?.let { stats = stats.mergedWith(it.stats) }
 
+            val improvement = before - bound
             val reward = if (!hadIncumbent) {
                 if (best != null) 1.0 else 0.0
             } else {
-                val improvement = before - bound
                 if (improvement > rewardScale) rewardScale = improvement
                 if (rewardScale > 0.0) (improvement / rewardScale).coerceIn(0.0, 1.0) else 0.0
             }
             bandit.update(arm, reward)
+
+            // Re-seed a plateaued resumable arm: after enough consecutive non-improving segments, drop
+            // its handle so the next schedule re-descends from the root under the tighter bound with the
+            // pool's clauses re-imported — restoring diversification without losing convergence (#3).
+            // Guards keep it from disrupting productive search: only once an incumbent exists (the
+            // feasibility hunt is never reset), and never on a segment that already returned a terminal
+            // verdict (a completed optimality / infeasibility proof short-circuits to the return below).
+            if (handle != null && terminal == null && best != null) {
+                if (improvement > 0.0) {
+                    staleSegments[arm] = 0
+                } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
+                    runCatching { handle.close() }
+                    handles[arm] = null
+                    staleSegments[arm] = 0
+                }
+            }
 
             if (isExhausted(terminal)) {
                 val exhaustedBest = best
@@ -218,6 +256,7 @@ class SequentialPortfolio(
             maxSliceMillis: Long = 60_000,
             sliceGrowth: Double = 1.5,
             warmupSliceMillis: Long = 1_000,
+            reseedStaleThreshold: Int = 3,
         ): SequentialPortfolio = withBandit(
             workers,
             Exp3Bandit(workers.size, eta, gamma, Random(seed)),
@@ -225,6 +264,7 @@ class SequentialPortfolio(
             maxSliceMillis,
             sliceGrowth,
             warmupSliceMillis,
+            reseedStaleThreshold,
         )
 
         /** UCB1 arm selection (stationary, deterministic given the seed) — the alternative to
@@ -237,6 +277,7 @@ class SequentialPortfolio(
             maxSliceMillis: Long = 60_000,
             sliceGrowth: Double = 1.5,
             warmupSliceMillis: Long = 1_000,
+            reseedStaleThreshold: Int = 3,
         ): SequentialPortfolio = withBandit(
             workers,
             MultiArmedBandit(workers.size, UCB1(alpha = alpha), Random(seed)),
@@ -244,6 +285,7 @@ class SequentialPortfolio(
             maxSliceMillis,
             sliceGrowth,
             warmupSliceMillis,
+            reseedStaleThreshold,
         )
 
         private fun withBandit(
@@ -253,6 +295,7 @@ class SequentialPortfolio(
             maxSliceMillis: Long,
             sliceGrowth: Double,
             warmupSliceMillis: Long,
+            reseedStaleThreshold: Int,
         ): SequentialPortfolio = SequentialPortfolio(
             workers = workers,
             bandit = bandit,
@@ -260,6 +303,7 @@ class SequentialPortfolio(
             maxSliceMillis = maxSliceMillis,
             sliceGrowth = sliceGrowth,
             warmupSliceMillis = warmupSliceMillis,
+            reseedStaleThreshold = reseedStaleThreshold,
         )
     }
 }
