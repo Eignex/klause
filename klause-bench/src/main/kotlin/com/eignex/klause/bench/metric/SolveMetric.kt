@@ -38,6 +38,8 @@ internal data class SolveRow(
     val timeMs: Long?,
     /** optimum proved (optimize) or search closed UNSAT/exhausted. */
     val proven: Boolean,
+    /** True when the objective is maximized (so a higher value is better) — for offline comparison. */
+    val maximize: Boolean,
     val display: String,
     val stats: Map<String, String> = emptyMap(),
 )
@@ -78,11 +80,14 @@ internal object SolveMetric {
         val rows = entries.map { entry ->
             val optimize = entry.objective != null
             val kind = if (optimize) "optimize" else "satisfy"
-            val r = runCatching { SolverInvocation.run(entry, solverId, settings, budget, optimize) }
-                .getOrElse {
-                    println("?? [${entry.name}] $kind $solver=ERROR: ${it.message ?: it::class.simpleName}")
-                    return@map errorRow(entry, kind, solver)
-                }
+            val r = runCatching {
+                val key = BenchCache.keyFor(entry, solver, budget)
+                BenchCache.load(key) ?: SolverInvocation.run(entry, solverId, settings, budget, optimize)
+                    .also { BenchCache.store(key, it) }
+            }.getOrElse {
+                println("?? [${entry.name}] $kind $solver=ERROR: ${it.message ?: it::class.simpleName}")
+                return@map errorRow(entry, kind, solver)
+            }
             command = r.command
             File(outDir, entry.name.replace('/', '_') + ".out").writeText(r.rawOutput)
             val row = row(entry, kind, solver, r)
@@ -126,6 +131,7 @@ internal object SolveMetric {
             objective = r.objective,
             timeMs = r.timeToBestMs,
             proven = r.proven,
+            maximize = entry.maximize,
             display = display,
             stats = r.stats,
         )
@@ -147,6 +153,7 @@ internal object SolveMetric {
         objective = null,
         timeMs = null,
         proven = false,
+        maximize = entry.maximize,
         display = "ERROR",
     )
 }

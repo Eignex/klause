@@ -5,6 +5,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
+import kotlinx.serialization.Serializable
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -34,7 +35,9 @@ internal object SolverInvocation {
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
-     *  `%%%mzn-stat` lines, and the raw stdout (saved as the run's "minizinc output"). */
+     *  `%%%mzn-stat` lines, and the raw stdout (saved as the run's "minizinc output"). Serializable
+     *  so [BenchCache] can persist and replay it. */
+    @Serializable
     internal data class Result(
         val feasible: Boolean?,
         val objective: Double?,
@@ -72,9 +75,13 @@ internal object SolverInvocation {
         return invoke(cmd)
     }
 
+    /** The provisioned klause-cli binary (its mtime keys the cache so a klause rebuild invalidates
+     *  klause's cached results while references stay frozen). */
+    fun klauseCliBin(): File = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)
+
     /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
     private fun klauseCommand(entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean): List<String> {
-        val bin = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)
+        val bin = klauseCliBin()
         check(bin.canExecute()) { "klause-cli not installed at $bin (run :klause-cli:installJvmDist)" }
         val file = if (entry.ref.format == Format.MINIZINC) {
             MiniZincRunner().compileFzn(entry.ref)

@@ -147,7 +147,7 @@ The in-process adapters re-derive the reference from klause's **already-decompos
 
 The parity sweep measures klause against the reference solvers on the MiniZinc Challenge corpus. The method is fixed so every run is comparable:
 
-1. **One backend per `bench solve` invocation** — there is no in-session comparison (a crash or warmup can't contaminate another solver's number). Each run writes `build/solve-<solver>.json`; comparison is done **offline** by diffing the saved files (`parity-runs/analyze.sh <klause.json> <reference.json>`).
+1. **One backend per `bench solve` invocation** — there is no in-session comparison (a crash or warmup can't contaminate another solver's number). Each run writes `build/solve-<solver>.json`; comparison is done **offline**, direction-aware (maximize vs minimize), by diffing the saved files: `parity-runs/compare.sh <A.json> <B.json>`. Results are also content-addressed in `build/bench-cache/` (keyed by `sha256(model+data) · time-settings · solver+settings`), so re-running an identical instance replays instantly — reference baselines stay frozen while klause iterates (klause's key folds in the cli-binary mtime). Disable with `-Dklause.bench.cache=false`.
 2. **Curated selection, not random sampling** — a fixed set chosen to span distinct global constraints, so a small set still exercises the breadth that matters. The MiniZinc Challenge itself is ~95% optimization, so the set is COP-heavy by design.
    - **8 COP**: `elitserien` (alldifferent, global_cardinality, inverse, member, regular), `gfd-schedule` (cumulative, at_most, nvalue), `cargo` (cumulative, diffn), `is` (among, circuit, table), `nfc` (network_flow), `mario` (path, subcircuit), `evilshop` (cumulative, disjunctive), `zephyrus` (arg_sort, lex_less).
    - **2 CSP**: `multi-knapsack` (knapsack), `oocsp_racks` (global_cardinality, increasing, element).
@@ -159,10 +159,10 @@ The parity sweep measures klause against the reference solvers on the MiniZinc C
 # LS track: klause local search vs Yuck, 180s, on the curated set
 bench solve suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus engine=ls       timeout=180000
 bench solve suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus backend=yuck    timeout=180000
-# then: parity-runs/analyze.sh parity-runs/cop-klause-ls.json parity-runs/cop-yuck.json
+# then: parity-runs/compare.sh klause-bench/build/solve-klause-ls-x8.json klause-bench/build/solve-yuck.json
 ```
 
-The `parity-runs/` scripts (`run-sweep.sh` full, `run-ls.sh` LS-only, `analyze.sh`) drive this with `-PbenchHeap=32g` and save per-run logs+JSON; they are local scratch (not committed). To stop a background sweep, kill the `run-*.sh` bash loop **first** (else it spawns the next leg), then the forked `BenchCli` JVM by PID.
+The `parity-runs/` scripts (`run-sweep.sh` full, `run-ls.sh` LS-only, `compare.sh` for offline diffs) drive this with `-PbenchHeap=32g` and save per-run logs+JSON; they are local scratch (not committed). To stop a background sweep, kill the `run-*.sh` bash loop **first** (else it spawns the next leg), then the forked `BenchCli` JVM by PID.
 
 ## Verifying a change
 
