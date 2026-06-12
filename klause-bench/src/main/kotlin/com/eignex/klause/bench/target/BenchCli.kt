@@ -29,7 +29,7 @@ import com.eignex.klause.portfolio.EngineMix
  *   `bench <metric> [filters…]`   e.g. `bench solve suite=smtlib-core backend=ortools`
  *
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
- * `category=SAT,OPT` `tag=…` `name=<glob>` `per-family=N` `max=N` `seed=N`
+ * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
  * `backend=choco|ortools|yuck` (the `solve` solver; default klause) `timeout=<ms>`
  * `engine=backtrack|ls|mixed` `processors=N` `fixed=true` (klause search for `solve`)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
@@ -149,7 +149,12 @@ object BenchCli {
         f["tag"]?.split(
             ",",
         )?.map { it.trim() }?.toSet()?.let { tags -> refs = refs.filter { it.tags.any { t -> t in tags } } }
-        f["name"]?.let { g -> refs = refs.filter { matches(g, it.name) } }
+        // `name=` is a comma-separated OR of substring-or-`*`-glob patterns: keep an instance if
+        // ANY pattern matches. Lets a curated selection list specific families, e.g.
+        // `name=cvrp,nfc,mario`.
+        f["name"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { pats ->
+            refs = refs.filter { ref -> pats.any { matches(it, ref.name) } }
+        }
         val sel = CorpusSelection.Selection(
             perFamily = f["per-family"]?.toIntOrNull(),
             maxInstances = f["max"]?.toIntOrNull(),
@@ -240,7 +245,7 @@ object BenchCli {
             |  bench coverage:xcsp3|smtlib          parse/solve rates over a whole format library
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
-            |         tag=… name=<glob> per-family=N max=N seed=N backend=choco|ortools|yuck timeout=<ms>
+            |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=choco|ortools|yuck timeout=<ms>
             |         engine=backtrack|ls|mixed processors=N fixed=true (klause search for solve)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
