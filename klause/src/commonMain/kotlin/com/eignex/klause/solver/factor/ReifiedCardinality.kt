@@ -34,15 +34,7 @@ class ReifiedCardinality(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)
 
-    override val boolVars: IntArray = run {
-        val unique = LinkedHashSet<Int>()
-        unique.add(auxBoolVar)
-        for (lit in literals) unique.add(Lit.variable(lit))
-        val out = IntArray(unique.size)
-        var i = 0
-        for (v in unique) out[i++] = v
-        out
-    }
+    override val boolVars: IntArray = literals.litVars(auxBoolVar)
     override val intVars: IntArray = EmptyIntArray
 
     /** Net polarity-signed occurrence count per Boolean variable in [literals] (excluding
