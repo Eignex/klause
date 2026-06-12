@@ -94,7 +94,9 @@ class ResumableSearchTest {
             numBoolVars = 0,
             numIntVars = n,
             intDomains = Array(n) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(Linear(coeffs = weights, vars = IntArray(n) { it }, op = LinearOp.LE, bound = cap)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = weights, vars = IntArray(n) { it }, op = LinearOp.LE, bound = cap),
+            ),
         )
         val obj = LinearObjective(intCoefficients = LongArray(n) { -values[it].toLong() })
 
@@ -116,7 +118,9 @@ class ResumableSearchTest {
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val handle = BacktrackSolver(problem).resumable(obj, BacktrackParams(randomSeed = 0L))

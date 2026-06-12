@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ResumableOptimizer
@@ -519,10 +519,8 @@ class BacktrackSolver(override val problem: Problem) :
      * at that check (with [runActive] still set) and re-entering from the top is a faithful resume; the
      * outer loop only re-initialises a run at an actual restart boundary ([runActive] cleared).
      */
-    private inner class ResumableMinimize(
-        private val objective: LinearObjective,
-        params0: BacktrackParams,
-    ) : ResumableSearch {
+    private inner class ResumableMinimize(private val objective: LinearObjective, params0: BacktrackParams) :
+        ResumableSearch {
         // lpAuto resolves the LP-relaxation family structurally, exactly as [improvements]. The slice
         // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
         private val params: BacktrackParams =
@@ -545,9 +543,12 @@ class BacktrackSolver(override val problem: Problem) :
         // --- LP-relaxation family state (built once; persists across slices = rolling warm starts). ---
         private val lpRelaxer = if (params.lpBounding) {
             CpToLpRelaxation(
-                problem, objective,
-                generateCuts = params.lpCuts, circuitArcs = params.lpCircuit,
-                elementHull = params.lpElement, tableHull = params.lpTable,
+                problem,
+                objective,
+                generateCuts = params.lpCuts,
+                circuitArcs = params.lpCircuit,
+                elementHull = params.lpElement,
+                tableHull = params.lpTable,
             )
         } else {
             null
@@ -613,7 +614,12 @@ class BacktrackSolver(override val problem: Problem) :
                 }
 
                 lagBoundL != null && run {
-                    val res = lagBoundL.computeBound(session, effectiveBound, lagMultipliers, params.lagrangianIterations)
+                    val res = lagBoundL.computeBound(
+                        session,
+                        effectiveBound,
+                        lagMultipliers,
+                        params.lagrangianIterations,
+                    )
                     if (res != null) {
                         lagMultipliers = res.multipliers
                         if (res.prune) sink.observeLagrangianPrune()
@@ -646,7 +652,13 @@ class BacktrackSolver(override val problem: Problem) :
                     val explanation = outcome.explanation
                     if (explanation != null) {
                         val analyzed = session.analyzeConflictClause(explanation) as? Learned
-                        if (analyzed != null && analyzed.asserting) lpBackjump = analyzed else lpNogoods?.add(explanation)
+                        if (analyzed != null && analyzed.asserting) {
+                            lpBackjump = analyzed
+                        } else {
+                            lpNogoods?.add(
+                                explanation,
+                            )
+                        }
                     }
                     outcome.prune
                 }
@@ -893,9 +905,20 @@ class BacktrackSolver(override val problem: Problem) :
                                         boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false,
                                     )
                                 ) {
-                                    BackjumpTerm.Resume -> { descend = true; continue@inner }
-                                    BackjumpTerm.Exhausted -> { done = terminalExhausted(); return done }
-                                    BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                                    BackjumpTerm.Resume -> {
+                                        descend = true
+                                        continue@inner
+                                    }
+
+                                    BackjumpTerm.Exhausted -> {
+                                        done = terminalExhausted()
+                                        return done
+                                    }
+
+                                    BackjumpTerm.Stuck -> {
+                                        descend = false
+                                        continue@inner
+                                    }
                                 }
                             }
                         }
@@ -963,9 +986,20 @@ class BacktrackSolver(override val problem: Problem) :
                                         boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true,
                                     )
                                 ) {
-                                    BackjumpTerm.Resume -> { descend = true; continue@inner }
-                                    BackjumpTerm.Exhausted -> { done = terminalExhausted(); return done }
-                                    BackjumpTerm.Stuck -> { descend = false; continue@inner }
+                                    BackjumpTerm.Resume -> {
+                                        descend = true
+                                        continue@inner
+                                    }
+
+                                    BackjumpTerm.Exhausted -> {
+                                        done = terminalExhausted()
+                                        return done
+                                    }
+
+                                    BackjumpTerm.Stuck -> {
+                                        descend = false
+                                        continue@inner
+                                    }
                                 }
                             }
                         }
