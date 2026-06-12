@@ -9,7 +9,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /**
  * `diffn(xs, ys, widths, heights)` — pairwise non-overlapping 2D rectangles. Each rectangle
- * `i` has lower-left corner `(xs[i], ys[i])` and dimensions `(widths[i], heights[i])`.
+ * `i` has lower-left corner `(xs(i), ys(i))` and dimensions `(widths(i), heights(i))`.
  * Two rectangles non-overlap iff they're disjoint on at least one axis.
  *
  * Sizes may be **constant or variable**. When [widthVars] / [heightVars] are non-null the

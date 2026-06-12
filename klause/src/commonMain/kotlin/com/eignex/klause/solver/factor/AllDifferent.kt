@@ -12,9 +12,9 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
 /**
- * `intVars[i] != intVars[j]` for every pair `i < j`. Stored payload:
+ * `intVars(i) != intVars(j)` for every pair `i < j`. Stored payload:
  *
- *   `refPayload[factorId]` = State (counts: IntArray, excess: Int)
+ *   `refPayload(factorId)` = State (counts: IntArray, excess: Int)
  *
  * `counts` is indexed by `value - domainMin` and tracks how many vars currently hold each
  * value across the union domain `[domainMin, domainMin + domainSize)`. `excess` is the graded
@@ -146,7 +146,7 @@ class AllDifferent(
     /** Clash excess contributed by a single value held by [count] vars: `max(0, count - 1)`. */
     private fun excessOf(count: Int): Int = if (count > 1) count - 1 else 0
 
-    /** Count of indices where `vars[i] == intVar` AND position `i` is currently present.
+    /** Count of indices where `vars(i) == intVar` AND position `i` is currently present.
      *  Falls back to [occurrencesByVar] in the non-opt case for the precomputed O(1) lookup. */
     private fun presentOccurrences(state: LocalSearchState, intVar: Int): Int {
         if (presents.isEmpty()) return occurrencesByVar[intVar]
@@ -206,7 +206,7 @@ class AllDifferent(
      *  responsible var's domain. Uses the Hall violator [propagate] captured in the
      *  session's [ReginCache] when available — only those vars' domains jointly prove the
      *  pigeonhole, so the others are irrelevant and citing them only over-specialises the
-     *  learned clause. Falls back to all vars if no Hall set was recorded (e.g. a failure
+     *  learned clause. Falls back to all vars if no Hall set was recorded (e.g., a failure
      *  path that didn't set it). The scratch lives on the per-session payload, not the
      *  factor, so portfolio workers sharing one Problem never cross reasons (#182). */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
@@ -244,9 +244,8 @@ class AllDifferent(
     }
 
     /* Conservative repair: only act on present occupants when [presents] is set. We
-     *  intentionally avoid forcing presence as a repair — the LS engine flips bools via
+     *  intentionally avoid forcing presence as a repair, the LS engine flips bools via
      *  its own move pool. */
-
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val s = state.refPayload[factorId] as State
         if (s.excess == 0) return
@@ -279,6 +278,7 @@ class AllDifferent(
         val targets = IntArray(MAX_REPAIR_TARGETS) { Int.MIN_VALUE }
         var filled = 0
         var seenTargets = 0
+
         // `forEach` skips holes for sparse domains; contiguous fast path is identical
         // to the previous `min..max` walk.
         d.forEach { target ->
@@ -303,9 +303,9 @@ class AllDifferent(
         // would just shuffle the duplicate. Propose value-swap candidates: pair the
         // occupant with the unique holder of another value in its domain. Within this
         // one AllDifferent the swap preserves the value multiset (so the local duplicate
-        // count is unchanged), but in problems with multiple coupled AllDifferents (e.g.
-        // Sudoku rows × columns) the swap may resolve a duplicate elsewhere. Cap to
-        // [MAX_SWAP_CANDIDATES] — each Compound costs an apply-and-revert in scoring.
+        // count is unchanged), but in problems with multiple coupled AllDifferents
+        // (e.g., Sudoku rows × columns) the swap may resolve a duplicate elsewhere.
+        // Cap to // [MAX_SWAP_CANDIDATES]; each Compound costs an apply-and-revert in scoring.
         var swapsAdded = 0
         for (w in d.min..d.max) {
             if (swapsAdded >= MAX_SWAP_CANDIDATES) break

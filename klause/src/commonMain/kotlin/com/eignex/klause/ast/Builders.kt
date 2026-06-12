@@ -253,14 +253,6 @@ fun regular(
     return RegularExpr(seq.map { it.toIntExpr() }, numStates, alphabetSize, transitions, q0, accepting)
 }
 
-// -----------------------------------------------------------------------------------
-//  Optional-variable global builders
-// -----------------------------------------------------------------------------------
-// Each opt-* builder mirrors its non-opt sibling but takes a parallel [presents] list
-// of Boolean expressions describing whether each position participates. Internally each
-// lowers to its *Opt AST node; the compiler threads presence through to the factor's
-// native `presents: IntArray`.
-
 /** AllDifferent over presence-gated positions: only present positions must be pairwise
  *  distinct. Each `OptIntHandle.present` is the typical source for the presence list. */
 fun allDifferentOpt(terms: List<IntTerm>, presents: List<BoolTerm>): BoolExpr {
@@ -347,11 +339,6 @@ fun gccOpt(
         presents = presents.map { it.toExpr() },
     )
 }
-
-// -----------------------------------------------------------------------------------
-//  Newer globals — decomposed in the compiler to existing primitives (Linear / Clause /
-//  ReifiedLinear). All bitblastable through the standard path.
-// -----------------------------------------------------------------------------------
 
 /**
  * `symmetric_all_different(xs)` — the map `i -> xs[i] − indexOffset` is a self-inverse

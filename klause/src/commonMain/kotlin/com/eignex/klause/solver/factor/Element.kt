@@ -8,7 +8,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
 /**
- * `result = arr[idx]` — the element constraint, native to local search rather than a
+ * `result = arr(idx)` — the element constraint, native to local search rather than a
  * per-index reified-linear + indicator-clause decomposition (which would explode one
  * constraint into ~5·len factors and 2·len aux bools and give CBLS no gradient).
  *
@@ -18,7 +18,7 @@ import com.eignex.klause.util.IntArrayList
  * of [arr] is selected by `idx = 1`.
  *
  * Stateless (no payload): every query reads the live assignment, O(1) for the selected
- * element. Graded violation `|result − arr[idx]|` (run through [compressViolation]) gives a
+ * element. Graded violation `|result − arr(idx)|` (run through [compressViolation]) gives a
  * descent gradient that pushes `result` toward the selected element (or the element toward
  * `result`); an out-of-range `idx` is graded by its distance back into range. Repair moves
  * snap `result` to the selected element, snap the selected element to `result`, or re-point
@@ -27,7 +27,7 @@ import com.eignex.klause.util.IntArrayList
 class Element(
     /** Index variable id. */
     val idx: Int,
-    /** Result variable id (`result = arr[idx - indexOffset]`). */
+    /** Result variable id (`result = arr(idx - indexOffset)`). */
     val result: Int,
     /** The indexed array: variable ids when [arrIsVars], else constant values. */
     val arr: IntArray,
@@ -72,7 +72,7 @@ class Element(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val pos = state.assignment.intValue(idx) - indexOffset
-        if (pos < 0 || pos >= len) return true
+        if (pos !in 0..<len) return true
         return state.assignment.intValue(result) != elementValue(state, pos)
     }
 
@@ -148,10 +148,10 @@ class Element(
      *  with both-way channeling once [idx] is fixed):
      *   1. `idx ∈ [indexOffset, indexOffset+len-1]` (structural).
      *   2. **Prune idx**: drop position `i` whose element range can't intersect `result`'s
-     *      domain — that position can never satisfy `result = arr[i]`.
+     *      domain — that position can never satisfy `result = arr(i)`.
      *   3. **Bound result**: it must equal *some* still-reachable element, so tighten it to the
      *      union `[min elemLow, max elemHigh]` over idx's surviving positions.
-     *   4. **idx fixed → channel** `result == arr[idx]` both ways (var array tightens the
+     *   4. **idx fixed → channel** `result == arr(idx)` both ways (var array tightens the
      *      selected element back from `result`). */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (!state.tightenIntMin(idx, indexOffset)) return false

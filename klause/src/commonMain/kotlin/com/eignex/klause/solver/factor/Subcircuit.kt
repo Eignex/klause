@@ -9,16 +9,16 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 
 /**
- * Hamiltonian-cycle constraint with optional exclusions. Like [Circuit], but `succ[i] = i`
+ * Hamiltonian-cycle constraint with optional exclusions. Like [Circuit], but `succ(i) = i`
  * (a self-loop) is permitted and reads "node `i` is not in the cycle". The included nodes
- * (those with `succ[i] != i`) must form a single closed cycle visiting every included node.
+ * (those with `succ(i) != i`) must form a single closed cycle visiting every included node.
  *
  * Semantics:
- *  - `succ[i] = j ≠ i` → "j is the successor of i in the cycle".
- *  - `succ[i] = i` → "i is excluded".
+ *  - `succ(i) = j ≠ i` → "j is the successor of i in the cycle".
+ *  - `succ(i) = i` → "i is excluded".
  *  - Included nodes must form a single cycle; pointing to an excluded node is a violation;
  *    sub-cycles among included nodes are a violation.
- *  - All-excluded (every `succ[i]` = i) is valid as the empty subcircuit.
+ *  - All-excluded (every `succ(i)` = i) is valid as the empty subcircuit.
  *  - Exactly-one-included is invalid (a single node can't form a cycle without self-loop,
  *    which would mark it excluded — contradiction).
  *
@@ -34,7 +34,7 @@ import kotlin.math.abs
  * non-excluded node, and "non-excluded" itself depends on other vars). Worklist-driven.
  */
 class Subcircuit(
-    /** Successor variable id per node; `succ[i] = i` excludes node i, the rest form one cycle. */
+    /** Successor variable id per node; `succ(i) = i` excludes node i, the rest form one cycle. */
     val succ: IntArray,
 ) : Factor {
 

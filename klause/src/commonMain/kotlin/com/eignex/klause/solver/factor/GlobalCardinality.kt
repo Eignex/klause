@@ -11,11 +11,11 @@ import com.eignex.klause.util.IntArrayList
 /**
  * Global Cardinality Constraint (GCC). Covers the four MiniZinc variants in one factor:
  *
- *  - `global_cardinality(xs, cover, counts)` — `counts[k] = #{i : xs[i] = cover[k]}`. Use
+ *  - `global_cardinality(xs, cover, counts)` — `counts(k) = #{i : xs(i) = cover(k)}`. Use
  *    [countVars] (`size = cover.size`) and [closed] = `false`.
- *  - `global_cardinality_low_up(xs, cover, lo, up)` — `lo[k] ≤ #{i : xs[i] = cover[k]} ≤ up[k]`.
+ *  - `global_cardinality_low_up(xs, cover, lo, up)` — `lo(k) ≤ #{i : xs(i) = cover(k)} ≤ up(k)`.
  *    Use [countLow] / [countHigh] (constant arrays) and [countVars] = `null`.
- *  - `_closed` variants additionally require every `xs[i] ∈ cover` — i.e. no value outside
+ *  - `_closed` variants additionally require every `xs(i) ∈ cover` — i.e. no value outside
  *    the cover set may appear. Pass [closed] = `true`.
  *
  * Exactly one of ([countVars], [countLow]+[countHigh]) is non-null — the constructor
@@ -23,7 +23,7 @@ import com.eignex.klause.util.IntArrayList
  *
  * Propagation: count-bound tightening (definite/possible matchers per cover value) plus
  * Régin-style max-flow GAC. The flow has lower bounds on `cover_k → sink` (matching the
- * cover lo/hi or current `countVars[k]` domain), is reduced to standard max-flow via the
+ * cover lo/hi or current `countVars(k)` domain), is reduced to standard max-flow via the
  * super-source/super-sink trick, solved by Edmonds-Karp, then the residual graph is
  * SCC'd. Any `xᵢ → cover_k` edge with zero flow whose endpoints sit in different SCCs
  * cannot extend to a feasible solution and is pruned from `dom(xᵢ)`.

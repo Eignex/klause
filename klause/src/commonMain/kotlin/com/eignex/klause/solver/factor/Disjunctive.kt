@@ -10,10 +10,10 @@ import kotlin.math.max
 
 /**
  * Disjunctive (one-machine / unary-resource) constraint: tasks must not overlap in time.
- * Task `i` occupies `[starts[i], starts[i] + durations[i])`; for any two tasks `i ≠ j`
+ * Task `i` occupies `[starts(i), starts(i) + durations(i))`; for any two tasks `i ≠ j`
  * one must end before the other starts.
  *
- * Semantically the unary special case of [Cumulative] (`resources[i] = 1`, `capacity = 1`),
+ * Semantically the unary special case of [Cumulative] (`resources(i) = 1`, `capacity = 1`),
  * and the LS side delegates to a private cumulative for cost, repair moves, and the
  * incremental usage timeline — the disjunctive surface is identical, no reason to copy.
  * The win is on the propagator: disjunctive admits much stronger reasoning than cumulative

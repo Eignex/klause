@@ -14,23 +14,23 @@ import kotlin.math.min
 /**
  * Cumulative scheduling constraint: at every integer time point the total resource use of
  * tasks running at that point stays under [capacity]. Task `i` has variable start time
- * `starts[i]`, fixed duration `durations[i] ≥ 0`, fixed resource demand `resources[i] ≥ 0`.
+ * `starts(i)`, fixed duration `durations(i) ≥ 0`, fixed resource demand `resources(i) ≥ 0`.
  *
  * Semantics:
- *  - Task `i` occupies the half-open interval `[starts[i], starts[i] + durations[i])`.
- *  - For every integer time point `t`, `Σ_{i: starts[i] ≤ t < starts[i]+durations[i]} resources[i] ≤ capacity`.
+ *  - Task `i` occupies the half-open interval `[starts(i), starts(i) + durations(i))`.
+ *  - For every integer time point `t`, `Σ_{i: starts(i) ≤ t < starts(i)+durations(i)} resources(i) ≤ capacity`.
  *  - Zero-duration tasks consume no resource and impose no constraint.
- *  - Any task with `resources[i] > capacity` makes the problem trivially infeasible (the
+ *  - Any task with `resources(i) > capacity` makes the problem trivially infeasible (the
  *    factor still reports a graded overage cost when LS hits such a placement).
  *
  * LS cost is graded:
- *   `cost = Σ_t max(0, usage`t` − capacity)`
+ *   `cost = Σ_t max(0, usage(t) − capacity)`
  * — broken assignments rank by total energy overflow rather than by a flat boolean,
  * giving the search a real gradient toward the cumulative bound. This energy overage is
  * the factor's [violationDegree] (run through [compressViolation] so a deeply-overloaded
  * profile can't dominate the global cost); [deltaIfIntSet] / [applyIntSet] and the
  * bool-flip paths return its compressed delta. The raw overage is also mirrored to
- * `state.intPayload[factorId]` for strategies that read it directly (as ALNS does).
+ * `state.intPayload(factorId)` for strategies that read it directly (as ALNS does).
  *
  * Propagation: **time-tabling**. For every task with overlap window `[lst_i, ect_i)`
  * (latest-start to earliest-completion), `resources[i]` is *mandatory* throughout that
@@ -67,8 +67,8 @@ class Cumulative(
      *  (they may yet go absent, so they can't sharpen Ω-energy deductions). */
     val presents: IntArray = EmptyIntArray,
     /** Per-task duration variables; empty = use [durations] as constants. When set, the
-     *  factor reads the current duration from `state.assignment.intValue(durationVars[i])`
-     *  and propagation pulls bounds from `state.intDomains[durationVars[i]]`. */
+     *  factor reads the current duration from `state.assignment.intValue(durationVars(i))`
+     *  and propagation pulls bounds from `state.intDomains(durationVars(i))`. */
     val durationVars: IntArray = EmptyIntArray,
     /** Per-task resource variables; empty = use [resources] as constants. Same pattern as
      *  [durationVars]. */

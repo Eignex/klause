@@ -12,7 +12,7 @@ import com.eignex.klause.util.IntIntMap
 /**
  * `auxBoolVar ↔ (#true literals in [min, max])`. Created by the compiler when a
  * [com.eignex.klause.ast.CardinalityExpr] / `AtMost` / `AtLeast` appears non-top-level so the
- * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
+ * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload(factorId)`
  * is the count of true literals, mirrored from [Cardinality].
  */
 class ReifiedCardinality(
