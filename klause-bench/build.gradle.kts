@@ -1,4 +1,6 @@
 import java.io.FileOutputStream
+import java.net.URI
+import org.gradle.process.ExecOperations
 
 plugins {
     id("com.eignex.jvm") version "1.2.6"
@@ -32,6 +34,92 @@ dependencies {
 
 application {
     mainClass.set("com.eignex.klause.bench.target.BenchCli")
+}
+
+// --- Choco as a faithful MiniZinc solver (`minizinc --solver choco`) ---
+// Choco is run end-to-end through MiniZinc (its own globals library), not via an in-process adapter.
+// choco-parsers isn't a runnable MiniZinc solver out of the box, so `installChoco` fetches the
+// FlatZinc parser jar + Choco's `mzn_lib` + the official `fzn-choco` wrapper, writes a `choco.msc`
+// pointing at them, and registers it under ~/.minizinc/solvers. Mirrors `:klause-yuck:installYuck`.
+val chocoVersion = "6.0.1"
+val chocoCacheDir = File(System.getProperty("user.home"), ".cache/klause-choco")
+
+abstract class InstallChocoTask : DefaultTask() {
+    @get:Input abstract val version: Property<String>
+
+    @get:Internal abstract val cacheDir: Property<File>
+
+    @get:Inject abstract val exec: ExecOperations
+
+    private fun download(url: String, dest: File) {
+        logger.lifecycle("Downloading $url")
+        val tmp = File.createTempFile(dest.name, ".part", dest.parentFile)
+        URI(url).toURL().openStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
+        if (!tmp.renameTo(dest)) tmp.copyTo(dest, overwrite = true)
+    }
+
+    @TaskAction
+    fun install() {
+        val v = version.get()
+        val cache = cacheDir.get().apply { mkdirs() }
+        val jar = cache.resolve("choco-parsers-$v-light.jar")
+        if (!jar.isFile) {
+            download(
+                "https://repo1.maven.org/maven2/org/choco-solver/choco-parsers/$v/choco-parsers-$v-light.jar",
+                jar,
+            )
+        }
+        val mznLib = cache.resolve("mzn_lib")
+        val sh = cache.resolve("fzn-choco.sh")
+        val py = cache.resolve("fzn-choco.py")
+        if (!mznLib.isDirectory) {
+            val tgz = cache.resolve("choco-src-$v.tgz")
+            if (!tgz.isFile) download("https://github.com/chocoteam/choco-solver/archive/refs/tags/v$v.tar.gz", tgz)
+            val sub = "choco-solver-$v/parsers/src/main/minizinc"
+            exec.exec {
+                commandLine(
+                    "tar", "xzf", tgz.absolutePath, "-C", cache.absolutePath,
+                    "$sub/mzn_lib", "$sub/fzn-choco.py", "$sub/fzn-choco.sh",
+                )
+            }
+            val ex = cache.resolve(sub)
+            ex.resolve("mzn_lib").copyRecursively(mznLib, overwrite = true)
+            ex.resolve("fzn-choco.py").copyTo(py, overwrite = true)
+            ex.resolve("fzn-choco.sh").copyTo(sh, overwrite = true)
+        }
+        // Point the official wrapper at the cached jar and make it runnable.
+        exec.exec { commandLine("sed", "-i", "s#^JAR_FILE=.*#JAR_FILE='${jar.absolutePath}'#", py.absolutePath) }
+        exec.exec { commandLine("chmod", "+x", sh.absolutePath, py.absolutePath) }
+        // Write the solver config and register it so `minizinc --solver choco` resolves.
+        val msc = cache.resolve("choco.msc")
+        msc.writeText(
+            """
+            {
+              "id": "org.choco.choco",
+              "name": "Choco",
+              "version": "$v",
+              "mznlib": "${mznLib.absolutePath}",
+              "executable": "${sh.absolutePath}",
+              "tags": ["cp", "int", "choco"],
+              "stdFlags": ["-a", "-f", "-p", "-t"],
+              "supportsMzn": false,
+              "supportsFzn": true,
+              "needsSolns2Out": true,
+              "isGUIApplication": false
+            }
+            """.trimIndent(),
+        )
+        val solvers = File(System.getProperty("user.home"), ".minizinc/solvers").apply { mkdirs() }
+        msc.copyTo(solvers.resolve("choco.msc"), overwrite = true)
+        logger.lifecycle("Registered Choco MiniZinc solver at ${solvers.resolve("choco.msc")}")
+    }
+}
+
+val installChoco by tasks.registering(InstallChocoTask::class) {
+    description = "Provision Choco as a MiniZinc solver (choco-parsers jar + mzn_lib + registered choco.msc)."
+    version.set(chocoVersion)
+    cacheDir.set(chocoCacheDir)
+    outputs.dir(chocoCacheDir)
 }
 
 /** Forward `-Dklause.*` props into the JavaExec child JVM so callers can tune any bench knob
