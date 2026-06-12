@@ -5,7 +5,6 @@ import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.runner.Budget
-import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.BanditProbe
@@ -17,7 +16,6 @@ import com.eignex.klause.bench.tools.MeasureBacktrack
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
-import com.eignex.klause.portfolio.EngineMix
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -80,7 +78,7 @@ object BenchCli {
             target.metric,
             Catalog.problems(*target.suiteIds.toTypedArray()),
             target.budget,
-            target.reference,
+            target.reference?.name?.lowercase(),
         )
     }
 
@@ -100,12 +98,9 @@ object BenchCli {
             return
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
-        // `backend=` selects the single solver the `solve` metric runs (alias: `reference=`).
-        // Only the reference names (choco/ortools/yuck) map to a backend; anything else (incl.
-        // `klause`/unset) leaves it null, i.e. klause via the engine/processors/fixed filters.
-        val backend = (f["backend"] ?: f["reference"])?.let {
-            runCatching { Backend.valueOf(it.uppercase().replace("-", "")) }.getOrNull()
-        }
+        // `backend=` is the `solve` metric's solver id: a registered MiniZinc solver (choco/gecode/
+        // yuck/…) run via `minizinc --solver`; unset (or `klause`) runs klause via klause-cli.
+        val backend = (f["backend"] ?: f["reference"])?.lowercase()?.takeIf { it != "klause" }
         val profile = parseProfile(f)
         val search = parseKlauseSearch(f)
         println("=== run: $metricName over ${refs.size} instance(s) ===")
@@ -119,16 +114,17 @@ object BenchCli {
     private fun parseKlauseSearch(f: Map<String, String>): KlauseSearch? {
         if (f["engine"] == null && f["processors"] == null && f["fixed"] == null) return null
         return KlauseSearch(
-            engine = f["engine"]?.let(::parseEngine) ?: EngineMix.MIXED,
+            engine = f["engine"]?.let(::parseEngine) ?: "portfolio",
             processors = f["processors"]?.toIntOrNull() ?: Runtime.getRuntime().availableProcessors(),
             fixed = f["fixed"]?.toBoolean() ?: false,
         )
     }
 
-    private fun parseEngine(name: String): EngineMix = when (name.lowercase()) {
-        "cp", "backtrack", "bt" -> EngineMix.BACKTRACK
-        "ls", "localsearch", "local-search" -> EngineMix.LOCAL_SEARCH
-        "mixed", "portfolio" -> EngineMix.MIXED
+    /** Map an `engine=` alias to the klause-cli `-e` value. */
+    private fun parseEngine(name: String): String = when (name.lowercase()) {
+        "cp", "backtrack", "bt" -> "cp"
+        "ls", "localsearch", "local-search" -> "ls"
+        "mixed", "portfolio" -> "portfolio"
         else -> error("engine must be backtrack|ls|mixed, got '$name'")
     }
 

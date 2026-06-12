@@ -43,7 +43,7 @@ bench coverage:xcsp3|smtlib          parse/solve rates over a whole format libra
 | `category=SAT,UNSAT,CSP,OPTIMIZATION,…` | keep only these categories |
 | `tag=…` / `name=<glob>[,…]` | tag membership / comma-separated OR of substring-or-`*`-glob patterns on the instance name (e.g. `name=cvrp,nfc,mario`) |
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
-| `backend=choco\|ortools\|yuck` | the single solver `solve` runs (default klause); alias `reference=` |
+| `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance budget for metrics that honor it |
 | `engine=backtrack\|ls\|mixed` `processors=N` `fixed=true` | klause's search for a `solve` run (below); `engine`/`processors` mirror the CLI's `--engine` / `-p`, `fixed` follows the model annotation |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
@@ -52,7 +52,7 @@ bench coverage:xcsp3|smtlib          parse/solve rates over a whole format libra
 
 - **time** — wall-time for solve/sample/enumerate per backend, plus a propagation microbench. Writes `build/bench-time.json` and flags regressions vs `bench-baseline.json` (`:klause-bench:saveBaseline` freezes the current run as the baseline).
 - **verify** — cross-backend SAT/UNSAT agreement + sample-validity gate. The correctness gate.
-- **solve** — run one backend (`backend=`, default klause) over the selection; records per-instance objective + time-to-best (optimization) or feasibility (satisfaction) + whether it was proved, to `build/solve-<solver>.json`. Run once per backend and diff offline.
+- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Records per-instance objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics, to `build/solve-<solver>.json`; the raw per-instance output is saved under `build/solve-<solver>/`. Run once per backend and diff offline. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
 - **search** — complete backtracker under a fixed CDCL config; reports nodes/conflicts/learned + solve-rate. A/B a learning or explanation change by holding the suite fixed and comparing conflicts (the `slack-alldiff` Golomb suite is the Hall-prone workload).
 - **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
 - **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.

@@ -6,14 +6,13 @@ import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.CoverageMetric
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.PortfolioCreditMetric
-import com.eignex.klause.bench.metric.Reference
 import com.eignex.klause.bench.metric.SearchEffortMetric
 import com.eignex.klause.bench.metric.SolveMetric
+import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.TimeMetric
 import com.eignex.klause.bench.metric.TuningMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
 import com.eignex.klause.bench.runner.Budget
-import com.eignex.klause.bench.solver.Backend
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileScope
 import com.eignex.klause.bench.tools.Profiler
@@ -35,14 +34,14 @@ internal object MetricRunner {
         metric: MetricKind,
         refs: List<ProblemRef>,
         budget: Budget,
-        reference: Backend?,
+        backend: String? = null,
         profile: ProfileConfig? = null,
         search: KlauseSearch? = null,
     ) {
         if (profile != null && profile.scope == ProfileScope.ALL) {
-            Profiler.record(profile) { dispatch(metric, refs, budget, reference, search, solveProfile = null) }
+            Profiler.record(profile) { dispatch(metric, refs, budget, backend, search, solveProfile = null) }
         } else {
-            dispatch(metric, refs, budget, reference, search, solveProfile = profile)
+            dispatch(metric, refs, budget, backend, search, solveProfile = profile)
         }
     }
 
@@ -52,7 +51,7 @@ internal object MetricRunner {
         metric: MetricKind,
         refs: List<ProblemRef>,
         budget: Budget,
-        reference: Backend?,
+        backend: String?,
         search: KlauseSearch?,
         solveProfile: ProfileConfig?,
     ) {
@@ -60,9 +59,15 @@ internal object MetricRunner {
         when (metric) {
             MetricKind.SOLVE -> {
                 val resolved = BenchLoad.resolveRefs(refs)
-                // backend=choco|ortools|yuck runs that reference solo; otherwise klause (engine/processors/fixed).
-                val ref = reference?.takeIf { it in Reference.backends }
-                solve { SolveMetric.run(resolved, budget, ref, search ?: KlauseSearch()) }
+                // backend=<minizinc solver id> (choco/gecode/yuck/…) runs that reference; default klause.
+                solve {
+                    SolveMetric.run(
+                        resolved,
+                        budget,
+                        backend ?: SolverInvocation.KLAUSE,
+                        search ?: KlauseSearch(),
+                    )
+                }
             }
 
             MetricKind.TUNING -> {
