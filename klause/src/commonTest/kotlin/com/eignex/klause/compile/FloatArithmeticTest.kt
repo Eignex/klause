@@ -1,7 +1,14 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.ge
+import com.eignex.klause.schema.gt
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.lt
+import com.eignex.klause.schema.minus
+import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
+import com.eignex.klause.schema.unaryMinus
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
@@ -183,7 +190,7 @@ class FloatArithmeticTest {
         class S : VariableSchema() {
             val a by floatVar(min = 0.0, max = 1.0, buckets = 11)
             val b by floatVar(min = 0.0, max = 1.0, buckets = 11)
-            val c by constraint { (a.toExpr() + b.toExpr()) le 1.0 }
+            val c by constraint { (a + b) le 1.0 }
         }
         val schema = S()
         val compiled = schema.compile()
@@ -203,7 +210,7 @@ class FloatArithmeticTest {
         class S : VariableSchema() {
             val a by floatVar(min = 0.0, max = 1.0, buckets = 11)
             val b by floatVar(min = 0.0, max = 1.0, buckets = 11)
-            val c by constraint { (a.toExpr() - b.toExpr()) ge 0.5 }
+            val c by constraint { (a - b) ge 0.5 }
         }
         val schema = S()
         val compiled = schema.compile()
@@ -223,7 +230,7 @@ class FloatArithmeticTest {
 
             val a by floatVar(min = 0.0, max = 2.0, buckets = 21)
             val b by floatVar(min = -1.0, max = 1.0, buckets = 11)
-            val c by constraint { (2 * a + 3 * b.toExpr()) le 5.0 }
+            val c by constraint { (2 * a + 3 * b) le 5.0 }
         }
         val schema = S()
         val compiled = schema.compile()

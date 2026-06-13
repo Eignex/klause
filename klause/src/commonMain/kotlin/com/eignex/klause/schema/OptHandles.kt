@@ -202,22 +202,22 @@ class OptFloatHandle(
         And(listOf(present.toExpr(), other.present.toExpr(), cmp))
 
     /** `this ≤ other`, and both present (false if either absent). */
-    infix fun le(other: OptFloatHandle): BoolExpr = cmpOpt(other, value le other.value.toExpr())
+    infix fun le(other: OptFloatHandle): BoolExpr = cmpOpt(other, value le other.value)
 
     /** `this < other`, and both present (false if either absent). */
-    infix fun lt(other: OptFloatHandle): BoolExpr = cmpOpt(other, value lt other.value.toExpr())
+    infix fun lt(other: OptFloatHandle): BoolExpr = cmpOpt(other, value lt other.value)
 
     /** `this ≥ other`, and both present (false if either absent). */
-    infix fun ge(other: OptFloatHandle): BoolExpr = cmpOpt(other, value ge other.value.toExpr())
+    infix fun ge(other: OptFloatHandle): BoolExpr = cmpOpt(other, value ge other.value)
 
     /** `this > other`, and both present (false if either absent). */
-    infix fun gt(other: OptFloatHandle): BoolExpr = cmpOpt(other, value gt other.value.toExpr())
+    infix fun gt(other: OptFloatHandle): BoolExpr = cmpOpt(other, value gt other.value)
 
     /** `this = other`, and both present (false if either absent). */
-    infix fun eq(other: OptFloatHandle): BoolExpr = cmpOpt(other, value eq other.value.toExpr())
+    infix fun eq(other: OptFloatHandle): BoolExpr = cmpOpt(other, value eq other.value)
 
     /** `this ≠ other`, and both present (false if either absent). */
-    infix fun ne(other: OptFloatHandle): BoolExpr = cmpOpt(other, value ne other.value.toExpr())
+    infix fun ne(other: OptFloatHandle): BoolExpr = cmpOpt(other, value ne other.value)
 }
 
 /**
