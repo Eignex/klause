@@ -94,7 +94,10 @@ class Portfolio(
      * (backtrack prunes on it; LS ignores it). A worker proving Optimal cancels the rest; otherwise
      * the global incumbent is returned as BestFound, or Optimal if every worker terminated cleanly.
      */
-    override fun minimize(cancellation: Cancellation, onImprovement: ((AttributedImprovement) -> Unit)?): MinimizeResult {
+    override fun minimize(
+        cancellation: Cancellation,
+        onImprovement: ((AttributedImprovement) -> Unit)?,
+    ): MinimizeResult {
         val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
         val cancelled = AtomicBoolean(false)
         val token: Cancellation = { cancelled.load() || cancellation() }
