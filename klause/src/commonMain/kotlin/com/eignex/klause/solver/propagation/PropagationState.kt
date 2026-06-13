@@ -12,20 +12,6 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
-// Three-tier learned-clause DB tiers (#201). Top-level so the engine's reduction policy in
-// BacktrackSolver and the parallel tier array in PropagationState share one definition.
-/** Not yet classified — the reduction policy assigns a tier by LBD on first encounter. */
-internal const val TIER_UNSET: Int = -1
-
-/** Permanent core: very low LBD, never deleted. */
-internal const val TIER_CORE: Int = 0
-
-/** Mid tier: kept across reductions, demoted to [TIER_LOCAL] when idle. */
-internal const val TIER_MID: Int = 1
-
-/** Local tier: aggressively deleted; promoted to [TIER_MID] on reuse. */
-internal const val TIER_LOCAL: Int = 2
-
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
 internal const val NO_CARVE: Int = Int.MIN_VALUE
 
@@ -365,9 +351,9 @@ class PropagationState(
      *  reported leaf and the search can revisit it forever. */
     internal val learnedPermanent: IntArrayList = IntArrayList()
 
-    /** Three-tier database tier per learned clause (#201), parallel to [learnedClauseStore]:
-     *  [TIER_CORE] / [TIER_MID] / [TIER_LOCAL], or [TIER_UNSET] before the reduction policy
-     *  first classifies it by LBD. The policy promotes/demotes clauses between tiers based on
+    /** Three-tier database tier per learned clause (#201), parallel to [learnedClauseStore],
+     *  stored as [ClauseTier] ordinals. [ClauseTier.UNSET] until the reduction policy first
+     *  classifies it by LBD; the policy then promotes/demotes clauses between tiers based on
      *  reuse, so the tier is persistent state rather than a pure function of LBD. */
     internal val learnedTier: IntArrayList = IntArrayList()
 
