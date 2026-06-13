@@ -95,8 +95,10 @@ internal class CpToLpRelaxation(
         if (cumulative) CumulativeRelaxation(problem).takeIf { it.applicable } else null
 
     private companion object {
-        /** Above this node count the O(n²)-column circuit arc model is skipped. */
-        const val MAX_NODES: Int = 24
+        /** Above this candidate-arc count the circuit arc model is skipped — a defensive bound on
+         *  the dense-tableau cost. Gating on arc count (LP columns) rather than node count lets
+         *  large but sparse routing graphs through (#431); #429 may bench this threshold. */
+        const val MAX_CIRCUIT_ARCS: Int = 1024
 
         /** Above this array length the O(len)-column Element selector model is skipped. */
         const val MAX_ELEM: Int = 256
@@ -447,14 +449,26 @@ internal class CpToLpRelaxation(
          * in-degree `Σ_i y_ij = 1`, and channelling `Σ_j j·y_ij = succ[i]` tying arcs to the integer
          * column. Integer solutions are then permutations; [CircuitSeparator] removes the subtours.
          * The column *layout* uses the declared domain so it is identical across nodes (warm-start
-         * safe). Circuits with more than [MAX_NODES] nodes are skipped (the O(n²) LP would dominate).
+         * safe). A circuit whose candidate-arc count exceeds [MAX_CIRCUIT_ARCS] is skipped (the dense
+         * LP tableau would dominate); gating on arc count rather than n lets large sparse graphs
+         * through (#431). Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
          */
         private fun buildCircuitArcs(factor: Circuit) {
             val succ = factor.succ
             val n = succ.size
-            if (n < 2 || n > MAX_NODES) return
-            val arcCol = Array(n) { IntArray(n) { -1 } }
-            // Out-degree and channelling rows, building the arc columns on the way.
+            if (n < 2) return
+            // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
+            // graphs (small per-node successor domains) are not skipped by a blunt node cap.
+            var arcCount = 0
+            for (i in 0 until n) {
+                problem.intDomains[succ[i]].forEach { j -> if (j != i && j in 0 until n) arcCount++ }
+            }
+            if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
+            val tails = IntArrayList()
+            val heads = IntArrayList()
+            val cols = IntArrayList()
+            val inColsByHead = Array(n) { IntArrayList() }
+            // Out-degree and channelling rows, building the (sparse) arc columns on the way.
             for (i in 0 until n) {
                 val live = session.intDomain(succ[i])
                 val outCols = IntArrayList()
@@ -464,10 +478,13 @@ internal class CpToLpRelaxation(
                     if (j == i || j < 0 || j >= n) return@forEach
                     val present = live.contains(j)
                     val col = auxColumn(0L, if (present) 1L else 0L)
-                    arcCol[i][j] = col
                     outCols.add(col)
                     chanCols.add(col)
                     chanCoef.add(j)
+                    tails.add(i)
+                    heads.add(j)
+                    cols.add(col)
+                    inColsByHead[j].add(col)
                 }
                 if (outCols.isEmpty()) return // degenerate: no candidate successor — leave to propagation
                 builder.addRow(outCols.toIntArray(), LongArray(outCols.size) { 1L }, Relation.EQ, 1L)
@@ -484,13 +501,12 @@ internal class CpToLpRelaxation(
             }
             // In-degree rows: Σ_i y_ij = 1 for each node j that is some arc's head.
             for (j in 0 until n) {
-                val inCols = IntArrayList()
-                for (i in 0 until n) if (arcCol[i][j] >= 0) inCols.add(arcCol[i][j])
+                val inCols = inColsByHead[j]
                 if (!inCols.isEmpty()) {
                     builder.addRow(inCols.toIntArray(), LongArray(inCols.size) { 1L }, Relation.EQ, 1L)
                 }
             }
-            circuitModels.add(CircuitArcModel(n, arcCol))
+            circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
         /**

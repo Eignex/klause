@@ -71,13 +71,9 @@ class CircuitCutTest {
         val model = r.circuitArcs.single()
         val cut = CircuitSeparator().separate(CutContext(p, r, sol, session)).first { it.rel == Relation.GE }
 
-        // Invert arcCol so a cut column maps back to its (i, j) arc.
+        // Map each arc column back to its (i, j) from the sparse arc lists.
         val arcOf = HashMap<Int, Pair<Int, Int>>()
-        for (i in 0 until model.n) {
-            for (j in 0 until model.n) {
-                if (model.arcCol[i][j] >= 0) arcOf[model.arcCol[i][j]] = i to j
-            }
-        }
+        for (k in model.cols.indices) arcOf[model.cols[k]] = model.tails[k] to model.heads[k]
         val cutArcs = cut.cols.map { arcOf.getValue(it) }
 
         // Every single 4-cycle (Hamiltonian tour) must use at least one cut arc.
@@ -100,6 +96,54 @@ class CircuitCutTest {
         val sol2 = DualSimplex(r2.model).solve()
         assertEquals(LpStatus.OPTIMAL, sol2.status)
         assertTrue(sol2.objectiveValue > 10.0 + eps, "subtour-eliminated bound ${sol2.objectiveValue} should exceed 10")
+    }
+
+    @Test
+    fun `subtour cut at n=6 excludes no Hamiltonian tour`() {
+        // Costs pair the largest c with the smallest successor value (rearrangement inequality), so
+        // c = [5,4,6,2,1,3] forces the min-cost assignment succ = [1,2,0,4,5,3] — two 3-cycles
+        // {0→1→2→0},{3→4→5→3}, a subtour that exercises the sparse max-flow separator beyond n=4.
+        val n = 6
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, n - 1) },
+            factors = arrayOf<Factor>(Circuit(IntArray(n) { it })),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(5L, 4L, 6L, 2L, 1L, 3L))
+        val session = PropagationSession(p)
+        val r = relaxer(p, obj).build(session)
+        val model = r.circuitArcs.single()
+        val sol = DualSimplex(r.model).solve()
+        assertEquals(LpStatus.OPTIMAL, sol.status)
+        val cut = CircuitSeparator().separate(CutContext(p, r, sol, session)).first { it.rel == Relation.GE }
+        val arcOf = HashMap<Int, Pair<Int, Int>>()
+        for (k in model.cols.indices) arcOf[model.cols[k]] = model.tails[k] to model.heads[k]
+        val cutArcs = cut.cols.map { arcOf.getValue(it) }
+        for (succ in singleCyclePermutations(n)) {
+            val crossings = cutArcs.count { (i, j) -> succ[i] == j }
+            assertTrue(crossings >= cut.rhs, "tour ${succ.toList()} violates the subtour cut")
+        }
+    }
+
+    @Test
+    fun `arc relaxation scales past the old 24-node cap`() {
+        // The old model was hard-capped at 24 nodes; the sparse model gates on candidate-arc count.
+        // n=30 (30·29 = 870 arcs ≤ MAX_CIRCUIT_ARCS) builds; n=40 (1560 arcs) exceeds the cap and is
+        // skipped, so the gate works both ways (#431).
+        fun fullCircuit(n: Int): LpRelaxation {
+            val p = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, n - 1) },
+                factors = arrayOf<Factor>(Circuit(IntArray(n) { it })),
+            )
+            return CpToLpRelaxation(p, null, generateCuts = false, circuitArcs = true).build(PropagationSession(p))
+        }
+        val built = fullCircuit(30).circuitArcs.single()
+        assertEquals(30, built.n)
+        assertEquals(30 * 29, built.cols.size) // every i→j with j ≠ i is a candidate arc
+        assertTrue(fullCircuit(40).circuitArcs.isEmpty(), "n=40 (1560 arcs) exceeds the arc cap, so skipped")
     }
 
     /** All permutations of `[0,n)` that form a single n-cycle, as successor arrays. */
