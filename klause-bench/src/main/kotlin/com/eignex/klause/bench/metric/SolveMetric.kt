@@ -1,6 +1,5 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.bench.report.EnvInfo
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
@@ -12,19 +11,26 @@ import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import java.io.File
 import java.time.Instant
 
 /**
  * Single-solver solve over a corpus, run entirely as **subprocesses** (see [SolverInvocation]):
- * klause via `klause-cli`, references via `minizinc --solver <id>`. One [run] measures one solver
- * and records, per instance, the objective reached + time-to-best (optimization) or feasibility
- * (satisfaction), whether it was proved, and the solver's `%%%mzn-stat` statistics. Each instance's
- * raw MiniZinc-format output is saved under `build/solve-<solver>/`, and a parsed roll-up to
- * `build/solve-<solver>.json`.
+ * klause via `klause-cli`, references via `minizinc --solver <id>`.
  *
- * No in-session comparison: to compare two solvers, run this once per solver (each writes its own
- * files) and diff offline (`parity-runs/compare.sh`). One solver's crash never taints another's.
+ * Output is saved **one file per problem**, under `output/<config>/`, where `<config>` encodes the
+ * solver + its settings + the time budget (so multiple settings-runs coexist without clobbering —
+ * see [configTag]). Each problem yields two files:
+ *  - `<problem>.out` — the raw, verbatim solver stdout (the MiniZinc-format stream); this **is** the
+ *    run's log.
+ *  - `<problem>.json` — a self-describing [SolveRecord]: solver, settings, problem, budget, plus the
+ *    parsed result (objective, time-to-best, proof/feasibility, `%%%mzn-stat` statistics, the exact
+ *    command, git sha, timestamp).
+ *
+ * No in-session comparison: to compare two configs, run this once per config (each writes its own
+ * `output/<config>/` dir) and diff offline (`output/compare.sh`). One solver's crash never taints
+ * another's. When [ProfileConfig] is set, the run instead profiles the klause engine in-process.
  */
 internal data class KlauseSearch(
     val engine: String = "portfolio", // cp | ls | portfolio (klause-cli -e)
@@ -33,45 +39,39 @@ internal data class KlauseSearch(
     val fixed: Boolean = false,
 )
 
+/** One problem's result for one solver+settings+budget — the durable per-problem record. */
 @Serializable
-internal data class SolveRow(
-    val name: String,
+internal data class SolveRecord(
+    val problem: String,
+    val solver: String, // solver id (klause | choco | gecode | yuck | …)
+    val engine: String?, // klause engine (cp/ls/portfolio); null for references
+    val processors: Int,
+    val search: String, // "free" | "fixed"
+    val seed: Long,
+    val budgetMs: Long,
     val kind: String, // "optimize" | "satisfy"
-    val solver: String,
+    /** True when the objective is maximized (higher is better) — for direction-aware comparison. */
+    val maximize: Boolean,
     /** true = feasible, false = infeasible (proved), null = unknown within budget. */
     val feasible: Boolean?,
     val objective: Double?,
     /** ms to the best incumbent (optimize) or to the first solution (satisfy); null when none. */
-    val timeMs: Long?,
+    val timeToBestMs: Long?,
     /** optimum proved (optimize) or search closed UNSAT/exhausted. */
     val proven: Boolean,
-    /** True when the objective is maximized (so a higher value is better) — for offline comparison. */
-    val maximize: Boolean,
-    val display: String,
     val stats: Map<String, String> = emptyMap(),
-)
-
-@Serializable
-internal data class SolveResults(
-    val timestamp: String,
     val gitSha: String?,
-    val env: EnvInfo,
-    val solver: String,
-    val budgetMillis: Long,
+    val timestamp: String,
     val command: String,
-    val rows: List<SolveRow>,
 )
 
 internal object SolveMetric {
     private const val SOLVE_SEED = 3L
 
-    /** Run [solverId] (`"klause"` or a registered MiniZinc reference id) over [entries]. [search]
-     *  applies to klause (engine/processors/annotation); references take only processors + free.
-     *
-     *  When [profile] is set, the run switches to **profiling mode**: the klause engine is run
-     *  IN-PROCESS under JFR (subprocess solves can't be sampled from the bench JVM), so the profile
-     *  captures the actual `BacktrackSolver`/`LocalSearchSolver` hot paths. No JSON/cache is written
-     *  in this mode — it measures the solver, not figures. */
+    /** Run [solverId] (`"klause"` or a registered MiniZinc reference id) over [entries], saving one
+     *  `.out` + `.json` per problem under `output/<config>/`. [search] applies to klause; references
+     *  take only processors + free. When [profile] is set, profiles the klause engine in-process
+     *  instead (subprocess solves can't be JFR-sampled from the bench JVM). */
     fun run(
         entries: List<ResolvedProblem>,
         budget: Budget = Budget(),
@@ -89,44 +89,126 @@ internal object SolveMetric {
             free = !search.fixed,
             seed = SOLVE_SEED,
         )
-        val solver = label(solverId, settings)
-        val outDir = File("build/solve-$solver").apply { mkdirs() }
+        val cacheLabel = label(solverId, settings) // kept stable so existing cache entries stay reachable
+        val tag = configTag(solverId, settings, budget)
+        val outDir = File("output", tag).apply { mkdirs() }
+        val timestamp = Instant.now().toString()
+        val sha = Reports.readGitSha()
         println()
-        println("=== solve ($solver; ${budget.timeoutMillis}ms budget) ===")
-        var command = ""
-        val rows = entries.map { entry ->
+        println("=== solve ($tag; ${budget.timeoutMillis}ms budget) -> output/$tag/ ===")
+        var feasible = 0
+        var proved = 0
+        for (entry in entries) {
             val optimize = entry.objective != null
             val kind = if (optimize) "optimize" else "satisfy"
-            val r = runCatching {
-                val key = BenchCache.keyFor(entry, solver, budget)
-                BenchCache.load(key) ?: SolverInvocation.run(entry, solverId, settings, budget, optimize)
-                    .also { BenchCache.store(key, it) }
+            val rec = runCatching {
+                val key = BenchCache.keyFor(entry, cacheLabel, budget)
+                val r = BenchCache.load(key)
+                    ?: SolverInvocation.run(
+                        entry,
+                        solverId,
+                        settings,
+                        budget,
+                        optimize,
+                    ).also { BenchCache.store(key, it) }
+                File(outDir, flat(entry) + ".out").writeText(r.rawOutput)
+                record(entry, solverId, settings, budget, kind, timestamp, sha, r)
             }.getOrElse {
-                println("?? [${entry.name}] $kind $solver=ERROR: ${it.message ?: it::class.simpleName}")
-                return@map errorRow(entry, kind, solver)
+                println("?? [${entry.name}] $kind ERROR: ${it.message ?: it::class.simpleName}")
+                errorRecord(entry, solverId, settings, budget, kind, timestamp, sha)
             }
-            command = r.command
-            File(outDir, entry.name.replace('/', '_') + ".out").writeText(r.rawOutput)
-            val row = row(entry, kind, solver, r)
-            val mark = if (row.feasible == null && !row.proven) "??" else "ok"
-            println("$mark [${row.name}] $kind $solver=${row.display}")
-            row
+            File(outDir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
+            if (rec.feasible == true) feasible++
+            if (rec.proven) proved++
+            val mark = if (rec.feasible == null && !rec.proven) "??" else "ok"
+            println("$mark [${rec.problem}] $kind = ${display(rec)}")
         }
-        Reports.writeJson(
-            "build/solve-$solver.json",
-            SolveResults(
-                Instant.now().toString(),
-                Reports.readGitSha(),
-                EnvInfo.capture(),
-                solver,
-                budget.timeoutMillis,
-                command,
-                rows,
-            ),
-        )
-        val feas = rows.count { it.feasible == true }
-        val prov = rows.count { it.proven }
-        println("\n$feas/${rows.size} feasible, $prov proved  (raw output in $outDir/)")
+        println("\n$feasible/${entries.size} feasible, $proved proved  (output/$tag/)")
+    }
+
+    /** Filesystem-safe, self-sufficient config dir name: solver + engine + processors + search mode +
+     *  budget. Two runs that differ in any of these land in different dirs. */
+    private fun configTag(solverId: String, s: SolverInvocation.Settings, budget: Budget): String = buildString {
+        append(solverId)
+        s.engine?.let { append('-').append(it) }
+        append("-p").append(s.processors)
+        append(if (s.free) "-free" else "-fixed")
+        append("-t").append(budget.timeoutMillis / 1000).append('s')
+    }
+
+    private fun flat(entry: ResolvedProblem): String = entry.name.replace('/', '_')
+
+    private fun record(
+        entry: ResolvedProblem,
+        solverId: String,
+        s: SolverInvocation.Settings,
+        budget: Budget,
+        kind: String,
+        timestamp: String,
+        sha: String?,
+        r: SolverInvocation.Result,
+    ): SolveRecord = SolveRecord(
+        problem = entry.name,
+        solver = solverId,
+        engine = s.engine,
+        processors = s.processors,
+        search = if (s.free) "free" else "fixed",
+        seed = s.seed,
+        budgetMs = budget.timeoutMillis,
+        kind = kind,
+        maximize = entry.maximize,
+        feasible = r.feasible,
+        objective = r.objective,
+        timeToBestMs = r.timeToBestMs,
+        proven = r.proven,
+        stats = r.stats,
+        gitSha = sha,
+        timestamp = timestamp,
+        command = r.command,
+    )
+
+    private fun errorRecord(
+        entry: ResolvedProblem,
+        solverId: String,
+        s: SolverInvocation.Settings,
+        budget: Budget,
+        kind: String,
+        timestamp: String,
+        sha: String?,
+    ): SolveRecord = SolveRecord(
+        problem = entry.name,
+        solver = solverId,
+        engine = s.engine,
+        processors = s.processors,
+        search = if (s.free) "free" else "fixed",
+        seed = s.seed,
+        budgetMs = budget.timeoutMillis,
+        kind = kind,
+        maximize = entry.maximize,
+        feasible = null,
+        objective = null,
+        timeToBestMs = null,
+        proven = false,
+        stats = emptyMap(),
+        gitSha = sha,
+        timestamp = timestamp,
+        command = "ERROR",
+    )
+
+    private fun display(rec: SolveRecord): String {
+        val at = "@${rec.timeToBestMs ?: "-"}ms"
+        if (rec.command == "ERROR") return "ERROR"
+        return when {
+            rec.kind != "optimize" -> when (rec.feasible) {
+                true -> "SAT$at"
+                false -> "UNSAT"
+                null -> "?"
+            }
+
+            rec.objective == null -> "?"
+
+            else -> "${if (rec.proven) "opt" else "best"}=${rec.objective}$at"
+        }
     }
 
     /** Profiling mode: run the klause engine IN-PROCESS under JFR so the profile captures the
@@ -175,48 +257,13 @@ internal object SolveMetric {
         }
     }
 
-    private fun row(entry: ResolvedProblem, kind: String, solver: String, r: SolverInvocation.Result): SolveRow {
-        val at = "@${r.timeToBestMs ?: "-"}ms"
-        val display = when {
-            kind != "optimize" -> when (r.feasible) {
-                true -> "SAT$at"
-                false -> "UNSAT"
-                null -> "?"
-            }
-
-            r.objective == null -> "?"
-
-            else -> "${if (r.proven) "opt" else "best"}=${r.objective}$at"
-        }
-        return SolveRow(
-            entry.name, kind, solver,
-            feasible = r.feasible,
-            objective = r.objective,
-            timeMs = r.timeToBestMs,
-            proven = r.proven,
-            maximize = entry.maximize,
-            display = display,
-            stats = r.stats,
-        )
-    }
-
-    /** A stable, filesystem-safe label encoding the solver + settings (also the output dir/json name). */
+    /** A stable, filesystem-safe label encoding solver + processors + search mode — the **cache key**
+     *  component (NOT the output dir; see [configTag]). Kept byte-for-byte stable so prior cached
+     *  results stay addressable across this refactor. */
     private fun label(solverId: String, s: SolverInvocation.Settings): String {
         if (solverId != SolverInvocation.KLAUSE) {
             return solverId + if (s.processors > 1) "-x${s.processors}" else ""
         }
         return "klause-${s.engine ?: "portfolio"}-x${s.processors}" + if (!s.free) "-ann" else ""
     }
-
-    private fun errorRow(entry: ResolvedProblem, kind: String, solver: String): SolveRow = SolveRow(
-        entry.name,
-        kind,
-        solver,
-        feasible = null,
-        objective = null,
-        timeMs = null,
-        proven = false,
-        maximize = entry.maximize,
-        display = "ERROR",
-    )
 }
