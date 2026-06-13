@@ -21,7 +21,7 @@ class CliTest {
     }
 
     @Test
-    fun `engine params reach the cp-single and ls engines`() {
+    fun `engine params reach the single-solver engines`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
@@ -29,6 +29,8 @@ class CliTest {
         for (engineArgs in listOf(
             // cp-single is the only engine that takes the per-solver var-/val-selector knobs.
             arrayOf("-e", "cp-single", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
+            // ls-single takes the ls strategy knobs (tabu-tenure / noise / lambda); ls is the portfolio.
+            arrayOf("-e", "ls-single", "--param", "seed=7", "--param", "tabu-tenure=5", "--param", "noise=0.1", "-t", "5000"),
             arrayOf("-e", "ls", "--param", "seed=7", "--param", "lambda=2.0", "-t", "5000"),
         )) {
             val out = capture { main(engineArgs + fzn.absolutePath) }

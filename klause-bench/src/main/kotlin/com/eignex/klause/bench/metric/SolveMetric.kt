@@ -241,8 +241,8 @@ internal object SolveMetric {
             println("profile= profiles the klause engine in-process; '$solverId' is external")
             return
         }
-        if (search.engine !in setOf("cp", "cp-single", "fixed", "ls")) {
-            println("profile= needs a single-solver klause engine (cp|cp-single|fixed|ls); got '${search.engine}'")
+        if (search.engine !in setOf("cp", "cp-single", "fixed", "ls", "ls-single")) {
+            println("profile= needs a single-solver engine (not the '${search.engine}' portfolio)")
             return
         }
         println()
@@ -260,7 +260,7 @@ internal object SolveMetric {
      *  on the model's annotated search; `cp`/`cp-single` → conflict-driven backtrack. */
     private fun solveInProcess(entry: ResolvedProblem, search: KlauseSearch, cancel: Cancellation) {
         when (search.engine) {
-            "ls" -> LocalSearchSolver(entry.problem).solve(
+            "ls", "ls-single" -> LocalSearchSolver(entry.problem).solve(
                 LocalSearchParams(randomSeed = SOLVE_SEED, cancellation = cancel, lsObjective = entry.lsObjective),
             )
 

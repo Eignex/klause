@@ -15,6 +15,12 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.localsearch.CostShaping
+import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
+import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.result.MinimizeResult
@@ -30,7 +36,7 @@ import com.eignex.klause.solver.result.SolveStats
  */
 internal object SolveCore {
 
-    private val pureLsEngines = setOf("ls", "localsearch", "local-search")
+    private val pureLsEngines = setOf("ls", "localsearch", "local-search", "ls-single", "lssingle")
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, output: OutputProtocol) {
         // Engine enum: fixed | cp | mixed | ls | cp-single. `-f` (free) is an alias for `-e cp`; no
@@ -66,6 +72,13 @@ internal object SolveCore {
             "cp-single", "cpsingle" -> {
                 if (cores > 1) usageError("engine 'cp-single' is single-core; use 'cp' for a parallel backtrack pool")
                 runBacktrack(solvable, common, output, useAnnotation = false, allowSelectors = true)
+            }
+
+            // Naked single local search — the only engine that takes the ls strategy --params
+            // (tabu-tenure, pair-swap-budget, lambda, noise, max-flips).
+            "ls-single", "lssingle" -> {
+                if (cores > 1) usageError("engine 'ls-single' is single-core; use 'ls' for a parallel pool")
+                runLocalSearch(solvable, common, output)
             }
 
             "cp", "backtrack", "bt" -> runPortfolio(solvable, common, output, cores, EngineMix.BACKTRACK)
@@ -120,6 +133,36 @@ internal object SolveCore {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
         runGeneric(BacktrackSolver(solvable.problem), params, solvable, common, output, complete = true)
+    }
+
+    /** Naked single local search (the `ls-single` engine), configured by the ls strategy --params
+     *  (tabu-tenure, pair-swap-budget, lambda, noise, max-flips). */
+    private fun runLocalSearch(solvable: Solvable, common: CommonOptions, output: OutputProtocol) {
+        val (params, setup) = applyLsParams(
+            LocalSearchParams(randomSeed = common.randomSeed),
+            EngineParams(common.engineParams),
+        )
+        val tabu = TabuFilter(tenure = setup.tabuTenure, aspiration = AspirationCriterion.OrImproving)
+        val strategy = Cbls(noiseProbability = setup.noise, tabu = tabu)
+        val solver = LocalSearchSolver(
+            solvable.problem,
+            strategy = strategy,
+            optimizeStrategy = strategy,
+            pairSwapBudget = setup.pairSwapBudget,
+            definitionalSweep = solvable.definitionalSweep,
+            perMoveInvariants = true,
+        )
+        val (_, cancel) = deadlineCancellation(common)
+        val cblsParams = params.copy(
+            costShaping = CostShaping.Linear(lambda = setup.lambda),
+            cancellation = cancel,
+            lsObjective = solvable.lsObjective,
+            onEvent = verboseListener(common.verbose),
+        )
+        cliLogger(common.verbose).v {
+            "engine ls-single: seed=${cblsParams.randomSeed} tabu=${setup.tabuTenure} noise=${setup.noise}"
+        }
+        runGeneric(solver, cblsParams, solvable, common, output, complete = false)
     }
 
     private fun runPortfolio(

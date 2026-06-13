@@ -17,6 +17,7 @@ import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.localsearch.LocalSearchParams
 
 /**
  * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
@@ -130,6 +131,26 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
             (if (allowSelectors) ", var-selector, val-selector" else ""),
     )
     return out
+}
+
+/** Constructor/strategy-level LS knobs for the `ls-single` engine (the rest ride on
+ *  [LocalSearchParams]). */
+internal class LsSetup(val tabuTenure: Int, val pairSwapBudget: Int, val lambda: Double, val noise: Double)
+
+/** Split `--param` overrides for the naked `ls-single` engine into per-call [LocalSearchParams] and
+ *  the constructor/strategy knobs ([LsSetup]). */
+internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<LocalSearchParams, LsSetup> {
+    var out = base
+    p.long("seed")?.let { out = out.copy(randomSeed = it) }
+    p.long("max-flips")?.let { out = out.copy(maxFlips = it) }
+    val setup = LsSetup(
+        tabuTenure = p.int("tabu-tenure") ?: 10,
+        pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
+        lambda = p.double("lambda") ?: 1.0,
+        noise = p.double("noise") ?: 0.05,
+    )
+    p.finish("ls", "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, noise")
+    return out to setup
 }
 
 /**
