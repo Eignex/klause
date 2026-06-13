@@ -27,7 +27,7 @@ class CliTest {
             deleteOnExit()
         }
         for (engineArgs in listOf(
-            arrayOf("-e", "cp", "--param", "seed=7", "--param", "val-heuristic=max", "--param", "luby=50"),
+            arrayOf("-e", "cp", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
             arrayOf("-e", "ls", "--param", "seed=7", "--param", "tabu-tenure=5", "--param", "lambda=2.0", "-t", "5000"),
         )) {
             val out = capture { main(engineArgs + fzn.absolutePath) }
