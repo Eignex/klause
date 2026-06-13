@@ -14,6 +14,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.addLearnedClause
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertIs

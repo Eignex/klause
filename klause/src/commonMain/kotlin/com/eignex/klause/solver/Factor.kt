@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.allDecisionsAreBool
 
 /** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
  *  the two var spaces (purely-Boolean ones leave [Factor.intVars] empty; purely-integer
@@ -95,7 +96,7 @@ interface Factor {
      * (`boolWatchersByLit[lit]`) instead of through [boolVars]: the factor fires only when
      * the literal that just became *false* is in this set. The factor is responsible for
      * keeping the index in sync as watches drift, via
-     * [PropagationState.moveBoolWatcher].
+     * [com.eignex.klause.solver.propagation.moveBoolWatcher].
      *
      * Used by [com.eignex.klause.solver.factor.Clause] to implement two-watched-literal
      * propagation (Zhang–Stickel / MiniSAT): only the two watched literals trigger

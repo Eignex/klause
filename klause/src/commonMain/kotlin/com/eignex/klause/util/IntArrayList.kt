@@ -30,7 +30,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
     /** Find the first occurrence of [value] and swap-remove it (O(1) removal, O(n) find);
      *  returns true if found. Hoists [data] / [size] into locals so the scan is a tight
      *  primitive-array loop with no per-iteration accessor or field reload — this is the
-     *  hot watcher-list removal in [com.eignex.klause.solver.propagation.PropagationState.moveBoolWatcher]. */
+     *  hot watcher-list removal in [com.eignex.klause.solver.propagation.moveBoolWatcher]. */
     fun removeValue(value: Int): Boolean {
         val d = data
         val n = size
@@ -82,7 +82,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
      * [size] when every element is strictly below [element]. O(log size) via [binarySearchInt],
      * whose exact-or-`-(insertion)-1` result is an exact lower bound only when elements are
      * distinct; the monotone bound-change histories this serves (each tighten pushes a strictly
-     * larger min, see [com.eignex.klause.solver.propagation.PropagationState.minLevelForGe]) are
+     * larger min, see [com.eignex.klause.solver.propagation.minLevelForGe]) are
      * always distinct.
      */
     fun lowerBound(element: Int): Int {
@@ -93,7 +93,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
     /**
      * Index of the first element `<= element` in `[0, size)`, assuming the list is sorted
      * **descending** — the symmetric lower bound for a monotone-decreasing history (see
-     * [com.eignex.klause.solver.propagation.PropagationState.maxLevelForLe]). Returns [size]
+     * [com.eignex.klause.solver.propagation.maxLevelForLe]). Returns [size]
      * when every element is strictly above [element]. O(log size).
      */
     fun lowerBoundDescending(element: Int): Int {
