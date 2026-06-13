@@ -33,7 +33,18 @@ fun main(args: Array<String>) {
         common.inputPath = positional
     }
 
-    val path = common.inputPath ?: usageError("no input file given\n" + USAGE)
+    // `--help` / `--version` are informational: they print to stdout and return (exit 0) without
+    // needing an input file, and `--help` wins if both are present (GNU convention).
+    if (common.showHelp) {
+        println(helpText())
+        return
+    }
+    if (common.showVersion) {
+        println(BuildInfo.versionLine())
+        return
+    }
+
+    val path = common.inputPath ?: usageError("no input file given\n$USAGE")
     val mode = pickMode(common, path)
     val session = sessions.getValue(mode)
     val solvable = session.load(path, common)
@@ -41,8 +52,56 @@ fun main(args: Array<String>) {
 }
 
 private const val USAGE =
-    "usage: klause-cli [--format minizinc|xcsp3|smtlib] [-e cp|ls|portfolio] [-a] [-n N] " +
-        "[-t ms] [-r seed] [-p threads] [-s] [-v] [-f] [--param key=value ...] <file>"
+    "usage: klause-cli [options] <file>\n" +
+        "Try 'klause-cli --help' for the full option list."
+
+/** Long `--help` output (stdout). Formats are listed from the live [MODES] registry so a new
+ *  front-end shows up here automatically. */
+private fun helpText(): String {
+    val formats = MODES.joinToString(" | ") { it.names.first() }
+    val byExtension = MODES.joinToString(", ") { m ->
+        ".${m.extensions.first()} → ${m.names.first()}"
+    }
+    return """
+        |${BuildInfo.versionLine()} — SMT-flavored finite-domain constraint solver
+        |
+        |usage: klause-cli [options] <file>
+        |
+        |Solves a single FlatZinc / XCSP3 / SMT-LIB instance. The front-end is chosen by
+        |--format, else by the file extension ($byExtension), else MiniZinc/FlatZinc.
+        |
+        |Standard FlatZinc options (MiniZinc fzn-spec):
+        |  -a, --all-solutions    report all solutions (satisfy) / all improving incumbents (optimize)
+        |  -i, --intermediate     print intermediate solutions of increasing quality (optimize)
+        |  -n <i>                 stop after reporting i solutions (satisfy)
+        |  -f, --free-search      ignore the model's search annotations (alias for -e cp)
+        |  -s, --statistics       print solving statistics (%%%mzn-stat lines for FlatZinc)
+        |  -v, --verbose          log progress to stderr (as % comment lines)
+        |  -t, --time-limit <ms>  wall-clock time limit in milliseconds
+        |  -r, --random-seed <i>  random seed
+        |  -p, --parallel <i>     solve with i parallel cores (portfolio engines only)
+        |
+        |Engine selection:
+        |  -e, --engine <name>    fixed | cp | ls | mixed | cp-single | ls-single
+        |                         (default: fixed = follow the model annotation; -f selects cp)
+        |  --param <key=value>    repeatable engine tuning knob (e.g. arms=8, val-selector=max)
+        |
+        |klause options:
+        |  --format, --mode <m>   force a front-end: $formats
+        |  --presolve <spec>      presolve passes: none | default | all | comma-list of pass ids
+        |  --ozn <file>           MiniZinc output model for solution reconstruction (FlatZinc mode)
+        |  -h, --help             show this help and exit
+        |  --version              print the solver version and exit
+        |
+        |Unknown -flags are ignored (with a stderr note) for forward compatibility with MiniZinc.
+        |
+        |Examples:
+        |  klause-cli model.fzn
+        |  klause-cli -a -s model.fzn
+        |  klause-cli -f -p 4 -t 60000 model.fzn
+        |  klause-cli --format xcsp3 instance.xml
+    """.trimMargin()
+}
 
 /** Select the mode: an explicit `--format` wins, else the file extension, else MiniZinc. */
 private fun pickMode(common: CommonOptions, path: String): CliMode {
