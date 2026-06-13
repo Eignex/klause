@@ -59,7 +59,7 @@ class SelectorPortfolioTest {
         )
         val visited = HashSet<Int>()
         visited.add(portfolio.currentArmIndex)
-        // Trigger several restarts manually via the var-heuristic onRestart hook.
+        // Trigger several restarts manually via the var-selector onRestart hook.
         repeat(20) {
             portfolio.variableSelector.onRestart()
             portfolio.valueSelector.onRestart()

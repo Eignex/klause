@@ -25,8 +25,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
  *
  * Keys per engine:
  *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`,
- *    `lbd-glue`, `var-heuristic` (`vsids|random|smallest-domain|input-order`),
- *    `val-heuristic` (`random|min|max|middle`)
+ *    `lbd-glue`, `var-selector` (`vsids|random|smallest-domain|input-order`),
+ *    `val-selector` (`random|min|max|middle`)
  *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
  *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
  */
@@ -112,13 +112,13 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.int("mid-lbd")?.let { out = out.copy(midLbdThreshold = it) }
     p.bool("vivification")?.let { out = out.copy(vivification = it) }
     p.int("vivify-batch")?.let { out = out.copy(vivifyBatch = it) }
-    p.varSelector("var-heuristic")?.let { out = out.copy(variableSelector = it) }
-    p.valSelector("val-heuristic")?.let { out = out.copy(valueSelector = it) }
+    p.varSelector("var-selector")?.let { out = out.copy(variableSelector = it) }
+    p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }
     p.finish(
         "cp",
         "seed, max-decisions, luby, adaptive-restart, phase-saving, target-phasing, " +
             "rephase-interval, max-learned, lbd-glue, tiered-db, mid-lbd, vivification, " +
-            "vivify-batch, var-heuristic, val-heuristic",
+            "vivify-batch, var-selector, val-selector",
     )
     return out
 }
