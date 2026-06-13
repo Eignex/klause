@@ -131,7 +131,7 @@ internal object PortfolioCreditMetric {
             PortfolioBuilder.build(
                 entry.problem,
                 PortfolioScenario.parallel(
-                    threads = ls + bt,
+                    cores = ls + bt,
                     kind = Kind.COP,
                     engine = if (bt > 0) EngineMix.MIXED else EngineMix.LOCAL_SEARCH,
                     seed = seed,

@@ -17,8 +17,8 @@ import com.eignex.kumulant.stream.lock
  * with no engine-specific switch.
  *
  * The returned [PortfolioWorker] list is the shared, executor-agnostic unit: wrap it in a parallel
- * `Portfolio` (`scenario.threads > 1`) or a single-core bandit-scheduled [SequentialPortfolio]
- * (`scenario.threads == 1`). The list is identical either way — only the executor differs.
+ * `Portfolio` (`scenario.cores > 1`) or a single-core bandit-scheduled [SequentialPortfolio]
+ * (`scenario.cores == 1`). The list is identical either way — only the executor differs.
  */
 object PortfolioBuilder {
     /**
@@ -120,7 +120,7 @@ object PortfolioBuilder {
      */
     private fun clausePoolFor(scenario: PortfolioScenario): SharedClausePool? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
-        val concurrency = if (scenario.threads == 1) Concurrency.None else Concurrency.Strict
+        val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
         return SharedClausePool(concurrency.lock())
     }
 }

@@ -31,22 +31,23 @@ enum class EngineMix {
 }
 
 /**
- * A point in the portfolio configuration space, described by the three orthogonal axes a portfolio
- * must adapt to: **threads** (compute width), **kind** (COP vs CSP), and **engine** (LS / backtrack
- * / mixed). [PortfolioComposition.compose] turns a scenario into an ordered arm list, and
- * [PortfolioBuilder.build] materialises that list into runnable [PortfolioWorker]s — so every
- * scenario flows through one construction path.
+ * A point in the portfolio configuration space. Its axes are **cores** (compute width) and **arms**
+ * (pool size) — kept separate so they don't conflate (#406) — plus **kind** (COP vs CSP) and
+ * **engine** (LS / backtrack / mixed). [PortfolioComposition.compose] turns a scenario into an ordered
+ * arm list of size [arms], and [PortfolioBuilder.build] materialises it into runnable
+ * [PortfolioWorker]s — so every scenario flows through one construction path.
  *
- * [threads] is the available concurrency. `threads > 1` ⇒ a parallel `Portfolio` of that many
- * workers (one arm per core, repeating the strong arms on fresh seeds past the pool size).
- * `threads == 1` ⇒ a single core: a [SequentialPortfolio] bandit-schedules a small pool
- * ([PortfolioComposition.SEQUENTIAL_POOL_SIZE]) of arms one slice at a time — pool size is
- * decoupled from the one core.
+ * [cores] selects the executor: `cores == 1` ⇒ a single-core [SequentialPortfolio] that bandit-
+ * schedules the [arms] arms one time-slice at a time; `cores > 1` ⇒ a parallel `Portfolio` running the
+ * [arms] arms on real threads. [arms] is independent of [cores] (≥ it): the single-core sequential
+ * track still draws on a multi-arm pool, and a parallel track may carry more arms than cores.
  */
 data class PortfolioScenario(
-    /** Available concurrency / pool width; `1` selects the single-core sequential executor (see
-     *  the class KDoc). */
-    val threads: Int,
+    /** Compute width. `1` selects the single-core sequential executor; `> 1` the parallel one. */
+    val cores: Int,
+    /** Pool size — how many arms [PortfolioComposition.compose] produces. Independent of [cores], but
+     *  never fewer (a parallel track needs at least one arm per core). */
+    val arms: Int,
     /** Whether the problem optimizes (COP) or only satisfies (CSP). */
     val kind: Kind,
     /** Which engine family supplies the arms (LS / backtrack / mixed). */
@@ -57,18 +58,24 @@ data class PortfolioScenario(
     val lsLambda: Double = 1.0,
 ) {
     init {
-        require(threads >= 1) { "threads must be ≥ 1" }
+        require(cores >= 1) { "cores must be ≥ 1" }
+        require(arms >= cores) { "arms must be ≥ cores (got arms=$arms, cores=$cores)" }
     }
 
     /** Factories for the two execution shapes a scenario can take. */
     companion object {
-        /** A parallel portfolio of [threads] workers. */
-        fun parallel(threads: Int, kind: Kind, engine: EngineMix = EngineMix.MIXED, seed: Long = 0L) =
-            PortfolioScenario(threads, kind, engine, seed)
+        /** Default arm-pool size when a caller doesn't specify one — larger than a single core so the
+         *  sequential free track bandit-schedules a real pool, not one arm. */
+        const val DEFAULT_ARMS = 6
 
-        /** A single-core, bandit-scheduled portfolio (the competition free/fixed track). */
-        fun sequential(kind: Kind, engine: EngineMix = EngineMix.MIXED, seed: Long = 0L) =
-            PortfolioScenario(threads = 1, kind = kind, engine = engine, seed = seed)
+        /** A parallel portfolio over [cores] cores; [arms] defaults to one arm per core. */
+        fun parallel(cores: Int, kind: Kind, engine: EngineMix = EngineMix.MIXED, seed: Long = 0L, arms: Int = cores) =
+            PortfolioScenario(cores = cores, arms = arms, kind = kind, engine = engine, seed = seed)
+
+        /** A single-core, bandit-scheduled portfolio (the competition free/fixed track) over an
+         *  [arms]-arm pool. */
+        fun sequential(kind: Kind, engine: EngineMix = EngineMix.MIXED, seed: Long = 0L, arms: Int = DEFAULT_ARMS) =
+            PortfolioScenario(cores = 1, arms = arms, kind = kind, engine = engine, seed = seed)
     }
 }
 
@@ -112,10 +119,6 @@ internal sealed interface WorkerConfig {
  */
 internal object PortfolioComposition {
 
-    /** Arm count the single-core [SequentialPortfolio] bandit schedules over (decoupled from the
-     *  one core — the bandit time-slices, it does not run them concurrently). */
-    const val SEQUENTIAL_POOL_SIZE = 6
-
     /** Fraction of a MIXED pool given to local-search arms (the rest go to backtrack). A #9 knob.
      *  COP leans LS (it streams good incumbents fast while backtrack tightens the bound); CSP leans
      *  backtrack (only complete search proves UNSAT / reliably reaches a first feasible). */
@@ -127,9 +130,9 @@ internal object PortfolioComposition {
         Kind.CSP -> 1.0 / 3.0
     }
 
-    /** The ordered arm list for [scenario]. */
+    /** The ordered arm list for [scenario] — exactly [PortfolioScenario.arms] arms. */
     fun compose(scenario: PortfolioScenario): List<WorkerConfig> {
-        val count = if (scenario.threads == 1) SEQUENTIAL_POOL_SIZE else scenario.threads
+        val count = scenario.arms
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(count)
             EngineMix.BACKTRACK -> btArms(scenario.kind, count)

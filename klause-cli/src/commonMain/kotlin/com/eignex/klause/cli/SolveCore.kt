@@ -53,30 +53,23 @@ internal object SolveCore {
         val solvable = rawSolvable.presolved(config, solutionSetSensitive)
         output.begin(solvable.optimize, solvable.maximize)
 
-        // MiniZinc-standard `-p N` (parallelism): N > 1 means a portfolio of N workers. An
-        // explicitly chosen engine picks the worker palette — `-e ls -p N` is a pure-LS pool,
-        // `-e cp -p N` is N complete workers — otherwise the default mixed pool (~2:1 LS:bt,
-        // at least one bt worker so UNSAT / optimality stay provable). `--param ls=/bt=` win.
-        val threads = common.parallel ?: 1
-        if (threads > 1) {
-            val (ls, bt) = when (engine) {
-                "ls", "localsearch", "local-search" -> threads to 0
-
-                "cp", "backtrack", "bt" -> 0 to threads
-
-                else -> {
-                    val b = maxOf(1, threads / 3)
-                    (threads - b) to b
-                }
-            }
-            runPortfolio(solvable, common, output, defaultLs = ls, defaultBt = bt)
-            return
-        }
-        when (engine) {
-            "cp", "backtrack", "bt" -> runBacktrack(solvable, common, output)
-            "ls", "localsearch", "local-search" -> runLocalSearch(solvable, common, output)
-            "portfolio", "pf" -> runPortfolio(solvable, common, output)
+        // `-p N` is MiniZinc-standard parallelism = the **core** count (#406), kept distinct from the
+        // arm-pool size. `cores == 1` runs a single dedicated engine (cp/ls, honouring the model's
+        // annotated search) or — for `-e portfolio` — the single-core bandit-scheduled
+        // SequentialPortfolio. `cores > 1` always runs a parallel portfolio; `-e` picks the arm family
+        // (`-e cp` complete-only, `-e ls` pure-LS, else mixed ~2:1 LS:bt). `--param arms=N` (or the
+        // ls=/bt= split) tunes the pool; otherwise it auto-tunes from the core count.
+        val cores = common.parallel ?: 1
+        val mix = when (engine) {
+            "cp", "backtrack", "bt" -> EngineMix.BACKTRACK
+            "ls", "localsearch", "local-search" -> EngineMix.LOCAL_SEARCH
+            "portfolio", "pf" -> EngineMix.MIXED
             else -> usageError("unknown engine `$engine`; expected one of cp, ls, portfolio")
+        }
+        when {
+            cores == 1 && mix == EngineMix.BACKTRACK -> runBacktrack(solvable, common, output)
+            cores == 1 && mix == EngineMix.LOCAL_SEARCH -> runLocalSearch(solvable, common, output)
+            else -> runPortfolio(solvable, common, output, cores, mix)
         }
     }
 
@@ -163,15 +156,18 @@ internal object SolveCore {
         solvable: Solvable,
         common: CommonOptions,
         output: OutputProtocol,
-        defaultLs: Int = cliProp("klause.fzn.portfolio.ls")?.toIntOrNull() ?: 4,
-        defaultBt: Int = cliProp("klause.fzn.portfolio.bt")?.toIntOrNull() ?: 2,
+        cores: Int,
+        mix: EngineMix,
     ) {
+        // Default arm-pool size: an env override, else auto-tuned from the core count (#406).
+        val defaultArms = cliProp("klause.fzn.portfolio.arms")?.toIntOrNull() ?: autoArms(cores)
         val scenario = buildPortfolioScenario(
             EngineParams(common.engineParams),
             common.randomSeed,
-            defaultLs,
-            defaultBt,
+            cores = cores,
             kind = if (solvable.optimize) Kind.COP else Kind.CSP,
+            defaultEngine = mix,
+            defaultArms = defaultArms,
         )
         val (_, cancel) = deadlineCancellation(common)
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
@@ -185,11 +181,11 @@ internal object SolveCore {
             onEvent = portfolioVerboseListener(common.verbose),
         )
         val t0 = nowMillis()
-        // threads == 1 → the single-core bandit-scheduled SequentialPortfolio (it persists/shares
-        // learned clauses across its segments); threads > 1 → the concurrent Portfolio. Both are
-        // blocking (the portfolio is coroutine-free) and yield the same result types.
+        // cores == 1 → the single-core bandit-scheduled SequentialPortfolio (it persists/shares learned
+        // clauses across its segments and bandit-schedules the whole arm pool on one core); cores > 1 →
+        // the concurrent Portfolio. Both are blocking (coroutine-free) and yield the same result types.
         val executor: PortfolioExecutor =
-            if (scenario.threads == 1) SequentialPortfolio.exp3(workers) else parallelPortfolio(workers)
+            if (scenario.cores == 1) SequentialPortfolio.exp3(workers) else parallelPortfolio(workers)
         executor.use {
             if (solvable.optimize) {
                 emitMinimize(it.minimize(cancel), solvable, common, output, complete, t0)

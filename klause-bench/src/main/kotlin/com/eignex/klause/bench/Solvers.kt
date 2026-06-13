@@ -159,7 +159,7 @@ private class PortfolioBench(
     private val portfolio: Portfolio = Portfolio(
         PortfolioBuilder.build(
             problem,
-            PortfolioScenario.parallel(threads = processors, kind = Kind.CSP, engine = EngineMix.MIXED),
+            PortfolioScenario.parallel(cores = processors, kind = Kind.CSP, engine = EngineMix.MIXED),
         ),
     )
     override val name = "portfolio"

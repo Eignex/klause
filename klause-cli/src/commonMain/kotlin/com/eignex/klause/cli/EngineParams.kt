@@ -140,28 +140,66 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
     return out to setup
 }
 
-/** Build the portfolio [PortfolioScenario] from `--param` overrides on top of the worker-count
- *  defaults the caller derived (from `-p N` parallelism or its own fallbacks). [fallbackSeed] is
- *  the `-r` flag, [kind] is whether the model optimizes. The `ls`/`bt` params set the total width
- *  (`threads = ls + bt`) and select the engine mix (LS-only / backtrack-only / mixed); the exact
- *  LS:backtrack split within a mixed pool is the scenario composition's (kind-derived) decision. */
+/**
+ * Build the [PortfolioScenario] from `-p N` parallelism ([cores]) and `--param` overrides.
+ * [fallbackSeed] is `-r`, [kind] is whether the model optimizes, [defaultEngine] comes from `-e`,
+ * and [defaultArms] is the auto-tuned pool size used when the user doesn't override it.
+ *
+ * Arm count and engine mix:
+ *  - `--param arms=N` sets the pool size directly (the common tuning knob); the engine mix is
+ *    [defaultEngine]. Clamped up to [cores] (a parallel track needs ≥ one arm per core).
+ *  - `--param ls=N` / `bt=N` instead set BOTH the count (`ls + bt`) and the mix (LS-only /
+ *    backtrack-only / mixed). Mutually exclusive with `arms`.
+ *  - neither ⇒ [defaultArms] arms of [defaultEngine].
+ *
+ * The exact LS:backtrack split within a MIXED pool stays the composition's (kind-derived) decision.
+ */
 internal fun buildPortfolioScenario(
     p: EngineParams,
     fallbackSeed: Long?,
-    defaultLs: Int,
-    defaultBt: Int,
+    cores: Int,
     kind: Kind,
+    defaultEngine: EngineMix,
+    defaultArms: Int,
 ): PortfolioScenario {
-    val ls = p.int("ls") ?: defaultLs
-    val bt = p.int("bt") ?: defaultBt
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
     val lambda = p.double("lambda") ?: 1.0
-    p.finish("portfolio", "ls, bt, seed, lambda")
-    require(ls >= 0 && bt >= 0 && ls + bt >= 1) { "portfolio needs ls + bt ≥ 1 (got ls=$ls, bt=$bt)" }
-    val engine = when {
-        ls == 0 -> EngineMix.BACKTRACK
-        bt == 0 -> EngineMix.LOCAL_SEARCH
-        else -> EngineMix.MIXED
+    val armsParam = p.int("arms")
+    val ls = p.int("ls")
+    val bt = p.int("bt")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda")
+    if (armsParam != null && (ls != null || bt != null)) {
+        usageError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
-    return PortfolioScenario(threads = ls + bt, kind = kind, engine = engine, seed = seed, lsLambda = lambda)
+    val (engine, arms) = if (ls != null || bt != null) {
+        val l = ls ?: 0
+        val b = bt ?: 0
+        require(l >= 0 && b >= 0 && l + b >= 1) { "portfolio needs ls + bt ≥ 1 (got ls=$l, bt=$b)" }
+        val e = when {
+            l == 0 -> EngineMix.BACKTRACK
+            b == 0 -> EngineMix.LOCAL_SEARCH
+            else -> EngineMix.MIXED
+        }
+        e to (l + b)
+    } else {
+        defaultEngine to (armsParam ?: defaultArms)
+    }
+    require(arms >= 1) { "portfolio needs arms ≥ 1 (got $arms)" }
+    return PortfolioScenario(
+        cores = cores,
+        arms = maxOf(arms, cores),
+        kind = kind,
+        engine = engine,
+        seed = seed,
+        lsLambda = lambda,
+    )
 }
+
+/** Auto-tuned default arm-pool size, scaling with the core count (#406): [ARMS_PER_CORE] arms per
+ *  core — always *more* arms than cores, so the bandit (single core) / parallel race always has a
+ *  pool to draw on — floored at [PortfolioScenario.DEFAULT_ARMS] so the single-core free track still
+ *  gets a real pool. Overridable via `--param arms=N`. */
+internal fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, cores * ARMS_PER_CORE)
+
+/** Default arms-per-core oversubscription factor for [autoArms] (a #9 tuning knob). */
+private const val ARMS_PER_CORE = 2
