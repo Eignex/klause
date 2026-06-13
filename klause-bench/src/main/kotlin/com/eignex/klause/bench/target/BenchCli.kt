@@ -82,14 +82,15 @@ object BenchCli {
     }
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
-     *  Returns null when none are set. Defaults: `engine=fixed` (annotation-following, mirroring the
-     *  cli) at **single core** (`processors` unset ⇒ no `-p`); multi-thread tracks pass `processors=`
-     *  explicitly. `engine`/`param` forward to the cli `-e`/`--param`; `fixed=true` is the reference
-     *  (`-f`) toggle. The cli owns the engine model; the bench just forwards. */
+     *  Returns null when none are set. Defaults: `engine` unset ⇒ no `-e`, so klause follows the cli's
+     *  own default engine (the bench has no engine default of its own); **single core** (`processors`
+     *  unset ⇒ no `-p`), so multi-thread tracks pass `processors=` explicitly. `engine`/`param` forward
+     *  to the cli `-e`/`--param`; `fixed=true` is the reference (`-f`) toggle. The cli owns the engine
+     *  model; the bench just forwards. */
     private fun parseKlauseSearch(f: Map<String, String>, params: List<String>): KlauseSearch? {
         if (f["engine"] == null && f["processors"] == null && f["fixed"] == null && params.isEmpty()) return null
         return KlauseSearch(
-            engine = f["engine"]?.let(::parseEngine) ?: "fixed",
+            engine = f["engine"]?.let(::parseEngine),
             processors = f["processors"]?.toIntOrNull(),
             fixed = f["fixed"]?.toBoolean() ?: false,
             params = params,
