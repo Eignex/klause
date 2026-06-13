@@ -9,7 +9,6 @@ internal enum class MetricKind {
     SOLVE,
     COVERAGE,
     AUDIT,
-    TUNING,
     CREDIT,
 }
 
@@ -48,13 +47,6 @@ internal object Targets {
      * be `bench <metric> suite=core` is not kept: spell it with the `suite=core` token instead.
      */
     val all: List<Target> = listOf(
-        Target(
-            "tune-mixed",
-            "Tune klause solver configs over a mixed sat+opt workload (rank by avg dense rank)",
-            listOf("handwritten-core", "flatzinc-core", "opb-core", "smtlib-core", "xcsp3-core"),
-            MetricKind.TUNING,
-            Budget(timeoutMillis = 2_000),
-        ),
         Target(
             "mzn-credit-ls",
             "LS portfolio credit campaign (top-8 palette prefix) over the MiniZinc Challenge benchmarks",

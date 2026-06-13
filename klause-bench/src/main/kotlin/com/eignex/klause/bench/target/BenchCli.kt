@@ -191,7 +191,6 @@ object BenchCli {
     private val metricAliases = mapOf(
         "uniform" to MetricKind.UNIFORMNESS,
         "complete" to MetricKind.COMPLETENESS,
-        "tune" to MetricKind.TUNING,
     )
 
     /** Resolve a metric by its enum name (case-insensitive) or a short [metricAliases] alias. */
