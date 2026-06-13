@@ -81,6 +81,23 @@ class LpAutoConfigTest {
     }
 
     @Test
+    fun `cumulative with a verifiable makespan enables the makespan row and bounding`() {
+        // ints 0,1,2 starts; 3 makespan, with M >= startᵢ + durᵢ — a verifiable scheduling makespan.
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.GE, 3),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.GE, 3),
+            Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1),
+        )
+        val p = Problem(0, 4, Array(4) { IntDomain(0, 20) }, factors)
+        val r = LpAutoConfig.recommend(p)
+        assertTrue(r.lpCumulative)
+        assertTrue(r.lpBounding) // the scheduling makespan turns the bounding stack on
+        assertTrue(r.lpLearn)
+        assertTrue(r.energeticReasoning) // the feasibility check rides along on the Cumulative
+    }
+
+    @Test
     fun `auto-enabled energetic reasoning derives a size-aware cadence`() {
         fun cumulative(tasks: Int) = Problem(
             0,
