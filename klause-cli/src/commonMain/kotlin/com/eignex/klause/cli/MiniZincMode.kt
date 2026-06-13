@@ -26,7 +26,14 @@ internal object MiniZincMode : CliMode {
         private var unboundedIntHi: Int? = null
 
         override fun flags(): List<FlagSpec> = listOf(
-            FlagSpec(listOf("--ozn"), true) { oznPath = it },
+            FlagSpec(
+                listOf("--ozn"),
+                true,
+                FlagGroup.MODE,
+                valueLabel = "file",
+                help = "MiniZinc output model (.ozn) for solution reconstruction",
+            ) { oznPath = it },
+            // Advanced unbounded-`var int` range knobs (also env-configurable); hidden from --help.
             FlagSpec(listOf("--unbounded-int-lo"), true) { unboundedIntLo = requireNotNull(it).toInt() },
             FlagSpec(listOf("--unbounded-int-hi"), true) { unboundedIntHi = requireNotNull(it).toInt() },
         )
