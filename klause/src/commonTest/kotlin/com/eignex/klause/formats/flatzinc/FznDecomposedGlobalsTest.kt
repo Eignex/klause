@@ -90,6 +90,20 @@ class FznDecomposedGlobalsTest {
         assertEquals(brute(3, 2) { t -> precedes(t, s = 2, target = 1) }, found)
     }
 
+    @Test
+    fun `value_precede_chain matches brute force`() {
+        // Chain [0,1,2]: first occurrences must appear in the order 0, then 1, then 2.
+        val found = enumerate(
+            decl(2) + "constraint value_precede_chain_int([0, 1, 2], [x1, x2, x3]);\nsolve satisfy;",
+            names,
+        )
+        val chain = intArrayOf(0, 1, 2)
+        assertEquals(
+            brute(3, 2) { t -> (0 until chain.size - 1).all { precedes(t, s = chain[it], target = chain[it + 1]) } },
+            found,
+        )
+    }
+
     /** True iff in [t] the first occurrence of [target] (if any) comes after some earlier [s]. */
     private fun precedes(t: List<Int>, s: Int, target: Int): Boolean {
         var seenS = false

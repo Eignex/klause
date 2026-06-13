@@ -115,10 +115,10 @@ class PresolverTest {
     }
 
     @Test
-    fun `value-precede pass grows vars and reconstructs to a feasible original solution`() {
-        // AllDifferent over {0,1,2}: value-anonymous, so the opt-in value-precedence pass adds
-        // running-max aux vars and a precedence chain. The pipeline must solve the grown problem and
-        // reconstruct back to a feasible original solution with the auxiliaries dropped.
+    fun `value-precede pass posts a precedence chain and stays satisfiable`() {
+        // AllDifferent over {0,1,2}: value-anonymous, so the opt-in value-precedence pass posts a
+        // value_precede_chain (native ValuePrecede factors, #432) collapsing the 6 permutations to the
+        // single canonical 0,1,2. Same variable space — reconstruct is the identity.
         val problem = Problem(
             0,
             3,
@@ -126,11 +126,12 @@ class PresolverTest {
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
         val pre = Presolver.run(problem, PresolveConfig.parse("value-precede"))
-        assertTrue(pre.problem.numIntVars > problem.numIntVars, "value precedence should add running-max aux vars")
+        assertTrue(pre.problem !== problem, "value precedence should add precedence factors")
+        assertEquals(problem.numIntVars, pre.problem.numIntVars, "no auxiliary variables are added")
         val result = BacktrackSolver(pre.problem).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
         val full = pre.reconstruct(result.assignment)
-        assertEquals(problem.numIntVars, full.ints.size, "reconstruct must drop the aux vars")
+        assertEquals(listOf(0, 1, 2), full.ints.toList(), "the single canonical permutation")
         assertTrue(isFeasible(problem, full), "reconstructed sample infeasible in the original problem")
     }
 
