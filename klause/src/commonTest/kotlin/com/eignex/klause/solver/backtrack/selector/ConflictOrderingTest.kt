@@ -1,14 +1,11 @@
-package com.eignex.klause.solver.backtrack
+package com.eignex.klause.solver.backtrack.selector
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.backtrack.selector.ConflictOrdering
-import com.eignex.klause.solver.backtrack.selector.DomWdeg
-import com.eignex.klause.solver.backtrack.selector.IndomainMin
-import com.eignex.klause.solver.backtrack.selector.InputOrder
-import com.eignex.klause.solver.backtrack.selector.VarRef
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
