@@ -232,34 +232,91 @@ object Presolve {
                 Reduced.Unchanged -> factor
             }
         }
-        return liftBinaryLinear(gcdReduced, domains)
+        return liftLinear(gcdReduced, domains)
     }
 
     /**
-     * Knapsack coefficient lifting (#365) for a `≤` [Linear] over 0/1 variables with positive
-     * coefficients — the same cover-dual clamp as [liftKnapsack], valid because each variable is
-     * binary. `d = Σaⱼ − b`; `d ≤ 0` ⟹ always satisfied (dropped). Any other shape (non-`≤`,
-     * non-binary domain, non-positive coefficient, out-of-range slack) passes through unchanged —
-     * general bounded-integer lifting needs the full MIP coefficient-tightening, a follow-up.
+     * Coefficient lifting (#365 / #372) for an inequality [Linear] over bounded-integer variables
+     * `xⱼ ∈ [lⱼ, uⱼ]` — the MIP coefficient-tightening of Savelsbergh / Achterberg, which
+     * generalises the 0/1 cover-dual clamp of [liftKnapsack] to `uⱼ > 1`.
+     *
+     * Reduce to a positive-coefficient bounded knapsack `Σ a̅ⱼ zⱼ ≤ B`, `zⱼ ∈ [0, cⱼ]` with
+     * `cⱼ = uⱼ − lⱼ`: shift `zⱼ = xⱼ − lⱼ` when `aⱼ > 0`, complement `zⱼ = uⱼ − xⱼ` (so `a̅ⱼ = −aⱼ`)
+     * when `aⱼ < 0`, folding the constants into `B`. Its complement `Σ a̅ⱼ(cⱼ − zⱼ) ≤ B` is the
+     * cover `Σ a̅ⱼ z̄ⱼ ≥ d` with `d = Amax − B`, `Amax = Σ a̅ⱼcⱼ` the maximal activity. The clamp
+     * `a̅ⱼ → min(a̅ⱼ, d)` is exact on this cover for *bounded* `z̄ⱼ ∈ [0, cⱼ]`, not just binary: the
+     * equivalence `Σ a̅ⱼz̄ⱼ ≥ d ⟺ Σ min(a̅ⱼ,d)z̄ⱼ ≥ d` holds pointwise at every nonnegative-integer
+     * assignment — whenever some `z̄ⱼ ≥ 1` has `a̅ⱼ > d` the clamped term alone already reaches `d`,
+     * and otherwise every active term has `a̅ⱼ ≤ d` so the two sides are identical. Mapping the
+     * clamped cover back to `≤` gives the bound `Σ min(a̅ⱼ,d)cⱼ − d` (de-shifted per variable).
+     *
+     * `d ≤ 0` ⟹ the constraint is always satisfied (dropped). `≥` is complemented to `≤` first;
+     * `=` can't be lifted by clamping (it ties both directions) and `≠` isn't a knapsack — both pass
+     * through, as do out-of-`Int`-range slacks. Fixed variables (`cⱼ = 0`) are folded into the bound
+     * and never clamped (their coefficient is immaterial to the feasible set).
      */
-    private fun liftBinaryLinear(l: Linear, domains: Array<IntDomain>): Factor? {
-        if (l.op != LinearOp.LE) return l
-        for (c in l.coeffs) if (c <= 0) return l
-        for (v in l.vars) if (domains[v].min != 0 || domains[v].max != 1) return l
-        var sum = 0L
-        for (c in l.coeffs) sum += c
-        val d = sum - l.bound
-        if (d <= 0L) return null
-        if (d >= sum || d > Int.MAX_VALUE) return l
+    private fun liftLinear(l: Linear, domains: Array<IntDomain>): Factor? {
+        // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound (#365).
+        val coeffs: IntArray
+        val bound: Long
+        when (l.op) {
+            LinearOp.LE -> {
+                coeffs = l.coeffs
+                bound = l.bound.toLong()
+            }
+
+            LinearOp.GE -> {
+                coeffs = IntArray(l.coeffs.size) { -l.coeffs[it] }
+                bound = -l.bound.toLong()
+            }
+
+            else -> return l
+        }
+        val n = coeffs.size
+        // Normalise to a positive-coefficient bounded knapsack Σ a̅ⱼzⱼ ≤ B, zⱼ ∈ [0, cⱼ].
+        val absA = IntArray(n)
+        val cap = LongArray(n)
+        var b = bound
+        for (i in 0 until n) {
+            val a = coeffs[i]
+            val dom = domains[l.vars[i]]
+            cap[i] = dom.max.toLong() - dom.min.toLong()
+            absA[i] = if (a < 0) -a else a
+            // Fold the variable's contribution at its zero-of-zⱼ end into the bound:
+            // aⱼ>0 shifts by aⱼ·lⱼ, aⱼ<0 (complemented) shifts by aⱼ·uⱼ.
+            val zeroEnd = if (a >= 0) dom.min else dom.max
+            b -= a.toLong() * zeroEnd
+        }
+        var amax = 0L
+        for (i in 0 until n) amax += absA[i].toLong() * cap[i]
+        val d = amax - b
+        if (d <= 0L) return null // maximal activity within bound ⇒ always satisfied
         var changed = false
-        var newSum = 0L
-        val lifted = IntArray(l.coeffs.size) { i ->
-            (if (l.coeffs[i] > d) d.toInt().also { changed = true } else l.coeffs[i]).also { newSum += it }
+        val lifted = IntArray(n) { i ->
+            if (cap[i] > 0L && absA[i].toLong() > d) {
+                changed = true
+                d.toInt() // d < absA[i] ≤ Int.MAX here, so the narrowing is safe
+            } else {
+                absA[i]
+            }
         }
         if (!changed) return l
-        val newBound = newSum - d
+        // New bound in z-space: Σ a̅'ⱼcⱼ − d, then de-shift each variable back to xⱼ.
+        var newBound = -d
+        for (i in 0 until n) newBound += lifted[i].toLong() * cap[i]
+        val newCoeffs = IntArray(n)
+        for (i in 0 until n) {
+            val dom = domains[l.vars[i]]
+            if (coeffs[i] >= 0) {
+                newCoeffs[i] = lifted[i]
+                newBound += lifted[i].toLong() * dom.min
+            } else {
+                newCoeffs[i] = -lifted[i]
+                newBound -= lifted[i].toLong() * dom.max
+            }
+        }
         if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return l
-        return Linear(lifted, l.vars.copyOf(), LinearOp.LE, newBound.toInt())
+        return Linear(newCoeffs, l.vars.copyOf(), LinearOp.LE, newBound.toInt())
     }
 
     private fun strengthenPb(factor: PseudoBoolean): Factor? {
