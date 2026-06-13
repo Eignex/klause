@@ -513,20 +513,39 @@ object Presolve {
     }
 
     /**
-     * Value symmetry breaking (#366). When every factor is value-anonymous ([Factor.isValueAnonymous]
-     * — AllDifferent and the like, where distinctness ignores which values are used), any permutation
-     * of values that maps every domain to itself is a symmetry. Values with the same domain-incidence
-     * (the set of variables whose domain contains them) are therefore mutually interchangeable. For
-     * each such orbit this pins one variable whose domain lies entirely within the orbit to the
-     * orbit's minimum value — a sound break (a solution can always be relabeled within the orbit so
-     * that variable takes the minimum). Returns the pinning constraints.
+     * Value symmetry breaking (#366, #374). A permutation of values that maps every domain to itself
+     * and the factor set to itself is a symmetry. Candidate orbits are values with the same
+     * domain-incidence (the set of variables whose domain contains them) — so any transposition
+     * within an orbit already maps every domain to itself. Each transposition is then *verified*
+     * against the factors: applying it via [Factor.remapValues] and comparing the [Factor.structuralKey]
+     * multiset proves the swap is a symmetry, the value analog of the [remap]-based automorphism check
+     * (#334). Transpositions generate the full symmetric group on a verified orbit, so one variable
+     * whose domain lies entirely within an orbit is pinned to the orbit minimum — a sound break (a
+     * solution can always be relabeled within the orbit so that variable takes the minimum).
      *
-     * This is the value analog of [breakSymmetries]; the stronger Law–Lee value precedence (which
-     * orders first-occurrences across all variables) needs auxiliary variables and is a follow-up.
+     * When every factor is value-anonymous ([Factor.isValueAnonymous] — AllDifferent), verification is
+     * skipped: anonymity means every relabeling is a symmetry, so the whole incidence group is one
+     * orbit (the #366 fast path). Otherwise verification widens detection to problems with
+     * value-relabelable factors (GlobalCardinality, Table, …) that the anonymity gate switched off; a
+     * factor that is unkeyed or returns `null` from [Factor.remapValues] conservatively blocks it.
+     *
+     * The stronger Law–Lee value precedence (ordering first-occurrences across all variables) needs
+     * auxiliary variables and a var-growing reconstruction, and is a follow-up.
      */
     private fun breakValueSymmetry(problem: Problem, objectiveIntVars: Set<Int>): List<Factor> {
         if (problem.numIntVars == 0) return emptyList()
-        if (problem.factors.any { !it.isValueAnonymous() }) return emptyList()
+        val allAnonymous = problem.factors.all { it.isValueAnonymous() }
+        // Verified path needs every factor keyed; build the base multiset (bail if any is unkeyed).
+        val base: Map<String, Int>? = if (allAnonymous) {
+            null
+        } else {
+            val m = HashMap<String, Int>()
+            for (f in problem.factors) {
+                val k = f.structuralKey() ?: return emptyList()
+                m[k] = (m[k] ?: 0) + 1
+            }
+            m
+        }
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
         for (d in problem.intDomains) {
@@ -534,27 +553,86 @@ object Presolve {
             if (d.max > hi) hi = d.max
         }
         if (lo > hi) return emptyList()
-        // Orbit values by domain-incidence signature: same set of containing variables ⇒ interchangeable.
-        val orbits = HashMap<String, MutableList<Int>>()
+        // Group values by domain-incidence signature: same set of containing variables ⇒ a candidate
+        // orbit (a swap within it maps every domain to itself).
+        val incidence = HashMap<String, MutableList<Int>>()
         for (value in lo..hi) {
-            val incidence = StringBuilder()
-            for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) incidence.append(x).append(',')
-            if (incidence.isNotEmpty()) orbits.getOrPut(incidence.toString()) { ArrayList() }.add(value)
+            val sig = StringBuilder()
+            for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.append(x).append(',')
+            if (sig.isNotEmpty()) incidence.getOrPut(sig.toString()) { ArrayList() }.add(value)
         }
         val extra = ArrayList<Factor>()
-        for (values in orbits.values) {
-            if (values.size < 2) continue
-            val orbitSet = values.toHashSet()
-            val minValue = values.min()
-            for (x in 0 until problem.numIntVars) {
-                if (x in objectiveIntVars) continue
-                if (domainWithin(problem.intDomains[x], orbitSet)) {
-                    extra.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.EQ, minValue))
-                    break
+        for (candidate in incidence.values) {
+            if (candidate.size < 2) continue
+            // Anonymous: the whole group is one orbit. Otherwise refine into verified-equal orbits.
+            val orbits =
+                if (allAnonymous) listOf(candidate) else verifyValueOrbits(problem, requireNotNull(base), candidate)
+            for (orbit in orbits) {
+                if (orbit.size < 2) continue
+                val orbitSet = orbit.toHashSet()
+                val minValue = orbit.min()
+                for (x in 0 until problem.numIntVars) {
+                    if (x in objectiveIntVars) continue
+                    if (domainWithin(problem.intDomains[x], orbitSet)) {
+                        extra.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.EQ, minValue))
+                        break
+                    }
                 }
             }
         }
         return extra
+    }
+
+    /** Refine a domain-incidence candidate [values] into verified-interchangeable value orbits: union
+     *  the value pairs whose transposition is verified a symmetry ([verifyValueSwap]). Transpositions
+     *  generate the full symmetric group on each resulting orbit. Groups beyond [MAX_VERIFIED_GROUP]
+     *  are skipped (the O(n²·factors) guard, as for variables). */
+    private fun verifyValueOrbits(problem: Problem, base: Map<String, Int>, values: List<Int>): List<List<Int>> {
+        val n = values.size
+        if (n > MAX_VERIFIED_GROUP) return emptyList()
+        val parent = IntArray(n) { it }
+        fun find(x: Int): Int {
+            var r = x
+            while (parent[r] != r) r = parent[r]
+            return r
+        }
+        for (i in 0 until n) {
+            for (j in i + 1 until n) {
+                if (find(
+                        i,
+                    ) != find(j) && verifyValueSwap(problem, base, values[i], values[j])
+                ) {
+                    parent[find(i)] = find(j)
+                }
+            }
+        }
+        val byRoot = HashMap<Int, MutableList<Int>>()
+        for (i in 0 until n) byRoot.getOrPut(find(i)) { ArrayList() }.add(values[i])
+        return byRoot.values.toList()
+    }
+
+    /** Whether the value transposition `(v w)` maps the factor multiset to itself — relabel every
+     *  factor via [Factor.remapValues] and compare [Factor.structuralKey] counts against [base].
+     *  `false` if any factor is not value-relabelable (returns `null`). The value analog of
+     *  [isAutomorphism]. */
+    private fun verifyValueSwap(problem: Problem, base: Map<String, Int>, v: Int, w: Int): Boolean {
+        val swap = { x: Int ->
+            if (x == v) {
+                w
+            } else if (x == w) {
+                v
+            } else {
+                x
+            }
+        }
+        val counts = HashMap<String, Int>(base.size)
+        for (f in problem.factors) {
+            val key = (f.remapValues(swap) ?: return false).structuralKey() ?: return false
+            val next = (counts[key] ?: 0) + 1
+            if (next > (base[key] ?: 0)) return false
+            counts[key] = next
+        }
+        return counts == base
     }
 
     /** Whether every value in [d] lies in [values]. */

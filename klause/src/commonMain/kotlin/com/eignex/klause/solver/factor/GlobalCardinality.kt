@@ -67,6 +67,40 @@ class GlobalCardinality(
         presents.remapLits(boolMap),
     )
 
+    // xs is a set (counts are per cover value, order-independent) so xs/presents pairs are sorted by
+    // var id; cover triples are sorted by value. Encodes every distinguishing field — fine enough
+    // that two non-equivalent GCCs never collide (a coarser key would let a symmetry swap through).
+    override fun structuralKey(): String {
+        val xsPart = xs.indices.sortedBy { xs[it] }.joinToString(",") { i ->
+            if (presents.isEmpty()) "${xs[i]}" else "${xs[i]}@${presents[i]}"
+        }
+        val coverPart = cover.indices.sortedBy { cover[it] }.joinToString(",") { i ->
+            if (countVars != null) {
+                "${cover[i]}=v${countVars[i]}"
+            } else {
+                "${cover[i]}=${requireNotNull(countLow)[i]}_${requireNotNull(countHigh)[i]}"
+            }
+        }
+        return "gcc:$closed:$xsPart:$coverPart"
+    }
+
+    /** Relabel the cover values (#374). Only the constant-count form is value-relabelable: with count
+     *  *variables* the counts live in a second value universe that one map can't relabel, so that form
+     *  blocks value symmetry (returns `null`). A value transposition is a bijection, so the relabeled
+     *  cover stays distinct. */
+    override fun remapValues(valueMap: (Int) -> Int): Factor? {
+        if (countVars != null) return null
+        return GlobalCardinality(
+            xs,
+            IntArray(cover.size) { valueMap(cover[it]) },
+            null,
+            countLow,
+            countHigh,
+            closed,
+            presents,
+        )
+    }
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
 
     private fun present(state: LocalSearchState, idx: Int): Boolean =
