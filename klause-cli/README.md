@@ -13,9 +13,9 @@ driver, and differ only in how they parse input and print results:
 - **SMT-LIB QF_LIA** (`.smt2`, `.smt`) — `sat` / `unsat` / `unknown` plus a
   `(get-model)`-style `(define-fun …)` block on sat, `;` stat comments for `-s`.
 
-Each invocation solves exactly one instance. Whole-corpus parse/solve coverage reporting
-lives in klause-bench (`bench coverage:xcsp3|smtlib`), which is catalog-driven and fetches
-the external libraries — it is not a CLI concern.
+Each invocation solves exactly one instance. Whole-corpus solving across the external
+libraries lives in klause-bench (`bench solve suite=xcsp3-core|smtlib-core`), which is
+catalog-driven and fetches them — it is not a CLI concern.
 
 Adding a new competition front-end is a new `CliMode` + its `OutputProtocol` (see
 `CliMode.kt`); the parser, router, and engines are untouched.
