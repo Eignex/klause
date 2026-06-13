@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.tools
 
-import com.eignex.klause.ast.SchemaEntry
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.le
-import com.eignex.klause.ast.not
+import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.schema.implies
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.not
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.skema.SchemaDef
 import com.eignex.skema.schemaJsonConfig

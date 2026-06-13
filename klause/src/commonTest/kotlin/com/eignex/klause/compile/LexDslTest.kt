@@ -1,8 +1,8 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.lexLeq
-import com.eignex.klause.ast.lexLt
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.lexLeq
+import com.eignex.klause.schema.lexLt
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

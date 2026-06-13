@@ -1,81 +1,7 @@
-package com.eignex.klause.ast
+package com.eignex.klause.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-
-/**
- * One row of a klause schema. Variables and named constraints are siblings under
- * [com.eignex.skema.SchemaDef]'s entries map; the map key is the entry's name, so
- * spec types don't carry a redundant `name` field.
- */
-@Serializable
-sealed interface SchemaEntry
-
-/** A schema entry that declares a decision variable (as opposed to a named constraint). */
-@Serializable
-sealed interface VarSpec : SchemaEntry
-
-/** A single Boolean decision variable. */
-@Serializable
-@SerialName("bool")
-data object BoolSpec : VarSpec
-
-/**
- * Presence marker for an optional variable: a Boolean that gates the value variable named
- * [valueName]. Compiles to an ordinary Boolean var, but its dedicated type lets the optional
- * machinery (notably absent-value pinning) recognise the (presence, value) pairing
- * *explicitly* — by type and the carried [valueName] — rather than by a fragile name
- * convention that could misfire on an unrelated bool that merely shares a suffix.
- */
-@Serializable
-@SerialName("presence")
-data class PresenceSpec(val valueName: String) : VarSpec
-
-/** A categorical variable taking exactly one of the named [labels]. */
-@Serializable
-@SerialName("nominal")
-data class NominalSpec(
-    /** The mutually-exclusive category labels this variable can take. */
-    val labels: List<String>,
-) : VarSpec
-
-/** An integer variable ranging over the inclusive interval `[min, max]`. */
-@Serializable
-@SerialName("int")
-data class IntSpec(
-    /** Inclusive lower bound of the domain. */
-    val min: Int,
-    /** Inclusive upper bound of the domain. */
-    val max: Int,
-) : VarSpec
-
-/**
- * Float variable bucketed to [buckets] uniformly-spaced values across `[min, max]`. The
- * solver represents it as an int domain `[0, buckets-1]`; the compiler stores a decoder so
- * solutions can be read back as Double.
- */
-@Serializable
-@SerialName("float")
-data class FloatSpec(
-    /** Inclusive lower bound of the real interval. */
-    val min: Double,
-    /** Inclusive upper bound of the real interval. */
-    val max: Double,
-    /** Number of uniformly-spaced values the interval is discretised into (≥ 2). */
-    val buckets: Int,
-) : VarSpec {
-    init {
-        require(buckets >= 2) { "FloatSpec needs at least 2 buckets" }
-    }
-
-    /** Real-value step between adjacent buckets: `(max - min) / (buckets - 1)`. The single
-     *  source of truth for the bucket-to-real affine map — decode and the float objectives
-     *  all route through it, and downstream consumers should too rather than re-deriving it. */
-    val scale: Double get() = (max - min) / (buckets - 1)
-
-    /** Decode bucket index [bucket] to its real value: `min + scale * bucket`. */
-    fun realValue(bucket: Int): Double = min + scale * bucket
-}
 
 /** Anything that can be coerced into a [BoolExpr] inside the constraint DSL. */
 interface BoolTerm {
@@ -193,88 +119,6 @@ data class CardinalityExpr(
     val max: Int,
 ) : BoolExpr
 
-/** Anything that can be coerced into an [IntExpr] inside the constraint DSL. */
-interface IntTerm {
-    /** Coerce this term into an [IntExpr] node. */
-    fun toIntExpr(): IntExpr
-}
-
-/** An integer-valued node in the constraint AST. */
-@Serializable
-sealed interface IntExpr : IntTerm {
-    override fun toIntExpr(): IntExpr = this
-}
-
-/** Reference to a named integer variable. */
-@Serializable
-@SerialName("intref")
-data class IntRef(
-    /** Name of the referenced integer variable. */
-    val name: String,
-) : IntExpr
-
-/** Integer constant. */
-@Serializable
-@SerialName("intlit")
-data class IntLit(
-    /** The literal value. */
-    val value: Int,
-) : IntExpr
-
-/** `coeff * child`. */
-@Serializable
-@SerialName("intscale")
-data class IntScale(
-    /** Multiplier applied to [child]. */
-    val coeff: Int,
-    /** The scaled sub-expression. */
-    val child: IntExpr,
-) : IntExpr
-
-/** Sum of children. */
-@Serializable
-@SerialName("intsum")
-data class IntSum(
-    /** Summands; must be non-empty. */
-    val children: List<IntExpr>,
-) : IntExpr {
-    init {
-        require(children.isNotEmpty()) { "IntSum must have at least one child" }
-    }
-}
-
-/** Minimum of [children]. */
-@Serializable
-@SerialName("intmin")
-data class IntMin(
-    /** Operands; must be non-empty. */
-    val children: List<IntExpr>,
-) : IntExpr {
-    init {
-        require(children.isNotEmpty()) { "IntMin must have at least one child" }
-    }
-}
-
-/** Maximum of [children]. */
-@Serializable
-@SerialName("intmax")
-data class IntMax(
-    /** Operands; must be non-empty. */
-    val children: List<IntExpr>,
-) : IntExpr {
-    init {
-        require(children.isNotEmpty()) { "IntMax must have at least one child" }
-    }
-}
-
-/** Absolute value of [child]. */
-@Serializable
-@SerialName("intabs")
-data class IntAbs(
-    /** The operand. */
-    val child: IntExpr,
-) : IntExpr
-
 /** `if cond then thenE else elseE`. */
 @Serializable
 @SerialName("intite")
@@ -285,50 +129,6 @@ data class IntIfThenElse(
     val thenE: IntExpr,
     /** Value when [cond] is false. */
     val elseE: IntExpr,
-) : IntExpr
-
-/** `items[index]` — array element selection. */
-@Serializable
-@SerialName("intelem")
-data class IntElement(
-    /** Zero-based index expression. */
-    val index: IntExpr,
-    /** The indexable items; must be non-empty. */
-    val items: List<IntExpr>,
-) : IntExpr {
-    init {
-        require(items.isNotEmpty()) { "IntElement must have at least one item" }
-    }
-}
-
-/** `left * right`. */
-@Serializable
-@SerialName("intmul")
-data class IntMul(
-    /** Left factor. */
-    val left: IntExpr,
-    /** Right factor. */
-    val right: IntExpr,
-) : IntExpr
-
-/** Integer (truncating) division `num / den`. */
-@Serializable
-@SerialName("intdiv")
-data class IntDiv(
-    /** Dividend. */
-    val num: IntExpr,
-    /** Divisor. */
-    val den: IntExpr,
-) : IntExpr
-
-/** Integer remainder `num % den`. */
-@Serializable
-@SerialName("intmod")
-data class IntMod(
-    /** Dividend. */
-    val num: IntExpr,
-    /** Divisor. */
-    val den: IntExpr,
 ) : IntExpr
 
 /** Integer comparison operators. */
@@ -789,101 +589,6 @@ data class PseudoBooleanExpr(
 // share the underlying indicator-bool encoding so set-expressions and -constraints work
 // uniformly on either kind.
 
-/** Set variable over an integer universe. The universe is fixed at schema-construction
- *  time and need not be contiguous, though contiguous ranges are the common case. */
-@Serializable
-@SerialName("set")
-data class SetSpec(
-    /** The (fixed, not necessarily contiguous) integer universe the set draws from. */
-    val universe: List<Int>,
-) : VarSpec {
-    init {
-        require(universe.isNotEmpty()) { "SetSpec needs a non-empty universe" }
-    }
-}
-
-/** Set variable over a nominal universe of [labels]. Internally lowers to an indicator
- *  bool per label, mirroring the encoding of [SetSpec] but typed against strings on the
- *  decoder side. */
-@Serializable
-@SerialName("multiple")
-data class MultipleSpec(
-    /** The nominal label universe the set draws from. */
-    val labels: List<String>,
-) : VarSpec {
-    init {
-        require(labels.isNotEmpty()) { "MultipleSpec needs at least one label" }
-    }
-}
-
-/** Anything that can be coerced into a [SetExpr] inside the constraint DSL — the
- *  set-side analogue of [IntTerm] / [BoolTerm]. */
-interface SetTerm {
-    /** Coerce this term into a [SetExpr] node. */
-    fun toSetExpr(): SetExpr
-}
-
-/** A set-valued node in the constraint AST. */
-@Serializable
-sealed interface SetExpr : SetTerm {
-    override fun toSetExpr(): SetExpr = this
-}
-
-/** Reference to a named set variable. */
-@Serializable
-@SerialName("setref")
-data class SetRef(
-    /** Name of the referenced set variable. */
-    val name: String,
-) : SetExpr
-
-/** Concrete set literal over an integer universe. */
-@Serializable
-@SerialName("setlit")
-data class SetLiteral(
-    /** The literal set's elements. */
-    val elements: List<Int>,
-) : SetExpr
-
-/** Concrete set literal over a nominal universe. The compiler resolves [labels] against
- *  the operand's nominal universe at lowering time. */
-@Serializable
-@SerialName("setlitnom")
-data class SetNominalLiteral(
-    /** The literal set's nominal labels, resolved against the operand's universe. */
-    val labels: List<String>,
-) : SetExpr
-
-/** Set union `left ∪ right`. */
-@Serializable
-@SerialName("setunion")
-data class SetUnion(
-    /** Left operand. */
-    val left: SetExpr,
-    /** Right operand. */
-    val right: SetExpr,
-) : SetExpr
-
-/** Set intersection `left ∩ right`. */
-@Serializable
-@SerialName("setisect")
-data class SetIntersect(
-    /** Left operand. */
-    val left: SetExpr,
-    /** Right operand. */
-    val right: SetExpr,
-) : SetExpr
-
-/** Set difference `left \ right`. */
-@Serializable
-@SerialName("setdiff")
-data class SetDiff(
-    /** Left operand. */
-    val left: SetExpr,
-    /** Right operand subtracted from [left]. */
-    val right: SetExpr,
-) : SetExpr
-
 /** Membership: `elem ∈ setExpr`. */
 @Serializable
 @SerialName("setin")
@@ -934,26 +639,6 @@ data class SetEq(
     /** Right operand. */
     val right: SetExpr,
 ) : BoolExpr
-
-/** Cardinality `|setExpr|` — returns the count of universe elements indicated true. */
-@Serializable
-@SerialName("setcard")
-data class SetCard(
-    /** The set whose cardinality is taken. */
-    val set: SetExpr,
-) : IntExpr
-
-// -----------------------------------------------------------------------------------
-//  Optional-variable globals
-// -----------------------------------------------------------------------------------
-// Each *Opt node mirrors its non-opt sibling but carries a parallel [presents] list of
-// Boolean expressions. The compiler reads each [BoolExpr] as a presence literal, threads
-// it into the corresponding factor's `presents: IntArray`, and the factor handles the
-// rest natively (see [com.eignex.klause.solver.factor.OptPresence]).
-//
-// AllDifferentOpt over zero or one present element is trivially true and emits no factor;
-// the constructor still requires `terms.size >= 2` because the compiler uses the same
-// pair-by-pair pigeonhole guard as the non-opt form for non-empty cases.
 
 /** Presence-gated [AllDifferent]: only present terms must be pairwise distinct. */
 @Serializable
@@ -1078,11 +763,3 @@ data class GccExprOpt(
         require(presents.size == xs.size) { "GccExprOpt: presents must match xs arity" }
     }
 }
-
-/** A named constraint schema entry wrapping a Boolean expression. */
-@Serializable
-@SerialName("constraint")
-data class NamedConstraint(
-    /** The constraint expression. */
-    val expr: BoolExpr,
-) : SchemaEntry

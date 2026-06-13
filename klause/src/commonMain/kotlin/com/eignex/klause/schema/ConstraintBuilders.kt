@@ -1,9 +1,9 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.AllDifferent
-import com.eignex.klause.ast.BoolExpr
-import com.eignex.klause.ast.IntTerm
-import com.eignex.klause.ast.TableConstraint
+import com.eignex.klause.model.AllDifferent
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.IntTerm
+import com.eignex.klause.model.TableConstraint
 
 /*
  * Constraint builders that validate their operands against *declared* variable domains. That's a

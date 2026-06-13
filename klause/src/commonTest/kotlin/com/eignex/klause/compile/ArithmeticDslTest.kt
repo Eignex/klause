@@ -1,14 +1,14 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.ge
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.le
-import com.eignex.klause.ast.minus
-import com.eignex.klause.ast.plus
-import com.eignex.klause.ast.times
-import com.eignex.klause.ast.unaryMinus
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.ge
+import com.eignex.klause.schema.implies
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.minus
+import com.eignex.klause.schema.plus
+import com.eignex.klause.schema.times
+import com.eignex.klause.schema.unaryMinus
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp

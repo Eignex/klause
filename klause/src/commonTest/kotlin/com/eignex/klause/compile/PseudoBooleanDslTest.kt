@@ -1,10 +1,10 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.pbAtLeast
-import com.eignex.klause.ast.pbAtMost
-import com.eignex.klause.ast.pbExactly
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.implies
+import com.eignex.klause.schema.pbAtLeast
+import com.eignex.klause.schema.pbAtMost
+import com.eignex.klause.schema.pbExactly
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart

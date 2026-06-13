@@ -1,16 +1,16 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.IntSpec
-import com.eignex.klause.ast.PresenceSpec
-import com.eignex.klause.ast.allDifferentOpt
-import com.eignex.klause.ast.cumulativeOpt
-import com.eignex.klause.ast.disjunctiveOpt
-import com.eignex.klause.ast.gccOpt
-import com.eignex.klause.ast.ge
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.le
-import com.eignex.klause.ast.nValueOpt
 import com.eignex.klause.compile.compile
+import com.eignex.klause.model.IntSpec
+import com.eignex.klause.model.PresenceSpec
+import com.eignex.klause.schema.allDifferentOpt
+import com.eignex.klause.schema.cumulativeOpt
+import com.eignex.klause.schema.disjunctiveOpt
+import com.eignex.klause.schema.gccOpt
+import com.eignex.klause.schema.ge
+import com.eignex.klause.schema.implies
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.nValueOpt
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cumulative

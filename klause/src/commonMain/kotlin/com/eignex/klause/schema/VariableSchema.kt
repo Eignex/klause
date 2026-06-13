@@ -1,16 +1,16 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.BoolExpr
-import com.eignex.klause.ast.BoolSpec
-import com.eignex.klause.ast.FloatSpec
-import com.eignex.klause.ast.IntSpec
-import com.eignex.klause.ast.MultipleSpec
-import com.eignex.klause.ast.NamedConstraint
-import com.eignex.klause.ast.NominalSpec
-import com.eignex.klause.ast.PresenceSpec
-import com.eignex.klause.ast.SchemaEntry
-import com.eignex.klause.ast.SetSpec
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.BoolSpec
+import com.eignex.klause.model.FloatSpec
+import com.eignex.klause.model.IntSpec
+import com.eignex.klause.model.MultipleSpec
+import com.eignex.klause.model.NamedConstraint
+import com.eignex.klause.model.NominalSpec
+import com.eignex.klause.model.PresenceSpec
+import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.model.SetSpec
 import com.eignex.skema.Schema
 import kotlin.properties.PropertyDelegateProvider
 import kotlin.properties.ReadOnlyProperty
@@ -45,7 +45,7 @@ open class VariableSchema : Schema<SchemaEntry>() {
     /**
      * Optional integer variable: declares a presence Boolean named `<prop>__present` alongside
      * the value variable. Compare via [OptIntHandle]'s opt-aware operators to get MiniZinc's
-     * "undefined → false" semantics, or coerce to a regular [com.eignex.klause.ast.IntExpr]
+     * "undefined → false" semantics, or coerce to a regular [com.eignex.klause.model.IntExpr]
      * with [OptIntHandle.valueOr].
      */
     protected fun optIntVar(min: Int, max: Int) =

@@ -1,17 +1,17 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.CostMddExpr
-import com.eignex.klause.ast.CostRegularExpr
-import com.eignex.klause.ast.IntCmpOp
-import com.eignex.klause.ast.IntCompare
-import com.eignex.klause.ast.IntExpr
-import com.eignex.klause.ast.IntLit
-import com.eignex.klause.ast.IntRef
-import com.eignex.klause.ast.IntScale
-import com.eignex.klause.ast.IntSum
-import com.eignex.klause.ast.MddExpr
-import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.TableConstraint
+import com.eignex.klause.model.CostMddExpr
+import com.eignex.klause.model.CostRegularExpr
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntExpr
+import com.eignex.klause.model.IntLit
+import com.eignex.klause.model.IntRef
+import com.eignex.klause.model.IntScale
+import com.eignex.klause.model.IntSum
+import com.eignex.klause.model.MddExpr
+import com.eignex.klause.model.Or
+import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.factor.Mdd
 

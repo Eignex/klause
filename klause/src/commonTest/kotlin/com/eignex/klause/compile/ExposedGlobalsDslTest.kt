@@ -1,9 +1,9 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.diffn
-import com.eignex.klause.ast.regular
-import com.eignex.klause.ast.sort
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.diffn
+import com.eignex.klause.schema.regular
+import com.eignex.klause.schema.sort
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test

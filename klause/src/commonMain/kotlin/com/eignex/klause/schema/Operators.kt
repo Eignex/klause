@@ -1,4 +1,16 @@
-package com.eignex.klause.ast
+package com.eignex.klause.schema
+
+import com.eignex.klause.model.And
+import com.eignex.klause.model.AtLeast
+import com.eignex.klause.model.AtMost
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.BoolRef
+import com.eignex.klause.model.BoolTerm
+import com.eignex.klause.model.CardinalityExpr
+import com.eignex.klause.model.Iff
+import com.eignex.klause.model.Implies
+import com.eignex.klause.model.Not
+import com.eignex.klause.model.Or
 
 /** Logical AND `this ∧ other`. */
 infix fun BoolTerm.and(other: BoolTerm): BoolExpr {

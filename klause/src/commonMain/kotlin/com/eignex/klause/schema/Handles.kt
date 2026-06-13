@@ -1,17 +1,16 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.BoolExpr
-import com.eignex.klause.ast.BoolRef
-import com.eignex.klause.ast.BoolTerm
-import com.eignex.klause.ast.FloatLinearConstraint
-import com.eignex.klause.ast.IntCmpOp
-import com.eignex.klause.ast.IntCompare
-import com.eignex.klause.ast.IntExpr
-import com.eignex.klause.ast.IntLit
-import com.eignex.klause.ast.IntRef
-import com.eignex.klause.ast.IntTerm
-import com.eignex.klause.ast.NominalEq
-import com.eignex.klause.ast.not
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.BoolRef
+import com.eignex.klause.model.BoolTerm
+import com.eignex.klause.model.FloatLinearConstraint
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntExpr
+import com.eignex.klause.model.IntLit
+import com.eignex.klause.model.IntRef
+import com.eignex.klause.model.IntTerm
+import com.eignex.klause.model.NominalEq
 
 /** DSL handle for a declared Boolean variable; usable directly as a [BoolTerm]. */
 class BoolHandle(

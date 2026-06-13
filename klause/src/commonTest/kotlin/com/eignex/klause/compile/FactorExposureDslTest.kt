@@ -1,8 +1,8 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.inverse
-import com.eignex.klause.ast.symmetricAllDifferent
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.inverse
+import com.eignex.klause.schema.symmetricAllDifferent
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test

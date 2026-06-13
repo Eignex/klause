@@ -1,6 +1,6 @@
 package com.eignex.klause.cnf
 
-import com.eignex.klause.ast.IntCmpOp
+import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit

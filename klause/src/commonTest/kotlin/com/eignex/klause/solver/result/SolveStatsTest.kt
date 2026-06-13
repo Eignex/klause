@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.result
 
-import com.eignex.klause.ast.IntCmpOp
-import com.eignex.klause.ast.IntCompare
-import com.eignex.klause.ast.IntRef
 import com.eignex.klause.compile.compile
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntRef
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.SolveResult

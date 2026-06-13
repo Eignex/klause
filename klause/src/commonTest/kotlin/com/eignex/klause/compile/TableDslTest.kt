@@ -1,7 +1,7 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.implies
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.notTable
 import com.eignex.klause.schema.table
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart

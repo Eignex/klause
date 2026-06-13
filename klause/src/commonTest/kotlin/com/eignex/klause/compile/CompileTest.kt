@@ -1,11 +1,11 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.ge
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.le
-import com.eignex.klause.ast.not
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.ge
+import com.eignex.klause.schema.implies
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.not
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear

@@ -1,8 +1,8 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.gcc
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
+import com.eignex.klause.schema.gcc
 import com.eignex.klause.schema.notTable
 import com.eignex.klause.schema.table
 import kotlin.test.Test

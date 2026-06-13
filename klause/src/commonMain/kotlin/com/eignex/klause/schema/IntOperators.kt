@@ -1,4 +1,16 @@
-package com.eignex.klause.ast
+package com.eignex.klause.schema
+
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntDiv
+import com.eignex.klause.model.IntExpr
+import com.eignex.klause.model.IntLit
+import com.eignex.klause.model.IntMod
+import com.eignex.klause.model.IntMul
+import com.eignex.klause.model.IntScale
+import com.eignex.klause.model.IntSum
+import com.eignex.klause.model.IntTerm
 
 /** `this + other`. */
 operator fun IntTerm.plus(other: IntTerm): IntExpr = flattenSum(this.toIntExpr(), other.toIntExpr())

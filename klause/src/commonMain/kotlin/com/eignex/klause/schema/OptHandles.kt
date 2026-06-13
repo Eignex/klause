@@ -1,17 +1,17 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.And
-import com.eignex.klause.ast.BoolExpr
-import com.eignex.klause.ast.BoolTerm
-import com.eignex.klause.ast.IntCmpOp
-import com.eignex.klause.ast.IntCompare
-import com.eignex.klause.ast.IntExpr
-import com.eignex.klause.ast.IntIfThenElse
-import com.eignex.klause.ast.IntLit
-import com.eignex.klause.ast.IntTerm
-import com.eignex.klause.ast.NominalEq
-import com.eignex.klause.ast.Not
-import com.eignex.klause.ast.Or
+import com.eignex.klause.model.And
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.BoolTerm
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntExpr
+import com.eignex.klause.model.IntIfThenElse
+import com.eignex.klause.model.IntLit
+import com.eignex.klause.model.IntTerm
+import com.eignex.klause.model.NominalEq
+import com.eignex.klause.model.Not
+import com.eignex.klause.model.Or
 
 /**
  * Optional integer variable: a `(present, value)` pair. The presence bool exists as an ordinary
@@ -142,7 +142,7 @@ class OptBoolHandle(
  * involving an absent operand evaluates to false rather than dropping out of the constraint.
  *
  * Unlike [OptIntHandle] there is no `valueOr`: floats lower only to linear
- * ([com.eignex.klause.ast.FloatLinearConstraint]) factors, and the AST has no float
+ * ([com.eignex.klause.model.FloatLinearConstraint]) factors, and the AST has no float
  * if-then-else node to express "value when present, default otherwise" in an arithmetic
  * context. Use [present] / [value] directly when a conditional real value is needed.
  */
