@@ -10,7 +10,7 @@ bench <metric> [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 
 Presets (`target/Targets.kt`) are named shorthands for a `bench <metric>` line that carries non-obvious config (a tuned budget or a curated suite mix) — nothing else.
 
-The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. There is no in-session comparison and no in-process reference adapter: run `solve` once per backend (each writes its own `build/solve-<solver>.json`, cached in `build/bench-cache/`) and diff offline with `parity-runs/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: freeze a baseline `solve` JSON and compare a fresh run against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by `uniformness`/`completeness`/`search`.)
+The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. Output is saved **one file per problem** under `output/<config>/` (`<config>` = solver+settings+budget, e.g. `choco-p8-free-t300s`): a `<problem>.out` (raw solver stream = the log) and a self-describing `<problem>.json` (solver/settings/budget + parsed result). There is no in-session comparison and no in-process reference adapter: run `solve` once per config and diff two config dirs offline with `output/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: keep a baseline config's dir and compare a fresh run's dir against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). Results are also content-addressed in `build/bench-cache/`, so re-running an identical instance replays instantly. (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by `uniformness`/`completeness`/`search`.)
 
 ## Quick start
 
@@ -48,7 +48,7 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 
 ## Metrics
 
-- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Records per-instance objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics, to `build/solve-<solver>.json`; the raw per-instance output is saved under `build/solve-<solver>/`. Run once per backend and diff offline (`parity-runs/compare.sh`), which also serves as the wall-time regression check against a frozen baseline JSON. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
+- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Saves **one file per problem** under `output/<config>/`: `<problem>.out` (raw solver log) + `<problem>.json` (solver/settings/budget + objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics). Run once per config and diff two config dirs offline (`output/compare.sh`), which also serves as the wall-time regression check. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
 - **search** — complete backtracker under a fixed CDCL config; reports nodes/conflicts/learned + solve-rate. A/B a learning or explanation change by holding the suite fixed and comparing conflicts (the `slack-alldiff` Golomb suite is the Hall-prone workload).
 - **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
 - **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.
@@ -63,7 +63,7 @@ Metrics write JSON (and Markdown where useful) under `build/`.
 bench solve suite=mzn-bench per-family=1 max=50 seed=1                 # klause (default), sampled slice
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=choco   # Choco baseline, same selection
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck baseline
-# each writes build/solve-<solver>.json — diff them offline with parity-runs/compare.sh
+# each writes output/<config>/<problem>.{out,json} — diff two config dirs with output/compare.sh
 
 # search-effort A/B on your own selection
 bench search suite=core category=UNSAT timeout=30000
@@ -139,22 +139,22 @@ Running references end-to-end via `minizinc --solver` is deliberate: an in-proce
 
 The parity sweep measures klause against the reference solvers on the MiniZinc Challenge corpus. The method is fixed so every run is comparable:
 
-1. **One backend per `bench solve` invocation** — there is no in-session comparison (a crash or warmup can't contaminate another solver's number). Each run writes `build/solve-<solver>.json`; comparison is done **offline**, direction-aware (maximize vs minimize), by diffing the saved files: `parity-runs/compare.sh <A.json> <B.json>`. Results are also content-addressed in `build/bench-cache/` (keyed by `sha256(model+data) · time-settings · solver+settings`), so re-running an identical instance replays instantly — reference baselines stay frozen while klause iterates (klause's key folds in the cli-binary mtime). Disable with `-Dklause.bench.cache=false`.
+1. **One backend per `bench solve` invocation** — there is no in-session comparison (a crash or warmup can't contaminate another solver's number). Each run writes one `.out` + `.json` per problem under `output/<config>/`; comparison is done **offline**, direction-aware (maximize vs minimize), by diffing two config dirs: `output/compare.sh <dirA> <dirB>`. Results are also content-addressed in `build/bench-cache/` (keyed by `sha256(model+data) · time-settings · solver+settings`), so re-running an identical instance replays instantly — reference baselines stay frozen while klause iterates (klause's key folds in the cli-binary mtime). Disable with `-Dklause.bench.cache=false`.
 2. **Curated selection, not random sampling** — a fixed set chosen to span distinct global constraints, so a small set still exercises the breadth that matters. The MiniZinc Challenge itself is ~95% optimization, so the set is COP-heavy by design.
    - **8 COP**: `elitserien` (alldifferent, global_cardinality, inverse, member, regular), `gfd-schedule` (cumulative, at_most, nvalue), `cargo` (cumulative, diffn), `is` (among, circuit, table), `nfc` (network_flow), `mario` (path, subcircuit), `evilshop` (cumulative, disjunctive), `zephyrus` (arg_sort, lex_less).
    - **2 CSP**: `multi-knapsack` (knapsack), `oocsp_racks` (global_cardinality, increasing, element).
    - Spell it with the `name=` OR filter: `name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus` (the `is/*` glob anchors the family so it doesn't substring-match e.g. `opt-cryptanalysis`).
-3. **Tracks** (each a `solve` filter combination; see the recipes above). klause: `parallel` (`engine=backtrack processors=8`), `open` (`processors=8`), `free` (`processors=1`), `fixed` (`fixed=true`), `ls` (`engine=ls`). References: Choco for the complete tracks, Yuck for `ls`.
+3. **Tracks** (each a `solve` filter combination; see the recipes above). klause: `parallel` (`engine=cp processors=8`), `open` (`processors=8`), `free` (`processors=1`), `fixed` (`fixed=true`), `ls` (`engine=ls`). References: Choco for the complete tracks, Yuck for `ls`.
 4. **Budgets**: complete tracks **300000 ms**, the LS track **180000 ms**.
 
 ```
 # LS track: klause local search vs Yuck, 180s, on the curated set
 bench solve suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus engine=ls       timeout=180000
 bench solve suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus backend=yuck    timeout=180000
-# then: parity-runs/compare.sh klause-bench/build/solve-klause-ls-x8.json klause-bench/build/solve-yuck.json
+# then: output/compare.sh output/klause-ls-p8-free-t180s output/yuck-p20-free-t180s
 ```
 
-The `parity-runs/` scripts (`run-sweep.sh` full, `run-ls.sh` LS-only, `compare.sh` for offline diffs) drive this with `-PbenchHeap=32g` and save per-run logs+JSON; they are local scratch (not committed). To stop a background sweep, kill the `run-*.sh` bash loop **first** (else it spawns the next leg), then the forked `BenchCli` JVM by PID.
+The `output/` scripts (`run-baselines.sh` curated subset, `run-baselines-full.sh` whole corpus, `compare.sh` for offline diffs) drive the baseline sweeps; the per-config result dirs they produce are gitignored. To stop a background sweep, kill the `run-*.sh` bash loop **first** (else it spawns the next leg), then the forked `BenchCli` JVM by PID.
 
 ## Verifying a change
 
