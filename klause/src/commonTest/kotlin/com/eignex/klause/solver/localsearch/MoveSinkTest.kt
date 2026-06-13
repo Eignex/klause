@@ -81,7 +81,7 @@ class MoveSinkTest {
     fun `frozen vars are filtered`() {
         val sink = MoveSink(Assumptions(bools = mapOf(1 to true)))
         sink.addBoolFlip(0)
-        sink.addBoolFlip(1) // frozen — dropped
+        sink.addBoolFlip(1)
         sink.addBoolFlip(2)
         assertEquals(listOf(Move.BoolFlip(0), Move.BoolFlip(2)), sink.list)
     }

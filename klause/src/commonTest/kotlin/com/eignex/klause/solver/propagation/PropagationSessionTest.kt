@@ -28,7 +28,6 @@ class PropagationSessionTest {
         // After pinning x0=true, the clause forces x1=true (already implied before pinning x2).
         // Pinning x2 doesn't add anything new.
         assertIs<PropagationResult.Implied>(r)
-        // Compare full state to one-shot.
         val oneShot = p.propagate(Assumptions(bools = mapOf(0 to true, 2 to false)))
         assertIs<PropagationResult.Implied>(oneShot)
         assertEquals(true, oneShot.bools[1])

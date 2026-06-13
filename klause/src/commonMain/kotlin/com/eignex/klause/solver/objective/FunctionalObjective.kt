@@ -105,9 +105,9 @@ internal class FunctionalObjective internal constructor(
         when (move) {
             is Move.IntSet -> into[move.varId] = move.newValue.toLong()
 
+            // bool moves don't change int-cone leaf values
             is Move.BoolFlip -> {}
 
-            // bool moves don't change int-cone leaf values
             is Move.Compound -> for (p in move.parts) collectIntMoves(p, into)
         }
     }

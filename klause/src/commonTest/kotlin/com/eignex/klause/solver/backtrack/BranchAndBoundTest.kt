@@ -114,7 +114,6 @@ class BranchAndBoundTest {
         assertNotNull(sample)
         val sum = sample.ints[0] + sample.ints[1] + sample.ints[2]
         assertEquals(6, sum, "optimal disjunctive schedule sums to 0+2+4=6; got ${sample.ints.toList()}")
-        // Non-overlap sanity check.
         val occ = IntArray(8)
         for (i in 0 until 3) {
             val s = sample.ints[i]

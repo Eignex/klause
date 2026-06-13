@@ -103,7 +103,7 @@ private fun ceilDiv(a: Long, b: Long): Long {
 
 /**
  * Bounded-variable **dual** simplex with **fraction-free (Bareiss-style) integer** pivoting — the
- * native LP core of issue, purpose-built for branch-and-bound node bounding.
+ * native LP core, purpose-built for branch-and-bound node bounding.
  *
  * ## Why dual simplex
  * Branch-and-bound branches tighten variable bounds, which leaves the parent's basis dual feasible
@@ -742,10 +742,9 @@ internal class DualSimplex(
         // that does move the objective strictly raises it, so a basis it leaves can never recur. A
         // dual pivot is degenerate exactly when the entering column's reduced cost is zero, so we
         // count consecutive degenerate pivots and latch Bland — which provably terminates — once
-        // they pass [stallLimit]. Counting *consecutive degenerate* pivots, rather than (as before)
-        // a global-best infeasibility count that reset the stall counter on every new low, is what
-        // makes the fallback actually latch on a long degenerate run instead of being reset out from
-        // under itself and running to the cap (issue #379).
+        // they pass [stallLimit]. Counting *consecutive degenerate* pivots (rather than a global-best
+        // infeasibility count that resets on every new low) is what makes the fallback latch on a long
+        // degenerate run instead of being reset out from under itself (issue #379).
         val stallLimit = if (stallLimitOverride >= 0) stallLimitOverride else 2 * (m + numVars) + 32
         var degeneratePivots = 0
         var useBland = false
@@ -754,7 +753,7 @@ internal class DualSimplex(
         // both are linear functionals of the tableau rows (beta over the rhs/at-upper columns,
         // reduced costs over the virtual cost row), so each transforms under exactly the same
         // Bareiss step as the tableau itself — one O(m)+O(numVars) update per pivot instead of
-        // the O(m·numVars) recompute per iteration this loop used to pay twice.
+        // an O(m·numVars) recompute per iteration.
         val beta = computeBeta()
         val reduced = computeReducedCostsScaled()
         val colScratch = LongArray(m) // pre-pivot entering column, for the beta update

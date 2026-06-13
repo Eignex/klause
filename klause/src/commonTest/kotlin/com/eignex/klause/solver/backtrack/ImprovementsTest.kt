@@ -38,11 +38,9 @@ class ImprovementsTest {
                 valueSelector = IndomainMax,
             ),
         ).toList()
-        // Last yield is the terminal verdict.
         val terminal = seq.last()
         assertIs<MinimizeResult.Optimal>(terminal)
         assertEquals(0.0, terminal.objective)
-        // Earlier yields are BestFound carrying strictly-decreasing objectives.
         val earlier = seq.dropLast(1)
         assertTrue(earlier.isNotEmpty(), "expected at least one intermediate improvement")
         var prev = Double.POSITIVE_INFINITY

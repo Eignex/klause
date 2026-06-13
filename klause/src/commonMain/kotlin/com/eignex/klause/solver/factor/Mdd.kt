@@ -39,7 +39,7 @@ class Mdd(
     /** Accepting states at the final layer. */
     val accepting: IntArray,
     /** Ints per transition record: 3 for plain MDD, 4 for cost MDD. */
-    val recordStride: Int, // 3 for plain MDD, 4 for cost MDD
+    val recordStride: Int,
     /** Cost variable id, or -1 for a plain (non-cost) MDD. */
     val cost: Int = -1,
 ) : Factor {

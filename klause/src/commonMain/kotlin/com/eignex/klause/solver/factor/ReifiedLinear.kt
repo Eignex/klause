@@ -231,7 +231,7 @@ class ReifiedLinear private constructor(
         val oldSum = newSum - coeff.toLong() * (newValue - oldValue)
         val oldHolds = holds(oldSum)
         val newHolds = holds(newSum)
-        if (oldHolds == newHolds) return // aux contribution unchanged
+        if (oldHolds == newHolds) return
         val aux = state.assignment.boolValue(auxBoolVar)
         val newViolated = aux != newHolds
         // oldViolated != newViolated, so the aux's contribution swaps break↔make.

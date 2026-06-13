@@ -201,7 +201,7 @@ class Cbls(
             } else if (state.step - lastImprovingStep >= stallSteps) {
                 bumpViolatedWeights(state, stallIncrement)
                 if (smoothProb > 0.0 && state.rng.nextDouble() < smoothProb) smoothAllWeights(state)
-                lastImprovingStep = state.step // reset stall window after the bump
+                lastImprovingStep = state.step
             }
             lastSeenStep = state.step
         }

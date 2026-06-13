@@ -542,8 +542,7 @@ class BacktrackSolverTest {
             factors = emptyArray(),
         )
         val vsids = Vsids()
-        // Bump v3 directly via the rich onConflict signature with an empty Unsat record
-        // so only v3 (the failing decision) gets the bump.
+        // Empty Unsat record so only v3 (the failing decision) gets the bump.
         val emptyUnsat = Unsat()
         repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
         val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = vsids))

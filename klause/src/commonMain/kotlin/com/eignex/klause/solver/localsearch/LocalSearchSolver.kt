@@ -418,7 +418,6 @@ class LocalSearchSolver(
                     cancelled = true
                     break
                 }
-                // Score the current feasible assignment, record if best.
                 val snap = state.assignment.snapshot()
                 val obj = objective.evaluate(snap)
                 if (obj < bestObj) {
@@ -820,9 +819,8 @@ class LocalSearchSolver(
      *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
     private fun revertMove(state: LocalSearchState, move: Move, baselineSnap: Sample) {
         when (move) {
-            is Move.BoolFlip -> state.apply(move)
+            is Move.BoolFlip -> state.apply(move) // self-inverse
 
-            // self-inverse
             is Move.IntSet -> {
                 val old = baselineSnap.ints[move.varId]
                 if (old != state.assignment.intValue(move.varId)) state.apply(Move.IntSet(move.varId, old))

@@ -420,7 +420,7 @@ class LocalSearchState(
      */
     fun synthesizeChannelingMove(intVar: Int, newValue: Int): Move {
         val cur = assignment.intValue(intVar)
-        if (cur == newValue) return Move.IntSet(intVar, newValue) // caller handles no-op
+        if (cur == newValue) return Move.IntSet(intVar, newValue)
         val parts = ArrayList<Move>(4)
         // Pinned-target set: vars whose update we've already committed to so a sibling
         // factor doesn't try to override the choice. Without this two Linear EQs sharing

@@ -191,7 +191,7 @@ class LpAutoConfigTest {
         val p = problem(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
         val r = LpAutoConfig.recommend(p, BacktrackParams(lpBounding = true, lpGomory = false))
         assertTrue(r.lpBounding)
-        assertFalse(r.lpGomory) // unrelated base settings are preserved
+        assertFalse(r.lpGomory)
         assertTrue(r.energeticReasoning)
     }
 

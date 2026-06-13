@@ -76,12 +76,11 @@ class VariableObjectiveTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        // Minimise the count of true bools — should leave us with exactly one true.
-        // Use one of them as the objective handle: picking `a` means `a=false` is preferred.
+        // Picking `a` as the objective handle means `a=false` is preferred, so `a` should
+        // not be set if either b or c can carry the at-least-one.
         val objective = compiled.minimize(schema.a)
         val sample = LocalSearchSolver(compiled.problem)
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
-        // `a` should not be set if either b or c can carry the at-least-one.
         assertEquals(false, compiled.decode(schema.a, sample))
     }
 
