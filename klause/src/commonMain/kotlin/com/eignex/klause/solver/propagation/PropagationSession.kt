@@ -379,7 +379,7 @@ class PropagationSession(
                 } else {
                     val atomId = v - numBool
                     quads[qi++] = state.atomIntVar[atomId]
-                    quads[qi++] = state.atomKind[atomId]
+                    quads[qi++] = state.atomKind[atomId].ordinal
                     quads[qi++] = state.atomThreshold[atomId]
                     quads[qi++] = if (Lit.isPositive(lit)) 0 else 1
                 }

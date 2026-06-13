@@ -17,6 +17,7 @@ import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
@@ -89,20 +90,32 @@ internal class CpToLpRelaxation(
     /** When true, emit the energetic makespan lower-bound row for each Cumulative / Disjunctive whose
      *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
     private val cumulative: Boolean = false,
+    /** When true, emit the time-indexed `x_{i,t}` relaxation of each Cumulative / Disjunctive over a
+     *  bounded horizon (#453): assignment + start channel + per-time resource rows. Adds O(n·H)
+     *  columns, so it is hard-gated on the horizon and total cell count. */
+    private val cumulativeTimeIndexed: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
         if (cumulative) CumulativeRelaxation(problem).takeIf { it.applicable } else null
 
     private companion object {
-        /** Above this node count the O(n²)-column circuit arc model is skipped. */
-        const val MAX_NODES: Int = 24
+        /** Above this candidate-arc count the circuit arc model is skipped — a defensive bound on
+         *  the dense-tableau cost. Gating on arc count (LP columns) rather than node count lets
+         *  large but sparse routing graphs through (#431); #429 may bench this threshold. */
+        const val MAX_CIRCUIT_ARCS: Int = 1024
 
         /** Above this array length the O(len)-column Element selector model is skipped. */
         const val MAX_ELEM: Int = 256
 
         /** Above this tuple count the O(numTuples)-column Table hull is skipped. */
         const val MAX_TUPLES: Int = 1024
+
+        /** Above this horizon (latest deadline − earliest start) the time-indexed model is skipped. */
+        const val MAX_TI_HORIZON: Int = 512
+
+        /** Above this many `x_{i,t}` columns one time-indexed Cumulative is skipped (the O(n·H) blow-up). */
+        const val MAX_TI_COLS: Int = 4096
     }
 
     /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
@@ -375,6 +388,9 @@ internal class CpToLpRelaxation(
                 for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
             }
             cumulativeRelaxation?.let { cumulativeRows(it) }
+            if (cumulativeTimeIndexed) {
+                for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
+            }
 
             for (factor in problem.factors) {
                 when (factor) {
@@ -447,14 +463,26 @@ internal class CpToLpRelaxation(
          * in-degree `Σ_i y_ij = 1`, and channelling `Σ_j j·y_ij = succ[i]` tying arcs to the integer
          * column. Integer solutions are then permutations; [CircuitSeparator] removes the subtours.
          * The column *layout* uses the declared domain so it is identical across nodes (warm-start
-         * safe). Circuits with more than [MAX_NODES] nodes are skipped (the O(n²) LP would dominate).
+         * safe). A circuit whose candidate-arc count exceeds [MAX_CIRCUIT_ARCS] is skipped (the dense
+         * LP tableau would dominate); gating on arc count rather than n lets large sparse graphs
+         * through (#431). Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
          */
         private fun buildCircuitArcs(factor: Circuit) {
             val succ = factor.succ
             val n = succ.size
-            if (n < 2 || n > MAX_NODES) return
-            val arcCol = Array(n) { IntArray(n) { -1 } }
-            // Out-degree and channelling rows, building the arc columns on the way.
+            if (n < 2) return
+            // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
+            // graphs (small per-node successor domains) are not skipped by a blunt node cap.
+            var arcCount = 0
+            for (i in 0 until n) {
+                problem.intDomains[succ[i]].forEach { j -> if (j != i && j in 0 until n) arcCount++ }
+            }
+            if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
+            val tails = IntArrayList()
+            val heads = IntArrayList()
+            val cols = IntArrayList()
+            val inColsByHead = Array(n) { IntArrayList() }
+            // Out-degree and channelling rows, building the (sparse) arc columns on the way.
             for (i in 0 until n) {
                 val live = session.intDomain(succ[i])
                 val outCols = IntArrayList()
@@ -464,10 +492,13 @@ internal class CpToLpRelaxation(
                     if (j == i || j < 0 || j >= n) return@forEach
                     val present = live.contains(j)
                     val col = auxColumn(0L, if (present) 1L else 0L)
-                    arcCol[i][j] = col
                     outCols.add(col)
                     chanCols.add(col)
                     chanCoef.add(j)
+                    tails.add(i)
+                    heads.add(j)
+                    cols.add(col)
+                    inColsByHead[j].add(col)
                 }
                 if (outCols.isEmpty()) return // degenerate: no candidate successor — leave to propagation
                 builder.addRow(outCols.toIntArray(), LongArray(outCols.size) { 1L }, Relation.EQ, 1L)
@@ -484,13 +515,12 @@ internal class CpToLpRelaxation(
             }
             // In-degree rows: Σ_i y_ij = 1 for each node j that is some arc's head.
             for (j in 0 until n) {
-                val inCols = IntArrayList()
-                for (i in 0 until n) if (arcCol[i][j] >= 0) inCols.add(arcCol[i][j])
+                val inCols = inColsByHead[j]
                 if (!inCols.isEmpty()) {
                     builder.addRow(inCols.toIntArray(), LongArray(inCols.size) { 1L }, Relation.EQ, 1L)
                 }
             }
-            circuitModels.add(CircuitArcModel(n, arcCol))
+            circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
         /**
@@ -610,6 +640,78 @@ internal class CpToLpRelaxation(
                     global = spec.global,
                     premises = spec.premises,
                 )
+            }
+        }
+
+        /**
+         * Time-indexed `x_{i,t}` relaxation of one scheduling [view] over the bounded horizon
+         * `[T0, T1)` (#453). For each task a binary `x_{i,t} ∈ [0,1]` per declared-feasible start `t`
+         * (pinned to 0 when `t` left the live start domain — layout stable across nodes for warm
+         * starts), with `Σ_t x_{i,t} = 1` (starts once), the start channel `Σ_t t·x_{i,t} = startᵢ`
+         * (ties to the integer column), and per-time-point resource rows
+         * `Σ_i Σ_{t: t≤tt<t+durᵢ} resᵢ·x_{i,t} ≤ capacity`. Every integer schedule satisfies all three,
+         * so the rows are globally valid; the resource ceiling uses the declared **max** capacity and
+         * the **min** demand, so it is a sound relaxation. Columns are O(n·H) — hard-gated on
+         * [MAX_TI_HORIZON] and [MAX_TI_COLS]; above either the model is skipped (only loosens).
+         */
+        private fun buildCumulativeTimeIndexed(view: SchedulingView) {
+            val n = view.starts.size
+            val est = IntArray(n) { problem.intDomains[view.starts[it]].min }
+            val lst = IntArray(n) { problem.intDomains[view.starts[it]].max }
+            var t0 = Int.MAX_VALUE
+            var t1 = Int.MIN_VALUE
+            var cols = 0L
+            for (i in 0 until n) {
+                if (lst[i] < est[i]) return // empty declared start domain — leave to propagation
+                if (est[i] < t0) t0 = est[i]
+                val end = lst[i] + view.durations[i]
+                if (end > t1) t1 = end
+                cols += (lst[i] - est[i] + 1).toLong()
+            }
+            val horizon = t1 - t0
+            if (horizon <= 0 || horizon > MAX_TI_HORIZON || cols > MAX_TI_COLS) return
+
+            // Per-task start-time columns, indexed by (t - est_i); assignment + start channel rows.
+            val taskCols = Array(n) { IntArray(lst[it] - est[it] + 1) }
+            for (i in 0 until n) {
+                val live = session.intDomain(view.starts[i])
+                val assignCols = IntArray(taskCols[i].size)
+                val chanCols = IntArray(taskCols[i].size + 1)
+                val chanVals = LongArray(taskCols[i].size + 1)
+                for (k in taskCols[i].indices) {
+                    val t = est[i] + k
+                    val col = auxColumn(0L, if (live.contains(t)) 1L else 0L)
+                    taskCols[i][k] = col
+                    assignCols[k] = col
+                    chanCols[k] = col
+                    chanVals[k] = t.toLong()
+                }
+                builder.addRow(assignCols, LongArray(assignCols.size) { 1L }, Relation.EQ, 1L)
+                chanCols[taskCols[i].size] = intColumn(view.starts[i])
+                chanVals[taskCols[i].size] = -1L
+                builder.addRow(chanCols, chanVals, Relation.EQ, 0L) // Σ t·x − startᵢ = 0
+            }
+
+            // Per-time-point resource rows: Σ_i Σ_{t ≤ tt < t+durᵢ} resᵢ·x_{i,t} ≤ capacity.
+            val rowCols = IntArrayList()
+            val rowVals = LongArrayList()
+            for (tt in t0 until t1) {
+                rowCols.clear()
+                rowVals.clear()
+                for (i in 0 until n) {
+                    val d = view.durations[i]
+                    val r = view.resources[i]
+                    if (d <= 0 || r <= 0) continue
+                    val lo = maxOf(est[i], tt - d + 1)
+                    val hi = minOf(lst[i], tt)
+                    for (t in lo..hi) {
+                        rowCols.add(taskCols[i][t - est[i]])
+                        rowVals.add(r.toLong())
+                    }
+                }
+                if (!rowCols.isEmpty()) {
+                    builder.addRow(rowCols.toIntArray(), rowVals.toLongArray(), Relation.LE, view.capacity.toLong())
+                }
             }
         }
 

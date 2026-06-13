@@ -34,6 +34,7 @@ class PresolverTest {
         val autoProblem = listOf(
             PresolvePass.STRENGTHEN_COEFFICIENTS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
+            PresolvePass.REMOVE_REDUNDANT,
             PresolvePass.BREAK_SYMMETRIES,
         )
         assertEquals(autoProblem, PresolveConfig.parse(null).problemPasses(ctx))
@@ -101,9 +102,13 @@ class PresolverTest {
         val ctx = PresolveContext.EMPTY
         // off → nothing.
         assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
-        // conservative → FAST tier only (strengthen + affine), no symmetry, single round.
+        // conservative → FAST tier only (strengthen + affine + subsume), no symmetry, single round.
         assertEquals(
-            listOf(PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.ELIMINATE_AFFINE_SINGLETONS),
+            listOf(
+                PresolvePass.STRENGTHEN_COEFFICIENTS,
+                PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
+                PresolvePass.REMOVE_REDUNDANT,
+            ),
             PresolveConfig.parse("conservative").problemPasses(ctx),
         )
         assertEquals(1, PresolveConfig.parse("conservative").emphasis.maxRounds)
