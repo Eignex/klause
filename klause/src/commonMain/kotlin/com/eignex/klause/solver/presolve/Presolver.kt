@@ -113,6 +113,14 @@ enum class PresolvePass(
         }
     },
 
+    /** Constraint subsumption / redundant-constraint removal (#447) — drops duplicate factors and
+     *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
+     *  already GCD-normalised. */
+    REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            PassResult(Presolve.removeRedundantConstraints(problem))
+    },
+
     /** Interchangeable-variable / block / value symmetry breaking (#317 / #367 / #373 / #366). */
     BREAK_SYMMETRIES(
         "symmetry",
