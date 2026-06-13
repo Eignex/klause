@@ -36,6 +36,7 @@ class PresolverTest {
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.REMOVE_REDUNDANT,
             PresolvePass.BREAK_SYMMETRIES,
+            PresolvePass.DUAL_FIX,
         )
         assertEquals(autoProblem, PresolveConfig.parse(null).problemPasses(ctx))
         assertEquals(autoProblem, PresolveConfig.parse("default").problemPasses(ctx))
