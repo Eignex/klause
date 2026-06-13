@@ -13,7 +13,7 @@ internal class VarAtomIndex {
     val eqKeys = IntArrayList()
     val eqIds = IntArrayList()
 
-    fun insert(kind: Int, k: Int, id: Int) {
+    fun insert(kind: AtomKind, k: Int, id: Int) {
         val keys = keysOf(kind)
         val ids = idsOf(kind)
         val at = keys.lowerBound(k)
@@ -21,15 +21,15 @@ internal class VarAtomIndex {
         ids.insertAt(at, id)
     }
 
-    fun keysOf(kind: Int): IntArrayList = when (kind) {
-        0 -> geKeys
-        1 -> leKeys
-        else -> eqKeys
+    fun keysOf(kind: AtomKind): IntArrayList = when (kind) {
+        AtomKind.GE -> geKeys
+        AtomKind.LE -> leKeys
+        AtomKind.EQ -> eqKeys
     }
 
-    fun idsOf(kind: Int): IntArrayList = when (kind) {
-        0 -> geIds
-        1 -> leIds
-        else -> eqIds
+    fun idsOf(kind: AtomKind): IntArrayList = when (kind) {
+        AtomKind.GE -> geIds
+        AtomKind.LE -> leIds
+        AtomKind.EQ -> eqIds
     }
 }

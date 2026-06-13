@@ -485,8 +485,8 @@ class PropagationState(
      *  long for the reverse lookup; stored separately here for fast iteration. */
     internal val atomIntVar: IntArrayList = IntArrayList()
 
-    /** 0 = `[x ≥ k]`, 1 = `[x ≤ k]`. */
-    internal val atomKind: IntArrayList = IntArrayList()
+    /** The relational form of each atom, parallel to [atomIntVar] / [atomThreshold]. */
+    internal val atomKind: ArrayList<AtomKind> = ArrayList()
 
     /** Threshold value `k` for the atom. */
     internal val atomThreshold: IntArrayList = IntArrayList()
@@ -527,15 +527,15 @@ class PropagationState(
     /** Allocate (or look up) the atom for `[intVar ≥ threshold]` and return its virtual
      *  variable id (past the bool var space). Pair with [Lit.make]
      *  to encode as a positive or negative literal. */
-    fun atomVarGe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = 0, threshold = threshold)
+    fun atomVarGe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = AtomKind.GE, threshold = threshold)
 
     /** Allocate (or look up) the atom for `[intVar ≤ threshold]`. */
-    fun atomVarLe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = 1, threshold = threshold)
+    fun atomVarLe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = AtomKind.LE, threshold = threshold)
 
     /** Allocate (or look up) the atom for `[intVar = value]`. The negative-polarity literal
      *  of this atom encodes `[intVar ≠ value]`; share the same atom id rather than allocating
      *  a dedicated `Ne` kind. */
-    fun atomVarEq(intVar: Int, value: Int): Int = allocAtom(intVar, kind = 2, threshold = value)
+    fun atomVarEq(intVar: Int, value: Int): Int = allocAtom(intVar, kind = AtomKind.EQ, threshold = value)
 
     /**
      * Allocate a *relaxed* bound atom (`kind` 0 = `[v ≥ threshold]`, 1 = `[v ≤ threshold]`)
@@ -550,7 +550,7 @@ class PropagationState(
      * learned clause's backjump level to be sound.
      */
     @Suppress("UNUSED_PARAMETER")
-    fun atomBoundLeafIfNew(intVar: Int, kind: Int, threshold: Int, level: Int): Int =
+    internal fun atomBoundLeafIfNew(intVar: Int, kind: AtomKind, threshold: Int, level: Int): Int =
         allocAtom(intVar, kind = kind, threshold = threshold)
 
     /** True iff bool [v] is currently assigned (by decision or propagation). Primitive — lets
@@ -611,26 +611,24 @@ class PropagationState(
         val intVar = atomIntVar[atomId]
         val k = atomThreshold[atomId]
         return when (atomKind[atomId]) {
-            0 -> if (pos) {
+            AtomKind.GE -> if (pos) {
                 tightenIntMinImpl(intVar, k, antecedents) // [v ≥ k] true → v.min ≥ k
             } else {
                 tightenIntMaxImpl(intVar, k - 1, antecedents) // [v ≥ k] false → v ≤ k-1
             }
 
-            1 -> if (pos) {
+            AtomKind.LE -> if (pos) {
                 tightenIntMaxImpl(intVar, k, antecedents) // [v ≤ k] true → v.max ≤ k
             } else {
                 tightenIntMinImpl(intVar, k + 1, antecedents) // [v ≤ k] false → v ≥ k+1
             }
 
-            2 -> if (pos) {
+            AtomKind.EQ -> if (pos) {
                 tightenIntMinImpl(intVar, k, antecedents) && // [v = k] true → v = k
                     tightenIntMaxImpl(intVar, k, antecedents)
             } else {
                 excludeIntValueImpl(intVar, k, antecedents) // [v = k] false → v ≠ k
             }
-
-            else -> error("unknown atom kind")
         }
     }
 
