@@ -192,6 +192,96 @@ object Presolve {
         )
     }
 
+    /**
+     * Constraint subsumption / redundant-constraint removal (#447): drop a constraint implied by
+     * another retained one, preserving the feasible set exactly. Two mechanisms:
+     *
+     *  1. **Exact duplicates** — any factor whose [Factor.structuralKey] equals an earlier kept one is
+     *     redundant (the keys are collision-free up to variable identity, so an equal key means an
+     *     equal constraint). Unkeyed factors (`null` key) are never matched and always kept.
+     *  2. **Linear inequality domination** — over the [Linear] inequalities, normalising each `≥` to a
+     *     `≤` (negating coefficients and bound), constraints sharing a coefficient vector are
+     *     comparable: the tightest (smallest `≤` bound) implies the rest, so only it is kept. An `=`
+     *     over the same coefficients contributes its bound to *both* directions and implies (drops)
+     *     any looser `≤` / `≥`, but is itself never dropped here.
+     *
+     * Meant to run after [strengthenCoefficients] so proportional rows are already GCD-normalised to a
+     * shared coefficient vector (run standalone it simply matches fewer). Self-redundant rows (maximal
+     * activity already within the bound) are dropped by the strengthen lift, so this pass is purely
+     * cross-constraint. PseudoBoolean domination and variable-subset domination are follow-ups.
+     */
+    fun removeRedundantConstraints(problem: Problem): Problem {
+        val factors = problem.factors
+        // Phase 1: exact-duplicate removal by structural key.
+        val deduped = ArrayList<Factor>(factors.size)
+        val seenKeys = HashSet<String>()
+        for (f in factors) {
+            val k = f.structuralKey()
+            if (k != null && !seenKeys.add(k)) continue
+            deduped.add(f)
+        }
+        // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
+        // tightest bound (and whether an `=` provides it) decides which inequalities are implied.
+        val bucketMin = HashMap<String, Long>()
+        val bucketEqAtMin = HashMap<String, Boolean>()
+        fun offer(key: String, bound: Long, fromEq: Boolean) {
+            val cur = bucketMin[key]
+            if (cur == null || bound < cur) {
+                bucketMin[key] = bound
+                bucketEqAtMin[key] = fromEq
+            } else if (bound == cur && fromEq) {
+                bucketEqAtMin[key] = true
+            }
+        }
+        for (f in deduped) {
+            if (f !is Linear) continue
+            when (f.op) {
+                LinearOp.LE -> offer(leKey(f.vars, f.coeffs, negate = false), f.bound.toLong(), fromEq = false)
+
+                LinearOp.GE -> offer(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = false)
+
+                LinearOp.EQ -> {
+                    offer(leKey(f.vars, f.coeffs, negate = false), f.bound.toLong(), fromEq = true)
+                    offer(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = true)
+                }
+
+                LinearOp.NE -> {}
+            }
+        }
+        val keptRep = HashSet<String>()
+        val out = ArrayList<Factor>(deduped.size)
+        for (f in deduped) {
+            if (f !is Linear || f.op == LinearOp.EQ || f.op == LinearOp.NE) {
+                out.add(f)
+                continue
+            }
+            val key = leKey(f.vars, f.coeffs, negate = f.op == LinearOp.GE)
+            val b = if (f.op == LinearOp.LE) f.bound.toLong() else -f.bound.toLong()
+            val tightest = bucketMin.getValue(key)
+            when {
+                b > tightest -> {}
+
+                // dominated by a tighter constraint → drop
+                bucketEqAtMin[key] == true -> {}
+
+                // an `=` over the same vector implies this → drop
+                keptRep.add(key) -> out.add(f)
+
+                // first representative at the tightest bound → keep
+                else -> {} // duplicate of the kept representative → drop
+            }
+        }
+        if (out.size == factors.size) return problem
+        return rebuildProblem(problem, out)
+    }
+
+    /** Canonical key for a linear inequality's `≤`-normal-form coefficient vector: the `(var, coeff)`
+     *  pairs sorted by variable, with every coefficient negated when [negate] (folding `≥` into `≤`). */
+    private fun leKey(vars: IntArray, coeffs: IntArray, negate: Boolean): String {
+        val sign = if (negate) -1 else 1
+        return vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${sign * coeffs[it]}" }
+    }
+
     private fun rebuildProblem(problem: Problem, factors: List<Factor>): Problem = Problem(
         numBoolVars = problem.numBoolVars,
         numIntVars = problem.numIntVars,
