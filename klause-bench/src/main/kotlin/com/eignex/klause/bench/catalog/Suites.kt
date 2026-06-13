@@ -471,7 +471,10 @@ internal object Suites {
         format = Format.MINIZINC
         license = "internal"
         val base = "klause-mzn-lib/test-models"
+        workspace("argmax", "$base/argmax.mzn", Category.CSP, Expected.Sat)
         workspace("bin_packing", "$base/bin_packing.mzn", Category.PACKING, Expected.Sat)
+        workspace("connected", "$base/connected.mzn", Category.CSP, Expected.Sat)
+        workspace("diffn_nonstrict_k", "$base/diffn_nonstrict_k.mzn", Category.PACKING, Expected.Sat)
         workspace("graph_coloring", "$base/graph_coloring.mzn", Category.CSP, Expected.Sat)
         workspace("latin_square", "$base/latin_square.mzn", Category.CSP, Expected.Sat)
         workspace("magic_square", "$base/magic_square.mzn", Category.CSP, Expected.Sat)

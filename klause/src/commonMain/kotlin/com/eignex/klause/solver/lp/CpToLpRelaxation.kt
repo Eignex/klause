@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
@@ -94,6 +95,9 @@ internal class CpToLpRelaxation(
      *  bounded horizon (#453): assignment + start channel + per-time resource rows. Adds O(n·H)
      *  columns, so it is hard-gated on the horizon and total cell count. */
     private val cumulativeTimeIndexed: Boolean = false,
+    /** When true, linearize each NValue with a one-hot value model (per-value "used" indicators) so
+     *  the distinct-count target gets an LP bound. Adds O(Σ|domain|) columns, so it is gated. */
+    private val nValueHull: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -116,6 +120,10 @@ internal class CpToLpRelaxation(
 
         /** Above this many `x_{i,t}` columns one time-indexed Cumulative is skipped (the O(n·H) blow-up). */
         const val MAX_TI_COLS: Int = 4096
+
+        /** Above this total selector count (Σ over `xs` of the declared-domain size) the NValue
+         *  one-hot value hull is skipped. */
+        const val MAX_NVALUE_CELLS: Int = 1024
     }
 
     /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
@@ -387,6 +395,9 @@ internal class CpToLpRelaxation(
             if (tableHull) {
                 for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
             }
+            if (nValueHull) {
+                for (factor in problem.factors) if (factor is NValue) buildNValueHull(factor)
+            }
             cumulativeRelaxation?.let { cumulativeRows(it) }
             if (cumulativeTimeIndexed) {
                 for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
@@ -569,6 +580,69 @@ internal class CpToLpRelaxation(
                 vals[k] = 1L
                 builder.addRow(cols, vals, Relation.EQ, 0L)
             }
+        }
+
+        /**
+         * One-hot value model for one [NValue] `n = |distinct(xs)|` (and the AtMost / AtLeast
+         * variants): a per-value "used" column `y_v ∈ [0,1]`, a one-hot selector `z_iv ∈ [0,1]` per
+         * variable/value with `Σ_v z_iv = 1` and the channel `Σ_v v·z_iv = xs(i)`, and `y_v ≥ z_iv` so
+         * a value taken by any variable forces its indicator up. The distinct count `Σ_v y_v` relates
+         * to `n` by the mode: `Eq → n = Σ y_v`, `AtMost (n ≥ distinct) → n ≥ Σ y_v`,
+         * `AtLeast (n ≤ distinct) → n ≤ Σ y_v`. Each relation holds at every integer solution (set
+         * `y_v = 1` iff value v is used), so the relaxation is sound; minimising `n` then reads a real
+         * lower bound off `Σ y_v`. Gated by [MAX_NVALUE_CELLS]; optional-presence NValue is skipped.
+         */
+        private fun buildNValueHull(factor: NValue) {
+            if (factor.presents.isNotEmpty()) return // count is over present vars only — defer
+            val xs = factor.xs
+            var cells = 0L
+            for (x in xs) cells += problem.intDomains[x].size.toLong()
+            if (cells == 0L || cells > MAX_NVALUE_CELLS) return
+            val yCols = IntArrayList()
+            val yByValue = HashMap<Int, Int>()
+            fun yOf(v: Int): Int = yByValue.getOrPut(v) { auxColumn(0L, 1L).also { yCols.add(it) } }
+            for (x in xs) {
+                val declared = problem.intDomains[x]
+                val live = session.intDomain(x)
+                val sel = IntArrayList()
+                val selVal = IntArrayList()
+                declared.forEach { v ->
+                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L)
+                    sel.add(z)
+                    selVal.add(v)
+                    builder.addRow(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), Relation.LE, 0L) // y_v ≥ z
+                }
+                val k = sel.size
+                if (k == 0) return // a variable with no declared values — leave it to propagation
+                builder.addRow(sel.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L) // Σ_v z = 1
+                // Σ_v v·z − xs(i) = 0.
+                val cCols = IntArray(k + 1)
+                val cVals = LongArray(k + 1)
+                for (s in 0 until k) {
+                    cCols[s] = sel[s]
+                    cVals[s] = selVal[s].toLong()
+                }
+                cCols[k] = intColumn(x)
+                cVals[k] = -1L
+                builder.addRow(cCols, cVals, Relation.EQ, 0L)
+            }
+            if (yCols.isEmpty()) return
+            // (Σ_v y_v) − n  {EQ | LE | GE}  0, per the mode (see KDoc).
+            val rel = when (factor.mode) {
+                NValue.Mode.Eq -> Relation.EQ
+                NValue.Mode.AtMost -> Relation.LE
+                NValue.Mode.AtLeast -> Relation.GE
+            }
+            val m = yCols.size
+            val cols = IntArray(m + 1)
+            val vals = LongArray(m + 1)
+            for (idx in 0 until m) {
+                cols[idx] = yCols[idx]
+                vals[idx] = 1L
+            }
+            cols[m] = intColumn(factor.n)
+            vals[m] = -1L
+            builder.addRow(cols, vals, rel, 0L)
         }
 
         /**
