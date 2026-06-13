@@ -28,10 +28,8 @@ import com.eignex.klause.bench.tools.ProfileScope
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
- *  - `<preset-id>` — run a saved [Target] preset (see `list`); a preset is just a named
- *    `bench <metric> [filters]` that carries a tuned budget / curated suite mix.
  *  - `preview <metric> [filters…]` — print the instances a run would cover, without running.
- *  - `list` — presets + suites; `list <suite>` — problems in a suite.
+ *  - `list` — suites; `list <suite>` — problems in a suite.
  */
 object BenchCli {
     /** CLI entry point dispatching bench subcommands. */
@@ -42,21 +40,9 @@ object BenchCli {
 
             "preview" -> adHoc(args.drop(1), preview = true)
 
-            // `bench <metric> [filters]` is the primary form; fall back to a preset id.
-            else -> if (metricOrNull(cmd) != null) adHoc(args.toList(), preview = false) else runTarget(cmd)
+            // `bench <metric> [filters]` is the only run form; adHoc errors on an unknown metric.
+            else -> adHoc(args.toList(), preview = false)
         }
-    }
-
-    @Suppress("SpreadOperator")
-    private fun runTarget(id: String) {
-        val target = Targets.get(id)
-        println("=== preset '${target.id}' — ${target.description} ===")
-        MetricRunner.run(
-            target.metric,
-            Catalog.problems(*target.suiteIds.toTypedArray()),
-            target.budget,
-            target.backend,
-        )
     }
 
     private fun adHoc(args: List<String>, preview: Boolean) {
@@ -187,16 +173,9 @@ object BenchCli {
 
     private fun metricNames(): String = MetricKind.entries.joinToString(", ") { it.name.lowercase() }
 
-    /** Short aliases that don't match a [MetricKind] name verbatim. */
-    private val metricAliases = mapOf(
-        "uniform" to MetricKind.UNIFORMNESS,
-        "complete" to MetricKind.COMPLETENESS,
-    )
-
-    /** Resolve a metric by its enum name (case-insensitive) or a short [metricAliases] alias. */
-    private fun metricOrNull(name: String): MetricKind? = name.lowercase().let { n ->
-        MetricKind.entries.firstOrNull { it.name.equals(n, ignoreCase = true) } ?: metricAliases[n]
-    }
+    /** Resolve a metric by its enum name (case-insensitive). */
+    private fun metricOrNull(name: String): MetricKind? =
+        MetricKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
 
     private fun parseMetric(name: String): MetricKind =
         metricOrNull(name) ?: error("unknown metric '$name' (have ${metricNames()})")
@@ -208,9 +187,7 @@ object BenchCli {
     }
 
     private fun printListing() {
-        println("Presets:")
-        for (t in Targets.all) println("  ${t.id.padEnd(22)} ${t.description}")
-        println("\nSuites:")
+        println("Suites:")
         for (s in Catalog.suites) println("  ${s.id.padEnd(22)} ${s.problems.size} problems — ${s.description}")
         for (d in Catalog.dynamicSuites) println("  ${d.id.padEnd(22)} (discovered) — ${d.description}")
         println("\nMetrics: ${metricNames()}")
@@ -219,9 +196,8 @@ object BenchCli {
             |
             |Usage:
             |  bench <metric> [filters…]             run a metric over a selection (primary form)
-            |  bench <preset-id>                     run a saved preset (see Presets above)
             |  bench preview <metric> [filters…]     show what a run would cover
-            |  bench list [<suite>]                  list presets+suites, or problems in a suite
+            |  bench list [<suite>]                  list suites, or problems in a suite
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
