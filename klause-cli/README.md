@@ -67,16 +67,18 @@ Solver-control flags are common to **every** mode:
 
 - `-a` / `--all-solutions`, `-n <count>` — enumeration controls (satisfy).
 - `-i` — accepted as a no-op (improving incumbents already stream on the optimize path).
-- `-f` / `--free-search` — ignore the model's search annotations (MiniZinc only carries them).
+- `-f` / `--free-search` — ignore the model's search annotations. Alias for `-e cp` (the free
+  backtrack portfolio); with no `-f` and no `-e`, the default engine is `fixed`.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
-- `-p <n>` — MiniZinc-standard parallelism. `n > 1` runs a portfolio of `n` workers; an
-  explicit `-e` picks the palette (`-e ls -p 4` = pure-LS pool, `-e cp -p 4` = 4 complete
-  workers, default = ≈2:1 LS:cp mix). Worker counts default to 4 LS / 2 backtrack, overridable
-  with `--param ls=N --param bt=N` (or the `klause.fzn.portfolio.ls` / `.bt` properties).
-- `-e <engine>` / `--engine <engine>` — `cp` (default; complete CDCL search, `backtrack`
-  accepted as an alias), `ls`, `portfolio`. Also settable via the `klause.fzn.engine` property.
-- `--cp-seed` — opt-in hybrid CP-seeding for the `ls` engine: a short backtrack solve
-  warm-starts local search.
+- `-p <n>` — MiniZinc-standard parallelism (core count). The portfolio engines (`cp`/`mixed`/`ls`)
+  run sequentially at `n=1` and as an `n`-worker parallel pool at `n>1`; the naked engines
+  (`fixed`/`cp-single`) are single-core. Pool size auto-tunes from `n`, overridable with
+  `--param arms=N` (or the `ls=N`/`bt=N` split).
+- `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.fzn.engine` property):
+  - `fixed` *(default)* — single naked backtrack following the model's `int_search` annotation (FD).
+  - `cp` — backtrack-only portfolio (free). `mixed` — bt+ls portfolio. `ls` — local-search portfolio.
+  - `cp-single` — single naked free backtrack; the **only** engine that accepts `var-selector`/
+    `val-selector` `--param`s (single-solver heuristic experiments).
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):

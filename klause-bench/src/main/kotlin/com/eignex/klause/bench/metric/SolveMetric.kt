@@ -33,11 +33,14 @@ import java.time.Instant
  * another's. When [ProfileConfig] is set, the run instead profiles the klause engine in-process.
  */
 internal data class KlauseSearch(
-    val engine: String = "portfolio", // cp | ls | portfolio (klause-cli -e)
+    // fixed | cp | mixed | ls | cp-single — forwarded verbatim to klause-cli `-e` (the cli owns the
+    // engine model). Default `fixed` mirrors the cli (annotation-following, the FD default).
+    val engine: String = "fixed",
     // null = unset: no `-p` is passed, so the solver applies its own default (klause-cli's is
     // single-core). Multi-thread tracks (parallel/open) must set `processors=` explicitly.
     val processors: Int? = null,
-    /** Follow the model's search annotation (the "fixed" track); false ⇒ free search (`-f`). */
+    /** References only (`-f` to `minizinc`): false ⇒ free search, true ⇒ follow the annotation. For
+     *  klause the engine value carries free/fixed, so this is ignored. */
     val fixed: Boolean = false,
     /** Repeatable klause-cli `--param key=value` engine knobs (e.g. `var-selector=vsids`); the way
      *  to A/B a heuristic — run `solve` twice with different params and diff the two config dirs. */
@@ -140,7 +143,8 @@ internal object SolveMetric {
         append(solverId)
         s.engine?.let { append('-').append(it) }
         append("-p").append(s.processors ?: 1) // unset ⇒ the solver default (single-core)
-        append(if (s.free) "-free" else "-fixed")
+        // free/fixed only for references (-f); for klause the engine value already carries it.
+        if (s.engine == null) append(if (s.free) "-free" else "-fixed")
         append("-t").append(budget.timeoutMillis / 1000).append('s')
         if (s.params.isNotEmpty()) {
             append('-').append(s.params.joinToString("_") { it.replace('=', '-') })
@@ -237,8 +241,8 @@ internal object SolveMetric {
             println("profile= profiles the klause engine in-process; '$solverId' is external")
             return
         }
-        if (search.engine !in setOf("cp", "ls")) {
-            println("profile= needs a single klause engine (engine=cp|ls); got '${search.engine}'")
+        if (search.engine !in setOf("cp", "cp-single", "fixed", "ls")) {
+            println("profile= needs a single-solver klause engine (cp|cp-single|fixed|ls); got '${search.engine}'")
             return
         }
         println()
@@ -252,7 +256,8 @@ internal object SolveMetric {
         }
     }
 
-    /** A single in-process klause solve for the profiler (cp → backtrack, ls → local search). */
+    /** A single in-process klause solve for the profiler: `ls` → local search; `fixed` → backtrack
+     *  on the model's annotated search; `cp`/`cp-single` → conflict-driven backtrack. */
     private fun solveInProcess(entry: ResolvedProblem, search: KlauseSearch, cancel: Cancellation) {
         when (search.engine) {
             "ls" -> LocalSearchSolver(entry.problem).solve(
@@ -260,7 +265,7 @@ internal object SolveMetric {
             )
 
             else -> {
-                val params = (entry.searchParams?.takeIf { search.fixed })?.copy(cancellation = cancel)
+                val params = (entry.searchParams?.takeIf { search.engine == "fixed" })?.copy(cancellation = cancel)
                     ?: BacktrackPresets.conflictDriven(randomSeed = SOLVE_SEED, cancellation = cancel)
                 val solver = BacktrackSolver(entry.problem)
                 entry.objective?.let { solver.minimize(it, params) } ?: solver.solve(params)

@@ -107,7 +107,8 @@ internal object SolverInvocation {
             add(s.seed.toString())
             add("-s")
             if (optimize) add("-a")
-            if (s.free) add("-f")
+            // No -f for klause: the engine enum encodes free vs fixed (cp/mixed/ls/cp-single = free,
+            // fixed = annotation). -f is only for references (minizincCommand).
             s.engine?.let {
                 add("-e")
                 add(it)

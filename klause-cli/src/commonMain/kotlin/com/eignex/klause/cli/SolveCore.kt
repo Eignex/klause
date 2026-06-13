@@ -8,7 +8,6 @@ import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -16,12 +15,6 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
-import com.eignex.klause.solver.localsearch.CostShaping
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.result.MinimizeResult
@@ -40,7 +33,10 @@ internal object SolveCore {
     private val pureLsEngines = setOf("ls", "localsearch", "local-search")
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, output: OutputProtocol) {
-        val engine = (common.engine ?: cliProp("klause.fzn.engine") ?: "cp").lowercase()
+        // Engine enum: fixed | cp | mixed | ls | cp-single. `-f` (free) is an alias for `-e cp`; no
+        // flag at all ⇒ `fixed` (follow the model's annotation — the MiniZinc-Challenge FD default).
+        val engine = (common.engine ?: cliProp("klause.fzn.engine") ?: if (common.freeSearch) "cp" else "fixed")
+            .lowercase()
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. Symmetry breaking is dropped for a pure-LS engine (its
         // ordering constraints hurt local search); solutions are reconstructed at render time.
@@ -53,23 +49,32 @@ internal object SolveCore {
         val solvable = rawSolvable.presolved(config, solutionSetSensitive)
         output.begin(solvable.optimize, solvable.maximize)
 
-        // `-p N` is MiniZinc-standard parallelism = the **core** count (#406), kept distinct from the
-        // arm-pool size. `cores == 1` runs a single dedicated engine (cp/ls, honouring the model's
-        // annotated search) or — for `-e portfolio` — the single-core bandit-scheduled
-        // SequentialPortfolio. `cores > 1` always runs a parallel portfolio; `-e` picks the arm family
-        // (`-e cp` complete-only, `-e ls` pure-LS, else mixed ~2:1 LS:bt). `--param arms=N` (or the
-        // ls=/bt= split) tunes the pool; otherwise it auto-tunes from the core count.
+        // `-p N` is MiniZinc-standard parallelism = the **core** count (#406). The portfolio engines
+        // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The two naked
+        // engines (fixed, cp-single) are inherently single-core.
         val cores = common.parallel ?: 1
-        val mix = when (engine) {
-            "cp", "backtrack", "bt" -> EngineMix.BACKTRACK
-            "ls", "localsearch", "local-search" -> EngineMix.LOCAL_SEARCH
-            "portfolio", "pf" -> EngineMix.MIXED
-            else -> usageError("unknown engine `$engine`; expected one of cp, ls, portfolio")
-        }
-        when {
-            cores == 1 && mix == EngineMix.BACKTRACK -> runBacktrack(solvable, common, output)
-            cores == 1 && mix == EngineMix.LOCAL_SEARCH -> runLocalSearch(solvable, common, output)
-            else -> runPortfolio(solvable, common, output, cores, mix)
+        when (engine) {
+            // Naked single backtrack following the model's search annotation (FD track). The
+            // annotation decides the heuristic, so per-solver selector --params are rejected.
+            "fixed" -> {
+                if (cores > 1) usageError("engine 'fixed' is single-core (FD track); drop -p")
+                runBacktrack(solvable, common, output, useAnnotation = true, allowSelectors = false)
+            }
+
+            // Naked single backtrack, free search — the only engine that takes var-selector/
+            // val-selector --params (for single-solver heuristic A/B).
+            "cp-single", "cpsingle" -> {
+                if (cores > 1) usageError("engine 'cp-single' is single-core; use 'cp' for a parallel backtrack pool")
+                runBacktrack(solvable, common, output, useAnnotation = false, allowSelectors = true)
+            }
+
+            "cp", "backtrack", "bt" -> runPortfolio(solvable, common, output, cores, EngineMix.BACKTRACK)
+
+            "ls", "localsearch", "local-search" -> runPortfolio(solvable, common, output, cores, EngineMix.LOCAL_SEARCH)
+
+            "mixed", "portfolio", "pf" -> runPortfolio(solvable, common, output, cores, EngineMix.MIXED)
+
+            else -> usageError("unknown engine `$engine`; expected fixed | cp | mixed | ls | cp-single")
         }
     }
 
@@ -81,12 +86,19 @@ internal object SolveCore {
 
     // --- single-engine paths ---
 
-    private fun runBacktrack(solvable: Solvable, common: CommonOptions, output: OutputProtocol) {
-        // Full CDCL setup under a FIXED seed for determinism (a null seed makes optimality
-        // proofs flakily blow the budget); `-r` overrides. Honor the model's annotated search
-        // (FlatZinc `solve :: *_search`) unless `-f` (free search) is set; XCSP/SMT carry no
-        // annotations (null), so they always get this default CDCL config.
-        val annotated = if (common.freeSearch) null else solvable.annotatedBacktrackParams
+    /** Naked single backtrack solve. [useAnnotation] follows the model's `solve :: *_search`
+     *  annotation (the `fixed`/FD engine); otherwise a default free CDCL config. [allowSelectors]
+     *  lets `var-selector`/`val-selector` --params through (only the `cp-single` engine). */
+    private fun runBacktrack(
+        solvable: Solvable,
+        common: CommonOptions,
+        output: OutputProtocol,
+        useAnnotation: Boolean,
+        allowSelectors: Boolean,
+    ) {
+        // Fixed seed for determinism (a null seed makes optimality proofs flakily blow the budget);
+        // `-r` overrides. XCSP/SMT carry no annotation (null), so they fall back to this CDCL config.
+        val annotated = if (useAnnotation) solvable.annotatedBacktrackParams else null
         val base = annotated ?: BacktrackParams(
             randomSeed = 1L,
             variableSelector = Vsids(),
@@ -102,54 +114,12 @@ internal object SolveCore {
                 onEvent = verboseListener(common.verbose),
             ),
             EngineParams(common.engineParams),
+            allowSelectors = allowSelectors,
         )
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
         runGeneric(BacktrackSolver(solvable.problem), params, solvable, common, output, complete = true)
-    }
-
-    private fun runLocalSearch(solvable: Solvable, common: CommonOptions, output: OutputProtocol) {
-        val (params, setup) = applyLsParams(
-            LocalSearchParams(randomSeed = common.randomSeed),
-            EngineParams(common.engineParams),
-        )
-        val tabu = TabuFilter(tenure = setup.tabuTenure, aspiration = AspirationCriterion.OrImproving)
-        val solver = LocalSearchSolver(
-            solvable.problem,
-            strategy = Cbls(tabu = tabu),
-            optimizeStrategy = Cbls(tabu = tabu),
-            pairSwapBudget = setup.pairSwapBudget,
-            definitionalSweep = solvable.definitionalSweep,
-            perMoveInvariants = true,
-        )
-        val (deadline, cancel) = deadlineCancellation(common)
-        // CP-seeding (#65): OFF unless `--cp-seed`. A short backtrack solve warm-starts LS.
-        val initial = if (common.cpSeed) cpFeasibleSeed(solvable.problem, deadline) else null
-        val cblsParams = params.copy(
-            costShaping = CostShaping.Linear(lambda = setup.lambda),
-            cancellation = cancel,
-            initialAssignment = initial,
-            // The model's per-move gradient view of the objective, when it provides one.
-            lsObjective = solvable.lsObjective,
-            onEvent = verboseListener(common.verbose),
-        )
-        cliLogger(common.verbose).v {
-            "engine ls: seed=${cblsParams.randomSeed} tabu-tenure=${setup.tabuTenure} lambda=${setup.lambda}"
-        }
-        runGeneric(solver, cblsParams, solvable, common, output, complete = false)
-    }
-
-    /** CP-seeding helper for `--cp-seed`: a short backtrack solve (≤ `klause.fzn.cpseed.ms`,
-     *  default 2000ms, capped by `-t`) to find a feasible LS warm-start; null if none found. */
-    private fun cpFeasibleSeed(problem: Problem, overallDeadline: Long?): Sample? {
-        val cpMs = cliProp("klause.fzn.cpseed.ms")?.toLong() ?: 2000L
-        var cpDeadline = nowMillis() + cpMs
-        if (overallDeadline != null) cpDeadline = minOf(cpDeadline, overallDeadline)
-        val r = BacktrackSolver(problem).solve(
-            BacktrackParams(randomSeed = 1L, cancellation = Cancellation { nowMillis() > cpDeadline }),
-        )
-        return (r as? SolveResult.Sat)?.assignment
     }
 
     private fun runPortfolio(

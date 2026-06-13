@@ -17,7 +17,6 @@ import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
-import com.eignex.klause.solver.localsearch.LocalSearchParams
 
 /**
  * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
@@ -101,8 +100,11 @@ internal class EngineParams(pairs: List<String>) {
     }
 }
 
-/** Apply `--param` overrides for the cp engine on top of [base]. */
-internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
+/** Apply `--param` overrides for a backtrack solve on top of [base]. [allowSelectors] gates the
+ *  `var-selector`/`val-selector` keys: they are only meaningful for a **single** naked backtrack
+ *  solver (`-e cp-single`), so portfolios and the annotation-following `fixed` engine pass `false`
+ *  and reject those keys (the annotation or the per-arm config decides the heuristic instead). */
+internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowSelectors: Boolean): BacktrackParams {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
     p.long("max-decisions")?.let { out = out.copy(maxDecisions = it) }
@@ -117,32 +119,17 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.int("mid-lbd")?.let { out = out.copy(midLbdThreshold = it) }
     p.bool("vivification")?.let { out = out.copy(vivification = it) }
     p.int("vivify-batch")?.let { out = out.copy(vivifyBatch = it) }
-    p.varSelector("var-selector", out.randomSeed)?.let { out = out.copy(variableSelector = it) }
-    p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }
+    if (allowSelectors) {
+        p.varSelector("var-selector", out.randomSeed)?.let { out = out.copy(variableSelector = it) }
+        p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }
+    }
     p.finish(
         "cp",
         "seed, max-decisions, luby, adaptive-restart, phase-saving, target-phasing, " +
-            "rephase-interval, max-learned, lbd-glue, tiered-db, mid-lbd, vivification, " +
-            "vivify-batch, var-selector, val-selector",
+            "rephase-interval, max-learned, lbd-glue, tiered-db, mid-lbd, vivification, vivify-batch" +
+            (if (allowSelectors) ", var-selector, val-selector" else ""),
     )
     return out
-}
-
-/** Constructor-level LS knobs (the rest ride on [LocalSearchParams]). */
-internal class LsSetup(val tabuTenure: Int, val pairSwapBudget: Int, val lambda: Double)
-
-/** Split `--param` overrides for the ls engine into constructor knobs and per-call params. */
-internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<LocalSearchParams, LsSetup> {
-    var out = base
-    p.long("seed")?.let { out = out.copy(randomSeed = it) }
-    p.long("max-flips")?.let { out = out.copy(maxFlips = it) }
-    val setup = LsSetup(
-        tabuTenure = p.int("tabu-tenure") ?: 10,
-        pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
-        lambda = p.double("lambda") ?: 1.0,
-    )
-    p.finish("ls", "seed, max-flips, lambda, tabu-tenure, pair-swap-budget")
-    return out to setup
 }
 
 /**

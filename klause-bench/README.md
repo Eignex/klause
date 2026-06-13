@@ -43,8 +43,8 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance budget for metrics that honor it |
-| `engine=cp\|ls\|portfolio` `processors=N` `fixed=true` | klause's search for a `solve` run (below); `engine`/`processors` mirror the CLI's `--engine` / `-p`, `fixed` follows the model annotation (default is free search) |
-| `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim (e.g. `param=var-selector=vsids param=luby=256`); the way to A/B a search config — run `solve` twice with different params, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
+| `engine=fixed\|cp\|mixed\|ls\|cp-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). Default `engine=fixed` (annotation-following). `fixed=true` is a *separate* reference-only `-f` toggle |
+| `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` apply only to `engine=cp-single` (a single backtrack solver) — the way to A/B a heuristic: run `solve` twice with different `cp-single` params, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
 ## Metrics
@@ -66,11 +66,10 @@ bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck ba
 # each writes output/<config>/<problem>.{out,json} — diff two config dirs with output/compare.sh
 
 # search-config A/B: run twice with different --param, then compare the two config dirs.
-# cp-engine knobs apply to the single backtrack worker, so use processors=1 (a parallel pool
-# diversifies its workers and takes only ls/bt/seed/lambda params).
-bench solve suite=core kind=cop engine=cp processors=1 param=var-selector=vsids timeout=30000
-bench solve suite=core kind=cop engine=cp processors=1 param=var-selector=chb   timeout=30000
-# output/compare.sh output/klause-cp-p1-free-t30s-var-selector-vsids output/klause-cp-p1-free-t30s-var-selector-chb
+# heuristic A/B: var-/val-selector params apply only to engine=cp-single (a single backtrack solver).
+bench solve suite=core kind=cop engine=cp-single param=var-selector=vsids timeout=30000
+bench solve suite=core kind=cop engine=cp-single param=var-selector=chb   timeout=30000
+# output/compare.sh output/klause-cp-single-p1-t30s-var-selector-vsids output/klause-cp-single-p1-t30s-var-selector-chb
 
 # compile audit (needs `:klause-cli:installJvmDist`)
 bench audit suite=mzn-smoke
@@ -78,36 +77,38 @@ bench audit suite=mzn-smoke
 
 ### Solve: klause competition tracks as filter combinations
 
-When `solve` runs klause (no `backend=`), the klause side is `engine` (`cp`/`ls`/`portfolio`) over
-`processors` workers — the portfolio's two axes, mirroring the CLI's `--engine` / `-p`. **`processors`
-defaults to 1** (single-core, matching the CLI), so the multi-thread tracks must request cores
-explicitly. The MiniZinc / XCSP competition tracks are just combinations of these, so there are no
-baked-in track names — spell each as a recipe (all compose with `kind=cop|csp` and `timeout=`):
+When `solve` runs klause (no `backend=`), the klause side is the `engine` enum — owned by klause-cli,
+which the bench forwards verbatim to `-e`. **`engine=fixed`** (the default, the MiniZinc-Challenge FD
+behaviour) is a single naked backtrack following the model's `int_search` annotation; the portfolio
+engines **`cp`** (backtrack-only), **`mixed`** (bt+ls), **`ls`** run sequentially at `-p1` and as a
+parallel pool at `-p N`; **`cp-single`** is a single naked free backtrack (the only engine that takes
+`var-selector`/`val-selector` `--param`s). `processors` defaults to 1, so multi-thread tracks request
+cores explicitly. The Challenge tracks are just `engine`/`processors` combinations (all compose with
+`kind=cop|csp` and `timeout=`):
 
 ```
-# free (default): 1 thread, klause's own search (the single-core sequential portfolio)
+# fixed (default): single naked backtrack following the search annotation (FD track)
 bench solve suite=mzn-bench timeout=300000
 
-# open: multi-thread, mixed engines
-bench solve suite=mzn-bench processors=8 timeout=300000
+# free: single-core backtrack portfolio (ignores the annotation)
+bench solve suite=mzn-bench engine=cp timeout=300000
 
-# parallel: multi-thread, a single engine (backtrack-only)
+# parallel: multi-thread backtrack portfolio
 bench solve suite=mzn-bench engine=cp processors=8 timeout=300000
 
-# fixed: 1 thread, follow the model's search annotation
-bench solve suite=mzn-bench fixed=true timeout=300000
+# open: multi-thread mixed (backtrack + local search) portfolio
+bench solve suite=mzn-bench engine=mixed processors=8 timeout=300000
 
-# ls: parallel local search
+# ls: parallel local-search portfolio
 bench solve suite=mzn-bench engine=ls processors=8 timeout=300000
 ```
 
-The one exception is the **fixed** track — follow the model's `int_search` annotation — which has no
-filter combination, so it's a flag of its own; models without an annotation fall back to free search.
-When the baseline backend is Choco, `fixed=true` mirrors the annotation onto Choco too (sound now that
-the LCG fixed-search bug is worked around).
+References take the standard `-f`: the bench's `fixed=true` filter drops `-f` (follow the annotation),
+default is free. When the baseline backend is Choco, `fixed=true` mirrors the annotation onto Choco
+(sound now that the LCG fixed-search bug is worked around).
 
 ```
-bench solve suite=mzn-bench fixed=true timeout=300000               # klause
+bench solve suite=mzn-bench engine=fixed timeout=300000            # klause FD (annotation)
 bench solve suite=mzn-bench fixed=true backend=choco timeout=300000 # Choco, same annotation
 ```
 
@@ -117,11 +118,11 @@ bench solve suite=mzn-bench fixed=true backend=choco timeout=300000 # Choco, sam
 
 `profile=cpu|wall|alloc` records the run with Java Flight Recorder, prints a flat top-method table, and leaves `build/bench-prof.jfr` for JMC / `jfr print`. `profile-scope=solve` (default) starts the recording only after the selection is resolved, so parse/compile/fetch are discounted; `profile-scope=all` covers the whole run. Sampling is statistical (1 ms), so pair it with a long-running selection.
 
-`solve` is special: it normally runs solvers as subprocesses (klause-cli / minizinc), which JFR on the bench JVM can't see. So `solve … profile=…` switches to **in-process profiling** — it runs the klause engine itself inside this JVM under the recorder, capturing the real `BacktrackSolver` / `LocalSearchSolver` hot paths. This needs a single klause engine: pass `engine=cp` (backtrack) or `engine=ls` (local search); the portfolio and external references aren't profilable. No JSON/cache is written in this mode — it measures the solver, not the figures.
+`solve` is special: it normally runs solvers as subprocesses (klause-cli / minizinc), which JFR on the bench JVM can't see. So `solve … profile=…` switches to **in-process profiling** — it runs the klause engine itself inside this JVM under the recorder, capturing the real `BacktrackSolver` / `LocalSearchSolver` hot paths. This needs a single-solver engine: `cp`/`cp-single`/`fixed` (→ `BacktrackSolver`) or `ls` (→ `LocalSearchSolver`); the `mixed` portfolio and external references aren't profilable. No JSON/cache is written in this mode — it measures the solver, not the figures.
 
 ```
-bench solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000
-bench solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000
+bench solve suite=mzn-bench name=mario engine=cp-single profile=cpu timeout=30000
+bench solve suite=mzn-bench name=mario engine=fixed profile=cpu timeout=30000
 bench solve suite=mzn-bench name=mario engine=ls profile=alloc timeout=30000
 ```
 
@@ -151,7 +152,7 @@ The parity sweep measures klause against the reference solvers on the MiniZinc C
    - **8 COP**: `elitserien` (alldifferent, global_cardinality, inverse, member, regular), `gfd-schedule` (cumulative, at_most, nvalue), `cargo` (cumulative, diffn), `is` (among, circuit, table), `nfc` (network_flow), `mario` (path, subcircuit), `evilshop` (cumulative, disjunctive), `zephyrus` (arg_sort, lex_less).
    - **2 CSP**: `multi-knapsack` (knapsack), `oocsp_racks` (global_cardinality, increasing, element).
    - Spell it with the `name=` OR filter: `name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus` (the `is/*` glob anchors the family so it doesn't substring-match e.g. `opt-cryptanalysis`).
-3. **Tracks** (each a `solve` filter combination; see the recipes above). klause: `parallel` (`engine=cp processors=8`), `open` (`processors=8`), `free` (`processors=1`), `fixed` (`fixed=true`), `ls` (`engine=ls processors=8`). References: Choco for the complete tracks, Yuck (`processors=8`) for `ls`.
+3. **Tracks** (each a `solve` filter combination; see the recipes above). klause: `free` (`engine=cp`), `parallel` (`engine=cp processors=8`), `open` (`engine=mixed processors=8`), `fixed` (`engine=fixed`), `ls` (`engine=ls processors=8`). References: Choco for the complete tracks (`fixed=true` for the FD track), Yuck (`processors=8`) for `ls`.
 4. **Budgets**: complete tracks **300000 ms**, the LS track **180000 ms**.
 
 ```
