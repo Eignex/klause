@@ -27,7 +27,9 @@ internal object SolverInvocation {
 
     /** Solver-side knobs. [engine] (`cp`/`ls`/`portfolio`) and [params] (repeatable `--param
      *  key=value` engine knobs, e.g. `var-selector=vsids`) apply to klause only; references run
-     *  their own search. [processors] maps to `-p`.
+     *  their own search. [processors] maps to `-p` — **null means "unset"**: no `-p` is passed and the
+     *  solver applies its own default (klause-cli's is single-core), so the bench never duplicates the
+     *  default. `-p` is emitted only when set above 1.
      *
      *  [free] (`-f`, ignore the model's search annotation) **defaults to true** — a deliberate
      *  divergence from MiniZinc's CLI default (which honours the annotation). Free search measures
@@ -36,7 +38,7 @@ internal object SolverInvocation {
      *  explicit opt-in (`fixed=true`). */
     internal data class Settings(
         val engine: String? = null,
-        val processors: Int = 1,
+        val processors: Int? = null,
         val free: Boolean = true,
         val seed: Long = 3L,
         val params: List<String> = emptyList(),
@@ -110,9 +112,9 @@ internal object SolverInvocation {
                 add("-e")
                 add(it)
             }
-            if (s.processors > 1) {
+            s.processors?.takeIf { it > 1 }?.let {
                 add("-p")
-                add(s.processors.toString())
+                add(it.toString())
             }
             for (param in s.params) {
                 add("--param")
@@ -147,9 +149,9 @@ internal object SolverInvocation {
                 add("--output-objective")
             }
             if (s.free) add("-f")
-            if (s.processors > 1) {
+            s.processors?.takeIf { it > 1 }?.let {
                 add("-p")
-                add(s.processors.toString())
+                add(it.toString())
             }
             add(mzn.absolutePath)
             if (dzn != null) add(dzn.absolutePath)

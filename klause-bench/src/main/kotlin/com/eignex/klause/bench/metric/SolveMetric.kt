@@ -34,7 +34,9 @@ import java.time.Instant
  */
 internal data class KlauseSearch(
     val engine: String = "portfolio", // cp | ls | portfolio (klause-cli -e)
-    val processors: Int = Runtime.getRuntime().availableProcessors(),
+    // null = unset: no `-p` is passed, so the solver applies its own default (klause-cli's is
+    // single-core). Multi-thread tracks (parallel/open) must set `processors=` explicitly.
+    val processors: Int? = null,
     /** Follow the model's search annotation (the "fixed" track); false ⇒ free search (`-f`). */
     val fixed: Boolean = false,
     /** Repeatable klause-cli `--param key=value` engine knobs (e.g. `var-selector=vsids`); the way
@@ -137,7 +139,7 @@ internal object SolveMetric {
     private fun configTag(solverId: String, s: SolverInvocation.Settings, budget: Budget): String = buildString {
         append(solverId)
         s.engine?.let { append('-').append(it) }
-        append("-p").append(s.processors)
+        append("-p").append(s.processors ?: 1) // unset ⇒ the solver default (single-core)
         append(if (s.free) "-free" else "-fixed")
         append("-t").append(budget.timeoutMillis / 1000).append('s')
         if (s.params.isNotEmpty()) {
@@ -160,7 +162,7 @@ internal object SolveMetric {
         problem = entry.name,
         solver = solverId,
         engine = s.engine,
-        processors = s.processors,
+        processors = s.processors ?: 1,
         search = if (s.free) "free" else "fixed",
         seed = s.seed,
         budgetMs = budget.timeoutMillis,
@@ -188,7 +190,7 @@ internal object SolveMetric {
         problem = entry.name,
         solver = solverId,
         engine = s.engine,
-        processors = s.processors,
+        processors = s.processors ?: 1,
         search = if (s.free) "free" else "fixed",
         seed = s.seed,
         budgetMs = budget.timeoutMillis,
@@ -265,5 +267,4 @@ internal object SolveMetric {
             }
         }
     }
-
 }
