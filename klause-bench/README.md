@@ -78,7 +78,7 @@ bench audit suite=mzn-smoke
 
 ### Solve: klause competition tracks as filter combinations
 
-When `solve` runs klause (no `backend=`), the klause side is `engine` (`backtrack`/`ls`/`mixed`) over
+When `solve` runs klause (no `backend=`), the klause side is `engine` (`cp`/`ls`/`portfolio`) over
 `processors` workers — the portfolio's two axes, mirroring the CLI's `--engine` / `-p`. `processors=1`
 is the single-core sequential portfolio. The MiniZinc / XCSP competition tracks are just combinations
 of these, so there are no baked-in track names — spell each as a recipe (all compose with
@@ -92,7 +92,7 @@ bench solve suite=mzn-bench timeout=300000
 bench solve suite=mzn-bench processors=1 timeout=300000
 
 # parallel: multi-thread, a single engine (backtrack-only)
-bench solve suite=mzn-bench engine=backtrack processors=8 timeout=300000
+bench solve suite=mzn-bench engine=cp processors=8 timeout=300000
 
 # local search only
 bench solve suite=mzn-bench engine=ls timeout=300000
