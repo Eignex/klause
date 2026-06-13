@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective
@@ -110,6 +111,26 @@ class PresolverTest {
         assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
         val full = pre.reconstruct(result.assignment)
         assertEquals(2 * full.ints[1] + 1, full.ints[0], "affine var not reconstructed: x should be 2y+1")
+        assertTrue(isFeasible(problem, full), "reconstructed sample infeasible in the original problem")
+    }
+
+    @Test
+    fun `value-precede pass grows vars and reconstructs to a feasible original solution`() {
+        // AllDifferent over {0,1,2}: value-anonymous, so the opt-in value-precedence pass adds
+        // running-max aux vars and a precedence chain. The pipeline must solve the grown problem and
+        // reconstruct back to a feasible original solution with the auxiliaries dropped.
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+        )
+        val pre = Presolver.run(problem, PresolveConfig.parse("value-precede"))
+        assertTrue(pre.problem.numIntVars > problem.numIntVars, "value precedence should add running-max aux vars")
+        val result = BacktrackSolver(pre.problem).solve(BacktrackParams())
+        assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
+        val full = pre.reconstruct(result.assignment)
+        assertEquals(problem.numIntVars, full.ints.size, "reconstruct must drop the aux vars")
         assertTrue(isFeasible(problem, full), "reconstructed sample infeasible in the original problem")
     }
 

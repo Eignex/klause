@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Element
@@ -72,6 +73,83 @@ class SymmetryBreakingTest {
     }
 
     private fun pos(v: Int) = Lit.make(v, true)
+
+    /** Enumerate every int assignment of [problem] (these cases have no bools), invoking [body]. */
+    private fun forEachIntAssignment(problem: Problem, body: (IntArray) -> Unit) {
+        val ints = IntArray(problem.numIntVars) { problem.intDomains[it].min }
+        while (true) {
+            body(ints)
+            var i = 0
+            while (i < problem.numIntVars) {
+                ints[i]++
+                if (ints[i] <= problem.intDomains[i].max) break
+                ints[i] = problem.intDomains[i].min
+                i++
+            }
+            if (i == problem.numIntVars) break
+        }
+    }
+
+    @Test
+    fun `law-lee value precedence collapses value-symmetric solutions`() {
+        // Three variables over {0,1,2} with no constraints: pure value symmetry. The symmetry classes
+        // are the Bell(3)=5 set partitions, and precedence keeps exactly one canonical (restricted-
+        // growth) representative each — far stronger than pinning a single variable.
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, emptyList())
+        val vp = Presolve.breakValuePrecedence(problem)
+        val orig = countFeasible(problem)
+        val after = countFeasible(vp.problem)
+        assertTrue(after < orig, "expected reduction: $orig -> $after")
+        assertEquals(orig > 0, after > 0)
+        assertEquals(5, after, "value precedence should keep one representative per symmetry class")
+        assertReconstructsToOriginalFeasible(problem, vp)
+    }
+
+    @Test
+    fun `law-lee precedence on alldifferent keeps the single canonical permutation`() {
+        // AllDifferent over {0,1,2} is value-anonymous; precedence forces the identity assignment
+        // 0,1,2 (the one canonical labeling), collapsing all 6 permutations.
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+        )
+        val vp = Presolve.breakValuePrecedence(problem)
+        assertEquals(6, countFeasible(problem))
+        assertEquals(1, countFeasible(vp.problem), "precedence + alldifferent should leave one solution")
+        assertReconstructsToOriginalFeasible(problem, vp)
+    }
+
+    @Test
+    fun `law-lee precedence is a no-op when no factor is value-anonymous`() {
+        // A Linear is value-meaningful, so value symmetry does not apply — the pass must not grow vars.
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
+        )
+        val vp = Presolve.breakValuePrecedence(problem)
+        assertSame(problem, vp.problem, "no value symmetry ⇒ no var-growing")
+    }
+
+    /** Every feasible assignment of the grown problem must reconstruct (auxiliaries dropped) to a
+     *  feasible assignment of the original — the var-growing soundness contract. */
+    private fun assertReconstructsToOriginalFeasible(original: Problem, vp: ValuePrecedence) {
+        val grown = vp.problem
+        assertTrue(grown.numIntVars >= original.numIntVars)
+        val noBools = BooleanArray(grown.numBoolVars)
+        forEachIntAssignment(grown) { ints ->
+            if (!isFeasible(grown, noBools, ints.copyOf())) return@forEachIntAssignment
+            val recon = vp.reconstruct(Sample(noBools.copyOf(), ints.copyOf()))
+            assertEquals(original.numIntVars, recon.ints.size, "reconstruct must drop auxiliaries")
+            assertTrue(
+                isFeasible(original, recon.bools, recon.ints),
+                "reconstructed assignment ${recon.ints.toList()} is infeasible in the original",
+            )
+        }
+    }
 
     @Test
     fun `value symmetry pins an interchangeable-value variable`() {
