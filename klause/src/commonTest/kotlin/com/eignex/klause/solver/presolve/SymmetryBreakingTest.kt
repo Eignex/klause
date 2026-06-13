@@ -8,10 +8,12 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Element
+import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -265,6 +267,56 @@ class SymmetryBreakingTest {
         assertEquals(intColour[0], intColour[2], "coeff-1 cells should share a WL colour")
         assertEquals(intColour[1], intColour[3], "coeff-2 cells should share a WL colour")
         assertTrue(intColour[0] != intColour[1], "different roles should get different WL colours")
+    }
+
+    @Test
+    fun `interchangeable values in a global cardinality are pinned`() {
+        // GCC over x0,x1 ∈ {0,1}: each of values 0,1 may occur 0..2 times. The two values are
+        // interchangeable (same bounds, same domain-incidence). GCC is not value-anonymous, so the
+        // old gate switched value symmetry off; remapValues verification (#374) catches the swap and
+        // pins a fully-internal variable to the orbit minimum.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            listOf(
+                GlobalCardinality(
+                    xs = intArrayOf(0, 1),
+                    cover = intArrayOf(0, 1),
+                    countLow = intArrayOf(0, 0),
+                    countHigh = intArrayOf(2, 2),
+                ),
+            ),
+        )
+        checkSound("gcc-value", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `interchangeable values in a table are pinned`() {
+        // Table allowing (0,1) and (1,0): swapping values 0↔1 maps the row set to itself, so the two
+        // values are an interchangeable orbit (verified via Table.remapValues). A fully-internal var
+        // is pinned to the orbit minimum.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            listOf(Table(intArrayOf(0, 1), intArrayOf(0, 1, 1, 0))),
+        )
+        checkSound("table-value", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `non-relabelable factor blocks value symmetry`() {
+        // A single allowed tuple (0,1) is NOT value-symmetric (swapping 0↔1 gives the row (1,0),
+        // which isn't allowed), and the columns aren't variable-interchangeable either — so nothing
+        // is broken.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            listOf(Table(intArrayOf(0, 1), intArrayOf(0, 1))),
+        )
+        checkSound("table-asymmetric", problem, expectReduced = false)
     }
 
     @Test

@@ -55,6 +55,9 @@ class AllDifferent(
     /** Distinctness ignores which values are used — invariant under any value relabeling (#366). */
     override fun isValueAnonymous(): Boolean = true
 
+    /** Value-anonymous: no constant names a value, so any relabeling leaves the factor unchanged. */
+    override fun remapValues(valueMap: (Int) -> Int): Factor = this
+
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         AllDifferent(vars.remapVars(intMap), domainMin, domainSize, presents.remapLits(boolMap))
 

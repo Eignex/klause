@@ -37,6 +37,21 @@ class Table(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(xs.remapVars(intMap), tuples)
 
+    // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so row strings are sorted.
+    // Encodes the full var sequence and tuple set — collision-free up to variable identity.
+    override fun structuralKey(): String {
+        val rows = ArrayList<String>(numTuples)
+        for (r in 0 until numTuples) {
+            rows.add((0 until arity).joinToString(".") { c -> tuples[r * arity + c].toString() })
+        }
+        rows.sort()
+        return "table:" + xs.joinToString(",") + ":" + rows.joinToString(";")
+    }
+
+    /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the
+     *  one value universe, so a single map relabels the whole table. */
+    override fun remapValues(valueMap: (Int) -> Int): Factor = Table(xs, IntArray(tuples.size) { valueMap(tuples[it]) })
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 

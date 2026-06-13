@@ -62,6 +62,26 @@ interface Factor {
     fun isValueAnonymous(): Boolean = false
 
     /**
+     * A copy of this factor with every *value-dependent constant* relabeled through [valueMap]
+     * (`newValue = valueMap(oldValue)`) — the value analog of [remap] (#374). Relabels things that
+     * name domain values: an [com.eignex.klause.solver.factor.GlobalCardinality] cover, a
+     * [com.eignex.klause.solver.factor.Table]'s tuples, an Element constant array, Regular/Mdd
+     * symbols. Variable ids, coefficients, and structural positions are unchanged.
+     *
+     * Used by value-symmetry detection to *verify* that a value permutation maps the factor set to
+     * itself: applying it to every factor and comparing the [structuralKey] multiset proves the
+     * permutation is a symmetry, the value analog of the [remap]-based automorphism check (#334).
+     *
+     * `null` (the default) means "not value-relabelable" — arithmetic / value-meaningful factors
+     * ([com.eignex.klause.solver.factor.Linear], Product) where a value carries magnitude, not just
+     * identity, and a factor whose values live in more than one universe (e.g. a GCC with count
+     * *variables*) which can't be relabeled by a single map. A `null` anywhere conservatively blocks
+     * value symmetry for the whole problem. A [isValueAnonymous] factor returns `this` (no constant
+     * names a value).
+     */
+    fun remapValues(valueMap: (Int) -> Int): Factor? = null
+
+    /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
      * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
      * — sound but trivial. Factors override to participate in [Problem.propagate].
