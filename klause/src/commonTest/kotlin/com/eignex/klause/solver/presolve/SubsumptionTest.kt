@@ -1,11 +1,14 @@
 package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -151,5 +154,77 @@ class SubsumptionTest {
         val out = checkPreserved("negated-equiv", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
         assertTrue(out.factors.single() in factorsBefore, "a surviving original is kept verbatim")
+    }
+
+    private fun pos(v: Int) = Lit.make(v, true)
+
+    private fun feasibleCountBools(problem: Problem): Int {
+        val b = problem.numBoolVars
+        var count = 0
+        for (mask in 0 until (1 shl b)) {
+            var a = Assumptions.None
+            for (v in 0 until b) a = a.withBool(v, (mask shr v) and 1 == 1)
+            if (problem.propagate(a) !is PropagationResult.Unsat) count++
+        }
+        return count
+    }
+
+    private fun checkPbPreserved(name: String, problem: Problem, expectDrop: Boolean): Problem {
+        val out = Presolve.removeRedundantConstraints(problem)
+        assertEquals(feasibleCountBools(problem), feasibleCountBools(out), "$name: feasible set changed")
+        if (expectDrop) {
+            assertTrue(out.factors.size < problem.factors.size, "$name: expected a constraint to be dropped")
+        } else {
+            assertSame(problem, out, "$name: expected no change")
+        }
+        return out
+    }
+
+    @Test
+    fun `dominated pseudo-boolean constraint is dropped`() {
+        // 2a + b <= 2 implies 2a + b <= 3 (same weight vector); the tighter survives.
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(
+                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 3),
+                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+            ),
+        )
+        val out = checkPbPreserved("pb-dominated", problem, expectDrop = true)
+        assertEquals(2, (out.factors.single() as PseudoBoolean).bound)
+    }
+
+    @Test
+    fun `pseudo-boolean equality dominates the matching inequalities`() {
+        // 2a + b = 2 implies 2a + b <= 3 and 2a + b >= 1 — both inequalities drop, the equality stays.
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(
+                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 2),
+                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 3),
+                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.GE, 1),
+            ),
+        )
+        val out = checkPbPreserved("pb-eq-dominates", problem, expectDrop = true)
+        assertEquals(PbOp.EQ, (out.factors.single() as PseudoBoolean).op)
+    }
+
+    @Test
+    fun `independent pseudo-boolean constraints are left untouched`() {
+        // Different weight vectors ⇒ not comparable ⇒ no-op.
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(
+                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+                PseudoBoolean(intArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+            ),
+        )
+        checkPbPreserved("pb-independent", problem, expectDrop = false)
     }
 }
