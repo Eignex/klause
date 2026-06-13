@@ -168,6 +168,6 @@ The `output/` scripts (`run-baselines.sh` curated subset, `run-baselines-full.sh
 
 ```
 ./gradlew :klause-bench:test                              unit, parser, and selection tests
-./gradlew :klause-bench:bench --args="verify suite=core"  cross-backend agreement gate
 ./gradlew :klause-bench:bench --args="solve suite=core"   klause solves the in-process core
+./gradlew :klause-bench:bench --args="coverage suite=mzn-smoke"  native-predicate coverage
 ```
