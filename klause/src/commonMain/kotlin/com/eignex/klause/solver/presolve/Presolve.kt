@@ -7,13 +7,13 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.LexLess
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
 
 /**
@@ -585,86 +585,59 @@ object Presolve {
     }
 
     /**
-     * Law–Lee value precedence (#374), the strong value-symmetry break — and the first *var-growing*
-     * presolve. For the value-anonymous case (#366: every factor is [Factor.isValueAnonymous], so any
-     * value relabeling is a symmetry), a contiguous orbit of interchangeable values `[omin..omax]` and
-     * the ≥ 2 variables whose domain is that orbit (in id order — `x₀ … x_{m-1}`) are forced to
-     * *introduce values in order*: `x₀ = omin`, and each `xᵢ` exceeds the running maximum of
-     * `x₀ … x_{i-1}` by at most one. Every solution can be relabeled within the orbit to this
-     * canonical "restricted-growth" form, so exactly one representative per symmetry class survives —
-     * strictly stronger than pinning a single variable ([breakValueSymmetry]).
+     * Law–Lee value precedence (#374), the strong value-symmetry break, posted with the native
+     * [ValuePrecede] propagator (#432). For the value-anonymous case (#366: every factor is
+     * [Factor.isValueAnonymous], so any value relabeling is a symmetry), each orbit of interchangeable
+     * values is forced to be *introduced in sorted order*: the first occurrence of the orbit's `j`-th
+     * smallest value precedes the first occurrence of its `(j+1)`-th, over the variables whose domain
+     * is that orbit. This is a `value_precede_chain` — one [ValuePrecede] per consecutive value pair.
+     * Every solution can be relabeled within the orbit to this canonical "restricted-growth" form, so
+     * exactly one representative per symmetry class survives — strictly stronger than pinning a single
+     * variable ([breakValueSymmetry]).
      *
-     * Var-growing: each orbit adds running-maximum auxiliary integers (`mxᵢ = max(x₀ … xᵢ)` via
-     * [ArrayMinMax]); the returned [ValuePrecedence.reconstruct] drops them from a solution. Only the
-     * value-anonymous setting is handled because there an orbit equals a value-incidence class, so
+     * Only the value-anonymous setting is handled: there an orbit equals a value-incidence class, so
      * every fully-internal variable's domain is *exactly* the orbit (incidence-equality forces it),
-     * which is what makes `x₀ = omin` and the running-max chain sound; non-anonymous problems keep the
-     * verified single-variable pin. Gapped (non-contiguous) orbits keep the pin too — "max + 1" only
-     * names the next value when the orbit is a contiguous range.
+     * which is what makes ordering the first occurrences sound. Non-anonymous problems keep the
+     * verified single-variable pin. Unlike the original decomposition this needs no auxiliary
+     * variables — the native factor reasons over arbitrary (not just consecutive) value pairs — so
+     * the variable space is unchanged and no reconstruction is required.
      *
      * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns
-     * the original problem (identity reconstruction) when nothing is eligible.
+     * the original problem unchanged when nothing is eligible.
      */
-    fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): ValuePrecedence {
-        val n0 = problem.numIntVars
-        if (n0 == 0 || problem.factors.any { !it.isValueAnonymous() }) return ValuePrecedence(problem, n0)
+    fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): Problem {
+        val n = problem.numIntVars
+        if (n == 0 || problem.factors.any { !it.isValueAnonymous() }) return problem
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
         for (d in problem.intDomains) {
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
         }
-        if (lo > hi) return ValuePrecedence(problem, n0)
+        if (lo > hi) return problem
         val incidence = HashMap<String, MutableList<Int>>()
         for (value in lo..hi) {
             val sig = StringBuilder()
-            for (x in 0 until n0) if (value in problem.intDomains[x]) sig.append(x).append(',')
+            for (x in 0 until n) if (value in problem.intDomains[x]) sig.append(x).append(',')
             if (sig.isNotEmpty()) incidence.getOrPut(sig.toString()) { ArrayList() }.add(value)
         }
         val extra = ArrayList<Factor>()
-        val auxDomains = ArrayList<IntDomain>()
-        var nextAux = n0
         for (values in incidence.values) {
             if (values.size < 2) continue
-            val omin = values.min()
-            val omax = values.max()
-            if (omax - omin + 1 != values.size) continue // not a contiguous range → leave to the pin
             val orbitSet = values.toHashSet()
             val seq = ArrayList<Int>()
-            for (x in 0 until n0) {
+            for (x in 0 until n) {
                 if (x !in objectiveIntVars && domainWithin(problem.intDomains[x], orbitSet)) seq.add(x)
             }
             if (seq.size < 2) continue
-            // x₀ = omin: the first variable must introduce the smallest value.
-            extra.add(Linear(intArrayOf(1), intArrayOf(seq[0]), LinearOp.EQ, omin))
-            var prevMax = seq[0] // mx₀ ≡ x₀
-            for (i in 1 until seq.size) {
-                val xi = seq[i]
-                // Precedence: xᵢ ≤ (running max of x₀…x_{i-1}) + 1.
-                extra.add(Linear(intArrayOf(1, -1), intArrayOf(xi, prevMax), LinearOp.LE, 1))
-                if (i < seq.size - 1) { // running max only needed to feed the next position
-                    val mx = nextAux++
-                    auxDomains.add(IntDomain(omin, omax))
-                    extra.add(ArrayMinMax(mx, intArrayOf(prevMax, xi), max = true))
-                    prevMax = mx
-                }
+            val sortedValues = values.sorted()
+            val seqArray = seq.toIntArray()
+            for (i in 0 until sortedValues.size - 1) {
+                extra.add(ValuePrecede(sortedValues[i], sortedValues[i + 1], seqArray))
             }
         }
-        if (extra.isEmpty()) return ValuePrecedence(problem, n0)
-        val newDomains = Array(nextAux) { if (it < n0) problem.intDomains[it] else auxDomains[it - n0] }
-        val grown = Problem(
-            numBoolVars = problem.numBoolVars,
-            numIntVars = nextAux,
-            intDomains = newDomains,
-            factors = problem.factors.toList() + extra,
-            probeFailedLiterals = problem.probeFailedLiterals,
-            probeIntBounds = problem.probeIntBounds,
-            probeIntHoles = problem.probeIntHoles,
-            probeBudgetPerVar = problem.probeBudgetPerVar,
-            probeTotalBudget = problem.probeTotalBudget,
-            probeSeed = problem.probeSeed,
-        )
-        return ValuePrecedence(grown, n0)
+        if (extra.isEmpty()) return problem
+        return rebuildProblem(problem, problem.factors.toList() + extra)
     }
 
     /** Refine a domain-incidence candidate [values] into verified-interchangeable value orbits: union
@@ -1181,25 +1154,6 @@ object Presolve {
             groups.getOrPut(roles[v].joinToString(",")) { ArrayList() }.add(v)
         }
         return groups.values.filter { it.size >= 2 }.map { it.toIntArray() }
-    }
-}
-
-/**
- * Var-growing result of [Presolve.breakValuePrecedence]: [problem] is the original augmented with
- * running-maximum auxiliary integers (appended after the original ids) and the value-precedence
- * constraints. Solve [problem], then pass the solution through [reconstruct] to recover a solution of
- * the original problem — the auxiliaries are functionally determined by the originals, so dropping
- * them is exact.
- */
-class ValuePrecedence internal constructor(
-    /** The original problem augmented with precedence constraints and running-max auxiliaries. */
-    val problem: Problem,
-    private val numOriginalIntVars: Int,
-) {
-    /** Drop the appended auxiliary integers from a solution [sample] of [problem]. */
-    fun reconstruct(sample: Sample): Sample {
-        if (sample.ints.size <= numOriginalIntVars) return sample
-        return Sample(sample.bools, sample.ints.copyOf(numOriginalIntVars))
     }
 }
 

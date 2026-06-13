@@ -23,6 +23,7 @@ import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.SymmetricAllDifferent
 import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.factor.ValuePrecede
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
@@ -235,53 +236,24 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
     )
 }
 
-/** `value_precede(s, t, xs)`: t may only appear in xs after s has. */
+/** `value_precede(s, t, xs)`: t may only appear in xs after s has — the native [ValuePrecede]
+ *  GAC factor (#432), replacing the sub-GAC reified-equality + prefix-OR clause decomposition. */
 internal fun FlatZincCompiler.emitValuePrecede(c: FznConstraint) {
     require(c.args.size == 3)
     val s = evalIntConst(c.args[0]).toInt()
     val t = evalIntConst(c.args[1]).toInt()
     val xs = evalIntVarArray(c.args[2])
-    emitValuePrecedeDecomp(s, t, xs)
+    if (xs.isNotEmpty()) factors.add(ValuePrecede(s, t, xs))
 }
 
-/** `value_precede(s, t, xs)`: t may only appear in xs after s has. Decompose via reified
- *  per-index equalities `eqS(i) ↔ xs(i)=s`, `eqT(i) ↔ xs(i)=t`, a "seen s by i" prefix-OR
- *  chain `seenS(i) ↔ seenS(i-1) ∨ eqS(i)`, then assert `eqT(i) ⇒ seenS(i-1)` (and eqT(0)
- *  false). */
-private fun FlatZincCompiler.emitValuePrecedeDecomp(s: Int, t: Int, xs: IntArray) {
-    val n = xs.size
-    if (n == 0) return
-    val eqS = IntArray(n) { allocBool("__vp_s_$numBoolVars") }
-    val eqT = IntArray(n) { allocBool("__vp_t_$numBoolVars") }
-    for (i in 0 until n) {
-        factors.add(ReifiedLinear(eqS[i], intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, s))
-        factors.add(ReifiedLinear(eqT[i], intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, t))
-    }
-    val seenS = IntArray(n) { allocBool("__vp_seen_$numBoolVars") }
-    factors.add(Clause(intArrayOf(Lit.make(seenS[0], true), Lit.make(eqS[0], false))))
-    factors.add(Clause(intArrayOf(Lit.make(seenS[0], false), Lit.make(eqS[0], true))))
-    for (i in 1 until n) {
-        factors.add(
-            Clause(intArrayOf(Lit.make(seenS[i], false), Lit.make(seenS[i - 1], true), Lit.make(eqS[i], true))),
-        )
-        factors.add(Clause(intArrayOf(Lit.make(seenS[i], true), Lit.make(seenS[i - 1], false))))
-        factors.add(Clause(intArrayOf(Lit.make(seenS[i], true), Lit.make(eqS[i], false))))
-    }
-    factors.add(Clause(intArrayOf(Lit.make(eqT[0], false))))
-    for (i in 1 until n) {
-        factors.add(Clause(intArrayOf(Lit.make(eqT[i], false), Lit.make(seenS[i - 1], true))))
-    }
-}
-
-/** `value_precede_chain_int(values, xs)` — a chain of value_precede for every consecutive
+/** `value_precede_chain_int(values, xs)` — one native [ValuePrecede] per consecutive
  *  `(values(i), values(i+1))` pair. */
 internal fun FlatZincCompiler.emitValuePrecedeChain(c: FznConstraint) {
     require(c.args.size == 2)
     val values = evalIntConstArray(c.args[0])
     val xs = evalIntVarArray(c.args[1])
-    for (i in 0 until values.size - 1) {
-        emitValuePrecedeDecomp(values[i], values[i + 1], xs)
-    }
+    if (xs.isEmpty()) return
+    for (i in 0 until values.size - 1) factors.add(ValuePrecede(values[i], values[i + 1], xs))
 }
 
 internal fun FlatZincCompiler.emitLexLess(c: FznConstraint, strict: Boolean) {

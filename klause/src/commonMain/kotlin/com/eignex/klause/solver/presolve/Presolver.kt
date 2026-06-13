@@ -69,11 +69,12 @@ enum class PresolvePass(val id: String, val stage: Stage, val preservesSolutionS
      *  pure local-search engine (the ordering constraints fight the search). */
     BREAK_SYMMETRIES("symmetry", Stage.PROBLEM, preservesSolutionSet = false),
 
-    /** Law–Lee value precedence (#374): the strong, var-growing value-symmetry break (running-max
-     *  aux + precedence chain). Solution-set-ALTERING (collapses value-symmetric solutions). Opt-in:
-     *  it adds variables and constraints, and stacking it with [BREAK_SYMMETRIES] interacts (each
-     *  pass's added factors disable the other's value-anonymity / interchangeability detection), so it
-     *  defaults off and is enabled explicitly as an alternative to the single-variable value pin. */
+    /** Law–Lee value precedence (#374): the strong value-symmetry break — a `value_precede_chain` of
+     *  native [com.eignex.klause.solver.factor.ValuePrecede] factors (#432) per orbit, same variable
+     *  space, identity reconstruction. Solution-set-ALTERING (collapses value-symmetric solutions).
+     *  Opt-in: stacking it with [BREAK_SYMMETRIES] interacts (each pass's added factors disable the
+     *  other's value-anonymity / interchangeability detection), so it defaults off and is enabled
+     *  explicitly as an alternative to the single-variable value pin. */
     VALUE_PRECEDENCE("value-precede", Stage.PROBLEM, preservesSolutionSet = false),
 
     /** Construction-time failed-literal SAC (#146): fold forced polarities into `Problem.baked`. */
@@ -199,11 +200,8 @@ object Presolver {
                 PresolvePass.BREAK_SYMMETRIES ->
                     current = Presolve.breakSymmetries(current, context.objectiveIntVars, context.objectiveBoolVars)
 
-                PresolvePass.VALUE_PRECEDENCE -> {
-                    val vp = Presolve.breakValuePrecedence(current, context.objectiveIntVars)
-                    current = vp.problem
-                    reconstructs.add(vp::reconstruct)
-                }
+                PresolvePass.VALUE_PRECEDENCE ->
+                    current = Presolve.breakValuePrecedence(current, context.objectiveIntVars)
 
                 // Construction-time SAC passes never reach here — problemPasses filters to Stage.PROBLEM.
                 PresolvePass.PROBE_FAILED_LITERALS,
