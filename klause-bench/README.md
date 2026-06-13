@@ -49,12 +49,18 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 
 ## Metrics
 
-- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Saves **one file per problem** under `output/<config>/`: `<problem>.out` (raw solver log) + `<problem>.json` (solver/settings/budget + objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics). Run once per config and diff two config dirs offline (`output/compare.sh`), which also serves as the wall-time regression check. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
+- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Saves **one file per problem** under `output/<config>/`: `<problem>.out` (raw solver log) + `<problem>.json` (solver/settings/budget + objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics + per-arm `attribution` for klause portfolios). Run once per config and diff two config dirs offline (`output/compare.sh`), which also serves as the wall-time regression check. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
 - **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
 - **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.
-- **credit** — per-worker portfolio attribution (which arm earns each solve). (To compare solver *configs*, there's no dedicated metric: run `solve` once per config and diff the dirs with `compare.sh`.)
 
 Metrics write JSON (and Markdown where useful) under `build/`.
+
+## Offline analysis scripts (`output/`)
+
+Both read the per-problem `output/<config>/*.json` `solve` records — no solving, no Gradle.
+
+- **`compare.sh <dirA> <dirB>`** — diff two configs across their shared problems: direction-aware win/tie/loss, the "solves 100% of B's" superset, and the time-to-best aggregate.
+- **`credit.sh <dir>`** — per-**arm** credit over ONE klause-portfolio config: firsts / bests / soles / improvements per arm + a greedy marginal-contribution ranking, read from each record's `attribution` (klause emits `%%%klause-arm:` lines under `-s` on a `-e mixed/cp/ls` optimize). Produce the data with `bench solve … backend=klause engine=mixed -p8`.
 
 ## Recipes
 
