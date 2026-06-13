@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.optimize
 
-import com.eignex.klause.ast.PbOp
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit

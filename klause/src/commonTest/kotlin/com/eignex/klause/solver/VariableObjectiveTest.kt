@@ -1,10 +1,10 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.ast.atLeast
-import com.eignex.klause.ast.ge
-import com.eignex.klause.ast.le
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.atLeast
+import com.eignex.klause.schema.ge
+import com.eignex.klause.schema.le
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.objective.LinearObjective

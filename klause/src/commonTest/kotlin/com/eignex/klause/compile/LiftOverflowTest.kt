@@ -1,8 +1,8 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.le
-import com.eignex.klause.ast.times
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.times
 import kotlin.test.Test
 import kotlin.test.assertFails
 

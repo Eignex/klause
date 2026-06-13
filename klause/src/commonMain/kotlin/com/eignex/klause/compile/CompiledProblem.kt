@@ -1,7 +1,7 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.FloatSpec
 import com.eignex.klause.compile.SetLayout
+import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.IntHandle

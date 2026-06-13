@@ -1,10 +1,10 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.eq
-import com.eignex.klause.ast.le
-import com.eignex.klause.ast.minus
-import com.eignex.klause.ast.plus
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.eq
+import com.eignex.klause.schema.le
+import com.eignex.klause.schema.minus
+import com.eignex.klause.schema.plus
 import kotlin.test.Test
 import kotlin.test.assertFails
 

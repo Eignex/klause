@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.json
 
-import com.eignex.klause.ast.SchemaEntry
 import com.eignex.klause.compile.CompiledProblem
 import com.eignex.klause.compile.Compiler
+import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.solver.Problem
 import com.eignex.skema.SchemaDef
 import com.eignex.skema.schemaJsonConfig

@@ -1,6 +1,6 @@
 package com.eignex.klause.bench.catalog
 
-import com.eignex.klause.ast.PbOp
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.LibminizincExpected
 import com.eignex.klause.solver.Factor

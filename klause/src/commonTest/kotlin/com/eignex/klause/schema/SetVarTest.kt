@@ -1,12 +1,12 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.MultipleSpec
-import com.eignex.klause.ast.SetSpec
-import com.eignex.klause.ast.eq
-import com.eignex.klause.ast.iff
 import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.compile.CompiledProblem
 import com.eignex.klause.compile.compile
+import com.eignex.klause.model.MultipleSpec
+import com.eignex.klause.model.SetSpec
+import com.eignex.klause.schema.eq
+import com.eignex.klause.schema.iff
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test

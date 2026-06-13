@@ -1,9 +1,9 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.costMdd
-import com.eignex.klause.ast.costRegular
-import com.eignex.klause.ast.mdd
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.costMdd
+import com.eignex.klause.schema.costRegular
+import com.eignex.klause.schema.mdd
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test

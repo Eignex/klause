@@ -1,27 +1,27 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.AllDifferentOpt
-import com.eignex.klause.ast.And
-import com.eignex.klause.ast.BoolExpr
-import com.eignex.klause.ast.CircuitExpr
-import com.eignex.klause.ast.CumulativeExpr
-import com.eignex.klause.ast.CumulativeExprOpt
-import com.eignex.klause.ast.DisjunctiveExpr
-import com.eignex.klause.ast.DisjunctiveExprOpt
-import com.eignex.klause.ast.GccExprOpt
-import com.eignex.klause.ast.IntCmpOp
-import com.eignex.klause.ast.IntCompare
-import com.eignex.klause.ast.IntElement
-import com.eignex.klause.ast.IntExpr
-import com.eignex.klause.ast.IntIfThenElse
-import com.eignex.klause.ast.IntLit
-import com.eignex.klause.ast.IntRef
-import com.eignex.klause.ast.IntSum
-import com.eignex.klause.ast.NValueExprOpt
-import com.eignex.klause.ast.NValueMode
-import com.eignex.klause.ast.Not
-import com.eignex.klause.ast.Or
-import com.eignex.klause.ast.SubcircuitExpr
+import com.eignex.klause.model.AllDifferentOpt
+import com.eignex.klause.model.And
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.CircuitExpr
+import com.eignex.klause.model.CumulativeExpr
+import com.eignex.klause.model.CumulativeExprOpt
+import com.eignex.klause.model.DisjunctiveExpr
+import com.eignex.klause.model.DisjunctiveExprOpt
+import com.eignex.klause.model.GccExprOpt
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntElement
+import com.eignex.klause.model.IntExpr
+import com.eignex.klause.model.IntIfThenElse
+import com.eignex.klause.model.IntLit
+import com.eignex.klause.model.IntRef
+import com.eignex.klause.model.IntSum
+import com.eignex.klause.model.NValueExprOpt
+import com.eignex.klause.model.NValueMode
+import com.eignex.klause.model.Not
+import com.eignex.klause.model.Or
+import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.solver.IntDomain
 
 /*
@@ -182,7 +182,7 @@ private fun pairwiseNoOverlap(si: IntExpr, di: Int, sj: IntExpr, dj: Int): BoolE
  *  decomposition: at every integer t in the static horizon, the sum of `r_i ·
  *  runs_i(t)` must stay under capacity. The horizon spans `[minEst, maxLct)` derived from
  *  the static start-var domains; absent that information the lowering can't bound the
- *  number of time-point constraints, so each start must lift to a bare [com.eignex.klause.ast.IntRef]. */
+ *  number of time-point constraints, so each start must lift to a bare [com.eignex.klause.model.IntRef]. */
 internal fun Lowering.reifyCumulative(expr: CumulativeExpr): Int =
     cumulativeTimeTabling(expr.starts, expr.durations, expr.resources, expr.capacity, presents = null)
 

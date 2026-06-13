@@ -1,4 +1,42 @@
-package com.eignex.klause.ast
+package com.eignex.klause.schema
+
+import com.eignex.klause.model.AllDifferentOpt
+import com.eignex.klause.model.And
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.BoolTerm
+import com.eignex.klause.model.CardinalityExpr
+import com.eignex.klause.model.CircuitExpr
+import com.eignex.klause.model.CostMddExpr
+import com.eignex.klause.model.CostRegularExpr
+import com.eignex.klause.model.CumulativeExpr
+import com.eignex.klause.model.CumulativeExprOpt
+import com.eignex.klause.model.DiffnExpr
+import com.eignex.klause.model.DisjunctiveExpr
+import com.eignex.klause.model.DisjunctiveExprOpt
+import com.eignex.klause.model.GccExprOpt
+import com.eignex.klause.model.Iff
+import com.eignex.klause.model.IntAbs
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntElement
+import com.eignex.klause.model.IntExpr
+import com.eignex.klause.model.IntIfThenElse
+import com.eignex.klause.model.IntLit
+import com.eignex.klause.model.IntMax
+import com.eignex.klause.model.IntMin
+import com.eignex.klause.model.IntTerm
+import com.eignex.klause.model.InverseChannel
+import com.eignex.klause.model.MddExpr
+import com.eignex.klause.model.NValueExprOpt
+import com.eignex.klause.model.NValueMode
+import com.eignex.klause.model.Or
+import com.eignex.klause.model.PbOp
+import com.eignex.klause.model.PseudoBooleanExpr
+import com.eignex.klause.model.RegularExpr
+import com.eignex.klause.model.SortExpr
+import com.eignex.klause.model.SubcircuitExpr
+import com.eignex.klause.model.SymmetricAllDifferent
+import com.eignex.klause.model.XorExpr
 
 /** Minimum of [xs] (at least one argument). */
 fun min(vararg xs: IntTerm): IntExpr {

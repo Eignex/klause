@@ -1,9 +1,9 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.eq
-import com.eignex.klause.ast.ifThenElse
-import com.eignex.klause.ast.le
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.eq
+import com.eignex.klause.schema.ifThenElse
+import com.eignex.klause.schema.le
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

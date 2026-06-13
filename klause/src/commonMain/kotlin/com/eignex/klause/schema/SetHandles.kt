@@ -1,29 +1,29 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.BoolExpr
-import com.eignex.klause.ast.IntExpr
-import com.eignex.klause.ast.IntTerm
-import com.eignex.klause.ast.Not
-import com.eignex.klause.ast.SetCard
-import com.eignex.klause.ast.SetDiff
-import com.eignex.klause.ast.SetDisjoint
-import com.eignex.klause.ast.SetEq
-import com.eignex.klause.ast.SetExpr
-import com.eignex.klause.ast.SetIn
-import com.eignex.klause.ast.SetIntersect
-import com.eignex.klause.ast.SetLiteral
-import com.eignex.klause.ast.SetNominalIn
-import com.eignex.klause.ast.SetNominalLiteral
-import com.eignex.klause.ast.SetRef
-import com.eignex.klause.ast.SetSubsetOf
-import com.eignex.klause.ast.SetTerm
-import com.eignex.klause.ast.SetUnion
+import com.eignex.klause.model.BoolExpr
+import com.eignex.klause.model.IntExpr
+import com.eignex.klause.model.IntTerm
+import com.eignex.klause.model.Not
+import com.eignex.klause.model.SetCard
+import com.eignex.klause.model.SetDiff
+import com.eignex.klause.model.SetDisjoint
+import com.eignex.klause.model.SetEq
+import com.eignex.klause.model.SetExpr
+import com.eignex.klause.model.SetIn
+import com.eignex.klause.model.SetIntersect
+import com.eignex.klause.model.SetLiteral
+import com.eignex.klause.model.SetNominalIn
+import com.eignex.klause.model.SetNominalLiteral
+import com.eignex.klause.model.SetRef
+import com.eignex.klause.model.SetSubsetOf
+import com.eignex.klause.model.SetTerm
+import com.eignex.klause.model.SetUnion
 
 /**
  * Set variable handle over an integer universe. Internally lowers to one indicator
  * Boolean per universe element; the decoder reads those indicators back to a [Set]<Int>.
  *
- * Use the infix operators in `com.eignex.klause.ast.SetOperators` (`inSet`, `subsetOf`,
+ * Use the infix operators in `com.eignex.klause.model.SetOperators` (`inSet`, `subsetOf`,
  * `disjointFrom`, `union`, `intersect`, `diff`, `eq`, `ne`) and the [card] / [size]
  * function for cardinality. Set-valued combinators ([SetUnion] / [SetIntersect] /
  * [SetDiff] / [SetLiteral]) return a [SetExpr] tree that the compiler materialises into

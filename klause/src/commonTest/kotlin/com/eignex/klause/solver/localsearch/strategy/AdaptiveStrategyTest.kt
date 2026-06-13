@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.localsearch.strategy
 
-import com.eignex.klause.ast.atLeast
-import com.eignex.klause.ast.atMost
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.atLeast
+import com.eignex.klause.schema.atMost
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

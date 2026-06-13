@@ -1,17 +1,17 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.CircuitExpr
-import com.eignex.klause.ast.CumulativeExpr
-import com.eignex.klause.ast.DisjunctiveExpr
-import com.eignex.klause.ast.SubcircuitExpr
-import com.eignex.klause.ast.allDifferentOpt
-import com.eignex.klause.ast.cumulativeOpt
-import com.eignex.klause.ast.disjunctiveOpt
-import com.eignex.klause.ast.gccOpt
-import com.eignex.klause.ast.iff
-import com.eignex.klause.ast.nValueOpt
 import com.eignex.klause.cnf.BitBlaster
+import com.eignex.klause.model.CircuitExpr
+import com.eignex.klause.model.CumulativeExpr
+import com.eignex.klause.model.DisjunctiveExpr
+import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.allDifferentOpt
+import com.eignex.klause.schema.cumulativeOpt
+import com.eignex.klause.schema.disjunctiveOpt
+import com.eignex.klause.schema.gccOpt
+import com.eignex.klause.schema.iff
+import com.eignex.klause.schema.nValueOpt
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

@@ -1,9 +1,9 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.circuit
-import com.eignex.klause.ast.cumulative
-import com.eignex.klause.ast.disjunctive
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.circuit
+import com.eignex.klause.schema.cumulative
+import com.eignex.klause.schema.disjunctive
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.Circuit

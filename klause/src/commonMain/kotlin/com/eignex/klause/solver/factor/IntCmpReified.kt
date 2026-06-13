@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.ast.IntCmpOp
+import com.eignex.klause.model.IntCmpOp
 
 /**
  * Convenience factory: build a [ReifiedLinear] from an [IntCmpOp] over a single int var.

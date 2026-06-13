@@ -9,7 +9,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /**
  * `auxBoolVar ↔ (#true literals in [min, max])`. Created by the compiler when a
- * [com.eignex.klause.ast.CardinalityExpr] / `AtMost` / `AtLeast` appears non-top-level so the
+ * [com.eignex.klause.model.CardinalityExpr] / `AtMost` / `AtLeast` appears non-top-level so the
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `longPayload(factorId)`
  * is the count of true literals, mirrored from [Cardinality].
  */

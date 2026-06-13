@@ -1,13 +1,13 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.ast.BoolRef
-import com.eignex.klause.ast.BoolSpec
-import com.eignex.klause.ast.Implies
-import com.eignex.klause.ast.NamedConstraint
-import com.eignex.klause.ast.NominalSpec
-import com.eignex.klause.ast.SchemaEntry
-import com.eignex.klause.ast.implies
-import com.eignex.klause.ast.not
+import com.eignex.klause.model.BoolRef
+import com.eignex.klause.model.BoolSpec
+import com.eignex.klause.model.Implies
+import com.eignex.klause.model.NamedConstraint
+import com.eignex.klause.model.NominalSpec
+import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.schema.implies
+import com.eignex.klause.schema.not
 import com.eignex.skema.SchemaDef
 import com.eignex.skema.SchemaJson
 import kotlin.test.Test

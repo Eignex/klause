@@ -1,7 +1,7 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.ast.Not
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.model.Not
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchParams

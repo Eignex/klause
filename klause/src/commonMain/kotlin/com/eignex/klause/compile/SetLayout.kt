@@ -10,7 +10,7 @@ package com.eignex.klause.compile
  *  - `indicatorBoolIds[i]` is the klause-side Bool var id that's true iff `universe[i]`
  *    is currently a member of the set.
  *
- * Anything that walks a [com.eignex.klause.ast.SetExpr] eventually produces one of these,
+ * Anything that walks a [com.eignex.klause.model.SetExpr] eventually produces one of these,
  * either by looking up an existing set var via [Lowering.materializeSet] or by
  * synthesising aux indicators for `union` / `intersect` / `diff` / set literals.
  */

@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.opb
 
-import com.eignex.klause.ast.PbOp
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.PseudoBoolean
 import kotlin.test.Test
