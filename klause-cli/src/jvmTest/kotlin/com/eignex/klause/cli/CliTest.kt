@@ -21,6 +21,60 @@ class CliTest {
     }
 
     @Test
+    fun `parser accepts attached short values, bundled shorts, long=value, and -- terminator`() {
+        val opts = CommonOptions()
+        val positionals = mutableListOf<String>()
+        parseArgs(
+            // -as          → bundled booleans (all-solutions + statistics)
+            // -t5000       → attached short value
+            // --random-seed=7 → long with =value
+            // -p 2         → space-separated short value
+            // --           → end of options
+            // -notaflag    → positional after the terminator, not an ignored flag
+            arrayOf("-as", "-t5000", "--random-seed=7", "-p", "2", "--", "-notaflag"),
+            commonFlagSpecs(opts),
+        ) { positionals.add(it) }
+
+        assertTrue(opts.allSolutions, "expected -a")
+        assertTrue(opts.statistics, "expected -s")
+        assertTrue(opts.timeLimitMs == 5000L, "timeLimitMs=${opts.timeLimitMs}")
+        assertTrue(opts.randomSeed == 7L, "randomSeed=${opts.randomSeed}")
+        assertTrue(opts.parallel == 2, "parallel=${opts.parallel}")
+        assertTrue(positionals == listOf("-notaflag"), positionals.toString())
+    }
+
+    @Test
+    fun `-p2 attached form drives the parallel portfolio (matches the documented spelling)`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        val out = capture { main(arrayOf("-f", "-p2", "-t", "10000", fzn.absolutePath)) }
+        assertTrue("x = " in out, out)
+    }
+
+    @Test
+    fun `--help prints usage with standard flags and known formats and needs no input file`() {
+        for (flag in listOf("--help", "-h")) {
+            val out = capture { main(arrayOf(flag)) }
+            assertTrue("usage: klause-cli" in out, out)
+            // The standard MiniZinc fzn-spec flags are all documented.
+            for (token in listOf("-a", "-i", "-n", "-f", "-s", "-v", "-t", "-r", "-p", "--engine")) {
+                assertTrue(token in out, "help missing $token:\n$out")
+            }
+            // Formats come from the live mode registry.
+            assertTrue("minizinc" in out, out)
+            assertTrue("xcsp3" in out, out)
+        }
+    }
+
+    @Test
+    fun `--version prints name and version on a single line`() {
+        val out = capture { main(arrayOf("--version")) }.trim()
+        assertTrue(out == "Klause 0.1.0", out)
+    }
+
+    @Test
     fun `engine params reach the single-solver engines`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")

@@ -50,6 +50,12 @@ internal class CommonOptions {
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
     val engineParams = mutableListOf<String>()
 
+    /** `--help` / `-h`: print usage and exit 0 (checked before any input file is required). */
+    var showHelp = false
+
+    /** `--version`: print `<name> <version>` and exit 0. */
+    var showVersion = false
+
     /** The single positional input file. */
     var inputPath: String? = null
 }
@@ -78,6 +84,8 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     FlagSpec(listOf("--param"), true) { o.engineParams.add(requireNotNull(it)) },
     FlagSpec(listOf("--format", "--mode"), true) { o.formatOverride = it },
     FlagSpec(listOf("--presolve"), true) { o.presolve = it },
+    FlagSpec(listOf("-h", "--help"), false) { o.showHelp = true },
+    FlagSpec(listOf("--version"), false) { o.showVersion = true },
 )
 
 /**
@@ -104,40 +112,104 @@ internal fun Solvable.presolved(config: PresolveConfig, solutionSetSensitive: Bo
 }
 
 /**
- * Spec-driven argument parser. Walks [args], dispatching each recognised flag to its
- * [FlagSpec]; unknown `-flags` are tolerated (printed to stderr) to stay forward-compatible
- * with MiniZinc additions; the first non-flag token is the positional via [onPositional].
+ * Spec-driven, getopt-style argument parser. Walks [args], dispatching each recognised flag to
+ * its [FlagSpec]. It accepts the conventional Unix spellings:
+ *  - long options with a space- or `=`-attached value: `--time-limit 5000` / `--time-limit=5000`;
+ *  - short options with a space- or directly-attached value: `-t 5000` / `-t5000`;
+ *  - bundled boolean shorts: `-as` ≡ `-a -s` (a value-taking short ends the bundle and takes the
+ *    remainder as its value, so `-asn10` ≡ `-a -s -n 10`);
+ *  - a bare `--` terminator after which every token is a positional.
+ *
+ * Unknown `-flags` are tolerated (noted on stderr, not fatal) to stay forward-compatible with
+ * MiniZinc passing standard flags this solver doesn't implement. Each non-flag token (and `-`,
+ * the stdin convention) is a positional reported via [onPositional].
  */
 internal fun parseArgs(args: Array<String>, specs: List<FlagSpec>, onPositional: (String) -> Unit) {
     val byName = HashMap<String, FlagSpec>()
     for (s in specs) for (n in s.names) byName[n] = s
+
     var i = 0
+    var optionsEnded = false
     while (i < args.size) {
         val a = args[i]
-        val spec = byName[a]
         when {
-            spec != null -> {
-                if (spec.takesValue) {
-                    val v = args.getOrNull(i + 1) ?: usageError("flag $a expects a value")
-                    i++
-                    spec.apply(v)
-                } else {
-                    spec.apply(null)
-                }
-                i++
-            }
-
-            a.startsWith("-") -> {
-                errPrintln("klause-cli: ignoring unknown flag $a")
-                i++
-            }
-
-            else -> {
+            optionsEnded || a == "-" || !a.startsWith("-") -> {
                 onPositional(a)
                 i++
             }
+
+            a == "--" -> {
+                optionsEnded = true
+                i++
+            }
+
+            a.startsWith("--") -> i = parseLong(a, args, i, byName)
+
+            else -> i = parseShortCluster(a, args, i, byName)
         }
     }
+}
+
+/** Parse one `--name` / `--name=value` token; returns the next index to read. */
+private fun parseLong(token: String, args: Array<String>, i: Int, byName: Map<String, FlagSpec>): Int {
+    val eq = token.indexOf('=')
+    val name = if (eq >= 0) token.substring(0, eq) else token
+    val attached = if (eq >= 0) token.substring(eq + 1) else null
+    val spec = byName[name]
+    return when {
+        spec == null -> {
+            errPrintln("klause-cli: ignoring unknown flag $name")
+            i + 1
+        }
+
+        spec.takesValue -> {
+            if (attached != null) {
+                spec.apply(attached)
+                i + 1
+            } else {
+                spec.apply(args.getOrNull(i + 1) ?: usageError("flag $name expects a value"))
+                i + 2
+            }
+        }
+
+        else -> {
+            if (attached != null) usageError("flag $name takes no value")
+            spec.apply(null)
+            i + 1
+        }
+    }
+}
+
+/** Parse one short-option cluster (`-a`, `-as`, `-t5000`, `-asn10`); returns the next index. */
+private fun parseShortCluster(token: String, args: Array<String>, i: Int, byName: Map<String, FlagSpec>): Int {
+    var j = 1
+    while (j < token.length) {
+        val name = "-" + token[j]
+        val spec = byName[name]
+        when {
+            spec == null -> {
+                errPrintln("klause-cli: ignoring unknown flag $name")
+                j++
+            }
+
+            spec.takesValue -> {
+                // The rest of the token is the value (`-t5000`); otherwise the next arg (`-t 5000`).
+                val rest = token.substring(j + 1)
+                if (rest.isNotEmpty()) {
+                    spec.apply(rest)
+                    return i + 1
+                }
+                spec.apply(args.getOrNull(i + 1) ?: usageError("flag $name expects a value"))
+                return i + 2
+            }
+
+            else -> {
+                spec.apply(null)
+                j++
+            }
+        }
+    }
+    return i + 1
 }
 
 internal fun usageError(msg: String): Nothing {
