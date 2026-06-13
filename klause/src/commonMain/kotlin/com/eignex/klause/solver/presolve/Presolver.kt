@@ -69,6 +69,13 @@ enum class PresolvePass(val id: String, val stage: Stage, val preservesSolutionS
      *  pure local-search engine (the ordering constraints fight the search). */
     BREAK_SYMMETRIES("symmetry", Stage.PROBLEM, preservesSolutionSet = false),
 
+    /** Law–Lee value precedence (#374): the strong, var-growing value-symmetry break (running-max
+     *  aux + precedence chain). Solution-set-ALTERING (collapses value-symmetric solutions). Opt-in:
+     *  it adds variables and constraints, and stacking it with [BREAK_SYMMETRIES] interacts (each
+     *  pass's added factors disable the other's value-anonymity / interchangeability detection), so it
+     *  defaults off and is enabled explicitly as an alternative to the single-variable value pin. */
+    VALUE_PRECEDENCE("value-precede", Stage.PROBLEM, preservesSolutionSet = false),
+
     /** Construction-time failed-literal SAC (#146): fold forced polarities into `Problem.baked`. */
     PROBE_FAILED_LITERALS("probe-failed-literals", Stage.CONSTRUCTION, preservesSolutionSet = true),
 
@@ -123,7 +130,12 @@ class PresolveConfig(
      *  expensive construction-time SAC probes are opt-in (off). */
     private fun autoEnabled(pass: PresolvePass, context: PresolveContext): Boolean = when (pass) {
         PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.ELIMINATE_AFFINE_SINGLETONS -> true
+
         PresolvePass.BREAK_SYMMETRIES -> !context.solutionSetSensitive
+
+        // Opt-in: a stronger but var-growing alternative to the value pin; see the enum doc.
+        PresolvePass.VALUE_PRECEDENCE -> false
+
         PresolvePass.PROBE_FAILED_LITERALS, PresolvePass.PROBE_INT_BOUNDS, PresolvePass.PROBE_INT_HOLES -> false
     }
 
@@ -186,6 +198,12 @@ object Presolver {
 
                 PresolvePass.BREAK_SYMMETRIES ->
                     current = Presolve.breakSymmetries(current, context.objectiveIntVars, context.objectiveBoolVars)
+
+                PresolvePass.VALUE_PRECEDENCE -> {
+                    val vp = Presolve.breakValuePrecedence(current, context.objectiveIntVars)
+                    current = vp.problem
+                    reconstructs.add(vp::reconstruct)
+                }
 
                 // Construction-time SAC passes never reach here — problemPasses filters to Stage.PROBLEM.
                 PresolvePass.PROBE_FAILED_LITERALS,
