@@ -142,9 +142,6 @@ internal class OznEvaluator(items: List<OznItem>) {
         val out = ArrayList<OznValue>()
         fun recurse(genIdx: Int) {
             if (genIdx == c.generators.size) {
-                if (c.body !is OznExpr.StringLit) {
-                    // Optimisation only — fall through.
-                }
                 out.add(eval(c.body, ctx))
                 return
             }

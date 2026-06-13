@@ -72,7 +72,6 @@ internal fun interface DestroyOperator {
             val queue = ArrayDeque<Int>()
             while (freedCount < k) {
                 if (queue.isEmpty()) {
-                    // Seed from a random unvisited variable.
                     val startCandidates = (0 until totalVars).filter { !freed[it] }
                     if (startCandidates.isEmpty()) break
                     val seed = startCandidates[rng.nextInt(startCandidates.size)]
@@ -83,7 +82,6 @@ internal fun interface DestroyOperator {
                 freed[v] = true
                 freedCount++
                 if (freedCount >= k) break
-                // Walk factor neighbours: for each factor touching v, enqueue its other vars.
                 val factorIds = if (v < problem.numBoolVars) {
                     problem.boolOccurrences[v]
                 } else {
@@ -119,7 +117,6 @@ internal fun interface DestroyOperator {
             scratch.recompute()
             val violatedFactors = scratch.violated.toIntArray()
             if (violatedFactors.isEmpty()) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
-            // Union the vars across all violated factors.
             val freedSlots = HashSet<Int>()
             for (fid in violatedFactors) {
                 val f = problem.factors[fid]
@@ -157,7 +154,6 @@ internal fun interface DestroyOperator {
                 }
                 val totalVars = problem.numBoolVars + problem.numIntVars
                 val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
-                // Sort vars descending by touch count (more touched = higher activity); take top k.
                 val indexed = IntArray(touches.size) { it }
                 val sorted = indexed.sortedByDescending { touches[it] }.take(k)
                 split(sorted, problem.numBoolVars)
@@ -196,7 +192,6 @@ internal fun interface DestroyOperator {
                 globalLo + rng.nextInt(span - windowSize + 1)
             }
             val end = start + windowSize // exclusive
-            // Collect int vars whose current value lies in [start, end).
             val inWindow = IntArrayList()
             for (i in 0 until n) {
                 val v = incumbent.ints[i]

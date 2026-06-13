@@ -228,8 +228,6 @@ class NValue(
             Mode.Eq -> nv > s.distinctCount
 
             Mode.AtLeast -> true
-
-            // nv > distinct → must raise distinct
             Mode.AtMost -> false
         }
         val needDecrease = when (mode) {

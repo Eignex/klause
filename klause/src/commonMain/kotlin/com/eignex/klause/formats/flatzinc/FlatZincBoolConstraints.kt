@@ -188,9 +188,6 @@ internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: B
     }
 }
 
-/* `increasing_int(xs)` / `decreasing_int(xs)` / strict variants — chained pairwise
- *  ordering, lowered to a chain of Linear comparisons. */
-
 /**
  * Channel a bool literal array into a parallel int-var array with domain [0, 1] each.
  * Adds a ReifiedLinear per literal that ties `lit ↔ (channel = 1)`. Returns the new int

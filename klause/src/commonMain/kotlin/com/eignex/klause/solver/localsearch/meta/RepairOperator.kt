@@ -105,7 +105,7 @@ internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : Repa
             val baseline = currentScore()
             state.apply(Move.BoolFlip(b))
             val flipped = currentScore()
-            if (flipped >= baseline) state.apply(Move.BoolFlip(b)) // revert
+            if (flipped >= baseline) state.apply(Move.BoolFlip(b))
         }
 
         val intOrder = context.freed.ints.copyOf().also { it.shuffle(context.rng) }
@@ -128,7 +128,7 @@ internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : Repa
                     bestScore = s
                     bestVal = v
                 }
-                state.apply(Move.IntSet(i, cur)) // revert
+                state.apply(Move.IntSet(i, cur))
             }
             if (bestVal != cur) state.apply(Move.IntSet(i, bestVal))
         }

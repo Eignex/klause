@@ -93,7 +93,6 @@ class ImpactSelectorTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        // Verify the assignment is a permutation of 0..4.
         assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
     }
 
@@ -172,9 +171,7 @@ class ImpactSelectorTest {
         )
         val session = PropagationSession(problem)
         Impact().values(session, VarRef.IntVar(0), Random(0L)).toList()
-        // Trail level must still be 0 after probing.
         assertEquals(0, session.decisionLevel)
-        // And we can still pin v0 = 1 cleanly afterwards.
         val r = session.pinInt(0, 1)
         assertTrue(r !is PropagationResult.Unsat, "post-probe pin must succeed; got $r")
     }

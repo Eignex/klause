@@ -1037,12 +1037,10 @@ class PropagationState(
         val k = atomThreshold[atomId]
         val truth = atomCurrentTruth(atomId) ?: return levelToDecisionVar.size
         return when (atomKind[atomId]) {
-            0 -> if (truth) minLevelForGe(v, k) else maxLevelForLe(v, k - 1)
+            0 -> if (truth) minLevelForGe(v, k) else maxLevelForLe(v, k - 1) // v ≥ k
 
-            // v ≥ k
-            1 -> if (truth) maxLevelForLe(v, k) else minLevelForGe(v, k + 1)
+            1 -> if (truth) maxLevelForLe(v, k) else minLevelForGe(v, k + 1) // v ≤ k
 
-            // v ≤ k
             2 -> if (truth) { // v = k : true when the later of the two bounds reached k
                 maxOf(minLevelForGe(v, k), maxLevelForLe(v, k))
             } else { // v ≠ k : established at the level k left the domain
@@ -1211,12 +1209,8 @@ class PropagationState(
             }
 
             2 -> when {
-                d.min == d.max && d.min == k -> true
-
-                // singleton {k} → eq true
-                k !in d -> false
-
-                // k absent → eq false
+                d.min == d.max && d.min == k -> true // singleton {k} → eq true
+                k !in d -> false // k absent → eq false
                 else -> null
             }
 
@@ -1828,11 +1822,8 @@ class PropagationState(
         // justifies the exclusion, so the prior bound atom and the crossed values' exclusions
         // must join the recorded reason (see [antecedentsAcrossHoles]) — without them the
         // implication is stronger than what was derived and learned clauses can prune feasible
-        // assignments.
-        // The exclusion's immediate consequence is the one-step bound move (prior bound +
-        // the exclusion); the landed bound additionally rests on any holes crossed by the
-        // snap. Kept as separate near/far reason sets so each flipped atom can take the
-        // weakest sufficient one.
+        // assignments. Kept as separate near/far reason sets (the one-step bound move vs. the
+        // hole-snapped landing) so each flipped atom can take the weakest sufficient one.
         val antNear = when {
             newDomain.min != d.min -> appendPriorBound(
                 Lit.make(atomVarGe(v, d.min), false),

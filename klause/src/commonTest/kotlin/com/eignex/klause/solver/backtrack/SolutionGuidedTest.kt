@@ -31,7 +31,6 @@ class SolutionGuidedTest {
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
         val values = guided.values(session, VarRef.IntVar(0), Random(0L)).toList()
-        // IndomainMin → 0, 1, 2, 3, 4
         assertEquals(listOf(0, 1, 2, 3, 4), values)
     }
 

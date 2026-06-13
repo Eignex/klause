@@ -395,7 +395,6 @@ class SetPredicateTest {
         val program = parseFlatZinc(src)
         val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        // Read each set; ensure intersection is empty.
         val sets = (1..3).map { i -> program.setVarsByName.getValue("a[$i]") }
         val membersOf: (SetVarLayout) -> Set<Int> = { layout ->
             layout.elements.filterIndexed { idx, _ -> sat.assignment.bools[layout.indicatorBoolIds[idx]] }.toSet()

@@ -20,7 +20,7 @@ class Table(
     /** The variable ids forming each candidate tuple. */
     val xs: IntArray,
     /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
-    val tuples: IntArray, // row-major; length must be a multiple of xs.size
+    val tuples: IntArray,
 ) : Factor {
 
     /** Number of variables per tuple. */

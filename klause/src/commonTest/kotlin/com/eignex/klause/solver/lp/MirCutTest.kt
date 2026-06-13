@@ -27,7 +27,7 @@ class MirCutTest {
         for (xi in 0..5) {
             if (2 * xi > 3) continue
             for (cut in cuts) {
-                val lhs = cut.cols.indices.sumOf { cut.coeffs[it] * xi } // single column here
+                val lhs = cut.cols.indices.sumOf { cut.coeffs[it] * xi }
                 assertTrue(lhs >= cut.rhs, "x=$xi violates a MIR cut")
             }
         }

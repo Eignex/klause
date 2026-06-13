@@ -47,14 +47,12 @@ class ActivityBasedSearchTest {
         )
         val session = PropagationSession(problem)
         val abs = ActivityBasedSearch()
-        // Bake the initial size so the activity arrays exist (one pick to size them).
+        // One pick to size the activity arrays before bumping.
         abs.pick(session, Random(0L))
-        // Simulate a propagation event bumping var 2 ten times.
         repeat(10) {
             abs.onPropagation(implied(intKeys = intArrayOf(2)))
             abs.onCommit(VarRef.IntVar(2))
         }
-        // Verify var 2 wins.
         val picked = abs.pick(session, Random(0L))
         assertEquals(
             VarRef.IntVar(2),
@@ -77,11 +75,10 @@ class ActivityBasedSearchTest {
         val session = PropagationSession(problem)
         val abs = ActivityBasedSearch(decay = 0.95)
         abs.pick(session, Random(0L))
-        // Bump var 0 first.
         abs.onPropagation(implied(intKeys = intArrayOf(0)))
-        // Pass time via commits (increment grows).
+        // Pass time via commits so the increment grows.
         repeat(50) { abs.onCommit(VarRef.IntVar(0)) }
-        // Now bump var 1 (gets the larger increment).
+        // Bump var 1 with the now-larger increment.
         abs.onPropagation(implied(intKeys = intArrayOf(1)))
         val picked = abs.pick(session, Random(0L))
         assertEquals(
@@ -103,7 +100,6 @@ class ActivityBasedSearchTest {
         val abs = ActivityBasedSearch(resetOnRestart = true)
         abs.pick(session, Random(0L))
         abs.onPropagation(implied(intKeys = intArrayOf(1)))
-        // Confirm var 1 is preferred before restart.
         assertEquals(VarRef.IntVar(1), abs.pick(session, Random(0L)))
         abs.onRestart()
         // After restart, activity is reset → ties broken by id → var 0 wins.

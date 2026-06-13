@@ -123,7 +123,6 @@ class IteratedLocalSearchRestart(
         }
         if (accept) {
             insertSortedByObjective(Incumbent(sample, objective))
-            // Evict the worst (last) when over capacity.
             while (population.size > populationSize) population.removeAt(population.size - 1)
             stallCount = 0
             if (adaptivePerturbation && perturbationStrength > initialPerturbationStrength) {

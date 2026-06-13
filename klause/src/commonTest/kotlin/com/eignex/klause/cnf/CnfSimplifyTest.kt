@@ -48,7 +48,7 @@ class CnfSimplifyTest {
     fun `duplicate clauses collapse to one`() {
         val clauses = listOf(
             intArrayOf(pos(0), neg(1)),
-            intArrayOf(neg(1), pos(0)), // same clause, different order
+            intArrayOf(neg(1), pos(0)),
         )
         val out = CnfSimplify.subsumeClauses(clauses)
         assertEquals(1, out.size)

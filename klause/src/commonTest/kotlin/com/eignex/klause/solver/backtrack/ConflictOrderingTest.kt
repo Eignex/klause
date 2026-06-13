@@ -46,7 +46,6 @@ class ConflictOrderingTest {
         cos.onConflict(VarRef.IntVar(2))
         cos.onConflict(VarRef.IntVar(1))
         cos.onConflict(VarRef.IntVar(3))
-        // Most recent stamp is on var 3.
         assertEquals(VarRef.IntVar(3), cos.pick(session, Random(0L)))
     }
 
