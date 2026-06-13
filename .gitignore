@@ -16,6 +16,3 @@ out/
 .fleet/
 .kotlin/
 /tools/
-
-# bench per-problem result dirs (generated)
-klause-bench/output/*/

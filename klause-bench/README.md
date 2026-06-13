@@ -154,7 +154,7 @@ bench solve suite=mzn-bench kind=cop per-family=1 name=elitserien,gfd-schedule,c
 # then: output/compare.sh output/klause-ls-p8-free-t180s output/yuck-p20-free-t180s
 ```
 
-The `output/` scripts (`run-baselines.sh` curated subset, `run-baselines-full.sh` whole corpus, `compare.sh` for offline diffs) drive the baseline sweeps; the per-config result dirs they produce are gitignored. To stop a background sweep, kill the `run-*.sh` bash loop **first** (else it spawns the next leg), then the forked `BenchCli` JVM by PID.
+The `output/` scripts (`run-baselines.sh` curated subset, `run-baselines-full.sh` whole corpus, `compare.sh` for offline diffs) drive the baseline sweeps; the per-config result dirs they produce are committed (version-controlled) so baselines are shared and diffable across machines. To stop a background sweep, kill the `run-*.sh` bash loop **first** (else it spawns the next leg), then the forked `BenchCli` JVM by PID.
 
 ## Verifying a change
 
