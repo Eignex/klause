@@ -86,7 +86,14 @@ internal class CpToLpRelaxation(
     /** When true, linearize each Table with one selector column per allowed tuple — its exact convex
      *  hull. Adds O(numTuples) columns, so it is gated. */
     private val tableHull: Boolean = false,
+    /** When true, emit the energetic makespan lower-bound row for each Cumulative / Disjunctive whose
+     *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
+    private val cumulative: Boolean = false,
 ) {
+    /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
+    private val cumulativeRelaxation: CumulativeRelaxation? =
+        if (cumulative) CumulativeRelaxation(problem).takeIf { it.applicable } else null
+
     private companion object {
         /** Above this node count the O(n²)-column circuit arc model is skipped. */
         const val MAX_NODES: Int = 24
@@ -367,6 +374,7 @@ internal class CpToLpRelaxation(
             if (tableHull) {
                 for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
             }
+            cumulativeRelaxation?.let { cumulativeRows(it) }
 
             for (factor in problem.factors) {
                 when (factor) {
@@ -580,6 +588,29 @@ internal class CpToLpRelaxation(
             resCols[k] = intColumn(factor.result)
             resVals[k] = -1L
             builder.addRow(resCols, resVals, Relation.EQ, 0L)
+        }
+
+        /**
+         * Emit the energetic makespan lower-bound row `capacity·M ≥ rhs` for each verified plan (see
+         * [CumulativeRelaxation]). The right-hand side is recomputed from the live earliest-starts, so
+         * the row tightens as branching raises task starts; it is marked global at the declared bounds
+         * and otherwise carries the live starts it leaned on as premises. One row per plan keeps the
+         * row count structural (warm-start safe).
+         */
+        private fun cumulativeRows(rel: CumulativeRelaxation) {
+            for (plan in rel.plans) {
+                val spec = rel.rowSpec(plan, session)
+                addIntRow(
+                    intArrayOf(plan.makespanVar),
+                    intArrayOf(plan.capacity),
+                    auxCol = -1,
+                    auxCoeff = 0L,
+                    rel = Relation.GE,
+                    rhs = spec.rhs,
+                    global = spec.global,
+                    premises = spec.premises,
+                )
+            }
         }
 
         private fun linearRow(op: LinearOp, vars: IntArray, coeffs: IntArray, bound: Long) {
