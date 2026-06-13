@@ -234,52 +234,88 @@ object Presolve {
             }
         }
         for (f in deduped) {
-            if (f !is Linear) continue
-            when (f.op) {
-                LinearOp.LE -> offer(leKey(f.vars, f.coeffs, negate = false), f.bound.toLong(), fromEq = false)
-
-                LinearOp.GE -> offer(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = false)
-
-                LinearOp.EQ -> {
-                    offer(leKey(f.vars, f.coeffs, negate = false), f.bound.toLong(), fromEq = true)
-                    offer(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = true)
-                }
-
-                LinearOp.NE -> {}
-            }
+            val n = ineqNormalForm(f) ?: continue
+            offer(n.key, n.bound, fromEq = n.fromEq)
+            // An `=` contributes its bound to both directions, so it can dominate either inequality.
+            if (n.opposite != null) offer(n.opposite.key, n.opposite.bound, fromEq = true)
         }
         val keptRep = HashSet<String>()
         val out = ArrayList<Factor>(deduped.size)
         for (f in deduped) {
-            if (f !is Linear || f.op == LinearOp.EQ || f.op == LinearOp.NE) {
+            val n = ineqNormalForm(f)
+            // Keep equalities, ≠, and non-(Linear/PseudoBoolean) factors; they are never dropped here.
+            if (n == null || n.fromEq) {
                 out.add(f)
                 continue
             }
-            val key = leKey(f.vars, f.coeffs, negate = f.op == LinearOp.GE)
-            val b = if (f.op == LinearOp.LE) f.bound.toLong() else -f.bound.toLong()
-            val tightest = bucketMin.getValue(key)
-            when {
-                b > tightest -> {}
+            val tightest = bucketMin.getValue(n.key)
+            val keep = when {
+                n.bound > tightest -> false
 
-                // dominated by a tighter constraint → drop
-                bucketEqAtMin[key] == true -> {}
+                // dominated by a tighter constraint
+                bucketEqAtMin[n.key] == true -> false
 
-                // an `=` over the same vector implies this → drop
-                keptRep.add(key) -> out.add(f)
-
-                // first representative at the tightest bound → keep
-                else -> {} // duplicate of the kept representative → drop
+                // an `=` over the same vector implies this
+                else -> keptRep.add(n.key) // keep the first representative at the tightest bound; drop dups
             }
+            if (keep) out.add(f)
         }
         if (out.size == factors.size) return problem
         return rebuildProblem(problem, out)
     }
 
+    /** A linear / pseudo-Boolean constraint as a `≤`-normalised bucket contribution: [key] is the
+     *  coefficient vector (a `≥` folds to `≤` by negating), [bound] the `≤` right-hand side. [fromEq]
+     *  marks an equality (it also contributes its [opposite] direction and is never itself dropped).
+     *  `null` for `≠` and non-(Linear/PseudoBoolean) factors, which take no part in domination. */
+    private class IneqForm(val key: String, val bound: Long, val fromEq: Boolean, val opposite: IneqForm? = null)
+
+    private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {
+        is Linear -> when (f.op) {
+            LinearOp.LE -> IneqForm(leKey(f.vars, f.coeffs, negate = false), f.bound.toLong(), fromEq = false)
+
+            LinearOp.GE -> IneqForm(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = false)
+
+            LinearOp.EQ -> IneqForm(
+                leKey(f.vars, f.coeffs, negate = false),
+                f.bound.toLong(),
+                fromEq = true,
+                opposite = IneqForm(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = true),
+            )
+
+            LinearOp.NE -> null
+        }
+
+        is PseudoBoolean -> when (f.op) {
+            PbOp.LE -> IneqForm(pbKey(f.literals, f.weights, negate = false), f.bound.toLong(), fromEq = false)
+
+            PbOp.GE -> IneqForm(pbKey(f.literals, f.weights, negate = true), -f.bound.toLong(), fromEq = false)
+
+            PbOp.EQ -> IneqForm(
+                pbKey(f.literals, f.weights, negate = false),
+                f.bound.toLong(),
+                fromEq = true,
+                opposite = IneqForm(pbKey(f.literals, f.weights, negate = true), -f.bound.toLong(), fromEq = true),
+            )
+        }
+
+        else -> null
+    }
+
     /** Canonical key for a linear inequality's `≤`-normal-form coefficient vector: the `(var, coeff)`
-     *  pairs sorted by variable, with every coefficient negated when [negate] (folding `≥` into `≤`). */
+     *  pairs sorted by variable, with every coefficient negated when [negate] (folding `≥` into `≤`).
+     *  Prefixed so it never shares a bucket with a [pbKey]. */
     private fun leKey(vars: IntArray, coeffs: IntArray, negate: Boolean): String {
         val sign = if (negate) -1 else 1
-        return vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${sign * coeffs[it]}" }
+        return "L:" + vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${sign * coeffs[it]}" }
+    }
+
+    /** The pseudo-Boolean analogue of [leKey] over `(literal, weight)` pairs (#465). Distinct literal
+     *  ids for opposite polarities keep `x` and `¬x` apart; prefixed disjoint from [leKey]. */
+    private fun pbKey(literals: IntArray, weights: IntArray, negate: Boolean): String {
+        val sign = if (negate) -1 else 1
+        return "P:" + literals.indices.sortedBy { literals[it] }
+            .joinToString(",") { "${literals[it]}=${sign * weights[it]}" }
     }
 
     /**
