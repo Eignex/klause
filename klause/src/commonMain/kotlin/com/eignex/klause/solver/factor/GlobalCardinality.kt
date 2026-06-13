@@ -39,8 +39,9 @@ class GlobalCardinality(
     val closed: Boolean = false,
     /** Per-xs presence literals; empty for the non-opt fast path. Absent positions
      *  contribute nothing to any cover-value count and don't trip the closed check. */
-    val presents: IntArray = EmptyIntArray,
-) : Factor {
+    override val presents: IntArray = EmptyIntArray,
+) : Factor,
+    OptionalFactor {
 
     init {
         require(xs.isNotEmpty()) { "gcc: empty xs" }
@@ -102,9 +103,6 @@ class GlobalCardinality(
     }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
-
-    private fun present(state: LocalSearchState, idx: Int): Boolean =
-        OptPresence.isPresentInAssignment(presents, idx, state)
     override val intVars: IntArray = run {
         val cv = countVars
         if (cv != null) xs + cv else xs
@@ -277,8 +275,8 @@ class GlobalCardinality(
         val out = IntArrayList()
         for (i in presents.indices) {
             when {
-                OptPresence.isDefinitelyPresent(presents, i, state) -> out.add(Lit.negate(presents[i]))
-                OptPresence.isDefinitelyAbsent(presents, i, state) -> out.add(presents[i])
+                definitelyPresent(i, state) -> out.add(Lit.negate(presents[i]))
+                definitelyAbsent(i, state) -> out.add(presents[i])
             }
         }
         return out.toIntArray()
@@ -314,7 +312,7 @@ class GlobalCardinality(
             IntArray(xs.size) { it }
         } else {
             val acc = IntArrayList()
-            for (i in xs.indices) if (OptPresence.isDefinitelyPresent(presents, i, state)) acc.add(i)
+            for (i in xs.indices) if (definitelyPresent(i, state)) acc.add(i)
             IntArray(acc.size) { acc[it] }
         }
         val effectiveXs: IntArray = if (presents.isEmpty()) {
@@ -333,8 +331,8 @@ class GlobalCardinality(
         } else {
             val acc = IntArrayList()
             for (i in xs.indices) {
-                if (!OptPresence.isDefinitelyPresent(presents, i, state) &&
-                    !OptPresence.isDefinitelyAbsent(presents, i, state)
+                if (!definitelyPresent(i, state) &&
+                    !definitelyAbsent(i, state)
                 ) {
                     acc.add(xs[i])
                 }

@@ -65,7 +65,7 @@ class Cumulative(
      *  zero energy / zero compulsory part. Theta-tree leaves stay inactive for
      *  definitely-absent tasks; unpinned-presence tasks are excluded from edge-finding too
      *  (they may yet go absent, so they can't sharpen Ω-energy deductions). */
-    val presents: IntArray = EmptyIntArray,
+    override val presents: IntArray = EmptyIntArray,
     /** Per-task duration variables; empty = use [durations] as constants. When set, the
      *  factor reads the current duration from `state.assignment.intValue(durationVars(i))`
      *  and propagation pulls bounds from `state.intDomains(durationVars(i))`. */
@@ -75,7 +75,8 @@ class Cumulative(
     val resourceVars: IntArray = EmptyIntArray,
     /** Capacity variable id; -1 = use [capacity] as a constant. */
     val capacityVar: Int = -1,
-) : Factor {
+) : Factor,
+    OptionalFactor {
 
     init {
         require(starts.size == durations.size && starts.size == resources.size) {
@@ -126,9 +127,6 @@ class Cumulative(
             out
         }
     }
-
-    private fun present(state: LocalSearchState, idx: Int): Boolean =
-        OptPresence.isPresentInAssignment(presents, idx, state)
 
     private val n: Int = starts.size
 
@@ -578,8 +576,8 @@ class Cumulative(
         }
         // Per-task resource feasibility — only definitely-present tasks must fit.
         for (i in 0 until n) {
-            if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (definitelyAbsent(i, state)) continue
+            if (!definitelyPresent(i, state)) continue
             if (effDur[i] > 0 && effRes[i] > effCap) return false
         }
         // Overload + edge-finding, both driven off the Θ-tree max-envelope (the overload
@@ -588,7 +586,7 @@ class Cumulative(
         if (!edgeFindingPass(state, effDur, effRes, effCap)) return false
         val profile = MandatoryProfile()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!definitelyPresent(i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
             if (d == 0 || r == 0) continue
@@ -597,7 +595,7 @@ class Cumulative(
         }
         if (!profile.build(effCap)) return false
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!definitelyPresent(i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
             if (d == 0 || r == 0) continue
@@ -664,7 +662,7 @@ class Cumulative(
         if (n < 2 || effCap == 0) return true
         val active = IntArrayList()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!definitelyPresent(i, state)) continue
             if (effDur[i] > 0 && effRes[i] > 0) active.add(i)
         }
         val m = active.size

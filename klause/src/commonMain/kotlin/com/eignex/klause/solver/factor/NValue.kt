@@ -29,8 +29,9 @@ class NValue(
     /** How [n] relates to the actual distinct-value count. */
     val mode: Mode = Mode.Eq,
     /** Per-index presence literals; empty for the non-opt fast path. */
-    val presents: IntArray = EmptyIntArray,
-) : Factor {
+    override val presents: IntArray = EmptyIntArray,
+) : Factor,
+    OptionalFactor {
 
     /** How an `nvalue` constraint's target relates to the actual distinct-value count. */
     enum class Mode {
@@ -56,9 +57,6 @@ class NValue(
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = xs + intArrayOf(n)
-
-    private fun present(state: LocalSearchState, idx: Int): Boolean =
-        OptPresence.isPresentInAssignment(presents, idx, state)
 
     /** Maintains a per-value count over the assignment. `distinctCount` = number of values
      *  whose count is > 0. */
@@ -272,7 +270,7 @@ class NValue(
         // Upper bound: |∪ dom(xs[i])| for indices that aren't definitely absent.
         val unionValues = IntHashSet()
         for (i in xs.indices) {
-            if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
+            if (definitelyAbsent(i, state)) continue
             state.intDomains[xs[i]].forEach { unionValues.add(it) }
         }
         val maxDistinct = unionValues.size
@@ -281,7 +279,7 @@ class NValue(
         // likely to stay disjoint); a var joins the set when its domain shares no value with
         // any already-selected var. Pairwise-disjoint domains force pairwise-distinct values.
         val present = IntArrayList(xs.size)
-        for (i in xs.indices) if (OptPresence.isDefinitelyPresent(presents, i, state)) present.add(xs[i])
+        for (i in xs.indices) if (definitelyPresent(i, state)) present.add(xs[i])
         present.sortByIntKey { state.intDomains[it].size }
         val covered = IntHashSet()
         var minDistinct = 0

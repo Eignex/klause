@@ -32,14 +32,15 @@ class AllDifferent(
      *  only present positions are required pairwise-different, and Régin filtering treats
      *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
      *  slot nor block other positions from claiming their value. */
-    val presents: IntArray = EmptyIntArray,
+    override val presents: IntArray = EmptyIntArray,
     /** Values exempt from the distinctness requirement: any number of variables may share a
      *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family, #433).
      *  Empty for plain all-different — then this factor behaves exactly as before. Excepted
      *  values are modelled inside [reginFilter] as capacity-n value copies, so the exact
      *  Hall/matching machinery applies unchanged. */
     val exceptSet: IntArray = EmptyIntArray,
-) : Factor {
+) : Factor,
+    OptionalFactor {
 
     init {
         require(vars.size >= 2) { "AllDifferent needs at least two variables" }
@@ -86,9 +87,6 @@ class AllDifferent(
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars
-
-    private fun present(state: LocalSearchState, idx: Int): Boolean =
-        OptPresence.isPresentInAssignment(presents, idx, state)
 
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
@@ -262,7 +260,7 @@ class AllDifferent(
         } else {
             val acc = IntArrayList()
             for (i in vars.indices) {
-                if (OptPresence.isDefinitelyPresent(presents, i, state)) acc.add(i)
+                if (definitelyPresent(i, state)) acc.add(i)
             }
             IntArray(acc.size) { acc[it] }
         }
