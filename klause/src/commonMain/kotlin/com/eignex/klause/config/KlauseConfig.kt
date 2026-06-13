@@ -1,6 +1,7 @@
 package com.eignex.klause.config
 
 import com.eignex.klause.solver.presolve.PresolveConfig
+import com.eignex.klause.solver.presolve.PresolveEmphasis
 import com.eignex.klause.solver.presolve.PresolvePass
 
 /** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries
@@ -72,11 +73,14 @@ data class KlauseConfig(
      *  bounds are multiplied by this and rounded to integers). Env: `KLAUSE_FLOAT_SCALE`. */
     val floatScale: Long = DEFAULT_FLOAT_SCALE,
 
-    // Presolve passes, one tri-state knob each: `true` forces the pass on, `false` off, and `null`
-    // (the default) leaves it to automatic resolution. Assembled into a [PresolveConfig] via
+    // Presolve: an emphasis level plus one tri-state override knob per pass (`true` forces the pass
+    // on, `false` off, `null` defers to the emphasis). Assembled into a [PresolveConfig] via
     // [presolveConfig]; the CLI `--presolve` flag / `klause.presolve` property override these.
 
-    /** GCD coefficient strengthening. `null` = auto (on). */
+    /** Presolve effort level. */
+    val presolveEmphasis: PresolveEmphasis = PresolveEmphasis.DEFAULT,
+
+    /** GCD coefficient strengthening. `null` = follow the emphasis. */
     val presolveStrengthenCoefficients: Boolean? = null,
 
     /** Affine singleton elimination. `null` = auto (on). */
@@ -95,10 +99,11 @@ data class KlauseConfig(
     /** Construction-time interior-hole SAC (implies bound SAC). `null` = auto (off — opt-in). */
     val presolveProbeIntHoles: Boolean? = null,
 ) {
-    /** Bundle the per-pass presolve knobs into a [PresolveConfig]; `null` knobs are left out
-     *  (auto-resolved), explicit values become forced on/off settings. */
+    /** Bundle the emphasis level and the per-pass override knobs into a [PresolveConfig]; `null`
+     *  knobs are left out (deferred to the emphasis), explicit values become forced overrides. */
     fun presolveConfig(): PresolveConfig = PresolveConfig(
-        buildMap {
+        emphasis = presolveEmphasis,
+        overrides = buildMap {
             presolveStrengthenCoefficients?.let { put(PresolvePass.STRENGTHEN_COEFFICIENTS, it) }
             presolveAffineSingletons?.let { put(PresolvePass.ELIMINATE_AFFINE_SINGLETONS, it) }
             presolveBreakSymmetries?.let { put(PresolvePass.BREAK_SYMMETRIES, it) }
