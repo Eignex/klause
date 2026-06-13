@@ -132,7 +132,10 @@ class SequentialPortfolio(
      * with the arm that produced it (the segment is single-armed, so attribution is exact) and the
      * elapsed time — the anytime/credit telemetry, identical in shape to the parallel executor's.
      */
-    override fun minimize(cancellation: Cancellation, onImprovement: ((AttributedImprovement) -> Unit)?): MinimizeResult {
+    override fun minimize(
+        cancellation: Cancellation,
+        onImprovement: ((AttributedImprovement) -> Unit)?,
+    ): MinimizeResult {
         var bound = Double.POSITIVE_INFINITY
         var best: Sample? = null
         var rewardScale = 0.0
