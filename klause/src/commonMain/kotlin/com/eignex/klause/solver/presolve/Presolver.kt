@@ -22,6 +22,9 @@ class PresolveContext(
     val objectiveIntVars: Set<Int> = emptySet(),
     val objectiveBoolVars: Set<Int> = emptySet(),
     val solutionSetSensitive: Boolean = false,
+    /** Minimize-sense integer objective coefficients (var → nonzero coefficient), used by dual fixing
+     *  to decide which bound a dominated variable can be pinned to. */
+    val objectiveIntCoeffs: Map<Int, Long> = emptyMap(),
 ) {
     /** Factories for the common contexts. */
     companion object {
@@ -32,10 +35,17 @@ class PresolveContext(
         fun of(objective: LinearObjective?, solutionSetSensitive: Boolean = false): PresolveContext {
             if (objective == null) return PresolveContext(solutionSetSensitive = solutionSetSensitive)
             val ints = HashSet<Int>()
-            for (i in objective.intCoefficients.indices) if (objective.intCoefficients[i] != 0L) ints.add(i)
+            val intCoeffs = HashMap<Int, Long>()
+            for (i in objective.intCoefficients.indices) {
+                val c = objective.intCoefficients[i]
+                if (c != 0L) {
+                    ints.add(i)
+                    intCoeffs[i] = c
+                }
+            }
             val bools = HashSet<Int>()
             for (b in objective.boolWeights.indices) if (objective.boolWeights[b] != 0L) bools.add(b)
-            return PresolveContext(ints, bools, solutionSetSensitive)
+            return PresolveContext(ints, bools, solutionSetSensitive, intCoeffs)
         }
     }
 }
@@ -145,6 +155,14 @@ enum class PresolvePass(
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
             PassResult(Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars))
+    },
+
+    /** Dual fixing / dominated-variable reductions (#448) — pins a variable to a bound when the
+     *  objective and constraint structure guarantee an optimum there. Solution-set altering, so
+     *  auto-disabled for solution-set-sensitive queries. */
+    DUAL_FIX("dual-fix", Stage.PROBLEM, PresolveTiming.MEDIUM, preservesSolutionSet = false, autoEligible = true) {
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            PassResult(Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs))
     },
 
     /** Construction-time failed-literal SAC (#146): folded into `Problem.baked` at build, read via
