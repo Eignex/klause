@@ -128,19 +128,24 @@ class SequentialPortfolio(
      * (backtrack prunes on it) and the incumbent assignment (LS warm-starts from it). Returns
      * [MinimizeResult.Optimal]/[MinimizeResult.Infeasible] only when an arm exhausts its search
      * (a `SearchExhausted` terminal that the slice did not truncate), otherwise the best incumbent
-     * as [MinimizeResult.BestFound]. `onIncumbent` fires once per strict global improvement, for
-     * anytime telemetry.
+     * as [MinimizeResult.BestFound]. `onImprovement` fires once per strict global improvement, tagged
+     * with the arm that produced it (the segment is single-armed, so attribution is exact) and the
+     * elapsed time — the anytime/credit telemetry, identical in shape to the parallel executor's.
      */
-    override fun minimize(cancellation: Cancellation): MinimizeResult = minimize(cancellation, onIncumbent = null)
-
-    /** [minimize] with an `onIncumbent` callback fired once per strict global improvement. */
-    fun minimize(cancellation: Cancellation, onIncumbent: ((MinimizeResult) -> Unit)?): MinimizeResult {
+    override fun minimize(
+        cancellation: Cancellation,
+        onImprovement: ((AttributedImprovement) -> Unit)?,
+    ): MinimizeResult {
         var bound = Double.POSITIVE_INFINITY
         var best: Sample? = null
         var rewardScale = 0.0
         var stats = SolveStats.EMPTY
         var slice = baseSliceMillis
         var segment = 0
+        val start = TimeSource.Monotonic.markNow()
+        // The label of the arm running the current segment — single-threaded, so it is unambiguous
+        // for every improvement [accept] folds while that segment is active.
+        var armLabel = workers.first().label
         val readBound = { bound }
         // One resumable handle per backtrack arm, opened lazily on the arm's first segment and resumed
         // on every later one (#381). LS arms stay null and run a fresh warm-started slice each time.
@@ -148,12 +153,13 @@ class SequentialPortfolio(
         // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
         val staleSegments = IntArray(workers.size)
 
-        // Fold a strictly-improving incumbent into the shared bound + fire the telemetry callback.
+        // Fold a strictly-improving incumbent into the shared bound + fire the telemetry callback,
+        // attributing it to the arm of the active segment ([armLabel]).
         fun accept(r: MinimizeResult.WithSample) {
             if (r.objectiveValue < bound) {
                 bound = r.objectiveValue
                 best = r.sample
-                onIncumbent?.invoke(r)
+                onImprovement?.invoke(AttributedImprovement(armLabel, start.elapsedNow(), r))
             }
         }
 
@@ -166,6 +172,7 @@ class SequentialPortfolio(
             val hadIncumbent = best != null
             val before = bound
             val worker = workers[arm]
+            armLabel = worker.label
             val handle = handles[arm] ?: worker.newResumableSearch(readBound)?.also { handles[arm] = it }
             var terminal: MinimizeResult? = null
             if (handle != null) {

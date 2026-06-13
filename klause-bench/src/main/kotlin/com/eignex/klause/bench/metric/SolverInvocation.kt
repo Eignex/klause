@@ -45,8 +45,9 @@ internal object SolverInvocation {
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
-     *  `%%%mzn-stat` lines, and the raw stdout (saved as the run's "minizinc output"). Serializable
-     *  so [BenchCache] can persist and replay it. */
+     *  `%%%mzn-stat` lines, the per-arm [attribution] stream (klause portfolio `-s` only), and the
+     *  raw stdout (saved as the run's "minizinc output"). Serializable so [BenchCache] can persist
+     *  and replay it. */
     @Serializable
     internal data class Result(
         val feasible: Boolean?,
@@ -54,6 +55,7 @@ internal object SolverInvocation {
         val timeToBestMs: Long?,
         val proven: Boolean,
         val stats: Map<String, String>,
+        val attribution: List<Attribution> = emptyList(),
         val rawOutput: String,
         val command: String,
     )
@@ -168,6 +170,7 @@ internal object SolverInvocation {
 
         val raw = StringBuilder()
         val stats = LinkedHashMap<String, String>()
+        val attribution = ArrayList<Attribution>()
         var objective: Double? = null
         var timeToBestMs: Long? = null
         var proven = false
@@ -189,6 +192,8 @@ internal object SolverInvocation {
                 UNKNOWN, ERROR -> Unit
 
                 else -> when {
+                    line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let { attribution.add(it) }
+
                     line.startsWith(STAT_PREFIX) -> line.removePrefix(STAT_PREFIX).trim().split('=', limit = 2)
                         .takeIf { it.size == 2 }?.let { stats[it[0].trim()] = it[1].trim() }
 
@@ -215,8 +220,22 @@ internal object SolverInvocation {
             timeToBestMs = timeToBestMs,
             proven = proven,
             stats = stats,
+            attribution = attribution,
             rawOutput = raw.toString(),
             command = cmd.joinToString(" "),
+        )
+    }
+
+    /** Parse a `%%%klause-arm:` body (`label=<l> objective=<v> time=<ms>`); null if malformed. */
+    private fun parseArm(body: String): Attribution? {
+        val kv = body.trim().split(' ').mapNotNull {
+            it.split('=', limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] }
+        }.toMap()
+        val label = kv["label"] ?: return null
+        return Attribution(
+            label = label,
+            objective = kv["objective"]?.toDoubleOrNull(),
+            elapsedMs = kv["time"]?.toLongOrNull() ?: return null,
         )
     }
 
@@ -230,8 +249,20 @@ internal object SolverInvocation {
     private const val OBJECTIVE_KEY = "objective ="
     private const val MODEL_OBJECTIVE_KEY = "_objective"
     private const val STAT_PREFIX = "%%%mzn-stat:"
+    private const val ARM_PREFIX = "%%%klause-arm:"
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000
     private const val REGISTRY_WAIT_MILLIS = 10_000L
 }
+
+/** One strict global improvement, parsed off a klause portfolio's `%%%klause-arm:` line: the arm
+ *  ([label]) that produced the incumbent, its model-oriented [objective], and the [elapsedMs] at
+ *  which it was found. The ordered list across a solve is the per-arm credit signal (which arm got
+ *  the first incumbent, held the last/best, how many it contributed). */
+@Serializable
+internal data class Attribution(
+    val label: String,
+    val objective: Double?,
+    val elapsedMs: Long,
+)

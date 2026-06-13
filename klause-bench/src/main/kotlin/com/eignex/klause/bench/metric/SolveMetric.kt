@@ -68,6 +68,10 @@ internal data class SolveRecord(
     /** optimum proved (optimize) or search closed UNSAT/exhausted. */
     val proven: Boolean,
     val stats: Map<String, String> = emptyMap(),
+    /** Per-arm improvement stream from a klause portfolio `-s` run (`%%%klause-arm:` lines), in
+     *  arrival order; empty for references and single-engine klause. The `credit.sh` script
+     *  aggregates this across a config dir into first/best/sole/marginal per-arm credit. */
+    val attribution: List<Attribution> = emptyList(),
     val gitSha: String?,
     val timestamp: String,
     val command: String,
@@ -177,6 +181,7 @@ internal object SolveMetric {
         timeToBestMs = r.timeToBestMs,
         proven = r.proven,
         stats = r.stats,
+        attribution = r.attribution,
         gitSha = sha,
         timestamp = timestamp,
         command = r.command,

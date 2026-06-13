@@ -282,10 +282,72 @@ object Presolve {
         return vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${sign * coeffs[it]}" }
     }
 
-    private fun rebuildProblem(problem: Problem, factors: List<Factor>): Problem = Problem(
+    /**
+     * Dual fixing / dominated-variable reductions (#448). A minimize objective `min Σ cⱼxⱼ` plus the
+     * constraint structure can pin a variable to a bound without changing the optimum:
+     *  - **down-safe**: lowering `xⱼ` never violates any constraint — it occurs only in `≤` rows with a
+     *    positive coefficient or `≥` rows with a negative one; if also `cⱼ ≥ 0` (lowering never raises
+     *    the objective), an optimum exists with `xⱼ` at its lower bound, so pin it there.
+     *  - **up-safe**: the mirror (`≤`/negative or `≥`/positive, and `cⱼ ≤ 0`) → pin to the upper bound.
+     *
+     * Only integer variables whose every occurrence is a `≤`/`≥` [Linear] are considered: an `=`/`≠`
+     * row or any non-[Linear] (global) factor makes the safety undecidable, so the variable is
+     * excluded. Coefficients come from [objectiveIntCoeffs] (minimize sense, absent ⇒ 0). Pins by
+     * tightening the domain to a singleton — no elimination, identity reconstruction. Solution-set
+     * altering (discards optimum-equivalent and feasible-but-suboptimal assignments), so the engine
+     * runs it only for non-solution-set-sensitive queries. Bool dual fixing is a follow-up.
+     */
+    fun fixDominatedVariables(problem: Problem, objectiveIntCoeffs: Map<Int, Long>): Problem {
+        val n = problem.numIntVars
+        if (n == 0) return problem
+        val downSafe = BooleanArray(n) { true }
+        val upSafe = BooleanArray(n) { true }
+        val eligible = BooleanArray(n) { true }
+        for (f in problem.factors) {
+            if (f is Linear && (f.op == LinearOp.LE || f.op == LinearOp.GE)) {
+                for (i in f.vars.indices) {
+                    val a = f.coeffs[i]
+                    if (a == 0) continue
+                    // For a nonzero coefficient in a ≤/≥ row exactly one direction is safe: lowering is
+                    // safe iff (LE ∧ a>0) ∨ (GE ∧ a<0); raising is the complement.
+                    val loweringSafe = if (f.op == LinearOp.LE) a > 0 else a < 0
+                    if (loweringSafe) upSafe[f.vars[i]] = false else downSafe[f.vars[i]] = false
+                }
+            } else {
+                for (v in f.intVars) eligible[v] = false
+            }
+        }
+        var changed = false
+        val domains = problem.intDomains.copyOf()
+        for (v in 0 until n) {
+            if (!eligible[v]) continue
+            val d = problem.intDomains[v]
+            if (d.min == d.max) continue // already fixed
+            val c = objectiveIntCoeffs[v] ?: 0L
+            when {
+                downSafe[v] && c >= 0L -> {
+                    domains[v] = IntDomain(d.min, d.min)
+                    changed = true
+                }
+
+                upSafe[v] && c <= 0L -> {
+                    domains[v] = IntDomain(d.max, d.max)
+                    changed = true
+                }
+            }
+        }
+        if (!changed) return problem
+        return rebuildProblem(problem, problem.factors.toList(), domains)
+    }
+
+    private fun rebuildProblem(
+        problem: Problem,
+        factors: List<Factor>,
+        intDomains: Array<IntDomain> = problem.intDomains.copyOf(),
+    ): Problem = Problem(
         numBoolVars = problem.numBoolVars,
         numIntVars = problem.numIntVars,
-        intDomains = problem.intDomains.copyOf(),
+        intDomains = intDomains,
         factors = factors,
         probeFailedLiterals = problem.probeFailedLiterals,
         probeIntBounds = problem.probeIntBounds,

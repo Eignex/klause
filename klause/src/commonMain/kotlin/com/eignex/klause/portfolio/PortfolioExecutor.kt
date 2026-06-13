@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import kotlin.time.Duration
 
 /**
  * The common, **blocking** interface of the two portfolio executors — the parallel `Portfolio`
@@ -14,6 +15,27 @@ interface PortfolioExecutor : AutoCloseable {
     /** Solve (satisfaction), honouring [cancellation]. */
     fun solve(cancellation: Cancellation = Cancellation.Never): SolveResult
 
-    /** Branch-and-bound minimisation, honouring [cancellation]. */
-    fun minimize(cancellation: Cancellation = Cancellation.Never): MinimizeResult
+    /**
+     * Branch-and-bound minimisation, honouring [cancellation]. When [onImprovement] is set it fires
+     * once per **strict global improvement**, tagged with the producing worker — the attribution
+     * entry point for anytime telemetry / per-arm credit. The callback is serialised: the parallel
+     * executor holds a lock across it, the single-core one is inherently sequential, so the consumer
+     * never sees concurrent invocations.
+     */
+    fun minimize(
+        cancellation: Cancellation = Cancellation.Never,
+        onImprovement: ((AttributedImprovement) -> Unit)? = null,
+    ): MinimizeResult
 }
+
+/** One strict global improvement, tagged with the producing worker's label and the elapsed time
+ *  since the minimisation started. Emitted by [PortfolioExecutor.minimize]'s `onImprovement` and by
+ *  the parallel `Portfolio.improvementsAttributed` stream. */
+data class AttributedImprovement(
+    /** [PortfolioWorker.label] of the worker that produced this incumbent. */
+    val workerLabel: String,
+    /** Time since the minimisation started. */
+    val elapsed: Duration,
+    /** The strict global improvement itself (always a [MinimizeResult.WithSample]). */
+    val result: MinimizeResult,
+)

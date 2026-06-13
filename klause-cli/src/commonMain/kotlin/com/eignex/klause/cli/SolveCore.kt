@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
@@ -202,11 +203,22 @@ internal object SolveCore {
             if (scenario.cores == 1) SequentialPortfolio.exp3(workers) else parallelPortfolio(workers)
         executor.use {
             if (solvable.optimize) {
-                emitMinimize(it.minimize(cancel), solvable, common, output, complete, t0)
+                // Under `-s`, attribute each strict global improvement to its arm (a `%%%klause-arm:`
+                // comment). Null otherwise, so the executor skips the serialising lock entirely.
+                val onImprovement = if (common.statistics) attributionSink(solvable, output) else null
+                emitMinimize(it.minimize(cancel, onImprovement), solvable, common, output, complete, t0)
             } else {
                 emitSolve(it.solve(cancel), solvable, common, output, t0)
             }
         }
+    }
+
+    /** Build the `onImprovement` callback that renders one attribution line per incumbent, in the
+     *  model's objective orientation. */
+    private fun attributionSink(solvable: Solvable, output: OutputProtocol): (AttributedImprovement) -> Unit = { imp ->
+        val r = imp.result as MinimizeResult.WithSample
+        val obj = solvable.objectiveValue?.invoke(r.sample) ?: r.objectiveValue.toLong()
+        output.onImprovement(imp.workerLabel, obj, imp.elapsed.inWholeMilliseconds)
     }
 
     /** Emit a satisfaction verdict + the sole model (if any) + stats. */

@@ -360,6 +360,14 @@ internal interface OutputProtocol {
     fun onSolution(rendered: String, objective: Long?)
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
+
+    /** `-s` on a portfolio optimize: one line per strict global improvement, naming the arm that
+     *  produced it (`-p N` races several). A machine-readable FlatZinc comment — every other output
+     *  parser treats a `%`-prefixed line as a comment, so it is mode-agnostic; the default renders it
+     *  and modes need not override. [objective] is the model-oriented value of the incumbent. */
+    fun onImprovement(arm: String, objective: Long, elapsedMs: Long) {
+        println("%%%klause-arm: label=$arm objective=$objective time=$elapsedMs")
+    }
 }
 
 /**

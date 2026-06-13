@@ -8,10 +8,11 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /**
@@ -93,11 +94,26 @@ class Portfolio(
      * (backtrack prunes on it; LS ignores it). A worker proving Optimal cancels the rest; otherwise
      * the global incumbent is returned as BestFound, or Optimal if every worker terminated cleanly.
      */
-    override fun minimize(cancellation: Cancellation): MinimizeResult {
+    override fun minimize(
+        cancellation: Cancellation,
+        onImprovement: ((AttributedImprovement) -> Unit)?,
+    ): MinimizeResult {
         val incumbent = AtomicReference(Incumbent(Double.POSITIVE_INFINITY, null))
         val cancelled = AtomicBoolean(false)
         val token: Cancellation = { cancelled.load() || cancellation() }
         fun readBound(): Double = incumbent.load().bound
+        // Workers improve concurrently; [emitLock] serialises the attribution callback so the consumer
+        // (e.g. the CLI's `-s` per-arm line) never sees interleaved invocations. It is non-null exactly
+        // when [onImprovement] is, so the no-callback path takes neither the lock nor the callback. Only
+        // the thread whose CAS actually installed the new global best fires it — a loser never reports.
+        val start = TimeSource.Monotonic.markNow()
+        val emitLock = if (onImprovement != null) Concurrency.Strict.lock() else null
+        fun fold(worker: PortfolioWorker, r: MinimizeResult.WithSample) {
+            if (!updateSharedBound(incumbent, r.objectiveValue, r.sample)) return
+            val cb = onImprovement ?: return
+            val lock = emitLock ?: return
+            lock.withLock { cb(AttributedImprovement(worker.label, start.elapsedNow(), r)) }
+        }
 
         val results = parallelRun(
             workers.map { worker ->
@@ -106,12 +122,12 @@ class Portfolio(
                     for (r in worker.improvements(::readBound, token)) {
                         when (r) {
                             is MinimizeResult.BestFound -> {
-                                updateSharedBound(incumbent, r.objectiveValue, r.sample)
+                                fold(worker, r)
                                 local = r
                             }
 
                             is MinimizeResult.Optimal -> {
-                                updateSharedBound(incumbent, r.objectiveValue, r.sample)
+                                fold(worker, r)
                                 cancelled.store(true)
                                 local = r
                                 break
@@ -157,12 +173,15 @@ class Portfolio(
         }
     }
 
-    private fun updateSharedBound(incumbent: AtomicReference<Incumbent>, objective: Double, sample: Sample) {
+    /** CAS the (bound, sample) cell to [objective] when strictly better. Returns true iff *this* call
+     *  installed the new global best — the caller fires attribution only then, so a racing loser's
+     *  stale value is never reported. */
+    private fun updateSharedBound(incumbent: AtomicReference<Incumbent>, objective: Double, sample: Sample): Boolean {
         while (true) {
             val cur = incumbent.load()
-            if (objective >= cur.bound) return
+            if (objective >= cur.bound) return false
             // One CAS swaps bound + sample together so a reported bound always matches its sample (#81).
-            if (incumbent.compareAndSet(cur, Incumbent(objective, sample))) return
+            if (incumbent.compareAndSet(cur, Incumbent(objective, sample))) return true
         }
     }
 
@@ -217,17 +236,6 @@ class Portfolio(
 /** Immutable (bound, sample) pair published as one [AtomicReference] cell so the shared bound and
  *  the best sample are swapped together in a single CAS — they can never desync under a race (#81). */
 private class Incumbent(val bound: Double, val sample: Sample?)
-
-/** One strict global improvement from [Portfolio.improvementsAttributed], tagged with the producing
- *  worker's label and the elapsed time since the stream started. */
-data class AttributedImprovement(
-    /** [PortfolioWorker.label] of the worker that produced this incumbent. */
-    val workerLabel: String,
-    /** Time since the attributed stream started. */
-    val elapsed: Duration,
-    /** The strict global improvement itself (always a [MinimizeResult.WithSample]). */
-    val result: MinimizeResult,
-)
 
 /** Strategy knobs for [Portfolio]. Affects `solve` only; `samples` always fans in from every worker
  *  and `minimize` always shares the global bound (race honoured via cancellation on Optimal). */
