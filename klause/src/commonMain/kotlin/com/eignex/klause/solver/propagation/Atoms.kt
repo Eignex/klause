@@ -15,11 +15,11 @@ internal fun PropagationState.markAtomWatched(atomId: Int) {
     idx.insert(kind, k, atomId)
 }
 
-internal fun PropagationState.atomKey(intVar: Int, kind: Int, threshold: Int): Long {
+internal fun PropagationState.atomKey(intVar: Int, kind: AtomKind, threshold: Int): Long {
     // Threshold can be negative; bias by Int.MIN_VALUE to keep it non-negative within
     // the lower 32 bits. Kind (0..2) takes bits 32..33; intVar takes bits 34..63.
     val biased = threshold.toLong() - Int.MIN_VALUE.toLong()
-    return (intVar.toLong() shl 34) or (kind.toLong() shl 32) or biased
+    return (intVar.toLong() shl 34) or (kind.ordinal.toLong() shl 32) or biased
 }
 
 /** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
@@ -60,15 +60,11 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     val k = atomThreshold[atomId]
     val truth = atomCurrentTruth(atomId) ?: return levelToDecisionVar.size
     return when (atomKind[atomId]) {
-        0 -> if (truth) minLevelForGe(v, k) else maxLevelForLe(v, k - 1)
+        AtomKind.GE -> if (truth) minLevelForGe(v, k) else maxLevelForLe(v, k - 1)
 
-        // v ≥ k
+        AtomKind.LE -> if (truth) maxLevelForLe(v, k) else minLevelForGe(v, k + 1)
 
-        1 -> if (truth) maxLevelForLe(v, k) else minLevelForGe(v, k + 1)
-
-        // v ≤ k
-
-        2 -> if (truth) { // v = k : true when the later of the two bounds reached k
+        AtomKind.EQ -> if (truth) { // v = k : true when the later of the two bounds reached k
             maxOf(minLevelForGe(v, k), maxLevelForLe(v, k))
         } else { // v ≠ k : established at the level k left the domain
             val d = intDomains[v]
@@ -78,13 +74,11 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
                 else -> holeLevelFor(v, k) // interior hole — carve history
             }
         }
-
-        else -> levelToDecisionVar.size
     }
 }
 
-internal fun PropagationState.allocAtom(intVar: Int, kind: Int, threshold: Int): Int {
-    val slot = intVar * 3 + kind
+internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: Int): Int {
+    val slot = intVar * 3 + kind.ordinal
     if (atomMemoId[slot] >= 0 && atomMemoThr[slot] == threshold) {
         return problem.numBoolVars + atomMemoId[slot]
     }
@@ -120,11 +114,11 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     val k = atomThreshold[atomId]
     val truth = atomCurrentTruth(atomId) ?: return null
     return when (atomKind[atomId]) {
-        0 -> if (truth) minReasonFor(v, k) else intArrayOf(Lit.make(atomVarLe(v, k - 1), false))
+        AtomKind.GE -> if (truth) minReasonFor(v, k) else intArrayOf(Lit.make(atomVarLe(v, k - 1), false))
 
-        1 -> if (truth) maxReasonFor(v, k) else intArrayOf(Lit.make(atomVarGe(v, k + 1), false))
+        AtomKind.LE -> if (truth) maxReasonFor(v, k) else intArrayOf(Lit.make(atomVarGe(v, k + 1), false))
 
-        2 -> if (truth) {
+        AtomKind.EQ -> if (truth) {
             composeIntVarAtomAntecedents(intArrayOf(v))
         } else {
             val d = intDomains[v]
@@ -134,27 +128,25 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
                 else -> holeReasonFor(v, k)
             }
         }
-
-        else -> null
     }
 }
 
-internal fun PropagationState.atomTruthOf(v: Int, kind: Int, k: Int): Boolean? {
+internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Int): Boolean? {
     val d = intDomains[v]
     return when (kind) {
-        0 -> when {
+        AtomKind.GE -> when {
             d.min >= k -> true
             d.max < k -> false
             else -> null
         }
 
-        1 -> when {
+        AtomKind.LE -> when {
             d.max <= k -> true
             d.min > k -> false
             else -> null
         }
 
-        2 -> when {
+        AtomKind.EQ -> when {
             d.min == d.max && d.min == k -> true
 
             // singleton {k} → eq true
@@ -163,8 +155,6 @@ internal fun PropagationState.atomTruthOf(v: Int, kind: Int, k: Int): Boolean? {
             // k absent → eq false
             else -> null
         }
-
-        else -> error("unknown atom kind")
     }
 }
 

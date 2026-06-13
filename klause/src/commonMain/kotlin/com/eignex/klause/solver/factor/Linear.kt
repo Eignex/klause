@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.AtomKind
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.maxAboveLevel
 import com.eignex.klause.solver.propagation.maxLevelForLe
@@ -458,7 +459,10 @@ internal fun collectLinearRelaxedAntecedents(
             if (cost <= remaining) {
                 remaining -= cost
                 if (kBelow > rootMin) {
-                    val lit = Lit.make(state.atomBoundLeafIfNew(v, 0, kBelow, state.minLevelForGe(v, kBelow)), false)
+                    val lit = Lit.make(
+                        state.atomBoundLeafIfNew(v, AtomKind.GE, kBelow, state.minLevelForGe(v, kBelow)),
+                        false,
+                    )
                     if (seen.add(lit)) out.add(lit)
                 } // else relaxed all the way to root → global fact, cite nothing
             } else {
@@ -474,7 +478,10 @@ internal fun collectLinearRelaxedAntecedents(
             if (cost <= remaining) {
                 remaining -= cost
                 if (kAbove < rootMax) {
-                    val lit = Lit.make(state.atomBoundLeafIfNew(v, 1, kAbove, state.maxLevelForLe(v, kAbove)), false)
+                    val lit = Lit.make(
+                        state.atomBoundLeafIfNew(v, AtomKind.LE, kAbove, state.maxLevelForLe(v, kAbove)),
+                        false,
+                    )
                     if (seen.add(lit)) out.add(lit)
                 }
             } else {
