@@ -311,6 +311,28 @@ data class BacktrackParams(
      */
     val lpCumulative: Boolean = false,
     /**
+     * Time-indexed LP reformulation of the scheduling globals (#453). When true and [lpBounding]
+     * holds, each Cumulative / Disjunctive over a bounded horizon gets binary `x_{i,t}` start
+     * columns with assignment, start-channel and per-time-point resource rows — the resource–time
+     * coupling the start-variable LP lacks, so the LP bound is far tighter than the energetic row
+     * ([lpCumulative]) alone. Adds O(n·H) columns, hard-gated on the horizon, so it is opt-in and off
+     * by default; a no-op without a bounded-horizon scheduling global.
+     */
+    val lpCumulativeTimeIndexed: Boolean = false,
+    /**
+     * Preemptive min-cost-flow feasibility / makespan bound for the scheduling globals (#454). When
+     * true, a node is pruned if the tasks' energy cannot be preemptively packed into their release /
+     * deadline windows at capacity (an exact max-flow feasibility test, strictly stronger than the
+     * pairwise-window [energeticReasoning] scan and horizon-independent — it keys off the O(n)
+     * start-bound breakpoints, not the time axis), and the verified makespan variable is lower-bounded
+     * by the smallest feasible completion time. Pure relaxation; off by default; a no-op without a
+     * scheduling global. See [com.eignex.klause.solver.lp.CumulativeFlowBound].
+     */
+    val lpCumulativeFlow: Boolean = false,
+    /** Frequency policy for [lpCumulativeFlow]: run the max-flow check at one in every this-many
+     *  pruning checks, mirroring [energeticEvery]. Must be positive. */
+    val lpCumulativeFlowEvery: Int = 1,
+    /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear

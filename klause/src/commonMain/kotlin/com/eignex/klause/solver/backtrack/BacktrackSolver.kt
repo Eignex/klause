@@ -17,6 +17,7 @@ import com.eignex.klause.solver.lp.CircuitSeparator
 import com.eignex.klause.solver.lp.CliqueCutSeparator
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
+import com.eignex.klause.solver.lp.CumulativeFlowBound
 import com.eignex.klause.solver.lp.Cut
 import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
@@ -297,6 +298,7 @@ class BacktrackSolver(override val problem: Problem) :
                 elementHull = params.lpElement,
                 tableHull = params.lpTable,
                 cumulative = params.lpCumulative,
+                cumulativeTimeIndexed = params.lpCumulativeTimeIndexed,
             )
         } else {
             null
@@ -333,8 +335,14 @@ class BacktrackSolver(override val problem: Problem) :
         } else {
             null
         }
+        private val cumulativeFlowBound = if (params.lpCumulativeFlow) {
+            CumulativeFlowBound(problem).takeIf { it.applicable }
+        } else {
+            null
+        }
         private var lpCheckCounter = 0
         private var energeticCheckCounter = 0
+        private var cumulativeFlowCheckCounter = 0
         private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
         private val lpBasisByDepth = ArrayList<Basis?>()
         private var lpHotTableau: DualSimplex? = null
@@ -348,6 +356,7 @@ class BacktrackSolver(override val problem: Problem) :
             val lpRelaxerL = lpRelaxer
             val lagBoundL = lagBound
             val energeticBoundL = energeticBound
+            val cumulativeFlowBoundL = cumulativeFlowBound
             val lpNogoodsL = lpNogoods
             val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
@@ -358,6 +367,14 @@ class BacktrackSolver(override val problem: Problem) :
                     energeticBoundL.isInfeasible(session) -> {
                     sink.observeEnergeticPrune()
                     if (lpNogoodsL != null) energeticBoundL.explain(session)?.let { lpNogoodsL.add(it) }
+                    true
+                }
+
+                cumulativeFlowBoundL != null &&
+                    ++cumulativeFlowCheckCounter % params.lpCumulativeFlowEvery == 0 &&
+                    cumulativeFlowBoundL.isInfeasible(session) -> {
+                    sink.observeEnergeticPrune() // same scheduling-feasibility-prune family
+                    if (lpNogoodsL != null) cumulativeFlowBoundL.explain(session)?.let { lpNogoodsL.add(it) }
                     true
                 }
 
