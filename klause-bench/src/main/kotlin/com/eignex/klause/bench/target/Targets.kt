@@ -10,7 +10,6 @@ internal enum class MetricKind {
     COVERAGE,
     AUDIT,
     TUNING,
-    SEARCH,
     CREDIT,
 }
 
@@ -55,13 +54,6 @@ internal object Targets {
             listOf("handwritten-core", "flatzinc-core", "opb-core", "smtlib-core", "xcsp3-core"),
             MetricKind.TUNING,
             Budget(timeoutMillis = 2_000),
-        ),
-        Target(
-            "search-slack-alldiff",
-            "Complete-search effort (conflicts/nodes) over slack all_different instances",
-            listOf("slack-alldiff"),
-            MetricKind.SEARCH,
-            Budget(timeoutMillis = 30_000),
         ),
         Target(
             "mzn-credit-ls",

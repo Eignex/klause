@@ -23,7 +23,7 @@ import com.eignex.klause.bench.tools.ProfileScope
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
  * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
  * `backend=choco|ortools|yuck` (the `solve` solver; default klause) `timeout=<ms>`
- * `engine=backtrack|ls|mixed` `processors=N` `fixed=true` (klause search for `solve`)
+ * `engine=cp|ls|portfolio` `processors=N` `fixed=true` `param=key=value` (klause search for `solve`)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
@@ -78,7 +78,10 @@ object BenchCli {
         // yuck/…) run via `minizinc --solver`; unset (or `klause`) runs klause via klause-cli.
         val backend = (f["backend"] ?: f["reference"])?.lowercase()?.takeIf { it != "klause" }
         val profile = parseProfile(f)
-        val search = parseKlauseSearch(f)
+        // `param=` is repeatable (`param=var-selector=vsids param=luby=256`), so collect it from the
+        // raw args rather than the dedup'd filter map; each value is a klause-cli `key=value` knob.
+        val params = args.drop(1).filter { it.startsWith("param=") }.map { it.substringAfter('=') }
+        val search = parseKlauseSearch(f, params)
         println("=== run: $metricName over ${refs.size} instance(s) ===")
         MetricRunner.run(metric, refs, budget, backend, profile, search)
     }
@@ -87,12 +90,13 @@ object BenchCli {
      *  null when none are set (the metric default: mixed engine over the host core count). These map
      *  onto the portfolio's engine × threads axes; the competition tracks are filter combinations (see
      *  the README recipes). `engine`/`processors` mirror the CLI's `--engine` / `-p`/`--parallel`. */
-    private fun parseKlauseSearch(f: Map<String, String>): KlauseSearch? {
-        if (f["engine"] == null && f["processors"] == null && f["fixed"] == null) return null
+    private fun parseKlauseSearch(f: Map<String, String>, params: List<String>): KlauseSearch? {
+        if (f["engine"] == null && f["processors"] == null && f["fixed"] == null && params.isEmpty()) return null
         return KlauseSearch(
             engine = f["engine"]?.let(::parseEngine) ?: "portfolio",
             processors = f["processors"]?.toIntOrNull() ?: Runtime.getRuntime().availableProcessors(),
             fixed = f["fixed"]?.toBoolean() ?: false,
+            params = params,
         )
     }
 
@@ -216,18 +220,19 @@ object BenchCli {
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
-            |         engine=backtrack|ls|mixed processors=N fixed=true (klause search for solve)
+            |         engine=cp|ls|portfolio processors=N fixed=true (klause search for solve)
+            |         param=key=value (repeatable; klause-cli --param engine knobs, e.g. var-selector=vsids)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
             |  bench solve suite=mzn-bench kind=cop per-family=1               (klause, mixed ×cores)
             |  bench solve suite=mzn-bench backend=choco timeout=300000        (Choco baseline)
             |  bench solve suite=mzn-bench backend=yuck timeout=300000         (Yuck baseline)
-            |  bench solve suite=mzn-bench engine=backtrack processors=8       (klause parallel, backtrack-only)
+            |  bench solve suite=mzn-bench engine=cp processors=8              (klause parallel, backtrack-only)
+            |  bench solve suite=mzn-bench engine=cp processors=1 param=var-selector=vsids (heuristic A/B: re-run with =chb, then compare.sh)
             |  bench solve suite=mzn-bench fixed=true                          (klause follows the model annotation)
-            |  bench search suite=slack-alldiff timeout=30000 profile=cpu
             |
-            |To compare solvers, run `solve` once per backend (each writes build/solve-<solver>.json) and diff offline.
+            |To compare configs, run `solve` once per config (each writes output/<config>/) and diff dirs offline.
             """.trimMargin(),
         )
     }

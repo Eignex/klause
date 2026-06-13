@@ -18,7 +18,7 @@
 set -eu
 A="${1%/}"; B="${2%/}"
 
-jq -n \
+jq -rn \
   --arg as "$(basename "$A")" --arg bs "$(basename "$B")" \
   --slurpfile a <(cat "$A"/*.json) \
   --slurpfile b <(cat "$B"/*.json) \
@@ -30,6 +30,8 @@ jq -n \
           name: .problem, kind: .kind, max: $max,
           ao: .objective, at: .timeToBestMs, ap: .proven, af: .feasible,
           bo: $y.objective, bt: $y.timeToBestMs, bp: $y.proven, bf: $y.feasible,
+          afl: (.stats.failures), bfl: ($y.stats.failures),
+          and: (.stats.nodes), bnd: ($y.stats.nodes),
           verdict:
             (if (.objective != null and $y.objective != null) then
                (if (.objective == $y.objective) then
@@ -54,11 +56,17 @@ jq -n \
   | ($rows|map(select(.at!=null and .bt!=null))) as $timed
   | ($timed|map(.at)|add // 0) as $atot
   | ($timed|map(.bt)|add // 0) as $btot
+  | ($rows|map(select(.afl!=null and .bfl!=null))) as $stated
+  | ($stated|map(.afl|tonumber)|add // 0) as $afl
+  | ($stated|map(.bfl|tonumber)|add // 0) as $bfl
+  | ($stated|map(.and|tonumber)|add // 0) as $anod
+  | ($stated|map(.bnd|tonumber)|add // 0) as $bnod
   | "=== \($as)  vs  \($bs)   (\($n) shared problems) ===",
     ($rows[] | "  \(.verdict|ascii_upcase|.[0:4]) [\(.name)]\(if .max then " (max)" else "" end) "
        + "A=\(.ao // .af)@\(.at // "-")ms  B=\(.bo // .bf)@\(.bt // "-")ms\(if .bp then " (B proved)" else "" end)"),
     "",
     "A wins \($w)/\($n)  (loss \($l), tie \($t), unsound \($u))",
     "B-solved problems A missed: \($missed|length)\(if ($missed|length)>0 then "  -> " + ($missed|join(", ")) else "" end)",
-    "time-to-best over both-timed (\($timed|length)): A=\($atot)ms B=\($btot)ms\(if $btot>0 then "  (\(($atot/$btot*100|round)/100)×)" else "" end)"
+    "time-to-best over both-timed (\($timed|length)): A=\($atot)ms B=\($btot)ms\(if $btot>0 then "  (\(($atot/$btot*100|round)/100)×)" else "" end)",
+    (if ($stated|length)>0 then "search effort over both-with-stats (\($stated|length)): A=\($afl) conflicts / \($anod) nodes  B=\($bfl) / \($bnod)" else empty end)
 '
