@@ -39,7 +39,7 @@ bench list [<suite>]                 list suites, or the problems in one suite
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance solve budget |
-| `engine=fixed\|cp\|mixed\|ls\|cp-single\|ls-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). Default `engine=fixed` (annotation-following). `fixed=true` is a *separate* reference-only `-f` toggle |
+| `engine=fixed\|cp\|mixed\|ls\|cp-single\|ls-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). `engine` unset ⇒ no `-e`, so klause follows the cli's own default engine (the bench has no engine default of its own). `fixed=true` is a *separate* reference-only `-f` toggle |
 | `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` apply only to `engine=cp-single` (a single backtrack solver) — the way to A/B a heuristic: run `solve` twice with different `cp-single` params, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
@@ -58,7 +58,7 @@ Both read the per-problem `output/<config>/*.json` `solve` records — no solvin
 
 ```
 # solve a corpus with each backend, one invocation each (klause needs `:klause-cli:installJvmDist`)
-bench solve suite=mzn-bench per-family=1 max=50 seed=1                 # klause (default), sampled slice
+bench solve suite=mzn-bench per-family=1 max=50 seed=1                 # klause (cli default engine), sampled slice
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=choco   # Choco baseline, same selection
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck baseline
 # each writes output/<config>/<problem>.{out,json} — diff two config dirs with output/compare.sh
@@ -73,12 +73,13 @@ bench solve suite=core kind=cop engine=cp-single param=var-selector=chb   timeou
 ### Solve: klause competition tracks as filter combinations
 
 When `solve` runs klause (no `backend=`), the klause side is the `engine` enum — owned by klause-cli,
-which the bench forwards verbatim to `-e`. **`engine=fixed`** (the default, the MiniZinc-Challenge FD
-behaviour) is a single naked backtrack following the model's `int_search` annotation; the portfolio
-engines **`cp`** (backtrack-only), **`mixed`** (bt+ls), **`ls`** run sequentially at `-p1` and as a
-parallel pool at `-p N`; **`cp-single`** is a single naked free backtrack (the only engine that takes
-`var-selector`/`val-selector` `--param`s). `processors` defaults to 1, so multi-thread tracks request
-cores explicitly. The Challenge tracks are just `engine`/`processors` combinations (all compose with
+which the bench forwards verbatim to `-e`. With `engine` unset the bench passes no `-e`, so klause
+follows the cli's **own** default engine (the bench has no engine default of its own). **`engine=fixed`**
+(the MiniZinc-Challenge FD behaviour) is a single naked backtrack following the model's `int_search`
+annotation; the portfolio engines **`cp`** (backtrack-only), **`mixed`** (bt+ls), **`ls`** run
+sequentially at `-p1` and as a parallel pool at `-p N`; **`cp-single`** is a single naked free backtrack
+(the only engine that takes `var-selector`/`val-selector` `--param`s). `processors` defaults to 1, so
+multi-thread tracks request cores explicitly. The Challenge tracks are just `engine`/`processors` combinations (all compose with
 `kind=cop|csp` and `timeout=`):
 
 ```

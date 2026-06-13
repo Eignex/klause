@@ -34,8 +34,9 @@ import java.time.Instant
  */
 internal data class KlauseSearch(
     // fixed | cp | mixed | ls | cp-single — forwarded verbatim to klause-cli `-e` (the cli owns the
-    // engine model). Default `fixed` mirrors the cli (annotation-following, the FD default).
-    val engine: String = "fixed",
+    // engine model). null = unset: no `-e` is passed, so the bench follows the cli's own default
+    // engine (the bench deliberately has no engine default of its own).
+    val engine: String? = null,
     // null = unset: no `-p` is passed, so the solver applies its own default (klause-cli's is
     // single-core). Multi-thread tracks (parallel/open) must set `processors=` explicitly.
     val processors: Int? = null,
@@ -147,8 +148,9 @@ internal object SolveMetric {
         append(solverId)
         s.engine?.let { append('-').append(it) }
         append("-p").append(s.processors ?: 1) // unset ⇒ the solver default (single-core)
-        // free/fixed only for references (-f); for klause the engine value already carries it.
-        if (s.engine == null) append(if (s.free) "-free" else "-fixed")
+        // free/fixed only for references (their `-f` toggle); klause carries it in the engine value,
+        // and a null klause engine just means "the cli's default engine" (no suffix).
+        if (s.engine == null && solverId != SolverInvocation.KLAUSE) append(if (s.free) "-free" else "-fixed")
         append("-t").append(budget.timeoutMillis / 1000).append('s')
         if (s.params.isNotEmpty()) {
             append('-').append(s.params.joinToString("_") { it.replace('=', '-') })
