@@ -108,8 +108,10 @@ class Portfolio(
         val start = TimeSource.Monotonic.markNow()
         val emitLock = onImprovement?.let { Concurrency.Strict.lock() }
         fun fold(worker: PortfolioWorker, r: MinimizeResult.WithSample) {
-            if (updateSharedBound(incumbent, r.objectiveValue, r.sample) && onImprovement != null) {
-                emitLock!!.withLock { onImprovement(AttributedImprovement(worker.label, start.elapsedNow(), r)) }
+            if (updateSharedBound(incumbent, r.objectiveValue, r.sample)) {
+                // emitLock is non-null iff onImprovement is; the ?. on both keeps the no-callback path
+                // lock-free (and dodges a !! on the nullable mutex).
+                emitLock?.withLock { onImprovement?.invoke(AttributedImprovement(worker.label, start.elapsedNow(), r)) }
             }
         }
 
