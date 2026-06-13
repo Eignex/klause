@@ -3,14 +3,11 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.propagation.ClauseTier
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.solver.propagation.TIER_CORE
-import com.eignex.klause.solver.propagation.TIER_LOCAL
-import com.eignex.klause.solver.propagation.TIER_MID
-import com.eignex.klause.solver.propagation.TIER_UNSET
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.IntArrayList
@@ -192,13 +189,13 @@ internal fun BacktrackSolver.forgetTiered(
         val lbd = session.learnedClauseLbd(i)
         val used = session.learnedClauseUsedSinceReduction(i)
         val entryTier = session.learnedClauseTier(i).let { t ->
-            if (t != TIER_UNSET) {
+            if (t != ClauseTier.UNSET) {
                 t
             } else {
                 when {
-                    lbd <= coreThreshold -> TIER_CORE
-                    lbd <= midThreshold -> TIER_MID
-                    else -> TIER_LOCAL
+                    lbd <= coreThreshold -> ClauseTier.CORE
+                    lbd <= midThreshold -> ClauseTier.MID
+                    else -> ClauseTier.LOCAL
                 }
             }
         }
@@ -207,17 +204,19 @@ internal fun BacktrackSolver.forgetTiered(
             continue
         }
         when (entryTier) {
-            TIER_CORE -> session.setLearnedClauseTier(i, TIER_CORE)
+            ClauseTier.CORE -> session.setLearnedClauseTier(i, ClauseTier.CORE)
 
             // Mid is kept this pass; demote to local when idle so it ages out next time.
-            TIER_MID -> session.setLearnedClauseTier(i, if (used) TIER_MID else TIER_LOCAL)
+            ClauseTier.MID -> session.setLearnedClauseTier(i, if (used) ClauseTier.MID else ClauseTier.LOCAL)
 
-            else -> if (used) {
-                session.setLearnedClauseTier(i, TIER_MID) // promote a reused local clause
+            ClauseTier.LOCAL -> if (used) {
+                session.setLearnedClauseTier(i, ClauseTier.MID) // promote a reused local clause
             } else {
-                session.setLearnedClauseTier(i, TIER_LOCAL)
+                session.setLearnedClauseTier(i, ClauseTier.LOCAL)
                 locals.add(intArrayOf(lbd, i)) // deletion candidate
             }
+
+            ClauseTier.UNSET -> error("entryTier is resolved away from UNSET above")
         }
     }
     val kept = learnedSize - locals.size

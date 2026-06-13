@@ -340,10 +340,11 @@ class PropagationSession(
     fun learnedClauseAt(learnedIndex: Int): Clause = state.learnedClauses[learnedIndex]
 
     /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
-    fun learnedClauseTier(learnedIndex: Int): Int = state.learnedClauseTier(learnedIndex)
+    internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)
 
     /** Set the three-tier DB tier of learned clause [learnedIndex]. */
-    fun setLearnedClauseTier(learnedIndex: Int, tier: Int) = state.setLearnedClauseTier(learnedIndex, tier)
+    internal fun setLearnedClauseTier(learnedIndex: Int, tier: ClauseTier) =
+        state.setLearnedClauseTier(learnedIndex, tier)
 
     /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last reduction. */
     fun learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean =

@@ -34,7 +34,7 @@ class LearnedClauseTierTest {
         val s = emptyState(3)
         val fid = s.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))), lbd = 4)
         val idx = fid - s.problem.numFactors
-        assertEquals(TIER_UNSET, s.learnedClauseTier(idx))
+        assertEquals(ClauseTier.UNSET, s.learnedClauseTier(idx))
         assertFalse(s.learnedClauseUsedSinceReduction(idx))
     }
 
@@ -60,9 +60,9 @@ class LearnedClauseTierTest {
         val f1 = s.addLearnedClause(Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))), lbd = 5)
         val f2 = s.addLearnedClause(Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))), lbd = 9)
         val base = s.problem.numFactors
-        s.setLearnedClauseTier(f0 - base, TIER_CORE)
-        s.setLearnedClauseTier(f1 - base, TIER_MID)
-        s.setLearnedClauseTier(f2 - base, TIER_LOCAL)
+        s.setLearnedClauseTier(f0 - base, ClauseTier.CORE)
+        s.setLearnedClauseTier(f1 - base, ClauseTier.MID)
+        s.setLearnedClauseTier(f2 - base, ClauseTier.LOCAL)
         s.noteLearnedUse(f2) // mark the third clause used
 
         // Drop the middle clause (index 1); keep indices 0 and 2.
@@ -70,9 +70,9 @@ class LearnedClauseTierTest {
 
         assertEquals(2, s.learnedClauses.size)
         // Old index 0 stays at 0 (core); old index 2 slides to 1 (local, still used).
-        assertEquals(TIER_CORE, s.learnedClauseTier(0))
+        assertEquals(ClauseTier.CORE, s.learnedClauseTier(0))
         assertFalse(s.learnedClauseUsedSinceReduction(0))
-        assertEquals(TIER_LOCAL, s.learnedClauseTier(1))
+        assertEquals(ClauseTier.LOCAL, s.learnedClauseTier(1))
         assertTrue(s.learnedClauseUsedSinceReduction(1), "the surviving used clause must keep its reuse flag")
     }
 }

@@ -54,7 +54,7 @@ internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permane
     learnedClauseStore.add(clause)
     learnedLbds.add(lbd)
     learnedPermanent.add(if (permanent) 1 else 0)
-    learnedTier.add(TIER_UNSET)
+    learnedTier.add(ClauseTier.UNSET.ordinal)
     learnedUsedFlags.add(0)
     if (clause.literals.size == 2) binaryClauseCount++ // keep the #202 gate current
     refPayloadStore.add(null)
@@ -70,14 +70,15 @@ internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int = learned
 /** True iff learned clause [learnedIndex] must survive every forgetting pass. */
 internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean = learnedPermanent[learnedIndex] == 1
 
-/** Three-tier (#201) DB tier of learned clause [learnedIndex] ([TIER_UNSET] until the
+/** Three-tier (#201) DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
  *  reduction policy classifies it). */
-internal fun PropagationState.learnedClauseTier(learnedIndex: Int): Int = learnedTier[learnedIndex]
+internal fun PropagationState.learnedClauseTier(learnedIndex: Int): ClauseTier =
+    ClauseTier.entries[learnedTier[learnedIndex]]
 
 /** Set the three-tier DB tier of learned clause [learnedIndex] (promotion / demotion /
  *  initial classification by the reduction policy). */
-internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: Int) {
-    learnedTier[learnedIndex] = tier
+internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: ClauseTier) {
+    learnedTier[learnedIndex] = tier.ordinal
 }
 
 /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
