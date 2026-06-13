@@ -177,7 +177,7 @@ class CumulativeRelaxationTest {
     fun `bound never exceeds the true optimum - soundness vs brute force`() {
         val rng = Random(20260613)
         var nontrivial = 0
-        repeat(120) {
+        repeat(120) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
             val durations = IntArray(n) { rng.nextInt(1, 4) }
@@ -208,7 +208,7 @@ class CumulativeRelaxationTest {
         val rng = Random(20260613)
         var optimal = 0
         var infeasible = 0
-        repeat(45) {
+        repeat(45) { iter ->
             val n = rng.nextInt(2, 4)
             val durations = IntArray(n) { rng.nextInt(1, 4) }
             val resources = IntArray(n) { rng.nextInt(1, 3) }
@@ -222,16 +222,16 @@ class CumulativeRelaxationTest {
             when (val res = BacktrackSolver(p).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {
                     optimal++
-                    assertTrue(optimum != null, "solver Optimal on a brute-infeasible instance #$it")
-                    assertEquals(optimum.toDouble(), res.objective, 1e-9, "wrong scheduling optimum on instance #$it")
+                    assertTrue(optimum != null, "solver Optimal on a brute-infeasible instance #$iter")
+                    assertEquals(optimum.toDouble(), res.objective, 1e-9, "wrong scheduling optimum on instance #$iter")
                 }
 
                 is MinimizeResult.Infeasible -> {
                     infeasible++
-                    assertTrue(optimum == null, "solver Infeasible on a brute-feasible instance #$it")
+                    assertTrue(optimum == null, "solver Infeasible on a brute-feasible instance #$iter")
                 }
 
-                else -> error("unexpected non-terminal result $res on instance #$it")
+                else -> error("unexpected non-terminal result $res on instance #$iter")
             }
         }
         assertTrue(optimal > 12, "covered only $optimal optimal instances")
