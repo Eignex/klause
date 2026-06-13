@@ -17,7 +17,6 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.Regular
-import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Sort
 import com.eignex.klause.solver.factor.Subcircuit
@@ -28,34 +27,25 @@ import com.eignex.klause.solver.factor.ValuePrecede
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
-    emitGatedPairwiseNe(vars, intArrayOf(0))
+    emitAllDifferentExcept(vars, intArrayOf(0))
 }
 
-/** Shared gated-pairwise-NE encoding. For each var an "is in except" aux bool is reified as
- *  the disjunction of equality reifications across the exception set; for each pair an "ne"
- *  aux is reified as `xs(i) ≠ xs(j)`, then a Clause asserts at least one release condition
- *  (`inExcept(i) ∨ inExcept(j) ∨ ne_ij`) holds. */
-private fun FlatZincCompiler.emitGatedPairwiseNe(xs: IntArray, except: IntArray) {
-    val inExcept = IntArray(xs.size) { allocBool("__adne_in_$numBoolVars") }
-    for (i in xs.indices) {
-        val eqLits = IntArray(except.size) { v ->
-            val eqV = allocBool("__adne_eq_$numBoolVars")
-            factors.add(ReifiedLinear(eqV, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, except[v]))
-            Lit.make(eqV, true)
-        }
-        factors.add(ReifiedCardinality(inExcept[i], eqLits, min = 1, max = except.size))
+/** Native `alldifferent_except(xs, except)` — `xs(i) != xs(j)` for every pair unless one of the
+ *  two values is in [except]. Emits the [AllDifferent] factor with [AllDifferent.exceptSet]: the
+ *  excepted values are modelled inside the shared `reginFilter` as capacity-n value copies, so this gets
+ *  full Régin matching / Hall propagation — far stronger than the O(n²) reified gated-pairwise-NE
+ *  decomposition this replaced (#433). 0 or 1 vars are trivially distinct; the factor requires ≥2
+ *  (matching the std decomposition's empty `forall(i<j)`). */
+private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: IntArray) {
+    if (vars.size < 2) return
+    var lo = Int.MAX_VALUE
+    var hi = Int.MIN_VALUE
+    for (v in vars) {
+        val d = intDomains[v]
+        if (d.min < lo) lo = d.min
+        if (d.max > hi) hi = d.max
     }
-    for (i in 0 until xs.size - 1) {
-        for (j in i + 1 until xs.size) {
-            val neAux = allocBool("__adne_ne_$numBoolVars")
-            factors.add(ReifiedLinear(neAux, intArrayOf(1, -1), intArrayOf(xs[i], xs[j]), LinearOp.NE, 0))
-            factors.add(
-                Clause(
-                    intArrayOf(Lit.make(inExcept[i], true), Lit.make(inExcept[j], true), Lit.make(neAux, true)),
-                ),
-            )
-        }
-    }
+    factors.add(AllDifferent(vars = vars, domainMin = lo, domainSize = hi - lo + 1, exceptSet = except))
 }
 
 internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
