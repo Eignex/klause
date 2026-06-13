@@ -456,14 +456,14 @@ class BacktrackSolver(override val problem: Problem) :
         private val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
         private val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
         private var bestTrailSize = -1
-        private var rephaseMode = REPHASE_TARGET
+        private var rephaseMode = RephaseMode.TARGET
         private var conflictsSinceRephase = 0L
         private val onConflictTick: () -> Unit = tick@{
             if (boolTarget == null) return@tick
             conflictsSinceRephase++
             if (conflictsSinceRephase >= params.rephaseInterval) {
                 conflictsSinceRephase = 0
-                rephaseMode = (rephaseMode + 1) % REPHASE_MODE_COUNT
+                rephaseMode = rephaseMode.next()
             }
         }
         private var pendingBlock: Sample? = null
@@ -872,23 +872,3 @@ internal const val MAX_CASCADING_BACKJUMPS: Int = 64
  *  long means the backjump + assert cycle is not progressing. Generous enough that
  *  healthy re-learning (after forgetting or restarts) never trips it. */
 internal const val RELEARN_FALLBACK_THRESHOLD: Int = 8
-
-// Rephasing polarity sources (#204), rotated every `rephaseInterval` conflicts.
-
-/** Bias toward the deepest conflict-free assignment seen (falls back to saved). */
-internal const val REPHASE_TARGET: Int = 0
-
-/** Plain phase saving — the last value committed for the variable. */
-internal const val REPHASE_SAVED: Int = 1
-
-/** Force all decisions to try `true` first. */
-internal const val REPHASE_TRUE: Int = 2
-
-/** Force all decisions to try `false` first. */
-internal const val REPHASE_FALSE: Int = 3
-
-/** Random polarity per decision. */
-internal const val REPHASE_RANDOM: Int = 4
-
-/** Number of rephase modes in the rotation. */
-internal const val REPHASE_MODE_COUNT: Int = 5

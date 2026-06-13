@@ -213,7 +213,7 @@ internal fun BacktrackSolver.driveSearch(
     val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
     val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
     var bestTrailSize = -1
-    var rephaseMode = REPHASE_TARGET
+    var rephaseMode = RephaseMode.TARGET
     var conflictsSinceRephase = 0L
     // Counts conflicts as they happen inside [advance] and rotates the rephase mode when
     // the interval elapses. The mode change takes effect on the next fresh descent — no
@@ -224,7 +224,7 @@ internal fun BacktrackSolver.driveSearch(
         conflictsSinceRephase++
         if (conflictsSinceRephase >= params.rephaseInterval) {
             conflictsSinceRephase = 0
-            rephaseMode = (rephaseMode + 1) % REPHASE_MODE_COUNT
+            rephaseMode = rephaseMode.next()
         }
     }
 
@@ -607,7 +607,7 @@ internal fun BacktrackSolver.applyPhase(
     intPhaseSet: BooleanArray?,
     boolTarget: BooleanArray? = null,
     boolTargetSet: BooleanArray? = null,
-    rephaseMode: Int = REPHASE_TARGET,
+    rephaseMode: RephaseMode = RephaseMode.TARGET,
     rng: Random? = null,
 ): Sequence<Int> = when (varRef) {
     is VarRef.Bool -> {
@@ -623,17 +623,15 @@ internal fun BacktrackSolver.applyPhase(
         val preferred: Int? = if (boolTarget != null && boolTargetSet != null) {
             when (rephaseMode) {
                 // Target: the deepest conflict-free phase, falling back to saved.
-                REPHASE_TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1 else 0) else savedFirst
+                RephaseMode.TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1 else 0) else savedFirst
 
-                REPHASE_SAVED -> savedFirst
+                RephaseMode.SAVED -> savedFirst
 
-                REPHASE_TRUE -> 1
+                RephaseMode.TRUE -> 1
 
-                REPHASE_FALSE -> 0
+                RephaseMode.FALSE -> 0
 
-                REPHASE_RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1 else 0
-
-                else -> savedFirst
+                RephaseMode.RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1 else 0
             }
         } else {
             savedFirst
