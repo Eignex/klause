@@ -24,6 +24,10 @@ object Presolve {
     /** Cap on a verified-symmetry candidate group; larger groups are skipped (#367 size guard). */
     private const val MAX_VERIFIED_GROUP = 40
 
+    /** Widest bool row a binary-number lex-leader can encode: `2^(m−1)` must fit in `Int`, so
+     *  `m ≤ 31`. Wider rows are left unbroken (#373); their lex needs an aux-var encoding. */
+    private const val MAX_BOOL_LEX_WIDTH = 31
+
     /**
      * GCD coefficient strengthening (#319) for [Linear] and [PseudoBoolean] constraints. If the
      * coefficients of an integer linear (or pseudo-Boolean) constraint share a common divisor
@@ -473,8 +477,24 @@ object Presolve {
         // isomorphic factors), ordered by lex-leader. Only when verified detection is available.
         val brokenInts = intGroups.flatMap { it.toList() }.toHashSet()
         val blockLex = if (verified == null) emptyList() else verifiedBlockLex(problem, objectiveIntVars, brokenInts)
+        // Bool block/row symmetry (#373): the boolean analogue — rows of bool vars defined by
+        // isomorphic bool-only factors, ordered by a binary-number lex-leader.
+        val brokenBools = boolGroups.flatMap { it.toList() }.toHashSet()
+        val boolBlockLex = if (verified == null) {
+            emptyList()
+        } else {
+            verifiedBoolBlockLex(
+                problem,
+                objectiveBoolVars,
+                brokenBools,
+            )
+        }
         val valuePins = breakValueSymmetry(problem, objectiveIntVars)
-        if (intGroups.isEmpty() && boolGroups.isEmpty() && blockLex.isEmpty() && valuePins.isEmpty()) return problem
+        if (intGroups.isEmpty() && boolGroups.isEmpty() && blockLex.isEmpty() &&
+            boolBlockLex.isEmpty() && valuePins.isEmpty()
+        ) {
+            return problem
+        }
         val extra = ArrayList<Factor>()
         for (group in intGroups) {
             for (j in 0 until group.size - 1) {
@@ -487,6 +507,7 @@ object Presolve {
             }
         }
         extra.addAll(blockLex)
+        extra.addAll(boolBlockLex)
         extra.addAll(valuePins)
         return rebuildProblem(problem, problem.factors.toList() + extra)
     }
@@ -550,6 +571,12 @@ object Presolve {
      * factors, matrix rows), and is sound by construction. Returns `null` when any factor lacks a
      * [Factor.structuralKey] (then the caller uses the conservative heuristic). Returns the int and
      * bool orbits (size ≥ 2) otherwise; objective variables are excluded.
+     *
+     * Candidate groups come from Weisfeiler–Leman colour refinement ([refineColours], #373): only
+     * same-colour variables can be interchangeable, so the colour classes are exactly the candidate
+     * groups, finer than the old domain-only / single-bool-group partition. This finds more (finer
+     * classes fit under the [MAX_VERIFIED_GROUP] size guard that would skip a large coarse group)
+     * and verifies fewer impossible pairs — and stays sound because each candidate is still verified.
      */
     private fun verifiedSymmetryOrbits(
         problem: Problem,
@@ -564,9 +591,10 @@ object Presolve {
         val intMap = IntArray(problem.numIntVars) { it }
         val boolMap = IntArray(problem.numBoolVars) { it }
 
-        val intCandidates = HashMap<String, MutableList<Int>>()
+        val (intColour, boolColour) = refineColours(problem, objectiveIntVars, objectiveBoolVars)
+        val intCandidates = HashMap<Int, MutableList<Int>>()
         for (v in 0 until problem.numIntVars) {
-            if (v !in objectiveIntVars) intCandidates.getOrPut(domainKey(problem.intDomains[v])) { ArrayList() }.add(v)
+            if (v !in objectiveIntVars) intCandidates.getOrPut(intColour[v]) { ArrayList() }.add(v)
         }
         val intOrbits = buildVerifiedOrbits(problem.numIntVars, intCandidates.values.toList()) { u, v ->
             intMap[u] = v
@@ -576,8 +604,11 @@ object Presolve {
             intMap[v] = v
             ok
         }
-        val boolVarsCand = (0 until problem.numBoolVars).filter { it !in objectiveBoolVars }
-        val boolOrbits = buildVerifiedOrbits(problem.numBoolVars, listOf(boolVarsCand)) { u, v ->
+        val boolCandidates = HashMap<Int, MutableList<Int>>()
+        for (v in 0 until problem.numBoolVars) {
+            if (v !in objectiveBoolVars) boolCandidates.getOrPut(boolColour[v]) { ArrayList() }.add(v)
+        }
+        val boolOrbits = buildVerifiedOrbits(problem.numBoolVars, boolCandidates.values.toList()) { u, v ->
             boolMap[u] = v
             boolMap[v] = u
             val ok = isAutomorphism(problem, base, boolMap, intMap)
@@ -587,6 +618,112 @@ object Presolve {
         }
         return intOrbits to boolOrbits
     }
+
+    /** Sentinel "variable id" marking the focal variable in a [refineColours] port signature; far
+     *  above any colour id (colours are small dense counters) so it never collides with one. */
+    private const val WL_FOCAL = 1_000_000_000
+
+    /**
+     * Weisfeiler–Leman colour refinement (#373) seeding verified-symmetry candidates. Two variables
+     * can be interchangeable only if they share a WL colour (colour is an automorphism invariant),
+     * so the colour classes are the candidate groups — finer than grouping ints by domain and all
+     * bools together. Returns `(intColour, boolColour)`, parallel to the variable ids.
+     *
+     * Initial colour separates kinds, distinct domains, and each objective variable (a distinguished
+     * fixed point). Each round refines a variable's colour by its current colour plus, for every
+     * incident factor, that factor's [Factor.structuralKey] computed with the focal variable
+     * remapped to [WL_FOCAL] and every other variable to its current colour — the WL "edge"
+     * signature, derived generically for any keyed factor with no per-type code. Iterated to a
+     * fixpoint (partition stops refining). Soundness never rests on this: the pairwise/block verifier
+     * re-checks every candidate, so a wrong colouring can only miss symmetries, never invent one.
+     */
+    private fun refineColours(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        objectiveBoolVars: Set<Int>,
+    ): Pair<IntArray, IntArray> {
+        val nInt = problem.numIntVars
+        val nBool = problem.numBoolVars
+        val intInc = Array(nInt) { ArrayList<Int>() }
+        val boolInc = Array(nBool) { ArrayList<Int>() }
+        problem.factors.forEachIndexed { fi, f ->
+            for (v in f.intVars.distinct()) intInc[v].add(fi)
+            for (v in f.boolVars.distinct()) boolInc[v].add(fi)
+        }
+        val intColour = IntArray(nInt)
+        val boolColour = IntArray(nBool)
+        val initInt = Array(nInt) { v ->
+            if (v in objectiveIntVars) "o$v" else domainKey(problem.intDomains[v])
+        }
+        val initBool = Array(nBool) { v -> if (v in objectiveBoolVars) "o$v" else "b" }
+        var numColours = assignColours(initInt, initBool, intColour, boolColour)
+        // Working colour maps reused across all port queries in a round (rebuilt each round).
+        val intMap = IntArray(nInt)
+        val boolMap = IntArray(nBool)
+        repeat(nInt + nBool + 1) {
+            for (v in 0 until nInt) intMap[v] = intColour[v]
+            for (v in 0 until nBool) boolMap[v] = boolColour[v]
+            val sigInt = Array(
+                nInt,
+            ) { v -> portSignature(problem, intInc[v], v, isBool = false, intMap, boolMap, intColour[v]) }
+            val sigBool =
+                Array(
+                    nBool,
+                ) { v -> portSignature(problem, boolInc[v], v, isBool = true, intMap, boolMap, boolColour[v]) }
+            val next = assignColours(sigInt, sigBool, intColour, boolColour)
+            if (next == numColours) return intColour to boolColour // partition stable
+            numColours = next
+        }
+        return intColour to boolColour
+    }
+
+    /** WL signature of variable [v] this round: its [oldColour] plus the sorted multiset of incident
+     *  factor keys, each computed with [v] remapped to [WL_FOCAL] (the focal marker) and every other
+     *  variable to its current colour (already loaded into [intMap]/[boolMap]). */
+    private fun portSignature(
+        problem: Problem,
+        incident: List<Int>,
+        v: Int,
+        isBool: Boolean,
+        intMap: IntArray,
+        boolMap: IntArray,
+        oldColour: Int,
+    ): String {
+        val ports = ArrayList<String>(incident.size)
+        for (fi in incident) {
+            val saved: Int
+            if (isBool) {
+                saved = boolMap[v]
+                boolMap[v] = WL_FOCAL
+            } else {
+                saved = intMap[v]
+                intMap[v] = WL_FOCAL
+            }
+            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey() ?: "?")
+            if (isBool) boolMap[v] = saved else intMap[v] = saved
+        }
+        ports.sort()
+        return "$oldColour|" + ports.joinToString(";")
+    }
+
+    /** Re-colour every variable by its signature, writing dense ids into [intColour]/[boolColour] and
+     *  returning the number of distinct colours. Int and bool signatures are kept in disjoint spaces
+     *  (prefixed) so the two kinds never share a colour. */
+    private fun assignColours(
+        sigInt: Array<String>,
+        sigBool: Array<String>,
+        intColour: IntArray,
+        boolColour: IntArray,
+    ): Int {
+        val ids = HashMap<String, Int>()
+        for (v in sigInt.indices) intColour[v] = ids.getOrPut("I" + sigInt[v]) { ids.size }
+        for (v in sigBool.indices) boolColour[v] = ids.getOrPut("B" + sigBool[v]) { ids.size }
+        return ids.size
+    }
+
+    /** Test-only view of [refineColours] with no objective variables (#373). */
+    internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
+        refineColours(problem, emptySet(), emptySet())
 
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
      *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
@@ -683,6 +820,115 @@ object Presolve {
             intMap[b[k]] = b[k]
         }
         return ok
+    }
+
+    /**
+     * Verified bool-block lex (#373): the boolean analogue of [verifiedBlockLex]. Blocks of Boolean
+     * variables defined by *isomorphic* bool-only factors (rows of a 0/1 matrix) are interchangeable
+     * as blocks; verified-equal blocks are ordered by a lexicographic-leader chain. Skips factors that
+     * touch int variables, objective bools, and bools already broken as single-var orbits
+     * ([alreadyBroken]) so row and cell breaking don't interact unsoundly.
+     *
+     * A Boolean lex-leader `a ≤ₗₑₓ b` is posted as a [PseudoBoolean] (see [boolLexLeader]): reading
+     * each id-sorted row as a binary number with the first position most-significant, lexicographic
+     * order on equal-length 0/1 vectors is exactly numeric order. The weights are powers of two, so a
+     * row wider than [MAX_BOOL_LEX_WIDTH] (where `2^(m−1)` overflows `Int`) is skipped — sound, just
+     * unbroken; the aux-variable lex encoding for wider rows is a follow-up.
+     */
+    private fun verifiedBoolBlockLex(
+        problem: Problem,
+        objectiveBoolVars: Set<Int>,
+        alreadyBroken: Set<Int>,
+    ): List<Factor> {
+        val base = HashMap<String, Int>()
+        for (f in problem.factors) {
+            val k = f.structuralKey() ?: return emptyList()
+            base[k] = (base[k] ?: 0) + 1
+        }
+        val byShape = HashMap<String, MutableList<IntArray>>()
+        for (f in problem.factors) {
+            if (f.intVars.isNotEmpty() || f.boolVars.isEmpty()) continue
+            val block = f.boolVars.distinct().sorted().toIntArray()
+            if (block.size > MAX_BOOL_LEX_WIDTH) continue
+            if (block.any { it in objectiveBoolVars || it in alreadyBroken }) continue
+            val shape = canonicalBoolShape(problem, f, block) ?: continue
+            byShape.getOrPut(shape) { ArrayList() }.add(block)
+        }
+        val boolMap = IntArray(problem.numBoolVars) { it }
+        val extra = ArrayList<Factor>()
+        for ((_, blocks) in byShape) {
+            if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
+            val parent = IntArray(blocks.size) { it }
+            fun find(x: Int): Int {
+                var r = x
+                while (parent[r] != r) r = parent[r]
+                return r
+            }
+            for (i in blocks.indices) {
+                for (j in i + 1 until blocks.size) {
+                    if (find(i) != find(j) && boolBlocksSwapVerified(problem, base, boolMap, blocks[i], blocks[j])) {
+                        parent[find(i)] = find(j)
+                    }
+                }
+            }
+            val byRoot = HashMap<Int, MutableList<IntArray>>()
+            for (i in blocks.indices) byRoot.getOrPut(find(i)) { ArrayList() }.add(blocks[i])
+            for (cls in byRoot.values) {
+                val ordered = cls.sortedBy { it[0] }
+                for (k in 0 until ordered.size - 1) extra.add(boolLexLeader(ordered[k], ordered[k + 1]))
+            }
+        }
+        return extra
+    }
+
+    /** Canonical structure key for a bool block: remap its (sorted) variables to `0..k-1`, so two
+     *  isomorphic bool-only factors over disjoint variables share a key. `null` if unkeyed. */
+    private fun canonicalBoolShape(problem: Problem, f: Factor, block: IntArray): String? {
+        val boolMap = IntArray(problem.numBoolVars) { it }
+        for (k in block.indices) boolMap[block[k]] = k
+        return f.remap(boolMap, IntArray(problem.numIntVars) { it }).structuralKey()
+    }
+
+    /** Whether swapping disjoint bool blocks [a] and [b] position-wise (`a[k] ↔ b[k]`) is an
+     *  automorphism. Bools carry no domain, so (unlike [blocksSwapVerified]) there is no domain
+     *  check — only structural verification via [isAutomorphism]. */
+    private fun boolBlocksSwapVerified(
+        problem: Problem,
+        base: Map<String, Int>,
+        boolMap: IntArray,
+        a: IntArray,
+        b: IntArray,
+    ): Boolean {
+        if (a.size != b.size) return false
+        for (k in a.indices) if (a[k] in b) return false // overlapping blocks: swap would tangle
+        for (k in a.indices) {
+            boolMap[a[k]] = b[k]
+            boolMap[b[k]] = a[k]
+        }
+        val ok = isAutomorphism(problem, base, boolMap, IntArray(problem.numIntVars) { it })
+        for (k in a.indices) {
+            boolMap[a[k]] = a[k]
+            boolMap[b[k]] = b[k]
+        }
+        return ok
+    }
+
+    /** Lex-leader `a ≤ₗₑₓ b` on two equal-length bool rows as a [PseudoBoolean]. Reading each row
+     *  as a binary number (position 0 most-significant), lexicographic order is numeric order, so
+     *  `Σ 2^(m−1−k)·a`k` − Σ 2^(m−1−k)·b`k` ≤ 0`. Callers must keep `a.size == b.size ≤`
+     *  [MAX_BOOL_LEX_WIDTH] so the top weight `2^(m−1)` fits in `Int`. */
+    private fun boolLexLeader(a: IntArray, b: IntArray): PseudoBoolean {
+        val m = a.size
+        val literals = IntArray(2 * m)
+        val weights = IntArray(2 * m)
+        for (k in 0 until m) {
+            val w = 1 shl (m - 1 - k)
+            literals[k] = Lit.make(a[k], true)
+            weights[k] = w
+            literals[m + k] = Lit.make(b[k], true)
+            weights[m + k] = -w
+        }
+        return PseudoBoolean(weights, literals, PbOp.LE, 0)
     }
 
     /** Union the candidate variables whose pairwise transposition [verify]s as a symmetry, then

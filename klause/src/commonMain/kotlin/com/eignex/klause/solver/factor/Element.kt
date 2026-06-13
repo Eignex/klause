@@ -44,6 +44,12 @@ class Element(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         Element(intMap[idx], intMap[result], if (arrIsVars) arr.remapVars(intMap) else arr, arrIsVars, indexOffset)
 
+    // Positional: the array is ordered (idx selects by position), so the key keeps array order
+    // rather than sorting. Encodes every distinguishing field — array kind, offset, idx, result,
+    // and the ordered array (var ids when [arrIsVars], else constant values) — so two non-equivalent
+    // Elements never collide (a coarser key would let symmetry verification accept a false swap).
+    override fun structuralKey(): String = "element:$arrIsVars:$indexOffset:$idx:$result:" + arr.joinToString(",")
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)

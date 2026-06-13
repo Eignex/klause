@@ -36,6 +36,13 @@ class Inverse(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         Inverse(f.remapVars(intMap), g.remapVars(intMap), fOffset, gOffset)
 
+    // Positional: f(i)/g(i) are channelled by index, so neither array is sorted. Encodes both
+    // offsets and the ordered f / g var sequences — fine enough that two non-equivalent Inverses
+    // never share a key (required for sound symmetry verification). The f/g sides are kept distinct
+    // (not canonicalised against each other); at worst this misses an f↔g symmetry, never unsound.
+    override fun structuralKey(): String =
+        "inverse:$fOffset:$gOffset:" + f.joinToString(",") + ":" + g.joinToString(",")
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = f + g
 
