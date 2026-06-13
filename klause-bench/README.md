@@ -52,7 +52,7 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 - **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Saves **one file per problem** under `output/<config>/`: `<problem>.out` (raw solver log) + `<problem>.json` (solver/settings/budget + objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics). Run once per config and diff two config dirs offline (`output/compare.sh`), which also serves as the wall-time regression check. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
 - **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
 - **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.
-- **tuning** / **credit** — rank solver configs by avg dense rank; per-worker portfolio attribution.
+- **credit** — per-worker portfolio attribution (which arm earns each solve). (To compare solver *configs*, there's no dedicated metric: run `solve` once per config and diff the dirs with `compare.sh`.)
 
 Metrics write JSON (and Markdown where useful) under `build/`.
 

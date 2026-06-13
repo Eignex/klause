@@ -8,7 +8,6 @@ import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.PortfolioCreditMetric
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
-import com.eignex.klause.bench.metric.TuningMetric
 import com.eignex.klause.bench.metric.UniformnessMetric
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.tools.ProfileConfig
@@ -62,11 +61,6 @@ internal object MetricRunner {
         fun <T> solve(block: () -> T): T = if (solveProfile != null) Profiler.record(solveProfile, block) else block()
         when (metric) {
             MetricKind.SOLVE -> error("SOLVE is handled in run() (in-process profiling path)")
-
-            MetricKind.TUNING -> {
-                val resolved = BenchLoad.resolveRefs(refs)
-                solve { TuningMetric.run(resolved, budget) }
-            }
 
             MetricKind.CREDIT -> {
                 val resolved = BenchLoad.resolveRefs(refs)
