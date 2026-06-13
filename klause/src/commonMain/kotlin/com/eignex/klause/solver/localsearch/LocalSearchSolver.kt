@@ -819,7 +819,9 @@ class LocalSearchSolver(
      *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
     private fun revertMove(state: LocalSearchState, move: Move, baselineSnap: Sample) {
         when (move) {
-            is Move.BoolFlip -> state.apply(move) // self-inverse
+            is Move.BoolFlip -> state.apply(move)
+
+            // self-inverse
 
             is Move.IntSet -> {
                 val old = baselineSnap.ints[move.varId]
