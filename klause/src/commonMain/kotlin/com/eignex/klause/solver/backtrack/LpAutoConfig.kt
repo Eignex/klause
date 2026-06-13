@@ -10,6 +10,7 @@ import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
@@ -36,6 +37,7 @@ import com.eignex.klause.solver.lp.schedulingViews
  *  - **[BacktrackParams.lpCircuit]** — a [Circuit] is present (subtour-elimination cuts).
  *  - **[BacktrackParams.lpElement]** — a constant-array [Element] is present (its convex hull).
  *  - **[BacktrackParams.lpTable]** — a [Table] is present (its convex hull).
+ *  - **[BacktrackParams.lpNValue]** — an [NValue] is present (its one-hot value hull, #435).
  *  - **[BacktrackParams.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
  *  - **[BacktrackParams.energeticReasoning]** — a [Cumulative] is present. When the auto path is
  *    the one enabling it, [BacktrackParams.energeticEvery] is derived from the models' task counts
@@ -86,6 +88,7 @@ object LpAutoConfig {
         var circuit = false
         var constArrayElement = false
         var table = false
+        var nValue = false
         var rows = 0L
         for (f in problem.factors) {
             when (f) {
@@ -128,6 +131,8 @@ object LpAutoConfig {
 
                 is Table -> table = true
 
+                is NValue -> nValue = true
+
                 else -> Unit
             }
         }
@@ -146,7 +151,10 @@ object LpAutoConfig {
         val cutEligible = allDifferent || globalCardinality
         val makespanLp = lpFits && makespanPlans > 0
         val lpBounding = lpFits &&
-            (lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement || table || makespanLp)
+            (
+                lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
+                    table || nValue || makespanLp
+                )
         val lpCuts = lpFits && (cutEligible || pseudoBoolean)
         return base.copy(
             lpBounding = base.lpBounding || lpBounding,
@@ -159,6 +167,7 @@ object LpAutoConfig {
             lpCircuit = base.lpCircuit || (lpFits && circuit),
             lpElement = base.lpElement || (lpFits && constArrayElement),
             lpTable = base.lpTable || (lpFits && table),
+            lpNValue = base.lpNValue || (lpFits && nValue),
             lpCumulative = base.lpCumulative || makespanLp,
             // #453: the time-indexed LP only when lpBounding is on and its columns fit the tableau.
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed || (lpBounding && timeIndexedFits),

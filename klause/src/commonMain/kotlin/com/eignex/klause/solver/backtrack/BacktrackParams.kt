@@ -301,6 +301,12 @@ data class BacktrackParams(
      */
     val lpTable: Boolean = false,
     /**
+     * One-hot NValue value hull (#435). When true and [lpBounding] holds, each NValue contributes a
+     * per-value "used"-indicator model so the distinct-count target gets an LP bound (a real lower
+     * bound under minimisation). Sound by construction; off by default; a no-op when no NValue exists.
+     */
+    val lpNValue: Boolean = false,
+    /**
      * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
      * [lpBounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
      * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
