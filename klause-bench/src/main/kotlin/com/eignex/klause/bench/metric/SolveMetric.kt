@@ -93,7 +93,6 @@ internal object SolveMetric {
             seed = SOLVE_SEED,
             params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
         )
-        val cacheLabel = label(solverId, settings) // kept stable so existing cache entries stay reachable
         val tag = configTag(solverId, settings, budget)
         val outDir = File("output", tag).apply { mkdirs() }
         val timestamp = Instant.now().toString()
@@ -106,7 +105,7 @@ internal object SolveMetric {
             val optimize = entry.objective != null
             val kind = if (optimize) "optimize" else "satisfy"
             val rec = runCatching {
-                val key = BenchCache.keyFor(entry, cacheLabel, budget)
+                val key = BenchCache.keyFor(entry, tag, budget)
                 val r = BenchCache.load(key)
                     ?: SolverInvocation.run(
                         entry,
@@ -130,9 +129,11 @@ internal object SolveMetric {
         println("\n$feasible/${entries.size} feasible, $proved proved  (output/$tag/)")
     }
 
-    /** Filesystem-safe, self-sufficient config dir name: solver + engine + processors + search mode +
-     *  budget + any `--param` knobs. Two runs that differ in any of these land in different dirs (so
-     *  `param=var-selector=vsids` and `param=var-selector=chb` don't clobber each other). */
+    /** Filesystem-safe, self-sufficient config identifier: solver + engine + processors + search mode
+     *  + budget + any `--param` knobs. Used for BOTH the `output/<config>/` dir name AND the bench
+     *  cache key (via [BenchCache.keyFor], which additionally hashes the per-instance model+data), so
+     *  a cache hit requires byte-identical settings. Two runs differing in any of these get distinct
+     *  dirs/keys (so `param=var-selector=vsids` and `param=var-selector=chb` never clobber). */
     private fun configTag(solverId: String, s: SolverInvocation.Settings, budget: Budget): String = buildString {
         append(solverId)
         s.engine?.let { append('-').append(it) }
@@ -265,15 +266,4 @@ internal object SolveMetric {
         }
     }
 
-    /** A stable, filesystem-safe label encoding solver + processors + search mode — the **cache key**
-     *  component (NOT the output dir; see [configTag]). Kept byte-for-byte stable so prior cached
-     *  results stay addressable across this refactor. */
-    private fun label(solverId: String, s: SolverInvocation.Settings): String {
-        // params fold in only when present, so no-param runs keep the prior key (cache stays warm).
-        val paramSuffix = if (s.params.isEmpty()) "" else "|" + s.params.joinToString(",")
-        if (solverId != SolverInvocation.KLAUSE) {
-            return solverId + (if (s.processors > 1) "-x${s.processors}" else "") + paramSuffix
-        }
-        return "klause-${s.engine ?: "portfolio"}-x${s.processors}" + (if (!s.free) "-ann" else "") + paramSuffix
-    }
 }
