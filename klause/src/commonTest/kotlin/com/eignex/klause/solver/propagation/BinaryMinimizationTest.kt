@@ -45,7 +45,7 @@ class BinaryMinimizationTest {
     @Test
     fun `binary-dense unsat pigeonhole is still proven unsat`() {
         val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4)).solve(
-            BacktrackParams(randomSeed = 1L, variableHeuristic = Vsids(), maxLearnedClauses = 5_000),
+            BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 5_000),
         )
         assertIs<SolveResult.Unsat>(verdict)
     }
@@ -56,7 +56,7 @@ class BinaryMinimizationTest {
         val pigeons = 4
         val sat = assertIs<SolveResult.Sat>(
             BacktrackSolver(pigeonhole(pigeons, holes)).solve(
-                BacktrackParams(randomSeed = 2L, variableHeuristic = Vsids(), maxLearnedClauses = 5_000),
+                BacktrackParams(randomSeed = 2L, variableSelector = Vsids(), maxLearnedClauses = 5_000),
             ),
         )
         val b = sat.assignment.bools
@@ -91,7 +91,7 @@ class BinaryMinimizationTest {
             ),
         )
         val models = BacktrackSolver(problem)
-            .enumerate(BacktrackParams(randomSeed = 4L, variableHeuristic = Vsids(), lubyRestartBase = 4L))
+            .enumerate(BacktrackParams(randomSeed = 4L, variableSelector = Vsids(), lubyRestartBase = 4L))
             .map { it.bools.toList() }
             .toSet()
         // Independently brute-force the feasible set and compare.

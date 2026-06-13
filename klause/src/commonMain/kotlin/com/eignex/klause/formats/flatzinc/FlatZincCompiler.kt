@@ -11,8 +11,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.SearchTier
 import com.eignex.klause.solver.backtrack.TierVarSelect
-import com.eignex.klause.solver.backtrack.TieredValueHeuristic
-import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
+import com.eignex.klause.solver.backtrack.TieredValueSelector
+import com.eignex.klause.solver.backtrack.TieredVariableSelector
 import com.eignex.klause.solver.backtrack.selector.DomWdeg
 import com.eignex.klause.solver.backtrack.selector.DomainMaxRegret
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
@@ -151,9 +151,9 @@ internal class FlatZincCompiler(
      * Map the `solve :: int_search/bool_search/set_search/seq_search(...)` annotation onto
      * [BacktrackParams]. Each search block becomes a [SearchTier] over the variables its
      * array actually lists, in order; `seq_search` contributes its blocks as consecutive
-     * tiers. A [TieredVariableHeuristic] explores the tiers first and falls back to the
+     * tiers. A [TieredVariableSelector] explores the tiers first and falls back to the
      * first block's strategy applied globally for the remaining (introduced) variables,
-     * with a matching [TieredValueHeuristic] on the value side. Returns `null` when no
+     * with a matching [TieredValueSelector] on the value side. Returns `null` when no
      * recognised search annotation is present or no block lists any resolvable variable.
      */
     internal fun compileSearchAnnotation(): BacktrackParams? {
@@ -166,7 +166,7 @@ internal class FlatZincCompiler(
             ?: SmallestDomain
         val fallbackVal = firstBlockValName?.let(::mapValueStrategy)
             ?: IndomainMin
-        val tieredVal = TieredValueHeuristic(tiers, fallbackVal, numBoolVars, intDomains.size)
+        val tieredVal = TieredValueSelector(tiers, fallbackVal, numBoolVars, intDomains.size)
         // For minimize / maximize, wrap the value side in SolutionGuided so each new
         // incumbent biases the next descent toward "near the last good solution" — the
         // standard SOTA phase-saving-for-BnB pattern.
@@ -175,8 +175,8 @@ internal class FlatZincCompiler(
             is FznSolve.Satisfy -> tieredVal
         }
         return BacktrackParams(
-            variableHeuristic = TieredVariableHeuristic(tiers, fallbackVar),
-            valueHeuristic = wrappedValH,
+            variableSelector = TieredVariableSelector(tiers, fallbackVar),
+            valueSelector = wrappedValH,
         )
     }
 
@@ -195,8 +195,8 @@ internal class FlatZincCompiler(
         val ordered = occ.entries.sortedBy { it.value }.map { it.key }.toIntArray()
         val tier = SearchTier(ordered, IntArray(0), TierVarSelect.InputOrder, IndomainMin)
         return BacktrackParams(
-            variableHeuristic = TieredVariableHeuristic(listOf(tier), LastConflict(Vsids())),
-            valueHeuristic = TieredValueHeuristic(
+            variableSelector = TieredVariableSelector(listOf(tier), LastConflict(Vsids())),
+            valueSelector = TieredValueSelector(
                 listOf(tier),
                 SolutionGuided(IndomainMin),
                 numBoolVars,
@@ -239,7 +239,7 @@ internal class FlatZincCompiler(
             // An unrecognised variable strategy keeps the tier (the var list is the
             // valuable part) and labels it in listed order.
             varSelect = varName?.let(::mapTierVarSelect) ?: TierVarSelect.InputOrder,
-            valueHeuristic = valName?.let(::mapValueStrategy)
+            valueSelector = valName?.let(::mapValueStrategy)
                 ?: IndomainMin,
         )
     }

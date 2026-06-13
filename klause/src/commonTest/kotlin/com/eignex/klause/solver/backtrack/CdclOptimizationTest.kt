@@ -56,7 +56,7 @@ class CdclOptimizationTest {
         // The previously-regressing config: VSIDS + Luby restarts + LBD learning.
         val params = BacktrackParams(
             randomSeed = 1L,
-            variableHeuristic = Vsids(),
+            variableSelector = Vsids(),
             lubyRestartBase = 4L,
             maxLearnedClauses = 1_000,
             maxDecisions = 200_000L,

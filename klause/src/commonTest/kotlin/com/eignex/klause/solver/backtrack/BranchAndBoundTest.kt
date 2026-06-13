@@ -77,8 +77,8 @@ class BranchAndBoundTest {
             BacktrackParams(
                 randomSeed = 0L,
                 maxDecisions = 200L,
-                variableHeuristic = InputOrder,
-                valueHeuristic = IndomainMin,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
             ),
         ).assignment
         assertNotNull(sample, "B&B should land at the optimum well inside a 200-decision budget")

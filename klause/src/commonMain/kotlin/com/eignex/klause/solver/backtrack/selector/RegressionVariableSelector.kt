@@ -36,7 +36,7 @@ import kotlin.random.Random
  * otherwise the reward is the propagation it triggered, squashed into [0,1]. A single arm (index 0)
  * carries the shared regression; the per-candidate feature vector is the context.
  */
-class RegressionVariableHeuristic private constructor(
+class RegressionVariableSelector private constructor(
     private val bandit: RegressionContextualBandit<*>,
     private val scoreCap: Int,
 ) : VariableSelector {
@@ -228,10 +228,10 @@ class RegressionVariableHeuristic private constructor(
             exploration: Double = 1.0,
             priorVariance: Double = 1.0,
             scoreCap: Int = 64,
-        ): RegressionVariableHeuristic {
+        ): RegressionVariableSelector {
             val regression = LinearRegressionSpec.Bayesian(FEATURE_SIZE, priorVariance)
             val spec = RegressionContextualSpec(1, regression, LinUcb, exploration, regression)
-            return RegressionVariableHeuristic(spec.materialize(Random(seed), Concurrency.None), scoreCap)
+            return RegressionVariableSelector(spec.materialize(Random(seed), Concurrency.None), scoreCap)
         }
     }
 }

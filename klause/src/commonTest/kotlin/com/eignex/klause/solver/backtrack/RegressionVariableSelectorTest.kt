@@ -4,7 +4,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.backtrack.selector.RegressionVariableHeuristic
+import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -16,7 +16,7 @@ import kotlin.test.assertIs
 
 /** The LinUCB variable heuristic only reorders branching choices, so every verdict must stay
  *  correct regardless of what the per-session model learns. */
-class RegressionVariableHeuristicTest {
+class RegressionVariableSelectorTest {
 
     @Test
     fun `solves an all-different and yields a valid permutation`() {
@@ -28,7 +28,7 @@ class RegressionVariableHeuristicTest {
             factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
         )
         val r = BacktrackSolver(problem).solve(
-            BacktrackParams(variableHeuristic = RegressionVariableHeuristic.linUcb(seed = 1L), randomSeed = 0L),
+            BacktrackParams(variableSelector = RegressionVariableSelector.linUcb(seed = 1L), randomSeed = 0L),
         )
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0 until n).toSet(), sat.assignment.ints.toSet(), "not a permutation")
@@ -48,7 +48,7 @@ class RegressionVariableHeuristicTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val r = BacktrackSolver(problem).minimize(
             obj,
-            BacktrackParams(variableHeuristic = RegressionVariableHeuristic.linUcb(seed = 2L), randomSeed = 0L),
+            BacktrackParams(variableSelector = RegressionVariableSelector.linUcb(seed = 2L), randomSeed = 0L),
         )
         assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
     }

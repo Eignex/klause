@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
+import com.eignex.klause.solver.backtrack.TieredVariableSelector
 import com.eignex.klause.solver.factor.GaussianXor
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +24,7 @@ class FlatZincXorSearchTest {
         val program = parseFlatZinc(src)
         assertEquals(1, program.problem.factors.count { it is GaussianXor })
         val params = assertNotNull(program.xorSearchParams)
-        val tiers = (params.variableHeuristic as TieredVariableHeuristic).tiers
+        val tiers = (params.variableSelector as TieredVariableSelector).tiers
         assertEquals(1, tiers.size)
         val ordered = tiers[0].boolVars
         // b occurs in 4 literal slots, a and c once each: b must come last.

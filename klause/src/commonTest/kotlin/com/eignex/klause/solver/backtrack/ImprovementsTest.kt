@@ -34,8 +34,8 @@ class ImprovementsTest {
             obj,
             BacktrackParams(
                 randomSeed = 0L,
-                variableHeuristic = InputOrder,
-                valueHeuristic = IndomainMax,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMax,
             ),
         ).toList()
         // Last yield is the terminal verdict.
@@ -79,7 +79,7 @@ class ImprovementsTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val solver = BacktrackSolver(problem)
-        val params = BacktrackParams(randomSeed = 0L, variableHeuristic = InputOrder, valueHeuristic = IndomainMin)
+        val params = BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMin)
         val viaMinimize = solver.minimize(obj, params)
         val viaImprovements = solver.improvements(obj, params).last()
         // Two separate runs report their own wall-clock stats; the verdicts must agree.

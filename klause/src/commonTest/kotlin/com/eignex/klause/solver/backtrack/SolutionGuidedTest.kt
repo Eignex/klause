@@ -94,8 +94,8 @@ class SolutionGuidedTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = SmallestDomain,
-                valueHeuristic = SolutionGuided(IndomainMin),
+                variableSelector = SmallestDomain,
+                valueSelector = SolutionGuided(IndomainMin),
                 randomSeed = 0L,
             ),
         )
@@ -122,7 +122,7 @@ class SolutionGuidedTest {
         )
         BacktrackSolver(problem).enumerate(
             BacktrackParams(
-                valueHeuristic = spy,
+                valueSelector = spy,
                 randomSeed = 0L,
             ),
         ).toList()

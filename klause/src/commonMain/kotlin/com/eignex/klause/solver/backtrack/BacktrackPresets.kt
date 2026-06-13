@@ -50,7 +50,7 @@ object BacktrackPresets {
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
         randomSeed = randomSeed,
-        variableHeuristic = Vsids(),
+        variableSelector = Vsids(),
         phaseSaving = true,
         targetPhasing = true,
         adaptiveRestart = true,
@@ -84,8 +84,8 @@ object BacktrackPresets {
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
         randomSeed = randomSeed,
-        variableHeuristic = LastConflict(Vsids()),
-        valueHeuristic = SolutionGuided(IndomainMin),
+        variableSelector = LastConflict(Vsids()),
+        valueSelector = SolutionGuided(IndomainMin),
         phaseSaving = true,
         lubyRestartBase = lubyRestartBase,
         cancellation = cancellation,

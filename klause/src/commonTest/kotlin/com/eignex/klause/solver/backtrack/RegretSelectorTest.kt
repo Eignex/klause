@@ -17,7 +17,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-class RegretHeuristicTest {
+class RegretSelectorTest {
 
     @Test
     fun `MaxRegret picks variable with largest weighted span`() {
@@ -101,8 +101,8 @@ class RegretHeuristicTest {
         val r = BacktrackSolver(problem).minimize(
             obj,
             BacktrackParams(
-                variableHeuristic = MaxRegret(obj),
-                valueHeuristic = IndomainBest(obj),
+                variableSelector = MaxRegret(obj),
+                valueSelector = IndomainBest(obj),
                 randomSeed = 0L,
             ),
         )

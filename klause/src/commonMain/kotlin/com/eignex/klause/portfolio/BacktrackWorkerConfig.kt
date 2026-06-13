@@ -5,7 +5,7 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.IndomainMin
-import com.eignex.klause.solver.backtrack.selector.RegressionVariableHeuristic
+import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -82,13 +82,13 @@ internal data class BacktrackWorkerConfig(
             BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
         }
 
-        /** The learned LinUCB variable heuristic ([RegressionVariableHeuristic], #8) on
+        /** The learned LinUCB variable heuristic ([RegressionVariableSelector], #8) on
          *  solution-guided values — the COP routing / feasibility-reach diversity arm. */
         fun linUcb() = BacktrackWorkerConfig("linucb") { seed, onEvent ->
             BacktrackParams(
                 randomSeed = seed,
-                variableHeuristic = RegressionVariableHeuristic.linUcb(seed = seed),
-                valueHeuristic = SolutionGuided(IndomainMin),
+                variableSelector = RegressionVariableSelector.linUcb(seed = seed),
+                valueSelector = SolutionGuided(IndomainMin),
                 phaseSaving = true,
                 lubyRestartBase = 256L,
                 onEvent = onEvent,

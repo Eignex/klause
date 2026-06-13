@@ -27,8 +27,8 @@ class ActivityBasedSearchTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = ActivityBasedSearch(),
-                valueHeuristic = IndomainMin,
+                variableSelector = ActivityBasedSearch(),
+                valueSelector = IndomainMin,
                 randomSeed = 0L,
             ),
         )

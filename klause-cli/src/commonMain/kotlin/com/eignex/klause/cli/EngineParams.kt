@@ -61,7 +61,7 @@ internal class EngineParams(pairs: List<String>) {
         }
     }
 
-    fun varHeuristic(key: String): VariableSelector? = map.remove(key)?.let {
+    fun varSelector(key: String): VariableSelector? = map.remove(key)?.let {
         when (it.lowercase()) {
             "vsids" -> Vsids()
             "chb" -> Chb()
@@ -72,7 +72,7 @@ internal class EngineParams(pairs: List<String>) {
         }
     }
 
-    fun valHeuristic(key: String): ValueSelector? = map.remove(key)?.let {
+    fun valSelector(key: String): ValueSelector? = map.remove(key)?.let {
         when (it.lowercase()) {
             "random" -> IndomainRandom
             "min" -> IndomainMin
@@ -112,8 +112,8 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.int("mid-lbd")?.let { out = out.copy(midLbdThreshold = it) }
     p.bool("vivification")?.let { out = out.copy(vivification = it) }
     p.int("vivify-batch")?.let { out = out.copy(vivifyBatch = it) }
-    p.varHeuristic("var-heuristic")?.let { out = out.copy(variableHeuristic = it) }
-    p.valHeuristic("val-heuristic")?.let { out = out.copy(valueHeuristic = it) }
+    p.varSelector("var-heuristic")?.let { out = out.copy(variableSelector = it) }
+    p.valSelector("val-heuristic")?.let { out = out.copy(valueSelector = it) }
     p.finish(
         "cp",
         "seed, max-decisions, luby, adaptive-restart, phase-saving, target-phasing, " +

@@ -10,7 +10,7 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.IndomainMin
-import com.eignex.klause.solver.backtrack.selector.RegressionVariableHeuristic
+import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.result.MinimizeResult
@@ -24,7 +24,7 @@ import java.util.Locale
  * under a fixed seed and per-instance timeout. The two legs (`legA`/`legB`) are chosen from a named
  * palette — `vsids` (the historical baseline: VSIDS + phase + Luby + LBD), `satopt`
  * ([BacktrackPresets.satOptimized]), `conflict` ([BacktrackPresets.conflictDriven]), and `linucb`
- * (the learned [RegressionVariableHeuristic]) — so any heuristic/explanation change can be A/B'd by
+ * (the learned [RegressionVariableSelector]) — so any heuristic/explanation change can be A/B'd by
  * holding the suite fixed; the default pair `vsids` vs `satopt` preserves the original comparison.
  *
  * Each leg reports the engine's own [SolveStats] — nodes, conflicts (fails), learned clauses,
@@ -189,8 +189,8 @@ internal object SearchEffortMetric {
 
             "linucb" -> BacktrackParams(
                 randomSeed = seed,
-                variableHeuristic = RegressionVariableHeuristic.linUcb(seed = seed),
-                valueHeuristic = SolutionGuided(IndomainMin),
+                variableSelector = RegressionVariableSelector.linUcb(seed = seed),
+                valueSelector = SolutionGuided(IndomainMin),
                 phaseSaving = true,
                 lubyRestartBase = 256L,
                 cancellation = cancel,
@@ -198,7 +198,7 @@ internal object SearchEffortMetric {
 
             else -> BacktrackParams( // "vsids": the historical baseline (VSIDS + phase + Luby + LBD)
                 randomSeed = seed,
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 phaseSaving = true,
                 lubyRestartBase = 100L,
                 maxLearnedClauses = 20_000,

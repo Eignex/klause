@@ -15,7 +15,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 
 /**
- * Within-tier variable selection for [TieredVariableHeuristic]. A tier restricts the
+ * Within-tier variable selection for [TieredVariableSelector]. A tier restricts the
  * candidate set to its listed variables, so the dynamic heap-backed heuristics aren't
  * reusable here; these are the strategies MiniZinc search annotations name, evaluated
  * by a linear scan over the tier's (typically small) variable list.
@@ -56,7 +56,7 @@ class SearchTier(
     /** Variable selection within the tier. */
     val varSelect: TierVarSelect,
     /** Value ordering for variables this tier owns. */
-    val valueHeuristic: ValueSelector,
+    val valueSelector: ValueSelector,
 )
 
 /**
@@ -67,7 +67,7 @@ class SearchTier(
  * forward to the fallback so an activity-driven fallback keeps learning during the
  * tiered phase.
  */
-class TieredVariableHeuristic(
+class TieredVariableSelector(
     /** The search phases, in exploration order. */
     val tiers: List<SearchTier>,
     /** Completes the variables no tier owns once every tier is assigned. */
@@ -167,12 +167,12 @@ class TieredVariableHeuristic(
 }
 
 /**
- * Per-tier value ordering companion to [TieredVariableHeuristic]: variables owned by a
- * tier use that tier's [SearchTier.valueHeuristic]; everything else uses [fallback].
+ * Per-tier value ordering companion to [TieredVariableSelector]: variables owned by a
+ * tier use that tier's [SearchTier.valueSelector]; everything else uses [fallback].
  * Hooks broadcast to every tier heuristic plus the fallback so stateful wrappers
  * (solution-guided, impact) stay coherent regardless of which tier consulted them.
  */
-class TieredValueHeuristic(
+class TieredValueSelector(
     /** The search phases, in ownership-priority order. */
     val tiers: List<SearchTier>,
     /** Orders values for the variables no tier owns. */
@@ -193,27 +193,27 @@ class TieredValueHeuristic(
         }
     }
 
-    private fun heuristicFor(varRef: VarRef): ValueSelector {
+    private fun selectorFor(varRef: VarRef): ValueSelector {
         val owner = when (varRef) {
             is VarRef.Bool -> if (varRef.varId < boolOwner.size) boolOwner[varRef.varId] else 0
             is VarRef.IntVar -> if (varRef.varId < intOwner.size) intOwner[varRef.varId] else 0
         }
-        return if (owner == 0) fallback else tiers[owner - 1].valueHeuristic
+        return if (owner == 0) fallback else tiers[owner - 1].valueSelector
     }
 
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
-        heuristicFor(varRef).values(session, varRef, rng)
+        selectorFor(varRef).values(session, varRef, rng)
 
-    override fun onConflict(varRef: VarRef, value: Int) = heuristicFor(varRef).onConflict(varRef, value)
-    override fun onCommit(varRef: VarRef, value: Int) = heuristicFor(varRef).onCommit(varRef, value)
+    override fun onConflict(varRef: VarRef, value: Int) = selectorFor(varRef).onConflict(varRef, value)
+    override fun onCommit(varRef: VarRef, value: Int) = selectorFor(varRef).onCommit(varRef, value)
 
     override fun onRestart() {
-        for (tier in tiers) tier.valueHeuristic.onRestart()
+        for (tier in tiers) tier.valueSelector.onRestart()
         fallback.onRestart()
     }
 
     override fun onSolution(snapshot: Sample) {
-        for (tier in tiers) tier.valueHeuristic.onSolution(snapshot)
+        for (tier in tiers) tier.valueSelector.onSolution(snapshot)
         fallback.onSolution(snapshot)
     }
 }

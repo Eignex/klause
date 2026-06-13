@@ -119,7 +119,7 @@ class ConflictAnalyzerTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableHeuristic = InputOrder))
+        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = InputOrder))
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -160,7 +160,7 @@ class ConflictAnalyzerTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = InputOrder,
+                variableSelector = InputOrder,
                 randomSeed = 0L,
             ),
         )

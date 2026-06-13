@@ -82,7 +82,7 @@ class BlockingLiteralTest {
     @Test
     fun `clause-dense unsat pigeonhole still proves unsat under blocking literals`() {
         val verdict = BacktrackSolver(pigeonhole(pigeons = 4, holes = 3)).solve(
-            BacktrackParams(randomSeed = 1L, variableHeuristic = Vsids(), maxLearnedClauses = 5_000),
+            BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 5_000),
         )
         assertIs<SolveResult.Unsat>(verdict)
     }
@@ -93,7 +93,7 @@ class BlockingLiteralTest {
         val pigeons = 4 // P(4,4) is satisfiable: a perfect matching exists.
         val sat = assertIs<SolveResult.Sat>(
             BacktrackSolver(pigeonhole(pigeons, holes)).solve(
-                BacktrackParams(randomSeed = 2L, variableHeuristic = Vsids(), maxLearnedClauses = 5_000),
+                BacktrackParams(randomSeed = 2L, variableSelector = Vsids(), maxLearnedClauses = 5_000),
             ),
         )
         val b = sat.assignment.bools

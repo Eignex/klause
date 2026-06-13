@@ -99,8 +99,8 @@ class ConflictOrderingTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = ConflictOrdering(DomWdeg()),
-                valueHeuristic = IndomainMin,
+                variableSelector = ConflictOrdering(DomWdeg()),
+                valueSelector = IndomainMin,
                 randomSeed = 0L,
             ),
         )
