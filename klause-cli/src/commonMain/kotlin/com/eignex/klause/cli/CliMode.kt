@@ -44,8 +44,8 @@ internal class CommonOptions {
     /** `--format NAME` / `--mode NAME`: force a specific mode regardless of file extension. */
     var formatOverride: String? = null
 
-    /** `--presolve SPEC`: an emphasis level (default | off | conservative | aggressive), `all`,
-     *  or a comma-list of pass ids to enable. Parsed by `PresolveConfig.parse`. */
+    /** `--presolve STRENGTH`: the presolve effort level — `off` | `conservative` | `default` |
+     *  `aggressive`. Parsed into a `PresolveConfig` by `PresolveConfig.parse`. */
     var presolve: String? = null
 
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
@@ -182,8 +182,8 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         listOf("--presolve"),
         true,
         FlagGroup.KLAUSE,
-        valueLabel = "spec",
-        help = "default | off | conservative | aggressive | all | <pass-id>,…",
+        valueLabel = "strength",
+        help = "presolve strength: off | conservative | default | aggressive",
     ) { o.presolve = it },
     FlagSpec(
         listOf("-h", "--help"),
