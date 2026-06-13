@@ -40,7 +40,6 @@ internal class CommonOptions {
     var solutionCap: Long? = null
     var parallel: Int? = null
     var freeSearch = false
-    var cpSeed = false
 
     /** `--format NAME` / `--mode NAME`: force a specific mode regardless of file extension. */
     var formatOverride: String? = null
@@ -76,7 +75,6 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     FlagSpec(listOf("-p", "--parallel"), true) {
         o.parallel = requireNotNull(it).toIntOrNull() ?: usageError("-p expects an integer, got `$it`")
     },
-    FlagSpec(listOf("--cp-seed"), false) { o.cpSeed = true },
     FlagSpec(listOf("--param"), true) { o.engineParams.add(requireNotNull(it)) },
     FlagSpec(listOf("--format", "--mode"), true) { o.formatOverride = it },
     FlagSpec(listOf("--presolve"), true) { o.presolve = it },

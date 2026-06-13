@@ -18,12 +18,13 @@ import com.eignex.klause.bench.tools.ProfileScope
  * (which ones), with an optional **reference** solver and **budget**. That is exactly the
  * primary form:
  *
- *   `bench <metric> [filters…]`   e.g. `bench solve suite=smtlib-core backend=ortools`
+ *   `bench <metric> [filters…]`   e.g. `bench solve suite=smtlib-core backend=choco`
  *
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
  * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
- * `backend=choco|ortools|yuck` (the `solve` solver; default klause) `timeout=<ms>`
- * `engine=cp|ls|portfolio` `processors=N` `fixed=true` `param=key=value` (klause search for `solve`)
+ * `backend=choco|gecode|yuck` (the `solve` solver; default klause) `timeout=<ms>`
+ * `engine=fixed|cp|mixed|ls|cp-single` `processors=N` `fixed=true` (references) `param=key=value`
+ * (klause search for `solve`)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
@@ -86,27 +87,30 @@ object BenchCli {
         MetricRunner.run(metric, refs, budget, backend, profile, search)
     }
 
-    /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=true` /
-     *  `param=`. Returns null when none are set. Defaults: mixed engine, **single core** (`processors`
-     *  defaults to 1, matching the CLI) — multi-thread tracks must pass `processors=` explicitly.
-     *  These map onto the portfolio's engine × threads axes; the competition tracks are filter
-     *  combinations (see the README recipes). `engine`/`processors` mirror `--engine` / `-p`. */
+    /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
+     *  Returns null when none are set. Defaults: `engine=fixed` (annotation-following, mirroring the
+     *  cli) at **single core** (`processors` unset ⇒ no `-p`); multi-thread tracks pass `processors=`
+     *  explicitly. `engine`/`param` forward to the cli `-e`/`--param`; `fixed=true` is the reference
+     *  (`-f`) toggle. The cli owns the engine model; the bench just forwards. */
     private fun parseKlauseSearch(f: Map<String, String>, params: List<String>): KlauseSearch? {
         if (f["engine"] == null && f["processors"] == null && f["fixed"] == null && params.isEmpty()) return null
         return KlauseSearch(
-            engine = f["engine"]?.let(::parseEngine) ?: "portfolio",
+            engine = f["engine"]?.let(::parseEngine) ?: "fixed",
             processors = f["processors"]?.toIntOrNull(),
             fixed = f["fixed"]?.toBoolean() ?: false,
             params = params,
         )
     }
 
-    /** Map an `engine=` alias to the klause-cli `-e` value. */
+    /** Map an `engine=` alias to a klause-cli `-e` value. The cli owns the model (fixed | cp | mixed |
+     *  ls | cp-single); the bench just forwards. */
     private fun parseEngine(name: String): String = when (name.lowercase()) {
         "cp", "backtrack", "bt" -> "cp"
         "ls", "localsearch", "local-search" -> "ls"
-        "mixed", "portfolio" -> "portfolio"
-        else -> error("engine must be backtrack|ls|mixed, got '$name'")
+        "mixed", "portfolio", "pf" -> "mixed"
+        "fixed", "fd" -> "fixed"
+        "cp-single", "cpsingle", "single" -> "cp-single"
+        else -> error("engine must be fixed|cp|mixed|ls|cp-single, got '$name'")
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
@@ -221,17 +225,17 @@ object BenchCli {
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
-            |         engine=cp|ls|portfolio processors=N fixed=true (klause search for solve)
-            |         param=key=value (repeatable; klause-cli --param engine knobs, e.g. var-selector=vsids)
+            |         engine=fixed|cp|mixed|ls|cp-single processors=N (klause search for solve)
+            |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; cp-single only for var-/val-selector)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:
-            |  bench solve suite=mzn-bench kind=cop per-family=1               (klause, mixed ×cores)
+            |  bench solve suite=mzn-bench kind=cop per-family=1               (klause, engine=fixed ×1 by default)
             |  bench solve suite=mzn-bench backend=choco timeout=300000        (Choco baseline)
             |  bench solve suite=mzn-bench backend=yuck timeout=300000         (Yuck baseline)
-            |  bench solve suite=mzn-bench engine=cp processors=8              (klause parallel, backtrack-only)
-            |  bench solve suite=mzn-bench engine=cp processors=1 param=var-selector=vsids (heuristic A/B: re-run with =chb, then compare.sh)
-            |  bench solve suite=mzn-bench fixed=true                          (klause follows the model annotation)
+            |  bench solve suite=mzn-bench engine=cp processors=8              (klause parallel backtrack portfolio)
+            |  bench solve suite=mzn-bench engine=cp-single param=var-selector=vsids (heuristic A/B: re-run with =chb, then compare.sh)
+            |  bench solve suite=mzn-bench engine=fixed                        (klause follows the model annotation)
             |
             |To compare configs, run `solve` once per config (each writes output/<config>/) and diff dirs offline.
             """.trimMargin(),

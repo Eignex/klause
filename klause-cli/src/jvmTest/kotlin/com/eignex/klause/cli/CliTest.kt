@@ -21,14 +21,15 @@ class CliTest {
     }
 
     @Test
-    fun `engine params reach the cp and ls engines`() {
+    fun `engine params reach the cp-single and ls engines`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
         for (engineArgs in listOf(
-            arrayOf("-e", "cp", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
-            arrayOf("-e", "ls", "--param", "seed=7", "--param", "tabu-tenure=5", "--param", "lambda=2.0", "-t", "5000"),
+            // cp-single is the only engine that takes the per-solver var-/val-selector knobs.
+            arrayOf("-e", "cp-single", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
+            arrayOf("-e", "ls", "--param", "seed=7", "--param", "lambda=2.0", "-t", "5000"),
         )) {
             val out = capture { main(engineArgs + fzn.absolutePath) }
             assertTrue("x = " in out, out)
@@ -49,13 +50,14 @@ class CliTest {
     }
 
     @Test
-    fun `minizinc standard -p routes to a parallel portfolio`() {
+    fun `minizinc standard -f -p routes to a parallel portfolio`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // No -e: mixed pool sized to 2. With -e ls: pure-LS pool, still solves.
-        for (engineArgs in listOf(arrayOf("-p", "2"), arrayOf("-e", "ls", "-p", "2"))) {
+        // `-f -p2` ⇒ free (cp alias) parallel pool sized to 2. `-e ls -p2` ⇒ pure-LS pool. (Bare
+        // `-p2` would be the single-core `fixed` engine and is rejected — that's by design.)
+        for (engineArgs in listOf(arrayOf("-f", "-p", "2"), arrayOf("-e", "ls", "-p", "2"))) {
             val out = capture { main(engineArgs + arrayOf("-t", "10000", fzn.absolutePath)) }
             assertTrue("x = " in out, out)
         }
