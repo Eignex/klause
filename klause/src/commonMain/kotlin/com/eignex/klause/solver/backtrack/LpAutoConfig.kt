@@ -15,6 +15,7 @@ import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.CumulativeRelaxation
+import com.eignex.klause.solver.lp.schedulingViews
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -134,8 +135,14 @@ object LpAutoConfig {
         // guard. The plan build also tells us whether *any* makespan link is provable at all.
         val makespanPlans = if (scheduling) CumulativeRelaxation(problem).plans.size else 0
         rows += makespanPlans.toLong()
-        val cols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
+        // Time-indexed reformulation (#453): O(n·H) extra columns + H resource rows per bounded-horizon
+        // scheduling factor. Estimate them so the auto path only turns it on when the dense tableau
+        // still fits; the builder applies the real per-factor horizon / column gates.
+        val ti = if (scheduling) timeIndexedEstimate(problem) else TimeIndexedEstimate(0L, 0L, false)
+        val cols = problem.numIntVars.toLong() + problem.numBoolVars.toLong() + ti.cols
+        val rowsWithTi = rows + ti.rows
         val lpFits = rows * (cols + rows + 1L) <= MAX_AUTO_TABLEAU_CELLS
+        val timeIndexedFits = ti.anyFits && rowsWithTi * (cols + rowsWithTi + 1L) <= MAX_AUTO_TABLEAU_CELLS
         val cutEligible = allDifferent || globalCardinality
         val makespanLp = lpFits && makespanPlans > 0
         val lpBounding = lpFits &&
@@ -153,6 +160,11 @@ object LpAutoConfig {
             lpElement = base.lpElement || (lpFits && constArrayElement),
             lpTable = base.lpTable || (lpFits && table),
             lpCumulative = base.lpCumulative || makespanLp,
+            // #453: the time-indexed LP only when lpBounding is on and its columns fit the tableau.
+            lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed || (lpBounding && timeIndexedFits),
+            // #454: the preemptive max-flow feasibility prune — cheap, horizon-independent, no tableau
+            // impact (not an LP row), so it rides along on any scheduling global like the energetic check.
+            lpCumulativeFlow = base.lpCumulativeFlow || scheduling,
             lagrangian = base.lagrangian || allDifferent,
             energeticReasoning = base.energeticReasoning || cumulative,
             // Derive the cadence only when the auto path is the one enabling the check — an
@@ -164,5 +176,43 @@ object LpAutoConfig {
                 base.energeticEvery
             },
         )
+    }
+
+    /** Above this horizon / column count the time-indexed model is skipped (mirrors the builder gates). */
+    private const val MAX_TI_HORIZON: Int = 512
+    private const val MAX_TI_COLS: Long = 4096L
+
+    private class TimeIndexedEstimate(val cols: Long, val rows: Long, val anyFits: Boolean)
+
+    /** Estimated added columns/rows of the time-indexed reformulation over the bounded-horizon
+     *  scheduling factors, and whether any factor is small enough to encode. */
+    private fun timeIndexedEstimate(problem: Problem): TimeIndexedEstimate {
+        var cols = 0L
+        var rows = 0L
+        var anyFits = false
+        for (v in schedulingViews(problem)) {
+            val n = v.starts.size
+            var t0 = Int.MAX_VALUE
+            var t1 = Int.MIN_VALUE
+            var c = 0L
+            var ok = true
+            for (i in 0 until n) {
+                val dom = problem.intDomains[v.starts[i]]
+                if (dom.max < dom.min) {
+                    ok = false
+                    break
+                }
+                if (dom.min < t0) t0 = dom.min
+                val end = dom.max.toLong() + v.durations[i]
+                if (end > t1) t1 = end.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                c += (dom.max - dom.min + 1).toLong()
+            }
+            val horizon = t1.toLong() - t0
+            if (!ok || horizon <= 0 || horizon > MAX_TI_HORIZON || c > MAX_TI_COLS) continue
+            anyFits = true
+            cols += c
+            rows += horizon + 2L * n // H resource rows + assignment + channel per task
+        }
+        return TimeIndexedEstimate(cols, rows, anyFits)
     }
 }

@@ -97,6 +97,35 @@ class LpAutoConfigTest {
         assertTrue(r.energeticReasoning) // the feasibility check rides along on the Cumulative
     }
 
+    /** Makespan COP: ints 0..n-1 starts, n is the makespan with `M ≥ startᵢ + durᵢ`, plus a cumulative. */
+    private fun makespanScheduling(startHi: Int): Problem {
+        val n = 3
+        val factors = ArrayList<Factor>()
+        for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, 3))
+        factors.add(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
+        val domains = Array(n + 1) { if (it < n) IntDomain(0, startHi) else IntDomain(0, startHi + 3) }
+        return Problem(0, n + 1, domains, factors.toTypedArray())
+    }
+
+    @Test
+    fun `bounded-horizon scheduling enables the time-indexed and flow relaxations`() {
+        // Small declared start horizon + a verified makespan: both the time-indexed LP (#453) and the
+        // preemptive flow prune (#454) auto-enable.
+        val r = LpAutoConfig.recommend(makespanScheduling(startHi = 10))
+        assertTrue(r.lpCumulativeFlow, "the flow prune rides along on any scheduling global")
+        assertTrue(r.lpCumulativeTimeIndexed, "a small bounded horizon fits the time-indexed tableau")
+        assertTrue(r.lpCumulative, "the energetic makespan row is on too")
+    }
+
+    @Test
+    fun `huge-horizon scheduling keeps the time-indexed model off but the flow prune on`() {
+        // A 200000-wide start horizon blows the O(n·H) time-indexed column budget, so it stays off;
+        // the horizon-independent flow prune still rides along.
+        val r = LpAutoConfig.recommend(makespanScheduling(startHi = 200_000))
+        assertTrue(r.lpCumulativeFlow)
+        assertFalse(r.lpCumulativeTimeIndexed, "the huge horizon must keep the time-indexed model off")
+    }
+
     @Test
     fun `auto-enabled energetic reasoning derives a size-aware cadence`() {
         fun cumulative(tasks: Int) = Problem(

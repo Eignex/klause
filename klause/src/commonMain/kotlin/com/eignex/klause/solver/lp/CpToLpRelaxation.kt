@@ -17,6 +17,7 @@ import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
@@ -89,6 +90,10 @@ internal class CpToLpRelaxation(
     /** When true, emit the energetic makespan lower-bound row for each Cumulative / Disjunctive whose
      *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
     private val cumulative: Boolean = false,
+    /** When true, emit the time-indexed `x_{i,t}` relaxation of each Cumulative / Disjunctive over a
+     *  bounded horizon (#453): assignment + start channel + per-time resource rows. Adds O(n·H)
+     *  columns, so it is hard-gated on the horizon and total cell count. */
+    private val cumulativeTimeIndexed: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -103,6 +108,12 @@ internal class CpToLpRelaxation(
 
         /** Above this tuple count the O(numTuples)-column Table hull is skipped. */
         const val MAX_TUPLES: Int = 1024
+
+        /** Above this horizon (latest deadline − earliest start) the time-indexed model is skipped. */
+        const val MAX_TI_HORIZON: Int = 512
+
+        /** Above this many `x_{i,t}` columns one time-indexed Cumulative is skipped (the O(n·H) blow-up). */
+        const val MAX_TI_COLS: Int = 4096
     }
 
     /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
@@ -375,6 +386,9 @@ internal class CpToLpRelaxation(
                 for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
             }
             cumulativeRelaxation?.let { cumulativeRows(it) }
+            if (cumulativeTimeIndexed) {
+                for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
+            }
 
             for (factor in problem.factors) {
                 when (factor) {
@@ -610,6 +624,78 @@ internal class CpToLpRelaxation(
                     global = spec.global,
                     premises = spec.premises,
                 )
+            }
+        }
+
+        /**
+         * Time-indexed `x_{i,t}` relaxation of one scheduling [view] over the bounded horizon
+         * `[T0, T1)` (#453). For each task a binary `x_{i,t} ∈ [0,1]` per declared-feasible start `t`
+         * (pinned to 0 when `t` left the live start domain — layout stable across nodes for warm
+         * starts), with `Σ_t x_{i,t} = 1` (starts once), the start channel `Σ_t t·x_{i,t} = startᵢ`
+         * (ties to the integer column), and per-time-point resource rows
+         * `Σ_i Σ_{t: t≤tt<t+durᵢ} resᵢ·x_{i,t} ≤ capacity`. Every integer schedule satisfies all three,
+         * so the rows are globally valid; the resource ceiling uses the declared **max** capacity and
+         * the **min** demand, so it is a sound relaxation. Columns are O(n·H) — hard-gated on
+         * [MAX_TI_HORIZON] and [MAX_TI_COLS]; above either the model is skipped (only loosens).
+         */
+        private fun buildCumulativeTimeIndexed(view: SchedulingView) {
+            val n = view.starts.size
+            val est = IntArray(n) { problem.intDomains[view.starts[it]].min }
+            val lst = IntArray(n) { problem.intDomains[view.starts[it]].max }
+            var t0 = Int.MAX_VALUE
+            var t1 = Int.MIN_VALUE
+            var cols = 0L
+            for (i in 0 until n) {
+                if (lst[i] < est[i]) return // empty declared start domain — leave to propagation
+                if (est[i] < t0) t0 = est[i]
+                val end = lst[i] + view.durations[i]
+                if (end > t1) t1 = end
+                cols += (lst[i] - est[i] + 1).toLong()
+            }
+            val horizon = t1 - t0
+            if (horizon <= 0 || horizon > MAX_TI_HORIZON || cols > MAX_TI_COLS) return
+
+            // Per-task start-time columns, indexed by (t - est_i); assignment + start channel rows.
+            val taskCols = Array(n) { IntArray(lst[it] - est[it] + 1) }
+            for (i in 0 until n) {
+                val live = session.intDomain(view.starts[i])
+                val assignCols = IntArray(taskCols[i].size)
+                val chanCols = IntArray(taskCols[i].size + 1)
+                val chanVals = LongArray(taskCols[i].size + 1)
+                for (k in taskCols[i].indices) {
+                    val t = est[i] + k
+                    val col = auxColumn(0L, if (live.contains(t)) 1L else 0L)
+                    taskCols[i][k] = col
+                    assignCols[k] = col
+                    chanCols[k] = col
+                    chanVals[k] = t.toLong()
+                }
+                builder.addRow(assignCols, LongArray(assignCols.size) { 1L }, Relation.EQ, 1L)
+                chanCols[taskCols[i].size] = intColumn(view.starts[i])
+                chanVals[taskCols[i].size] = -1L
+                builder.addRow(chanCols, chanVals, Relation.EQ, 0L) // Σ t·x − startᵢ = 0
+            }
+
+            // Per-time-point resource rows: Σ_i Σ_{t ≤ tt < t+durᵢ} resᵢ·x_{i,t} ≤ capacity.
+            val rowCols = IntArrayList()
+            val rowVals = LongArrayList()
+            for (tt in t0 until t1) {
+                rowCols.clear()
+                rowVals.clear()
+                for (i in 0 until n) {
+                    val d = view.durations[i]
+                    val r = view.resources[i]
+                    if (d <= 0 || r <= 0) continue
+                    val lo = maxOf(est[i], tt - d + 1)
+                    val hi = minOf(lst[i], tt)
+                    for (t in lo..hi) {
+                        rowCols.add(taskCols[i][t - est[i]])
+                        rowVals.add(r.toLong())
+                    }
+                }
+                if (!rowCols.isEmpty()) {
+                    builder.addRow(rowCols.toIntArray(), rowVals.toLongArray(), Relation.LE, view.capacity.toLong())
+                }
             }
         }
 
