@@ -518,7 +518,7 @@ object Presolve {
      * domain-incidence (the set of variables whose domain contains them) — so any transposition
      * within an orbit already maps every domain to itself. Each transposition is then *verified*
      * against the factors: applying it via [Factor.remapValues] and comparing the [Factor.structuralKey]
-     * multiset proves the swap is a symmetry, the value analog of the [remap]-based automorphism check
+     * multiset proves the swap is a symmetry, the value analog of the [Factor.remap]-based automorphism check
      * (#334). Transpositions generate the full symmetric group on a verified orbit, so one variable
      * whose domain lies entirely within an orbit is pinned to the orbit minimum — a sound break (a
      * solution can always be relabeled within the orbit so that variable takes the minimum).
