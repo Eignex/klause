@@ -68,7 +68,7 @@ class InverseTest {
                 intDomains = doms,
                 factors = arrayOf<Factor>(Inverse(f = IntArray(n) { it }, g = IntArray(n) { n + it })),
             )
-            val params = BacktrackParams(randomSeed = 1L, variableHeuristic = Vsids(), maxLearnedClauses = 1_000)
+            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
                 .map { it.ints.toList() }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")

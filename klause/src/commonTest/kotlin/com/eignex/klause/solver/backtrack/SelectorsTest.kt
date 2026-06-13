@@ -22,7 +22,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class HeuristicsTest {
+class SelectorsTest {
 
     private val rng = Random(1)
 
@@ -146,7 +146,7 @@ class HeuristicsTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L, variableHeuristic = Chb())),
+            BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
         )
         val b = sat.assignment.bools
         assertTrue(b[0] || b[1])
@@ -166,7 +166,7 @@ class HeuristicsTest {
             ),
         )
         assertIs<SolveResult.Unsat>(
-            BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L, variableHeuristic = Chb())),
+            BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
         )
     }
 }

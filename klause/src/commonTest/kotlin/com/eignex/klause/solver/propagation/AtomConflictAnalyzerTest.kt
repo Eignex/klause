@@ -189,7 +189,7 @@ class AtomConflictAnalyzerTest {
                 Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, -1), // z - x <= -1  (z < x)
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableHeuristic = InputOrder, randomSeed = 0L))
+        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = InputOrder, randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
     }
 

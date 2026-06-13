@@ -18,7 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class MaxSdHeuristicTest {
+class MaxSdSelectorTest {
 
     @Test
     fun `MaxSd drops infeasible probe values just like Impact`() {
@@ -88,8 +88,8 @@ class MaxSdHeuristicTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = SmallestDomain,
-                valueHeuristic = MaxSd(),
+                variableSelector = SmallestDomain,
+                valueSelector = MaxSd(),
                 randomSeed = 0L,
             ),
         )

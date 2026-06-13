@@ -190,8 +190,8 @@ class PortfolioTest {
                 BacktrackParams(
                     randomSeed = i.toLong(),
                     maxDecisions = 4,
-                    variableHeuristic = InputOrder,
-                    valueHeuristic = if (i == 0) IndomainMax else IndomainMiddle,
+                    variableSelector = InputOrder,
+                    valueSelector = if (i == 0) IndomainMax else IndomainMiddle,
                 ),
                 objective = obj,
             ) { params, supplier ->

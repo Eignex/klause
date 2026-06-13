@@ -42,7 +42,7 @@ class VivificationTest {
         val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4)).solve(
             BacktrackParams(
                 randomSeed = 1L,
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 lubyRestartBase = 50L, // restart often so vivification fires repeatedly
                 maxLearnedClauses = 5_000,
                 vivification = true,
@@ -60,7 +60,7 @@ class VivificationTest {
             BacktrackSolver(pigeonhole(pigeons, holes)).solve(
                 BacktrackParams(
                     randomSeed = 3L,
-                    variableHeuristic = Vsids(),
+                    variableSelector = Vsids(),
                     lubyRestartBase = 30L,
                     vivification = true,
                 ),
@@ -101,7 +101,7 @@ class VivificationTest {
             .enumerate(
                 BacktrackParams(
                     randomSeed = 5L,
-                    variableHeuristic = Vsids(),
+                    variableSelector = Vsids(),
                     lubyRestartBase = 4L,
                     vivification = vivify,
                     vivifyBatch = 8,

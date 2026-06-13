@@ -96,7 +96,7 @@ internal object SolveCore {
         val annotated = if (common.freeSearch) null else solvable.annotatedBacktrackParams
         val base = annotated ?: BacktrackParams(
             randomSeed = 1L,
-            variableHeuristic = Vsids(),
+            variableSelector = Vsids(),
             phaseSaving = true,
             lubyRestartBase = 100L,
             maxLearnedClauses = 20_000,

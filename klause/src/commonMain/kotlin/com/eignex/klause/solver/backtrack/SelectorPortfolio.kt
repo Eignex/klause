@@ -20,8 +20,8 @@ import kotlin.random.Random
  * UCB1Tuned, ThompsonSampling, etc.) is consulted at construction to pick the initial arm,
  * and at every restart to update the previous arm's reward and choose the next arm.
  *
- *  - [variableHeuristic] / [valueHeuristic] expose the portfolio as drop-in slots for
- *    [BacktrackParams]. **Both slots must reference the same `HeuristicPortfolio` instance
+ *  - [variableSelector] / [valueSelector] expose the portfolio as drop-in slots for
+ *    [BacktrackParams]. **Both slots must reference the same `SelectorPortfolio` instance
  *    to share state**; treat the portfolio as the unit, not the two slots.
  *  - At restart, the variable-heuristic delegate is responsible for the bandit update +
  *    arm switch; the value-heuristic delegate just forwards `onRestart` to the (now new)
@@ -37,7 +37,7 @@ import kotlin.random.Random
  *
  * Construction example (UCB1 over four classical configs):
  * ```
- * val portfolio = HeuristicPortfolio(
+ * val portfolio = SelectorPortfolio(
  *     arms = listOf(
  *         Arm("vsids+random", Vsids(), IndomainRandom),
  *         Arm("domwdeg+min",   DomWdeg(), IndomainMin),
@@ -47,13 +47,13 @@ import kotlin.random.Random
  *     bandit = MultiArmedBandit(nbrArms = 4, policy = UCB1(alpha = 1.0)),
  * )
  * solver.solve(BacktrackParams(
- *     variableHeuristic = portfolio.variableHeuristic,
- *     valueHeuristic    = portfolio.valueHeuristic,
+ *     variableSelector = portfolio.variableSelector,
+ *     valueSelector    = portfolio.valueSelector,
  *     lubyRestartBase   = 100L,
  * ))
  * ```
  */
-internal class HeuristicPortfolio(
+internal class SelectorPortfolio(
     val arms: List<Arm>,
     private val bandit: MultiArmedBandit<*>,
     private val rewardFn: (RunStats) -> Double = { stats -> if (stats.solutionsFound > 0) 1.0 else 0.0 },
@@ -66,7 +66,7 @@ internal class HeuristicPortfolio(
     }
 
     /** One strategy in the portfolio's palette. */
-    data class Arm(val label: String, val variableHeuristic: VariableSelector, val valueHeuristic: ValueSelector)
+    data class Arm(val label: String, val variableSelector: VariableSelector, val valueSelector: ValueSelector)
 
     /** Statistics passed to [rewardFn] at the end of every Luby-restart-bounded run. */
     data class RunStats(
@@ -86,43 +86,42 @@ internal class HeuristicPortfolio(
     /** Index of [current] within [arms]. Inspectable for telemetry. */
     val currentArmIndex: Int get() = currentArm
 
-    /** Drop-in [VariableSelector] slot for [BacktrackParams.variableHeuristic]. */
-    val variableHeuristic: VariableSelector = object : VariableSelector {
-        override fun pick(session: PropagationSession, rng: Random) = current.variableHeuristic.pick(session, rng)
+    /** Drop-in [VariableSelector] slot for [BacktrackParams.variableSelector]. */
+    val variableSelector: VariableSelector = object : VariableSelector {
+        override fun pick(session: PropagationSession, rng: Random) = current.variableSelector.pick(session, rng)
         override fun onConflict(varRef: VarRef) {
             conflicts++
-            current.variableHeuristic.onConflict(varRef)
+            current.variableSelector.onConflict(varRef)
         }
         override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
             conflicts++
-            current.variableHeuristic.onConflict(varRef, unsat)
+            current.variableSelector.onConflict(varRef, unsat)
         }
-        override fun onCommit(varRef: VarRef) = current.variableHeuristic.onCommit(varRef)
-        override fun onPropagation(implied: PropagationResult.Implied) =
-            current.variableHeuristic.onPropagation(implied)
+        override fun onCommit(varRef: VarRef) = current.variableSelector.onCommit(varRef)
+        override fun onPropagation(implied: PropagationResult.Implied) = current.variableSelector.onPropagation(implied)
         override fun onSolution(snapshot: Sample) {
             solutionsFound++
-            current.variableHeuristic.onSolution(snapshot)
+            current.variableSelector.onSolution(snapshot)
         }
         override fun onRestart() {
             // Update the bandit on the just-ended run, switch to the next arm, then forward
             // restart to the (now new) arm's variable heuristic for its own decay/reset.
             updateAndSwitch()
-            current.variableHeuristic.onRestart()
+            current.variableSelector.onRestart()
         }
     }
 
-    /** Drop-in [ValueSelector] slot for [BacktrackParams.valueHeuristic]. */
-    val valueHeuristic: ValueSelector = object : ValueSelector {
+    /** Drop-in [ValueSelector] slot for [BacktrackParams.valueSelector]. */
+    val valueSelector: ValueSelector = object : ValueSelector {
         override fun values(session: PropagationSession, varRef: VarRef, rng: Random) =
-            current.valueHeuristic.values(session, varRef, rng)
-        override fun onConflict(varRef: VarRef, value: Int) = current.valueHeuristic.onConflict(varRef, value)
-        override fun onCommit(varRef: VarRef, value: Int) = current.valueHeuristic.onCommit(varRef, value)
-        override fun onSolution(snapshot: Sample) = current.valueHeuristic.onSolution(snapshot)
+            current.valueSelector.values(session, varRef, rng)
+        override fun onConflict(varRef: VarRef, value: Int) = current.valueSelector.onConflict(varRef, value)
+        override fun onCommit(varRef: VarRef, value: Int) = current.valueSelector.onCommit(varRef, value)
+        override fun onSolution(snapshot: Sample) = current.valueSelector.onSolution(snapshot)
         override fun onRestart() {
             // Bandit update is owned by the variable-heuristic delegate (fired first by the
             // engine). Here we just forward restart to the (now new) arm's value heuristic.
-            current.valueHeuristic.onRestart()
+            current.valueSelector.onRestart()
         }
     }
 
@@ -139,7 +138,7 @@ internal class HeuristicPortfolio(
          * Convenience: build a portfolio backed by classical [UCB1] over the supplied arms.
          * `exploration` is UCB1's `alpha` (1.0 = textbook default).
          */
-        fun ucb1(arms: List<Arm>, exploration: Double = 1.0): HeuristicPortfolio = HeuristicPortfolio(
+        fun ucb1(arms: List<Arm>, exploration: Double = 1.0): SelectorPortfolio = SelectorPortfolio(
             arms = arms,
             bandit = MultiArmedBandit(nbrArms = arms.size, policy = UCB1(alpha = exploration)),
         )

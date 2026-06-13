@@ -496,7 +496,7 @@ class BacktrackSolverTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 randomSeed = 0L,
             ),
         )
@@ -527,7 +527,7 @@ class BacktrackSolverTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableHeuristic = Vsids()))
+        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = Vsids()))
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -546,7 +546,7 @@ class BacktrackSolverTest {
         // so only v3 (the failing decision) gets the bump.
         val emptyUnsat = Unsat()
         repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableHeuristic = vsids))
+        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = vsids))
         assertIs<SolveResult.Sat>(r)
     }
 
@@ -561,7 +561,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
-        val r1 = BacktrackSolver(p1).solve(BacktrackParams(variableHeuristic = vsids))
+        val r1 = BacktrackSolver(p1).solve(BacktrackParams(variableSelector = vsids))
         assertIs<SolveResult.Sat>(r1)
 
         val p2 = Problem(
@@ -570,7 +570,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(6, true)))),
         )
-        val r2 = BacktrackSolver(p2).solve(BacktrackParams(variableHeuristic = vsids))
+        val r2 = BacktrackSolver(p2).solve(BacktrackParams(variableSelector = vsids))
         assertIs<SolveResult.Sat>(r2)
         assertEquals(true, r2.assignment.bools[6])
     }
@@ -596,7 +596,7 @@ class BacktrackSolverTest {
         )
         val r1 = BacktrackSolver(satProblem).solve(
             BacktrackParams(
-                variableHeuristic = DomWdeg(),
+                variableSelector = DomWdeg(),
                 randomSeed = 0L,
             ),
         )
@@ -614,7 +614,7 @@ class BacktrackSolverTest {
         )
         val r2 = BacktrackSolver(unsatProblem).solve(
             BacktrackParams(
-                variableHeuristic = DomWdeg(),
+                variableSelector = DomWdeg(),
             ),
         )
         assertIs<SolveResult.Unsat>(r2)
@@ -690,7 +690,7 @@ class BacktrackSolverTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = LastConflict(Vsids()),
+                variableSelector = LastConflict(Vsids()),
                 randomSeed = 0L,
             ),
         )
@@ -783,7 +783,7 @@ class BacktrackSolverTest {
             }
 
             val params =
-                BacktrackParams(randomSeed = seed.toLong(), variableHeuristic = Vsids(), maxLearnedClauses = 1_000)
+                BacktrackParams(randomSeed = seed.toLong(), variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val raw = BacktrackSolver(p).enumerate(params).take(brute.size + 10)
                 .map { s -> s.bools.map { if (it) 1 else 0 } + s.ints.toList() }.toList()
             assertEquals(raw.size, raw.toHashSet().size, "seed $seed: a solution was yielded more than once")

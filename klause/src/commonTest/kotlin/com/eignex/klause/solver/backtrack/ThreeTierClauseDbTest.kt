@@ -42,7 +42,7 @@ class ThreeTierClauseDbTest {
         val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4)).solve(
             BacktrackParams(
                 randomSeed = 1L,
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 lubyRestartBase = 50L, // restart often so the reduction policy runs repeatedly
                 maxLearnedClauses = 40,
                 tieredLearnedDb = true,
@@ -70,12 +70,12 @@ class ThreeTierClauseDbTest {
             BacktrackSolver(clauseProblem()).enumerate(params).map { it.bools.toList() }.toSet()
 
         val binary = models(
-            BacktrackParams(randomSeed = 7L, variableHeuristic = Vsids(), lubyRestartBase = 8L, maxLearnedClauses = 4),
+            BacktrackParams(randomSeed = 7L, variableSelector = Vsids(), lubyRestartBase = 8L, maxLearnedClauses = 4),
         )
         val tiered = models(
             BacktrackParams(
                 randomSeed = 7L,
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 lubyRestartBase = 8L,
                 maxLearnedClauses = 4,
                 tieredLearnedDb = true,

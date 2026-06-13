@@ -102,7 +102,7 @@ class ReifiedHoleChainTest {
             // must agree.
             val params = BacktrackParams(
                 randomSeed = seed.toLong(),
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 maxLearnedClauses = 1_000,
                 maxDecisions = 200_000,
             )

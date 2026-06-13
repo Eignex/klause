@@ -74,7 +74,7 @@ class AdaptiveRestartTest {
         val verdict = BacktrackSolver(pigeonhole(pigeons = 4, holes = 3)).solve(
             BacktrackParams(
                 randomSeed = 1L,
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 adaptiveRestart = true,
                 maxLearnedClauses = 5_000,
             ),
@@ -99,9 +99,9 @@ class AdaptiveRestartTest {
         fun models(params: BacktrackParams): Set<List<Boolean>> =
             BacktrackSolver(clauseProblem()).enumerate(params).map { it.bools.toList() }.toSet()
 
-        val plain = models(BacktrackParams(randomSeed = 5L, variableHeuristic = Vsids()))
+        val plain = models(BacktrackParams(randomSeed = 5L, variableSelector = Vsids()))
         val adaptive = models(
-            BacktrackParams(randomSeed = 5L, variableHeuristic = Vsids(), adaptiveRestart = true),
+            BacktrackParams(randomSeed = 5L, variableSelector = Vsids(), adaptiveRestart = true),
         )
         assertTrue(plain.isNotEmpty())
         assertEquals(plain, adaptive, "adaptive restarts must not change the feasible set")

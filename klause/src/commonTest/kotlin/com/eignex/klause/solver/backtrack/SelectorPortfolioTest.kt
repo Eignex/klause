@@ -20,7 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class HeuristicPortfolioTest {
+class SelectorPortfolioTest {
 
     private fun simpleAllDifferent(n: Int) = Problem(
         numBoolVars = 0,
@@ -31,16 +31,16 @@ class HeuristicPortfolioTest {
 
     @Test
     fun `portfolio solves with default Bernoulli reward`() {
-        val portfolio = HeuristicPortfolio.ucb1(
+        val portfolio = SelectorPortfolio.ucb1(
             listOf(
-                HeuristicPortfolio.Arm("input+min", InputOrder, IndomainMin),
-                HeuristicPortfolio.Arm("smallest+random", SmallestDomain, IndomainRandom),
+                SelectorPortfolio.Arm("input+min", InputOrder, IndomainMin),
+                SelectorPortfolio.Arm("smallest+random", SmallestDomain, IndomainRandom),
             ),
         )
         val r = BacktrackSolver(simpleAllDifferent(5)).solve(
             BacktrackParams(
-                variableHeuristic = portfolio.variableHeuristic,
-                valueHeuristic = portfolio.valueHeuristic,
+                variableSelector = portfolio.variableSelector,
+                valueSelector = portfolio.valueSelector,
                 randomSeed = 0L,
             ),
         )
@@ -50,19 +50,19 @@ class HeuristicPortfolioTest {
 
     @Test
     fun `portfolio switches arms across restarts`() {
-        val portfolio = HeuristicPortfolio.ucb1(
+        val portfolio = SelectorPortfolio.ucb1(
             listOf(
-                HeuristicPortfolio.Arm("a", InputOrder, IndomainMin),
-                HeuristicPortfolio.Arm("b", SmallestDomain, IndomainMax),
-                HeuristicPortfolio.Arm("c", RandomVariable, IndomainRandom),
+                SelectorPortfolio.Arm("a", InputOrder, IndomainMin),
+                SelectorPortfolio.Arm("b", SmallestDomain, IndomainMax),
+                SelectorPortfolio.Arm("c", RandomVariable, IndomainRandom),
             ),
         )
         val visited = HashSet<Int>()
         visited.add(portfolio.currentArmIndex)
         // Trigger several restarts manually via the var-heuristic onRestart hook.
         repeat(20) {
-            portfolio.variableHeuristic.onRestart()
-            portfolio.valueHeuristic.onRestart()
+            portfolio.variableSelector.onRestart()
+            portfolio.valueSelector.onRestart()
             visited.add(portfolio.currentArmIndex)
         }
         assertTrue(
@@ -74,8 +74,8 @@ class HeuristicPortfolioTest {
     @Test
     fun `portfolio rejects mismatched arm count and bandit size`() {
         val ex = runCatching {
-            HeuristicPortfolio(
-                arms = listOf(HeuristicPortfolio.Arm("a", InputOrder, IndomainMin)),
+            SelectorPortfolio(
+                arms = listOf(SelectorPortfolio.Arm("a", InputOrder, IndomainMin)),
                 bandit = MultiArmedBandit(nbrArms = 3, policy = UCB1()),
             )
         }.exceptionOrNull()
@@ -84,11 +84,11 @@ class HeuristicPortfolioTest {
 
     @Test
     fun `portfolio with custom reward forwards run stats`() {
-        var lastStats: HeuristicPortfolio.RunStats? = null
-        val portfolio = HeuristicPortfolio(
+        var lastStats: SelectorPortfolio.RunStats? = null
+        val portfolio = SelectorPortfolio(
             arms = listOf(
-                HeuristicPortfolio.Arm("a", InputOrder, IndomainMin),
-                HeuristicPortfolio.Arm("b", InputOrder, IndomainMax),
+                SelectorPortfolio.Arm("a", InputOrder, IndomainMin),
+                SelectorPortfolio.Arm("b", InputOrder, IndomainMax),
             ),
             bandit = MultiArmedBandit(nbrArms = 2, policy = UCB1()),
             rewardFn = { stats ->
@@ -97,17 +97,17 @@ class HeuristicPortfolioTest {
             },
         )
         // Synthetic conflicts and a solution on the first run, then a restart.
-        portfolio.variableHeuristic.onConflict(VarRef.IntVar(0))
-        portfolio.variableHeuristic.onConflict(VarRef.IntVar(1))
-        portfolio.variableHeuristic.onSolution(
+        portfolio.variableSelector.onConflict(VarRef.IntVar(0))
+        portfolio.variableSelector.onConflict(VarRef.IntVar(1))
+        portfolio.variableSelector.onSolution(
             Sample(BooleanArray(0), intArrayOf(0)),
         )
-        portfolio.variableHeuristic.onRestart()
+        portfolio.variableSelector.onRestart()
         val firstStats = requireNotNull(lastStats)
         assertEquals(2, firstStats.conflicts)
         assertEquals(1, firstStats.solutionsFound)
         // Stats reset on restart.
-        portfolio.variableHeuristic.onRestart()
+        portfolio.variableSelector.onRestart()
         val resetStats = requireNotNull(lastStats)
         assertEquals(0, resetStats.conflicts)
         assertEquals(0, resetStats.solutionsFound)

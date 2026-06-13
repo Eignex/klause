@@ -121,8 +121,8 @@ class LpLearnTest {
                 randomSeed = 1L,
                 lpBounding = true,
                 lpLearn = true,
-                variableHeuristic = InputOrder,
-                valueHeuristic = IndomainMin,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
             ),
         )
         assertTrue(result is MinimizeResult.Optimal, "immediate-backjump run must prove optimality")

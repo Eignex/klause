@@ -45,8 +45,8 @@ class SearchEventTest {
                 randomSeed = 1L,
                 lubyRestartBase = 1L,
                 maxDecisions = 50_000,
-                variableHeuristic = InputOrder,
-                valueHeuristic = IndomainMin,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
                 onEvent = { events.add(it) },
             ),
         )
@@ -67,8 +67,8 @@ class SearchEventTest {
             objective,
             BacktrackParams(
                 randomSeed = 1L,
-                variableHeuristic = InputOrder,
-                valueHeuristic = IndomainMin,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
                 onEvent = { events.add(it) },
             ),
         ).toList()

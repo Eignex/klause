@@ -21,13 +21,13 @@ import com.eignex.klause.solver.result.SearchEvent
  *
  *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). `Long.MAX_VALUE`
  *    by default — let the search run to completion.
- *  - [randomSeed] — seeds the engine RNG that's threaded into [variableHeuristic] and
- *    [valueHeuristic]. `null` picks a fresh seed per call.
+ *  - [randomSeed] — seeds the engine RNG that's threaded into [variableSelector] and
+ *    [valueSelector]. `null` picks a fresh seed per call.
  *  - [assumptions] — variables pinned for the duration of the call.
- *  - [variableHeuristic] — picks the next variable to branch on. Defaults to
+ *  - [variableSelector] — picks the next variable to branch on. Defaults to
  *    [RandomVariable] for diverse search; CSP-typical alternatives are [SmallestDomain]
  *    (first-fail) and [InputOrder].
- *  - [valueHeuristic] — picks the order in which to try values of the chosen variable.
+ *  - [valueSelector] — picks the order in which to try values of the chosen variable.
  *    Defaults to [IndomainRandom]; alternatives include [IndomainMin] / [IndomainMax] /
  *    [IndomainMiddle] / [IndomainSet] for hole domains.
  *  - [minHammingDistance] / [recentWindow] — opt-in diversity filter for the
@@ -48,8 +48,8 @@ data class BacktrackParams(
     val maxInstructions: Long? = null,
     val randomSeed: Long? = null,
     val assumptions: Assumptions = Assumptions.None,
-    val variableHeuristic: VariableSelector = RandomVariable,
-    val valueHeuristic: ValueSelector = IndomainRandom,
+    val variableSelector: VariableSelector = RandomVariable,
+    val valueSelector: ValueSelector = IndomainRandom,
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
     /**

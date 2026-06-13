@@ -35,7 +35,7 @@ class SparseDomainEndToEndTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = InputOrder,
+                variableSelector = InputOrder,
                 randomSeed = 0L,
             ),
         )
@@ -62,7 +62,7 @@ class SparseDomainEndToEndTest {
         )
         val models = BacktrackSolver(problem).enumerate(
             BacktrackParams(
-                variableHeuristic = InputOrder,
+                variableSelector = InputOrder,
                 randomSeed = 0L,
             ),
         ).toList()

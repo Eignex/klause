@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.backtrack.TierVarSelect
-import com.eignex.klause.solver.backtrack.TieredValueHeuristic
-import com.eignex.klause.solver.backtrack.TieredVariableHeuristic
+import com.eignex.klause.solver.backtrack.TieredValueSelector
+import com.eignex.klause.solver.backtrack.TieredVariableSelector
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
 import com.eignex.klause.solver.backtrack.selector.IndomainMedian
 import com.eignex.klause.solver.backtrack.selector.IndomainMin
@@ -21,8 +21,8 @@ import kotlin.test.assertTrue
 
 class FlatZincSearchAnnotationTest {
 
-    private fun tieredVar(program: FlatZincProgram): TieredVariableHeuristic =
-        assertNotNull(program.defaultBacktrackParams).variableHeuristic as TieredVariableHeuristic
+    private fun tieredVar(program: FlatZincProgram): TieredVariableSelector =
+        assertNotNull(program.defaultBacktrackParams).variableSelector as TieredVariableSelector
 
     @Test
     fun `int_search becomes one tier over the annotated array`() {
@@ -38,7 +38,7 @@ class FlatZincSearchAnnotationTest {
         val tier = varH.tiers[0]
         assertContentEquals(intArrayOf(assertNotNull(program.intVarsByName["x"])), tier.intVars)
         assertEquals(TierVarSelect.SmallestDomain, tier.varSelect)
-        assertEquals(IndomainMin, tier.valueHeuristic)
+        assertEquals(IndomainMin, tier.valueSelector)
         assertEquals(SmallestDomain, varH.fallback)
     }
 
@@ -53,7 +53,7 @@ class FlatZincSearchAnnotationTest {
         val varH = tieredVar(program)
         assertEquals(TierVarSelect.MaxRegret, varH.tiers[0].varSelect)
         // indomain_median is its own heuristic now, no longer conflated with indomain_middle.
-        assertEquals(IndomainMedian, varH.tiers[0].valueHeuristic)
+        assertEquals(IndomainMedian, varH.tiers[0].valueSelector)
     }
 
     @Test
@@ -71,13 +71,13 @@ class FlatZincSearchAnnotationTest {
         val varH = tieredVar(program)
         assertEquals(2, varH.tiers.size)
         assertEquals(TierVarSelect.InputOrder, varH.tiers[0].varSelect)
-        assertEquals(IndomainMax, varH.tiers[0].valueHeuristic)
+        assertEquals(IndomainMax, varH.tiers[0].valueSelector)
         assertContentEquals(intArrayOf(assertNotNull(program.intVarsByName["x"])), varH.tiers[0].intVars)
         assertEquals(TierVarSelect.SmallestDomain, varH.tiers[1].varSelect)
-        assertEquals(IndomainMin, varH.tiers[1].valueHeuristic)
+        assertEquals(IndomainMin, varH.tiers[1].valueSelector)
         assertContentEquals(intArrayOf(assertNotNull(program.boolVarsByName["y"])), varH.tiers[1].boolVars)
-        val valH = assertNotNull(program.defaultBacktrackParams).valueHeuristic
-        assertTrue(valH is TieredValueHeuristic)
+        val valH = assertNotNull(program.defaultBacktrackParams).valueSelector
+        assertTrue(valH is TieredValueSelector)
     }
 
     @Test
@@ -90,7 +90,7 @@ class FlatZincSearchAnnotationTest {
         val program = parseFlatZinc(src)
         val varH = tieredVar(program)
         assertEquals(TierVarSelect.SmallestLowerBound, varH.tiers[0].varSelect)
-        assertEquals(IndomainSplit, varH.tiers[0].valueHeuristic)
+        assertEquals(IndomainSplit, varH.tiers[0].valueSelector)
         assertEquals(SmallestLowerBound, varH.fallback)
     }
 
@@ -157,7 +157,7 @@ class FlatZincSearchAnnotationTest {
         """.trimIndent()
         val program = parseFlatZinc(src)
         val params = assertNotNull(program.defaultBacktrackParams)
-        assertTrue(params.valueHeuristic is SolutionGuided)
+        assertTrue(params.valueSelector is SolutionGuided)
     }
 
     @Test
@@ -169,6 +169,6 @@ class FlatZincSearchAnnotationTest {
         """.trimIndent()
         val program = parseFlatZinc(src)
         val params = assertNotNull(program.defaultBacktrackParams)
-        assertTrue(params.valueHeuristic is TieredValueHeuristic)
+        assertTrue(params.valueSelector is TieredValueSelector)
     }
 }

@@ -24,9 +24,9 @@ import kotlin.test.assertTrue
  * last-conflict) hang off these hooks; if they break the next heuristic-driven CP
  * search work goes blind.
  */
-class HeuristicCallbackTest {
+class SelectorCallbackTest {
 
-    private class CountingHeuristics :
+    private class CountingSelectors :
         VariableSelector,
         ValueSelector {
         var commitCount: Int = 0
@@ -69,12 +69,12 @@ class HeuristicCallbackTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val h = CountingHeuristics()
+        val h = CountingSelectors()
         val samples = BacktrackSolver(problem).enumerate(
             BacktrackParams(
                 randomSeed = 0L,
-                variableHeuristic = h,
-                valueHeuristic = h,
+                variableSelector = h,
+                valueSelector = h,
             ),
         ).toList()
         assertEquals(8, samples.size)
@@ -99,12 +99,12 @@ class HeuristicCallbackTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             ),
         )
-        val h = CountingHeuristics()
+        val h = CountingSelectors()
         BacktrackSolver(problem).solve(
             BacktrackParams(
                 randomSeed = 0L,
-                variableHeuristic = h,
-                valueHeuristic = h,
+                variableSelector = h,
+                valueSelector = h,
                 maxDecisions = 100L,
             ),
         )
@@ -126,12 +126,12 @@ class HeuristicCallbackTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val h = CountingHeuristics()
+        val h = CountingSelectors()
         BacktrackSolver(problem).solve(
             BacktrackParams(
                 randomSeed = 0L,
-                variableHeuristic = h,
-                valueHeuristic = h,
+                variableSelector = h,
+                valueSelector = h,
                 lubyRestartBase = 1L,
                 maxDecisions = 30L,
             ),

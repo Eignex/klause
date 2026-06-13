@@ -70,7 +70,7 @@ class AllDifferentTest {
             // explanations) actually run; no restarts to keep enumeration completeness simple.
             val params = BacktrackParams(
                 randomSeed = 1,
-                variableHeuristic = Vsids(),
+                variableSelector = Vsids(),
                 maxLearnedClauses = 1_000,
             )
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)

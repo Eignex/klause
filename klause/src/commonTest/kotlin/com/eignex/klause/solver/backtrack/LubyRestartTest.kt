@@ -31,8 +31,8 @@ class LubyRestartTest {
             randomSeed = 0L,
             lubyRestartBase = 4L,
             phaseSaving = true,
-            variableHeuristic = InputOrder,
-            valueHeuristic = IndomainMin,
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
         )
         val r = BacktrackSolver(problem).solve(params)
         val sat = assertIs<SolveResult.Sat>(r)
@@ -56,8 +56,8 @@ class LubyRestartTest {
                 randomSeed = 7L,
                 lubyRestartBase = 32L,
                 phaseSaving = true,
-                variableHeuristic = InputOrder,
-                valueHeuristic = IndomainMin,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
             ),
         )
         // With phase-saving + IndomainMin, the first leaf is the all-false optimum and the
@@ -84,8 +84,8 @@ class LubyRestartTest {
         val params = BacktrackParams(
             randomSeed = 0L,
             phaseSaving = true,
-            variableHeuristic = InputOrder,
-            valueHeuristic = IndomainMin,
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
         )
         val samples = BacktrackSolver(problem).enumerate(params).take(2).toList()
         assertEquals(2, samples.size)
@@ -113,8 +113,8 @@ class LubyRestartTest {
             randomSeed = 0L,
             lubyRestartBase = 1L,
             maxDecisions = 200L,
-            variableHeuristic = InputOrder,
-            valueHeuristic = IndomainMin,
+            variableSelector = InputOrder,
+            valueSelector = IndomainMin,
         )
         val r = BacktrackSolver(problem).solve(params)
         assertIs<SolveResult.Sat>(r)
@@ -137,8 +137,8 @@ class LubyRestartTest {
             BacktrackParams(
                 randomSeed = 0L,
                 phaseSaving = true,
-                variableHeuristic = InputOrder,
-                valueHeuristic = IndomainMin,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
             ),
         ).toList()
         assertEquals(4, samples.size)

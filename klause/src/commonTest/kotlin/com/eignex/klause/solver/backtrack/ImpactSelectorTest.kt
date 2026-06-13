@@ -18,7 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class ImpactHeuristicTest {
+class ImpactSelectorTest {
 
     @Test
     fun `impact drops infeasible probe values from the returned order`() {
@@ -87,8 +87,8 @@ class ImpactHeuristicTest {
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(
-                variableHeuristic = SmallestDomain,
-                valueHeuristic = Impact(),
+                variableSelector = SmallestDomain,
+                valueSelector = Impact(),
                 randomSeed = 0L,
             ),
         )

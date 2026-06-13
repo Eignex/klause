@@ -66,7 +66,7 @@ import kotlin.time.TimeSource
 /**
  * Complete depth-first search over a [Problem]'s assignment space, driven by propagation
  * via [PropagationSession]. Variable selection and value selection are plug-in heuristics
- * via [BacktrackParams.variableHeuristic] / [BacktrackParams.valueHeuristic] — same split
+ * via [BacktrackParams.variableSelector] / [BacktrackParams.valueSelector] — same split
  * MiniZinc uses for `solve :: int_search(vars, var_strategy, value_strategy, complete)`.
  *
  *  - [solve] — first witness as [SolveResult.Sat], [SolveResult.Unsat] when the tree is
@@ -500,8 +500,8 @@ class BacktrackSolver(override val problem: Problem) :
                 rootCore = coreOf(baked)
                 done = terminalExhausted()
             } else {
-                if (params.variableHeuristic.tracksUnassign) {
-                    val heuristic = params.variableHeuristic
+                if (params.variableSelector.tracksUnassign) {
+                    val heuristic = params.variableSelector
                     val numBool = problem.numBoolVars
                     session.unassignListener = { enc ->
                         heuristic.onUnassign(if (enc < numBool) VarRef.Bool(enc) else VarRef.IntVar(enc - numBool))
@@ -637,11 +637,11 @@ class BacktrackSolver(override val problem: Problem) :
                         continue@outer
                     }
                     if (descend) {
-                        val varRef = params.variableHeuristic.pick(session, rng)
+                        val varRef = params.variableSelector.pick(session, rng)
                         if (varRef == null) {
                             val snap = snapshotAssignment(session)
-                            params.variableHeuristic.onSolution(snap)
-                            params.valueHeuristic.onSolution(snap)
+                            params.variableSelector.onSolution(snap)
+                            params.valueSelector.onSolution(snap)
                             // Always block this leaf and backtrack; surface it as an event only when it
                             // strictly improves the incumbent.
                             pendingBlock = snap
@@ -649,7 +649,7 @@ class BacktrackSolver(override val problem: Problem) :
                             recordIfImproving(snap, objective.evaluate(snap))?.let { return it }
                             continue@inner
                         }
-                        val values = params.valueHeuristic.values(session, varRef, rng)
+                        val values = params.valueSelector.values(session, varRef, rng)
                         val phased = applyPhase(
                             varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
                             boolTarget, boolTargetSet, rephaseMode, rng,
@@ -844,8 +844,8 @@ class BacktrackSolver(override val problem: Problem) :
             }
             params.clauseExchange?.onRestart(session)
             if (assertObjectiveBoundAtRoot()) return terminalExhausted()
-            params.variableHeuristic.onRestart()
-            params.valueHeuristic.onRestart()
+            params.variableSelector.onRestart()
+            params.valueSelector.onRestart()
             forgetIfOverCap(session, params)
             if (vivifyEnabled) vivifyCursor = vivify(session, params, vivifyCursor)
             lubyIdx++
@@ -1599,8 +1599,8 @@ class BacktrackSolver(override val problem: Problem) :
         // Bridge backtrack-time unassigns to a heuristic that removes assigned vars from its
         // order structure on pick (VSIDS): decode the combined index and re-offer the var.
         // Only wired when the heuristic opts in, so other heuristics pay no per-revert cost.
-        if (params.variableHeuristic.tracksUnassign) {
-            val heuristic = params.variableHeuristic
+        if (params.variableSelector.tracksUnassign) {
+            val heuristic = params.variableSelector
             val numBool = problem.numBoolVars
             session.unassignListener = { enc ->
                 heuristic.onUnassign(if (enc < numBool) VarRef.Bool(enc) else VarRef.IntVar(enc - numBool))
@@ -1797,8 +1797,8 @@ class BacktrackSolver(override val problem: Problem) :
                         yield(SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels)))
                         return@sequence
                     }
-                    params.variableHeuristic.onRestart()
-                    params.valueHeuristic.onRestart()
+                    params.variableSelector.onRestart()
+                    params.valueSelector.onRestart()
                     // LCG learned-clause forgetting: at each restart, prune the database
                     // when over [maxLearnedClauses]. Glue clauses (LBD ≤ glueThreshold)
                     // are always retained; among the rest, the lowest-LBD entries are
@@ -1813,19 +1813,19 @@ class BacktrackSolver(override val problem: Problem) :
                     continue@outer
                 }
                 if (descend) {
-                    val varRef = params.variableHeuristic.pick(session, rng)
+                    val varRef = params.variableSelector.pick(session, rng)
                     if (varRef == null) {
                         val snap = snapshotAssignment(session)
                         // Notify heuristics first so solution-guided variants can snapshot
                         // the incumbent before the engine continues with the next yield.
-                        params.variableHeuristic.onSolution(snap)
-                        params.valueHeuristic.onSolution(snap)
+                        params.variableSelector.onSolution(snap)
+                        params.valueSelector.onSolution(snap)
                         pendingBlock = snap
                         yield(SearchOutcome.Found(snap))
                         descend = false
                         continue@inner
                     }
-                    val values = params.valueHeuristic.values(session, varRef, rng)
+                    val values = params.valueSelector.values(session, varRef, rng)
                     val phased = applyPhase(
                         varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
                         boolTarget, boolTargetSet, rephaseMode, rng,
@@ -2199,8 +2199,8 @@ class BacktrackSolver(override val problem: Problem) :
                 // Forward the full conflict reason record so activity-, weight-, and
                 // factor-driven heuristics (VSIDS, dom/wdeg) all see exactly what they
                 // need without further plumbing.
-                params.variableHeuristic.onConflict(node.varRef, r)
-                params.valueHeuristic.onConflict(node.varRef, outcome.value)
+                params.variableSelector.onConflict(node.varRef, r)
+                params.valueSelector.onConflict(node.varRef, outcome.value)
                 // CDB: if the analyzer produced a 1UIP clause with a non-chronological
                 // backjump target, signal it up. The engine pops to the backjump level and
                 // then persists the clause via [PropagationSession.addLearnedClause] (see
@@ -2252,10 +2252,10 @@ class BacktrackSolver(override val problem: Problem) :
             // ABS-style activity heuristics need the implied set from the just-completed
             // propagation step; only Implied carries those keys.
             if (r is PropagationResult.Implied) {
-                params.variableHeuristic.onPropagation(r)
+                params.variableSelector.onPropagation(r)
             }
-            params.variableHeuristic.onCommit(node.varRef)
-            params.valueHeuristic.onCommit(node.varRef, outcome.value)
+            params.variableSelector.onCommit(node.varRef)
+            params.valueSelector.onCommit(node.varRef, outcome.value)
             return AdvanceOutcome.Success
         }
     }
