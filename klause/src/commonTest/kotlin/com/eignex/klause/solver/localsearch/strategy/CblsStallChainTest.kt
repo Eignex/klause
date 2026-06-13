@@ -9,6 +9,7 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.proposeRepairChains
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

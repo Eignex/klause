@@ -301,6 +301,16 @@ data class BacktrackParams(
      */
     val lpTable: Boolean = false,
     /**
+     * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
+     * [lpBounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
+     * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
+     * `capacity·M ≥ cap·t1 + Σ energy-after(t1)` — the energetic / area objective bound the
+     * start-variable LP otherwise lacks for scheduling. Sound by construction (a missing row only
+     * loosens; the makespan link is never guessed); off by default; a no-op without a verifiable
+     * scheduling makespan. See [com.eignex.klause.solver.lp.CumulativeRelaxation].
+     */
+    val lpCumulative: Boolean = false,
+    /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear

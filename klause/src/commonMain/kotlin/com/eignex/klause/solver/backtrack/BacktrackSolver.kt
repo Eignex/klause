@@ -296,6 +296,7 @@ class BacktrackSolver(override val problem: Problem) :
                 circuitArcs = params.lpCircuit,
                 elementHull = params.lpElement,
                 tableHull = params.lpTable,
+                cumulative = params.lpCumulative,
             )
         } else {
             null

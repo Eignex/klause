@@ -6,6 +6,7 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
@@ -13,6 +14,7 @@ import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
+import com.eignex.klause.solver.lp.CumulativeRelaxation
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -39,6 +41,10 @@ import com.eignex.klause.solver.lp.CumulativeEnergeticBound
  *    so the O(windows² · tasks) window scan stays a bounded fraction of a node's cost (a per-check
  *    budget normalization, [ENERGETIC_OPS_PER_CHECK] — the same class of guard as the tableau
  *    cap, not a tuning judgement); a caller who enabled the check explicitly keeps their cadence.
+ *  - **[BacktrackParams.lpCumulative]** — a [Cumulative] / [Disjunctive] with a *verifiable*
+ *    makespan variable is present (the energetic makespan LP row, #430). Applicability is the
+ *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
+ *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
  *
  * The LP-relaxation flags are additionally gated by a **size guard**: the dual simplex keeps a
  * dense `m × (n + m + 1)` Long tableau per node, so the auto path declines models whose estimated
@@ -73,6 +79,7 @@ object LpAutoConfig {
         var allDifferent = false
         var globalCardinality = false
         var cumulative = false
+        var scheduling = false
         var energeticOps = 0L
         var pseudoBoolean = false
         var circuit = false
@@ -101,10 +108,13 @@ object LpAutoConfig {
 
                 is Cumulative -> {
                     cumulative = true
+                    scheduling = true
                     // The scan skips factors above its own task cap; they cost nothing.
                     val t = f.starts.size.toLong()
                     if (t <= CumulativeEnergeticBound.MAX_TASKS) energeticOps += t * t * t
                 }
+
+                is Disjunctive -> scheduling = true
 
                 is PseudoBoolean -> {
                     pseudoBoolean = true
@@ -120,11 +130,16 @@ object LpAutoConfig {
                 else -> Unit
             }
         }
+        // The scheduling makespan rows (#430) are one per verified plan; count them before the size
+        // guard. The plan build also tells us whether *any* makespan link is provable at all.
+        val makespanPlans = if (scheduling) CumulativeRelaxation(problem).plans.size else 0
+        rows += makespanPlans.toLong()
         val cols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
         val lpFits = rows * (cols + rows + 1L) <= MAX_AUTO_TABLEAU_CELLS
         val cutEligible = allDifferent || globalCardinality
+        val makespanLp = lpFits && makespanPlans > 0
         val lpBounding = lpFits &&
-            (lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement || table)
+            (lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement || table || makespanLp)
         val lpCuts = lpFits && (cutEligible || pseudoBoolean)
         return base.copy(
             lpBounding = base.lpBounding || lpBounding,
@@ -137,6 +152,7 @@ object LpAutoConfig {
             lpCircuit = base.lpCircuit || (lpFits && circuit),
             lpElement = base.lpElement || (lpFits && constArrayElement),
             lpTable = base.lpTable || (lpFits && table),
+            lpCumulative = base.lpCumulative || makespanLp,
             lagrangian = base.lagrangian || allDifferent,
             energeticReasoning = base.energeticReasoning || cumulative,
             // Derive the cadence only when the auto path is the one enabling the check — an
