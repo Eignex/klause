@@ -50,14 +50,21 @@ class IntHandle(
 }
 
 /**
- * Float variable with bounds `[min, max]`, always bucketed onto bounded integers at
- * solve-time. Arithmetic and comparison operators build a [FloatExpr] that lowers
- * to a [FloatLinearConstraint] AST node at compile-time; the compiler converts that
- * into a `com.eignex.klause.solver.factor.FloatLinear` factor in the [com.eignex.klause.solver.Problem].
- *
- * The historical `buckets` parameter is preserved for source compatibility but is no
- * longer used at the schema layer — bucketing is now a per-backend concern handled by
- * `com.eignex.klause.solver.FloatLowering` at solve-time.
+ * Anything usable as a real-valued term in the float DSL — a [FloatHandle] or a (possibly
+ * multi-term) [FloatExpr]. The arithmetic and comparison operators below are defined once over
+ * `FloatTerm`, so handles, expressions, and `Double` constants all combine uniformly (mirroring
+ * [com.eignex.klause.model.IntTerm]).
+ */
+interface FloatTerm {
+    /** Coerce to the canonical linear [FloatExpr] form. */
+    fun toFloatExpr(): FloatExpr
+}
+
+/**
+ * DSL handle for a declared float variable. Combines and compares via the shared [FloatTerm]
+ * operators, lowering to a [FloatLinearConstraint] AST node (the compiler turns that into a
+ * `com.eignex.klause.solver.factor.FloatLinear` factor). The historical `buckets` parameter is kept
+ * for source compatibility but ignored — bucketing is a per-backend solve-time concern.
  */
 class FloatHandle(
     /** Name of the underlying float variable. */
@@ -69,106 +76,30 @@ class FloatHandle(
     /** Deprecated, ignored bucket count kept for source compatibility. */
     @Deprecated("Bucketing is now a per-backend solve-time concern; this parameter is ignored.")
     val buckets: Int = 0,
-) {
-
-    /** Identity expression `1·f + 0`. Use this when an API needs a [FloatExpr]. */
-    fun toExpr(): FloatExpr = FloatExpr(this, coeff = 1.0, offset = 0.0)
-
-    /** `this + d`. */
-    operator fun plus(d: Double): FloatExpr = FloatExpr(this, 1.0, d)
-
-    /** `this - d`. */
-    operator fun minus(d: Double): FloatExpr = FloatExpr(this, 1.0, -d)
-
-    /** `c · this`. */
-    operator fun times(c: Int): FloatExpr = FloatExpr(this, c.toDouble(), 0.0)
-
-    /** `c · this`. */
-    operator fun times(c: Double): FloatExpr = FloatExpr(this, c, 0.0)
-
-    /** `-this`. */
-    operator fun unaryMinus(): FloatExpr = FloatExpr(this, -1.0, 0.0)
-
-    /** `this ≤ c`. */
-    infix fun le(c: Double): BoolExpr = toExpr() le c
-
-    /** `this < c`. */
-    infix fun lt(c: Double): BoolExpr = toExpr() lt c
-
-    /** `this ≥ c`. */
-    infix fun ge(c: Double): BoolExpr = toExpr() ge c
-
-    /** `this > c`. */
-    infix fun gt(c: Double): BoolExpr = toExpr() gt c
-
-    /** `this = c`. */
-    infix fun eq(c: Double): BoolExpr = toExpr() eq c
-
-    /** `this ≠ c`. */
-    infix fun ne(c: Double): BoolExpr = toExpr() ne c
-
-    /** `this ≤ other`. */
-    infix fun le(other: FloatExpr): BoolExpr = toExpr() le other
-
-    /** `this < other`. */
-    infix fun lt(other: FloatExpr): BoolExpr = toExpr() lt other
-
-    /** `this ≥ other`. */
-    infix fun ge(other: FloatExpr): BoolExpr = toExpr() ge other
-
-    /** `this > other`. */
-    infix fun gt(other: FloatExpr): BoolExpr = toExpr() gt other
-
-    /** `this = other`. */
-    infix fun eq(other: FloatExpr): BoolExpr = toExpr() eq other
-
-    /** `this ≠ other`. */
-    infix fun ne(other: FloatExpr): BoolExpr = toExpr() ne other
+) : FloatTerm {
+    override fun toFloatExpr(): FloatExpr = FloatExpr(this, coeff = 1.0, offset = 0.0)
 }
 
-/** `this · handle`. */
-operator fun Int.times(handle: FloatHandle): FloatExpr = FloatExpr(handle, this.toDouble(), 0.0)
-
-/** `this · handle`. */
-operator fun Double.times(handle: FloatHandle): FloatExpr = FloatExpr(handle, this, 0.0)
-
-/** `this · expr`. */
-operator fun Int.times(expr: FloatExpr): FloatExpr = expr * this
-
-/** `this · expr`. */
-operator fun Double.times(expr: FloatExpr): FloatExpr = expr * this
-
 /**
- * Linear expression `Σ c_i · h_i + offset` over one or more [FloatHandle]s, all in real
- * (Double) space. Arithmetic operators fold by merging coefficient maps; comparisons
- * against a Double or another [FloatExpr] lower to a [FloatLinearConstraint] AST node,
- * which the compiler turns into a `com.eignex.klause.solver.factor.FloatLinear` factor.
+ * Linear expression `Σ c_i · h_i + offset` over [FloatHandle]s in real (Double) space. Build it with
+ * the [FloatTerm] operators; comparisons lower to a [FloatLinearConstraint] AST node.
  */
-class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>, private val offset: Double) {
+class FloatExpr internal constructor(internal val terms: Map<FloatHandle, Double>, internal val offset: Double) :
+    FloatTerm {
 
     internal constructor(handle: FloatHandle, coeff: Double, offset: Double) :
         this(if (coeff == 0.0) emptyMap() else mapOf(handle to coeff), offset)
 
-    /** `this + d`. */
-    operator fun plus(d: Double): FloatExpr = FloatExpr(terms, offset + d)
+    override fun toFloatExpr(): FloatExpr = this
 
-    /** `this - d`. */
-    operator fun minus(d: Double): FloatExpr = FloatExpr(terms, offset - d)
+    internal fun shifted(d: Double): FloatExpr = FloatExpr(terms, offset + d)
 
-    /** `c · this`. */
-    operator fun times(c: Int): FloatExpr = times(c.toDouble())
-
-    /** `c · this`. */
-    operator fun times(c: Double): FloatExpr {
+    internal fun scaled(c: Double): FloatExpr {
         if (c == 0.0) return FloatExpr(emptyMap(), 0.0)
         return FloatExpr(terms.mapValues { it.value * c }, offset * c)
     }
 
-    /** `-this`. */
-    operator fun unaryMinus(): FloatExpr = times(-1.0)
-
-    /** `this + other`, merging coefficient maps. */
-    operator fun plus(other: FloatExpr): FloatExpr {
+    internal fun mergedWith(other: FloatExpr): FloatExpr {
         val merged = LinkedHashMap<FloatHandle, Double>(terms)
         for ((h, c) in other.terms) {
             val sum = (merged[h] ?: 0.0) + c
@@ -177,46 +108,7 @@ class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>
         return FloatExpr(merged, offset + other.offset)
     }
 
-    /** `this - other`. */
-    operator fun minus(other: FloatExpr): FloatExpr = this + (-other)
-
-    /** `this ≤ threshold`. */
-    infix fun le(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LE)
-
-    /** `this < threshold`. */
-    infix fun lt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.LT)
-
-    /** `this ≥ threshold`. */
-    infix fun ge(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GE)
-
-    /** `this > threshold`. */
-    infix fun gt(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.GT)
-
-    /** `this = threshold`. */
-    infix fun eq(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.EQ)
-
-    /** `this ≠ threshold`. */
-    infix fun ne(threshold: Double): BoolExpr = compare(threshold, IntCmpOp.NE)
-
-    /** `this ≤ other`, rewritten as `(this - other) ≤ 0`. */
-    infix fun le(other: FloatExpr): BoolExpr = (this - other) le 0.0
-
-    /** `this < other`, rewritten as `(this - other) < 0`. */
-    infix fun lt(other: FloatExpr): BoolExpr = (this - other) lt 0.0
-
-    /** `this ≥ other`, rewritten as `(this - other) ≥ 0`. */
-    infix fun ge(other: FloatExpr): BoolExpr = (this - other) ge 0.0
-
-    /** `this > other`, rewritten as `(this - other) > 0`. */
-    infix fun gt(other: FloatExpr): BoolExpr = (this - other) gt 0.0
-
-    /** `this = other`, rewritten as `(this - other) = 0`. */
-    infix fun eq(other: FloatExpr): BoolExpr = (this - other) eq 0.0
-
-    /** `this ≠ other`, rewritten as `(this - other) ≠ 0`. */
-    infix fun ne(other: FloatExpr): BoolExpr = (this - other) ne 0.0
-
-    private fun compare(threshold: Double, op: IntCmpOp): BoolExpr {
+    internal fun compareWith(threshold: Double, op: IntCmpOp): BoolExpr {
         if (terms.isEmpty()) return constantBool(evalConstant(op, threshold))
         // `Σ c_i · h_i + offset  ⟨op⟩  threshold`  →  `Σ c_i · h_i  ⟨op⟩  threshold - offset`.
         val coeffs = DoubleArray(terms.size)
@@ -244,3 +136,74 @@ class FloatExpr internal constructor(private val terms: Map<FloatHandle, Double>
         IntCompare(IntLit(0), IntCmpOp.NE, IntLit(0))
     }
 }
+
+// ---- FloatTerm operators: defined once so handles, exprs, and Double constants compose uniformly.
+
+/** `this + other`. */
+operator fun FloatTerm.plus(other: FloatTerm): FloatExpr = toFloatExpr().mergedWith(other.toFloatExpr())
+
+/** `this + d`. */
+operator fun FloatTerm.plus(d: Double): FloatExpr = toFloatExpr().shifted(d)
+
+/** `d + this`. */
+operator fun Double.plus(t: FloatTerm): FloatExpr = t + this
+
+/** `this - other`. */
+operator fun FloatTerm.minus(other: FloatTerm): FloatExpr = this + (-other)
+
+/** `this - d`. */
+operator fun FloatTerm.minus(d: Double): FloatExpr = toFloatExpr().shifted(-d)
+
+/** `d - this`. */
+operator fun Double.minus(t: FloatTerm): FloatExpr = (-t) + this
+
+/** `c · this`. */
+operator fun FloatTerm.times(c: Double): FloatExpr = toFloatExpr().scaled(c)
+
+/** `c · this`. */
+operator fun FloatTerm.times(c: Int): FloatExpr = this * c.toDouble()
+
+/** `c · this`. */
+operator fun Double.times(t: FloatTerm): FloatExpr = t * this
+
+/** `c · this`. */
+operator fun Int.times(t: FloatTerm): FloatExpr = t * this.toDouble()
+
+/** `-this`. */
+operator fun FloatTerm.unaryMinus(): FloatExpr = this * -1.0
+
+/** `this ≤ threshold`. */
+infix fun FloatTerm.le(threshold: Double): BoolExpr = toFloatExpr().compareWith(threshold, IntCmpOp.LE)
+
+/** `this < threshold`. */
+infix fun FloatTerm.lt(threshold: Double): BoolExpr = toFloatExpr().compareWith(threshold, IntCmpOp.LT)
+
+/** `this ≥ threshold`. */
+infix fun FloatTerm.ge(threshold: Double): BoolExpr = toFloatExpr().compareWith(threshold, IntCmpOp.GE)
+
+/** `this > threshold`. */
+infix fun FloatTerm.gt(threshold: Double): BoolExpr = toFloatExpr().compareWith(threshold, IntCmpOp.GT)
+
+/** `this = threshold`. */
+infix fun FloatTerm.eq(threshold: Double): BoolExpr = toFloatExpr().compareWith(threshold, IntCmpOp.EQ)
+
+/** `this ≠ threshold`. */
+infix fun FloatTerm.ne(threshold: Double): BoolExpr = toFloatExpr().compareWith(threshold, IntCmpOp.NE)
+
+/** `this ≤ other`. */
+infix fun FloatTerm.le(other: FloatTerm): BoolExpr = (this - other) le 0.0
+
+/** `this < other`. */
+infix fun FloatTerm.lt(other: FloatTerm): BoolExpr = (this - other) lt 0.0
+
+/** `this ≥ other`. */
+infix fun FloatTerm.ge(other: FloatTerm): BoolExpr = (this - other) ge 0.0
+
+/** `this > other`. */
+infix fun FloatTerm.gt(other: FloatTerm): BoolExpr = (this - other) gt 0.0
+
+/** `this = other`. */
+infix fun FloatTerm.eq(other: FloatTerm): BoolExpr = (this - other) eq 0.0
+
+/** `this ≠ other`. */
+infix fun FloatTerm.ne(other: FloatTerm): BoolExpr = (this - other) ne 0.0
