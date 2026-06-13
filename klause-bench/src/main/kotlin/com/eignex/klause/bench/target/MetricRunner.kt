@@ -72,14 +72,11 @@ internal object MetricRunner {
             MetricKind.AUDIT -> solve { CompileAuditMetric.run(refs) }
 
             MetricKind.UNIFORMNESS, MetricKind.COMPLETENESS -> {
-                // loadAndVerifyRefs still runs the cross-engine agreement + sample-validity gate as a
-                // side effect (the old `verify` metric's check); it survives here as the loader that
-                // hands these sampling metrics their feasible-expected subset.
-                val corpus = BenchLoad.loadAndVerifyRefs(refs)
+                val entries = BenchLoad.feasibleInProcessRefs(refs)
                 solve {
                     when (metric) {
-                        MetricKind.UNIFORMNESS -> UniformnessMetric.run(corpus.benchEntries)
-                        MetricKind.COMPLETENESS -> CompletenessMetric.run(corpus.benchEntries)
+                        MetricKind.UNIFORMNESS -> UniformnessMetric.run(entries)
+                        MetricKind.COMPLETENESS -> CompletenessMetric.run(entries)
                         else -> error("unreachable")
                     }
                 }
