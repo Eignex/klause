@@ -33,6 +33,12 @@ class AllDifferent(
      *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
      *  slot nor block other positions from claiming their value. */
     val presents: IntArray = EmptyIntArray,
+    /** Values exempt from the distinctness requirement: any number of variables may share a
+     *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family, #433).
+     *  Empty for plain all-different — then this factor behaves exactly as before. Excepted
+     *  values are modelled inside [reginFilter] as capacity-n value copies, so the exact
+     *  Hall/matching machinery applies unchanged. */
+    val exceptSet: IntArray = EmptyIntArray,
 ) : Factor {
 
     init {
@@ -43,23 +49,40 @@ class AllDifferent(
         }
     }
 
+    /** Canonical excepted values (deduped, sorted) for [structuralKey] / [remap]. */
+    private val exceptSorted: IntArray =
+        if (exceptSet.isEmpty()) EmptyIntArray else exceptSet.distinct().sorted().toIntArray()
+
+    /** Membership view of [exceptSet] for the hot value checks; the shared empty set when none. */
+    private val exceptValues: IntHashSet =
+        if (exceptSet.isEmpty()) NO_EXCEPT else IntHashSet(exceptSet.size).also { s -> for (e in exceptSet) s.add(e) }
+
     // Propagation strength: full GAC via Régin's matching + SCC algorithm over the
     // definitely-present positions. IntDomain supports interior holes, so non-matching
     // value pruning lands at the variable domain level. Opt-aware: definitely-absent
     // positions are skipped entirely; unpinned-presence positions are skipped too, so any
     // filtering remains sound under "this position might still go absent".
 
-    override fun structuralKey(): String =
-        "alldiff:$domainMin:$domainSize:" + vars.sorted().joinToString(",") + ":" + presents.sorted().joinToString(",")
+    override fun structuralKey(): String {
+        val exceptKey = if (exceptSorted.isEmpty()) "" else ":except=" + exceptSorted.joinToString(",")
+        return "alldiff:$domainMin:$domainSize:" +
+            vars.sorted().joinToString(",") + ":" + presents.sorted().joinToString(",") + exceptKey
+    }
 
-    /** Distinctness ignores which values are used — invariant under any value relabeling (#366). */
-    override fun isValueAnonymous(): Boolean = true
+    /** Plain distinctness ignores which values are used — invariant under any value relabeling
+     *  (#366); an excepted-value set names those values, so it is no longer value-anonymous. */
+    override fun isValueAnonymous(): Boolean = exceptSet.isEmpty()
 
-    /** Value-anonymous: no constant names a value, so any relabeling leaves the factor unchanged. */
-    override fun remapValues(valueMap: (Int) -> Int): Factor = this
+    /** Plain all-different names no value, so any relabeling leaves it unchanged; with an
+     *  excepted-value set the excepted values are named and must be relabeled too (#374). */
+    override fun remapValues(valueMap: (Int) -> Int): Factor = if (exceptSet.isEmpty()) {
+        this
+    } else {
+        AllDifferent(vars, domainMin, domainSize, presents, IntArray(exceptSet.size) { valueMap(exceptSet[it]) })
+    }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        AllDifferent(vars.remapVars(intMap), domainMin, domainSize, presents.remapLits(boolMap))
+        AllDifferent(vars.remapVars(intMap), domainMin, domainSize, presents.remapLits(boolMap), exceptSet)
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars
@@ -95,7 +118,9 @@ class AllDifferent(
         var excess = 0
         for (i in vars.indices) {
             if (!present(state, i)) continue
-            val idx = state.assignment.intValue(vars[i]) - domainMin
+            val value = state.assignment.intValue(vars[i])
+            if (value in exceptValues) continue // excepted values may repeat freely.
+            val idx = value - domainMin
             val prev = counts[idx]
             counts[idx] = prev + 1
             if (prev >= 1) excess++ // each extra occupant of an already-held value adds one excess.
@@ -119,10 +144,16 @@ class AllDifferent(
         if (old == newValue) return 0
         val n = presentOccurrences(state, intVar)
         if (n == 0) return 0 // every occurrence of [intVar] is currently absent.
-        val oldCount = s.counts[old - domainMin]
-        val newCount = s.counts[newValue - domainMin]
-        val rawDelta = (excessOf(oldCount - n) - excessOf(oldCount)) +
-            (excessOf(newCount + n) - excessOf(newCount))
+        // Excepted values never contribute clash excess, so a move out of / into one is free.
+        var rawDelta = 0
+        if (old !in exceptValues) {
+            val oldCount = s.counts[old - domainMin]
+            rawDelta += excessOf(oldCount - n) - excessOf(oldCount)
+        }
+        if (newValue !in exceptValues) {
+            val newCount = s.counts[newValue - domainMin]
+            rawDelta += excessOf(newCount + n) - excessOf(newCount)
+        }
         return compressViolation((s.excess + rawDelta).toLong(), state.violationSoftCap) -
             compressViolation(s.excess.toLong(), state.violationSoftCap)
     }
@@ -134,14 +165,19 @@ class AllDifferent(
         val n = presentOccurrences(state, intVar)
         if (n == 0) return 0 // every occurrence of [intVar] is currently absent.
         val before = s.excess
-        val oldIdx = oldValue - domainMin
-        val oldCount = s.counts[oldIdx]
-        s.counts[oldIdx] = oldCount - n
-        s.excess += excessOf(oldCount - n) - excessOf(oldCount)
-        val newIdx = cur - domainMin
-        val newCount = s.counts[newIdx]
-        s.counts[newIdx] = newCount + n
-        s.excess += excessOf(newCount + n) - excessOf(newCount)
+        // Excepted values are kept out of counts/excess entirely (they may repeat freely).
+        if (oldValue !in exceptValues) {
+            val oldIdx = oldValue - domainMin
+            val oldCount = s.counts[oldIdx]
+            s.counts[oldIdx] = oldCount - n
+            s.excess += excessOf(oldCount - n) - excessOf(oldCount)
+        }
+        if (cur !in exceptValues) {
+            val newIdx = cur - domainMin
+            val newCount = s.counts[newIdx]
+            s.counts[newIdx] = newCount + n
+            s.excess += excessOf(newCount + n) - excessOf(newCount)
+        }
         return compressViolation(s.excess.toLong(), state.violationSoftCap) -
             compressViolation(before.toLong(), state.violationSoftCap)
     }
@@ -176,10 +212,11 @@ class AllDifferent(
         val touchedDelta = IntArrayList()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
+            val value = state.assignment.intValue(vars[i])
+            if (value in exceptValues) continue // excepted values never contribute excess.
             val wasP = present(state, i)
             val delta = if (wasP) -1 else +1
-            val valueIdx = state.assignment.intValue(vars[i]) - domainMin
-            touchedIdx.add(valueIdx)
+            touchedIdx.add(value - domainMin)
             touchedDelta.add(delta)
         }
         var excessDelta = 0
@@ -196,10 +233,11 @@ class AllDifferent(
         val before = s.excess
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
+            val value = state.assignment.intValue(vars[i])
+            if (value in exceptValues) continue // excepted values never contribute excess.
             val nowP = present(state, i)
             val delta = if (nowP) +1 else -1
-            val valueIdx = state.assignment.intValue(vars[i]) - domainMin
-            s.excess += adjustExcess(s.counts, valueIdx, delta)
+            s.excess += adjustExcess(s.counts, value - domainMin, delta)
         }
         return compressViolation(s.excess.toLong(), state.violationSoftCap) -
             compressViolation(before.toLong(), state.violationSoftCap)
@@ -232,13 +270,13 @@ class AllDifferent(
         if (n < 2) return true // nothing to filter on a single (or zero) present position.
         val filteredVars = IntArray(n) { vars[filtered[it]] }
 
-        // Régin matching / reverse-reachability / SCC / Hall pruning, shared with the
-        // alldifferent_except family via [reginFilter]. No excepted values here. The cache
-        // warm-starts the matching across calls (#96).
+        // Régin matching / reverse-reachability / SCC / Hall pruning via [reginFilter].
+        // [exceptValues] is empty for plain all-different. The cache warm-starts the matching
+        // across calls (#96).
         val cache = (state.refPayload[factorId] as? ReginCache)
             ?: ReginCache().also { state.refPayload[factorId] = it }
         cache.conflictVars = null // stale-guard; set at the failure point below.
-        val hall = reginFilter(state, filteredVars, NO_EXCEPT, cache)
+        val hall = reginFilter(state, filteredVars, exceptValues, cache)
         if (hall != null) {
             cache.conflictVars = hall
             return false

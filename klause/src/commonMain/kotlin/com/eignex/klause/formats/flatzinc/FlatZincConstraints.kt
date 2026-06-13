@@ -111,7 +111,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // Global
     "all_different_int", "klause_all_different_int" -> emitAllDifferent(c)
 
-    "alldifferent_except_0", "fzn_alldifferent_except_0" -> emitAllDifferentExceptZero(c)
+    "alldifferent_except_0", "fzn_alldifferent_except_0", "klause_alldifferent_except_0" ->
+        emitAllDifferentExceptZero(c)
 
     "all_equal_int", "fzn_all_equal_int", "klause_all_equal_int" -> emitAllEqual(c)
 

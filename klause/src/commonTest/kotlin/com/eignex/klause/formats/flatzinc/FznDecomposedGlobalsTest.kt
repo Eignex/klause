@@ -6,11 +6,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Brute-force equivalence for the constraints that are no longer native factors and are
- * lowered to primitives at the FlatZinc emit site (all_equal, increasing/decreasing, member,
- * alldifferent_except_0, value_precede). Each ingests a small model and asserts the enumerated
- * solution set (projected onto the named int vars) equals the brute-force solution set, so the
- * decomposition is neither over- nor under-constrained.
+ * Brute-force equivalence for globals handled at the FlatZinc emit site. Most are lowered to
+ * primitives (all_equal, increasing/decreasing, member, value_precede); alldifferent_except_0 is
+ * dispatched to the native AllDifferent factor with an excepted-value set (#433). Each ingests a
+ * small model and asserts the enumerated solution set (projected onto the named int vars) equals the
+ * brute-force solution set, so the handling is neither over- nor under-constrained.
  */
 class FznDecomposedGlobalsTest {
 
