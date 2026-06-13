@@ -4,6 +4,8 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.metric.KlauseSearch
+import com.eignex.klause.bench.metric.SolveMetric
+import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
@@ -14,21 +16,20 @@ import com.eignex.klause.bench.tools.ProfileScope
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
  *
- * A run is fully described by a **metric** (what to measure) over a **selection** of problems
- * (which ones), with an optional **reference** solver and **budget**. That is exactly the
- * primary form:
+ * The bench does one thing — **solve** a **selection** of problems with one solver, as a subprocess,
+ * saving per-problem output (see [SolveMetric]); the offline `output/compare.sh` / `output/credit.sh`
+ * scripts analyse the saved dirs. The run form:
  *
- *   `bench <metric> [filters…]`   e.g. `bench solve suite=smtlib-core backend=choco`
+ *   `bench solve [filters…]`   e.g. `bench solve suite=smtlib-core backend=choco`
  *
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
  * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
- * `backend=choco|gecode|yuck` (the `solve` solver; default klause) `timeout=<ms>`
+ * `backend=choco|gecode|yuck` (the solver; default klause) `timeout=<ms>`
  * `engine=fixed|cp|mixed|ls|cp-single|ls-single` `processors=N` `fixed=true` (references) `param=key=value`
- * (klause search for `solve`)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
- *  - `preview <metric> [filters…]` — print the instances a run would cover, without running.
+ *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
 object BenchCli {
@@ -38,39 +39,46 @@ object BenchCli {
         when (val cmd = args.firstOrNull() ?: "list") {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
 
-            "preview" -> adHoc(args.drop(1), preview = true)
+            "solve" -> run(args.drop(1), preview = false)
 
-            // `bench <metric> [filters]` is the only run form; adHoc errors on an unknown metric.
-            else -> adHoc(args.toList(), preview = false)
+            "preview" -> run(args.drop(1), preview = true)
+
+            else -> error("unknown command '$cmd' (commands: solve, preview, list)")
         }
     }
 
-    private fun adHoc(args: List<String>, preview: Boolean) {
-        val metricName = args.firstOrNull() ?: error("usage: <metric> [filters…] (metrics: ${metricNames()})")
-        val metric = parseMetric(metricName)
-        val f = args.drop(1).filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+    /** Run `solve` over the [filterArgs] selection (or just print it when [preview]). `solve` is the
+     *  bench's one measurement: one solver per invocation, as a subprocess, saving per-problem
+     *  output (see [SolveMetric]); offline `output/compare.sh` / `output/credit.sh` analyse the dirs. */
+    private fun run(filterArgs: List<String>, preview: Boolean) {
+        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
         if (refs.isEmpty()) {
             println("(no problems matched the selection)")
             return
         }
-
         if (preview) {
-            println("=== preview: $metricName over ${refs.size} instance(s) ===")
+            println("=== preview: solve over ${refs.size} instance(s) ===")
             refs.forEach { println("  ${it.name}  [${it.format}/${it.category}]") }
             return
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
-        // `backend=` is the `solve` metric's solver id: a registered MiniZinc solver (choco/gecode/
-        // yuck/…) run via `minizinc --solver`; unset (or `klause`) runs klause via klause-cli.
+        // `backend=` is the solver id: a registered MiniZinc solver (choco/gecode/yuck/…) run via
+        // `minizinc --solver`; unset (or `klause`) runs klause via klause-cli.
         val backend = (f["backend"] ?: f["reference"])?.lowercase()?.takeIf { it != "klause" }
         val profile = parseProfile(f)
         // `param=` is repeatable (`param=var-selector=vsids param=luby=256`), so collect it from the
         // raw args rather than the dedup'd filter map; each value is a klause-cli `key=value` knob.
-        val params = args.drop(1).filter { it.startsWith("param=") }.map { it.substringAfter('=') }
+        val params = filterArgs.filter { it.startsWith("param=") }.map { it.substringAfter('=') }
         val search = parseKlauseSearch(f, params)
-        println("=== run: $metricName over ${refs.size} instance(s) ===")
-        MetricRunner.run(metric, refs, budget, backend, profile, search)
+        println("=== solve over ${refs.size} instance(s) ===")
+        SolveMetric.run(
+            BenchLoad.resolveRefs(refs),
+            budget,
+            backend ?: SolverInvocation.KLAUSE,
+            search ?: KlauseSearch(),
+            profile,
+        )
     }
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
@@ -171,15 +179,6 @@ object BenchCli {
         name.contains(pattern)
     }
 
-    private fun metricNames(): String = MetricKind.entries.joinToString(", ") { it.name.lowercase() }
-
-    /** Resolve a metric by its enum name (case-insensitive). */
-    private fun metricOrNull(name: String): MetricKind? =
-        MetricKind.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
-
-    private fun parseMetric(name: String): MetricKind =
-        metricOrNull(name) ?: error("unknown metric '$name' (have ${metricNames()})")
-
     private fun listProblems(suite: String) {
         val s = Catalog.suite(suite)
         println("=== suite '${s.id}' — ${s.problems.size} problems ===")
@@ -190,13 +189,12 @@ object BenchCli {
         println("Suites:")
         for (s in Catalog.suites) println("  ${s.id.padEnd(22)} ${s.problems.size} problems — ${s.description}")
         for (d in Catalog.dynamicSuites) println("  ${d.id.padEnd(22)} (discovered) — ${d.description}")
-        println("\nMetrics: ${metricNames()}")
         println(
             """
             |
             |Usage:
-            |  bench <metric> [filters…]             run a metric over a selection (primary form)
-            |  bench preview <metric> [filters…]     show what a run would cover
+            |  bench solve [filters…]                solve a selection (the bench's one measurement)
+            |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
