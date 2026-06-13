@@ -2,21 +2,17 @@ package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.metric.CompileAuditMetric
-import com.eignex.klause.bench.metric.CompletenessMetric
-import com.eignex.klause.bench.metric.CoverageMetric
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
-import com.eignex.klause.bench.metric.UniformnessMetric
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.tools.ProfileConfig
-import com.eignex.klause.bench.tools.ProfileScope
 import com.eignex.klause.bench.tools.Profiler
 
 /**
- * Runs a [MetricKind] over a concrete set of [ProblemRef]s. The single dispatch point shared
- * by predefined [Target]s and the ad-hoc selection CLI — so both reach every metric the same
- * way. The [SolveMetric] takes a single backend (`backend=`); the rest ignore it.
+ * Runs a [MetricKind] over a concrete set of [ProblemRef]s — the single dispatch the ad-hoc
+ * selection CLI reaches every metric through. Only [SolveMetric] takes a backend (`backend=`);
+ * [CompileAuditMetric] ignores it.
  *
  * When [profile] is set the run is recorded with the in-harness JFR [Profiler]. `scope=ALL`
  * wraps the whole run (resolve + solve); `scope=SOLVE` wraps only the measurement, so the
@@ -47,35 +43,8 @@ internal object MetricRunner {
             )
             return
         }
-        if (profile != null && profile.scope == ProfileScope.ALL) {
-            Profiler.record(profile) { dispatch(metric, refs, solveProfile = null) }
-        } else {
-            dispatch(metric, refs, solveProfile = profile)
-        }
-    }
-
-    /** [solveProfile], when set, profiles just the measurement of each metric — resolution has
-     *  already happened by then, so parsing/setup is discounted. The non-SOLVE metrics ignore the
-     *  time budget (sampling/coverage/audit run to their own limits), so it is not threaded here. */
-    private fun dispatch(metric: MetricKind, refs: List<ProblemRef>, solveProfile: ProfileConfig?) {
-        fun <T> solve(block: () -> T): T = if (solveProfile != null) Profiler.record(solveProfile, block) else block()
-        when (metric) {
-            MetricKind.SOLVE -> error("SOLVE is handled in run() (in-process profiling path)")
-
-            MetricKind.COVERAGE -> solve { CoverageMetric.run(refs) }
-
-            MetricKind.AUDIT -> solve { CompileAuditMetric.run(refs) }
-
-            MetricKind.UNIFORMNESS, MetricKind.COMPLETENESS -> {
-                val entries = BenchLoad.feasibleInProcessRefs(refs)
-                solve {
-                    when (metric) {
-                        MetricKind.UNIFORMNESS -> UniformnessMetric.run(entries)
-                        MetricKind.COMPLETENESS -> CompletenessMetric.run(entries)
-                        else -> error("unreachable")
-                    }
-                }
-            }
-        }
+        // AUDIT is compile-only — there is no separate solve phase, so the scope=SOLVE/ALL split is
+        // moot; profile the whole run when asked, else just run it.
+        if (profile != null) Profiler.record(profile) { CompileAuditMetric.run(refs) } else CompileAuditMetric.run(refs)
     }
 }

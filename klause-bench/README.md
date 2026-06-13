@@ -8,17 +8,15 @@ A run is fully described by a **metric over a selection of problems**, plus an o
 bench <metric> [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 ```
 
-Presets (`target/Targets.kt`) are named shorthands for a `bench <metric>` line that carries non-obvious config (a tuned budget or a curated suite mix) — nothing else.
-
-The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. Output is saved **one file per problem** under `output/<config>/` (`<config>` = solver+settings+budget, e.g. `choco-p8-free-t300s`): a `<problem>.out` (raw solver stream = the log) and a self-describing `<problem>.json` (solver/settings/budget + parsed result). There is no in-session comparison and no in-process reference adapter: run `solve` once per config and diff two config dirs offline with `output/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: keep a baseline config's dir and compare a fresh run's dir against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). Results are also content-addressed in `build/bench-cache/`, so re-running an identical instance replays instantly. (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by `uniformness`/`completeness`.)
+The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. Output is saved **one file per problem** under `output/<config>/` (`<config>` = solver+settings+budget, e.g. `choco-p8-free-t300s`): a `<problem>.out` (raw solver stream = the log) and a self-describing `<problem>.json` (solver/settings/budget + parsed result). There is no in-session comparison and no in-process reference adapter: run `solve` once per config and diff two config dirs offline with `output/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: keep a baseline config's dir and compare a fresh run's dir against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). Results are also content-addressed in `build/bench-cache/`, so re-running an identical instance replays instantly.
 
 ## Quick start
 
 ```
-./gradlew :klause-bench:bench --args="list"                       suites, presets, metrics, usage
+./gradlew :klause-bench:bench --args="list"                       suites, metrics, usage
 ./gradlew :klause-bench:bench --args="solve suite=core"           klause solves the in-process core
 ./gradlew :klause-bench:bench --args="solve suite=core backend=choco"  a reference baseline to diff against
-./gradlew :klause-bench:bench --args="coverage suite=mzn-smoke"   percent native-predicate coverage
+./gradlew :klause-bench:bench --args="audit suite=mzn-smoke"      compile→FZN; percent native-predicate coverage
 ```
 
 Tune any knob with `-Dklause.*` properties (forwarded to the run JVM), e.g. `-Dklause.bench.mzn.timeoutSec=30`.
@@ -26,10 +24,9 @@ Tune any knob with `-Dklause.*` properties (forwarded to the run JVM), e.g. `-Dk
 ## Commands
 
 ```
-bench <metric> [filters…]            run a metric over a selection
-bench <preset-id>                    run a saved preset (see `list`)
+bench <metric> [filters…]            run a metric (solve | audit) over a selection
 bench preview <metric> [filters…]    print what a run would cover, without running
-bench list [<suite>]                 list suites+presets, or the problems in one suite
+bench list [<suite>]                 list suites, or the problems in one suite
 ```
 
 ## Filters
@@ -49,11 +46,10 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 
 ## Metrics
 
-- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Saves **one file per problem** under `output/<config>/`: `<problem>.out` (raw solver log) + `<problem>.json` (solver/settings/budget + objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics + per-arm `attribution` for klause portfolios). Run once per config and diff two config dirs offline (`output/compare.sh`), which also serves as the wall-time regression check. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
-- **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
-- **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.
+Two: a subprocess **solve** (the spine) and a compile-only **audit**.
 
-Metrics write JSON (and Markdown where useful) under `build/`.
+- **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Saves **one file per problem** under `output/<config>/`: `<problem>.out` (raw solver log) + `<problem>.json` (solver/settings/budget + objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics + per-arm `attribution` for klause portfolios). Run once per config and diff two config dirs offline (`output/compare.sh`), which also serves as the wall-time regression check. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
+- **audit** — compile-only, no solve: compile each `.mzn`→`.fzn` against klause's redefinitions (recording compile failures), tally surviving constraint predicates as native (preserved) vs MiniZinc-decomposed, and run an optional `klause-cli` ingest smoke. The native-coverage headline to push toward 100%. Writes JSON + Markdown under `build/`.
 
 ## Offline analysis scripts (`output/`)
 
@@ -175,5 +171,5 @@ The `output/` scripts (`run-baselines.sh` curated subset, `run-baselines-full.sh
 ```
 ./gradlew :klause-bench:test                              unit, parser, and selection tests
 ./gradlew :klause-bench:bench --args="solve suite=core"   klause solves the in-process core
-./gradlew :klause-bench:bench --args="coverage suite=mzn-smoke"  native-predicate coverage
+./gradlew :klause-bench:bench --args="audit suite=mzn-smoke"  native-predicate coverage
 ```
