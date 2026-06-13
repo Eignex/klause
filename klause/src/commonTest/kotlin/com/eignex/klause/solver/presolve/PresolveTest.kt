@@ -42,15 +42,48 @@ class PresolveTest {
         }
     }
 
-    private fun assertLinearEquivalent(numVars: Int, domain: Int, original: Linear) {
-        val problem = Problem(0, numVars, Array(numVars) { IntDomain(0, domain) }, listOf(original))
+    private fun assertLinearEquivalent(numVars: Int, domain: Int, original: Linear) =
+        assertLinearEquivalent(Array(numVars) { 0..domain }, original)
+
+    /**
+     * Feasible-set equivalence over arbitrary per-variable integer domains [domains]. Enumeration
+     * runs over the problem's *post-construction* domains: the [Problem] constructor folds the
+     * constraint's own bound deductions into the domains (#148 init tightening), so that — not the
+     * declared range — is the feasible region presolve must preserve.
+     */
+    private fun assertLinearEquivalent(domains: Array<IntRange>, original: Linear) {
+        val numVars = domains.size
+        val problem =
+            Problem(0, numVars, Array(numVars) { IntDomain(domains[it].first, domains[it].last) }, listOf(original))
         val rewritten = Presolve.strengthenCoefficients(problem).factors.getOrNull(0) as? Linear
+        val values = Array(numVars) { v ->
+            val d = problem.intDomains[v]
+            IntArray(d.size) { d.valueAt(it) }
+        }
         val assign = IntArray(numVars)
-        enumerate(numVars, domain + 1) { mask ->
-            for (v in 0 until numVars) assign[v] = mask[v]
+        enumerateMixed(values) { idx ->
+            for (v in 0 until numVars) assign[v] = values[v][idx[v]]
             val origSat = evalLinear(original, assign)
             val newSat = rewritten?.let { evalLinear(it, assign) } ?: true // dropped ⇒ always-true
             assertEquals(origSat, newSat, "linear disagrees at ${assign.toList()}: $original -> $rewritten")
+        }
+    }
+
+    /** Enumerate the cartesian product of index ranges `0 until values[i].size`. */
+    private fun enumerateMixed(values: Array<IntArray>, body: (IntArray) -> Unit) {
+        val idx = IntArray(values.size)
+        while (true) {
+            body(idx)
+            var i = 0
+            while (i < values.size) {
+                if (idx[i] < values[i].size - 1) {
+                    idx[i]++
+                    break
+                }
+                idx[i] = 0
+                i++
+            }
+            if (i == values.size) return
         }
     }
 
@@ -63,20 +96,6 @@ class PresolveTest {
             val origSat = evalPb(original, bools)
             val newSat = rewritten?.let { evalPb(it, bools) } ?: true
             assertEquals(origSat, newSat, "pb disagrees at ${bools.toList()}: $original -> $rewritten")
-        }
-    }
-
-    /** Enumerate every assignment of [numVars] vars each in `0 until radix`. */
-    private fun enumerate(numVars: Int, radix: Int, body: (IntArray) -> Unit) {
-        val digits = IntArray(numVars)
-        val total = generateSequence(1) { it * radix }.elementAt(numVars)
-        repeat(total) { n ->
-            var x = n
-            for (i in 0 until numVars) {
-                digits[i] = x % radix
-                x /= radix
-            }
-            body(digits)
         }
     }
 
@@ -147,6 +166,50 @@ class PresolveTest {
     }
 
     @Test
+    fun `bounded integer linear lifting`() {
+        // 5x ≤ 12, x ∈ [0,3]: Amax=15, d=3, coeff clamps 5→3 ⇒ 3x ≤ 6 (both ⇒ x ≤ 2).
+        assertLinearEquivalent(arrayOf(0..3), Linear(intArrayOf(5), intArrayOf(0), LinearOp.LE, 12))
+        // d ≤ 0 ⇒ always satisfied (max activity 10 ≤ 12), dropped.
+        assertLinearEquivalent(arrayOf(0..2), Linear(intArrayOf(5), intArrayOf(0), LinearOp.LE, 12))
+        // Mixed bounds, two vars: 7x + 2y ≤ 9, x ∈ [0,2], y ∈ [0,3].
+        assertLinearEquivalent(arrayOf(0..2, 0..3), Linear(intArrayOf(7, 2), intArrayOf(0, 1), LinearOp.LE, 9))
+        // Non-zero lower bounds.
+        assertLinearEquivalent(arrayOf(1..3, 2..4), Linear(intArrayOf(6, 1), intArrayOf(0, 1), LinearOp.LE, 14))
+    }
+
+    @Test
+    fun `bounded integer lifting with negative coefficients and ge`() {
+        // 3x − 2y ≤ 2, x ∈ [0,2], y ∈ [1,3]: clamps to x ≤ y.
+        assertLinearEquivalent(arrayOf(0..2, 1..3), Linear(intArrayOf(3, -2), intArrayOf(0, 1), LinearOp.LE, 2))
+        // GE complemented to ≤ then lifted.
+        assertLinearEquivalent(arrayOf(0..3), Linear(intArrayOf(-5), intArrayOf(0), LinearOp.GE, -12))
+        assertLinearEquivalent(arrayOf(0..2, 1..3), Linear(intArrayOf(2, 5), intArrayOf(0, 1), LinearOp.GE, 8))
+    }
+
+    @Test
+    fun `bounded integer eq and ne are not lifted`() {
+        // EQ / NE pass through coefficient lifting unchanged (feasible set must still match).
+        assertLinearEquivalent(arrayOf(0..3), Linear(intArrayOf(5), intArrayOf(0), LinearOp.EQ, 10))
+        assertLinearEquivalent(arrayOf(0..3, 0..2), Linear(intArrayOf(5, 2), intArrayOf(0, 1), LinearOp.NE, 6))
+    }
+
+    @Test
+    fun `random bounded integer constraints preserve the feasible set`() {
+        val rng = Random(0x372)
+        repeat(2000) {
+            val n = 1 + rng.nextInt(3) // 1..3
+            val domains = Array(n) {
+                val lo = rng.nextInt(5) - 2 // -2..2
+                lo..(lo + rng.nextInt(4)) // span 0..3
+            }
+            val coeffs = IntArray(n) { rng.nextInt(13) - 6 } // -6..6
+            val op = LinearOp.entries[rng.nextInt(LinearOp.entries.size)]
+            val bound = rng.nextInt(31) - 15
+            assertLinearEquivalent(domains, Linear(coeffs, IntArray(n) { idx -> idx }, op, bound))
+        }
+    }
+
+    @Test
     fun `random ge knapsack constraints preserve the feasible set`() {
         val rng = Random(0x6E)
         repeat(400) {
@@ -159,8 +222,10 @@ class PresolveTest {
 
     @Test
     fun `coprime coefficients are left untouched`() {
-        val original = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 5)
-        val problem = Problem(0, 2, Array(2) { IntDomain(0, 4) }, listOf(original))
+        // Coprime (no GCD reduction), loose enough that no coefficient exceeds the cover slack
+        // d = Amax − b = 4 (so no lifting), and not so loose the bound tightens the [0,2] domains.
+        val original = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 6)
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(original))
         assertTrue(Presolve.strengthenCoefficients(problem).factors[0] === original, "coprime factor was rewritten")
     }
 
