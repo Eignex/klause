@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.catalog
 
-import com.eignex.klause.model.PbOp
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.LibminizincExpected
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -471,6 +471,7 @@ internal object Suites {
         format = Format.MINIZINC
         license = "internal"
         val base = "klause-mzn-lib/test-models"
+        workspace("bin_packing", "$base/bin_packing.mzn", Category.PACKING, Expected.Sat)
         workspace("graph_coloring", "$base/graph_coloring.mzn", Category.CSP, Expected.Sat)
         workspace("latin_square", "$base/latin_square.mzn", Category.CSP, Expected.Sat)
         workspace("magic_square", "$base/magic_square.mzn", Category.CSP, Expected.Sat)
