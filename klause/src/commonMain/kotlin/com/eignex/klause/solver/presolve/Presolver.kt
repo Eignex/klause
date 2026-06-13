@@ -58,6 +58,19 @@ enum class PresolveTiming {
 /** Round cap for the iterating emphasis levels; the fixpoint is almost always reached well before. */
 private const val MAX_PRESOLVE_ROUNDS = 16
 
+/** Diminishing-returns abort threshold (SCIP `abortfac`): a round that reduces the problem by less
+ *  than this fraction ends the loop. Tiny, so it only trips on marginal spinning, never real work. */
+private const val PRESOLVE_ABORT_FRACTION = 0.001
+
+/** Cheap problem-complexity measure for the effectiveness abort: constraint count plus total domain
+ *  span. Drops when a pass removes a constraint or tightens a domain; a round that instead grows the
+ *  problem (symmetry breaking adding ordering constraints) simply doesn't trip the abort. */
+private fun complexity(problem: Problem): Long {
+    var c = problem.factors.size.toLong()
+    for (d in problem.intDomains) c += d.max.toLong() - d.min.toLong()
+    return c
+}
+
 /** What a [PresolvePass] produced: the (possibly identical) [problem] and, if it changed the
  *  variable mapping, the [reconstruct] that lifts a solution back. `problem === input` signals the
  *  pass was a no-op this round (the engine uses identity to detect the fixpoint). */
@@ -302,6 +315,7 @@ object Presolver {
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()
         var round = 0
+        var roundStartComplexity = complexity(current)
         while (round < maxRounds) {
             var ranAny = false
             for (pass in passes) {
@@ -318,6 +332,14 @@ object Presolver {
             }
             if (!ranAny) break // every enabled pass has run at the current version → fixpoint
             round++
+            // Effectiveness-based abort (SCIP `abortfac`): a round that simplified the problem, but by
+            // less than [PRESOLVE_ABORT_FRACTION] of it, isn't worth another full sweep. A round that
+            // grew the problem (e.g. symmetry adding ordering constraints) or left it unchanged is left
+            // to the fixpoint check above.
+            val now = complexity(current)
+            val reduced = roundStartComplexity - now
+            if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
+            roundStartComplexity = now
         }
 
         val reconstruct: (Sample) -> Sample =
