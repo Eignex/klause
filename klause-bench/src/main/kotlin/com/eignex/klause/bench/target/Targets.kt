@@ -9,7 +9,6 @@ internal enum class MetricKind {
     SOLVE,
     COVERAGE,
     AUDIT,
-    CREDIT,
 }
 
 /**
@@ -45,16 +44,10 @@ internal object Targets {
      * The kept presets. A preset earns its place only by carrying config that *isn't* obvious
      * from a one-line filter — a tuned budget or a curated suite mix. A preset that would just
      * be `bench <metric> suite=core` is not kept: spell it with the `suite=core` token instead.
+     *
+     * Currently none: every measurement is reachable by `bench <metric> <filters>`.
      */
-    val all: List<Target> = listOf(
-        Target(
-            "mzn-credit-ls",
-            "LS portfolio credit campaign (top-8 palette prefix) over the MiniZinc Challenge benchmarks",
-            listOf("mzn-bench"),
-            MetricKind.CREDIT,
-            Budget(timeoutMillis = 10_000),
-        ),
-    )
+    val all: List<Target> = emptyList()
 
     fun get(id: String): Target =
         all.firstOrNull { it.id == id } ?: error("no such target: $id (have ${all.map { it.id }})")

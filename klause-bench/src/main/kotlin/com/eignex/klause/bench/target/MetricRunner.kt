@@ -5,7 +5,6 @@ import com.eignex.klause.bench.metric.CompileAuditMetric
 import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.CoverageMetric
 import com.eignex.klause.bench.metric.KlauseSearch
-import com.eignex.klause.bench.metric.PortfolioCreditMetric
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.UniformnessMetric
@@ -49,23 +48,19 @@ internal object MetricRunner {
             return
         }
         if (profile != null && profile.scope == ProfileScope.ALL) {
-            Profiler.record(profile) { dispatch(metric, refs, budget, solveProfile = null) }
+            Profiler.record(profile) { dispatch(metric, refs, solveProfile = null) }
         } else {
-            dispatch(metric, refs, budget, solveProfile = profile)
+            dispatch(metric, refs, solveProfile = profile)
         }
     }
 
     /** [solveProfile], when set, profiles just the measurement of each metric — resolution has
-     *  already happened by then, so parsing/setup is discounted. */
-    private fun dispatch(metric: MetricKind, refs: List<ProblemRef>, budget: Budget, solveProfile: ProfileConfig?) {
+     *  already happened by then, so parsing/setup is discounted. The non-SOLVE metrics ignore the
+     *  time budget (sampling/coverage/audit run to their own limits), so it is not threaded here. */
+    private fun dispatch(metric: MetricKind, refs: List<ProblemRef>, solveProfile: ProfileConfig?) {
         fun <T> solve(block: () -> T): T = if (solveProfile != null) Profiler.record(solveProfile, block) else block()
         when (metric) {
             MetricKind.SOLVE -> error("SOLVE is handled in run() (in-process profiling path)")
-
-            MetricKind.CREDIT -> {
-                val resolved = BenchLoad.resolveRefs(refs)
-                solve { PortfolioCreditMetric.run(resolved, budget) }
-            }
 
             MetricKind.COVERAGE -> solve { CoverageMetric.run(refs) }
 
