@@ -23,7 +23,7 @@ import com.eignex.klause.bench.tools.ProfileScope
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
  * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
  * `backend=choco|gecode|yuck` (the `solve` solver; default klause) `timeout=<ms>`
- * `engine=fixed|cp|mixed|ls|cp-single` `processors=N` `fixed=true` (references) `param=key=value`
+ * `engine=fixed|cp|mixed|ls|cp-single|ls-single` `processors=N` `fixed=true` (references) `param=key=value`
  * (klause search for `solve`)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
@@ -109,8 +109,9 @@ object BenchCli {
         "ls", "localsearch", "local-search" -> "ls"
         "mixed", "portfolio", "pf" -> "mixed"
         "fixed", "fd" -> "fixed"
-        "cp-single", "cpsingle", "single" -> "cp-single"
-        else -> error("engine must be fixed|cp|mixed|ls|cp-single, got '$name'")
+        "cp-single", "cpsingle" -> "cp-single"
+        "ls-single", "lssingle" -> "ls-single"
+        else -> error("engine must be fixed|cp|mixed|ls|cp-single|ls-single, got '$name'")
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
@@ -225,7 +226,7 @@ object BenchCli {
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
-            |         engine=fixed|cp|mixed|ls|cp-single processors=N (klause search for solve)
+            |         engine=fixed|cp|mixed|ls|cp-single|ls-single processors=N (klause search for solve)
             |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; cp-single only for var-/val-selector)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |

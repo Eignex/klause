@@ -79,6 +79,8 @@ Solver-control flags are common to **every** mode:
   - `cp` — backtrack-only portfolio (free). `mixed` — bt+ls portfolio. `ls` — local-search portfolio.
   - `cp-single` — single naked free backtrack; the **only** engine that accepts `var-selector`/
     `val-selector` `--param`s (single-solver heuristic experiments).
+  - `ls-single` — single naked local search; takes the ls strategy `--param`s (`tabu-tenure`,
+    `pair-swap-budget`, `lambda`, `noise`, `max-flips`).
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):

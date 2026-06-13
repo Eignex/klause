@@ -43,7 +43,7 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance budget for metrics that honor it |
-| `engine=fixed\|cp\|mixed\|ls\|cp-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). Default `engine=fixed` (annotation-following). `fixed=true` is a *separate* reference-only `-f` toggle |
+| `engine=fixed\|cp\|mixed\|ls\|cp-single\|ls-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). Default `engine=fixed` (annotation-following). `fixed=true` is a *separate* reference-only `-f` toggle |
 | `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` apply only to `engine=cp-single` (a single backtrack solver) — the way to A/B a heuristic: run `solve` twice with different `cp-single` params, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
