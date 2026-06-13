@@ -81,7 +81,7 @@ Solver-control flags are common to **every** mode:
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):
   - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
-    `var-heuristic` (`vsids|random|smallest-domain|input-order`), `val-heuristic`
+    `var-selector` (`vsids|random|smallest-domain|input-order`), `val-selector`
     (`random|min|max|middle`)
   - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`

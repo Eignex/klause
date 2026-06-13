@@ -25,13 +25,21 @@ import java.util.concurrent.TimeUnit
  */
 internal object SolverInvocation {
 
-    /** Solver-side knobs. [engine] (`cp`/`ls`/`portfolio`) and [free] (ignore the model annotation)
-     *  apply to klause only; references run their own default search. [processors] maps to `-p`. */
+    /** Solver-side knobs. [engine] (`cp`/`ls`/`portfolio`) and [params] (repeatable `--param
+     *  key=value` engine knobs, e.g. `var-selector=vsids`) apply to klause only; references run
+     *  their own search. [processors] maps to `-p`.
+     *
+     *  [free] (`-f`, ignore the model's search annotation) **defaults to true** — a deliberate
+     *  divergence from MiniZinc's CLI default (which honours the annotation). Free search measures
+     *  the solver rather than the model's hand-written heuristic, which is the fairer strength
+     *  comparison for modern CDCL/portfolio solvers; the annotation-following ("fixed") track is the
+     *  explicit opt-in (`fixed=true`). */
     internal data class Settings(
         val engine: String? = null,
         val processors: Int = 1,
-        val free: Boolean = false,
+        val free: Boolean = true,
         val seed: Long = 3L,
+        val params: List<String> = emptyList(),
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -105,6 +113,10 @@ internal object SolverInvocation {
             if (s.processors > 1) {
                 add("-p")
                 add(s.processors.toString())
+            }
+            for (param in s.params) {
+                add("--param")
+                add(param)
             }
         }
     }

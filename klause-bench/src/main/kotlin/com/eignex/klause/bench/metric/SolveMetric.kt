@@ -37,6 +37,9 @@ internal data class KlauseSearch(
     val processors: Int = Runtime.getRuntime().availableProcessors(),
     /** Follow the model's search annotation (the "fixed" track); false ⇒ free search (`-f`). */
     val fixed: Boolean = false,
+    /** Repeatable klause-cli `--param key=value` engine knobs (e.g. `var-selector=vsids`); the way
+     *  to A/B a heuristic — run `solve` twice with different params and diff the two config dirs. */
+    val params: List<String> = emptyList(),
 )
 
 /** One problem's result for one solver+settings+budget — the durable per-problem record. */
@@ -88,6 +91,7 @@ internal object SolveMetric {
             processors = search.processors,
             free = !search.fixed,
             seed = SOLVE_SEED,
+            params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
         )
         val cacheLabel = label(solverId, settings) // kept stable so existing cache entries stay reachable
         val tag = configTag(solverId, settings, budget)
@@ -127,13 +131,17 @@ internal object SolveMetric {
     }
 
     /** Filesystem-safe, self-sufficient config dir name: solver + engine + processors + search mode +
-     *  budget. Two runs that differ in any of these land in different dirs. */
+     *  budget + any `--param` knobs. Two runs that differ in any of these land in different dirs (so
+     *  `param=var-selector=vsids` and `param=var-selector=chb` don't clobber each other). */
     private fun configTag(solverId: String, s: SolverInvocation.Settings, budget: Budget): String = buildString {
         append(solverId)
         s.engine?.let { append('-').append(it) }
         append("-p").append(s.processors)
         append(if (s.free) "-free" else "-fixed")
         append("-t").append(budget.timeoutMillis / 1000).append('s')
+        if (s.params.isNotEmpty()) {
+            append('-').append(s.params.joinToString("_") { it.replace('=', '-') })
+        }
     }
 
     private fun flat(entry: ResolvedProblem): String = entry.name.replace('/', '_')
@@ -261,9 +269,11 @@ internal object SolveMetric {
      *  component (NOT the output dir; see [configTag]). Kept byte-for-byte stable so prior cached
      *  results stay addressable across this refactor. */
     private fun label(solverId: String, s: SolverInvocation.Settings): String {
+        // params fold in only when present, so no-param runs keep the prior key (cache stays warm).
+        val paramSuffix = if (s.params.isEmpty()) "" else "|" + s.params.joinToString(",")
         if (solverId != SolverInvocation.KLAUSE) {
-            return solverId + if (s.processors > 1) "-x${s.processors}" else ""
+            return solverId + (if (s.processors > 1) "-x${s.processors}" else "") + paramSuffix
         }
-        return "klause-${s.engine ?: "portfolio"}-x${s.processors}" + if (!s.free) "-ann" else ""
+        return "klause-${s.engine ?: "portfolio"}-x${s.processors}" + (if (!s.free) "-ann" else "") + paramSuffix
     }
 }

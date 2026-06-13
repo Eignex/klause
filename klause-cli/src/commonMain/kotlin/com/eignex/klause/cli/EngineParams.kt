@@ -11,7 +11,9 @@ import com.eignex.klause.solver.backtrack.selector.IndomainMin
 import com.eignex.klause.solver.backtrack.selector.IndomainRandom
 import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.backtrack.selector.RandomVariable
+import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
@@ -25,8 +27,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
  *
  * Keys per engine:
  *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`,
- *    `lbd-glue`, `var-selector` (`vsids|random|smallest-domain|input-order`),
- *    `val-selector` (`random|min|max|middle`)
+ *    `lbd-glue`, `var-selector` (`vsids|chb|linucb|random|smallest-domain|input-order`),
+ *    `val-selector` (`random|min|max|middle|solution-guided`)
  *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
  *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
  */
@@ -61,14 +63,16 @@ internal class EngineParams(pairs: List<String>) {
         }
     }
 
-    fun varSelector(key: String): VariableSelector? = map.remove(key)?.let {
+    /** [seed] feeds the LinUCB selector's RNG so an A/B is reproducible under the run's `seed`. */
+    fun varSelector(key: String, seed: Long?): VariableSelector? = map.remove(key)?.let {
         when (it.lowercase()) {
             "vsids" -> Vsids()
             "chb" -> Chb()
+            "linucb" -> RegressionVariableSelector.linUcb(seed = seed ?: 0L)
             "random" -> RandomVariable
             "smallest-domain" -> SmallestDomain
             "input-order" -> InputOrder
-            else -> fail("engine param `$key` expects vsids|chb|random|smallest-domain|input-order, got `$it`")
+            else -> fail("engine param `$key` expects vsids|chb|linucb|random|smallest-domain|input-order, got `$it`")
         }
     }
 
@@ -78,7 +82,8 @@ internal class EngineParams(pairs: List<String>) {
             "min" -> IndomainMin
             "max" -> IndomainMax
             "middle" -> IndomainMiddle
-            else -> fail("engine param `$key` expects random|min|max|middle, got `$it`")
+            "solution-guided" -> SolutionGuided(IndomainMin)
+            else -> fail("engine param `$key` expects random|min|max|middle|solution-guided, got `$it`")
         }
     }
 
@@ -112,7 +117,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
     p.int("mid-lbd")?.let { out = out.copy(midLbdThreshold = it) }
     p.bool("vivification")?.let { out = out.copy(vivification = it) }
     p.int("vivify-batch")?.let { out = out.copy(vivifyBatch = it) }
-    p.varSelector("var-selector")?.let { out = out.copy(variableSelector = it) }
+    p.varSelector("var-selector", out.randomSeed)?.let { out = out.copy(variableSelector = it) }
     p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }
     p.finish(
         "cp",

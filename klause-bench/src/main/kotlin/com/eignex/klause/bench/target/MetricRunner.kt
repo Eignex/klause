@@ -6,7 +6,6 @@ import com.eignex.klause.bench.metric.CompletenessMetric
 import com.eignex.klause.bench.metric.CoverageMetric
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.PortfolioCreditMetric
-import com.eignex.klause.bench.metric.SearchEffortMetric
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.TuningMetric
@@ -72,11 +71,6 @@ internal object MetricRunner {
             MetricKind.CREDIT -> {
                 val resolved = BenchLoad.resolveRefs(refs)
                 solve { PortfolioCreditMetric.run(resolved, budget) }
-            }
-
-            MetricKind.SEARCH -> {
-                val resolved = BenchLoad.resolveRefs(refs)
-                solve { SearchEffortMetric.run(resolved, budget) }
             }
 
             MetricKind.COVERAGE -> solve { CoverageMetric.run(refs) }

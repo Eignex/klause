@@ -10,7 +10,7 @@ bench <metric> [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 
 Presets (`target/Targets.kt`) are named shorthands for a `bench <metric>` line that carries non-obvious config (a tuned budget or a curated suite mix) — nothing else.
 
-The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. Output is saved **one file per problem** under `output/<config>/` (`<config>` = solver+settings+budget, e.g. `choco-p8-free-t300s`): a `<problem>.out` (raw solver stream = the log) and a self-describing `<problem>.json` (solver/settings/budget + parsed result). There is no in-session comparison and no in-process reference adapter: run `solve` once per config and diff two config dirs offline with `output/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: keep a baseline config's dir and compare a fresh run's dir against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). Results are also content-addressed in `build/bench-cache/`, so re-running an identical instance replays instantly. (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by `uniformness`/`completeness`/`search`.)
+The `solve` metric runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. Output is saved **one file per problem** under `output/<config>/` (`<config>` = solver+settings+budget, e.g. `choco-p8-free-t300s`): a `<problem>.out` (raw solver stream = the log) and a self-describing `<problem>.json` (solver/settings/budget + parsed result). There is no in-session comparison and no in-process reference adapter: run `solve` once per config and diff two config dirs offline with `output/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: keep a baseline config's dir and compare a fresh run's dir against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). Results are also content-addressed in `build/bench-cache/`, so re-running an identical instance replays instantly. (klause's own `BacktrackSolver`/`LocalSearchSolver` are still used in-process by `uniformness`/`completeness`.)
 
 ## Quick start
 
@@ -43,13 +43,13 @@ bench list [<suite>]                 list suites+presets, or the problems in one
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance budget for metrics that honor it |
-| `engine=backtrack\|ls\|mixed` `processors=N` `fixed=true` | klause's search for a `solve` run (below); `engine`/`processors` mirror the CLI's `--engine` / `-p`, `fixed` follows the model annotation |
+| `engine=cp\|ls\|portfolio` `processors=N` `fixed=true` | klause's search for a `solve` run (below); `engine`/`processors` mirror the CLI's `--engine` / `-p`, `fixed` follows the model annotation (default is free search) |
+| `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim (e.g. `param=var-selector=vsids param=luby=256`); the way to A/B a search config — run `solve` twice with different params, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
 ## Metrics
 
 - **solve** — run one backend (`backend=`, default klause) over the selection **as a subprocess** (klause via `klause-cli`, references via `minizinc --solver <id>`), emitting MiniZinc-format output. Saves **one file per problem** under `output/<config>/`: `<problem>.out` (raw solver log) + `<problem>.json` (solver/settings/budget + objective + time-to-best (optimization) or feasibility (satisfaction) + proof status + `%%%mzn-stat` statistics). Run once per config and diff two config dirs offline (`output/compare.sh`), which also serves as the wall-time regression check. klause solving needs `:klause-cli:installJvmDist`; because klause-cli renders the *model's* objective, maximize values are reported in the model's orientation (sign-correct against references).
-- **search** — complete backtracker under a fixed CDCL config; reports nodes/conflicts/learned + solve-rate. A/B a learning or explanation change by holding the suite fixed and comparing conflicts (the `slack-alldiff` Golomb suite is the Hall-prone workload).
 - **uniformness** / **completeness** — sampling distinctness/spread/entropy; distinct SAT assignments reached under budget.
 - **coverage** / **audit** — percent of constraint predicates handled natively vs MiniZinc-decomposed; compile-only native/decomposed classification + a `klause-cli` ingest smoke.
 - **tuning** / **credit** — rank solver configs by avg dense rank; per-worker portfolio attribution.
@@ -65,8 +65,12 @@ bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=choco   # Choco b
 bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck baseline
 # each writes output/<config>/<problem>.{out,json} — diff two config dirs with output/compare.sh
 
-# search-effort A/B on your own selection
-bench search suite=core category=UNSAT timeout=30000
+# search-config A/B: run twice with different --param, then compare the two config dirs.
+# cp-engine knobs apply to the single backtrack worker, so use processors=1 (a parallel pool
+# diversifies its workers and takes only ls/bt/seed/lambda params).
+bench solve suite=core kind=cop engine=cp processors=1 param=var-selector=vsids timeout=30000
+bench solve suite=core kind=cop engine=cp processors=1 param=var-selector=chb   timeout=30000
+# output/compare.sh output/klause-cp-p1-free-t30s-var-selector-vsids output/klause-cp-p1-free-t30s-var-selector-chb
 
 # compile audit (needs `:klause-cli:installJvmDist`)
 bench audit suite=mzn-smoke
@@ -113,7 +117,7 @@ bench solve suite=mzn-bench fixed=true backend=choco timeout=300000 # Choco, sam
 `solve` is special: it normally runs solvers as subprocesses (klause-cli / minizinc), which JFR on the bench JVM can't see. So `solve … profile=…` switches to **in-process profiling** — it runs the klause engine itself inside this JVM under the recorder, capturing the real `BacktrackSolver` / `LocalSearchSolver` hot paths. This needs a single klause engine: pass `engine=cp` (backtrack) or `engine=ls` (local search); the portfolio and external references aren't profilable. No JSON/cache is written in this mode — it measures the solver, not the figures.
 
 ```
-bench search suite=slack-alldiff timeout=30000 profile=cpu
+bench solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000
 bench solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000
 bench solve suite=mzn-bench name=mario engine=ls profile=alloc timeout=30000
 ```
