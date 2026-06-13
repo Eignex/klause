@@ -102,17 +102,17 @@ class Portfolio(
         val cancelled = AtomicBoolean(false)
         val token: Cancellation = { cancelled.load() || cancellation() }
         fun readBound(): Double = incumbent.load().bound
-        // Workers improve concurrently; serialise the attribution callback so the consumer (e.g. the
-        // CLI's `-s` per-arm line) never sees interleaved invocations. Only the thread whose CAS
-        // actually installed the new global best fires it — a loser's stale value never reports.
+        // Workers improve concurrently; [emitLock] serialises the attribution callback so the consumer
+        // (e.g. the CLI's `-s` per-arm line) never sees interleaved invocations. It is non-null exactly
+        // when [onImprovement] is, so the no-callback path takes neither the lock nor the callback. Only
+        // the thread whose CAS actually installed the new global best fires it — a loser never reports.
         val start = TimeSource.Monotonic.markNow()
-        val emitLock = onImprovement?.let { Concurrency.Strict.lock() }
+        val emitLock = if (onImprovement != null) Concurrency.Strict.lock() else null
         fun fold(worker: PortfolioWorker, r: MinimizeResult.WithSample) {
-            if (updateSharedBound(incumbent, r.objectiveValue, r.sample)) {
-                // emitLock is non-null iff onImprovement is; the ?. on both keeps the no-callback path
-                // lock-free (and dodges a !! on the nullable mutex).
-                emitLock?.withLock { onImprovement?.invoke(AttributedImprovement(worker.label, start.elapsedNow(), r)) }
-            }
+            if (!updateSharedBound(incumbent, r.objectiveValue, r.sample)) return
+            val cb = onImprovement ?: return
+            val lock = emitLock ?: return
+            lock.withLock { cb(AttributedImprovement(worker.label, start.elapsedNow(), r)) }
         }
 
         val results = parallelRun(
