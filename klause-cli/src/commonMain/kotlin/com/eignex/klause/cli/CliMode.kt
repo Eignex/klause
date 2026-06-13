@@ -44,7 +44,8 @@ internal class CommonOptions {
     /** `--format NAME` / `--mode NAME`: force a specific mode regardless of file extension. */
     var formatOverride: String? = null
 
-    /** `--presolve SPEC`: presolve passes (none | default | all | comma-list of pass ids). */
+    /** `--presolve SPEC`: an emphasis level (default | off | conservative | aggressive), `all`,
+     *  or a comma-list of pass ids to enable. Parsed by `PresolveConfig.parse`. */
     var presolve: String? = null
 
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
@@ -60,32 +61,142 @@ internal class CommonOptions {
     var inputPath: String? = null
 }
 
-/** One recognised flag. [takesValue] flags consume the following argument; [apply] receives
- *  it (or `null` for boolean flags). The parser derives its value-flag set from these specs,
- *  so routing and parsing never drift. */
-internal class FlagSpec(val names: List<String>, val takesValue: Boolean, val apply: (String?) -> Unit)
+/** `--help` sections, rendered in declaration order. A flag's [FlagSpec.group] places it here. */
+internal enum class FlagGroup(val title: String) {
+    STANDARD("Standard FlatZinc options (MiniZinc fzn-spec)"),
+    ENGINE("Engine selection"),
+    KLAUSE("klause options"),
+    MODE("Front-end options"),
+}
+
+/**
+ * One recognised flag. [takesValue] flags consume the following argument; [apply] receives it
+ * (or `null` for boolean flags). The parser derives its value-flag set from these specs, so
+ * routing and parsing never drift — and `--help` renders its option list from [group] /
+ * [valueLabel] / [help], so the help text can't drift from the real flags either. A `null`
+ * [help] hides the flag from `--help` (aliases / no-op compatibility flags / advanced knobs).
+ */
+internal class FlagSpec(
+    val names: List<String>,
+    val takesValue: Boolean,
+    val group: FlagGroup = FlagGroup.KLAUSE,
+    val valueLabel: String? = null,
+    val help: String? = null,
+    val apply: (String?) -> Unit,
+)
+
+/** Built-in default engine for a bare invocation (no `-e`, no `-f`). */
+internal const val DEFAULT_ENGINE = "mixed"
+
+/** The engine for a bare invocation (no `-e`, no `-f`): the `KLAUSE_FZN_ENGINE` env var /
+ *  `klause.fzn.engine` property when set — so a packaged image (e.g. a MiniZinc-Challenge-compliant
+ *  Docker build) can ship a different default — else [DEFAULT_ENGINE]. `-e` and `-f` override it. */
+internal fun defaultEngine(): String = cliProp("klause.fzn.engine") ?: DEFAULT_ENGINE
 
 /** The solver-control flags every mode accepts. Mode-specific flags are appended per mode. */
 internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
-    FlagSpec(listOf("-a", "--all-solutions"), false) { o.allSolutions = true },
+    FlagSpec(
+        listOf("-a", "--all-solutions"),
+        false,
+        FlagGroup.STANDARD,
+        help = "report all solutions (satisfy) / all improving incumbents (optimize)",
+    ) { o.allSolutions = true },
     // Improving incumbents stream on the optimize path unconditionally — `-i` semantics — so
     // the flag is accepted as a no-op for MiniZinc-protocol compatibility.
-    FlagSpec(listOf("-i", "--intermediate", "--intermediate-solutions"), false) { },
-    FlagSpec(listOf("-f", "--free-search"), false) { o.freeSearch = true },
-    FlagSpec(listOf("-n"), true) { o.solutionCap = requireNotNull(it).toLong() },
-    FlagSpec(listOf("-s", "--statistics"), false) { o.statistics = true },
-    FlagSpec(listOf("-v", "--verbose"), false) { o.verbose = true },
-    FlagSpec(listOf("-t", "--time-limit"), true) { o.timeLimitMs = requireNotNull(it).toLong() },
-    FlagSpec(listOf("-r", "--random-seed"), true) { o.randomSeed = requireNotNull(it).toLong() },
-    FlagSpec(listOf("-e", "--engine"), true) { o.engine = it },
-    FlagSpec(listOf("-p", "--parallel"), true) {
+    FlagSpec(
+        listOf("-i", "--intermediate", "--intermediate-solutions"),
+        false,
+        FlagGroup.STANDARD,
+        help = "print intermediate solutions of increasing quality (optimize)",
+    ) { },
+    FlagSpec(
+        listOf("-f", "--free-search"),
+        false,
+        FlagGroup.STANDARD,
+        help = "ignore the model's search annotations (≡ -e cp)",
+    ) { o.freeSearch = true },
+    FlagSpec(
+        listOf("-n"),
+        true,
+        FlagGroup.STANDARD,
+        valueLabel = "i",
+        help = "stop after reporting i solutions (satisfy)",
+    ) { o.solutionCap = requireNotNull(it).toLong() },
+    FlagSpec(
+        listOf("-s", "--statistics"),
+        false,
+        FlagGroup.STANDARD,
+        help = "print solving statistics (%%%mzn-stat lines for FlatZinc)",
+    ) { o.statistics = true },
+    FlagSpec(
+        listOf("-v", "--verbose"),
+        false,
+        FlagGroup.STANDARD,
+        help = "log progress to stderr (as % comment lines)",
+    ) { o.verbose = true },
+    FlagSpec(
+        listOf("-t", "--time-limit"),
+        true,
+        FlagGroup.STANDARD,
+        valueLabel = "ms",
+        help = "wall-clock time limit in milliseconds",
+    ) { o.timeLimitMs = requireNotNull(it).toLong() },
+    FlagSpec(
+        listOf("-r", "--random-seed"),
+        true,
+        FlagGroup.STANDARD,
+        valueLabel = "i",
+        help = "random seed",
+    ) { o.randomSeed = requireNotNull(it).toLong() },
+    FlagSpec(
+        listOf("-p", "--parallel"),
+        true,
+        FlagGroup.STANDARD,
+        valueLabel = "i",
+        help = "solve with i parallel cores (portfolio engines only)",
+    ) {
         o.parallel = requireNotNull(it).toIntOrNull() ?: usageError("-p expects an integer, got `$it`")
     },
-    FlagSpec(listOf("--param"), true) { o.engineParams.add(requireNotNull(it)) },
-    FlagSpec(listOf("--format", "--mode"), true) { o.formatOverride = it },
-    FlagSpec(listOf("--presolve"), true) { o.presolve = it },
-    FlagSpec(listOf("-h", "--help"), false) { o.showHelp = true },
-    FlagSpec(listOf("--version"), false) { o.showVersion = true },
+    FlagSpec(
+        listOf("-e", "--engine"),
+        true,
+        FlagGroup.ENGINE,
+        valueLabel = "name",
+        help = "fixed | cp | ls | mixed | cp-single | ls-single (default: ${defaultEngine()}; -f selects cp)",
+    ) { o.engine = it },
+    FlagSpec(
+        listOf("--param"),
+        true,
+        FlagGroup.ENGINE,
+        valueLabel = "key=value",
+        help = "repeatable engine tuning knob (e.g. arms=8, val-selector=max)",
+    ) { o.engineParams.add(requireNotNull(it)) },
+    FlagSpec(
+        listOf("--format", "--mode"),
+        true,
+        FlagGroup.KLAUSE,
+        valueLabel = "name",
+        help = "force a front-end: " + MODES.joinToString(" | ") { it.names.first() },
+    ) { o.formatOverride = it },
+    FlagSpec(
+        listOf("--presolve"),
+        true,
+        FlagGroup.KLAUSE,
+        valueLabel = "spec",
+        help = "default | off | conservative | aggressive | all | <pass-id>,…",
+    ) { o.presolve = it },
+    FlagSpec(
+        listOf("-h", "--help"),
+        false,
+        FlagGroup.KLAUSE,
+        help = "show this help and exit",
+    ) { o.showHelp = true },
+    FlagSpec(
+        listOf("--version"),
+        false,
+        FlagGroup.KLAUSE,
+        help = "print the solver version and exit",
+    ) { o.showVersion = true },
 )
 
 /**

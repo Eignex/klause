@@ -36,7 +36,7 @@ fun main(args: Array<String>) {
     // `--help` / `--version` are informational: they print to stdout and return (exit 0) without
     // needing an input file, and `--help` wins if both are present (GNU convention).
     if (common.showHelp) {
-        println(helpText())
+        println(helpText(specs))
         return
     }
     if (common.showVersion) {
@@ -55,13 +55,11 @@ private const val USAGE =
     "usage: klause-cli [options] <file>\n" +
         "Try 'klause-cli --help' for the full option list."
 
-/** Long `--help` output (stdout). Formats are listed from the live [MODES] registry so a new
- *  front-end shows up here automatically. */
-private fun helpText(): String {
-    val formats = MODES.joinToString(" | ") { it.names.first() }
-    val byExtension = MODES.joinToString(", ") { m ->
-        ".${m.extensions.first()} → ${m.names.first()}"
-    }
+/** Long `--help` output (stdout). The option list is rendered from the live [specs] (so it can't
+ *  drift from the real flags); the surrounding prose (formats, examples) reads the [MODES]
+ *  registry, so a new front-end shows up automatically too. */
+private fun helpText(specs: List<FlagSpec>): String {
+    val byExtension = MODES.joinToString(", ") { m -> ".${m.extensions.first()} → ${m.names.first()}" }
     return """
         |${BuildInfo.versionLine()} — SMT-flavored finite-domain constraint solver
         |
@@ -70,28 +68,7 @@ private fun helpText(): String {
         |Solves a single FlatZinc / XCSP3 / SMT-LIB instance. The front-end is chosen by
         |--format, else by the file extension ($byExtension), else MiniZinc/FlatZinc.
         |
-        |Standard FlatZinc options (MiniZinc fzn-spec):
-        |  -a, --all-solutions    report all solutions (satisfy) / all improving incumbents (optimize)
-        |  -i, --intermediate     print intermediate solutions of increasing quality (optimize)
-        |  -n <i>                 stop after reporting i solutions (satisfy)
-        |  -f, --free-search      ignore the model's search annotations (alias for -e cp)
-        |  -s, --statistics       print solving statistics (%%%mzn-stat lines for FlatZinc)
-        |  -v, --verbose          log progress to stderr (as % comment lines)
-        |  -t, --time-limit <ms>  wall-clock time limit in milliseconds
-        |  -r, --random-seed <i>  random seed
-        |  -p, --parallel <i>     solve with i parallel cores (portfolio engines only)
-        |
-        |Engine selection:
-        |  -e, --engine <name>    fixed | cp | ls | mixed | cp-single | ls-single
-        |                         (default: fixed = follow the model annotation; -f selects cp)
-        |  --param <key=value>    repeatable engine tuning knob (e.g. arms=8, val-selector=max)
-        |
-        |klause options:
-        |  --format, --mode <m>   force a front-end: $formats
-        |  --presolve <spec>      presolve passes: none | default | all | comma-list of pass ids
-        |  --ozn <file>           MiniZinc output model for solution reconstruction (FlatZinc mode)
-        |  -h, --help             show this help and exit
-        |  --version              print the solver version and exit
+        |${renderOptions(specs)}
         |
         |Unknown -flags are ignored (with a stderr note) for forward compatibility with MiniZinc.
         |
@@ -101,6 +78,27 @@ private fun helpText(): String {
         |  klause-cli -f -p 4 -t 60000 model.fzn
         |  klause-cli --format xcsp3 instance.xml
     """.trimMargin()
+}
+
+/** Column where flag descriptions begin; the names column wraps onto its own line past it. */
+private const val HELP_DESC_COLUMN = 24
+
+/** Render the grouped option list from [specs]: one section per non-empty [FlagGroup] (in enum
+ *  order). Specs with a `null` help are omitted. */
+private fun renderOptions(specs: List<FlagSpec>): String {
+    val visible = specs.filter { it.help != null }
+    return FlagGroup.entries.mapNotNull { group ->
+        val rows = visible.filter { it.group == group }
+        if (rows.isEmpty()) null else "${group.title}:\n" + rows.joinToString("\n") { renderOptionRow(it) }
+    }.joinToString("\n\n")
+}
+
+/** One `  -x, --long <label>   description` line; an over-long names column wraps to its own line. */
+private fun renderOptionRow(spec: FlagSpec): String {
+    val left = "  " + spec.names.joinToString(", ") + spec.valueLabel?.let { " <$it>" }.orEmpty()
+    val pad = HELP_DESC_COLUMN - left.length
+    val gap = if (pad > 0) " ".repeat(pad) else "\n" + " ".repeat(HELP_DESC_COLUMN)
+    return left + gap + spec.help
 }
 
 /** Select the mode: an explicit `--format` wins, else the file extension, else MiniZinc. */

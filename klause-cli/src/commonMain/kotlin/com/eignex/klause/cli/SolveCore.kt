@@ -39,10 +39,10 @@ internal object SolveCore {
     private val pureLsEngines = setOf("ls", "localsearch", "local-search", "ls-single", "lssingle")
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, output: OutputProtocol) {
-        // Engine enum: fixed | cp | mixed | ls | cp-single. `-f` (free) is an alias for `-e cp`; no
-        // flag at all ⇒ `fixed` (follow the model's annotation — the MiniZinc-Challenge FD default).
-        val engine = (common.engine ?: cliProp("klause.fzn.engine") ?: if (common.freeSearch) "cp" else "fixed")
-            .lowercase()
+        // Engine enum: fixed | cp | mixed | ls | cp-single. Resolution order: explicit `-e` wins,
+        // then `-f` (free) ≡ `-e cp`, else the configured default ([defaultEngine] — the built-in
+        // `mixed`, or whatever a packaged image set via the env var).
+        val engine = (common.engine ?: if (common.freeSearch) "cp" else defaultEngine()).lowercase()
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. Solution-set-altering passes (symmetry breaking, value
         // precedence) are dropped for a pure-LS engine (their ordering constraints hurt local

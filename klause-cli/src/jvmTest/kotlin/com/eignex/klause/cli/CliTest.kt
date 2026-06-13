@@ -44,6 +44,21 @@ class CliTest {
     }
 
     @Test
+    fun `default engine is mixed and is overridable via the KLAUSE_FZN_ENGINE property`() {
+        assertTrue(defaultEngine() == "mixed", defaultEngine())
+        // cliProp reads the system property first on the JVM, so it stands in for the env var.
+        System.setProperty("klause.fzn.engine", "fixed")
+        try {
+            assertTrue(defaultEngine() == "fixed", defaultEngine())
+            // The override must surface in --help so a packaged image's default is visible.
+            val out = capture { main(arrayOf("--help")) }
+            assertTrue("default: fixed" in out, out)
+        } finally {
+            System.clearProperty("klause.fzn.engine")
+        }
+    }
+
+    @Test
     fun `-p2 attached form drives the parallel portfolio (matches the documented spelling)`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
