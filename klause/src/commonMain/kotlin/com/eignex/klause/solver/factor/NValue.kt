@@ -226,7 +226,6 @@ class NValue(
         if (s.distinctCount in nDom) sink.addChannelingIntSet(state, n, s.distinctCount)
         val needIncrease = when (mode) {
             Mode.Eq -> nv > s.distinctCount
-
             Mode.AtLeast -> true
             Mode.AtMost -> false
         }
