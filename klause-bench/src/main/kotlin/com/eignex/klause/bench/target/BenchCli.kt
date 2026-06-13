@@ -86,15 +86,16 @@ object BenchCli {
         MetricRunner.run(metric, refs, budget, backend, profile, search)
     }
 
-    /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=true`. Returns
-     *  null when none are set (the metric default: mixed engine over the host core count). These map
-     *  onto the portfolio's engine × threads axes; the competition tracks are filter combinations (see
-     *  the README recipes). `engine`/`processors` mirror the CLI's `--engine` / `-p`/`--parallel`. */
+    /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=true` /
+     *  `param=`. Returns null when none are set. Defaults: mixed engine, **single core** (`processors`
+     *  defaults to 1, matching the CLI) — multi-thread tracks must pass `processors=` explicitly.
+     *  These map onto the portfolio's engine × threads axes; the competition tracks are filter
+     *  combinations (see the README recipes). `engine`/`processors` mirror `--engine` / `-p`. */
     private fun parseKlauseSearch(f: Map<String, String>, params: List<String>): KlauseSearch? {
         if (f["engine"] == null && f["processors"] == null && f["fixed"] == null && params.isEmpty()) return null
         return KlauseSearch(
             engine = f["engine"]?.let(::parseEngine) ?: "portfolio",
-            processors = f["processors"]?.toIntOrNull() ?: Runtime.getRuntime().availableProcessors(),
+            processors = f["processors"]?.toIntOrNull(),
             fixed = f["fixed"]?.toBoolean() ?: false,
             params = params,
         )

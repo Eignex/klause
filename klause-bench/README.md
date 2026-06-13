@@ -79,23 +79,26 @@ bench audit suite=mzn-smoke
 ### Solve: klause competition tracks as filter combinations
 
 When `solve` runs klause (no `backend=`), the klause side is `engine` (`cp`/`ls`/`portfolio`) over
-`processors` workers — the portfolio's two axes, mirroring the CLI's `--engine` / `-p`. `processors=1`
-is the single-core sequential portfolio. The MiniZinc / XCSP competition tracks are just combinations
-of these, so there are no baked-in track names — spell each as a recipe (all compose with
-`kind=cop|csp` and `timeout=`):
+`processors` workers — the portfolio's two axes, mirroring the CLI's `--engine` / `-p`. **`processors`
+defaults to 1** (single-core, matching the CLI), so the multi-thread tracks must request cores
+explicitly. The MiniZinc / XCSP competition tracks are just combinations of these, so there are no
+baked-in track names — spell each as a recipe (all compose with `kind=cop|csp` and `timeout=`):
 
 ```
-# open (default): multi-thread, mixed engines
+# free (default): 1 thread, klause's own search (the single-core sequential portfolio)
 bench solve suite=mzn-bench timeout=300000
 
-# free: 1 thread, klause's own search (the single-core sequential portfolio)
-bench solve suite=mzn-bench processors=1 timeout=300000
+# open: multi-thread, mixed engines
+bench solve suite=mzn-bench processors=8 timeout=300000
 
 # parallel: multi-thread, a single engine (backtrack-only)
 bench solve suite=mzn-bench engine=cp processors=8 timeout=300000
 
-# local search only
-bench solve suite=mzn-bench engine=ls timeout=300000
+# fixed: 1 thread, follow the model's search annotation
+bench solve suite=mzn-bench fixed=true timeout=300000
+
+# ls: parallel local search
+bench solve suite=mzn-bench engine=ls processors=8 timeout=300000
 ```
 
 The one exception is the **fixed** track — follow the model's `int_search` annotation — which has no
@@ -148,7 +151,7 @@ The parity sweep measures klause against the reference solvers on the MiniZinc C
    - **8 COP**: `elitserien` (alldifferent, global_cardinality, inverse, member, regular), `gfd-schedule` (cumulative, at_most, nvalue), `cargo` (cumulative, diffn), `is` (among, circuit, table), `nfc` (network_flow), `mario` (path, subcircuit), `evilshop` (cumulative, disjunctive), `zephyrus` (arg_sort, lex_less).
    - **2 CSP**: `multi-knapsack` (knapsack), `oocsp_racks` (global_cardinality, increasing, element).
    - Spell it with the `name=` OR filter: `name=elitserien,gfd-schedule,cargo,is/*,nfc,mario,evilshop,zephyrus` (the `is/*` glob anchors the family so it doesn't substring-match e.g. `opt-cryptanalysis`).
-3. **Tracks** (each a `solve` filter combination; see the recipes above). klause: `parallel` (`engine=cp processors=8`), `open` (`processors=8`), `free` (`processors=1`), `fixed` (`fixed=true`), `ls` (`engine=ls`). References: Choco for the complete tracks, Yuck for `ls`.
+3. **Tracks** (each a `solve` filter combination; see the recipes above). klause: `parallel` (`engine=cp processors=8`), `open` (`processors=8`), `free` (`processors=1`), `fixed` (`fixed=true`), `ls` (`engine=ls processors=8`). References: Choco for the complete tracks, Yuck (`processors=8`) for `ls`.
 4. **Budgets**: complete tracks **300000 ms**, the LS track **180000 ms**.
 
 ```

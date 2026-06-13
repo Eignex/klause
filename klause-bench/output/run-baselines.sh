@@ -13,9 +13,9 @@ CSP="suite=mzn-bench kind=csp per-family=1 name=multi-knapsack,oocsp_racks"
 run() { echo ">>> solve $* ($(date +%H:%M))" >&2; ./gradlew :klause-bench:bench --args="solve $* timeout=300000" -q; }
 
 for SEL in "$COP" "$CSP"; do
-  run "$SEL backend=choco processors=8"   # parallel + open
-  run "$SEL backend=choco processors=1"   # free
-  run "$SEL backend=choco fixed=true"     # fixed
-  run "$SEL backend=yuck"                 # ls
+  run "$SEL backend=choco processors=8"            # parallel + open (multi-thread)
+  run "$SEL backend=choco processors=1"            # free (single-core)
+  run "$SEL backend=choco processors=1 fixed=true" # fixed (single-core, follow annotation)
+  run "$SEL backend=yuck processors=8"             # ls (parallel local search)
 done
 echo "BASELINES-COMPLETE ($(date +%H:%M))" >&2
