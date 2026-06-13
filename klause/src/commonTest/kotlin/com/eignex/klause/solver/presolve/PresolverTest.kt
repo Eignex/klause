@@ -62,8 +62,80 @@ class PresolverTest {
         // Construction-time SAC probes are expensive → auto-off; explicit `all` turns them on.
         assertEquals(false, auto.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY))
         assertEquals(true, PresolveConfig.parse("all").resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY))
-        // withoutSymmetry forces it off even under a non-sensitive query.
-        assertTrue(PresolvePass.BREAK_SYMMETRIES !in auto.withoutSymmetry().problemPasses(PresolveContext.EMPTY))
+        // forLocalSearch forces every solution-set-altering pass off, even under a non-sensitive
+        // query — here the default emphasis plus an explicit value-precedence override.
+        val ls = PresolveConfig(PresolveConfig.AUTO.emphasis, mapOf(PresolvePass.VALUE_PRECEDENCE to true))
+            .forLocalSearch()
+        val lsPasses = ls.problemPasses(PresolveContext.EMPTY)
+        assertTrue(PresolvePass.BREAK_SYMMETRIES !in lsPasses)
+        assertTrue(PresolvePass.VALUE_PRECEDENCE !in lsPasses)
+        // …but the cheap solution-preserving reductions stay on.
+        assertTrue(PresolvePass.STRENGTHEN_COEFFICIENTS in lsPasses)
+    }
+
+    @Test
+    fun `every pass self-registers and is dispatchable`() {
+        // The enum is the registry: a new entry must declare metadata + apply to compile, lands in
+        // `entries` automatically, and the engine dispatches it polymorphically (no central `when`).
+        // This guards the remaining conventions so a malformed addition fails loudly.
+        val ids = PresolvePass.entries.map { it.id }
+        assertEquals(ids.size, ids.toSet().size, "pass ids must be unique")
+        for (p in PresolvePass.entries) {
+            assertSame(p, PresolvePass.fromId(p.id), "id `${p.id}` must round-trip through fromId")
+        }
+        // Every problem-stage pass applies cleanly to a trivial problem — no unhandled entry.
+        val trivial = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
+        )
+        for (p in PresolvePass.entries.filter { it.stage == PresolvePass.Stage.PROBLEM }) {
+            val result = p.apply(trivial, PresolveContext.EMPTY)
+            assertEquals(trivial.numIntVars, result.problem.numIntVars, "${p.id} returned a malformed problem")
+        }
+    }
+
+    @Test
+    fun `emphasis levels select cost tiers`() {
+        val ctx = PresolveContext.EMPTY
+        // off → nothing.
+        assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
+        // conservative → FAST tier only (strengthen + affine), no symmetry, single round.
+        assertEquals(
+            listOf(PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.ELIMINATE_AFFINE_SINGLETONS),
+            PresolveConfig.parse("conservative").problemPasses(ctx),
+        )
+        assertEquals(1, PresolveConfig.parse("conservative").emphasis.maxRounds)
+        // default → adds symmetry (MEDIUM) and iterates; SAC probes (EXHAUSTIVE) stay off.
+        assertTrue(PresolvePass.BREAK_SYMMETRIES in PresolveConfig.parse("default").problemPasses(ctx))
+        assertEquals(false, PresolveConfig.parse("default").resolved(PresolvePass.PROBE_INT_HOLES, ctx))
+        assertTrue(PresolveConfig.parse("default").emphasis.maxRounds > 1)
+        // aggressive → also enables the EXHAUSTIVE SAC probes (the compilers read these via resolved).
+        assertEquals(true, PresolveConfig.parse("aggressive").resolved(PresolvePass.PROBE_INT_HOLES, ctx))
+        assertEquals(true, PresolveConfig.parse("aggressive").resolved(PresolvePass.PROBE_FAILED_LITERALS, ctx))
+        // value precedence stays opt-in even at aggressive (it interacts with variable symmetry).
+        assertEquals(false, PresolveConfig.parse("aggressive").resolved(PresolvePass.VALUE_PRECEDENCE, ctx))
+        assertTrue(PresolvePass.VALUE_PRECEDENCE in PresolveConfig.parse("value-precede").problemPasses(ctx))
+    }
+
+    @Test
+    fun `the round engine iterates to a fixpoint`() {
+        // affine x=2y+1 substituted into 2x+4y<=10 leaves a row strengthen reduces — which only
+        // happens on a second round (strengthen runs before affine in the first). Re-presolving the
+        // result must then change nothing: the single run already reached the fixpoint.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 9), IntDomain(0, 3)),
+            listOf(
+                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 10),
+            ),
+        )
+        val once = Presolver.run(problem, PresolveConfig.AUTO).problem
+        assertTrue(once !== problem, "expected the engine to transform the problem")
+        assertSame(once, Presolver.run(once, PresolveConfig.AUTO).problem, "re-presolving a fixpoint must be a no-op")
     }
 
     @Test

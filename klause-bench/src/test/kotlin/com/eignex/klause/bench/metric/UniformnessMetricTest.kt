@@ -3,7 +3,6 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.InProcessSolver
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.test.Test
@@ -15,9 +14,6 @@ class UniformnessMetricTest {
 
     private class FixedSamples(override val problem: Problem, private val list: List<Sample>) : InProcessSolver {
         override val name = "fixed"
-        override fun solve(): SolveResult = error("unused in this test")
-        override fun samples(n: Int): List<Sample> = list.take(n)
-        override fun enumerated(n: Int): List<Sample> = list.take(n)
         override fun enumerateSequence(): Sequence<Sample> = list.asSequence()
         override fun samplesSequence(): Sequence<Sample> = list.asSequence()
     }
