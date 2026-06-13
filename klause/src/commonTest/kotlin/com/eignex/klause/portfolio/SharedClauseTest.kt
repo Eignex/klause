@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.propagation.SharedClause
+import com.eignex.klause.solver.propagation.addLearnedClause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

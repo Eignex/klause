@@ -2,6 +2,9 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.extractConflictBools
+import com.eignex.klause.solver.propagation.extractConflictFactors
+import com.eignex.klause.solver.propagation.extractConflictInts
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 

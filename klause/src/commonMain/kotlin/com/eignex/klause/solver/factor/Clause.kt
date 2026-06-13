@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.moveBoolWatcher
 import com.eignex.klause.util.IntIntMap
 
 /**

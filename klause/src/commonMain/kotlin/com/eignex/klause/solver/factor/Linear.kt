@@ -7,6 +7,10 @@ import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.maxAboveLevel
+import com.eignex.klause.solver.propagation.maxLevelForLe
+import com.eignex.klause.solver.propagation.minBelowLevel
+import com.eignex.klause.solver.propagation.minLevelForGe
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
