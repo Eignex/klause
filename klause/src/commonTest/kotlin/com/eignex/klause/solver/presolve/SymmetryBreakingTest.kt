@@ -1,13 +1,17 @@
 package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Element
+import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -189,6 +193,78 @@ class SymmetryBreakingTest {
             ),
         )
         checkSound("differentFactors", problem, expectReduced = false)
+    }
+
+    @Test
+    fun `interchangeable bool rows are lex-ordered`() {
+        // Two bool rows a0+2·a1 ≤ 2 and b0+2·b1 ≤ 2. The rows are interchangeable as blocks, but the
+        // cells within a row are NOT (different weights), so this is bool block/row symmetry — broken
+        // by a binary-number lex-leader (#373) rather than per-variable ordering.
+        val problem = Problem(
+            4,
+            0,
+            emptyArray(),
+            listOf(
+                PseudoBoolean(intArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+                PseudoBoolean(intArrayOf(1, 2), intArrayOf(pos(2), pos(3)), PbOp.LE, 2),
+            ),
+        )
+        checkSound("bool-rows", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `isomorphic element factors are block-ordered`() {
+        // Two element constraints v1 = arr(v0), v3 = arr(v2) over the same constant table are
+        // interchangeable as blocks. element used to be unkeyed (structuralKey == null), forcing the
+        // conservative heuristic which excludes element-touched vars and breaks nothing; with a key,
+        // verified block detection orders the rows.
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(1, 2), IntDomain(7, 8), IntDomain(1, 2), IntDomain(7, 8)),
+            listOf(
+                Element(idx = 0, result = 1, arr = intArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
+                Element(idx = 2, result = 3, arr = intArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
+            ),
+        )
+        checkSound("element-blocks", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `isomorphic inverse factors are block-ordered`() {
+        // Two inverse constraints over disjoint var blocks are interchangeable as blocks; the new
+        // inverse structuralKey enables verified detection (and the brute gate guards the key's
+        // soundness — a too-coarse key would let a false swap through and ADD solutions).
+        val problem = Problem(
+            0,
+            8,
+            Array(8) { IntDomain(0, 1) },
+            listOf(
+                Inverse(f = intArrayOf(0, 1), g = intArrayOf(2, 3)),
+                Inverse(f = intArrayOf(4, 5), g = intArrayOf(6, 7)),
+            ),
+        )
+        checkSound("inverse-blocks", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `wl refinement splits candidate groups by structural role`() {
+        // Two rows x0 + 2·x1 ≤ 3 and x2 + 2·x3 ≤ 3, all same domain. The old grouping put all four
+        // same-domain vars in one candidate group; WL colour refinement splits them by their role —
+        // the coeff-1 cells {x0,x2} and the coeff-2 cells {x1,x3} — into two colour classes.
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            listOf(
+                Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 2), intArrayOf(2, 3), LinearOp.LE, 3),
+            ),
+        )
+        val (intColour, _) = Presolve.refineColoursForTest(problem)
+        assertEquals(intColour[0], intColour[2], "coeff-1 cells should share a WL colour")
+        assertEquals(intColour[1], intColour[3], "coeff-2 cells should share a WL colour")
+        assertTrue(intColour[0] != intColour[1], "different roles should get different WL colours")
     }
 
     @Test
