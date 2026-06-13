@@ -7,7 +7,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 /**
  * The common, **blocking** interface of the two portfolio executors — the parallel `Portfolio`
  * (jvm+native, real threads) and the single-core [SequentialPortfolio] (bandit-scheduled segments).
- * A caller selects one by [PortfolioScenario.threads] and then invokes `solve`/`minimize`
+ * A caller selects one by [PortfolioScenario.cores] and then invokes `solve`/`minimize`
  * identically, regardless of which it got. Coroutine-free: both are plain blocking calls.
  */
 interface PortfolioExecutor : AutoCloseable {

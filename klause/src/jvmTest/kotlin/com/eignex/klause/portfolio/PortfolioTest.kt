@@ -268,7 +268,7 @@ class PortfolioTest {
         Portfolio(
             PortfolioBuilder.build(
                 problem,
-                PortfolioScenario.parallel(threads = 4, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
+                PortfolioScenario.parallel(cores = 4, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
                 objective = obj,
                 onEvent = { _, e ->
                     if (e is SearchEvent.Incumbent && e.objective <= 3.0) sawOptimum.store(true)
@@ -302,7 +302,7 @@ class PortfolioTest {
         Portfolio(
             PortfolioBuilder.build(
                 problem,
-                PortfolioScenario.parallel(threads = 2, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
+                PortfolioScenario.parallel(cores = 2, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
                 objective = obj,
                 onEvent = { worker, e ->
                     while (true) {
@@ -342,7 +342,7 @@ class PortfolioTest {
         Portfolio(
             PortfolioBuilder.build(
                 problem,
-                PortfolioScenario.parallel(threads = 4, kind = Kind.CSP, engine = EngineMix.MIXED, seed = 1L),
+                PortfolioScenario.parallel(cores = 4, kind = Kind.CSP, engine = EngineMix.MIXED, seed = 1L),
             ),
         ).use { p ->
             val r = p.solve()
