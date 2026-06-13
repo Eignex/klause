@@ -8,7 +8,6 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.LpAutoConfig
@@ -28,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * All backends run **in-process** — there are no external solver binaries. The native klause
  * engines (LS, backtrack) plus the SAT/CP side-door adapters all implement the same shape.
  */
-enum class Backend {
+internal enum class Backend {
     /** klause local-search engine (stochastic sampling, large domains). */
     KLAUSE_LS,
 
@@ -39,26 +38,22 @@ enum class Backend {
     BRUTE_FORCE,
 
     /** klause unified parallel [Portfolio] (mixed LS + backtrack workers) run *as a solver* —
-     *  exposed here so the time / completeness / solve / verify metrics can benchmark the portfolio
-     *  itself. The pool width comes from `-Dklause.portfolio.processors` (default: host core count);
-     *  the LS:backtrack split is the scenario's kind-derived decision, not a per-engine knob. */
+     *  exposed here so the sampling metrics (uniformness / completeness) can build it. The pool
+     *  width comes from `-Dklause.portfolio.processors` (default: host core count); the LS:backtrack
+     *  split is the scenario's kind-derived decision, not a per-engine knob. */
     KLAUSE_PORTFOLIO,
 }
 
 /** A named solver configuration: a [Backend] plus its pre-bound params. */
-data class SolverConfig(internal val id: String, internal val backend: Backend)
+internal data class SolverConfig(internal val id: String, internal val backend: Backend)
 
 /**
- * Type-erased solver wrapper for the bench metrics. Each impl pre-binds its params and
- * exposes the four call kinds the metrics consume (single solve, bounded samples/enumerate,
- * and the lazy sequence views used under wall-time budgets).
+ * Type-erased solver wrapper for the sampling metrics. Each impl pre-binds its params and exposes
+ * the lazy sequence views (samples / enumerate) the metrics consume under their budgets.
  */
 internal interface InProcessSolver {
     val name: String
     val problem: Problem
-    fun solve(): SolveResult
-    fun samples(n: Int): List<Sample>
-    fun enumerated(n: Int): List<Sample>
     fun enumerateSequence(): Sequence<Sample>
     fun samplesSequence(): Sequence<Sample>
 }
@@ -74,13 +69,6 @@ private class ReconstructingInProcess(
     private val reconstruct: (Sample) -> Sample,
 ) : InProcessSolver {
     override val name get() = inner.name
-    override fun solve(): SolveResult = when (val r = inner.solve()) {
-        is SolveResult.Sat -> r.copy(assignment = reconstruct(r.assignment))
-        else -> r
-    }
-
-    override fun samples(n: Int) = inner.samples(n).map(reconstruct)
-    override fun enumerated(n: Int) = inner.enumerated(n).map(reconstruct)
     override fun enumerateSequence() = inner.enumerateSequence().map(reconstruct)
     override fun samplesSequence() = inner.samplesSequence().map(reconstruct)
 }
@@ -91,9 +79,6 @@ private class LocalSearchBench(
 ) : InProcessSolver {
     private val s = LocalSearchSolver(problem)
     override val name = "local-search"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
     override fun enumerateSequence() = s.enumerate(params)
     override fun samplesSequence() = s.samples(params)
 }
@@ -113,9 +98,6 @@ private class BacktrackBench(
         }
     private val s = BacktrackSolver(problem)
     override val name = "backtrack"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
     override fun enumerateSequence() = s.enumerate(params)
     override fun samplesSequence() = s.samples(params)
 }
@@ -126,9 +108,6 @@ private class BruteForceBench(
 ) : InProcessSolver {
     private val s = BruteForceSolver(problem)
     override val name = "brute-force"
-    override fun solve() = s.solve(params)
-    override fun samples(n: Int) = s.samples(params).take(n).toList()
-    override fun enumerated(n: Int) = s.enumerate(params).take(n).toList()
     override fun enumerateSequence() = s.enumerate(params)
     override fun samplesSequence() = s.samples(params)
 }
@@ -164,10 +143,6 @@ private class PortfolioBench(
     )
     override val name = "portfolio"
 
-    override fun solve(): SolveResult = portfolio.solve()
-
-    override fun samples(n: Int): List<Sample> = collectSamples(n)
-    override fun enumerated(n: Int): List<Sample> = collectSamples(n)
     override fun enumerateSequence(): Sequence<Sample> = collectSamples(SEQUENCE_CAP).asSequence()
     override fun samplesSequence(): Sequence<Sample> = collectSamples(SEQUENCE_CAP).asSequence()
 
