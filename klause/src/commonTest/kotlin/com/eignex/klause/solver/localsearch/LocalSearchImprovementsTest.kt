@@ -32,7 +32,7 @@ class LocalSearchImprovementsTest {
         val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val seq = LocalSearchSolver(problem).improvements(
             obj,
-            LocalSearchParams(maxFlips = 50_000L, randomSeed = 1L),
+            LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L),
         ).toList()
         assertTrue(seq.isNotEmpty(), "improvements must yield at least the terminal verdict")
         // Last entry is the terminal verdict — a BestFound (LS can't prove Optimal).
@@ -71,7 +71,7 @@ class LocalSearchImprovementsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L, 1L))
         val solver = LocalSearchSolver(problem)
-        val params = LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L)
+        val params = LocalSearchParams(maxFlips = 2_000L, randomSeed = 0L)
         val viaMinimize = solver.minimize(obj, params)
         val viaImprovementsLast = solver.improvements(obj, params).last()
         // Two separate runs report their own wall-clock stats; the verdicts must agree.

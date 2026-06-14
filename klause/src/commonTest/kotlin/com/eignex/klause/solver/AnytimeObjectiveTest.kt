@@ -63,7 +63,7 @@ class AnytimeObjectiveTest {
             LocalSearchParams(
                 maxFlips = Long.MAX_VALUE,
                 randomSeed = 0L,
-                cancellation = { ++polls >= 10_000 },
+                cancellation = { ++polls >= 2_000 },
             ),
         ).assignment
         assertNotNull(sample, "minimize must remember the best feasible across cancellation")

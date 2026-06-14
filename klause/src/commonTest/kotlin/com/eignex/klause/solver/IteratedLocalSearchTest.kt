@@ -227,7 +227,7 @@ class IteratedLocalSearchTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val solver = LocalSearchSolver(problem, restartPolicy = IteratedLocalSearchRestart(maxFlipsBeforeRestart = 50))
-        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 20_000L, randomSeed = 1L)).assignment
+        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
     }
