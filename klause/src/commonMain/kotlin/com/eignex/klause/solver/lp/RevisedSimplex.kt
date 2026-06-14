@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.solver.Cancellation
 import kotlin.math.abs
 
 /**
@@ -26,7 +27,10 @@ internal class FloatLpResult(val basis: Basis, val objective: Double, val duals:
  * warm-started few-pivot search). Forrest–Tomlin / eta updates between refactorizations are the
  * remaining speed step.
  */
-internal class RevisedSimplex(private val model: LpModel) {
+internal class RevisedSimplex(
+    private val model: LpModel,
+    private val cancellation: Cancellation = Cancellation.Never,
+) {
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
@@ -109,6 +113,10 @@ internal class RevisedSimplex(private val model: LpModel) {
         val aq = DoubleArray(m)
         var iter = 0
         while (iter++ < maxIter) {
+            // Cooperative deadline: each iteration refactorizes (heavier than a single pivot), so an
+            // unbounded loop on a large model would otherwise blow the wall-clock limit (#574). On
+            // cancellation give up (null) — the basis is only a heuristic, so this is sound.
+            if (iter % CANCEL_POLL == 0 && cancellation()) return null
             // Refactorize the basis each iteration (sparse, warm-started search ⇒ few iterations);
             // Forrest–Tomlin / eta updates between refactorizations are the remaining speed step.
             val lu = factorizeBasis() ?: return null
@@ -209,5 +217,8 @@ internal class RevisedSimplex(private val model: LpModel) {
 
     private companion object {
         const val TOL: Double = 1e-7
+
+        /** Iterations between cooperative cancellation polls (each iteration refactorizes). */
+        const val CANCEL_POLL: Int = 32
     }
 }

@@ -230,13 +230,7 @@ internal fun BacktrackSolver.lpBoundAndFix(
     // basis-certification pipeline (#567); a missing bound or reduction only loses pruning, never
     // soundness, so a null/failed pipeline just keeps the node.
     if (params.lpSparseBound) {
-        sparseCertifiedPrune(
-            relaxer,
-            session,
-            bound,
-            globalCuts,
-            sink,
-        )
+        sparseCertifiedPrune(relaxer, session, bound, globalCuts, sink, cancellation)
     } else {
         LpNodeOutcome(false, null)
     }
@@ -256,12 +250,14 @@ internal fun BacktrackSolver.sparseCertifiedPrune(
     bound: Double,
     globalCuts: List<Cut>,
     sink: SolveStatsSink,
+    cancellation: Cancellation,
 ): LpNodeOutcome {
     if (!bound.isFinite()) return LpNodeOutcome(false, null) // no incumbent to prune against
     val relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
-    val result = RevisedSimplex(relaxation.model).solve() ?: return LpNodeOutcome(false, null)
+    val result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
+    if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
     val lb = ExactBasisCertifier.lowerBoundCeil(relaxation.model, result.basis) ?: return LpNodeOutcome(false, null)
     val full = try {
         addExact(lb, relaxation.objectiveConstant)
