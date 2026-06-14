@@ -194,6 +194,7 @@ object LpAutoConfig {
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
             lpBounding = base.lpBounding || bounding,
+            lpSparseBound = base.lpSparseBound || bounding,
             lpCuts = base.lpCuts || cuts,
             lpCutPool = base.lpCutPool || cuts,
             lpLearn = base.lpLearn || bounding,

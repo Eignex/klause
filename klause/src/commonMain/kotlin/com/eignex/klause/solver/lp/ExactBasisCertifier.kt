@@ -43,7 +43,9 @@ internal object ExactBasisCertifier {
                 l += dj * BigRational.of(model.upper[j])
             }
         }
-        return l
+        // L(y) is the lower-bound-shifted objective; re-add the constant the shift folded out
+        // (`c·lo`), exactly as DualSimplex does, so the bound is on the true objective.
+        return l + BigRational.of(model.objConstant)
     }
 
     /** Exact solve of `M y = c_B` with `M[t][i] = A_full[i][basicVar[t]]`: fraction-free Bareiss

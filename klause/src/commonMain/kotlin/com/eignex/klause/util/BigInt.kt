@@ -322,11 +322,13 @@ internal class BigInt private constructor(val sign: Int, val mag: IntArray) : Co
 
         /** Divide a magnitude by a small positive divisor; returns (quotient mag, remainder). */
         private fun divmodSmall(mag: IntArray, divisor: Int): Pair<IntArray, Int> {
-            val d = divisor.toLong() and LIMB_MASK
+            // Unsigned 64-bit: a single-limb divisor with its high bit set (≥ 2³¹) makes
+            // `rem·2³² + limb` exceed signed-Long range, so ULong is required.
+            val d = (divisor.toLong() and LIMB_MASK).toULong()
             val q = IntArray(mag.size)
-            var rem = 0L
+            var rem = 0uL
             for (i in mag.indices.reversed()) {
-                val cur = (rem shl 32) or (mag[i].toLong() and LIMB_MASK)
+                val cur = (rem shl 32) or (mag[i].toLong() and LIMB_MASK).toULong()
                 q[i] = (cur / d).toInt()
                 rem = cur % d
             }
