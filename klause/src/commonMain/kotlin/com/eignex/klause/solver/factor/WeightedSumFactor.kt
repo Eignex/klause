@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
 /** Common parent of the weighted-sum factors: a running `Σ` in `longPayload(factorId)` with the
@@ -181,7 +182,7 @@ internal class CoalescedTerms(val vars: IntArray, val coeffs: IntArray)
  */
 internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTerms {
     require(vars.size == coeffs.size) { "coeffs/vars length mismatch" }
-    val seen = HashSet<Int>(vars.size)
+    val seen = IntHashSet(vars.size)
     var hasDuplicate = false
     for (v in vars) {
         if (!seen.add(v)) {

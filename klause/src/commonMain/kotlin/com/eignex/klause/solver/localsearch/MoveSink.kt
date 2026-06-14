@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Move
+import com.eignex.klause.util.LongArrayList
 
 /**
  * Mutable accumulator that factors push repair-move suggestions into. Optionally consults
@@ -18,8 +19,7 @@ import com.eignex.klause.solver.Move
  * mutation. Callers that never read [list] on an empty sink pay zero per-add allocation.
  */
 class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
-    private var lane: LongArray = LongArray(INITIAL_CAPACITY)
-    private var laneSize: Int = 0
+    private val lane = LongArrayList(INITIAL_CAPACITY)
 
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on first compound move
     private var compounds: ArrayList<Move.Compound>? = null
@@ -49,8 +49,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     fun addBoolFlip(varId: Int) {
         if (assumptions.isFrozenBool(varId)) return
         if (invariants?.isDefinedBool(varId) == true) return
-        ensureCapacity()
-        lane[laneSize++] = encodeBoolFlip(varId)
+        lane.add(encodeBoolFlip(varId))
         cachedList = null
     }
 
@@ -58,8 +57,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     fun addIntSet(varId: Int, newValue: Int) {
         if (assumptions.isFrozenInt(varId)) return
         if (invariants?.isDefinedInt(varId) == true) return
-        ensureCapacity()
-        lane[laneSize++] = encodeIntSet(varId, newValue)
+        lane.add(encodeIntSet(varId, newValue))
         cachedList = null
     }
 
@@ -105,7 +103,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     /** Discard all queued moves. */
     fun clear() {
-        laneSize = 0
+        lane.clear()
         compounds = null
         cachedList = null
     }
@@ -132,16 +130,12 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         }
     }
 
-    private fun ensureCapacity() {
-        if (laneSize == lane.size) lane = lane.copyOf(lane.size * 2)
-    }
-
     private fun materialize(): List<Move> {
         val compoundsRef = compounds
-        val total = laneSize + (compoundsRef?.size ?: 0)
+        val total = lane.size + (compoundsRef?.size ?: 0)
         if (total == 0) return emptyList()
         val out = ArrayList<Move>(total)
-        for (i in 0 until laneSize) out.add(decode(lane[i]))
+        for (i in 0 until lane.size) out.add(decode(lane[i]))
         if (compoundsRef != null) out.addAll(compoundsRef)
         return out
     }

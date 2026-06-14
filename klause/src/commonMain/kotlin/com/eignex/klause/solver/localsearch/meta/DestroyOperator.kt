@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.localsearch.LocalSearchSession
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 import kotlin.random.Random
@@ -69,7 +70,7 @@ internal fun interface DestroyOperator {
             if (totalVars == 0) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
             val freed = BooleanArray(totalVars)
             var freedCount = 0
-            val queue = ArrayDeque<Int>()
+            val queue = IntArrayDeque()
             while (freedCount < k) {
                 if (queue.isEmpty()) {
                     val startCandidates = (0 until totalVars).filter { !freed[it] }
