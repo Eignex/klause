@@ -1,9 +1,11 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.backtrack.LpEmphasis
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliTest {
@@ -63,6 +65,16 @@ class CliTest {
         assertTrue(opts.randomSeed == 7L, "randomSeed=${opts.randomSeed}")
         assertTrue(opts.parallel == 2, "parallel=${opts.parallel}")
         assertTrue(positionals == listOf("-notaflag"), positionals.toString())
+    }
+
+    @Test
+    fun `--lp parses into an LpEmphasis ceiling via the enum`() {
+        val opts = CommonOptions()
+        parseArgs(arrayOf("--lp", "conservative"), commonFlagSpecs(opts)) { }
+        assertTrue(opts.lp == "conservative", "lp=${opts.lp}")
+        // The token routes through the same enum the help/error text is drawn from.
+        assertEquals(LpEmphasis.CONSERVATIVE, LpEmphasis.fromId(requireNotNull(opts.lp)))
+        assertEquals(null, LpEmphasis.fromId("bogus"))
     }
 
     @Test
