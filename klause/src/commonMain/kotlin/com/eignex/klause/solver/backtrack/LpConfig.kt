@@ -61,10 +61,13 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     CUMULATIVE_TIME_INDEXED("cumulative-time-indexed", LpTiming.EXHAUSTIVE),
     ;
 
-    /** Lookup by [id]. */
+    /** Token lookup and the id listing for spec parsing / help. */
     companion object {
         /** The technique with serializable [id], or null if none matches. */
         fun fromId(id: String?): LpTechnique? = entries.firstOrNull { it.id == id?.trim()?.lowercase() }
+
+        /** Canonical ids joined for spec/help: `energetic | cumulative-flow | …`. */
+        fun ids(): String = entries.joinToString(" | ") { it.id }
     }
 }
 
@@ -73,36 +76,44 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
  * [com.eignex.klause.solver.presolve.PresolveEmphasis]. Each level enables the set of [LpTiming]
  * tiers up to its cost, so the order `OFF < CONSERVATIVE < DEFAULT < AGGRESSIVE` is a strict ceiling
  * the portfolio caps arms against.
- *
- * @property timings the [LpTiming] cost tiers this level permits — a technique runs only if its tier
- *   is in this set (absent an override).
  */
-enum class LpEmphasis(val timings: Set<LpTiming>) {
+enum class LpEmphasis(
+    /** Canonical token shown in `--lp` / `--help` and error messages. */
+    val id: String,
+    /** The [LpTiming] cost tiers this level permits — a technique runs only if its tier is in this
+     *  set (absent an override). */
+    val timings: Set<LpTiming>,
+    /** Accepted spellings besides [id]. */
+    private val aliases: List<String> = emptyList(),
+) {
     /** No LP at all. */
-    OFF(emptySet()),
+    OFF("off", emptySet(), aliases = listOf("none")),
 
     /** Cheap combinatorial bounds only (energetic / flow / Lagrangian) — no per-node simplex. */
-    CONSERVATIVE(setOf(LpTiming.FAST)),
+    CONSERVATIVE("conservative", setOf(LpTiming.FAST), aliases = listOf("fast")),
 
     /** + the per-node simplex bounding (relaxation bound, objective propagation, the cumulative
      *  makespan row). No cut rounds or hull models. The shipped single-config default. */
-    DEFAULT(setOf(LpTiming.FAST, LpTiming.MEDIUM)),
+    DEFAULT("default", setOf(LpTiming.FAST, LpTiming.MEDIUM), aliases = listOf("auto")),
 
     /** + the expensive add-ons (cuts, hulls, time-indexed, probe / fixpoint). */
-    AGGRESSIVE(setOf(LpTiming.FAST, LpTiming.MEDIUM, LpTiming.EXHAUSTIVE)),
+    AGGRESSIVE("aggressive", setOf(LpTiming.FAST, LpTiming.MEDIUM, LpTiming.EXHAUSTIVE)),
     ;
 
-    /** Spec-string parsing for the emphasis level. */
+    /** Token lookup and the id listing for spec parsing / help (single source of truth). */
     companion object {
+        private val byToken: Map<String, LpEmphasis> =
+            entries.flatMap { e -> (listOf(e.id) + e.aliases).map { it to e } }.toMap()
+
         /** `null`/blank/`default`/`auto` → [DEFAULT]; `off`/`none` → [OFF]; `conservative`/`fast` →
          *  [CONSERVATIVE]; `aggressive` → [AGGRESSIVE]; otherwise `null`. */
-        fun fromId(id: String?): LpEmphasis? = when (id?.trim()?.lowercase()) {
-            null, "", "default", "auto" -> DEFAULT
-            "off", "none" -> OFF
-            "conservative", "fast" -> CONSERVATIVE
-            "aggressive" -> AGGRESSIVE
-            else -> null
+        fun fromId(id: String?): LpEmphasis? {
+            val token = id?.trim()?.lowercase()
+            return if (token.isNullOrEmpty()) DEFAULT else byToken[token]
         }
+
+        /** Canonical ids joined for `--help` / error messages: `off | conservative | default | aggressive`. */
+        fun ids(): String = entries.joinToString(" | ") { it.id }
     }
 }
 
@@ -153,7 +164,8 @@ class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map
             LpEmphasis.fromId(s)?.let { return LpConfig(it) }
             if (s == "all") return LpConfig(LpEmphasis.AGGRESSIVE, LpTechnique.entries.associateWith { true })
             val on = s.split(",").map { token ->
-                LpTechnique.fromId(token.trim()) ?: error("unknown LP technique `${token.trim()}`")
+                val t = token.trim()
+                LpTechnique.fromId(t) ?: error("unknown LP technique `$t`; expected ${LpTechnique.ids()}")
             }.toSet()
             return LpConfig(LpEmphasis.AGGRESSIVE, LpTechnique.entries.associateWith { it in on })
         }

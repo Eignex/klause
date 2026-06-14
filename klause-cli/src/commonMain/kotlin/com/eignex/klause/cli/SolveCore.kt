@@ -182,7 +182,7 @@ internal object SolveCore {
         // #429: `--lp CEILING` caps the portfolio's LP emphasis; absent ⇒ AGGRESSIVE (uncapped — the
         // pool spreads the LP intensity itself), `off` disables LP across the pool.
         val lpCeiling = common.lp?.let {
-            LpEmphasis.fromId(it) ?: usageError("--lp: off | conservative | default | aggressive")
+            LpEmphasis.fromId(it) ?: usageError("unknown --lp ceiling `$it`; expected ${LpEmphasis.ids()}")
         } ?: LpEmphasis.AGGRESSIVE
         val scenario = buildPortfolioScenario(
             EngineParams(common.engineParams),

@@ -43,6 +43,19 @@ class LpConfigTest {
     }
 
     @Test
+    fun `emphasis ids and fromId are a single source of truth with aliases`() {
+        assertEquals("off | conservative | default | aggressive", LpEmphasis.ids())
+        // Every canonical id round-trips; the aliases map to the same value.
+        for (e in LpEmphasis.entries) assertEquals(e, LpEmphasis.fromId(e.id))
+        assertEquals(LpEmphasis.OFF, LpEmphasis.fromId("none"))
+        assertEquals(LpEmphasis.CONSERVATIVE, LpEmphasis.fromId("fast"))
+        assertEquals(LpEmphasis.DEFAULT, LpEmphasis.fromId("auto"))
+        assertEquals(LpEmphasis.DEFAULT, LpEmphasis.fromId(null)) // blank/absent → DEFAULT
+        assertEquals(null, LpEmphasis.fromId("nonsense"))
+        assertEquals(LpTechnique.entries.joinToString(" | ") { it.id }, LpTechnique.ids())
+    }
+
+    @Test
     fun `resolved follows the emphasis cost tiers`() {
         // OFF: nothing. CONSERVATIVE: FAST only. DEFAULT: FAST+MEDIUM. AGGRESSIVE: all.
         assertTrue(LpTechnique.entries.none { LpConfig(LpEmphasis.OFF).resolved(it) })

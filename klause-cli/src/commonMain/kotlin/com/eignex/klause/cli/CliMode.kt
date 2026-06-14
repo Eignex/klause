@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.LpEmphasis
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -201,7 +202,8 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.KLAUSE,
         valueLabel = "ceiling",
-        help = "LP relaxation ceiling: off | conservative | default | aggressive",
+        help = "LP relaxation ceiling: " + LpEmphasis.ids(),
+        default = LpEmphasis.AGGRESSIVE.id,
     ) { o.lp = it },
     FlagSpec(
         listOf("-h", "--help"),
