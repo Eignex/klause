@@ -46,6 +46,9 @@ internal data class KlauseSearch(
     /** Repeatable klause-cli `--param key=value` engine knobs (e.g. `var-selector=vsids`); the way
      *  to A/B a heuristic — run `solve` twice with different params and diff the two config dirs. */
     val params: List<String> = emptyList(),
+    /** klause-cli `--lp CEILING`: the LP-relaxation emphasis (`off`|`conservative`|`balanced`|
+     *  `aggressive`, plus `+id`/`-id` per-technique deltas). null = unset (cli's own default). */
+    val lp: String? = null,
 )
 
 /** One problem's result for one solver+settings+budget — the durable per-problem record. */
@@ -103,6 +106,7 @@ internal object SolveMetric {
             free = !search.fixed,
             seed = SOLVE_SEED,
             params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
+            lp = if (solverId == SolverInvocation.KLAUSE) search.lp else null,
         )
         val tag = configTag(solverId, settings, budget, label)
         val outDir = File("output", tag).apply { mkdirs() }
@@ -158,6 +162,7 @@ internal object SolveMetric {
         // and a null klause engine just means "the cli's default engine" (no suffix).
         if (s.engine == null && solverId != SolverInvocation.KLAUSE) append(if (s.free) "-free" else "-fixed")
         append("-t").append(budget.timeoutMillis / 1000).append('s')
+        s.lp?.let { append("-lp-").append(it.replace(Regex("[^A-Za-z0-9.+-]"), "")) }
         if (s.params.isNotEmpty()) {
             append('-').append(s.params.joinToString("_") { it.replace('=', '-') })
         }
