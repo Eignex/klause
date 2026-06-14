@@ -78,6 +78,28 @@ class ProblemDomainTighteningTest {
     }
 
     @Test
+    fun `cross-constraint bound propagation reaches a multi-hop fixpoint at construction`() {
+        // A three-link chain x0 >= x1 >= x2 >= x3 with only x0 <= 5 declared: the upper bound has to
+        // hop x0 -> x1 -> x2 -> x3 across separate constraints, which only a propagation *fixpoint*
+        // (re-queue a factor when a neighbour's bound moves), not a one-shot per-constraint sweep,
+        // can reach. The construction bake folds that fixpoint into the problem's domains.
+        val wide = { IntDomain(0, 1_000_000) }
+        val p =
+            Problem(
+                0,
+                4,
+                arrayOf(wide(), wide(), wide(), wide()),
+                listOf(
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5), // x0 <= 5
+                    Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, 0), // x1 - x0 <= 0
+                    Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.LE, 0), // x2 - x1 <= 0
+                    Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.LE, 0), // x3 - x2 <= 0
+                ),
+            )
+        for (v in 0..3) assertEquals(5, p.intDomains[v].max, "var $v max should propagate to 5")
+    }
+
+    @Test
     fun `caller-supplied domain array is not mutated`() {
         val input = arrayOf(IntDomain(-1_000_000, 1_000_000))
         Problem(0, 1, input, listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)))
