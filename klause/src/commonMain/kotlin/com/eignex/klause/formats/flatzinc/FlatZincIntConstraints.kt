@@ -100,23 +100,18 @@ internal fun FlatZincCompiler.emitIntTimes(c: FznConstraint) {
     )
 }
 
-internal fun FlatZincCompiler.emitIntPlus(c: FznConstraint) {
-    // int_plus(a, b, r): a + b = r.
+/** `int_plus(a, b, r)` / `int_minus(a, b, r)`: `a ± b = r` as `a + [bCoeff]·b − r = 0`. */
+private fun FlatZincCompiler.emitIntAddSub(c: FznConstraint, bCoeff: Int) {
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val r = resolveIntVar(c.args[2])
-    factors.add(Linear(intArrayOf(1, 1, -1), intArrayOf(a, b, r), LinearOp.EQ, 0))
+    factors.add(Linear(intArrayOf(1, bCoeff, -1), intArrayOf(a, b, r), LinearOp.EQ, 0))
 }
 
-internal fun FlatZincCompiler.emitIntMinus(c: FznConstraint) {
-    // int_minus(a, b, r): a - b = r.
-    require(c.args.size == 3)
-    val a = resolveIntVar(c.args[0])
-    val b = resolveIntVar(c.args[1])
-    val r = resolveIntVar(c.args[2])
-    factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(a, b, r), LinearOp.EQ, 0))
-}
+internal fun FlatZincCompiler.emitIntPlus(c: FznConstraint) = emitIntAddSub(c, bCoeff = 1)
+
+internal fun FlatZincCompiler.emitIntMinus(c: FznConstraint) = emitIntAddSub(c, bCoeff = -1)
 
 internal fun FlatZincCompiler.emitIntAbs(c: FznConstraint) {
     // int_abs(a, r): r = |a|. Shared encoding — see [IntFunctionLowering.absFactors].
