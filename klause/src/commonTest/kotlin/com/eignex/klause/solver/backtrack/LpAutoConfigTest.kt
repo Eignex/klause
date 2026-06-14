@@ -12,6 +12,7 @@ import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
@@ -124,6 +125,49 @@ class LpAutoConfigTest {
         val r = LpAutoConfig.recommend(makespanScheduling(startHi = 200_000))
         assertTrue(r.lpCumulativeFlow)
         assertFalse(r.lpCumulativeTimeIndexed, "the huge horizon must keep the time-indexed model off")
+    }
+
+    @Test
+    fun `size guard sheds an over-budget hull but keeps the base LP`() {
+        // NValue over 32 vars × domain 32 = 1024 cells: under its own MAX_NVALUE_CELLS cap (so the
+        // builder would build it), but its ~2048 columns + ~1089 rows blow the dense-tableau budget.
+        // The size guard (#484) must shed the hull (lpNValue off) while the base LP still runs.
+        val n = 32
+        val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n) }
+        val big = Problem(0, n + 1, domains, arrayOf<Factor>(NValue(n, IntArray(n) { it })))
+        val rBig = LpAutoConfig.recommend(big)
+        assertFalse(rBig.lpNValue, "the over-budget NValue hull must be shed")
+        assertTrue(rBig.lpBounding, "the base LP still runs; only the hull is shed")
+
+        // A small NValue (3×3 = 9 cells) fits comfortably and is enabled.
+        val small = Problem(
+            0,
+            4,
+            Array(4) { if (it < 3) IntDomain(0, 2) else IntDomain(0, 3) },
+            arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))),
+        )
+        assertTrue(LpAutoConfig.recommend(small).lpNValue, "a small NValue hull fits and is enabled")
+    }
+
+    @Test
+    fun `size guard sheds the larger of two stacked hulls`() {
+        // A Table (1024 tuples) and an NValue (1024 cells) both fit on their own, but together they
+        // exceed the budget — the size guard keeps the cheaper one (smallest-first) and sheds the other.
+        val nVars = 32
+        val tableXs = intArrayOf(0, 1)
+        val tuples = IntArray(1024 * 2) { it % 2 } // 1024 two-column tuples
+        val xs = IntArray(nVars) { it + 2 } // NValue over fresh vars 2..33
+        val total = 2 + nVars + 1 // table xs + nvalue xs + nvalue count var
+        val domains = Array(total) { IntDomain(0, 31) }
+        val p = Problem(
+            0,
+            total,
+            domains,
+            arrayOf<Factor>(Table(tableXs, tuples), NValue(total - 1, xs)),
+        )
+        val r = LpAutoConfig.recommend(p)
+        assertFalse(r.lpTable && r.lpNValue, "two stacked hulls cannot both be enabled past the budget")
+        assertTrue(r.lpTable || r.lpNValue, "the cheaper hull is still kept")
     }
 
     @Test

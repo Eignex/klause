@@ -14,6 +14,7 @@ import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.CumulativeRelaxation
 import com.eignex.klause.solver.lp.schedulingViews
@@ -52,9 +53,12 @@ import com.eignex.klause.solver.lp.schedulingViews
  * The LP-relaxation flags are additionally gated by a **size guard**: the dual simplex keeps a
  * dense `m × (n + m + 1)` Long tableau per node, so the auto path declines models whose estimated
  * tableau exceeds [MAX_AUTO_TABLEAU_CELLS] (a memory/feasibility bound, not a tuning judgement —
- * the engine is purpose-built for small dense per-node LPs). The Lagrangian and energetic bounds
- * have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
- * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
+ * the engine is purpose-built for small dense per-node LPs). The estimate folds in each enabled
+ * gated hull's columns/rows (circuit / element / table / nvalue / time-indexed) and accepts them
+ * smallest-first under the budget, so a stack of hulls is shed rather than allowed to defeat the
+ * guard (#484). The Lagrangian and energetic bounds have their own internal caps and are not
+ * size-gated here. An explicit caller flag bypasses the guard: every flag is OR-ed onto `base`, so
+ * an explicit setting is never turned *off*.
  *
  * Called by `BacktrackSolver` under [BacktrackParams.lpConfig] (via [resolve]); also callable
  * directly for ahead-of-time configuration (the bench's auto mode).
@@ -63,8 +67,9 @@ object LpAutoConfig {
 
     /**
      * Auto-enable ceiling on the estimated dense-tableau size `rows × (cols + rows + 1)`, in Long
-     * cells (8 bytes each — the cap is ~8 MB per node LP). The row estimate counts the base
-     * relaxation's factor rows; cut rows and the gated hull columns are bounded by their own caps.
+     * cells (8 bytes each — the cap is ~8 MB per node LP). The estimate counts the base relaxation's
+     * rows/cols **and** every enabled gated-hull's columns/rows (#484); cut rows are separated lazily
+     * per node and bounded by the cut-round caps, so they are not pre-counted here.
      */
     const val MAX_AUTO_TABLEAU_CELLS: Long = 1L shl 20
 
@@ -149,31 +154,46 @@ object LpAutoConfig {
                 else -> Unit
             }
         }
-        // The scheduling makespan rows (#430) are one per verified plan; count them before the size
-        // guard. The plan build also tells us whether *any* makespan link is provable at all.
+        // ── #484 dense-tableau size guard ────────────────────────────────────────────────────────
+        // The per-node tableau is the base relaxation PLUS every enabled gated-hull's columns/rows.
+        // Estimate each hull against the same MAX_* caps the builders skip at, then accept them
+        // smallest-first only while the combined `base + accepted` tableau stays under the budget — so
+        // a stack of hulls (Table + NValue + Circuit + time-indexed) can't defeat the guard: the
+        // largest are shed and the base LP still runs.
         val makespanPlans = if (scheduling) CumulativeRelaxation(problem).plans.size else 0
         rows += makespanPlans.toLong()
-        // Time-indexed reformulation (#453): O(n·H) extra columns + H resource rows per bounded-horizon
-        // scheduling factor. Estimate them so the auto path only turns it on when the dense tableau
-        // still fits; the builder applies the real per-factor horizon / column gates.
-        val ti = if (scheduling) timeIndexedEstimate(problem) else TimeIndexedEstimate(0L, 0L, false)
-        val cols = problem.numIntVars.toLong() + problem.numBoolVars.toLong() + ti.cols
-        val rowsWithTi = rows + ti.rows
-        val lpFits = rows * (cols + rows + 1L) <= MAX_AUTO_TABLEAU_CELLS
-        val timeIndexedFits = ti.anyFits && rowsWithTi * (cols + rowsWithTi + 1L) <= MAX_AUTO_TABLEAU_CELLS
-        val cutEligible = allDifferent || globalCardinality
-        val makespanLp = lpFits && makespanPlans > 0
+        val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
+        val baseFits = tableauCells(rows, baseCols) <= MAX_AUTO_TABLEAU_CELLS
 
-        // Each technique runs iff structurally applicable AND the config permits its cost tier. The
-        // simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE add-ons additionally
-        // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM), so `bounding` is on
-        // whenever a higher tier is permitted and applicable.
-        val boundingApplicable = lpFits &&
+        val cutEligible = allDifferent || globalCardinality
+        val makespanLp = baseFits && makespanPlans > 0
+        // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
+        // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
+        val boundingApplicable = baseFits &&
             (
                 lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
                     table || nValue || makespanLp
                 )
         val bounding = boundingApplicable && config.resolved(LpTechnique.BOUNDING)
+
+        // Only structurally-present hulls the emphasis permits compete for the budget (a forbidden
+        // hull is never built, so it costs nothing). Each estimate sums over its factors and honours
+        // that hull's own MAX_* cap, exactly as the builder does.
+        val candidates = if (!bounding) {
+            emptyList()
+        } else {
+            buildList {
+                if (circuit && config.resolved(LpTechnique.CIRCUIT)) circuitEstimate(problem)?.let(::add)
+                if (constArrayElement && config.resolved(LpTechnique.ELEMENT)) elementEstimate(problem)?.let(::add)
+                if (table && config.resolved(LpTechnique.TABLE)) tableEstimate(problem)?.let(::add)
+                if (nValue && config.resolved(LpTechnique.NVALUE)) nValueEstimate(problem)?.let(::add)
+                if (scheduling && config.resolved(LpTechnique.CUMULATIVE_TIME_INDEXED)) {
+                    timeIndexedEstimate(problem)?.let(::add)
+                }
+            }
+        }
+        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates)
+
         val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
@@ -184,13 +204,13 @@ object LpAutoConfig {
             lpObjectiveBound = base.lpObjectiveBound || bounding,
             lpFixpoint = base.lpFixpoint || bounding,
             lpProbe = base.lpProbe || bounding,
-            lpCircuit = base.lpCircuit || (bounding && circuit && config.resolved(LpTechnique.CIRCUIT)),
-            lpElement = base.lpElement || (bounding && constArrayElement && config.resolved(LpTechnique.ELEMENT)),
-            lpTable = base.lpTable || (bounding && table && config.resolved(LpTechnique.TABLE)),
-            lpNValue = base.lpNValue || (bounding && nValue && config.resolved(LpTechnique.NVALUE)),
+            lpCircuit = base.lpCircuit || (LpTechnique.CIRCUIT in acceptedHulls),
+            lpElement = base.lpElement || (LpTechnique.ELEMENT in acceptedHulls),
+            lpTable = base.lpTable || (LpTechnique.TABLE in acceptedHulls),
+            lpNValue = base.lpNValue || (LpTechnique.NVALUE in acceptedHulls),
             lpCumulative = base.lpCumulative || (bounding && makespanLp),
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
-                (bounding && timeIndexedFits && config.resolved(LpTechnique.CUMULATIVE_TIME_INDEXED)),
+                (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
             lpCumulativeFlow = base.lpCumulativeFlow || (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
             lagrangian = base.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
             energeticReasoning = base.energeticReasoning || energetic,
@@ -205,18 +225,105 @@ object LpAutoConfig {
         )
     }
 
-    /** Above this horizon / column count the time-indexed model is skipped (mirrors the builder gates). */
-    private const val MAX_TI_HORIZON: Int = 512
-    private const val MAX_TI_COLS: Long = 4096L
+    /** Dense-tableau cell count `m × (n + m + 1)` for `rows = m` constraint rows and `cols = n`
+     *  structural columns (plus the `m` slacks and the rhs column). */
+    private fun tableauCells(rows: Long, cols: Long): Long = rows * (cols + rows + 1L)
 
-    private class TimeIndexedEstimate(val cols: Long, val rows: Long, val anyFits: Boolean)
+    /** A gated hull's estimated added columns and rows, summed over its factors of one kind. */
+    private class HullEstimate(val key: LpTechnique, val cols: Long, val rows: Long)
 
-    /** Estimated added columns/rows of the time-indexed reformulation over the bounded-horizon
-     *  scheduling factors, and whether any factor is small enough to encode. */
-    private fun timeIndexedEstimate(problem: Problem): TimeIndexedEstimate {
+    /** Accept hulls smallest-first while the combined `base + accepted` tableau stays under
+     *  [MAX_AUTO_TABLEAU_CELLS]; the rest are shed (their flag stays off), so a stack of hulls can't
+     *  push the per-node LP past the budget (#484). */
+    private fun acceptUnderBudget(baseRows: Long, baseCols: Long, candidates: List<HullEstimate>): Set<LpTechnique> {
+        var r = baseRows
+        var c = baseCols
+        val accepted = HashSet<LpTechnique>()
+        for (h in candidates.sortedBy { it.cols + it.rows }) {
+            if (tableauCells(r + h.rows, c + h.cols) <= MAX_AUTO_TABLEAU_CELLS) {
+                r += h.rows
+                c += h.cols
+                accepted.add(h.key)
+            }
+        }
+        return accepted
+    }
+
+    /** Circuit arc-model columns (`Σ` candidate arcs) + degree/channel rows, over the under-cap
+     *  [Circuit] factors (mirrors `CpToLpRelaxation.buildCircuitArcs`). */
+    private fun circuitEstimate(problem: Problem): HullEstimate? {
         var cols = 0L
         var rows = 0L
-        var anyFits = false
+        var any = false
+        for (f in problem.factors) {
+            if (f !is Circuit) continue
+            val n = f.succ.size
+            if (n < 2) continue
+            var arcs = 0L
+            for (i in 0 until n) problem.intDomains[f.succ[i]].forEach { j -> if (j != i && j in 0 until n) arcs++ }
+            if (arcs == 0L || arcs > CpToLpRelaxation.MAX_CIRCUIT_ARCS) continue
+            any = true
+            cols += arcs
+            rows += 3L * n // out-degree + channel + in-degree rows (upper bound)
+        }
+        return if (any) HullEstimate(LpTechnique.CIRCUIT, cols, rows) else null
+    }
+
+    /** Constant-array [Element] selector columns + 3 rows each (mirrors `buildElementHull`). */
+    private fun elementEstimate(problem: Problem): HullEstimate? {
+        var cols = 0L
+        var rows = 0L
+        var any = false
+        for (f in problem.factors) {
+            if (f !is Element || f.arrIsVars || f.arr.size > CpToLpRelaxation.MAX_ELEM) continue
+            val declared = problem.intDomains[f.idx]
+            var k = 0L
+            for (p in f.arr.indices) if ((p + f.indexOffset) in declared) k++
+            if (k == 0L) continue
+            any = true
+            cols += k
+            rows += 3L // Σ y = 1 + index channel + result channel
+        }
+        return if (any) HullEstimate(LpTechnique.ELEMENT, cols, rows) else null
+    }
+
+    /** [Table] selector columns (≤ tuple count) + `1 + arity` rows each (mirrors `buildTableHull`). */
+    private fun tableEstimate(problem: Problem): HullEstimate? {
+        var cols = 0L
+        var rows = 0L
+        var any = false
+        for (f in problem.factors) {
+            if (f !is Table || f.numTuples > CpToLpRelaxation.MAX_TUPLES) continue
+            any = true
+            cols += f.numTuples.toLong() // upper bound on the declared-feasible selectors
+            rows += 1L + f.arity // Σ y = 1 + one channel per column
+        }
+        return if (any) HullEstimate(LpTechnique.TABLE, cols, rows) else null
+    }
+
+    /** [NValue] one-hot columns (`z` per var×value + `y` per value) and rows (mirrors `buildNValueHull`). */
+    private fun nValueEstimate(problem: Problem): HullEstimate? {
+        var cols = 0L
+        var rows = 0L
+        var any = false
+        for (f in problem.factors) {
+            if (f !is NValue || f.presents.isNotEmpty()) continue
+            var cells = 0L
+            for (x in f.xs) cells += problem.intDomains[x].size.toLong()
+            if (cells == 0L || cells > CpToLpRelaxation.MAX_NVALUE_CELLS) continue
+            any = true
+            cols += 2L * cells // z (per var×value) + y (≤ distinct values ≤ cells)
+            rows += cells + 2L * f.xs.size + 1L // y≥z rows + (Σz=1, channel) per var + the count row
+        }
+        return if (any) HullEstimate(LpTechnique.NVALUE, cols, rows) else null
+    }
+
+    /** Time-indexed `x_{i,t}` columns + resource/assignment/channel rows over the bounded-horizon
+     *  scheduling factors (#453), honouring the horizon / column caps (mirrors `buildCumulativeTimeIndexed`). */
+    private fun timeIndexedEstimate(problem: Problem): HullEstimate? {
+        var cols = 0L
+        var rows = 0L
+        var any = false
         for (v in schedulingViews(problem)) {
             val n = v.starts.size
             var t0 = Int.MAX_VALUE
@@ -235,11 +342,13 @@ object LpAutoConfig {
                 c += (dom.max - dom.min + 1).toLong()
             }
             val horizon = t1.toLong() - t0
-            if (!ok || horizon <= 0 || horizon > MAX_TI_HORIZON || c > MAX_TI_COLS) continue
-            anyFits = true
+            if (!ok || horizon <= 0 || horizon > CpToLpRelaxation.MAX_TI_HORIZON || c > CpToLpRelaxation.MAX_TI_COLS) {
+                continue
+            }
+            any = true
             cols += c
             rows += horizon + 2L * n // H resource rows + assignment + channel per task
         }
-        return TimeIndexedEstimate(cols, rows, anyFits)
+        return if (any) HullEstimate(LpTechnique.CUMULATIVE_TIME_INDEXED, cols, rows) else null
     }
 }
