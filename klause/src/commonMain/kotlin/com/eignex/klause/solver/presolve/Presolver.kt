@@ -25,6 +25,8 @@ class PresolveContext(
     /** Minimize-sense integer objective coefficients (var → nonzero coefficient), used by dual fixing
      *  to decide which bound a dominated variable can be pinned to. */
     val objectiveIntCoeffs: Map<Int, Long> = emptyMap(),
+    /** Minimize-sense Boolean objective weights (var → nonzero weight), used by Boolean dual fixing. */
+    val objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
 ) {
     /** Factories for the common contexts. */
     companion object {
@@ -44,8 +46,15 @@ class PresolveContext(
                 }
             }
             val bools = HashSet<Int>()
-            for (b in objective.boolWeights.indices) if (objective.boolWeights[b] != 0L) bools.add(b)
-            return PresolveContext(ints, bools, solutionSetSensitive, intCoeffs)
+            val boolCoeffs = HashMap<Int, Long>()
+            for (b in objective.boolWeights.indices) {
+                val w = objective.boolWeights[b]
+                if (w != 0L) {
+                    bools.add(b)
+                    boolCoeffs[b] = w
+                }
+            }
+            return PresolveContext(ints, bools, solutionSetSensitive, intCoeffs, boolCoeffs)
         }
     }
 }
@@ -162,7 +171,7 @@ enum class PresolvePass(
      *  auto-disabled for solution-set-sensitive queries. */
     DUAL_FIX("dual-fix", Stage.PROBLEM, PresolveTiming.MEDIUM, preservesSolutionSet = false, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs))
+            PassResult(Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs))
     },
 
     /** Construction-time failed-literal SAC (#146): folded into `Problem.baked` at build, read via

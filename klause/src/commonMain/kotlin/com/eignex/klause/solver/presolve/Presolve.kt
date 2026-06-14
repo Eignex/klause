@@ -326,19 +326,32 @@ object Presolve {
      *    the objective), an optimum exists with `xⱼ` at its lower bound, so pin it there.
      *  - **up-safe**: the mirror (`≤`/negative or `≥`/positive, and `cⱼ ≤ 0`) → pin to the upper bound.
      *
-     * Only integer variables whose every occurrence is a `≤`/`≥` [Linear] are considered: an `=`/`≠`
-     * row or any non-[Linear] (global) factor makes the safety undecidable, so the variable is
-     * excluded. Coefficients come from [objectiveIntCoeffs] (minimize sense, absent ⇒ 0). Pins by
-     * tightening the domain to a singleton — no elimination, identity reconstruction. Solution-set
-     * altering (discards optimum-equivalent and feasible-but-suboptimal assignments), so the engine
-     * runs it only for non-solution-set-sensitive queries. Bool dual fixing is a follow-up.
+     * Integers: a variable whose every occurrence is a `≤`/`≥` [Linear] (an `=`/`≠` row or non-[Linear]
+     * global makes the safety undecidable, so it is excluded) is pinned by tightening its domain to a
+     * singleton. Booleans (#469): the pure-literal mirror — a `+b` literal in a [Clause] is satisfied
+     * by `b = true`, so `b = true` is safe there and `b = false` may not be; `¬b` is the reverse; any
+     * non-[Clause] bool factor excludes the variable. A safe-direction bool is pinned with a unit
+     * clause (a bool already unit-pinned is skipped, keeping the pass idempotent). Coefficients come
+     * from [objectiveIntCoeffs] / [objectiveBoolCoeffs] (minimize sense, absent ⇒ 0).
+     *
+     * No elimination, identity reconstruction. Solution-set altering (discards optimum-equivalent and
+     * feasible-but-suboptimal assignments), so the engine runs it only for non-solution-set-sensitive
+     * queries.
      */
-    fun fixDominatedVariables(problem: Problem, objectiveIntCoeffs: Map<Int, Long>): Problem {
+    fun fixDominatedVariables(
+        problem: Problem,
+        objectiveIntCoeffs: Map<Int, Long>,
+        objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
+    ): Problem {
         val n = problem.numIntVars
-        if (n == 0) return problem
         val downSafe = BooleanArray(n) { true }
         val upSafe = BooleanArray(n) { true }
-        val eligible = BooleanArray(n) { true }
+        val intEligible = BooleanArray(n) { true }
+        val nb = problem.numBoolVars
+        val trueSafe = BooleanArray(nb) { true } // b = true never violates a constraint
+        val falseSafe = BooleanArray(nb) { true } // b = false never violates a constraint
+        val boolEligible = BooleanArray(nb) { true }
+        val alreadyPinned = HashSet<Int>() // bool vars already forced by a unit clause
         for (f in problem.factors) {
             if (f is Linear && (f.op == LinearOp.LE || f.op == LinearOp.GE)) {
                 for (i in f.vars.indices) {
@@ -350,13 +363,28 @@ object Presolve {
                     if (loweringSafe) upSafe[f.vars[i]] = false else downSafe[f.vars[i]] = false
                 }
             } else {
-                for (v in f.intVars) eligible[v] = false
+                for (v in f.intVars) intEligible[v] = false
+            }
+            if (f is Clause) {
+                if (f.literals.size == 1) alreadyPinned.add(Lit.variable(f.literals[0]))
+                for (lit in f.literals) {
+                    if (Lit.isPositive(
+                            lit,
+                        )
+                    ) {
+                        falseSafe[Lit.variable(lit)] = false
+                    } else {
+                        trueSafe[Lit.variable(lit)] = false
+                    }
+                }
+            } else {
+                for (v in f.boolVars) boolEligible[v] = false
             }
         }
         var changed = false
         val domains = problem.intDomains.copyOf()
         for (v in 0 until n) {
-            if (!eligible[v]) continue
+            if (!intEligible[v]) continue
             val d = problem.intDomains[v]
             if (d.min == d.max) continue // already fixed
             val c = objectiveIntCoeffs[v] ?: 0L
@@ -372,8 +400,19 @@ object Presolve {
                 }
             }
         }
+        val extra = ArrayList<Factor>()
+        for (b in 0 until nb) {
+            if (!boolEligible[b] || b in alreadyPinned) continue
+            val c = objectiveBoolCoeffs[b] ?: 0L
+            when {
+                trueSafe[b] && c <= 0L -> extra.add(Clause(intArrayOf(Lit.make(b, true))))
+                falseSafe[b] && c >= 0L -> extra.add(Clause(intArrayOf(Lit.make(b, false))))
+                else -> continue
+            }
+            changed = true
+        }
         if (!changed) return problem
-        return rebuildProblem(problem, problem.factors.toList(), domains)
+        return rebuildProblem(problem, problem.factors.toList() + extra, domains)
     }
 
     private fun rebuildProblem(
