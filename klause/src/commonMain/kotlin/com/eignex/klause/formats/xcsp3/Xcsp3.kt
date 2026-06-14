@@ -142,7 +142,7 @@ object Xcsp3 {
         }
 
         private fun sum(e: XmlElement) {
-            val vars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
+            val vars = listVars(e)
             val coeffs = parseInts(e.child("coeffs")?.textContent) ?: IntArray(vars.size) { 1 }
             val (op, k) = condition(requireNotNull(e.child("condition")).textContent.trim())
             factors.add(Linear(coeffs, vars, op, k))
@@ -151,7 +151,7 @@ object Xcsp3 {
         // --- extension (positive supports / negative conflicts) ---
 
         private fun extension(e: XmlElement) {
-            val vars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
+            val vars = listVars(e)
             val supports = e.child("supports")?.textContent?.trim()
             val conflicts = e.child("conflicts")?.textContent?.trim()
             when {
@@ -281,23 +281,28 @@ object Xcsp3 {
             return Lit.make(aux, true)
         }
 
+        /** Map an XCSP3 relation operator to its [LinearOp] plus the delta to fold into the bound:
+         *  strict `lt`/`gt` collapse to `LE`/`GE` with a ∓1 shift, the rest contribute 0. Null on an
+         *  unknown operator, so each caller throws with its own context. */
+        private fun relOp(fn: String): Pair<LinearOp, Int>? = when (fn) {
+            "le" -> LinearOp.LE to 0
+            "lt" -> LinearOp.LE to -1
+            "ge" -> LinearOp.GE to 0
+            "gt" -> LinearOp.GE to 1
+            "eq" -> LinearOp.EQ to 0
+            "ne" -> LinearOp.NE to 0
+            else -> null
+        }
+
         /** `rel(lhs, rhs)` → a [Linear] `coeffs·vars OP bound`. */
         private fun relationLinear(node: FExpr.Call): Linear {
-            val op = when (node.fn) {
-                "le", "lt" -> LinearOp.LE
-                "ge", "gt" -> LinearOp.GE
-                "eq" -> LinearOp.EQ
-                "ne" -> LinearOp.NE
-                else -> throw UnsupportedXcsp3Exception("relation '${node.fn}'")
-            }
+            val (op, delta) = relOp(node.fn) ?: throw UnsupportedXcsp3Exception("relation '${node.fn}'")
             val lhs = linear(node.args[0])
             val rhs = linear(node.args[1])
             val combined = HashMap(lhs.coeffs)
             for ((v, c) in rhs.coeffs) combined[v] = (combined[v] ?: 0) - c
             combined.entries.removeAll { it.value == 0 }
-            var bound = rhs.constant - lhs.constant
-            if (node.fn == "lt") bound -= 1
-            if (node.fn == "gt") bound += 1
+            val bound = rhs.constant - lhs.constant + delta
             val vars = combined.keys.toIntArray()
             return Linear(IntArray(vars.size) { combined.getValue(vars[it]) }, vars, op, bound)
         }
@@ -305,7 +310,7 @@ object Xcsp3 {
         // --- count / element / channel / regular / cumulative / circuit / lex ---
 
         private fun count(e: XmlElement) {
-            val vars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
+            val vars = listVars(e)
             val values = parseInts(e.child("values")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("count: only constant <values> supported")
             if (values.size != 1) throw UnsupportedXcsp3Exception("count: only a single value supported")
@@ -327,7 +332,7 @@ object Xcsp3 {
         }
 
         private fun element(e: XmlElement) {
-            val arr = refList(requireNotNull(e.child("list")).textContent).toIntArray()
+            val arr = listVars(e)
             val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
             val idx = singleTermVar(
                 e.child("index")?.textContent
@@ -360,7 +365,7 @@ object Xcsp3 {
         }
 
         private fun regular(e: XmlElement) {
-            val seqVars = refList(requireNotNull(e.child("list")).textContent).toIntArray()
+            val seqVars = listVars(e)
             val start = requireNotNull(e.child("start")).textContent.trim()
             val finals = requireNotNull(
                 e.child("final"),
@@ -527,6 +532,12 @@ object Xcsp3 {
         // --- ref / domain helpers ---
 
         private fun listText(e: XmlElement): String = e.child("list")?.textContent ?: e.textContent
+
+        /** Vars referenced by the constraint's mandatory `<list>` child. */
+        private fun listVars(e: XmlElement): IntArray = refList(
+            requireNotNull(e.child("list")).textContent,
+        ).toIntArray()
+
         private fun parseInts(text: String?): IntArray? =
             text?.trim()?.split(Regex("\\s+"))?.filter { it.isNotBlank() }?.map { it.toInt() }?.toIntArray()
 
@@ -577,15 +588,9 @@ object Xcsp3 {
             val m = Regex("""\(\s*(\w+)\s*,\s*(-?\d+)\s*\)""").find(text)
                 ?: throw UnsupportedXcsp3Exception("condition '$text' (only (op,const) supported)")
             val k = m.groupValues[2].toInt()
-            return when (m.groupValues[1]) {
-                "le" -> LinearOp.LE to k
-                "ge" -> LinearOp.GE to k
-                "eq" -> LinearOp.EQ to k
-                "ne" -> LinearOp.NE to k
-                "lt" -> LinearOp.LE to (k - 1)
-                "gt" -> LinearOp.GE to (k + 1)
-                else -> throw UnsupportedXcsp3Exception("condition op '${m.groupValues[1]}'")
-            }
+            val (op, delta) = relOp(m.groupValues[1])
+                ?: throw UnsupportedXcsp3Exception("condition op '${m.groupValues[1]}'")
+            return op to (k + delta)
         }
 
         fun build(): Xcsp3Problem = Xcsp3Problem(
