@@ -346,19 +346,10 @@ object SmtLibQfLia {
                         if (args.size == 2) {
                             reifyRelation(t)
                         } else {
-                            val ts = args.map {
-                                linearTerm(
-                                    it,
-                                )
-                            }
-                            tseitinAnd((1 until ts.size).map { reifyEq(ts[0], ts[it]) })
+                            chainEqToFirst(args.map { linearTerm(it) }, ::reifyEq)
                         }
                     } else {
-                        args.map {
-                            compileBool(
-                                it,
-                            )
-                        }.let { ls -> tseitinAnd((1 until ls.size).map { tseitinIff(ls[0], ls[it]) }) }
+                        chainEqToFirst(args.map { compileBool(it) }, ::tseitinIff)
                     }
 
                     "let" -> withLet(args[0]) { compileBool(args[1]) }
@@ -407,6 +398,11 @@ object SmtLibQfLia {
         /** `a ⇔ (c ? x : y)` ≡ `a ⇔ (c∧x)∨(¬c∧y)`. */
         private fun tseitinIte(c: Int, x: Int, y: Int): Int =
             tseitinOr(listOf(tseitinAnd(listOf(c, x)), tseitinAnd(listOf(Lit.negate(c), y))))
+
+        /** n-ary `=` as `⋀ (items[i] ≈ items[0])` for `i > 0`, where [relate] reifies one pairwise
+         *  equality (`reifyEq` for arithmetic terms, `tseitinIff` for bools). */
+        private fun <T> chainEqToFirst(items: List<T>, relate: (T, T) -> Int): Int =
+            tseitinAnd((1 until items.size).map { relate(items[0], items[it]) })
 
         // --- let ---
 
@@ -457,12 +453,16 @@ object SmtLibQfLia {
                     val max = vars.maxOf { intDomains[it].max }
                     factors.add(AllDifferent(vars = vars, domainMin = min, domainSize = max - min + 1))
                 } else {
-                    for ((i, j) in pairs(terms.size)) factors.add(neLinear(terms[i], terms[j]))
+                    assertPairwiseNe(terms)
                 }
             } else {
-                val terms = args.map { if (isBoolExpr(it)) litToIntTerm(compileBool(it)) else linearTerm(it) }
-                for ((i, j) in pairs(terms.size)) factors.add(neLinear(terms[i], terms[j]))
+                assertPairwiseNe(args.map { if (isBoolExpr(it)) litToIntTerm(compileBool(it)) else linearTerm(it) })
             }
+        }
+
+        /** Post `tᵢ ≠ tⱼ` (as a [Linear] NE) for every distinct pair — the hard-distinct fallback. */
+        private fun assertPairwiseNe(terms: List<LinTerm>) {
+            for ((i, j) in pairs(terms.size)) factors.add(neLinear(terms[i], terms[j]))
         }
 
         private fun compileDistinct(args: List<SExpr>): Int {
@@ -561,37 +561,18 @@ object SmtLibQfLia {
                     "$op with ${t.items.size - 1} operands not supported as a single linear relation",
                 )
             }
-            val lhs = linearTerm(t.items[1])
-            val rhs = linearTerm(t.items[2])
-            val combined = HashMap<Int, Int>(lhs.coeffs)
-            for ((v, c) in rhs.coeffs) combined[v] = (combined[v] ?: 0) - c
-            combined.entries.removeAll { it.value == 0 }
-            val constDiff = lhs.constant - rhs.constant
-            var bound = -constDiff
-            val linOp = when (op) {
-                "<=" -> LinearOp.LE
-
-                ">=" -> LinearOp.GE
-
-                "=" -> LinearOp.EQ
-
-                "distinct" -> LinearOp.NE
-
-                "<" -> {
-                    bound -= 1
-                    LinearOp.LE
-                }
-
-                ">" -> {
-                    bound += 1
-                    LinearOp.GE
-                }
-
+            val (vars, coeffs, baseBound) = diff(linearTerm(t.items[1]), linearTerm(t.items[2]))
+            // op → (LinearOp, bound delta): strict `<`/`>` collapse to LE/GE with a ∓1 shift.
+            val (linOp, delta) = when (op) {
+                "<=" -> LinearOp.LE to 0
+                ">=" -> LinearOp.GE to 0
+                "=" -> LinearOp.EQ to 0
+                "distinct" -> LinearOp.NE to 0
+                "<" -> LinearOp.LE to -1
+                ">" -> LinearOp.GE to 1
                 else -> throw UnsupportedSmtException("relation '$op'")
             }
-            val vars = combined.keys.toIntArray()
-            val coeffs = IntArray(vars.size) { combined.getValue(vars[it]) }
-            return Rel(vars, coeffs, linOp, bound)
+            return Rel(vars, coeffs, linOp, baseBound + delta)
         }
 
         // --- linear int term → (coeffs, constant) ---
