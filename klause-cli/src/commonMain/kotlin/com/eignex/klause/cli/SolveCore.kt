@@ -15,7 +15,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.LpEmphasis
+import com.eignex.klause.solver.backtrack.LpConfig
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -182,8 +182,8 @@ internal object SolveCore {
         // #429: `--lp CEILING` caps the portfolio's LP emphasis; absent ⇒ AGGRESSIVE (uncapped — the
         // pool spreads the LP intensity itself), `off` disables LP across the pool.
         val lpCeiling = common.lp?.let {
-            LpEmphasis.fromId(it) ?: usageError("unknown --lp ceiling `$it`; expected ${LpEmphasis.ids()}")
-        } ?: LpEmphasis.AGGRESSIVE
+            runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
+        } ?: LpConfig.AGGRESSIVE
         val scenario = buildPortfolioScenario(
             EngineParams(common.engineParams),
             common.randomSeed,

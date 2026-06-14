@@ -7,7 +7,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpConfig
 import com.eignex.klause.solver.backtrack.LpEmphasis
+import com.eignex.klause.solver.backtrack.LpTechnique
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
 import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
 import com.eignex.klause.solver.backtrack.selector.InputOrder
@@ -52,23 +54,19 @@ class PortfolioTest {
     }
 
     @Test
-    fun `lp ceiling caps the portfolio arms`() {
-        // --lp off disables LP across the pool; --lp default caps the AGGRESSIVE arm down to DEFAULT.
-        val off = BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = LpEmphasis.OFF)
-        assertTrue(
-            off.all { (it.build(1L, null).lpConfig?.emphasis ?: LpEmphasis.OFF) == LpEmphasis.OFF },
-            "an OFF ceiling must leave no arm running LP",
-        )
-        val capped = BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = LpEmphasis.DEFAULT)
-        assertTrue(
-            capped.mapNotNull {
-                it.build(
-                    1L,
-                    null,
-                ).lpConfig?.emphasis
-            }.all { it.ordinal <= LpEmphasis.DEFAULT.ordinal },
-            "no arm may exceed the supplied ceiling",
-        )
+    fun `lp ceiling caps and toggles the portfolio arms`() {
+        fun lpConfigs(ceiling: LpConfig): List<LpConfig?> =
+            BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = ceiling).map { it.build(1L, null).lpConfig }
+
+        // --lp off disables LP across the pool.
+        val off = lpConfigs(LpConfig(LpEmphasis.OFF))
+        assertTrue(off.all { (it?.emphasis ?: LpEmphasis.OFF) == LpEmphasis.OFF }, "OFF ceiling leaves no arm on LP")
+        // --lp default caps the AGGRESSIVE arm down to DEFAULT.
+        val capped = lpConfigs(LpConfig(LpEmphasis.DEFAULT)).mapNotNull { it?.emphasis }
+        assertTrue(capped.all { it.ordinal <= LpEmphasis.DEFAULT.ordinal }, "no arm may exceed the ceiling")
+        // --lp aggressive,-cuts forces cuts off on every LP arm while keeping the spread.
+        val noCuts = lpConfigs(LpConfig.parse("aggressive,-cuts")).filterNotNull()
+        assertTrue(noCuts.all { !it.resolved(LpTechnique.CUTS) }, "the -cuts ceiling override must reach every LP arm")
     }
 
     @Test

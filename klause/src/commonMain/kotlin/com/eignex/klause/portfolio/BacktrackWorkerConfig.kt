@@ -130,28 +130,22 @@ internal data class BacktrackWorkerConfig(
             Kind.CSP -> cspOrder
         }
 
-        /** Cap this arm's LP emphasis at [ceiling] (the `--lp` ceiling): the produced params' LP
-         *  config is lowered to the ceiling, so no arm ever runs LP above what the user permitted.
-         *  Non-LP arms (and `AGGRESSIVE` ceiling) are untouched; an `OFF` ceiling disables LP. */
-        private fun BacktrackWorkerConfig.capLp(ceiling: LpEmphasis): BacktrackWorkerConfig =
-            if (ceiling == LpEmphasis.AGGRESSIVE) {
-                this
-            } else {
-                copy(build = { seed, onEvent ->
-                    val p = build(seed, onEvent)
-                    val intended = p.lpConfig
-                    if (intended == null) p else p.copy(lpConfig = intended.cappedAt(ceiling))
-                })
-            }
+        /** Cap this arm under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
+         *  emphasis lowered and the ceiling's per-technique overrides applied — so no arm runs LP above
+         *  what the user permitted, and `--lp aggressive,-cuts` / `off,+energetic` toggle individual
+         *  techniques across the pool. Non-LP arms keep no LP; an all-`AGGRESSIVE`, no-override ceiling
+         *  is a no-op. */
+        private fun BacktrackWorkerConfig.capLp(ceiling: LpConfig): BacktrackWorkerConfig =
+            copy(build = { seed, onEvent ->
+                val p = build(seed, onEvent)
+                val intended = p.lpConfig
+                if (intended == null) p else p.copy(lpConfig = intended.cappedUnder(ceiling))
+            })
 
         /** The top-[count] prefix of [ranked], wrapping past the pool size so larger pools repeat
-         *  the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls). Each arm's
-         *  LP emphasis is capped at [lpCeiling] (default `AGGRESSIVE` = uncapped). */
-        fun diverse(
-            kind: Kind,
-            count: Int,
-            lpCeiling: LpEmphasis = LpEmphasis.AGGRESSIVE,
-        ): List<BacktrackWorkerConfig> {
+         *  the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls). Each arm is
+         *  capped under [lpCeiling] (default `AGGRESSIVE`, no overrides = uncapped). */
+        fun diverse(kind: Kind, count: Int, lpCeiling: LpConfig = LpConfig.AGGRESSIVE): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = ranked(kind)
             return List(count) { order[it % order.size].capLp(lpCeiling) }
