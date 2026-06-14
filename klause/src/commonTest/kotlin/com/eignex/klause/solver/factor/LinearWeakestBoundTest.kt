@@ -104,4 +104,51 @@ class LinearWeakestBoundTest {
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
     }
+
+    @Test
+    fun `wide constraints use the shared start-bound reason and still enumerate exactly`() {
+        // Arity > LINEAR_SHARED_REASON_ARITY (32) switches Linear onto the shared start-of-call
+        // reason built from the contribution snapshot — now the *only* path that materialises
+        // rLo/rHi. Pad the constraint with fixed singleton vars (1..1) so the arity is wide while
+        // the free space stays small enough to brute-force; the propagated tightenings on the free
+        // vars then exercise the wide reason builder (and the NE case exercises the recomputed
+        // contribution in the NE branch) under full CDCL learning.
+        val arity = 40
+        val freeCount = 3
+        val varsOf = IntArray(arity) { it }
+        val lo = IntArray(arity) { if (it < freeCount) 0 else 1 }
+        val hi = IntArray(arity) { if (it < freeCount) 3 else 1 }
+        val cons = listOf(
+            Con(IntArray(arity) { 1 }, LinearOp.LE, 39), // free sum <= 2 (37 from the fixed tail)
+            Con(IntArray(arity) { 1 }, LinearOp.GE, 40), // free sum >= 3
+            Con(IntArray(arity) { if (it < freeCount) 2 else 1 }, LinearOp.EQ, 41), // 2*free sum == 4
+            Con(IntArray(arity) { 1 }, LinearOp.NE, 38), // free sum != 1
+        )
+        for ((idx, con) in cons.withIndex()) {
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(arity) { if (it < freeCount) 0 else 1 }
+            fun rec(p: Int) {
+                if (p == freeCount) {
+                    if (satisfies(con, acc, varsOf)) brute.add(acc.toList())
+                    return
+                }
+                for (v in lo[p]..hi[p]) {
+                    acc[p] = v
+                    rec(p + 1)
+                }
+            }
+            rec(0)
+
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = arity,
+                intDomains = Array(arity) { IntDomain(lo[it], hi[it]) },
+                factors = arrayOf<Factor>(Linear(coeffs = con.coeffs, vars = varsOf, op = con.op, bound = con.bound)),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(200_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "wide instance #$idx (op=${con.op}): solution set must equal brute force")
+        }
+    }
 }

@@ -12,6 +12,11 @@ import com.eignex.klause.solver.propagation.allDecisionsAreBool
  *  per-class empty array. */
 internal val EmptyIntArray: IntArray = IntArray(0)
 
+/** Shared singleton empty `LongArray`, for scratch slots that some code paths leave unused
+ *  (e.g. the wide-only term-contribution snapshot in [com.eignex.klause.solver.factor.propagateLinearBounds])
+ *  so the common path binds this instead of allocating. */
+internal val EmptyLongArray: LongArray = LongArray(0)
+
 /**
  * Constraint metadata for [Problem]. Variables touched by a factor split into two id
  * spaces: Boolean vars in [boolVars] and integer vars in [intVars]. Pure-Boolean factors

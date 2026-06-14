@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.EmptyLongArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.IntSet
@@ -624,8 +625,15 @@ internal fun propagateLinearBounds(
     extraLit: Int = 0,
 ): Boolean {
     val n = vars.size
-    val rLo = LongArray(n)
-    val rHi = LongArray(n)
+    // Wide constraints reuse a shared start-of-call reason that reads a snapshot of every term's
+    // contribution range *after* earlier tightens have moved those vars' domains, so they need the
+    // full snapshot held in rLo/rHi. Narrow constraints don't: each tighten recomputes its slack at
+    // its own iteration from the term's still-pristine domain — vars are distinct (coalesced), so
+    // var i is untouched when iteration i reads it — which matches the snapshot exactly and lets the
+    // common path skip the two LongArray(n) allocations.
+    val wide = n > LINEAR_SHARED_REASON_ARITY
+    val rLo = if (wide) LongArray(n) else EmptyLongArray
+    val rHi = if (wide) LongArray(n) else EmptyLongArray
     var sumLo = 0L
     var sumHi = 0L
     for (i in 0 until n) {
@@ -633,15 +641,14 @@ internal fun propagateLinearBounds(
         val c = coeffs[i].toLong()
         val a = c * d.min
         val b = c * d.max
-        if (a <= b) {
-            rLo[i] = a
-            rHi[i] = b
-        } else {
-            rLo[i] = b
-            rHi[i] = a
+        val lo = if (a <= b) a else b
+        val hi = if (a <= b) b else a
+        sumLo += lo
+        sumHi += hi
+        if (wide) {
+            rLo[i] = lo
+            rHi[i] = hi
         }
-        sumLo += rLo[i]
-        sumHi += rHi[i]
     }
     when (op) {
         LinearOp.LE -> if (sumLo > bound) return false
@@ -653,24 +660,28 @@ internal fun propagateLinearBounds(
         for (i in 0 until n) {
             val c = coeffs[i].toLong()
             if (c == 0L) continue
-            val otherLo = sumLo - rLo[i]
-            val otherHi = sumHi - rHi[i]
+            val v = vars[i]
+            // Var i is still at its start-of-call domain here (distinct vars; only vars[0..i-1] were
+            // touched), so recomputing its contribution matches the pre-tighten snapshot.
+            val d = state.intDomains[v]
+            val a = c * d.min
+            val b = c * d.max
+            val otherLo = sumLo - (if (a <= b) a else b)
+            val otherHi = sumHi - (if (a <= b) b else a)
             if (otherLo != otherHi) continue
             val rhs = bound - otherLo
             if (rhs % c != 0L) continue
             val forbidden = rhs / c
             if (forbidden < Int.MIN_VALUE || forbidden > Int.MAX_VALUE) continue
-            val v = vars[i]
             val ant = collectLinearTightenAntecedents(state, vars, i, extraLit)
             if (!state.excludeIntValue(v, forbidden.toInt(), ant)) return false
         }
         return true
     }
-    // Wide constraints (set-partitioning / large int_lin_eq) use one shared start-of-call reason
-    // per sum-side, built once and reused across every tighten — O(arity) total instead of the
-    // relaxation's O(arity²). Narrow constraints keep the sharper per-var relaxation. See
+    // `wide` (computed above) picks the shared start-of-call reason — O(arity) total, built once and
+    // reused across every tighten — over the per-var relaxation's O(arity²), for set-partitioning /
+    // large int_lin_eq systems. Narrow constraints keep the sharper per-var relaxation. See
     // [LINEAR_SHARED_REASON_ARITY] / [collectLinearStartBoundAntecedents].
-    val wide = n > LINEAR_SHARED_REASON_ARITY
     var loBase: IntArray? = null
     var loBaseBuilt = false
     var hiBase: IntArray? = null
@@ -695,8 +706,13 @@ internal fun propagateLinearBounds(
         val c = coeffs[i].toLong()
         if (c == 0L) continue
         val v = vars[i]
-        val otherLo = sumLo - rLo[i]
-        val otherHi = sumHi - rHi[i]
+        // Var i is still at its start-of-call domain (distinct vars; only vars[0..i-1] tightened so
+        // far), so recomputing its contribution matches the pre-tighten snapshot rLo[i]/rHi[i].
+        val d = state.intDomains[v]
+        val a = c * d.min
+        val b = c * d.max
+        val otherLo = sumLo - (if (a <= b) a else b)
+        val otherHi = sumHi - (if (a <= b) b else a)
         if (op == LinearOp.LE || op == LinearOp.EQ) {
             // Upper-bound tighten driven by the lo side (Σ rLo of the other vars). The deduced
             // bound is `floor(slack0 / c)`; the lo-driving bounds may loosen until that floor
