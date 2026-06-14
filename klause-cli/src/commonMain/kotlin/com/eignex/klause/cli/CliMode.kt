@@ -10,6 +10,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.PresolveEmphasis
+import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.solver.presolve.Presolver
 import com.eignex.klause.solver.result.SolveStats
 
@@ -195,9 +196,9 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.KLAUSE,
         valueLabel = "strength",
-        help = "presolve strength: " + PresolveEmphasis.entries.joinToString(" | ") { it.name.lowercase() } +
-            "; append +/-<pass> to toggle one",
-        default = PresolveEmphasis.DEFAULT.name.lowercase(),
+        help = "presolve strength: " + PresolveEmphasis.ids() +
+            "; append +/-<pass> to toggle one (passes: " + PresolvePass.ids() + ")",
+        default = PresolveEmphasis.DEFAULT.id,
     ) { o.presolve = it },
     FlagSpec(
         listOf("--lp"),
