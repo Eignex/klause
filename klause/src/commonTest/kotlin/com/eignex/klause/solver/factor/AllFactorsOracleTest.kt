@@ -231,8 +231,10 @@ class AllFactorsOracleTest {
         check(f, intDomains = arrayOf(IntDomain(4, 10), IntDomain(0, 4)), exactProbe = true, gac = true)
     }
 
-    @Test fun `element with a variable array passes the propagation and repair oracles with an exact probe`() {
-        // result(0) = arr[idx(1)], arr = vars 2,3,4; idx 1-based ∈ [1,3].
+    @Test fun `element with a variable array is GAC and passes the repair oracle with an exact probe`() {
+        // result(0) = arr[idx(1)], arr = vars 2,3,4; idx 1-based ∈ [1,3]. Hole-aware var-array
+        // GAC: idx drops a position whose element domain is disjoint from result's, and result
+        // punches interior holes for values no reachable element can produce.
         val f = Element(idx = 1, result = 0, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
         check(
             f,
@@ -244,6 +246,27 @@ class AllFactorsOracleTest {
                 IntDomain(0, 3), // arr vars
             ),
             exactProbe = true,
+            gac = true,
+        )
+    }
+
+    @Test fun `element with a variable array punches result holes and drops disjoint positions`() {
+        // result(0) = arr[idx(1)], arr = vars 2,3,4; idx 1-based ∈ [1,3]. arr[0] ∈ {0,1},
+        // arr[1] ∈ {5}, arr[2] ∈ {2,3}, result ∈ 0..5. GAC must keep all positions (each meets
+        // result) and punch result to exactly {0,1,2,3,5} — value 4 has no reachable element, a
+        // gap a bounds-union propagator would leave open.
+        val f = Element(idx = 1, result = 0, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 5), // result
+                IntDomain(1, 3), // idx
+                IntDomain(0, 1), // arr[0]
+                IntDomain(5, 5), // arr[1]
+                IntDomain(2, 3), // arr[2]
+            ),
+            exactProbe = true,
+            gac = true,
         )
     }
 
@@ -263,7 +286,7 @@ class AllFactorsOracleTest {
         )
     }
 
-    @Test fun `inverse passes the brute-force propagation and repair oracles`() {
+    @Test fun `inverse is GAC and passes the brute-force propagation and repair oracles`() {
         val f = Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))
         check(
             f,
@@ -276,6 +299,29 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
             ),
             exactProbe = true,
+            gac = true,
+        )
+    }
+
+    @Test fun `inverse reaches GAC via Hall filtering the channel AC misses`() {
+        // The #541 probe (0-based): f0,f1 ∈ {0,1}, f2,f3,g0..g3 ∈ {0..3}. f0,f1 occupy {0,1} in
+        // any permutation, so GAC must prune 0,1 from f2 and f3 — a Hall deduction the channel AC
+        // alone leaves (it keeps f2=0 because g0=2 is unpruned, and vice versa).
+        val f = Inverse(f = intArrayOf(0, 1, 2, 3), g = intArrayOf(4, 5, 6, 7))
+        check(
+            f,
+            intDomains = arrayOf(
+                IntDomain(0, 1), // f0
+                IntDomain(0, 1), // f1
+                IntDomain(0, 3), // f2
+                IntDomain(0, 3), // f3
+                IntDomain(0, 3), // g0
+                IntDomain(0, 3), // g1
+                IntDomain(0, 3), // g2
+                IntDomain(0, 3), // g3
+            ),
+            exactProbe = true,
+            gac = true,
         )
     }
 
@@ -590,7 +636,7 @@ class AllFactorsOracleTest {
                 IntDomain(0, 2),
             ),
             "Inverse.holey",
-            gac = false,
+            gac = true,
         )
     }
 }
