@@ -11,18 +11,20 @@ import kotlin.math.abs
 internal class FloatLpResult(val basis: Basis, val objective: Double, val duals: DoubleArray)
 
 /**
- * Double-precision bounded-variable **dual** simplex in *revised* form: it maintains the explicit
- * basis inverse `B⁻¹` (dense `m × m`) and the constraint columns in sparse CSC, instead of the full
- * `m × (n+m)` dense tableau [FloatSimplex] carries. The decision logic — slack cold start, most-
- * violated leaving variable, dual ratio-test entering variable — is identical to [FloatSimplex];
- * only the linear algebra is revised, so for `n ≫ m` it avoids materializing the wide tableau.
+ * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
+ * sparse LU factorization ([SparseLu], `O(nnz)` memory) and the constraint columns in sparse CSC,
+ * instead of the full `m × (n+m)` dense tableau [FloatSimplex] carries or an explicit dense `B⁻¹`.
+ * The decision logic — slack cold start, most-violated leaving variable, dual ratio-test entering
+ * variable — is identical to [FloatSimplex]; only the linear algebra is revised (FTRAN/BTRAN via the
+ * LU), so it scales to large sparse models without materializing an `m²` structure.
  *
- * Like [FloatSimplex] it is a heuristic that can return null (non-convergence / dual-unbounded);
- * its [basis] is then certified exactly downstream, so float rounding here is never safety-critical.
+ * Like [FloatSimplex] it is a heuristic that can return null (non-convergence / dual-unbounded /
+ * singular basis); its [basis] is then certified exactly downstream, so float rounding here is never
+ * safety-critical.
  *
- * NOTE: `B⁻¹` is still dense (`m²`), so the per-iteration cost and memory match the tableau when
- * `m ≈ n`; replacing the explicit inverse with a sparse LU factorization is the remaining scaling
- * step. What lands here is the float revised core + the duals the safe bound needs.
+ * NOTE: the basis is refactorized from scratch each iteration (correct and sparse; fine for the
+ * warm-started few-pivot search). Forrest–Tomlin / eta updates between refactorizations are the
+ * remaining speed step.
  */
 internal class RevisedSimplex(private val model: LpModel) {
     private val m = model.m
@@ -35,7 +37,6 @@ internal class RevisedSimplex(private val model: LpModel) {
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
-    private val binv = Array(m) { DoubleArray(m) }
 
     init {
         colRows = Array(n) { IntArray(0) }
@@ -59,20 +60,15 @@ internal class RevisedSimplex(private val model: LpModel) {
         }
     }
 
-    /** `B⁻¹ · A_j` (FTRAN) into [out]; A_j is a structural CSC column or a slack unit column. */
-    private fun ftran(j: Int, out: DoubleArray) {
+    /** Dense original-row column `A_full[*][j]` into [out] (structural via CSC, slack as unit). */
+    private fun denseColumn(j: Int, out: DoubleArray) {
         for (i in 0 until m) out[i] = 0.0
         if (j >= n) {
-            val col = j - n
-            for (i in 0 until m) out[i] = binv[i][col]
-            return
-        }
-        val rows = colRows[j]
-        val vals = colVals[j]
-        for (k in rows.indices) {
-            val r = rows[k]
-            val a = vals[k]
-            for (i in 0 until m) out[i] += binv[i][r] * a
+            out[j - n] = 1.0
+        } else {
+            val rows = colRows[j]
+            val vals = colVals[j]
+            for (k in rows.indices) out[rows[k]] = vals[k]
         }
     }
 
@@ -86,15 +82,36 @@ internal class RevisedSimplex(private val model: LpModel) {
         return acc
     }
 
+    /** Sparse LU of the current basis `B` (`B[i][t] = A_full[i][basicVar[t]]`); null if singular. */
+    private fun factorizeBasis(): SparseLu? {
+        val rows = Array(m) { HashMap<Int, Double>() }
+        for (t in 0 until m) {
+            val col = basicVar[t]
+            if (col >= n) {
+                rows[col - n][t] = 1.0
+            } else {
+                val rs = colRows[col]
+                val vs = colVals[col]
+                for (k in rs.indices) rows[rs[k]][t] = vs[k]
+            }
+        }
+        return SparseLu.factorize(rows, m)
+    }
+
+    /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
+    private fun duals(lu: SparseLu): DoubleArray = lu.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
+
     fun solve(): FloatLpResult? {
         coldStart()
         val maxIter = 50 * (m + numVars) + 200
-        val beta = DoubleArray(m)
-        val y = DoubleArray(m)
         val rhsAdj = DoubleArray(m)
-        val alpha = DoubleArray(m)
+        val unit = DoubleArray(m)
+        val aq = DoubleArray(m)
         var iter = 0
         while (iter++ < maxIter) {
+            // Refactorize the basis each iteration (sparse, warm-started search ⇒ few iterations);
+            // Forrest–Tomlin / eta updates between refactorizations are the remaining speed step.
+            val lu = factorizeBasis() ?: return null
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
             for (i in 0 until m) rhsAdj[i] = model.rhs[i].toDouble()
             for (j in 0 until numVars) {
@@ -103,18 +120,13 @@ internal class RevisedSimplex(private val model: LpModel) {
                     if (j >= n) {
                         rhsAdj[j - n] -= u
                     } else {
-                        val rows = colRows[j]
-                        val vals = colVals[j]
-                        for (k in rows.indices) rhsAdj[rows[k]] -= vals[k] * u
+                        val rs = colRows[j]
+                        val vs = colVals[j]
+                        for (k in rs.indices) rhsAdj[rs[k]] -= vs[k] * u
                     }
                 }
             }
-            for (i in 0 until m) {
-                var acc = 0.0
-                val bi = binv[i]
-                for (t in 0 until m) acc += bi[t] * rhsAdj[t]
-                beta[i] = acc
-            }
+            val beta = lu.ftran(rhsAdj)
             // Leaving: most-violated basic bound (Dantzig).
             var r = -1
             var worst = TOL
@@ -134,12 +146,12 @@ internal class RevisedSimplex(private val model: LpModel) {
                     belowLower = false
                 }
             }
-            if (r == -1) return optimal(beta) // primal feasible ⇒ optimal
+            if (r == -1) return optimal(beta, lu) // primal feasible ⇒ optimal
 
-            // y = c_B · B⁻¹  (row vector), then reduced cost d_j = c_j − y·A_j.
-            computeDuals(y)
-            // Pivot row ρ = e_r^T B⁻¹; entering column by dual ratio test.
-            val rho = binv[r]
+            val y = duals(lu)
+            // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r; entering column by dual ratio test.
+            for (i in 0 until m) unit[i] = if (i == r) 1.0 else 0.0
+            val rho = lu.btran(unit)
             var q = -1
             var bestRatio = Double.MAX_VALUE
             for (j in 0 until numVars) {
@@ -162,17 +174,17 @@ internal class RevisedSimplex(private val model: LpModel) {
             }
             if (q == -1) return null // dual unbounded ⇒ primal infeasible; let the exact solver judge
 
-            ftran(q, alpha)
+            denseColumn(q, aq)
+            val alpha = lu.ftran(aq)
             if (abs(alpha[r]) < TOL) return null // numerically singular pivot
             status[basicVar[r]] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
-            updateInverse(r, alpha)
             basicVar[r] = q
             status[q] = VarStatus.BASIC
         }
         return null // budget exhausted
     }
 
-    private fun optimal(beta: DoubleArray): FloatLpResult {
+    private fun optimal(beta: DoubleArray, lu: SparseLu): FloatLpResult {
         var obj = 0.0
         for (j in 0 until numVars) {
             val c = model.cost[j]
@@ -182,39 +194,11 @@ internal class RevisedSimplex(private val model: LpModel) {
             val c = model.cost[basicVar[i]]
             if (c != 0L) obj += c.toDouble() * beta[i]
         }
-        val y = DoubleArray(m)
-        computeDuals(y)
-        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, y)
-    }
-
-    private fun computeDuals(y: DoubleArray) {
-        for (t in 0 until m) {
-            var acc = 0.0
-            for (i in 0 until m) {
-                val cb = model.cost[basicVar[i]]
-                if (cb != 0L) acc += cb.toDouble() * binv[i][t]
-            }
-            y[t] = acc
-        }
-    }
-
-    /** Product-form update of the explicit inverse after pivoting in row [r] with FTRAN column [alpha]. */
-    private fun updateInverse(r: Int, alpha: DoubleArray) {
-        val p = alpha[r]
-        val br = binv[r]
-        for (t in 0 until m) br[t] /= p
-        for (i in 0 until m) {
-            if (i == r) continue
-            val f = alpha[i]
-            if (abs(f) < TOL) continue
-            val bi = binv[i]
-            for (t in 0 until m) bi[t] -= f * br[t]
-        }
+        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, duals(lu))
     }
 
     private fun coldStart() {
         for (i in 0 until m) {
-            for (t in 0 until m) binv[i][t] = if (i == t) 1.0 else 0.0
             basicVar[i] = model.slackCol(i)
             status[model.slackCol(i)] = VarStatus.BASIC
         }
