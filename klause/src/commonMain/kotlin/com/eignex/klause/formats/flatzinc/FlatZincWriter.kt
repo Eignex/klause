@@ -7,8 +7,14 @@ import com.eignex.klause.solver.Sample
  * `output` declaration, items are rendered in order. Otherwise the writer emits one
  * `name = value;` line per declared variable in declaration order, then the terminating
  * `----------` line that MiniZinc expects per solution.
+ *
+ * When [outputObjective] is set and the model optimises, an extra `_objective = <value>;` line
+ * is emitted before the terminator — the same special variable `minizinc --output-objective`
+ * adds in dzn mode. The objective variable is otherwise often absent from the `output` section
+ * (it is frequently a `var_is_introduced` aux var), so a downstream parser scraping the solution
+ * stream has no other way to read the objective klause actually optimised.
  */
-fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample): String {
+fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObjective: Boolean = false): String {
     val sb = StringBuilder()
     val items = program.outputItems
     if (items != null) {
@@ -39,8 +45,18 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample): String {
             sb.append("$name = ${renderSet(sample, layout)};\n")
         }
     }
+    if (outputObjective) {
+        objectiveVarName(program.solve)?.let { sb.append("_objective = ${renderScalar(program, sample, it)};\n") }
+    }
     sb.append("----------\n")
     return sb.toString()
+}
+
+/** The objective variable's FlatZinc name for an optimisation directive, else null (satisfy). */
+private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {
+    is SolveDirective.Minimize -> solve.objVar
+    is SolveDirective.Maximize -> solve.objVar
+    SolveDirective.Satisfy -> null
 }
 
 private fun renderScalar(program: FlatZincProgram, sample: Sample, name: String): String {

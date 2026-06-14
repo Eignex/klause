@@ -24,6 +24,7 @@ internal object MiniZincMode : CliMode {
         private var oznPath: String? = null
         private var unboundedIntLo: Int? = null
         private var unboundedIntHi: Int? = null
+        private var outputObjective = false
 
         override fun flags(): List<FlagSpec> = listOf(
             FlagSpec(
@@ -36,6 +37,11 @@ internal object MiniZincMode : CliMode {
             // Advanced unbounded-`var int` range knobs (also env-configurable); hidden from --help.
             FlagSpec(listOf("--unbounded-int-lo"), true) { unboundedIntLo = requireNotNull(it).toInt() },
             FlagSpec(listOf("--unbounded-int-hi"), true) { unboundedIntHi = requireNotNull(it).toInt() },
+            // Like `minizinc --output-objective`: append `_objective = <value>;` to each solution
+            // so a parser reading the raw solution stream can recover the optimised objective even
+            // when the objective var is not in the model's `output` section. Off by default — the
+            // standard MiniZinc flow renders objectives through solns2out, not this binary.
+            FlagSpec(listOf("--output-objective"), false) { outputObjective = true },
         )
 
         override fun load(path: String, common: CommonOptions): Solvable {
@@ -56,7 +62,8 @@ internal object MiniZincMode : CliMode {
                     "factors=${program.problem.numFactors}"
             }
             val applier = oznPath?.let { OznApplier(readTextFile(it)) }
-            val render: (Sample) -> String = { s -> applier?.render(program, s) ?: writeFlatZincSolution(program, s) }
+            val render: (Sample) -> String =
+                { s -> applier?.render(program, s) ?: writeFlatZincSolution(program, s, outputObjective) }
 
             return when (val solve = program.solve) {
                 is SolveDirective.Satisfy -> Solvable(
