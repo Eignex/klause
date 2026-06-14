@@ -1,6 +1,8 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.backtrack.LpConfig
 import com.eignex.klause.solver.backtrack.LpEmphasis
+import com.eignex.klause.solver.backtrack.LpTechnique
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -68,13 +70,15 @@ class CliTest {
     }
 
     @Test
-    fun `--lp parses into an LpEmphasis ceiling via the enum`() {
+    fun `--lp parses an emphasis plus technique deltas into an LpConfig ceiling`() {
         val opts = CommonOptions()
-        parseArgs(arrayOf("--lp", "conservative"), commonFlagSpecs(opts)) { }
-        assertTrue(opts.lp == "conservative", "lp=${opts.lp}")
-        // The token routes through the same enum the help/error text is drawn from.
-        assertEquals(LpEmphasis.CONSERVATIVE, LpEmphasis.fromId(requireNotNull(opts.lp)))
-        assertEquals(null, LpEmphasis.fromId("bogus"))
+        parseArgs(arrayOf("--lp", "aggressive,-cuts"), commonFlagSpecs(opts)) { }
+        assertTrue(opts.lp == "aggressive,-cuts", "lp=${opts.lp}")
+        // The token routes through LpConfig.parse (emphasis + per-technique delta).
+        val cfg = LpConfig.parse(requireNotNull(opts.lp))
+        assertEquals(LpEmphasis.AGGRESSIVE, cfg.emphasis)
+        assertEquals(false, cfg.resolved(LpTechnique.CUTS))
+        assertEquals(true, cfg.resolved(LpTechnique.BOUNDING))
     }
 
     @Test

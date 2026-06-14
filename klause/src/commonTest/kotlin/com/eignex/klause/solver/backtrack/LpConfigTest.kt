@@ -83,13 +83,31 @@ class LpConfigTest {
     }
 
     @Test
-    fun `cappedAt lowers the emphasis and never raises it`() {
-        assertEquals(LpEmphasis.DEFAULT, LpConfig(LpEmphasis.AGGRESSIVE).cappedAt(LpEmphasis.DEFAULT).emphasis)
-        assertEquals(LpEmphasis.OFF, LpConfig(LpEmphasis.DEFAULT).cappedAt(LpEmphasis.OFF).emphasis)
-        // Capping at a higher ceiling is a no-op (the config stays where it is).
-        assertEquals(
-            LpEmphasis.CONSERVATIVE,
-            LpConfig(LpEmphasis.CONSERVATIVE).cappedAt(LpEmphasis.AGGRESSIVE).emphasis,
-        )
+    fun `parse emphasis plus deltas toggles individual techniques`() {
+        // aggressive minus cuts: full LP but no cut rounds.
+        val minusCuts = LpConfig.parse("aggressive,-cuts")
+        assertEquals(LpEmphasis.AGGRESSIVE, minusCuts.emphasis)
+        assertFalse(minusCuts.resolved(LpTechnique.CUTS))
+        assertTrue(minusCuts.resolved(LpTechnique.BOUNDING))
+        // off plus flow: no LP except the preemptive flow prune.
+        val justFlow = LpConfig.parse("off,+cumulative-flow")
+        assertEquals(LpEmphasis.OFF, justFlow.emphasis)
+        assertTrue(justFlow.resolved(LpTechnique.CUMULATIVE_FLOW))
+        assertFalse(justFlow.resolved(LpTechnique.BOUNDING))
+        // A non-delta token after an emphasis is rejected.
+        assertFailsWith<IllegalStateException> { LpConfig.parse("aggressive,cuts") }
+        assertFailsWith<IllegalStateException> { LpConfig.parse("default,+nonsense") }
+    }
+
+    @Test
+    fun `cappedUnder lowers the emphasis and applies the ceiling overrides`() {
+        val arm = LpConfig(LpEmphasis.AGGRESSIVE)
+        // Capping under DEFAULT lowers the emphasis; a higher ceiling is a no-op.
+        assertEquals(LpEmphasis.DEFAULT, arm.cappedUnder(LpConfig(LpEmphasis.DEFAULT)).emphasis)
+        assertEquals(LpEmphasis.AGGRESSIVE, arm.cappedUnder(LpConfig(LpEmphasis.AGGRESSIVE)).emphasis)
+        // A `-cuts` ceiling forces cuts off even on the AGGRESSIVE arm.
+        val capped = arm.cappedUnder(LpConfig.parse("aggressive,-cuts"))
+        assertFalse(capped.resolved(LpTechnique.CUTS))
+        assertTrue(capped.resolved(LpTechnique.BOUNDING))
     }
 }

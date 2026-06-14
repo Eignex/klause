@@ -50,9 +50,10 @@ internal class CommonOptions {
      *  `aggressive`. Parsed into a `PresolveConfig` by `PresolveConfig.parse`. */
     var presolve: String? = null
 
-    /** `--lp CEILING`: the LP-relaxation emphasis ceiling for the portfolio — `off` | `conservative`
-     *  | `default` | `aggressive`. Absent ⇒ uncapped (the pool spreads the LP intensity itself, so LP
-     *  is on by default); `off` disables LP across the portfolio. Parsed by `LpEmphasis.fromId`. */
+    /** `--lp CEILING`: the LP-relaxation ceiling for the portfolio — an emphasis (`off` | `conservative`
+     *  | `default` | `aggressive`) optionally followed by `+/-<technique>` deltas (e.g.
+     *  `aggressive,-cuts`). Absent ⇒ uncapped (the pool spreads the LP intensity itself, so LP is on by
+     *  default); `off` disables LP across the portfolio. Parsed by `LpConfig.parse`. */
     var lp: String? = null
 
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
@@ -202,7 +203,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.KLAUSE,
         valueLabel = "ceiling",
-        help = "LP relaxation ceiling: " + LpEmphasis.ids(),
+        help = "LP relaxation ceiling: " + LpEmphasis.ids() + "; append +/-<technique> to toggle one",
         default = LpEmphasis.AGGRESSIVE.id,
     ) { o.lp = it },
     FlagSpec(

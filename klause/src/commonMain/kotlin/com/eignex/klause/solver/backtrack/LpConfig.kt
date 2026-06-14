@@ -132,12 +132,13 @@ class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map
     /** Whether [technique] is permitted: an explicit override wins, else its tier ≤ the emphasis. */
     fun resolved(technique: LpTechnique): Boolean = overrides[technique] ?: (technique.timing in emphasis.timings)
 
-    /** This config capped at [ceiling] for a portfolio arm: the lower emphasis, with any override that
-     *  would force a technique above the ceiling dropped (the ceiling is an upper bound, never raises). */
-    fun cappedAt(ceiling: LpEmphasis): LpConfig {
-        val cappedEmphasis = if (emphasis.ordinal <= ceiling.ordinal) emphasis else ceiling
-        val cappedOverrides = overrides.filterKeys { it.timing in ceiling.timings || overrides[it] == false }
-        return LpConfig(cappedEmphasis, cappedOverrides)
+    /** This config capped under [ceiling] for a portfolio arm: the lower emphasis, with the ceiling's
+     *  per-technique overrides applied on top (so a `--lp aggressive,-cuts` ceiling forces cuts off on
+     *  every arm, and a `--lp off,+energetic` ceiling forces just that one on). The ceiling's overrides
+     *  win over the arm's own; an all-`AGGRESSIVE`, no-override ceiling leaves the arm unchanged. */
+    fun cappedUnder(ceiling: LpConfig): LpConfig {
+        val capped = if (emphasis.ordinal <= ceiling.emphasis.ordinal) emphasis else ceiling.emphasis
+        return LpConfig(capped, overrides + ceiling.overrides)
     }
 
     /** Predefined configs and the spec-string [parse]r. */
@@ -152,22 +153,42 @@ class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map
         val AGGRESSIVE = LpConfig(LpEmphasis.AGGRESSIVE)
 
         /**
-         * Parse a `--lp` / `klause.lp` spec:
-         *  - an emphasis level (`default`/`auto`, `off`/`none`, `conservative`/`fast`, `aggressive`),
-         *  - `all` — every technique forced on,
-         *  - or a comma-separated list of technique ids, each forced on with all others forced off.
+         * Parse a `--lp` / `klause.lp` spec into an [emphasis] + per-technique [overrides]:
+         *  - an emphasis level alone (`default`/`auto`, `off`/`none`, `conservative`/`fast`,
+         *    `aggressive`) — e.g. `aggressive`;
+         *  - an emphasis level followed by `+<technique>` / `-<technique>` deltas that force individual
+         *    techniques on/off on top of it — e.g. `aggressive,-cuts` (full LP but no cut rounds),
+         *    `off,+cumulative-flow` (no LP except the flow prune). This is what enables/disables a
+         *    single technique, which a bare list cannot;
+         *  - `all` — every technique forced on;
+         *  - a bare comma-separated technique-id list — each forced on, all others off (force-exactly).
          *
          * An unknown token throws.
          */
         fun parse(spec: String?): LpConfig {
             val s = spec?.trim()?.lowercase().orEmpty()
-            LpEmphasis.fromId(s)?.let { return LpConfig(it) }
+            if (s.isEmpty()) return AUTO
             if (s == "all") return LpConfig(LpEmphasis.AGGRESSIVE, LpTechnique.entries.associateWith { true })
-            val on = s.split(",").map { token ->
-                val t = token.trim()
-                LpTechnique.fromId(t) ?: error("unknown LP technique `$t`; expected ${LpTechnique.ids()}")
-            }.toSet()
+            val tokens = s.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            // Emphasis-base form: first token is a level, the rest are +/- deltas.
+            LpEmphasis.fromId(tokens.first())?.let { base ->
+                val overrides = HashMap<LpTechnique, Boolean>()
+                for (tok in tokens.drop(1)) {
+                    val on = when (tok.firstOrNull()) {
+                        '+' -> true
+                        '-' -> false
+                        else -> error("after an emphasis, `$tok` must be +<technique> or -<technique>")
+                    }
+                    overrides[techniqueOf(tok.substring(1))] = on
+                }
+                return LpConfig(base, overrides)
+            }
+            // Bare force-list: the named techniques on, all others off.
+            val on = tokens.map { techniqueOf(it) }.toSet()
             return LpConfig(LpEmphasis.AGGRESSIVE, LpTechnique.entries.associateWith { it in on })
         }
+
+        private fun techniqueOf(id: String): LpTechnique =
+            LpTechnique.fromId(id) ?: error("unknown LP technique `$id`; expected ${LpTechnique.ids()}")
     }
 }
