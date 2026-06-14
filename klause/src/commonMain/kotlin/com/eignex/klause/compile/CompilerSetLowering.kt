@@ -65,93 +65,82 @@ internal fun Lowering.materializeSet(expr: SetExpr): SetLayout = when (expr) {
         error("nominal set literal cannot be materialised without a nominal-set var operand on the other side")
     }
 
-    is SetUnion -> {
-        val l = materializeSet(expr.left)
-        val r = materializeSet(expr.right)
-        val universe = unionUniverse(l.universe, r.universe)
-        val ids = IntArray(universe.size) { newBoolVar() }
-        for (i in universe.indices) {
-            val v = universe[i]
-            val li = l.indexOf(v)
-            val ri = r.indexOf(v)
-            val outLit = Lit.make(ids[i], positive = true)
-            // out ↔ (left[v] ∨ right[v])
-            if (li >= 0 && ri >= 0) {
-                val ll = Lit.make(l.indicatorBoolIds[li], positive = true)
-                val rl = Lit.make(r.indicatorBoolIds[ri], positive = true)
+    // out ↔ (left[v] ∨ right[v]); result universe is both operands'.
+    is SetUnion -> materializeSetBinary(expr.left, expr.right, fullUnion = true) { outLit, ll, rl ->
+        when {
+            ll != null && rl != null -> {
                 factors += Clause(intArrayOf(Lit.negate(ll), outLit))
                 factors += Clause(intArrayOf(Lit.negate(rl), outLit))
                 factors += Clause(intArrayOf(Lit.negate(outLit), ll, rl))
-            } else if (li >= 0) {
-                val ll = Lit.make(l.indicatorBoolIds[li], positive = true)
+            }
+
+            ll != null -> {
                 factors += Clause(intArrayOf(Lit.negate(ll), outLit))
                 factors += Clause(intArrayOf(Lit.negate(outLit), ll))
-            } else if (ri >= 0) {
-                val rl = Lit.make(r.indicatorBoolIds[ri], positive = true)
+            }
+
+            rl != null -> {
                 factors += Clause(intArrayOf(Lit.negate(rl), outLit))
                 factors += Clause(intArrayOf(Lit.negate(outLit), rl))
-            } else {
-                // Shouldn't be reachable — the universe was built from l and r.
-                factors += Clause(intArrayOf(Lit.negate(outLit)))
             }
+
+            else -> factors += Clause(intArrayOf(Lit.negate(outLit))) // unreachable: universe ⊆ l ∪ r
         }
-        SetLayout(universe, ids)
     }
 
-    is SetIntersect -> {
-        val l = materializeSet(expr.left)
-        val r = materializeSet(expr.right)
-        // For ∩, only elements in both universes can be in the result; everything else is
-        // forced false. We still allocate the full union to keep universe arithmetic
-        // uniform downstream, but pin out-of-intersection indicators to false.
-        val universe = unionUniverse(l.universe, r.universe)
-        val ids = IntArray(universe.size) { newBoolVar() }
-        for (i in universe.indices) {
-            val v = universe[i]
-            val li = l.indexOf(v)
-            val ri = r.indexOf(v)
-            val outLit = Lit.make(ids[i], positive = true)
-            if (li >= 0 && ri >= 0) {
-                val ll = Lit.make(l.indicatorBoolIds[li], positive = true)
-                val rl = Lit.make(r.indicatorBoolIds[ri], positive = true)
-                // out ↔ (ll ∧ rl)
-                factors += Clause(intArrayOf(Lit.negate(outLit), ll))
-                factors += Clause(intArrayOf(Lit.negate(outLit), rl))
-                factors += Clause(intArrayOf(outLit, Lit.negate(ll), Lit.negate(rl)))
-            } else {
-                // Element appears in only one universe → never in intersection.
-                factors += Clause(intArrayOf(Lit.negate(outLit)))
-            }
+    // out ↔ (left[v] ∧ right[v]); elements in only one universe can never be in the intersection.
+    is SetIntersect -> materializeSetBinary(expr.left, expr.right, fullUnion = true) { outLit, ll, rl ->
+        if (ll != null && rl != null) {
+            factors += Clause(intArrayOf(Lit.negate(outLit), ll))
+            factors += Clause(intArrayOf(Lit.negate(outLit), rl))
+            factors += Clause(intArrayOf(outLit, Lit.negate(ll), Lit.negate(rl)))
+        } else {
+            factors += Clause(intArrayOf(Lit.negate(outLit)))
         }
-        SetLayout(universe, ids)
     }
 
-    is SetDiff -> {
-        val l = materializeSet(expr.left)
-        val r = materializeSet(expr.right)
-        // S \ T: out[v] = S[v] ∧ ¬T[v]. Universe is S's universe (anything outside S can't
-        // be in the difference). Elements in S but not T's universe: out = S[v] directly.
-        val universe = l.universe.copyOf()
-        val ids = IntArray(universe.size) { newBoolVar() }
-        for (i in universe.indices) {
-            val v = universe[i]
-            val outLit = Lit.make(ids[i], positive = true)
-            val ll = Lit.make(l.indicatorBoolIds[i], positive = true)
-            val ri = r.indexOf(v)
-            if (ri >= 0) {
-                val rl = Lit.make(r.indicatorBoolIds[ri], positive = true)
-                // out ↔ (ll ∧ ¬rl)
-                factors += Clause(intArrayOf(Lit.negate(outLit), ll))
-                factors += Clause(intArrayOf(Lit.negate(outLit), Lit.negate(rl)))
-                factors += Clause(intArrayOf(outLit, Lit.negate(ll), rl))
-            } else {
-                // out ↔ ll  (nothing to subtract for this element)
-                factors += Clause(intArrayOf(Lit.negate(outLit), ll))
-                factors += Clause(intArrayOf(outLit, Lit.negate(ll)))
-            }
+    // S \ T: out ↔ (left[v] ∧ ¬right[v]); result universe is S's, so `ll` is always present.
+    is SetDiff -> materializeSetBinary(expr.left, expr.right, fullUnion = false) { outLit, ll, rl ->
+        requireNotNull(ll) { "set diff: left indicator missing for a result-universe element" }
+        if (rl != null) {
+            factors += Clause(intArrayOf(Lit.negate(outLit), ll))
+            factors += Clause(intArrayOf(Lit.negate(outLit), Lit.negate(rl)))
+            factors += Clause(intArrayOf(outLit, Lit.negate(ll), rl))
+        } else {
+            // Nothing to subtract for this element → out ↔ ll.
+            factors += Clause(intArrayOf(Lit.negate(outLit), ll))
+            factors += Clause(intArrayOf(outLit, Lit.negate(ll)))
         }
-        SetLayout(universe, ids)
     }
+}
+
+/**
+ * Shared scaffold for the binary set-materialisation ops (∪, ∩, \). Materialises both operands,
+ * allocates one fresh indicator bool per result-universe element, and for each element invokes
+ * [emit] with the result literal plus each operand's indicator literal at that element (`null`
+ * when the element is absent from that operand's universe). [fullUnion] picks the result universe:
+ * the union of both operand universes (∪, ∩), or just the left operand's (\, where the result can
+ * only hold left-side elements). The per-element clause logic lives in [emit].
+ */
+private fun Lowering.materializeSetBinary(
+    left: SetExpr,
+    right: SetExpr,
+    fullUnion: Boolean,
+    emit: (outLit: Int, ll: Int?, rl: Int?) -> Unit,
+): SetLayout {
+    val l = materializeSet(left)
+    val r = materializeSet(right)
+    val universe = if (fullUnion) unionUniverse(l.universe, r.universe) else l.universe.copyOf()
+    val ids = IntArray(universe.size) { newBoolVar() }
+    for (i in universe.indices) {
+        val v = universe[i]
+        val li = l.indexOf(v)
+        val ri = r.indexOf(v)
+        val ll = if (li >= 0) Lit.make(l.indicatorBoolIds[li], positive = true) else null
+        val rl = if (ri >= 0) Lit.make(r.indicatorBoolIds[ri], positive = true) else null
+        emit(Lit.make(ids[i], positive = true), ll, rl)
+    }
+    return SetLayout(universe, ids)
 }
 
 /** Sorted ascending union of two universe arrays. */
@@ -186,8 +175,7 @@ internal fun Lowering.assertSetIn(expr: SetIn) {
             ),
         )
     }
-    val expanded = if (pieces.size == 1) pieces[0] else Or(pieces)
-    assertExpr(expanded)
+    assertExpr(orOf(pieces))
 }
 
 internal fun Lowering.assertSetNominalIn(expr: SetNominalIn) {
@@ -280,7 +268,7 @@ internal fun Lowering.reifySetIn(expr: SetIn): Int {
             ),
         )
     }
-    return lowerToLit(if (pieces.size == 1) pieces[0] else Or(pieces))
+    return lowerToLit(orOf(pieces))
 }
 
 internal fun Lowering.reifySetNominalIn(expr: SetNominalIn): Int {
@@ -308,7 +296,7 @@ internal fun Lowering.reifySetSubsetOf(expr: SetSubsetOf): Int {
             Not(ll)
         }
     }
-    return lowerToLit(if (pieces.size == 1) pieces[0] else And(pieces))
+    return lowerToLit(andOf(pieces))
 }
 
 internal fun Lowering.reifySetDisjoint(expr: SetDisjoint): Int {
@@ -326,7 +314,7 @@ internal fun Lowering.reifySetDisjoint(expr: SetDisjoint): Int {
     return if (pieces.isEmpty()) {
         trueLit()
     } else {
-        lowerToLit(if (pieces.size == 1) pieces[0] else And(pieces))
+        lowerToLit(andOf(pieces))
     }
 }
 
@@ -351,7 +339,7 @@ internal fun Lowering.reifySetEq(expr: SetEq): Int {
             else -> error("impossible")
         }
     }
-    return lowerToLit(if (pieces.size == 1) pieces[0] else And(pieces))
+    return lowerToLit(andOf(pieces))
 }
 
 // -----------------------------------------------------------------------------------
@@ -417,3 +405,9 @@ private fun Lowering.indicatorBoolExpr(boolId: Int): BoolExpr {
 
 /** Resolve a [SetExpr] to a set-var name if it's a bare [SetRef]; else null. */
 private fun setRefName(expr: SetExpr): String? = (expr as? SetRef)?.name
+
+/** Combine per-element [pieces] into one [BoolExpr]: the lone piece if there's just one, else [And]. */
+private fun andOf(pieces: List<BoolExpr>): BoolExpr = if (pieces.size == 1) pieces[0] else And(pieces)
+
+/** Combine per-element [pieces] into one [BoolExpr]: the lone piece if there's just one, else [Or]. */
+private fun orOf(pieces: List<BoolExpr>): BoolExpr = if (pieces.size == 1) pieces[0] else Or(pieces)
