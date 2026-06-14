@@ -70,6 +70,7 @@ internal class SmtLibOutput : OutputProtocol {
             println("; nodes=${stats.nodes.sum.toLong()}")
             println("; failures=${stats.fails.sum.toLong()}")
             println("; propagations=${stats.propagations.sum.toLong()}")
+            for ((k, v) in lpStatPairs(stats)) println("; $k=$v")
         }
     }
 }

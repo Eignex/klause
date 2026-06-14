@@ -133,11 +133,17 @@ internal object SolveCore {
             maxLearnedClauses = 20_000,
         )
         val (_, cancel) = deadlineCancellation(common)
+        // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
+        // LP-success measurement under `-s`); absent ⇒ keep the base config (LP off for naked CP).
+        val lpConfig = common.lp?.let {
+            runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
+        } ?: base.lpConfig
         val params = applyBacktrackParams(
             base.copy(
                 randomSeed = common.randomSeed ?: base.randomSeed,
                 cancellation = cancel,
                 onEvent = verboseListener(common.verbose),
+                lpConfig = lpConfig,
             ),
             EngineParams(common.engineParams),
             allowSelectors = allowSelectors,

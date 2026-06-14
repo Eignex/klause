@@ -151,6 +151,7 @@ internal class MiniZincOutput : OutputProtocol {
             println("%%%mzn-stat: propagations=${stats.propagations.sum.toLong()}")
             println("%%%mzn-stat: relearned=${stats.relearned.sum.toLong()}")
             if (stats.peakDepth.max.isFinite()) println("%%%mzn-stat: peakDepth=${stats.peakDepth.max.toLong()}")
+            for ((k, v) in lpStatPairs(stats)) println("%%%mzn-stat: $k=$v")
         }
         println("%%%mzn-stat-end")
     }

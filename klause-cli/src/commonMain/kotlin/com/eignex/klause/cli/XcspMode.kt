@@ -78,6 +78,7 @@ internal class XcspOutput : OutputProtocol {
             println("c restarts=${stats.restarts.sum.toLong()}")
             println("c propagations=${stats.propagations.sum.toLong()}")
             if (stats.peakDepth.max.isFinite()) println("c peakDepth=${stats.peakDepth.max.toLong()}")
+            for ((k, v) in lpStatPairs(stats)) println("c $k=$v")
         }
     }
 }

@@ -43,8 +43,21 @@ data class SolveStats(
     val learnedClauses: SumResult = ZERO_COUNT,
     /** Clauses conflict analysis re-derived identically — a livelock indicator when large. */
     val relearned: SumResult = ZERO_COUNT,
-    /** Nodes pruned by the LP-relaxation bound (#20): infeasible relaxation or bound ≥ incumbent. */
+    /** Node LP-bounding passes that built and solved a relaxation — the denominator for the prune /
+     *  fix / pivot rates. `lpPruned` alone is meaningless without knowing how many solves it took. */
+    val lpSolves: SumResult = ZERO_COUNT,
+    /** Nodes pruned by the LP-relaxation bound (#20): infeasible relaxation or bound ≥ incumbent.
+     *  Split into [lpInfeasible] (relaxation infeasible) and the remainder (bound dominated). */
     val lpPruned: SumResult = ZERO_COUNT,
+    /** Subset of [lpPruned] where the relaxation itself was infeasible (a feasibility filter, not a
+     *  bound); `lpPruned − lpInfeasible` is the bound-dominated count. */
+    val lpInfeasible: SumResult = ZERO_COUNT,
+    /** Root-node LP relaxation objective (the live dual bound at decision level 0), or NaN when the
+     *  LP never solved at the root. Against the final objective this is the integrality gap — the
+     *  most direct measure of relaxation tightness. */
+    val rootLpBound: Double = Double.NaN,
+    /** Wall time (ms) spent inside LP bounding — the cost side of the LP ROI (benefit = prunes/fixes). */
+    val lpMs: Long = 0L,
     /** Domain reductions applied by LP reduced-cost fixing (#21). */
     val lpFixed: SumResult = ZERO_COUNT,
     /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
@@ -91,7 +104,16 @@ data class SolveStats(
             restarts = SumResult(restarts.sum + other.restarts.sum),
             propagations = SumResult(propagations.sum + other.propagations.sum),
             learnedClauses = SumResult(learnedClauses.sum + other.learnedClauses.sum),
+            lpSolves = SumResult(lpSolves.sum + other.lpSolves.sum),
             lpPruned = SumResult(lpPruned.sum + other.lpPruned.sum),
+            lpInfeasible = SumResult(lpInfeasible.sum + other.lpInfeasible.sum),
+            // Same root across workers, so the tightest finite bound represents it; NaN defers.
+            rootLpBound = when {
+                rootLpBound.isNaN() -> other.rootLpBound
+                other.rootLpBound.isNaN() -> rootLpBound
+                else -> maxOf(rootLpBound, other.rootLpBound)
+            },
+            lpMs = lpMs + other.lpMs,
             lpFixed = SumResult(lpFixed.sum + other.lpFixed.sum),
             lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
             lpCuts = SumResult(lpCuts.sum + other.lpCuts.sum),
@@ -131,7 +153,9 @@ internal class SolveStatsSink(val backend: String) {
     val propagations: CountStat = CountStat()
     val learnedClauses: CountStat = CountStat()
     val relearned: CountStat = CountStat()
+    val lpSolves: CountStat = CountStat()
     val lpPruned: CountStat = CountStat()
+    val lpInfeasible: CountStat = CountStat()
     val lpFixed: CountStat = CountStat()
     val lpPivots: CountStat = CountStat()
     val lpCuts: CountStat = CountStat()
@@ -144,6 +168,11 @@ internal class SolveStatsSink(val backend: String) {
 
     private var startMark: TimeMark? = null
     private var endElapsedMs: Long? = null
+
+    /** Root-node LP bound (NaN until the LP solves at decision level 0); accumulated LP wall time. */
+    private var rootLpBound: Double = Double.NaN
+    private var lpMs: Long = 0L
+    private var lpClock: TimeMark? = null
     var timedOut: Boolean = false
 
     fun start() {
@@ -191,9 +220,38 @@ internal class SolveStatsSink(val backend: String) {
         relearned.update(1.0)
     }
 
-    /** A node whose subtree was cut by the LP-relaxation bound (#20). */
+    /** One node LP-bounding pass that built and solved a relaxation (the rate denominator). */
+    fun observeLpSolve() {
+        lpSolves.update(1.0)
+    }
+
+    /** A node whose subtree was cut by the LP-relaxation bound (#20) because its bound dominated the
+     *  incumbent (or an LP-derived deduction emptied a domain). */
     fun observeLpPrune() {
         lpPruned.update(1.0)
+    }
+
+    /** A node pruned because the LP relaxation was infeasible — counted in both [lpPruned] (the
+     *  total) and [lpInfeasible] (the feasibility-filter share). */
+    fun observeLpInfeasiblePrune() {
+        lpPruned.update(1.0)
+        lpInfeasible.update(1.0)
+    }
+
+    /** Record the root-node (decision level 0) LP relaxation objective; last write at the root wins,
+     *  so it reflects the strengthened post-cut bound. Ignored off the root or for a non-finite value. */
+    fun observeRootLpBound(decisionLevel: Int, value: Double) {
+        if (decisionLevel == 0 && value.isFinite()) rootLpBound = value
+    }
+
+    /** Bracket LP-bounding wall time: [lpClockStart] then [lpClockStop] adds the interval to [lpMs]. */
+    fun lpClockStart() {
+        lpClock = Monotonic.markNow()
+    }
+    fun lpClockStop() {
+        val mark = lpClock ?: return
+        lpMs += mark.elapsedNow().inWholeMilliseconds
+        lpClock = null
     }
 
     /** One domain reduction applied by LP reduced-cost fixing (#21). */
@@ -246,7 +304,11 @@ internal class SolveStatsSink(val backend: String) {
             propagations = propagations.read(),
             learnedClauses = learnedClauses.read(),
             relearned = relearned.read(),
+            lpSolves = lpSolves.read(),
             lpPruned = lpPruned.read(),
+            lpInfeasible = lpInfeasible.read(),
+            rootLpBound = rootLpBound,
+            lpMs = lpMs,
             lpFixed = lpFixed.read(),
             lpPivots = lpPivots.read(),
             lpCuts = lpCuts.read(),
