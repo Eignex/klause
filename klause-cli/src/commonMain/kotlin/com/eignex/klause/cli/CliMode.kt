@@ -74,8 +74,9 @@ internal enum class FlagGroup(val title: String) {
  * One recognised flag. [takesValue] flags consume the following argument; [apply] receives it
  * (or `null` for boolean flags). The parser derives its value-flag set from these specs, so
  * routing and parsing never drift — and `--help` renders its option list from [group] /
- * [valueLabel] / [help], so the help text can't drift from the real flags either. A `null`
- * [help] hides the flag from `--help` (aliases / no-op compatibility flags / advanced knobs).
+ * [valueLabel] / [help] / [default], so the help text can't drift from the real flags either.
+ * A `null` [help] hides the flag from `--help` (aliases / no-op compat flags / advanced knobs).
+ * [default], when set, is shown as `(default: X)` after the description.
  */
 internal class FlagSpec(
     val names: List<String>,
@@ -83,6 +84,7 @@ internal class FlagSpec(
     val group: FlagGroup = FlagGroup.KLAUSE,
     val valueLabel: String? = null,
     val help: String? = null,
+    val default: String? = null,
     val apply: (String?) -> Unit,
 )
 
@@ -154,6 +156,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.STANDARD,
         valueLabel = "i",
         help = "solve with i parallel cores (portfolio engines only)",
+        default = "1",
     ) {
         o.parallel = requireNotNull(it).toIntOrNull() ?: usageError("-p expects an integer, got `$it`")
     },
@@ -162,7 +165,9 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.ENGINE,
         valueLabel = "name",
-        help = "${Engine.ids()} (default: ${defaultEngine().id}; -f selects cp)",
+        help = "${Engine.ids()}; -f selects cp",
+        // env-aware: KLAUSE_FZN_ENGINE overrides the built-in default, and --help reflects it.
+        default = defaultEngine().id,
     ) { o.engine = it },
     FlagSpec(
         listOf("--param"),
@@ -184,6 +189,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.KLAUSE,
         valueLabel = "strength",
         help = "presolve strength: " + PresolveEmphasis.entries.joinToString(" | ") { it.name.lowercase() },
+        default = PresolveEmphasis.DEFAULT.name.lowercase(),
     ) { o.presolve = it },
     FlagSpec(
         listOf("-h", "--help"),

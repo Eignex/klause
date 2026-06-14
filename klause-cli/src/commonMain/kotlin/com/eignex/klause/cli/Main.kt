@@ -93,12 +93,14 @@ private fun renderOptions(specs: List<FlagSpec>): String {
     }.joinToString("\n\n")
 }
 
-/** One `  -x, --long <label>   description` line; an over-long names column wraps to its own line. */
+/** One `  -x, --long <label>   description (default: X)` line; an over-long names column wraps to
+ *  its own line, and the `(default: …)` suffix is appended only when the spec carries one. */
 private fun renderOptionRow(spec: FlagSpec): String {
     val left = "  " + spec.names.joinToString(", ") + spec.valueLabel?.let { " <$it>" }.orEmpty()
     val pad = HELP_DESC_COLUMN - left.length
     val gap = if (pad > 0) " ".repeat(pad) else "\n" + " ".repeat(HELP_DESC_COLUMN)
-    return left + gap + spec.help
+    val default = spec.default?.let { " (default: $it)" }.orEmpty()
+    return left + gap + spec.help + default
 }
 
 /** Select the mode: an explicit `--format` wins, else the file extension, else MiniZinc. */
