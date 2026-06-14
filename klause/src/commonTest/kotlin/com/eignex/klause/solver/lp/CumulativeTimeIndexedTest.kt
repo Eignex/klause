@@ -97,6 +97,100 @@ class CumulativeTimeIndexedTest {
         assertEquals(7.0, sumStartBound(p, intArrayOf(0, 1, 2), timeIndexed = true), eps)
     }
 
+    /** Makespan LP bound with the energetic row (#430) on and the time-indexed rows [ti] on/off. */
+    private fun energeticVsTiBound(problem: Problem, makespanVar: Int, ti: Boolean): Double {
+        val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
+        val relaxation = CpToLpRelaxation(problem, obj, cumulative = true, cumulativeTimeIndexed = ti)
+            .build(PropagationSession(problem))
+        val sol = DualSimplex(relaxation.model).solve()
+        assertEquals(LpStatus.OPTIMAL, sol.status)
+        return sol.objectiveValue + relaxation.objectiveConstant
+    }
+
+    @Test
+    fun `time-indexed resource coupling exceeds the energetic makespan row`() {
+        // #472 gate: the issue assumed the energetic area row (#430) dominates the time-indexed
+        // makespan, so the model would be redundant for makespan. It is not — the cross-task
+        // resource rows lift the bound past the energetic window on this multi-capacity profile.
+        val p = makespanProblem(
+            starts = arrayOf(IntDomain(0, 6), IntDomain(3, 5), IntDomain(4, 9), IntDomain(2, 6)),
+            durations = intArrayOf(3, 2, 3, 2),
+            resources = intArrayOf(3, 1, 2, 2),
+            capacity = 3,
+            horizon = 14,
+        )
+        val energetic = energeticVsTiBound(p, makespanVar = 4, ti = false)
+        val both = energeticVsTiBound(p, makespanVar = 4, ti = true)
+        assertTrue(both > energetic + eps, "time-indexed did not strengthen: energetic=$energetic both=$both")
+    }
+
+    @Test
+    fun `disaggregated makespan rows do not strengthen the expected-start channel`() {
+        // #472 scope: the proposed disaggregated `M ≥ (t+durᵢ)·x_{i,t}` rows (and the equivalent
+        // completion-indicator step rows) cannot beat the plain channel — any makespan bound linear
+        // in one task's x is dominated by the expected completion `M ≥ startᵢ + durᵢ` already gives.
+        // Built by hand so the negative result is documented independently of the production builder.
+        val est = intArrayOf(0, 0, 1)
+        val lst = intArrayOf(3, 3, 4)
+        val dur = intArrayOf(2, 2, 2)
+        val res = intArrayOf(1, 1, 1)
+        val cap = 2
+        val channel = handBuiltTiMakespan(est, lst, dur, res, cap, disaggregate = false)
+        val disagg = handBuiltTiMakespan(est, lst, dur, res, cap, disaggregate = true)
+        assertEquals(channel, disagg, eps, "disaggregation moved the bound: channel=$channel disagg=$disagg")
+    }
+
+    /** Minimum-makespan time-indexed LP, built directly; [disaggregate] adds `M ≥ (t+durᵢ)·x_{i,t}`. */
+    private fun handBuiltTiMakespan(
+        est: IntArray,
+        lst: IntArray,
+        dur: IntArray,
+        res: IntArray,
+        cap: Int,
+        disaggregate: Boolean,
+    ): Double {
+        val n = est.size
+        val t0 = est.min()
+        val t1 = (0 until n).maxOf { lst[it] + dur[it] }
+        val b = LpBuilder()
+        val mk = b.addVar(t0.toLong(), t1.toLong(), cost = 1L)
+        val xCols = Array(n) { IntArray(lst[it] - est[it] + 1) }
+        for (i in 0 until n) {
+            val assign = LinkedHashMap<Int, Long>()
+            val chan = LinkedHashMap<Int, Long>()
+            for (k in xCols[i].indices) {
+                val t = est[i] + k
+                val col = b.addVar(0L, 1L)
+                xCols[i][k] = col
+                assign[col] = 1L
+                chan[col] = t.toLong()
+            }
+            b.addRow(assign, Relation.EQ, 1L)
+            val start = b.addVar(est[i].toLong(), lst[i].toLong())
+            chan[start] = -1L
+            b.addRow(chan, Relation.EQ, 0L)
+            b.addRow(mapOf(mk to 1L, start to -1L), Relation.GE, dur[i].toLong())
+            if (disaggregate) {
+                for (k in xCols[i].indices) {
+                    val t = est[i] + k
+                    b.addRow(mapOf(mk to 1L, xCols[i][k] to -(t + dur[i]).toLong()), Relation.GE, 0L)
+                }
+            }
+        }
+        for (tt in t0 until t1) {
+            val row = LinkedHashMap<Int, Long>()
+            for (i in 0 until n) {
+                val lo = maxOf(est[i], tt - dur[i] + 1)
+                val hi = minOf(lst[i], tt)
+                for (t in lo..hi) row[xCols[i][t - est[i]]] = (row[xCols[i][t - est[i]]] ?: 0L) + res[i]
+            }
+            if (row.isNotEmpty()) b.addRow(row, Relation.LE, cap.toLong())
+        }
+        val sol = DualSimplex(b.build(Sense.MINIMIZE)).solve()
+        assertEquals(LpStatus.OPTIMAL, sol.status)
+        return sol.objectiveValue
+    }
+
     @Test
     fun `oversized horizon is skipped so the bound is unchanged`() {
         // Horizon 100000 ≫ MAX_TI_HORIZON: the builder emits nothing, so the bound matches plain.
