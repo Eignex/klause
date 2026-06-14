@@ -102,6 +102,10 @@ class CliTest {
             // Formats come from the live mode registry.
             assertTrue("minizinc" in out, out)
             assertTrue("xcsp3" in out, out)
+            // Defaults are shown for the flags that carry one.
+            assertTrue("(default: mixed)" in out, out) // engine (env-overridable)
+            assertTrue("(default: default)" in out, out) // presolve strength
+            assertTrue("(default: 1)" in out, out) // parallel cores
         }
     }
 
