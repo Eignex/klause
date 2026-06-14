@@ -210,10 +210,13 @@ enum class PresolvePass(
         PROBLEM,
     }
 
-    /** Lookup by serializable [id]. */
+    /** Lookup by serializable [id] and the id listing for spec parsing / errors. */
     companion object {
         /** The pass whose [id] equals [id], or `null` if none matches. */
         fun fromId(id: String): PresolvePass? = entries.firstOrNull { it.id == id }
+
+        /** Canonical ids joined for error messages: `strengthen | affine | … | symmetry | …`. */
+        fun ids(): String = entries.joinToString(" | ") { it.id }
     }
 }
 
@@ -301,24 +304,43 @@ class PresolveConfig(
         val NONE = PresolveConfig(PresolveEmphasis.OFF)
 
         /**
-         * Parse a `--presolve` / `klause.presolve` spec:
-         *  - an emphasis level (`default` / `auto`, `off` / `none`, `conservative` / `fast`,
-         *    `aggressive`),
-         *  - `all` — every pass forced on,
-         *  - or a comma-separated list of pass ids, each forced on with all others forced off.
+         * Parse a `--presolve` / `klause.presolve` spec into an [emphasis] + per-pass [overrides]:
+         *  - an emphasis level alone (`default` / `auto`, `off` / `none`, `conservative` / `fast`,
+         *    `aggressive`);
+         *  - an emphasis level followed by `+<pass>` / `-<pass>` deltas that force individual passes
+         *    on/off on top of it — e.g. `default,-symmetry` (defaults but no symmetry breaking),
+         *    `off,+symmetry` (no presolve except symmetry breaking). This is what enables/disables a
+         *    single pass, which a bare list cannot;
+         *  - `all` — every pass forced on;
+         *  - a bare comma-separated pass-id list — each forced on, all others off (force-exactly).
          *
          * An unknown token throws.
          */
         fun parse(spec: String?): PresolveConfig {
             val s = spec?.trim()?.lowercase().orEmpty()
-            // An emphasis keyword (incl. blank → DEFAULT) wins; otherwise it's `all` or a pass list.
-            PresolveEmphasis.fromId(s)?.let { return PresolveConfig(it) }
+            if (s.isEmpty()) return AUTO
             if (s == "all") return PresolveConfig(overrides = PresolvePass.entries.associateWith { true })
-            val on = s.split(",").map { token ->
-                PresolvePass.fromId(token.trim()) ?: error("unknown presolve pass `${token.trim()}`")
-            }.toSet()
+            val tokens = s.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            // Emphasis-base form: first token is a level, the rest are +/- deltas.
+            PresolveEmphasis.fromId(tokens.first())?.let { base ->
+                val overrides = HashMap<PresolvePass, Boolean>()
+                for (tok in tokens.drop(1)) {
+                    val on = when (tok.firstOrNull()) {
+                        '+' -> true
+                        '-' -> false
+                        else -> error("after an emphasis, `$tok` must be +<pass> or -<pass>")
+                    }
+                    overrides[passOf(tok.substring(1))] = on
+                }
+                return PresolveConfig(base, overrides)
+            }
+            // Bare force-list: the named passes on, all others off.
+            val on = tokens.map { passOf(it) }.toSet()
             return PresolveConfig(overrides = PresolvePass.entries.associateWith { it in on })
         }
+
+        private fun passOf(id: String): PresolvePass =
+            PresolvePass.fromId(id) ?: error("unknown presolve pass `$id`; expected ${PresolvePass.ids()}")
     }
 }
 
