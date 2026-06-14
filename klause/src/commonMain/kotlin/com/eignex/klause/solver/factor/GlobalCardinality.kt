@@ -306,10 +306,14 @@ class GlobalCardinality(
     /** Per-[PropagationState] propagation scratch (so it is never shared across worker threads).
      *  [cachedDoms] holds each [intVars] entry's domain ref at the last successful propagate, for the
      *  non-opt unchanged-domains fast path; [conflictVars] records the sharpened pigeonhole/flow var
-     *  subset for [conflictReason]. Not snapshotted: the refs only ever *miss* (never falsely skip)
-     *  after a restore and the subset is advisory, so the slot drifts across snapshot/restore. */
+     *  subset for [conflictReason]. [flow] is a reusable max-flow builder, reset and refilled every
+     *  fire so the Régin-GAC pass reuses one graph instead of allocating a fresh [FlowBuilder] per
+     *  call. Not snapshotted: all three are per-fire scratch (the refs only ever *miss* — never
+     *  falsely skip — after a restore, the flow is rebuilt every fire, the subset is advisory), so
+     *  the slot drifts across snapshot/restore. */
     private class PropCache(val cachedDoms: Array<IntDomain?>) {
         var conflictVars: IntArray? = null
+        val flow = FlowBuilder()
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -478,8 +482,9 @@ class GlobalCardinality(
         val totalNodes = baseNodes + 2
 
         // Edge list: parallel arrays (to, cap, rev). `headForward[i]` = first forward
-        // edge index in `edgeTo` for node i; we just keep flat lists per node.
-        val flow = FlowBuilder(totalNodes)
+        // edge index in `edgeTo` for node i; we just keep flat lists per node. Reuse the
+        // per-session builder (reset to an empty graph) instead of allocating a fresh one each fire.
+        val flow = cache.flow.also { it.reset(totalNodes) }
 
         // source → x_i with bounds [1, 1]: reduces to cap 0, excess[source] -= 1, excess[x_i] += 1.
         // Encoded by accumulating into `excess` and adding zero-cap edge.
@@ -603,11 +608,31 @@ class GlobalCardinality(
      * the original capacity), odd indices are residual reverses (initially zero). Flow
      * pushed on edge `e` shows up as `originalCap - cap[e]` for forward edges.
      */
-    private class FlowBuilder(val numNodes: Int) {
-        private val adj: Array<IntArrayList> = Array(numNodes) { IntArrayList() }
+    private class FlowBuilder {
+        // Reusable across propagate calls: [reset] grows the adjacency array on demand, clears the
+        // live `[0, numNodes)` lists, and empties the parallel edge arrays — so a fire refills the
+        // same backing instead of allocating a fresh graph (the dominant per-fire GCC allocation).
+        // Behaviour-identical: every fire rebuilds the full graph before [maxFlow] reads it.
+        private var adj: Array<IntArrayList> = emptyArray()
         private val edgeTo = IntArrayList()
         private val cap = IntArrayList()
         private val originalCap = IntArrayList()
+
+        var numNodes: Int = 0
+            private set
+
+        /** Clear to an empty graph over [nodes] nodes, reusing existing backing where possible. */
+        fun reset(nodes: Int) {
+            if (adj.size < nodes) {
+                val old = adj
+                adj = Array(nodes) { if (it < old.size) old[it] else IntArrayList() }
+            }
+            for (i in 0 until nodes) adj[i].clear()
+            edgeTo.clear()
+            cap.clear()
+            originalCap.clear()
+            numNodes = nodes
+        }
 
         fun addEdge(u: Int, v: Int, c: Int): Int {
             val eIdx = edgeTo.size
