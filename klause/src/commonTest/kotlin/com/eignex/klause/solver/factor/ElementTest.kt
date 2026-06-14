@@ -5,8 +5,11 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -48,5 +51,60 @@ class ElementTest {
             v >= problem.numBoolVars && state.atomIntVar[v - problem.numBoolVars] == 1
         }
         assertTrue(citesResult, "reason must cite the result var's bound; got ${ant.toList()}")
+    }
+
+    @Test
+    fun `backtrack enumeration over Element equals brute force for const and var arrays`() {
+        // Soundness gate for the unchanged-domains fast path: enumerating fires propagate repeatedly
+        // on one PropagationState (fast-path hits on no-op re-fires; misses when a decision shrinks a
+        // var), across push/pop. An unsound skip would drop or admit an assignment, so the enumerated
+        // set must equal brute force. Covers both the const-array and the heavier var-array path.
+
+        // Const array: result(0) = arr[idx(1) - 1], arr = [5,7,9], both vars over [0,10].
+        run {
+            val arr = intArrayOf(5, 7, 9)
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2,
+                intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+                factors = arrayOf<Factor>(Element(idx = 1, result = 0, arr = arr, arrIsVars = false, indexOffset = 1)),
+            )
+            val brute = HashSet<List<Int>>()
+            for (res in 0..10) {
+                for (idxV in 0..10) {
+                    val pos = idxV - 1
+                    if (pos in arr.indices && res == arr[pos]) brute.add(listOf(res, idxV))
+                }
+            }
+            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "const-array Element: enumerated set must equal brute force")
+        }
+
+        // Var array: result(0) = [arr0(2), arr1(3)][idx(1) - 1]; idx in [1,2], others in [0,3].
+        run {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 4,
+                intDomains = arrayOf(IntDomain(0, 3), IntDomain(1, 2), IntDomain(0, 3), IntDomain(0, 3)),
+                factors = arrayOf<Factor>(
+                    Element(idx = 1, result = 0, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 1),
+                ),
+            )
+            val brute = HashSet<List<Int>>()
+            for (res in 0..3) {
+                for (idxV in 1..2) {
+                    for (a0 in 0..3) {
+                        for (a1 in 0..3) {
+                            val sel = if (idxV == 1) a0 else a1
+                            if (res == sel) brute.add(listOf(res, idxV, a0, a1))
+                        }
+                    }
+                }
+            }
+            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "var-array Element: enumerated set must equal brute force")
+        }
     }
 }

@@ -200,13 +200,44 @@ class Element(
         return true
     }
 
+    /** Cached domain refs of every [intVars] entry at the last successful propagate, for the
+     *  unchanged-domains fast path. NOT a [PropagationState.SnapshottablePayload]: Element fires
+     *  often and its var-array `intVars` can be long, so per-push snapshot copies would cost more
+     *  than they save. Soundness doesn't need snapshotting — `IntDomain` is immutable, so per-entry
+     *  reference identity means that domain is unchanged; after a backtrack the restored domain
+     *  objects differ from these (deeper) refs, so the check simply misses (a full propagate runs)
+     *  rather than skipping unsoundly. The slot drifts across snapshot/restore like CDCL watches. */
+    private class Cache(val cachedDoms: Array<IntDomain?>)
+
     /** Element propagation. Both kinds first tighten `idx ∈ [indexOffset, indexOffset+len-1]`,
      *  then filter to full GAC: a **constant** array via [propagateConstArray], a **var** array
-     *  via [propagateVarArray]. */
+     *  via [propagateVarArray].
+     *
+     *  Fast path: if no [intVars] domain reference changed since the last successful propagate, the
+     *  previous fixpoint still holds (every prune/tighten below is a pure function of these domains),
+     *  so it returns immediately — skipping the var-array path's O(len · |dom|) per-position scan on
+     *  the redundant re-fires that fixpoint iteration produces. */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val cache = (state.refPayload[factorId] as? Cache) ?: run {
+            val fresh = Cache(arrayOfNulls(intVars.size))
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        var changed = false
+        for (k in intVars.indices) {
+            if (cache.cachedDoms[k] !== state.intDomains[intVars[k]]) {
+                changed = true
+                break
+            }
+        }
+        if (!changed && cache.cachedDoms[0] != null) return true
+
         if (!state.tightenIntMin(idx, indexOffset)) return false
         if (!state.tightenIntMax(idx, indexOffset + len - 1)) return false
-        return if (arrIsVars) propagateVarArray(state) else propagateConstArray(state)
+        if (!(if (arrIsVars) propagateVarArray(state) else propagateConstArray(state))) return false
+        // Record post-propagate refs so the next (often no-op) fire can short-circuit.
+        for (k in intVars.indices) cache.cachedDoms[k] = state.intDomains[intVars[k]]
+        return true
     }
 
     /**
