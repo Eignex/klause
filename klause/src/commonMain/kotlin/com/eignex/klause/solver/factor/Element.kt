@@ -143,6 +143,53 @@ class Element(
         }
     }
 
+    /**
+     * Full GAC for a **constant** array (`arrIsVars == false`). The element value at each position
+     * is a fixed constant, so the constraint is generalized-arc-consistent exactly when:
+     *   - **idx**: position `i` is supported iff its constant `arr(i)` is a live value of `result`
+     *     (membership, hole-aware — not merely inside result's `[min, max]`); and
+     *   - **result**: value `v` is supported iff some still-reachable position holds the constant
+     *     `v`, so every result value outside the reachable constant set is pruned (interior holes
+     *     included).
+     * Both directions are cheap (O(len) over the array, no domain scan), so unlike the var-array
+     * union this adds no per-position domain-walk cost.
+     */
+    private fun propagateConstArray(state: PropagationState): Boolean {
+        val resultDom = state.intDomains[result]
+        // 2. Prune idx: a position whose constant is not a live result value can never satisfy
+        //    result = arr(i). Reason: result's domain state (holes + bounds) excludes that constant.
+        var toExclude: IntArrayList? = null
+        state.intDomains[idx].forEach { iv ->
+            val pos = iv - indexOffset
+            if (pos in 0 until len && arr[pos] !in resultDom) {
+                (toExclude ?: IntArrayList().also { toExclude = it }).add(iv)
+            }
+        }
+        toExclude?.let { ex ->
+            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
+            for (i in 0 until ex.size) if (!state.excludeIntValue(idx, ex[i], ant)) return false
+        }
+
+        // 3. Prune result to the constants still reachable through idx's surviving positions.
+        val reachable = HashSet<Int>()
+        state.intDomains[idx].forEach { iv ->
+            val pos = iv - indexOffset
+            if (pos in 0 until len) reachable.add(arr[pos])
+        }
+        if (reachable.isEmpty()) return false // no reachable position — infeasible
+        var resExclude: IntArrayList? = null
+        state.intDomains[result].forEach { rv ->
+            if (rv !in reachable) (resExclude ?: IntArrayList().also { resExclude = it }).add(rv)
+        }
+        resExclude?.let { ex ->
+            // Reason: idx's surviving domain (which positions remain) — hole-aware, since dropping
+            // an interior position is what removes a value's support.
+            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx))
+            for (i in 0 until ex.size) if (!state.excludeIntValue(result, ex[i], ant)) return false
+        }
+        return true
+    }
+
     /** Lower / upper bound of the element value at 0-based [pos] under [state]'s domains
      *  (a singleton for the constant table). */
     private fun elemLow(state: PropagationState, pos: Int): Int =
@@ -150,8 +197,10 @@ class Element(
     private fun elemHigh(state: PropagationState, pos: Int): Int =
         if (arrIsVars) state.intDomains[arr[pos]].max else arr[pos]
 
-    /** Full element propagation (domain-consistent on [idx], bounds-consistent on [result],
-     *  with both-way channeling once [idx] is fixed):
+    /** Element propagation. Both kinds first tighten `idx ∈ [indexOffset, indexOffset+len-1]`.
+     *  A **constant** array is then filtered to full GAC (see [propagateConstArray]); a **var**
+     *  array is filtered to idx-domain + result-bounds consistency with both-way channeling once
+     *  [idx] is fixed:
      *   1. `idx ∈ [indexOffset, indexOffset+len-1]` (structural).
      *   2. **Prune idx**: drop position `i` whose element range can't intersect `result`'s
      *      domain — that position can never satisfy `result = arr(i)`.
@@ -162,6 +211,8 @@ class Element(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (!state.tightenIntMin(idx, indexOffset)) return false
         if (!state.tightenIntMax(idx, indexOffset + len - 1)) return false
+
+        if (!arrIsVars) return propagateConstArray(state)
 
         val resultDom = state.intDomains[result]
         // 2. Prune idx positions whose element can't equal result. Collect first (don't mutate
