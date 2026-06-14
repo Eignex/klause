@@ -46,15 +46,23 @@ internal object SolveCore {
             ?: if (common.freeSearch) Engine.CP else defaultEngine()
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. Solution-set-altering passes (symmetry breaking, value
-        // precedence) are dropped for a pure-LS engine (their ordering constraints hurt local
-        // search); solutions are reconstructed at render time.
+        // precedence) are dropped for a pure-LS engine (their ordering constraints are believed to
+        // hurt local search); solutions are reconstructed at render time. An explicit `--presolve`
+        // overrides this default verbatim, so an LS run can be benchmarked *with* those passes on
+        // (the A/B that decides whether the LS-specific stripping is worth keeping).
         val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolveConfig()
-        val config = if (engine.pureLs) base.forLocalSearch() else base
+        val config = if (engine.pureLs && common.presolve == null) base.forLocalSearch() else base
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
         val solutionSetSensitive = !rawSolvable.optimize && (common.allSolutions || (common.solutionCap ?: 1L) > 1L)
         val solvable = rawSolvable.presolved(config, solutionSetSensitive)
+        cliLogger(common.verbose).v {
+            val p0 = rawSolvable.problem
+            val p1 = solvable.problem
+            "presolve [${engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
+                "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}"
+        }
         output.begin(solvable.optimize, solvable.maximize)
 
         // `-p N` is MiniZinc-standard parallelism = the **core** count (#406). The portfolio engines
