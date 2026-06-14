@@ -16,10 +16,15 @@ internal enum class LpStatus {
 }
 
 /** Where a variable sits. Nonbasic variables are pinned to a finite bound; basic ones float. */
-internal object VarStatus {
-    const val BASIC = 0
-    const val AT_LOWER = 1
-    const val AT_UPPER = 2
+internal enum class VarStatus {
+    /** Basic: the variable floats; its value is read off the tableau. */
+    BASIC,
+
+    /** Nonbasic, pinned to its lower bound. */
+    AT_LOWER,
+
+    /** Nonbasic, pinned to its upper bound. */
+    AT_UPPER,
 }
 
 /**
@@ -32,7 +37,7 @@ internal class Basis(
     /** The `m` variable columns that are basic. Order is irrelevant; the loader assigns rows. */
     val basicVars: IntArray,
     /** Per-variable status (length `numVars`): [VarStatus.BASIC], [VarStatus.AT_LOWER] or `AT_UPPER`. */
-    val status: IntArray,
+    val status: Array<VarStatus>,
 )
 
 /**
@@ -155,7 +160,7 @@ internal class DualSimplex(
     private val basicVar = IntArray(m)
 
     /** Per-variable status; see [VarStatus]. */
-    private val status = IntArray(numVars)
+    private val status = Array(numVars) { VarStatus.BASIC }
 
     /** Per-row max `|entry|` (clamped to `Long.MAX_VALUE`), maintained by [loadOriginalMatrix] and
      *  [pivot]. Drives the pivot's bulk overflow precheck: when the bound proves a whole row's
@@ -917,7 +922,7 @@ internal class DualSimplex(
             val shiftedScaled = when (status[j]) {
                 VarStatus.AT_LOWER -> 0L
                 VarStatus.AT_UPPER -> mulExact(d, model.upper[j])
-                else -> beta[varRow[j]] // basic
+                VarStatus.BASIC -> beta[varRow[j]]
             }
             primalNum[j] = addExact(shiftedScaled, mulExact(d, model.loShift[j]))
         }

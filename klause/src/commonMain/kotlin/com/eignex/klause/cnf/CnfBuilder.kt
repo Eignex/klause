@@ -41,20 +41,16 @@ class CnfBuilder {
     // sorts; MAJ3 sorts. The aux↔gate definition is global, so reusing a cached literal in a
     // new context is always sound.
 
-    private class GateKey(val op: Int, val operands: IntArray) {
+    /** The primitive Tseitin gate a [GateKey] hash-conses over. */
+    private enum class GateOp { AND, OR, XOR, MAJ }
+
+    private class GateKey(val op: GateOp, val operands: IntArray) {
         override fun equals(other: Any?): Boolean =
             other is GateKey && other.op == op && other.operands.contentEquals(operands)
-        override fun hashCode(): Int = op * 31 + operands.contentHashCode()
+        override fun hashCode(): Int = op.ordinal * 31 + operands.contentHashCode()
     }
 
     private val gateCache = HashMap<GateKey, Int>()
-
-    private companion object {
-        const val OP_AND = 0
-        const val OP_OR = 1
-        const val OP_XOR = 2
-        const val OP_MAJ = 3
-    }
 
     /** Sort + drop exact-duplicate literals. */
     private fun sortDedup(a: IntArray): IntArray {
@@ -98,7 +94,7 @@ class CnfBuilder {
         val canon = sortDedup(inputs)
         if (canon.size == 1) return canon[0]
         if (hasComplementaryPair(canon)) return falseLit()
-        val key = GateKey(OP_AND, canon)
+        val key = GateKey(GateOp.AND, canon)
         gateCache[key]?.let { return it }
         val aux = Lit.make(newVar(), positive = true)
         for (l in canon) addClause(intArrayOf(Lit.negate(aux), l))
@@ -117,7 +113,7 @@ class CnfBuilder {
         val canon = sortDedup(inputs)
         if (canon.size == 1) return canon[0]
         if (hasComplementaryPair(canon)) return trueLit()
-        val key = GateKey(OP_OR, canon)
+        val key = GateKey(GateOp.OR, canon)
         gateCache[key]?.let { return it }
         val aux = Lit.make(newVar(), positive = true)
         for (l in canon) addClause(intArrayOf(Lit.negate(l), aux))
@@ -148,7 +144,7 @@ class CnfBuilder {
         if (x == y) return if (parity == 1) trueLit() else falseLit() // a⊕a=0, ¬a⊕a=1
         val lo = if (x <= y) x else y
         val hi = if (x <= y) y else x
-        val key = GateKey(OP_XOR, intArrayOf(lo, hi))
+        val key = GateKey(GateOp.XOR, intArrayOf(lo, hi))
         val base = gateCache[key] ?: run {
             val aux = Lit.make(newVar(), positive = true)
             addClause(intArrayOf(Lit.negate(aux), lo, hi))
@@ -168,7 +164,7 @@ class CnfBuilder {
     fun tseitinMaj3(a: Int, b: Int, c: Int): Int {
         val ops = intArrayOf(a, b, c)
         ops.sort()
-        val key = GateKey(OP_MAJ, ops)
+        val key = GateKey(GateOp.MAJ, ops)
         gateCache[key]?.let { return it }
         val aux = Lit.make(newVar(), positive = true)
         addClause(intArrayOf(Lit.negate(aux), a, b))
