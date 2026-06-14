@@ -291,8 +291,10 @@ object Presolve {
         }
         // Phase 3: variable-subset / proportional domination across different supports (#466).
         val out3 = dropSubsetDominated(problem, out)
-        if (out3.size == factors.size) return problem
-        return rebuildProblem(problem, out3)
+        // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques (#527).
+        val out4 = dropCliqueImpliedKnapsacks(out3)
+        if (out4.size == factors.size) return problem
+        return rebuildProblem(problem, out4)
     }
 
     /** Cap on the `≤`-rows Phase 3 compares pairwise, to keep the domination scan from going quadratic
@@ -380,6 +382,70 @@ object Presolve {
             if (maxExtra > OVERFLOW_GUARD || maxExtra < -OVERFLOW_GUARD) return false
         }
         return k * a.bound + maxExtra <= b.bound
+    }
+
+    /**
+     * Clique-aware redundancy (#527). An at-most-one (AMO) clique over a set of literals — at most one
+     * is satisfied — caps the contribution of those literals to a `≤` pseudo-Boolean knapsack at the
+     * single largest weight. So if covering a knapsack `Σ wⱼ·lⱼ ≤ b` (positive weights) with the
+     * model's AMO cliques brings its clique-aware maximal activity to `≤ b`, the knapsack holds for
+     * every clique-respecting assignment and is redundant — drop it (the clique factors stay, so
+     * soundness is preserved). The greedy cover yields *some* valid activity upper bound; a looser
+     * cover only misses drops, never makes an unsound one.
+     *
+     * Only redundancy is done here: clique-based coefficient *lifting* (GUB cover lifting) is subtle —
+     * the naive clamp to the clique-reduced slack is unsound — and is left to a follow-up.
+     */
+    private fun dropCliqueImpliedKnapsacks(factors: List<Factor>): List<Factor> {
+        val cliques = extractAmoCliques(factors)
+        if (cliques.isEmpty()) return factors
+        val out = ArrayList<Factor>(factors.size)
+        for (f in factors) {
+            if (f is PseudoBoolean && f.op == PbOp.LE && cliqueImpliesKnapsack(f, cliques)) continue
+            out.add(f)
+        }
+        return out
+    }
+
+    /** At-most-one cliques (each a set of Lit-encoded literals, at most one satisfied) recognised
+     *  soundly: a [Cardinality] `0 ≤ Σ lit ≤ 1`, and any binary [Clause] `(l1 ∨ l2)` ⟺ at most one of
+     *  `{¬l1, ¬l2}`. */
+    private fun extractAmoCliques(factors: List<Factor>): List<Set<Int>> {
+        val cliques = ArrayList<Set<Int>>()
+        for (f in factors) {
+            when {
+                f is Cardinality && f.min == 0 && f.max == 1 -> cliques.add(f.literals.toHashSet())
+
+                f is Clause && f.literals.size == 2 ->
+                    cliques.add(hashSetOf(Lit.negate(f.literals[0]), Lit.negate(f.literals[1])))
+            }
+        }
+        return cliques
+    }
+
+    /** Whether the AMO [cliques] force `Σ wⱼ·lⱼ ≤ bound` (all weights > 0): greedily cover the
+     *  knapsack literals with cliques (each contributing only its max assigned weight) and compare the
+     *  resulting activity upper bound to the bound. */
+    private fun cliqueImpliesKnapsack(knapsack: PseudoBoolean, cliques: List<Set<Int>>): Boolean {
+        if (knapsack.weights.any { it <= 0 }) return false
+        val weightByLit = HashMap<Int, Int>(knapsack.literals.size)
+        for (i in knapsack.literals.indices) weightByLit[knapsack.literals[i]] = knapsack.weights[i]
+        val assigned = HashSet<Int>()
+        var activity = 0L
+        for (clique in cliques) {
+            var maxW = 0
+            var any = false
+            for (lit in clique) {
+                if (lit in assigned) continue
+                val w = weightByLit[lit] ?: continue
+                any = true
+                assigned.add(lit)
+                if (w > maxW) maxW = w
+            }
+            if (any) activity += maxW
+        }
+        for (lit in knapsack.literals) if (lit !in assigned) activity += weightByLit.getValue(lit)
+        return activity <= knapsack.bound
     }
 
     /** A linear / pseudo-Boolean constraint as a `≤`-normalised bucket contribution: [key] is the
