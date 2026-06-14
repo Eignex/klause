@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.presolve
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -8,6 +9,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective
@@ -255,6 +257,53 @@ class PresolverTest {
         val full = pre.reconstruct(result.assignment)
         assertEquals(listOf(0, 1, 2), full.ints.toList(), "the single canonical permutation")
         assertTrue(isFeasible(problem, full), "reconstructed sample infeasible in the original problem")
+    }
+
+    @Test
+    fun `affine elimination is gated off for solution-set-sensitive queries`() {
+        // Affine elimination leaves the eliminated variable unconstrained in the reduced problem
+        // (its value is rebuilt from its partner on the way back). That is fine for solve/optimize, but
+        // a complete enumerator would branch over the freed variable's whole domain and yield each real
+        // solution once per spurious value (#507). So it must NOT run when the caller needs the exact
+        // solution set / count.
+        val auto = PresolveConfig.AUTO
+        assertTrue(PresolvePass.ELIMINATE_AFFINE_SINGLETONS in auto.problemPasses(PresolveContext.EMPTY))
+        assertTrue(
+            PresolvePass.ELIMINATE_AFFINE_SINGLETONS !in
+                auto.problemPasses(PresolveContext(solutionSetSensitive = true)),
+        )
+        // ...but local search (which never enumerates) keeps it on — it only shrinks the problem there.
+        val lsPasses = auto.forLocalSearch().problemPasses(PresolveContext.EMPTY)
+        assertTrue(PresolvePass.ELIMINATE_AFFINE_SINGLETONS in lsPasses)
+    }
+
+    @Test
+    fun `presolve preserves the model count for a channeled circuit under enumeration`() {
+        // Mirrors `emitCircuit`'s 1-based -> 0-based channeling: succ values in 1..4 are linked to
+        // 0-based aux vars via `src - aux = 1`, and the Circuit factor reasons over the aux vars. The
+        // affine pass eliminates the aux vars by folding the channel away; if it runs under `-a` the
+        // freed aux vars get enumerated independently, inflating circuit(4)'s 6 solutions (#507).
+        val n = 4
+        val domains = Array(2 * n) { v -> if (v < n) IntDomain(1, n) else IntDomain(0, n - 1) }
+        val factors = ArrayList<Factor>()
+        for (i in 0 until n) {
+            factors.add(Linear(intArrayOf(1, -1), intArrayOf(i, n + i), LinearOp.EQ, 1))
+        }
+        factors.add(Circuit(succ = IntArray(n) { n + it }))
+        val problem = Problem(0, 2 * n, domains, factors)
+
+        fun count(config: PresolveConfig, sensitive: Boolean): Int {
+            val pre = Presolver.run(problem, config, PresolveContext(solutionSetSensitive = sensitive))
+            return BacktrackSolver(pre.problem).enumerate(BacktrackParams(randomSeed = 0L)).count()
+        }
+
+        val unpresolved = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).count()
+        assertEquals(6, unpresolved, "circuit(4) has exactly 6 Hamiltonian cycles")
+        // Sensitive query (enumeration / counting): the affine gate keeps the count exact.
+        assertEquals(6, count(PresolveConfig.AUTO, sensitive = true), "presolve must not inflate the count under -a")
+        // Non-sensitive solve may eliminate aux vars (count is allowed to change there) — but every
+        // surviving solution still projects to a valid circuit, so it stays satisfiable.
+        assertTrue(count(PresolveConfig.AUTO, sensitive = false) >= 6, "solve presolve stays feasible")
     }
 
     @Test
