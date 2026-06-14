@@ -37,19 +37,18 @@ import com.eignex.klause.solver.result.SolveStats
  */
 internal object SolveCore {
 
-    private val pureLsEngines = setOf("ls", "localsearch", "local-search", "ls-single", "lssingle")
-
     fun solve(rawSolvable: Solvable, common: CommonOptions, output: OutputProtocol) {
-        // Engine enum: fixed | cp | mixed | ls | cp-single. Resolution order: explicit `-e` wins,
-        // then `-f` (free) ≡ `-e cp`, else the configured default ([defaultEngine] — the built-in
-        // `mixed`, or whatever a packaged image set via the env var).
-        val engine = (common.engine ?: if (common.freeSearch) "cp" else defaultEngine()).lowercase()
+        // Engine resolution: explicit `-e` wins, then `-f` (free) ≡ `-e cp`, else the configured
+        // default ([defaultEngine] — the built-in [Engine.DEFAULT] or a packaged image's env override).
+        val engine = common.engine
+            ?.let { Engine.fromId(it) ?: usageError("unknown engine `$it`; expected ${Engine.ids()}") }
+            ?: if (common.freeSearch) Engine.CP else defaultEngine()
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. Solution-set-altering passes (symmetry breaking, value
         // precedence) are dropped for a pure-LS engine (their ordering constraints hurt local
         // search); solutions are reconstructed at render time.
         val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolveConfig()
-        val config = if (engine in pureLsEngines) base.forLocalSearch() else base
+        val config = if (engine.pureLs) base.forLocalSearch() else base
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
@@ -64,33 +63,36 @@ internal object SolveCore {
         when (engine) {
             // Naked single backtrack following the model's search annotation (FD track). The
             // annotation decides the heuristic, so per-solver selector --params are rejected.
-            "fixed" -> {
-                if (cores > 1) usageError("engine 'fixed' is single-core (FD track); drop -p")
+            Engine.FIXED -> {
+                rejectParallel(engine, cores, alt = null)
                 runBacktrack(solvable, common, output, useAnnotation = true, allowSelectors = false)
             }
 
             // Naked single backtrack, free search — the only engine that takes var-selector/
             // val-selector --params (for single-solver heuristic A/B).
-            "cp-single", "cpsingle" -> {
-                if (cores > 1) usageError("engine 'cp-single' is single-core; use 'cp' for a parallel backtrack pool")
+            Engine.CP_SINGLE -> {
+                rejectParallel(engine, cores, alt = Engine.CP)
                 runBacktrack(solvable, common, output, useAnnotation = false, allowSelectors = true)
             }
 
             // Naked single local search — the only engine that takes the ls strategy --params
             // (tabu-tenure, pair-swap-budget, lambda, noise, max-flips).
-            "ls-single", "lssingle" -> {
-                if (cores > 1) usageError("engine 'ls-single' is single-core; use 'ls' for a parallel pool")
+            Engine.LS_SINGLE -> {
+                rejectParallel(engine, cores, alt = Engine.LS)
                 runLocalSearch(solvable, common, output)
             }
 
-            "cp", "backtrack", "bt" -> runPortfolio(solvable, common, output, cores, EngineMix.BACKTRACK)
-
-            "ls", "localsearch", "local-search" -> runPortfolio(solvable, common, output, cores, EngineMix.LOCAL_SEARCH)
-
-            "mixed", "portfolio", "pf" -> runPortfolio(solvable, common, output, cores, EngineMix.MIXED)
-
-            else -> usageError("unknown engine `$engine`; expected fixed | cp | mixed | ls | cp-single")
+            // The parallel-capable portfolio engines: their mix is carried on the enum.
+            Engine.CP, Engine.LS, Engine.MIXED ->
+                runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix))
         }
+    }
+
+    /** Reject `-p N>1` for a single-core engine; [alt], when given, is the parallel engine to suggest. */
+    private fun rejectParallel(engine: Engine, cores: Int, alt: Engine?) {
+        if (cores <= 1) return
+        val hint = alt?.let { "; use '${it.id}' for a parallel pool" } ?: " (FD track); drop -p"
+        usageError("engine '${engine.id}' is single-core$hint")
     }
 
     private fun deadlineCancellation(common: CommonOptions): Pair<Long?, Cancellation> {

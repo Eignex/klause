@@ -5,14 +5,20 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.selector.Chb
+import com.eignex.klause.solver.backtrack.selector.DomainMaxRegret
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
+import com.eignex.klause.solver.backtrack.selector.IndomainMedian
 import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
 import com.eignex.klause.solver.backtrack.selector.IndomainMin
 import com.eignex.klause.solver.backtrack.selector.IndomainRandom
+import com.eignex.klause.solver.backtrack.selector.IndomainSplit
 import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.backtrack.selector.LargestDomain
+import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
 import com.eignex.klause.solver.backtrack.selector.RandomVariable
 import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.solver.backtrack.selector.SmallestDomain
+import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
@@ -26,9 +32,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
  * hard usage error (exit 2) so typos never silently fall back to defaults.
  *
  * Keys per engine:
- *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`,
- *    `lbd-glue`, `var-selector` (`vsids|chb|linucb|random|smallest-domain|input-order`),
- *    `val-selector` (`random|min|max|middle|solution-guided`)
+ *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
+ *    `var-selector` (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind])
  *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
  *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
  */
@@ -64,26 +69,30 @@ internal class EngineParams(pairs: List<String>) {
     }
 
     /** [seed] feeds the LinUCB selector's RNG so an A/B is reproducible under the run's `seed`. */
-    fun varSelector(key: String, seed: Long?): VariableSelector? = map.remove(key)?.let {
-        when (it.lowercase()) {
-            "vsids" -> Vsids()
-            "chb" -> Chb()
-            "linucb" -> RegressionVariableSelector.linUcb(seed = seed ?: 0L)
-            "random" -> RandomVariable
-            "smallest-domain" -> SmallestDomain
-            "input-order" -> InputOrder
-            else -> fail("engine param `$key` expects vsids|chb|linucb|random|smallest-domain|input-order, got `$it`")
+    fun varSelector(key: String, seed: Long?): VariableSelector? = map.remove(key)?.let { raw ->
+        when (VarSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${VarSelectorKind.ids()}, got `$raw`")) {
+            VarSelectorKind.VSIDS -> Vsids()
+            VarSelectorKind.CHB -> Chb()
+            VarSelectorKind.LINUCB -> RegressionVariableSelector.linUcb(seed = seed ?: 0L)
+            VarSelectorKind.RANDOM -> RandomVariable
+            VarSelectorKind.INPUT_ORDER -> InputOrder
+            VarSelectorKind.SMALLEST_DOMAIN -> SmallestDomain
+            VarSelectorKind.LARGEST_DOMAIN -> LargestDomain
+            VarSelectorKind.SMALLEST_LOWER_BOUND -> SmallestLowerBound
+            VarSelectorKind.LARGEST_UPPER_BOUND -> LargestUpperBound
+            VarSelectorKind.DOMAIN_MAX_REGRET -> DomainMaxRegret
         }
     }
 
-    fun valSelector(key: String): ValueSelector? = map.remove(key)?.let {
-        when (it.lowercase()) {
-            "random" -> IndomainRandom
-            "min" -> IndomainMin
-            "max" -> IndomainMax
-            "middle" -> IndomainMiddle
-            "solution-guided" -> SolutionGuided(IndomainMin)
-            else -> fail("engine param `$key` expects random|min|max|middle|solution-guided, got `$it`")
+    fun valSelector(key: String): ValueSelector? = map.remove(key)?.let { raw ->
+        when (ValSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${ValSelectorKind.ids()}, got `$raw`")) {
+            ValSelectorKind.RANDOM -> IndomainRandom
+            ValSelectorKind.MIN -> IndomainMin
+            ValSelectorKind.MAX -> IndomainMax
+            ValSelectorKind.MIDDLE -> IndomainMiddle
+            ValSelectorKind.MEDIAN -> IndomainMedian
+            ValSelectorKind.SPLIT -> IndomainSplit
+            ValSelectorKind.SOLUTION_GUIDED -> SolutionGuided(IndomainMin)
         }
     }
 
@@ -216,3 +225,47 @@ internal fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, c
 
 /** Default arms-per-core oversubscription factor for [autoArms] (a #9 tuning knob). */
 private const val ARMS_PER_CORE = 2
+
+/** `var-selector` `--param` values for the `cp-single` engine (each maps to a [VariableSelector]).
+ *  Covers the public no-argument selectors; the objective-/base-parameterised ones (MaxRegret,
+ *  IndomainBest, LastConflict, …) and the `internal` ones (DomWdeg, ActivityBasedSearch) are not
+ *  exposable as a bare value here. */
+internal enum class VarSelectorKind(val id: String) {
+    VSIDS("vsids"),
+    CHB("chb"),
+    LINUCB("linucb"),
+    RANDOM("random"),
+    INPUT_ORDER("input-order"),
+    SMALLEST_DOMAIN("smallest-domain"),
+    LARGEST_DOMAIN("largest-domain"),
+    SMALLEST_LOWER_BOUND("smallest-lower-bound"),
+    LARGEST_UPPER_BOUND("largest-upper-bound"),
+    DOMAIN_MAX_REGRET("domain-max-regret"),
+    ;
+
+    companion object {
+        private val byId = entries.associateBy { it.id }
+        fun fromId(token: String): VarSelectorKind? = byId[token.trim().lowercase()]
+        fun ids(): String = entries.joinToString("|") { it.id }
+    }
+}
+
+/** `val-selector` `--param` values for the `cp-single` engine (each maps to a [ValueSelector]).
+ *  Covers the public no-argument value selectors; IndomainBest (needs the objective) and the
+ *  `internal` ones (IndomainSet, MaxSd, Impact) are not exposable as a bare value here. */
+internal enum class ValSelectorKind(val id: String) {
+    RANDOM("random"),
+    MIN("min"),
+    MAX("max"),
+    MIDDLE("middle"),
+    MEDIAN("median"),
+    SPLIT("split"),
+    SOLUTION_GUIDED("solution-guided"),
+    ;
+
+    companion object {
+        private val byId = entries.associateBy { it.id }
+        fun fromId(token: String): ValSelectorKind? = byId[token.trim().lowercase()]
+        fun ids(): String = entries.joinToString("|") { it.id }
+    }
+}

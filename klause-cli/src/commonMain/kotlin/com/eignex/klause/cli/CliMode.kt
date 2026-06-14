@@ -8,6 +8,7 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.presolve.PresolveContext
+import com.eignex.klause.solver.presolve.PresolveEmphasis
 import com.eignex.klause.solver.presolve.Presolver
 import com.eignex.klause.solver.result.SolveStats
 
@@ -85,13 +86,12 @@ internal class FlagSpec(
     val apply: (String?) -> Unit,
 )
 
-/** Built-in default engine for a bare invocation (no `-e`, no `-f`). */
-internal const val DEFAULT_ENGINE = "mixed"
-
 /** The engine for a bare invocation (no `-e`, no `-f`): the `KLAUSE_FZN_ENGINE` env var /
  *  `klause.fzn.engine` property when set — so a packaged image (e.g. a MiniZinc-Challenge-compliant
- *  Docker build) can ship a different default — else [DEFAULT_ENGINE]. `-e` and `-f` override it. */
-internal fun defaultEngine(): String = cliProp("klause.fzn.engine") ?: DEFAULT_ENGINE
+ *  Docker build) can ship a different default — else [Engine.DEFAULT]. `-e` and `-f` override it. */
+internal fun defaultEngine(): Engine = cliProp("klause.fzn.engine")
+    ?.let { Engine.fromId(it) ?: usageError("unknown KLAUSE_FZN_ENGINE `$it`; expected ${Engine.ids()}") }
+    ?: Engine.DEFAULT
 
 /** The solver-control flags every mode accepts. Mode-specific flags are appended per mode. */
 internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
@@ -162,7 +162,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.ENGINE,
         valueLabel = "name",
-        help = "fixed | cp | ls | mixed | cp-single | ls-single (default: ${defaultEngine()}; -f selects cp)",
+        help = "${Engine.ids()} (default: ${defaultEngine().id}; -f selects cp)",
     ) { o.engine = it },
     FlagSpec(
         listOf("--param"),
@@ -183,7 +183,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.KLAUSE,
         valueLabel = "strength",
-        help = "presolve strength: off | conservative | default | aggressive",
+        help = "presolve strength: " + PresolveEmphasis.entries.joinToString(" | ") { it.name.lowercase() },
     ) { o.presolve = it },
     FlagSpec(
         listOf("-h", "--help"),
