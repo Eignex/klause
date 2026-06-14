@@ -3,6 +3,7 @@ package com.eignex.klause.solver.objective
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.IntIntMap
 import kotlin.math.abs
 
 /**
@@ -81,13 +82,48 @@ internal class FunctionalObjective internal constructor(
         }
     }
 
+    /** Reusable dense evaluator for the defining cone; the slot index is built once here. */
+    private val coneMemo = ConeMemo(nodes, objectiveVar)
+
     /** Evaluate the cone over a base value-getter and return the "lower is better" objective. */
     private fun objValue(base: (Int) -> Long): Long {
-        val computed = HashMap<Int, Long>(nodes.size * 2)
-        val valOf: (Int) -> Long = { id -> computed[id] ?: base(id) }
-        for (n in nodes) computed[n.out] = n.compute(valOf)
-        val v = computed[objectiveVar] ?: base(objectiveVar)
+        val v = coneMemo.evaluate(base)
         return if (minimize) v else -v
+    }
+
+    /**
+     * Dense bottom-up evaluator for the defining cone. Each node-output variable owns a slot in a
+     * flat [LongArray] indexed in the nodes' topological order, so evaluating the cone is array
+     * writes plus O(1) slot lookups — replacing the per-evaluation `HashMap<Int, Long>` of boxed
+     * values the cone used to rebuild on every move (the dominant per-move allocation, since
+     * [deltaIfApplied] evaluates the cone twice). The slot index is computed once; the value array
+     * is allocated per [evaluate], so a single instance stays safe to share across concurrent
+     * local-search workers (the objective is held in [com.eignex.klause.solver.localsearch.LocalSearchParams]).
+     */
+    private class ConeMemo(private val nodes: List<Node>, private val objectiveVar: Int) {
+        /** Node-output varId → its value-array slot; an id with no defining node (a leaf) maps to `-1`.
+         *  [IntIntMap.build] picks a dense array backing for klause's dense aux-var ids. */
+        private val slotOf: IntIntMap = IntIntMap.build(
+            IntArray(nodes.size) { nodes[it].out },
+            IntArray(nodes.size) { it },
+            absent = -1,
+        )
+
+        /** Slot of the objective variable, or `-1` when it is itself a leaf with no defining node. */
+        private val objectiveSlot: Int = slotOf[objectiveVar]
+
+        /** Evaluate the cone bottom-up, reading leaf (decision) values from [base]. */
+        fun evaluate(base: (Int) -> Long): Long {
+            val vals = LongArray(nodes.size)
+            // A node's inputs are leaves or earlier nodes (topological order), so its slot is filled
+            // before it is read; ids with no slot fall through to the leaf getter.
+            val valOf: (Int) -> Long = { id ->
+                val s = slotOf[id]
+                if (s >= 0) vals[s] else base(id)
+            }
+            for (i in nodes.indices) vals[i] = nodes[i].compute(valOf)
+            return if (objectiveSlot >= 0) vals[objectiveSlot] else base(objectiveVar)
+        }
     }
 
     override fun evaluate(sample: Sample): Double = objValue { id -> sample.ints[id].toLong() }.toDouble()
