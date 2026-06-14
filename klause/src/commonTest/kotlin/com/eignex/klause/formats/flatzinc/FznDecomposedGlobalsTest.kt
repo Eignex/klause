@@ -104,6 +104,59 @@ class FznDecomposedGlobalsTest {
         )
     }
 
+    @Test
+    fun `inverse with a restricted first element is not falsely UNSAT (#389)`() {
+        // f1 is declared 2..3, so its domain min (2) differs from the 1-based array index base.
+        // emitInverse used to infer the channel offset from `intDomains[f[0]].min`, yielding 2,
+        // which over-pruned to a root false-UNSAT (the elitserien/handball failure). The offset is
+        // structurally 1 for FlatZinc index sets. Enumerate against the inverse predicate directly.
+        val src = "var 2..3: f1; var 1..3: f2; var 1..3: f3;\n" +
+            "var 1..3: g1; var 1..3: g2; var 1..3: g3;\n" +
+            "constraint fzn_inverse([f1, f2, f3], [g1, g2, g3]);\nsolve satisfy;"
+        val found = enumerate(src, listOf("f1", "f2", "f3", "g1", "g2", "g3"))
+        // f[i] = j  ⇔  g[j] = i, 1-based, with f1 restricted to {2,3}.
+        val expected = brute1(arity = 6, hi = 3) { t ->
+            val f = listOf(t[0], t[1], t[2])
+            val g = listOf(t[3], t[4], t[5])
+            t[0] >= 2 && // f1's declared 2..3
+                (1..3).all { i -> g[f[i - 1] - 1] == i } && (1..3).all { j -> f[g[j - 1] - 1] == j }
+        }
+        assertEquals(expected, found)
+        assertEquals(true, found.isNotEmpty(), "inverse must be satisfiable, not falsely UNSAT")
+    }
+
+    @Test
+    fun `symmetric_all_different with a restricted first element is not falsely UNSAT (#389)`() {
+        // Same offset-inference trap as inverse: x1 declared 2..4 so its domain min is not the
+        // 1-based index base. symmetric_all_different is the self-inverse permutation x[x[i]] = i.
+        val src = "var 2..4: x1; var 1..4: x2; var 1..4: x3; var 1..4: x4;\n" +
+            "constraint symmetric_all_different([x1, x2, x3, x4]);\nsolve satisfy;"
+        val found = enumerate(src, listOf("x1", "x2", "x3", "x4"))
+        val expected = brute1(arity = 4, hi = 4) { t ->
+            t[0] >= 2 && (1..4).all { i -> t[t[i - 1] - 1] == i }
+        }
+        assertEquals(expected, found)
+        assertEquals(true, found.isNotEmpty(), "symmetric_all_different must be satisfiable, not falsely UNSAT")
+    }
+
+    /** Brute-force tuples of arity [arity] over the 1-based value range `1..hi` satisfying [pred]. */
+    private fun brute1(arity: Int, hi: Int, pred: (List<Int>) -> Boolean): Set<List<Int>> {
+        val out = HashSet<List<Int>>()
+        val acc = IntArray(arity)
+        fun rec(i: Int) {
+            if (i == arity) {
+                if (pred(acc.toList())) out.add(acc.toList())
+                return
+            }
+            for (v in 1..hi) {
+                acc[i] = v
+                rec(i + 1)
+            }
+        }
+        rec(0)
+        return out
+    }
+
     /** True iff in [t] the first occurrence of [target] (if any) comes after some earlier [s]. */
     private fun precedes(t: List<Int>, s: Int, target: Int): Boolean {
         var seenS = false
