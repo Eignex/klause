@@ -103,7 +103,10 @@ internal class CpToLpRelaxation(
     private val cumulativeRelaxation: CumulativeRelaxation? =
         if (cumulative) CumulativeRelaxation(problem).takeIf { it.applicable } else null
 
-    private companion object {
+    /** Per-hull dense-tableau caps. Internal so [com.eignex.klause.solver.backtrack.LpAutoConfig]'s
+     *  size guard (#484) estimates each enabled hull against the *same* thresholds the builders skip
+     *  at — one source of truth, no drift. */
+    internal companion object {
         /** Above this candidate-arc count the circuit arc model is skipped — a defensive bound on
          *  the dense-tableau cost. Gating on arc count (LP columns) rather than node count lets
          *  large but sparse routing graphs through (#431); #429 may bench this threshold. */
