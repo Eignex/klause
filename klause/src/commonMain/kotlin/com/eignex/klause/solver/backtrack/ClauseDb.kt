@@ -58,6 +58,12 @@ internal fun BacktrackSolver.advance(
         sink?.observePropagation(session.propagationCount - propsBefore)
         val r = outcome.result
         if (r is PropagationResult.Unsat) {
+            // Every conflict is a failed node — count it here, the one point all
+            // conflicts funnel through, so both the satisfy (driveSearch) and
+            // branch-and-bound (ResumableMinimize) loops report failures regardless
+            // of whether the conflict backjumps or falls through to chronological
+            // within-node value enumeration (#509).
+            sink?.observeFail()
             onConflictTick?.invoke()
             // Forward the full conflict reason record so activity-, weight-, and
             // factor-driven heuristics (VSIDS, dom/wdeg) all see exactly what they
@@ -89,11 +95,18 @@ internal fun BacktrackSolver.advance(
                 learned.literals.none { session.litTruth(it) == true } &&
                 relearnTripped?.invoke(learned) != true
             ) {
+                sink?.observeLearn()
                 return AdvanceOutcome.Backjump(learned)
             }
             continue
         }
         if (pruneIf != null && pruneIf(session)) {
+            // A bound-pruned node is a failed node, same as a propagation conflict — count it so
+            // the failure total matches solvers that post the objective bound as a constraint
+            // (Gecode/Chuffed). This covers the dominant linear objective-bound prune, which has
+            // no other counter; the lp/energetic/lagrangian sub-counters set inside pruneIf remain
+            // a breakdown of part of this total (#509).
+            sink?.observeFail()
             // Immediate LP backjump (#280): if the prune carried an asserting Farkas 1UIP clause,
             // convert this node into a non-chronological backjump-and-learn. Revert the current
             // pin first (the propagation-conflict path reaches the Backjump return with the failed
@@ -106,6 +119,7 @@ internal fun BacktrackSolver.advance(
                 relearnTripped?.invoke(lpLearned) != true
             ) {
                 sink?.observeLpBackjump()
+                sink?.observeLearn()
                 session.popLast()
                 return AdvanceOutcome.Backjump(lpLearned)
             }
