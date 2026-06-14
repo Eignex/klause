@@ -82,12 +82,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
         if (peekKeyword("array")) {
             advance()
             expectPunct("[")
-            val ranges = ArrayList<OznExpr>()
-            ranges.add(parseExpr())
-            while (peekPunct(",")) {
-                advance()
-                ranges.add(parseExpr())
-            }
+            val ranges = parseCommaSeparated(parseExpr()) { parseExpr() }
             expectPunct("]")
             expectKeyword("of")
             val element = parseType()
@@ -372,11 +367,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
             expectPunct("]")
             return OznExpr.Comprehension(first, gens, isSet = false)
         }
-        val elements = ArrayList<OznExpr>().also { it.add(first) }
-        while (peekPunct(",")) {
-            advance()
-            elements.add(parseExpr())
-        }
+        val elements = parseCommaSeparated(first) { parseExpr() }
         expectPunct("]")
         return OznExpr.ArrayLit(elements)
     }
@@ -394,24 +385,12 @@ internal class OznParser(private val tokens: List<OznToken>) {
             expectPunct("}")
             return OznExpr.Comprehension(first, gens, isSet = true)
         }
-        val elements = ArrayList<OznExpr>().also { it.add(first) }
-        while (peekPunct(",")) {
-            advance()
-            elements.add(parseExpr())
-        }
+        val elements = parseCommaSeparated(first) { parseExpr() }
         expectPunct("}")
         return OznExpr.SetLit(elements)
     }
 
-    private fun parseGenerators(): List<OznExpr.Generator> {
-        val gens = ArrayList<OznExpr.Generator>()
-        gens.add(parseGenerator())
-        while (peekPunct(",")) {
-            advance()
-            gens.add(parseGenerator())
-        }
-        return gens
-    }
+    private fun parseGenerators(): List<OznExpr.Generator> = parseCommaSeparated(parseGenerator()) { parseGenerator() }
 
     private fun parseGenerator(): OznExpr.Generator {
         val names = ArrayList<String>()
@@ -452,17 +431,23 @@ internal class OznParser(private val tokens: List<OznToken>) {
     }
 
     private fun parseExprList(stopPunct: String): List<OznExpr> {
-        val out = ArrayList<OznExpr>()
-        if (peek().kind == OznTokenKind.PUNCT && peek().text == stopPunct) return out
-        out.add(parseExpr())
-        while (peekPunct(",")) {
-            advance()
-            out.add(parseExpr())
-        }
-        return out
+        if (peek().kind == OznTokenKind.PUNCT && peek().text == stopPunct) return emptyList()
+        return parseCommaSeparated(parseExpr()) { parseExpr() }
     }
 
     // --- Token helpers ----------------------------------------------------------
+
+    /** A non-empty comma-separated list: [first] (already parsed) followed by `, item` repetitions,
+     *  each parsed via [parseItem]. The caller consumes the surrounding delimiters. */
+    private fun <T> parseCommaSeparated(first: T, parseItem: () -> T): MutableList<T> {
+        val list = ArrayList<T>()
+        list.add(first)
+        while (peekPunct(",")) {
+            advance()
+            list.add(parseItem())
+        }
+        return list
+    }
 
     private fun peek(): OznToken = tokens[pos]
     private fun advance(): OznToken = tokens[pos++]
