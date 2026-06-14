@@ -113,9 +113,12 @@ class PassResult(val problem: Problem, val reconstruct: ((Sample) -> Sample)? = 
  *  passes (SAC probing) are folded into `Problem.baked` at build time and only read via
  *  [PresolveConfig.resolved].
  * @property timing cost tier — a [PresolveEmphasis] enables a set of tiers.
- * @property preservesSolutionSet whether the pass keeps every solution (true) or may collapse the
- *  set (false, e.g. symmetry breaking) — the latter is auto-disabled for solution-set-sensitive
- *  queries.
+ * @property preservesSolutionSet whether the pass leaves the model's solution **set and count**
+ *  exactly intact (true), or may alter them (false) — by collapsing the set (e.g. symmetry breaking,
+ *  dual fixing) *or* by inflating the model count (e.g. affine elimination, which folds the defining
+ *  equality away and leaves the eliminated variable unconstrained, so a complete enumerator branches
+ *  over its whole domain and yields each real solution once per spurious value). The latter are
+ *  auto-disabled for solution-set-sensitive queries (`-a` / `-n N>1`).
  * @property autoEligible whether emphasis may turn it on automatically; opt-in passes (value
  *  precedence, which interacts with variable-symmetry breaking) are `false` and need an explicit
  *  override.
@@ -133,8 +136,18 @@ enum class PresolvePass(
             PassResult(Presolve.strengthenCoefficients(problem))
     },
 
-    /** Affine singleton elimination (#318) — reconstructs the eliminated variable. */
-    ELIMINATE_AFFINE_SINGLETONS("affine", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+    /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated
+     *  variable is left unconstrained in the presolved problem (its value is rebuilt from its partner
+     *  on the way back), so a complete enumerator would branch over its domain and over-count each
+     *  real solution (#507). Hence solution-set-sensitive (`preservesSolutionSet = false`): gated off
+     *  under `-a` / `-n N>1`, while solve/optimize still benefit. */
+    ELIMINATE_AFFINE_SINGLETONS(
+        "affine",
+        Stage.PROBLEM,
+        PresolveTiming.FAST,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
         override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
             val elim = Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars)
             return PassResult(elim.problem, elim::reconstruct)
@@ -333,13 +346,17 @@ class PresolveConfig(
     fun problemPasses(context: PresolveContext): List<PresolvePass> =
         PresolvePass.entries.filter { it.stage == PresolvePass.Stage.PROBLEM && resolved(it, context) }
 
-    /** Force every solution-set-altering pass off (symmetry breaking, value precedence — the
-     *  `!preservesSolutionSet` ones) — for a pure local-search engine, where the ordering constraints
-     *  they add fight the search and it gains nothing from collapsing symmetric solutions. The cheap
-     *  solution-preserving reductions (strengthening, substitution, probing) stay on. */
+    /** Force the solution-set-*collapsing* passes off (symmetry breaking, value precedence, dual
+     *  fixing) — for a pure local-search engine, where the ordering constraints they add fight the
+     *  search and it gains nothing from collapsing symmetric solutions. The cheap solution-preserving
+     *  reductions (strengthening, substitution, probing) stay on; affine substitution counts as one
+     *  here — it only *inflates* the count for a complete enumerator (#507), which LS never does, so
+     *  it stays on and keeps shrinking the problem. */
     fun forLocalSearch(): PresolveConfig = PresolveConfig(
         emphasis,
-        overrides + PresolvePass.entries.filter { !it.preservesSolutionSet }.associateWith { false },
+        overrides + PresolvePass.entries
+            .filter { !it.preservesSolutionSet && it != PresolvePass.ELIMINATE_AFFINE_SINGLETONS }
+            .associateWith { false },
         probeBudgetPerVarOverride,
         probeTotalBudgetOverride,
     )
