@@ -206,19 +206,40 @@ class Regular(
     /** Hole-aware conflict reason, sharpened to the responsible prefix when [propagate]
      *  captured a forward-collapse layer; falls back to the whole sequence otherwise. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? IntArray) ?: seq)
+        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? Scratch)?.conflictPrefix ?: seq)
+
+    /**
+     * Per-[PropagationState] reusable propagation scratch (so it is never shared across concurrent
+     * worker threads). [forward] / [backward] are the layer-bitset working buffers — sized once to
+     * `(seq.size + 1) * stateWords` and refilled from zero on every fire, so reusing them across
+     * calls drops the two per-call `LongArray` allocations. [conflictPrefix] records the responsible
+     * `seq` prefix when a forward layer collapses, for [conflictReason]. Not a
+     * [PropagationState.SnapshottablePayload]: the buffers are recomputed every fire and the prefix
+     * is advisory, so the slot intentionally drifts across snapshot / restore (like CDCL watches).
+     */
+    private class Scratch(size: Int) {
+        val forward = LongArray(size)
+        val backward = LongArray(size)
+        var conflictPrefix: IntArray? = null
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        state.refPayload[factorId] = null // stale-guard; set at the forward-collapse failure point below.
         val n = seq.size
         val w = stateWords
-        val forward = LongArray((n + 1) * w)
+        val scratch = (state.refPayload[factorId] as? Scratch) ?: run {
+            val fresh = Scratch((n + 1) * w)
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        scratch.conflictPrefix = null // stale-guard; set at the forward-collapse failure point below.
+        val forward = scratch.forward
+        forward.fill(0L)
         // Layer 0: only q0 is reachable.
         setBit(forward, 0, q0 - 1)
         for (i in 0 until n) {
             // forward[i] empty ⇒ the prefix seq[0 until i] alone drove every state dead.
             if (isLayerEmpty(forward, i)) {
-                state.refPayload[factorId] = seq.copyOfRange(0, i)
+                scratch.conflictPrefix = seq.copyOfRange(0, i)
                 return false
             }
             val d = state.intDomains[seq[i]]
@@ -229,7 +250,8 @@ class Regular(
                 }
             }
         }
-        val backward = LongArray((n + 1) * w)
+        val backward = scratch.backward
+        backward.fill(0L)
         for (q in accepting) if (q in 1..numStates) setBit(backward, n, q - 1)
         // Intersect with forward[n] so we only keep states actually reachable.
         for (k in 0 until w) {
