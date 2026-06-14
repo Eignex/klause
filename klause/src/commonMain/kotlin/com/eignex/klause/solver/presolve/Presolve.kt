@@ -386,8 +386,27 @@ object Presolve {
         val out3 = dropSubsetDominated(problem, out)
         // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques (#527).
         val out4 = dropCliqueImpliedKnapsacks(out3)
-        if (out4.size == factors.size) return problem
-        return rebuildProblem(problem, out4)
+        // Phase 5: drop globals the current domains make vacuously satisfied (#553); removing one frees
+        // a variable contained only in it, which the affine pass then projects out (implied-free).
+        val out5 = out4.filterNot { isVacuousGlobal(it, problem.intDomains) }
+        if (out5.size == factors.size) return problem
+        return rebuildProblem(problem, out5)
+    }
+
+    /** Whether [factor] is a global constraint that the current [domains] make *vacuously* satisfied —
+     *  it can never prune, so dropping it preserves the feasible set exactly (#553). Currently detects
+     *  an [AllDifferent] whose variables have pairwise-disjoint domains (no two can ever be equal, so
+     *  distinctness always holds — for the plain, opt, and `_except` variants alike, since absence and
+     *  excepted values only relax the constraint). Disjointness is tested on the `[min, max]` intervals
+     *  (a sound sufficient condition; hole-induced disjointness is conservatively not claimed). */
+    private fun isVacuousGlobal(factor: Factor, domains: Array<IntDomain>): Boolean {
+        if (factor !is AllDifferent || factor.vars.size < 2) return false
+        var prevMax = Int.MIN_VALUE
+        for (d in factor.vars.map { domains[it] }.sortedBy { it.min }) {
+            if (d.min <= prevMax) return false // intervals overlap → a collision is possible
+            if (d.max > prevMax) prevMax = d.max
+        }
+        return true // every pair of intervals is disjoint → all-different holds for every assignment
     }
 
     /** Cap on the `≤`-rows Phase 3 compares pairwise, to keep the domination scan from going quadratic

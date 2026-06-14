@@ -260,6 +260,33 @@ class PresolverTest {
     }
 
     @Test
+    fun `dropping a vacuous global frees an implied variable for elimination`() {
+        // x0 = x1 + 1 (a unit-pivot definition) and x0 also sits in AllDifferent(x0, x2). With
+        // dom(x0)=[1,2] disjoint from dom(x2)=[5,6] that all-different is vacuous, so subsumption drops
+        // it (#553); x0 is then contained in just its defining equality, and the affine pass projects it
+        // out — implied-free elimination the global previously blocked. x1 sits in a *real*
+        // AllDifferent(x1, x3) over [0,1], which stays.
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(5, 6), IntDomain(0, 1)),
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 7), // vacuous (disjoint)
+                AllDifferent(intArrayOf(1, 3), domainMin = 0, domainSize = 2), // real (overlapping)
+            ),
+        )
+        val pre = Presolver.run(problem, PresolveConfig.DEFAULT)
+        assertEquals(1, pre.problem.factors.count { it is AllDifferent }, "the vacuous all-different is dropped")
+        assertTrue(pre.problem.factors.none { 0 in it.intVars }, "x0 is eliminated — present in no factor")
+        val result = BacktrackSolver(pre.problem).solve(BacktrackParams())
+        assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
+        val full = pre.reconstruct(result.assignment)
+        assertEquals(full.ints[1] + 1, full.ints[0], "x0 reconstructed as x1 + 1")
+        assertTrue(isFeasible(problem, full), "reconstructed sample infeasible in the original problem")
+    }
+
+    @Test
     fun `affine elimination is gated off for solution-set-sensitive queries`() {
         // Affine elimination leaves the eliminated variable unconstrained in the reduced problem
         // (its value is rebuilt from its partner on the way back). That is fine for solve/optimize, but
