@@ -416,8 +416,11 @@ internal class GccSeparator : CutSeparator {
  * strength. A *cover* `C` is a set of items with `Σ_{C} w_i > b`: no feasible 0/1 point can set all of
  * `C`, so `Σ_{i∈C} x_i ≤ |C| − 1` is a valid inequality. Separation finds a violated cover greedily by
  * fractional value: take the highest-`x*` items until their weight exceeds `b`; if the resulting
- * cover's `Σ x*` exceeds `|C| − 1` the cut is violated and emitted. Mixed-sign rows (negated literals
- * or non-positive weights) are skipped — their cover form needs complementing, deferred.
+ * cover's `Σ x*` exceeds `|C| − 1` the cut is violated and emitted. The cover is then **extended**
+ * (#552): every non-cover item whose weight is at least the cover's maximum is folded in with
+ * coefficient 1 while the bound stays `|C| − 1` — a lifted, strictly stronger inequality that also
+ * separates fractional points the bare cover misses. Mixed-sign rows (negated literals or
+ * non-positive weights) are skipped — their cover form needs complementing, deferred.
  */
 internal class KnapsackCoverSeparator : CutSeparator {
     private val tol = 1e-6
@@ -453,14 +456,27 @@ internal class KnapsackCoverSeparator : CutSeparator {
                 if (wsum > b) break
             }
             if (wsum <= b) continue // whole set fits under the bound — no cover, no cut
+            // Extend the cover to a stronger inequality (#552): every non-cover item whose weight is at
+            // least the cover's maximum joins it with coefficient 1, keeping the right-hand side at
+            // |C| − 1. Valid because the |C| lightest of C ∪ E are exactly C (the added items are no
+            // lighter than any cover member), and Σ_C w > b, so no |C| of them can be set together. A
+            // stronger cut than the bare cover, and it separates fractional points the bare one misses.
+            val inCover = BooleanArray(k)
+            var maxCoverW = 0
+            for (t in 0 until cover.size) {
+                inCover[cover[t]] = true
+                if (factor.weights[cover[t]] > maxCoverW) maxCoverW = factor.weights[cover[t]]
+            }
+            val rhs = (cover.size - 1).toLong()
+            val ext = IntArrayList()
+            for (t in 0 until cover.size) ext.add(cover[t])
+            for (i in 0 until k) if (!inCover[i] && factor.weights[i] >= maxCoverW) ext.add(i)
             var lhs = 0.0
-            for (t in 0 until cover.size) lhs += xstar[cover[t]]
-            if (lhs > cover.size - 1 + tol) {
-                val cutCols = IntArray(cover.size) { cols[cover[it]] }
-                // A cover is read off the factor's weights and bound alone — global by construction.
-                cuts.add(
-                    Cut(cutCols, LongArray(cover.size) { 1L }, Relation.LE, (cover.size - 1).toLong(), global = true),
-                )
+            for (t in 0 until ext.size) lhs += xstar[ext[t]]
+            if (lhs > rhs + tol) {
+                val cutCols = IntArray(ext.size) { cols[ext[it]] }
+                // Read off the factor's weights and bound alone — global by construction.
+                cuts.add(Cut(cutCols, LongArray(ext.size) { 1L }, Relation.LE, rhs, global = true))
             }
         }
         return cuts

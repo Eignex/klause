@@ -41,6 +41,26 @@ class KnapsackCoverCutTest {
     }
 
     @Test
+    fun `extended cover folds in a heavy non-cover item and separates a point the bare cover misses`() {
+        // 3 items, weights [3,3,3], capacity 4: at most one item fits. Maximising x0+x1+x2 drives the LP
+        // to 4/9 each. The bare cover {0,1} (3+3>4) has Σx* = 8/9 < 1 — NOT violated — but extending it
+        // with item 2 (weight 3 >= the cover max 3) gives x0+x1+x2 <= 1, violated at 4/3 (#552).
+        val p = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(PseudoBoolean(intArrayOf(3, 3, 3), posLits(3), PbOp.LE, 4)),
+        )
+        val r = CpToLpRelaxation(p, LinearObjective(boolWeights = longArrayOf(-1, -1, -1))).build(PropagationSession(p))
+        val sol = DualSimplex(r.model).solve()
+        val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+        assertTrue(cuts.isNotEmpty(), "the extended cover should separate the all-4/9 point")
+        val cut = cuts.first()
+        assertEquals(setOf(0, 1, 2), coverVarsOf(r, cut), "all three items are in the extended cover")
+        assertEquals(1L, cut.rhs, "rhs stays |C| - 1 = 1")
+    }
+
+    @Test
     fun `cover cuts exclude no knapsack-feasible point`() {
         val rng = Random(20260610)
         var separated = 0
