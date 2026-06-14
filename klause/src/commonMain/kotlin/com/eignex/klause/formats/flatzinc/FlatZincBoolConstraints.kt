@@ -45,23 +45,26 @@ internal fun FlatZincCompiler.emitBoolXor(c: FznConstraint) {
     factors.add(Xor(lits, targetParity = 0))
 }
 
-internal fun FlatZincCompiler.emitArrayBoolOr(c: FznConstraint) {
+/**
+ * `array_bool_or(lits, r)` / `array_bool_and(lits, r)` — both reified, and exact De Morgan
+ * duals: AND is OR with the polarity of every literal flipped. [isOr] selects which.
+ *   - OR:  r ↔ ⋁lits  →  (⋁lits ∨ ¬r) ∧ ∀l (¬l ∨ r)
+ *   - AND: r ↔ ⋀lits  →  (⋁¬lits ∨ r) ∧ ∀l (¬r ∨ l)
+ */
+private fun FlatZincCompiler.emitArrayBoolReduction(c: FznConstraint, isOr: Boolean) {
     require(c.args.size == 2)
     val lits = evalBoolVarArray(c.args[0])
     val r = resolveBoolLit(c.args[1])
-    // r ↔ (⋁ lits): two halves. (¬r ∨ ⋁lits) and for each lit l: (¬l ∨ r).
-    factors.add(Clause(lits + intArrayOf(Lit.negate(r))))
-    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), r)))
+    val body = if (isOr) lits else IntArray(lits.size) { Lit.negate(lits[it]) }
+    factors.add(Clause(body + intArrayOf(if (isOr) Lit.negate(r) else r)))
+    for (l in lits) {
+        factors.add(Clause(if (isOr) intArrayOf(Lit.negate(l), r) else intArrayOf(Lit.negate(r), l)))
+    }
 }
 
-internal fun FlatZincCompiler.emitArrayBoolAnd(c: FznConstraint) {
-    require(c.args.size == 2)
-    val lits = evalBoolVarArray(c.args[0])
-    val r = resolveBoolLit(c.args[1])
-    // r ↔ (⋀ lits): (⋁ ¬lits ∨ r) and for each lit l: (¬r ∨ l).
-    factors.add(Clause(lits.map { Lit.negate(it) }.toIntArray() + intArrayOf(r)))
-    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(r), l)))
-}
+internal fun FlatZincCompiler.emitArrayBoolOr(c: FznConstraint) = emitArrayBoolReduction(c, isOr = true)
+
+internal fun FlatZincCompiler.emitArrayBoolAnd(c: FznConstraint) = emitArrayBoolReduction(c, isOr = false)
 
 /** `bool_and(a, b, r)` / `bool_or(a, b, r)` — pairwise variants, both already reified. */
 internal fun FlatZincCompiler.emitBoolAndOr(c: FznConstraint, and: Boolean) {
