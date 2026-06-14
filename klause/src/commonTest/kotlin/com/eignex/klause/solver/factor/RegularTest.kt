@@ -125,4 +125,59 @@ class RegularTest {
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }
+
+    @Test
+    fun `regular plus a linear bound enumerates exactly the brute-force set`() {
+        // Soundness gate for the unchanged-domains fast path. Pairing Regular with a Linear over the
+        // SAME seq makes the two factors re-wake each other, so Regular is fired repeatedly on one
+        // PropagationState — including no-op re-fires where its domains are unchanged and the fast
+        // path returns early. An unsound skip would drop a feasible string, shrinking the set.
+        // DFA: no two consecutive 1s over {1,2} (q0=1, F={1,2}; δ (1,1)→2 (1,2)→1 (2,1)→0 (2,2)→1).
+        val transitions = intArrayOf(2, 1, 0, 1)
+        fun delta(q: Int, s: Int): Int = if (q in 1..2 && s in 1..2) transitions[(q - 1) * 2 + (s - 1)] else 0
+        fun accepts(vals: IntArray): Boolean {
+            var q = 1
+            for (s in vals) {
+                q = delta(q, s)
+                if (q == 0) return false
+            }
+            return q == 1 || q == 2
+        }
+        val n = 4
+        for (bound in intArrayOf(5, 6, 7)) {
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(n)
+            fun rec(p: Int) {
+                if (p == n) {
+                    if (accepts(acc) && acc.sum() <= bound) brute.add(acc.toList())
+                    return
+                }
+                for (v in 1..2) {
+                    acc[p] = v
+                    rec(p + 1)
+                }
+            }
+            rec(0)
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(1, 2) },
+                factors = arrayOf<Factor>(
+                    Regular(
+                        seq = IntArray(n) { it },
+                        numStates = 2,
+                        alphabetSize = 2,
+                        transitions = transitions,
+                        q0 = 1,
+                        accepting = intArrayOf(1, 2),
+                    ),
+                    Linear(coeffs = IntArray(n) { 1 }, vars = IntArray(n) { it }, op = LinearOp.LE, bound = bound),
+                ),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "Regular+Linear (bound=$bound): solution set must equal brute force")
+        }
+    }
 }
