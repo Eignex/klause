@@ -105,7 +105,7 @@ class FznDecomposedGlobalsTest {
     }
 
     @Test
-    fun `inverse with a restricted first element is not falsely UNSAT (#389)`() {
+    fun `inverse with a restricted first element is not falsely unsat`() {
         // f1 is declared 2..3, so its domain min (2) differs from the 1-based array index base.
         // emitInverse used to infer the channel offset from `intDomains[f[0]].min`, yielding 2,
         // which over-pruned to a root false-UNSAT (the elitserien/handball failure). The offset is
@@ -126,7 +126,7 @@ class FznDecomposedGlobalsTest {
     }
 
     @Test
-    fun `symmetric_all_different with a restricted first element is not falsely UNSAT (#389)`() {
+    fun `symmetric_all_different with a restricted first element is not falsely unsat`() {
         // Same offset-inference trap as inverse: x1 declared 2..4 so its domain min is not the
         // 1-based index base. symmetric_all_different is the self-inverse permutation x[x[i]] = i.
         val src = "var 2..4: x1; var 1..4: x2; var 1..4: x3; var 1..4: x4;\n" +
