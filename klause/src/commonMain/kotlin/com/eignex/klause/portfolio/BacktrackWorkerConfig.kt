@@ -4,6 +4,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpConfig
+import com.eignex.klause.solver.backtrack.LpEmphasis
 import com.eignex.klause.solver.backtrack.selector.IndomainMin
 import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.solver.backtrack.selector.SolutionGuided
@@ -24,10 +26,10 @@ import com.eignex.klause.solver.result.SearchEvent
  * **Per-kind ranking** ([ranked]) is the backtrack half of the #9 tuning surface:
  *  - **COP**: `satOptimized · conflictDriven · lp · linucb · free` — SAT-optimized first (the #117
  *    pigeonhole/dense-3SAT guard stays at slot 0 for any pool with ≥1 backtrack worker), then the
- *    conflict-driven workhorse, then the LP-focused arm (the conflict-driven core with the whole
- *    structurally-applicable LP-relaxation family on, [BacktrackParams.lpAuto]), then the learned
- *    LinUCB routing/feasibility-reach arm, then the bare free engine for plateau diversity. Each
- *    prunes on the shared objective bound.
+ *    conflict-driven workhorse, then the two LP-intensity arms (the conflict-driven core with the
+ *    LP-relaxation family resolved at [BacktrackParams.lpConfig] — AGGRESSIVE then DEFAULT), then the
+ *    learned LinUCB routing/feasibility-reach arm, then the bare free engine for plateau diversity.
+ *    Each prunes on the shared objective bound.
  *  - **CSP**: `satOptimized · conflictDriven · free` — **linucb dropped**: it is the COP routing
  *    arm and its per-decision contextual scoring buys nothing on pure satisfaction (objective-
  *    independent features, no bound to exploit), so a CSP would only pay the overhead.
@@ -100,16 +102,26 @@ internal data class BacktrackWorkerConfig(
             BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = onEvent)
         }
 
-        /** The LP-focused arm: the conflict-driven core with the whole structurally-applicable
-         *  LP-relaxation family enabled via [BacktrackParams.lpAuto] (relaxation bounding, cuts +
-         *  pool, Farkas learning, objective propagation, fixpoint, rounding probe — see
-         *  `LpAutoConfig`). A no-op fallback to plain conflict-driven on models with no
+        /** An LP arm: the conflict-driven core with the LP-relaxation family resolved at [emphasis]
+         *  (#429). `AGGRESSIVE` is the whole structurally-applicable family (cuts + hulls + probe);
+         *  `DEFAULT` is simplex bounding + objective propagation without the expensive cut machinery;
+         *  `CONSERVATIVE` is the cheap combinatorial bounds only. A no-op on models with no
          *  LP-applicable structure. COP-only: the LP machinery lives on the minimisation path. */
-        fun lpFocused() = BacktrackWorkerConfig("lp") { seed, onEvent ->
-            BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpAuto = true)
+        fun lpArm(emphasis: LpEmphasis) = BacktrackWorkerConfig("lp-${emphasis.name.lowercase()}") { seed, onEvent ->
+            BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpConfig = LpConfig(emphasis))
         }
 
-        private val copOrder = listOf(satOptimized(), conflictDriven(), lpFocused(), linUcb(), free())
+        // COP spread (#429): the OFF arms (satOptimized / conflictDriven / linucb / free) hedge the
+        // per-instance LP trade against the two LP-intensity arms — AGGRESSIVE (closes the bound hard)
+        // and DEFAULT (cheap simplex bounding). A supplied `--lp` ceiling caps both via [diverse].
+        private val copOrder = listOf(
+            satOptimized(),
+            conflictDriven(),
+            lpArm(LpEmphasis.AGGRESSIVE),
+            lpArm(LpEmphasis.DEFAULT),
+            linUcb(),
+            free(),
+        )
         private val cspOrder = listOf(satOptimized(), conflictDriven(), free())
 
         /** The credit-ordered backtrack pool for [kind] (see the class KDoc). */
@@ -118,12 +130,31 @@ internal data class BacktrackWorkerConfig(
             Kind.CSP -> cspOrder
         }
 
+        /** Cap this arm's LP emphasis at [ceiling] (the `--lp` ceiling): the produced params' LP
+         *  config is lowered to the ceiling, so no arm ever runs LP above what the user permitted.
+         *  Non-LP arms (and `AGGRESSIVE` ceiling) are untouched; an `OFF` ceiling disables LP. */
+        private fun BacktrackWorkerConfig.capLp(ceiling: LpEmphasis): BacktrackWorkerConfig =
+            if (ceiling == LpEmphasis.AGGRESSIVE) {
+                this
+            } else {
+                copy(build = { seed, onEvent ->
+                    val p = build(seed, onEvent)
+                    val intended = p.lpConfig
+                    if (intended == null) p else p.copy(lpConfig = intended.cappedAt(ceiling))
+                })
+            }
+
         /** The top-[count] prefix of [ranked], wrapping past the pool size so larger pools repeat
-         *  the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls). */
-        fun diverse(kind: Kind, count: Int): List<BacktrackWorkerConfig> {
+         *  the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls). Each arm's
+         *  LP emphasis is capped at [lpCeiling] (default `AGGRESSIVE` = uncapped). */
+        fun diverse(
+            kind: Kind,
+            count: Int,
+            lpCeiling: LpEmphasis = LpEmphasis.AGGRESSIVE,
+        ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = ranked(kind)
-            return List(count) { order[it % order.size] }
+            return List(count) { order[it % order.size].capLp(lpCeiling) }
         }
     }
 }

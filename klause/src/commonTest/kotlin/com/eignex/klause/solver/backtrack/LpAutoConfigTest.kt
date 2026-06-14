@@ -127,6 +127,36 @@ class LpAutoConfigTest {
     }
 
     @Test
+    fun `resolve gates techniques by the emphasis cost tier`() {
+        // Linear (bounding-MEDIUM), AllDifferent (lagrangian-FAST + cuts-EXHAUSTIVE), Cumulative
+        // (energetic / flow-FAST). Each tier should switch on exactly its cost class and below.
+        val p = problem(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6),
+            Cumulative(intArrayOf(0, 1, 2), intArrayOf(1, 1, 1), intArrayOf(1, 1, 1), capacity = 1),
+        )
+        val off = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.OFF))
+        assertFalse(off.lpBounding || off.lpCuts || off.lagrangian || off.energeticReasoning || off.lpCumulativeFlow)
+
+        val conservative = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.CONSERVATIVE))
+        assertTrue(conservative.lagrangian && conservative.energeticReasoning && conservative.lpCumulativeFlow)
+        assertFalse(conservative.lpBounding, "MEDIUM simplex stays off at CONSERVATIVE")
+        assertFalse(conservative.lpCuts, "EXHAUSTIVE cuts stay off at CONSERVATIVE")
+
+        val default = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.DEFAULT))
+        assertTrue(default.lpBounding && default.lagrangian)
+        assertFalse(default.lpCuts, "EXHAUSTIVE cuts stay off at DEFAULT")
+
+        val aggressive = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.AGGRESSIVE))
+        assertTrue(aggressive.lpBounding && aggressive.lpCuts)
+        // AGGRESSIVE reproduces the historical structural recommend (every applicable technique on).
+        val rec = LpAutoConfig.recommend(p)
+        assertEquals(rec.lpBounding, aggressive.lpBounding)
+        assertEquals(rec.lpCuts, aggressive.lpCuts)
+        assertEquals(rec.lagrangian, aggressive.lagrangian)
+    }
+
+    @Test
     fun `auto-enabled energetic reasoning derives a size-aware cadence`() {
         fun cumulative(tasks: Int) = Problem(
             0,
@@ -165,25 +195,33 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `lpAuto resolves at minimize and engages the lp machinery`() {
-        // Triangle covering: optimum 3. With lpAuto the node LPs must actually run (pivots
-        // observed); without it the default params leave the LP family off.
+    fun `lpConfig resolves at minimize and engages the lp machinery`() {
+        // Triangle covering: optimum 3. With an LP emphasis the node LPs must actually run (pivots
+        // observed); a null lpConfig leaves the LP family off.
         val p = problem(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
             Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 2),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val auto = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpAuto = true))
+        val auto = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
         assertTrue(auto is MinimizeResult.Optimal)
         assertEquals(3.0, auto.objectiveValue)
-        assertTrue(auto.stats.lpPivots.sum > 0.0, "lpAuto must engage the node LP")
+        assertTrue(auto.stats.lpPivots.sum > 0.0, "an LP emphasis must engage the node LP")
         assertTrue(auto.stats.lpSeeded.sum > 0.0, "descendant node LPs must reuse the hot tableau")
 
         val plain = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
         assertTrue(plain is MinimizeResult.Optimal)
         assertEquals(3.0, plain.objectiveValue)
-        assertEquals(0.0, plain.stats.lpPivots.sum, "without lpAuto the LP family stays off")
+        assertEquals(0.0, plain.stats.lpPivots.sum, "a null lpConfig leaves the LP family off")
+
+        // The CONSERVATIVE emphasis (FAST tier only) keeps the per-node simplex off — no pivots.
+        val conservative = BacktrackSolver(p).minimize(
+            obj,
+            BacktrackParams(randomSeed = 1L, lpConfig = LpConfig(LpEmphasis.CONSERVATIVE)),
+        )
+        assertTrue(conservative is MinimizeResult.Optimal && conservative.objectiveValue == 3.0)
+        assertEquals(0.0, conservative.stats.lpPivots.sum, "CONSERVATIVE runs no per-node simplex")
     }
 
     @Test

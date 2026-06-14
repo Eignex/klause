@@ -15,6 +15,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpEmphasis
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -178,6 +179,11 @@ internal object SolveCore {
     ) {
         // Default arm-pool size: an env override, else auto-tuned from the core count (#406).
         val defaultArms = cliProp("klause.fzn.portfolio.arms")?.toIntOrNull() ?: autoArms(cores)
+        // #429: `--lp CEILING` caps the portfolio's LP emphasis; absent ⇒ AGGRESSIVE (uncapped — the
+        // pool spreads the LP intensity itself), `off` disables LP across the pool.
+        val lpCeiling = common.lp?.let {
+            LpEmphasis.fromId(it) ?: usageError("--lp: off | conservative | default | aggressive")
+        } ?: LpEmphasis.AGGRESSIVE
         val scenario = buildPortfolioScenario(
             EngineParams(common.engineParams),
             common.randomSeed,
@@ -185,6 +191,7 @@ internal object SolveCore {
             kind = if (solvable.optimize) Kind.COP else Kind.CSP,
             defaultEngine = mix,
             defaultArms = defaultArms,
+            lpCeiling = lpCeiling,
         )
         val (_, cancel) = deadlineCancellation(common)
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.

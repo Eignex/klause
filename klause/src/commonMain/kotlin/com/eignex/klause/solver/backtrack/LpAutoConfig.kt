@@ -56,8 +56,8 @@ import com.eignex.klause.solver.lp.schedulingViews
  * have their own internal caps and are not size-gated here. An explicit caller flag bypasses the
  * guard: every flag is OR-ed onto `base`, so an explicit setting is never turned *off*.
  *
- * Called by `BacktrackSolver.improvements` under [BacktrackParams.lpAuto]; also callable directly
- * for ahead-of-time configuration (the bench's auto mode).
+ * Called by `BacktrackSolver` under [BacktrackParams.lpConfig] (via [resolve]); also callable
+ * directly for ahead-of-time configuration (the bench's auto mode).
  */
 object LpAutoConfig {
 
@@ -76,8 +76,21 @@ object LpAutoConfig {
      */
     const val ENERGETIC_OPS_PER_CHECK: Long = 1L shl 17
 
-    /** `base` with each LP-family flag enabled where [problem]'s structure makes it applicable. */
-    fun recommend(problem: Problem, base: BacktrackParams = BacktrackParams()): BacktrackParams {
+    /** `base` with every structurally-applicable LP technique enabled — i.e. [resolve] at the
+     *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). The historical structural auto-config. */
+    fun recommend(problem: Problem, base: BacktrackParams = BacktrackParams()): BacktrackParams =
+        resolve(problem, LpConfig.AGGRESSIVE, base)
+
+    /**
+     * `base` with each LP technique enabled where [problem]'s structure makes it applicable **and**
+     * [config] permits it (the emphasis cost ceiling + per-technique overrides — see [LpConfig]).
+     * Structural applicability and the dense-tableau size guard are unchanged; the emphasis just caps
+     * which cost tiers may run, so `AGGRESSIVE` reproduces the old all-applicable [recommend] and the
+     * cheaper levels switch the expensive tiers off. Flags are OR-ed onto `base`, so an explicit
+     * caller setting is never turned off.
+     */
+    @Suppress("CyclomaticComplexMethod")
+    fun resolve(problem: Problem, config: LpConfig, base: BacktrackParams = BacktrackParams()): BacktrackParams {
         var lpEmittable = false
         var allDifferent = false
         var globalCardinality = false
@@ -150,35 +163,40 @@ object LpAutoConfig {
         val timeIndexedFits = ti.anyFits && rowsWithTi * (cols + rowsWithTi + 1L) <= MAX_AUTO_TABLEAU_CELLS
         val cutEligible = allDifferent || globalCardinality
         val makespanLp = lpFits && makespanPlans > 0
-        val lpBounding = lpFits &&
+
+        // Each technique runs iff structurally applicable AND the config permits its cost tier. The
+        // simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE add-ons additionally
+        // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM), so `bounding` is on
+        // whenever a higher tier is permitted and applicable.
+        val boundingApplicable = lpFits &&
             (
                 lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
                     table || nValue || makespanLp
                 )
-        val lpCuts = lpFits && (cutEligible || pseudoBoolean)
+        val bounding = boundingApplicable && config.resolved(LpTechnique.BOUNDING)
+        val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
+        val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
-            lpBounding = base.lpBounding || lpBounding,
-            lpCuts = base.lpCuts || lpCuts,
-            lpCutPool = base.lpCutPool || lpCuts,
-            lpLearn = base.lpLearn || lpBounding,
-            lpObjectiveBound = base.lpObjectiveBound || lpBounding,
-            lpFixpoint = base.lpFixpoint || lpBounding,
-            lpProbe = base.lpProbe || lpBounding,
-            lpCircuit = base.lpCircuit || (lpFits && circuit),
-            lpElement = base.lpElement || (lpFits && constArrayElement),
-            lpTable = base.lpTable || (lpFits && table),
-            lpNValue = base.lpNValue || (lpFits && nValue),
-            lpCumulative = base.lpCumulative || makespanLp,
-            // #453: the time-indexed LP only when lpBounding is on and its columns fit the tableau.
-            lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed || (lpBounding && timeIndexedFits),
-            // #454: the preemptive max-flow feasibility prune — cheap, horizon-independent, no tableau
-            // impact (not an LP row), so it rides along on any scheduling global like the energetic check.
-            lpCumulativeFlow = base.lpCumulativeFlow || scheduling,
-            lagrangian = base.lagrangian || allDifferent,
-            energeticReasoning = base.energeticReasoning || cumulative,
+            lpBounding = base.lpBounding || bounding,
+            lpCuts = base.lpCuts || cuts,
+            lpCutPool = base.lpCutPool || cuts,
+            lpLearn = base.lpLearn || bounding,
+            lpObjectiveBound = base.lpObjectiveBound || bounding,
+            lpFixpoint = base.lpFixpoint || bounding,
+            lpProbe = base.lpProbe || bounding,
+            lpCircuit = base.lpCircuit || (bounding && circuit && config.resolved(LpTechnique.CIRCUIT)),
+            lpElement = base.lpElement || (bounding && constArrayElement && config.resolved(LpTechnique.ELEMENT)),
+            lpTable = base.lpTable || (bounding && table && config.resolved(LpTechnique.TABLE)),
+            lpNValue = base.lpNValue || (bounding && nValue && config.resolved(LpTechnique.NVALUE)),
+            lpCumulative = base.lpCumulative || (bounding && makespanLp),
+            lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
+                (bounding && timeIndexedFits && config.resolved(LpTechnique.CUMULATIVE_TIME_INDEXED)),
+            lpCumulativeFlow = base.lpCumulativeFlow || (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
+            lagrangian = base.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
+            energeticReasoning = base.energeticReasoning || energetic,
             // Derive the cadence only when the auto path is the one enabling the check — an
             // explicit caller enablement keeps the caller's cadence untouched.
-            energeticEvery = if (cumulative && !base.energeticReasoning) {
+            energeticEvery = if (energetic && !base.energeticReasoning) {
                 maxOf(base.energeticEvery.toLong(), 1L + (energeticOps - 1L) / ENERGETIC_OPS_PER_CHECK)
                     .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             } else {

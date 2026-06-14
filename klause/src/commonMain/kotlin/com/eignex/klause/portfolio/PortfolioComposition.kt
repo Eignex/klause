@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.LpEmphasis
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -56,6 +57,10 @@ data class PortfolioScenario(
     val seed: Long = 0L,
     /** Objective-shaping λ for the LS workers' optimize phase (mirrors the CLI's CBLS λ=1.0). */
     val lsLambda: Double = 1.0,
+    /** The LP emphasis ceiling for the backtrack arms (#429, the `--lp` parameter): each LP arm's
+     *  emphasis is capped at this. `AGGRESSIVE` (default) leaves the arms uncapped — the pool spreads
+     *  the LP-intensity itself; `OFF` disables LP across the portfolio. */
+    val lpCeiling: LpEmphasis = LpEmphasis.AGGRESSIVE,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
@@ -135,23 +140,24 @@ internal object PortfolioComposition {
         val count = scenario.arms
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(count)
-            EngineMix.BACKTRACK -> btArms(scenario.kind, count)
-            EngineMix.MIXED -> mixedArms(scenario.kind, count)
+            EngineMix.BACKTRACK -> btArms(scenario.kind, count, scenario.lpCeiling)
+            EngineMix.MIXED -> mixedArms(scenario.kind, count, scenario.lpCeiling)
         }
     }
 
     private fun lsArms(count: Int): List<WorkerConfig> = LocalSearchWorkerConfig.diverse(count)
 
-    private fun btArms(kind: Kind, count: Int): List<WorkerConfig> = BacktrackWorkerConfig.diverse(kind, count)
+    private fun btArms(kind: Kind, count: Int, lpCeiling: LpEmphasis): List<WorkerConfig> =
+        BacktrackWorkerConfig.diverse(kind, count, lpCeiling)
 
-    private fun mixedArms(kind: Kind, count: Int): List<WorkerConfig> {
+    private fun mixedArms(kind: Kind, count: Int, lpCeiling: LpEmphasis): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
         // fast first-incumbent engine).
         val lsCount = (count * lsShare(kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
         arms += lsArms(lsCount)
-        if (btCount > 0) arms += btArms(kind, btCount)
+        if (btCount > 0) arms += btArms(kind, btCount, lpCeiling)
         return arms
     }
 }
