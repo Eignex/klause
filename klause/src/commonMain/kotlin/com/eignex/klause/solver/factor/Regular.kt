@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -213,24 +214,40 @@ class Regular(
      * worker threads). [forward] / [backward] are the layer-bitset working buffers — sized once to
      * `(seq.size + 1) * stateWords` and refilled from zero on every fire, so reusing them across
      * calls drops the two per-call `LongArray` allocations. [conflictPrefix] records the responsible
-     * `seq` prefix when a forward layer collapses, for [conflictReason]. Not a
-     * [PropagationState.SnapshottablePayload]: the buffers are recomputed every fire and the prefix
-     * is advisory, so the slot intentionally drifts across snapshot / restore (like CDCL watches).
+     * `seq` prefix when a forward layer collapses, for [conflictReason]. [cachedDoms] holds each
+     * `seq` var's domain ref at the last successful propagate, for the unchanged-domains fast path.
+     * Not a [PropagationState.SnapshottablePayload]: the buffers are recomputed every fire, the prefix
+     * is advisory, and the cached refs only ever *miss* (never falsely skip) after a restore, so the
+     * slot intentionally drifts across snapshot / restore (like CDCL watches) — avoiding the
+     * per-decision snapshot copy a long `seq` would otherwise pay.
      */
-    private class Scratch(size: Int) {
-        val forward = LongArray(size)
-        val backward = LongArray(size)
+    private class Scratch(n: Int, w: Int) {
+        val forward = LongArray((n + 1) * w)
+        val backward = LongArray((n + 1) * w)
         var conflictPrefix: IntArray? = null
+        val cachedDoms = arrayOfNulls<IntDomain>(n)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = seq.size
         val w = stateWords
         val scratch = (state.refPayload[factorId] as? Scratch) ?: run {
-            val fresh = Scratch((n + 1) * w)
+            val fresh = Scratch(n, w)
             state.refPayload[factorId] = fresh
             fresh
         }
+        // Fast path: if no seq var's domain ref changed since the last successful propagate, the
+        // prior fixpoint still holds (the whole forward/backward GAC sweep is a pure function of
+        // these domains), so skip the O(n·Q·|Σ|) recompute. IntDomain is immutable — a tighten
+        // allocates a fresh object — so per-var reference identity means that domain is unchanged.
+        var changed = false
+        for (i in 0 until n) {
+            if (scratch.cachedDoms[i] !== state.intDomains[seq[i]]) {
+                changed = true
+                break
+            }
+        }
+        if (!changed && scratch.cachedDoms[0] != null) return true
         scratch.conflictPrefix = null // stale-guard; set at the forward-collapse failure point below.
         val forward = scratch.forward
         forward.fill(0L)
@@ -287,6 +304,8 @@ class Regular(
             }
             for (k in 0 until toRemove.size) if (!state.excludeIntValue(seq[i], toRemove[k], ant)) return false
         }
+        // Record post-propagate refs so the next (often no-op) fire can short-circuit.
+        for (i in 0 until n) scratch.cachedDoms[i] = state.intDomains[seq[i]]
         return true
     }
 
