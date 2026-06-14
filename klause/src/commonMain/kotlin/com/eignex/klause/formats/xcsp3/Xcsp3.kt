@@ -1,5 +1,11 @@
 package com.eignex.klause.formats.xcsp3
 
+import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.reifyLinear
+import com.eignex.klause.formats.trueLit
+import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.formats.tseitinIff
+import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -65,10 +71,10 @@ object Xcsp3 {
         build()
     }
 
-    private class Builder(val negTableCap: Long) {
+    private class Builder(val negTableCap: Long) : CnfLowering {
         private val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         private val domains = ArrayList<IntDomain>()
-        private val factors = ArrayList<Factor>()
+        override val factors = ArrayList<Factor>()
         private var nextBool = 0
         private var objective: LinearObjective? = null
         private var objectiveMaximize = false
@@ -99,7 +105,7 @@ object Xcsp3 {
             domains.add(IntDomain(lo, hi))
             return domains.size - 1
         }
-        private fun newBool(): Int = nextBool++
+        override fun newBool(): Int = nextBool++
 
         private fun parseDomain(text: String): IntDomain {
             val values = HashSet<Int>()
@@ -238,47 +244,11 @@ object Xcsp3 {
             }
         }
 
-        private var trueLitCache = -1
-        private fun trueLit(): Int {
-            if (trueLitCache < 0) {
-                trueLitCache = Lit.make(newBool(), true)
-                factors.add(
-                    Clause(intArrayOf(trueLitCache)),
-                )
-            }
-            return trueLitCache
-        }
-
-        private fun tseitinAnd(lits: List<Int>): Int {
-            val a = Lit.make(newBool(), true)
-            for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(a), l)))
-            factors.add(Clause((lits.map { Lit.negate(it) } + a).toIntArray()))
-            return a
-        }
-
-        private fun tseitinOr(lits: List<Int>): Int {
-            val a = Lit.make(newBool(), true)
-            factors.add(Clause((lits + Lit.negate(a)).toIntArray()))
-            for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), a)))
-            return a
-        }
-
-        private fun tseitinIff(x: Int, y: Int): Int {
-            val a = Lit.make(newBool(), true)
-            factors.add(Clause(intArrayOf(Lit.negate(a), Lit.negate(x), y)))
-            factors.add(Clause(intArrayOf(Lit.negate(a), x, Lit.negate(y))))
-            factors.add(Clause(intArrayOf(a, x, y)))
-            factors.add(Clause(intArrayOf(a, Lit.negate(x), Lit.negate(y))))
-            return a
-        }
+        override var trueLitCache = -1
 
         private fun reifyRel(node: FExpr.Call): Int {
             val lin = relationLinear(node)
-            val aux = newBool()
-            factors.add(
-                ReifiedLinear(auxBoolVar = aux, coeffs = lin.coeffs, vars = lin.vars, op = lin.op, bound = lin.bound),
-            )
-            return Lit.make(aux, true)
+            return reifyLinear(lin.coeffs, lin.vars, lin.op, lin.bound)
         }
 
         /** Map an XCSP3 relation operator to its [LinearOp] plus the delta to fold into the bound:

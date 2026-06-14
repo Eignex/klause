@@ -1,5 +1,11 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.reifyLinear
+import com.eignex.klause.formats.trueLit
+import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.formats.tseitinIff
+import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -61,16 +67,16 @@ object SmtLibQfLia {
         return b.build()
     }
 
-    private class Builder(val intBound: Int, val strictBounds: Boolean) {
+    private class Builder(val intBound: Int, val strictBounds: Boolean) : CnfLowering {
         private val boolNames = HashMap<String, Int>()
         private val intNames = HashMap<String, Int>()
         private var nextBool = 0
         private var nextInt = 0
         private val intDomains = ArrayList<IntDomain>()
-        private val factors = ArrayList<Factor>()
+        override val factors = ArrayList<Factor>()
         private val asserts = ArrayList<SExpr>()
         private var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
-        private var trueLit: Int = -1
+        override var trueLitCache: Int = -1
 
         // --- let environment: a stack of scopes; each binding compiled once and cached. ---
         private class Binding(val isBool: Boolean) {
@@ -83,7 +89,7 @@ object SmtLibQfLia {
             return null
         }
 
-        private fun newBool(): Int = nextBool++
+        override fun newBool(): Int = nextBool++
         private fun newInt(): Int {
             intDomains.add(IntDomain(-intBound, intBound))
             return nextInt++
@@ -312,9 +318,9 @@ object SmtLibQfLia {
 
         private fun compileBool(t: SExpr): Int = when (t) {
             is SExpr.Atom -> when (t.text) {
-                "true" -> trueLiteral()
+                "true" -> trueLit()
 
-                "false" -> Lit.negate(trueLiteral())
+                "false" -> Lit.negate(trueLit())
 
                 else -> lookup(t.text)?.let { boolBinding(t.text, it) }
                     ?: Lit.make(boolNames[t.text] ?: throw UnsupportedSmtException("unknown bool '${t.text}'"), true)
@@ -362,37 +368,6 @@ object SmtLibQfLia {
         private fun boolBinding(name: String, b: Binding): Int {
             if (!b.isBool) throw UnsupportedSmtException("'$name' used as Bool but bound to an Int term")
             return b.lit ?: throw UnsupportedSmtException("'$name' has no compiled Bool value")
-        }
-
-        private fun trueLiteral(): Int {
-            if (trueLit < 0) {
-                trueLit = Lit.make(newBool(), true)
-                factors.add(Clause(intArrayOf(trueLit)))
-            }
-            return trueLit
-        }
-
-        private fun tseitinAnd(lits: List<Int>): Int {
-            val a = Lit.make(newBool(), true)
-            for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(a), l))) // a -> li
-            factors.add(Clause((lits.map { Lit.negate(it) } + a).toIntArray())) // (∧li) -> a
-            return a
-        }
-
-        private fun tseitinOr(lits: List<Int>): Int {
-            val a = Lit.make(newBool(), true)
-            factors.add(Clause((lits + Lit.negate(a)).toIntArray())) // a -> ⋁li
-            for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), a))) // li -> a
-            return a
-        }
-
-        private fun tseitinIff(x: Int, y: Int): Int {
-            val a = Lit.make(newBool(), true)
-            factors.add(Clause(intArrayOf(Lit.negate(a), Lit.negate(x), y)))
-            factors.add(Clause(intArrayOf(Lit.negate(a), x, Lit.negate(y))))
-            factors.add(Clause(intArrayOf(a, x, y)))
-            factors.add(Clause(intArrayOf(a, Lit.negate(x), Lit.negate(y))))
-            return a
         }
 
         /** `a ⇔ (c ? x : y)` ≡ `a ⇔ (c∧x)∨(¬c∧y)`. */
@@ -466,7 +441,7 @@ object SmtLibQfLia {
         }
 
         private fun compileDistinct(args: List<SExpr>): Int {
-            if (args.size < 2) return trueLiteral()
+            if (args.size < 2) return trueLit()
             val terms = args.map { if (isBoolExpr(it)) litToIntTerm(compileBool(it)) else linearTerm(it) }
             return tseitinAnd(pairs(terms.size).map { (i, j) -> reifyNe(terms[i], terms[j]) })
         }
@@ -504,9 +479,7 @@ object SmtLibQfLia {
 
         private fun reifyRelTerms(a: LinTerm, b: LinTerm, op: LinearOp): Int {
             val (vars, coeffs, bound) = diff(a, b)
-            val aux = newBool()
-            factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = coeffs, vars = vars, op = op, bound = bound))
-            return Lit.make(aux, true)
+            return reifyLinear(coeffs, vars, op, bound)
         }
 
         /** `a − b ⟨op⟩ 0` lowered to `coeffs·vars ⟨op⟩ bound`. */
@@ -544,11 +517,7 @@ object SmtLibQfLia {
 
         private fun reifyRelation(t: SExpr.SList): Int {
             val rel = relationToLinear(t)
-            val aux = newBool()
-            factors.add(
-                ReifiedLinear(auxBoolVar = aux, coeffs = rel.coeffs, vars = rel.vars, op = rel.op, bound = rel.bound),
-            )
-            return Lit.make(aux, true)
+            return reifyLinear(rel.coeffs, rel.vars, rel.op, rel.bound)
         }
 
         private data class Rel(val vars: IntArray, val coeffs: IntArray, val op: LinearOp, val bound: Int)
