@@ -51,14 +51,10 @@ jobs:
       # -Ptargets.hostOnly: only jvm + linuxX64 here; the full matrix (apple, windows,
       # js/wasm with their browser/node runtimes) builds and tests on release.
 
-      # Repo-wide lintDocs: detekt plus dokka with fail-on-warning, for KDoc-link validation
-      # parity with the other modules.
-      - name: Run linter
-        run: ./gradlew lintDocs -Ptargets.hostOnly
-
-      - name: Assemble
-        run: ./gradlew assemble -Ptargets.hostOnly
-
+      # One Gradle invocation: `build` already depends on `assemble` and `check`, so a
+      # single run lets Gradle dedup the task graph instead of paying configuration and
+      # up-to-date-check overhead three times over. Docs linting runs in the parallel
+      # `lint` job below, off the critical path.
       - name: Run build and tests with coverage
         run: ./gradlew build koverXmlReport -Ptargets.hostOnly
 
@@ -79,3 +75,42 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: klause/build/reports/kover/report.xml
           fail_ci_if_error: false
+
+  # Repo-wide lintDocs: detekt plus dokka with fail-on-warning, for KDoc-link validation
+  # parity with the other modules. dokka's full doc generation is the slowest thing in CI,
+  # so it runs as its own job — still a required check, but in parallel with `test` rather
+  # than serially in front of it.
+  lint:
+    name: Lint and validate docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@v5
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts') }}
+          restore-keys: ${{ runner.os }}-konan-
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x gradlew
+
+      - name: Run linter
+        run: ./gradlew lintDocs -Ptargets.hostOnly
