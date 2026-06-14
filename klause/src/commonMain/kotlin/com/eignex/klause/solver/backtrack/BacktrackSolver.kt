@@ -280,6 +280,21 @@ class BacktrackSolver(override val problem: Problem) :
             baseCancellation()
         }
 
+        /** Steer [cancelCheckInterval] so the wall-clock gap between deadline polls hovers around
+         *  [CANCEL_CHECK_TARGET_MS]: grow (to the [CANCEL_CHECK_INTERVAL] ceiling) when polls are cheap,
+         *  shrink (to 1) when a few nodes already exceed the target. */
+        private fun adaptCancelInterval() {
+            val now = TimeSource.Monotonic.markNow()
+            val prev = lastCancelCheckMark
+            lastCancelCheckMark = now
+            val elapsedMs = if (prev == null) 0L else (now - prev).inWholeMilliseconds
+            if (elapsedMs > CANCEL_CHECK_TARGET_MS) {
+                if (cancelCheckInterval > 1) cancelCheckInterval = maxOf(1, cancelCheckInterval / 2)
+            } else if (cancelCheckInterval < CANCEL_CHECK_INTERVAL) {
+                cancelCheckInterval = minOf(CANCEL_CHECK_INTERVAL, cancelCheckInterval * 2)
+            }
+        }
+
         /** Root-level infeasibility core (bake / seed), carried into the Infeasible terminal. */
         private var rootCore: UnsatCore? = null
 
@@ -322,12 +337,11 @@ class BacktrackSolver(override val problem: Problem) :
         } else {
             emptyList()
         }
-        private val lpGlobalCuts: List<Cut> =
-            if (params.lpCutPool && lpRelaxer != null && lpSeparators.isNotEmpty()) {
-                harvestRootCuts(lpRelaxer, PropagationSession(problem), lpSeparators)
-            } else {
-                emptyList()
-            }
+
+        // Root cut harvesting solves the LP and can be slow on a large relaxation; it is deferred to
+        // [runUntilEvent]'s one-shot `started` block, where the cancellation token is live (it is unset
+        // at field-init time on the pausable portfolio path — the slice arms it before each slice).
+        private var lpGlobalCuts: List<Cut> = emptyList()
         private val lagBound = if (params.lagrangian) {
             LagrangianBound(problem, objective).takeIf { it.applicable }
         } else {
@@ -412,6 +426,7 @@ class BacktrackSolver(override val problem: Problem) :
                         objectiveVar = singleObj?.varId ?: -1,
                         objectiveAscending = singleObj?.ascending ?: true,
                         globalCuts = lpGlobalCuts, seedTableau = lpHotTableau,
+                        cancellation = params.cancellation,
                     )
                     if (outcome.basis != null) {
                         while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
@@ -483,6 +498,14 @@ class BacktrackSolver(override val problem: Problem) :
         private var decisionsThisRun = 0L
         private var perRunBudget = Long.MAX_VALUE
         private var cancelCheckCountdown = 0
+
+        // Time-adaptive cancellation cadence: the deadline is polled every [cancelCheckInterval] nodes,
+        // and the interval is steered so the wall-clock gap between polls hovers around
+        // [CANCEL_CHECK_TARGET_MS]. A fixed node count can't bound that gap — per-node cost spans sub-µs
+        // (pure SAT) to ~0.5s (heavy global propagation). Starts at 1 so the first gap can't be a full
+        // batch of expensive nodes; fast instances grow it to the [CANCEL_CHECK_INTERVAL] ceiling.
+        private var cancelCheckInterval = 1
+        private var lastCancelCheckMark: TimeSource.Monotonic.ValueTimeMark? = null
         private var runActive = false
         private var started = false
 
@@ -515,10 +538,8 @@ class BacktrackSolver(override val problem: Problem) :
                     // Import any nogoods already in the shared pool (cross-arm); the session persists for
                     // the whole search, so this arm's own clauses are never lost between slices.
                     params.clauseExchange?.onSearchStart(session)
-                    // Record the pre-search root LP bound once for the integrality-gap metric: search
-                    // only bounds from level 1 down, so this one-shot solve is the sole root capture.
-                    val relaxer = lpRelaxer
-                    if (relaxer != null) sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts))
+                    // The pre-search root LP work (cut harvest + bound capture) is deferred to the first
+                    // [runUntilEvent], where the cancellation/deadline is live — see [initRootLp].
                 }
             }
         }
@@ -584,6 +605,21 @@ class BacktrackSolver(override val problem: Problem) :
             return session.assertObjectiveBound(objectiveVar, threshold, atMost = ascending) is PropagationResult.Unsat
         }
 
+        /**
+         * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation
+         * bound for the integrality-gap metric (search only bounds from level 1 down, so this is the
+         * sole root capture). Run from [runUntilEvent]'s `started` guard — not at construction — so the
+         * live cancellation gates the LP solves it issues. Idempotent via that guard.
+         */
+        private fun initRootLp() {
+            val relaxer = lpRelaxer ?: return
+            if (params.lpCutPool && lpSeparators.isNotEmpty()) {
+                lpGlobalCuts =
+                    harvestRootCuts(relaxer, PropagationSession(problem), lpSeparators, params.cancellation)
+            }
+            sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation))
+        }
+
         /** Advance the search to the next reportable event (a new incumbent, the terminal verdict, or —
          *  in pausable mode — a slice-boundary pause), retaining all state so the next call resumes.
          *  Visible to the enclosing solver (which streams it from [improvements]); the class itself is
@@ -593,10 +629,12 @@ class BacktrackSolver(override val problem: Problem) :
             if (!started) {
                 started = true
                 sink.start()
+                // Root LP work runs here, not at construction, so the cancellation is live while it solves.
+                initRootLp()
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
                 if (params.lpProbe) {
-                    val seed = lpRoundingProbe(objective)
+                    val seed = lpRoundingProbe(objective, params.cancellation)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }
             }
@@ -626,7 +664,8 @@ class BacktrackSolver(override val problem: Problem) :
                             done = t
                             return StepEvent.Terminal(t)
                         }
-                        cancelCheckCountdown = CANCEL_CHECK_INTERVAL
+                        adaptCancelInterval()
+                        cancelCheckCountdown = cancelCheckInterval
                     }
                     if (decisionsThisRun >= perRunBudget || restartRequested) {
                         val term = doRestart()
@@ -857,10 +896,14 @@ class BacktrackSolver(override val problem: Problem) :
     }
 }
 
-/** Cancellation is polled this often inside the search loop. Lower = more
- *  responsive; higher = lower overhead. 256 is a few microseconds per check at
- *  worst, and the search stops within a few hundred decisions of a cancel. */
+/** Ceiling on the adaptive cancellation cadence (nodes between deadline polls). Fast instances
+ *  settle here — a few microseconds per check at worst; slow ones adapt below it. See
+ *  `ResumableMinimize.adaptCancelInterval`. */
 internal const val CANCEL_CHECK_INTERVAL: Int = 256
+
+/** Target wall-clock gap (ms) between deadline polls; the adaptive cadence steers toward it so `-t`
+ *  overshoot stays ~this small regardless of per-node cost. */
+internal const val CANCEL_CHECK_TARGET_MS: Long = 5
 
 /** Most Gomory cuts to draw from one tableau per separation round (#22). */
 internal const val GOMORY_CUTS_PER_ROUND: Int = 8

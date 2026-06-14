@@ -82,6 +82,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     // (never pruned), so the scan re-checks `seen[v]`. Cleared per analysis.
     private val seenAtomList = IntArrayList()
 
+    // O(1) membership index for the leaf-literal dedup in [ingestReason] / [drainSeenAsLeaves],
+    // replacing per-literal linear scans of `learned` that made analysis quadratic in clause size.
+    // Every literal added is `Lit.make(v, !currentTruth(v))` — one literal per variable, so this is
+    // equivalent to a by-variable dedup. Reused across analyses, cleared per call.
+    private val litsInLearned = IntHashSet()
+
     /** Bool vars seen during the last analysis (the VSIDS bump set). Valid only when the
      *  last call returned [AnalysisResult.Learned]; cleared at the start of each analysis. */
     fun lastBumpBoolVars(): IntArrayList = bumpBoolVars
@@ -226,6 +232,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
         atomLevelEpoch++
         seenAtomList.clear()
+        litsInLearned.clear()
         bumpBoolVars.clear()
         bumpIntVars.clear()
         var currentLevelCount = 0
@@ -272,13 +279,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             resolved[pivot] = true
             currentLevelCount--
             if (currentLevelCount == 0) {
-                learned.add(uipLit(pivot))
+                addLearned(learned, uipLit(pivot))
                 return finalizeClause(learned, currentLevel)
             }
             val antecedents = antecedentsOf(pivot)
                 ?: run {
                     // Leaf pivot — promote and drain the rest.
-                    learned.add(uipLit(pivot))
+                    addLearned(learned, uipLit(pivot))
                     drainSeenAsLeaves(learned)
                     return finalizeClause(learned, currentLevel)
                 }
@@ -288,6 +295,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
         drainSeenAsLeaves(learned)
         return finalizeClause(learned, currentLevel)
+    }
+
+    /** Append [lit] to [learned] and record it in [litsInLearned] so the leaf-literal dedup stays
+     *  O(1). Every literal reaches the clause through here, keeping the index exact. */
+    private fun addLearned(learned: IntArrayList, lit: Int) {
+        learned.add(lit)
+        litsInLearned.add(lit)
     }
 
     /** Produce the literal for [pivot] as it should appear in the learned clause —
@@ -601,18 +615,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (v >= universe) {
                 // An atom materialised mid-analysis — derived antecedents allocate the
                 // opposing-bound atoms they cite. It has no frontier slot, so keep the
-                // literal in the clause as a leaf (deduped): adding a literal only weakens
-                // the clause, while dropping it would silently strengthen the nogood past
-                // what was derived.
-                var present = false
-                for (i in 0 until learned.size) {
-                    if (learned[i] == lit) {
-                        present = true
-                        break
-                    }
-                }
-                if (!present) {
-                    learned.add(lit)
+                // literal in the clause as a leaf (deduped via [litsInLearned]): adding a
+                // literal only weakens the clause, while dropping it would silently strengthen
+                // the nogood past what was derived.
+                if (!litsInLearned.contains(lit)) {
+                    addLearned(learned, lit)
                     if (levelOf(v) == currentLevel) bumpCurrentLevel()
                 }
                 continue
@@ -624,20 +631,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 // have no trail order and can form same-level cycles (see [resolved]); a resolved
                 // atom can recur as a genuine premise — typically the opposite-polarity bound of
                 // the same int var. Skipping it then drops a literal the nogood needs, producing an
-                // unsound clause that prunes feasible solutions and over-proves optimality (#132).
-                // Keep that literal instead (deduped). Re-resolving the atom would risk the
-                // ping-pong the guard prevents; merely adding a literal only weakens the clause, so
-                // it stays sound. A second current-level literal makes the clause non-asserting,
-                // which [finalizeClause] flags so the engine backtracks chronologically.
-                if (v >= numBoolVars) {
-                    var present = false
-                    for (i in 0 until learned.size) {
-                        if (learned[i] == lit) {
-                            present = true
-                            break
-                        }
-                    }
-                    if (!present) learned.add(lit)
+                // unsound clause that prunes feasible solutions and over-proves optimality.
+                // Keep that literal instead (deduped via [litsInLearned]). Re-resolving the atom
+                // would risk the ping-pong the guard prevents; merely adding a literal only weakens
+                // the clause, so it stays sound. A second current-level literal makes the clause
+                // non-asserting, which [finalizeClause] flags so the engine backtracks chronologically.
+                if (v >= numBoolVars && !litsInLearned.contains(lit)) {
+                    addLearned(learned, lit)
                 }
                 continue
             }
@@ -656,18 +656,18 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             } else {
                 if (v < numBoolVars) {
                     val pinned = state.boolValues[v] ?: error("seen var $v not pinned")
-                    learned.add(Lit.make(v, !pinned))
+                    addLearned(learned, Lit.make(v, !pinned))
                 } else {
                     val atomId = v - numBoolVars
                     val holds = state.atomCurrentTruth(atomId)
                         ?: error("ingest atom $atomId at lower level undetermined")
-                    learned.add(Lit.make(v, !holds))
+                    addLearned(learned, Lit.make(v, !holds))
                 }
             }
         }
     }
 
-    /** Convert every still-seen variable into a literal in [learned]. */
+    /** Convert every still-seen variable into a literal in [learned], deduped via [litsInLearned]. */
     private fun drainSeenAsLeaves(learned: IntArrayList) {
         val numBoolVars = state.problem.numBoolVars
         for (v in 0 until universe) {
@@ -680,15 +680,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 val holds = state.atomCurrentTruth(atomId) ?: continue
                 Lit.make(v, !holds)
             }
-            var present = false
-            for (i in 0 until learned.size) {
-                if (Lit.variable(learned[i]) == v) {
-                    present = true
-                    break
-                }
-            }
-            if (present) continue
-            learned.add(lit)
+            if (!litsInLearned.contains(lit)) addLearned(learned, lit)
         }
     }
 

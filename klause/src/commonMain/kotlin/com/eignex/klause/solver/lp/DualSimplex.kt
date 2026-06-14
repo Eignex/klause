@@ -1,7 +1,11 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+
+/** Pivots between consecutive cancellation polls in [DualSimplex.runDualSimplex]. */
+private const val CANCEL_POLL_INTERVAL = 256L
 
 /** Outcome of an LP solve. */
 internal enum class LpStatus {
@@ -145,6 +149,14 @@ internal class DualSimplex(
      * only so the anti-cycling regression test can force the fallback on a small instance.
      */
     private val stallLimitOverride: Int = -1,
+    /**
+     * Cooperative cancellation, polled every [CANCEL_POLL_INTERVAL] pivots: a single exact solve over a
+     * large tableau runs up to `1000 + 100·(numVars + m)` iterations of O(m·numVars) work, enough to
+     * blow a wall-clock limit. On cancellation it abandons via [LpOverflowException] — the same
+     * graceful-degradation seam the iteration backstop uses, so every caller drops the LP bound and
+     * keeps the node, and the enclosing search then observes the deadline and stops.
+     */
+    private val cancellation: Cancellation = Cancellation.Never,
 ) {
     private val m = model.m
     private val numVars = model.numVars
@@ -766,6 +778,11 @@ internal class DualSimplex(
             if (iter++ > maxIter) {
                 // Unreachable once Bland latches; degrade gracefully instead of aborting the solve.
                 throw LpOverflowException("dual simplex exceeded $maxIter iterations")
+            }
+            // Cooperative deadline check: the clock read is negligible against the per-pivot O(m·numVars)
+            // work, so poll periodically and abandon via the same graceful-degradation path as the backstop.
+            if (iter % CANCEL_POLL_INTERVAL == 0L && cancellation()) {
+                throw LpOverflowException("dual simplex cancelled after $iter iterations")
             }
 
             // --- Leaving variable: largest infeasibility (Dantzig), or smallest index under Bland. ---

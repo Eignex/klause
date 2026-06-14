@@ -70,6 +70,32 @@ class LpLearnTest {
     }
 
     @Test
+    fun `a fired cancellation aborts an lp-bounded minimize before search`() {
+        // minimize Σx s.t. Σx ≥ 5 over [0,2]^3 (optimum 5). With LP bounding on but the deadline already
+        // past, the pre-search root-LP build/solve and the search loop must both honour the token: the
+        // cancel check runs before the first decision, so the verdict is the no-incumbent budget result
+        // and the call returns rather than wedging in the LP phase.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 5)),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val baseline = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 3L, lpBounding = true))
+        assertTrue(baseline is MinimizeResult.Optimal, "baseline run proves the optimum")
+
+        val cancelled = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 3L, lpBounding = true, lpProbe = false, cancellation = { true }),
+        )
+        assertTrue(
+            cancelled is MinimizeResult.Unknown,
+            "a fired deadline must stop before any decision with no incumbent proven; got $cancelled",
+        )
+    }
+
+    @Test
     fun `lp learning preserves the optimum`() {
         // minimize Σx s.t. Σx ≥ 5 over [0,2]^3; optimum 5. Branching that drives the reachable sum
         // below 5 makes the node LP infeasible, exercising the learned-clause path under restarts.
