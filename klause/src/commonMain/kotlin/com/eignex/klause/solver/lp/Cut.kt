@@ -416,17 +416,23 @@ internal class GccSeparator : CutSeparator {
  * strength. A *cover* `C` is a set of items with `Σ_{C} w_i > b`: no feasible 0/1 point can set all of
  * `C`, so `Σ_{i∈C} x_i ≤ |C| − 1` is a valid inequality. Separation finds a violated cover greedily by
  * fractional value: take the highest-`x*` items until their weight exceeds `b`; if the resulting
- * cover's `Σ x*` exceeds `|C| − 1` the cut is violated and emitted. The cover is then **extended**
- * (#552): every non-cover item whose weight is at least the cover's maximum is folded in with
- * coefficient 1 while the bound stays `|C| − 1` — a lifted, strictly stronger inequality that also
- * separates fractional points the bare cover misses. Mixed-sign rows (negated literals or
- * non-positive weights) are skipped — their cover form needs complementing, deferred.
+ * cover's `Σ x*` exceeds `|C| − 1` the cut is violated and emitted. The cover is then minimised and
+ * **lifted** (#552): every non-cover variable is up-lifted by sequential lifting — its coefficient is
+ * `αₖ = (|C| − 1) − max{ Σ aᵢxᵢ : Σ wᵢxᵢ ≤ b − wₖ }` over the already-lifted items, where the max is a
+ * small DP. When an at-most-one clique graph is present (binary clauses / AMO factors), the max is
+ * solved as a GUB knapsack (at most one item per clique), shrinking it and so strengthening the lift —
+ * such cuts are valid in conjunction with the clique rows, which are global and in the relaxation.
+ * Mixed-sign rows (negated literals or non-positive weights) are skipped — their cover form needs
+ * complementing, deferred.
  */
 internal class KnapsackCoverSeparator : CutSeparator {
     private val tol = 1e-6
 
     override fun separate(ctx: CutContext): List<Cut> {
         val cuts = ArrayList<Cut>()
+        // At-most-one conflict graph (binary clauses + AMO factors), shared across all knapsacks. Used
+        // for GUB lifting: within a clique at most one item is 1, which strengthens the lift (#552).
+        val conflict = conflictAdjacency(ctx.problem)
         for (factor in ctx.problem.factors) {
             if (factor !is PseudoBoolean || factor.op != PbOp.LE) continue
             if (factor.weights.any { it <= 0 } || factor.literals.any { !Lit.isPositive(it) }) continue
@@ -448,38 +454,167 @@ internal class KnapsackCoverSeparator : CutSeparator {
             if (!ok) continue
             // Greedy cover: highest fractional value first, until the weight sum exceeds the bound.
             val order = (0 until k).sortedByDescending { xstar[it] }
-            val cover = IntArrayList()
+            val inCover = BooleanArray(k)
+            var coverCount = 0
             var wsum = 0L
             for (i in order) {
-                cover.add(i)
+                inCover[i] = true
+                coverCount++
                 wsum = addExact(wsum, factor.weights[i].toLong())
                 if (wsum > b) break
             }
             if (wsum <= b) continue // whole set fits under the bound — no cover, no cut
-            // Extend the cover to a stronger inequality (#552): every non-cover item whose weight is at
-            // least the cover's maximum joins it with coefficient 1, keeping the right-hand side at
-            // |C| − 1. Valid because the |C| lightest of C ∪ E are exactly C (the added items are no
-            // lighter than any cover member), and Σ_C w > b, so no |C| of them can be set together. A
-            // stronger cut than the bare cover, and it separates fractional points the bare one misses.
-            val inCover = BooleanArray(k)
-            var maxCoverW = 0
-            for (t in 0 until cover.size) {
-                inCover[cover[t]] = true
-                if (factor.weights[cover[t]] > maxCoverW) maxCoverW = factor.weights[cover[t]]
+            // Minimise the cover: drop the lightest members while the sum still exceeds the bound, so
+            // the base inequality `Σ_C x ≤ |C| − 1` is as strong as possible before lifting.
+            run {
+                var cw = wsum
+                for (i in (0 until k).filter { inCover[it] }.sortedBy { factor.weights[it] }) {
+                    if (cw - factor.weights[i] > b) {
+                        inCover[i] = false
+                        coverCount--
+                        cw -= factor.weights[i].toLong()
+                    }
+                }
             }
-            val rhs = (cover.size - 1).toLong()
-            val ext = IntArrayList()
-            for (t in 0 until cover.size) ext.add(cover[t])
-            for (i in 0 until k) if (!inCover[i] && factor.weights[i] >= maxCoverW) ext.add(i)
+            val r = (coverCount - 1).toLong()
+            // Sequential up-lifting (#552): start from the cover (coefficient 1) and lift each non-cover
+            // variable k with the exact coefficient αₖ = r − max{ Σ aᵢxᵢ : Σ wᵢxᵢ ≤ b − wₖ over lifted
+            // items, at most one per AMO clique }. The clique cap (GUB lifting) shrinks that max, giving
+            // a larger — still valid — αₖ. The max is a small GUB-knapsack solved by DP; skip lifting
+            // when the capacity would make the DP too large (emit the bare minimal cover then).
+            val liftedPos = ArrayList<Int>(coverCount)
+            val liftedCoeff = ArrayList<Long>(coverCount)
+            for (i in 0 until k) {
+                if (inCover[i]) {
+                    liftedPos.add(i)
+                    liftedCoeff.add(1L)
+                }
+            }
+            if (b <= MAX_LIFT_CAP) {
+                val groupOf = cliquePartition(k, factor.literals, conflict)
+                val nonCover = (0 until k).filter { !inCover[it] }.sortedByDescending { factor.weights[it] }
+                for (kk in nonCover) {
+                    val cap = b - factor.weights[kk].toLong()
+                    val maxv = if (cap < 0) {
+                        0L
+                    } else {
+                        gubKnapsackMax(
+                            liftedPos,
+                            liftedCoeff,
+                            factor.weights,
+                            groupOf,
+                            cap.toInt(),
+                        )
+                    }
+                    val alpha = r - maxv
+                    if (alpha > 0) {
+                        liftedPos.add(kk)
+                        liftedCoeff.add(alpha)
+                    }
+                }
+            }
             var lhs = 0.0
-            for (t in 0 until ext.size) lhs += xstar[ext[t]]
-            if (lhs > rhs + tol) {
-                val cutCols = IntArray(ext.size) { cols[ext[it]] }
-                // Read off the factor's weights and bound alone — global by construction.
-                cuts.add(Cut(cutCols, LongArray(ext.size) { 1L }, Relation.LE, rhs, global = true))
+            for (t in liftedPos.indices) lhs += liftedCoeff[t] * xstar[liftedPos[t]]
+            if (lhs > r + tol) {
+                val cutCols = IntArray(liftedPos.size) { cols[liftedPos[it]] }
+                val cutCoeff = LongArray(liftedPos.size) { liftedCoeff[it] }
+                // Read off the row's weights, bound, and the (global) clique graph — global by construction.
+                cuts.add(Cut(cutCols, cutCoeff, Relation.LE, r, global = true))
             }
         }
         return cuts
+    }
+
+    /** At-most-one conflict graph (variable → mutually-exclusive variables) from binary clauses
+     *  `¬a ∨ ¬b` and at-most-one factors (`Cardinality(max = 1)`, unit `Σ x ≤ 1` pseudo-Boolean) over
+     *  positive literals — the same structure the clique-cut separator reads. */
+    private fun conflictAdjacency(problem: Problem): Map<Int, Set<Int>> {
+        val adj = HashMap<Int, HashSet<Int>>()
+        fun edge(a: Int, b: Int) {
+            if (a == b) return
+            adj.getOrPut(a) { HashSet() }.add(b)
+            adj.getOrPut(b) { HashSet() }.add(a)
+        }
+        fun atMostOne(literals: IntArray) {
+            if (literals.size < 2 || literals.any { !Lit.isPositive(it) }) return
+            val vars = IntArray(literals.size) { Lit.variable(literals[it]) }
+            for (i in vars.indices) for (j in i + 1 until vars.size) edge(vars[i], vars[j])
+        }
+        for (factor in problem.factors) {
+            when (factor) {
+                is Clause -> if (factor.literals.size == 2 && factor.literals.none { Lit.isPositive(it) }) {
+                    edge(Lit.variable(factor.literals[0]), Lit.variable(factor.literals[1]))
+                }
+
+                is Cardinality -> if (factor.max == 1) atMostOne(factor.literals)
+
+                is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1 && factor.weights.all { it == 1 }) {
+                    atMostOne(factor.literals)
+                }
+
+                else -> Unit
+            }
+        }
+        return adj
+    }
+
+    /** Greedy clique partition of the `k` knapsack positions over the [conflict] graph: each group is a
+     *  set of pairwise mutually-exclusive items. Used as the GUB structure for [gubKnapsackMax]. Using
+     *  only a partition's worth of edges (cross-group conflicts are ignored) keeps the lifting max an
+     *  over-estimate, so the derived coefficients stay valid. */
+    private fun cliquePartition(k: Int, literals: IntArray, conflict: Map<Int, Set<Int>>): IntArray {
+        val vars = IntArray(k) { Lit.variable(literals[it]) }
+        fun adjacent(i: Int, j: Int): Boolean = conflict[vars[i]]?.contains(vars[j]) == true
+        val group = IntArray(k) { -1 }
+        var g = 0
+        for (i in 0 until k) {
+            if (group[i] != -1) continue
+            group[i] = g
+            val members = arrayListOf(i)
+            for (j in i + 1 until k) {
+                if (group[j] == -1 && members.all { adjacent(it, j) }) {
+                    group[j] = g
+                    members.add(j)
+                }
+            }
+            g++
+        }
+        return group
+    }
+
+    /** Max `Σ coeffᵢ·xᵢ` over the [lifted] items with `Σ weightᵢ·xᵢ ≤ cap` and at most one item taken
+     *  per clique group ([groupOf] over the items' positions). A GUB (generalised-upper-bound) knapsack
+     *  solved by DP over the capacity, processing one clique group at a time so each contributes ≤ 1. */
+    private fun gubKnapsackMax(
+        lifted: List<Int>,
+        coeff: List<Long>,
+        weights: IntArray,
+        groupOf: IntArray,
+        cap: Int,
+    ): Long {
+        val byGroup = HashMap<Int, MutableList<Int>>()
+        for (t in lifted.indices) byGroup.getOrPut(groupOf[lifted[t]]) { ArrayList() }.add(t)
+        val dp = LongArray(cap + 1)
+        for ((_, idxs) in byGroup) {
+            val next = dp.copyOf() // "take none from this group"
+            for (t in idxs) {
+                val w = weights[lifted[t]]
+                if (w > cap) continue
+                val v = coeff[t]
+                // dp[c - w] is the pre-group value, so at most one item from the group is taken.
+                for (c in cap downTo w) {
+                    val cand = dp[c - w] + v
+                    if (cand > next[c]) next[c] = cand
+                }
+            }
+            for (c in 0..cap) dp[c] = next[c]
+        }
+        return dp[cap]
+    }
+
+    private companion object {
+        /** Capacity ceiling for the lifting DP (array size `cap + 1`); above it, emit the bare cover. */
+        const val MAX_LIFT_CAP: Long = 4096L
     }
 }
 
