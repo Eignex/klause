@@ -64,6 +64,13 @@ class Mdd(
         if (cost >= 0) intMap[cost] else cost,
     )
 
+    /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
+     *  diagram — per-layer state counts, layer offsets, the transition records, the initial and
+     *  accepting states, the record stride, and the cost var (#531). */
+    override fun structuralKey(): String = "mdd:$initial:$recordStride:$cost:${numStatesPerLayer.joinToString(",")}:" +
+        "${layerStarts.joinToString(",")}:${transitions.joinToString(",")}:" +
+        "${accepting.joinToString(",")}:${seq.joinToString(",")}"
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
 

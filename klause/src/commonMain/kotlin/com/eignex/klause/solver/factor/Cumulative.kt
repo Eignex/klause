@@ -110,6 +110,14 @@ class Cumulative(
         if (capacityVar >= 0) intMap[capacityVar] else capacityVar,
     )
 
+    /** Position-faithful (task i is fixed by index): keeps every array in order and folds in all
+     *  constants — durations/resources/capacity and the var/const split — so two non-equivalent
+     *  cumulatives never collide (#531). */
+    override fun structuralKey(): String =
+        "cumulative:$capacity:$capacityVar:${durations.joinToString(",")}:${resources.joinToString(",")}:" +
+            "${starts.joinToString(",")}:${presents.joinToString(",")}:" +
+            "${durationVars.joinToString(",")}:${resourceVars.joinToString(",")}"
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = run {
         val extra = (if (durationVars.isNotEmpty()) durationVars.size else 0) +

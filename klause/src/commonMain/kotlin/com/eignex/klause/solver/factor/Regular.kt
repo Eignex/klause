@@ -54,6 +54,12 @@ class Regular(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         Regular(seq.remapVars(intMap), numStates, alphabetSize, transitions, q0, accepting)
 
+    /** Position-faithful (seq position i matters): keeps the sequence vars in order and folds in the
+     *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting states
+     *  (#531). The symbol-relabeling value side is left to a follow-up. */
+    override fun structuralKey(): String = "regular:$numStates:$alphabetSize:$q0:${transitions.joinToString(",")}:" +
+        "${accepting.joinToString(",")}:${seq.joinToString(",")}"
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = seq
 

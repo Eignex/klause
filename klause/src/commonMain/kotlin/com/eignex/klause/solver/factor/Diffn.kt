@@ -53,6 +53,15 @@ class Diffn(
         nonStrict,
     )
 
+    /** Position-faithful (rectangle i is fixed by index): keeps the coordinate arrays in order and
+     *  folds in the constant sizes, the var-size split, and the [nonStrict] flag (#531). */
+    override fun structuralKey(): String {
+        val wv = widthVars?.joinToString(",").orEmpty()
+        val hv = heightVars?.joinToString(",").orEmpty()
+        return "diffn:$nonStrict:${widths.joinToString(",")}:${heights.joinToString(",")}:" +
+            "${xs.joinToString(",")}:${ys.joinToString(",")}:$wv:$hv"
+    }
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray)
