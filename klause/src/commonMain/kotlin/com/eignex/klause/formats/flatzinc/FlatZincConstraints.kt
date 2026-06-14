@@ -192,9 +192,13 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "array_var_bool_element" -> emitArrayBoolElement(c, varArray = true)
 
     // Counting
-    "at_least_int" -> emitAtLeast(c)
+    "at_least_int", "fzn_at_least_int" -> emitAtLeast(c)
 
-    "at_most_int" -> emitAtMost(c)
+    "at_most_int", "fzn_at_most_int" -> emitAtMost(c)
+
+    "count_eq", "fzn_count_eq", "klause_count_eq" -> emitCountEq(c)
+
+    "among", "fzn_among" -> emitAmong(c)
 
     "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, GccVariant.STANDARD)
 
