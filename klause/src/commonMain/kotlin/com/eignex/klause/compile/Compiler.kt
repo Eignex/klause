@@ -502,6 +502,8 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
             probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
             probeIntHoles = holes,
+            probeBudgetPerVar = presolve.probeBudgetPerVar(),
+            probeTotalBudget = presolve.probeTotalBudget(),
         ),
         boolVarIdByName = boolVarIdByName.toMap(),
         intVarIdByName = intVarIdByName.toMap(),

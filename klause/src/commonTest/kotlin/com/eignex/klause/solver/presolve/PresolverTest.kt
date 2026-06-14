@@ -144,6 +144,32 @@ class PresolverTest {
     }
 
     @Test
+    fun `emphasis surfaces a probe budget and aggressive gets a larger one`() {
+        // Each level exposes a finite SAC probe budget (no level leaves it unbounded), and the
+        // aggressive level — the only one that auto-runs the EXHAUSTIVE probes — gets a larger one.
+        val capped = PresolveConfig.parse("default")
+        val aggressive = PresolveConfig.parse("aggressive")
+        assertTrue(capped.probeTotalBudget() < Int.MAX_VALUE)
+        assertTrue(capped.probeBudgetPerVar() < Int.MAX_VALUE)
+        assertTrue(aggressive.probeTotalBudget() > capped.probeTotalBudget())
+        assertTrue(aggressive.probeBudgetPerVar() > capped.probeBudgetPerVar())
+        // A non-aggressive level that turns the probe on via an override inherits the capped budget,
+        // so the EXHAUSTIVE work can't dominate.
+        val overridden = PresolveConfig.parse("default,+probe-int-holes")
+        assertEquals(capped.probeTotalBudget(), overridden.probeTotalBudget())
+        // An explicit config-level budget override wins over the emphasis tier.
+        val custom = PresolveConfig(
+            PresolveEmphasis.AGGRESSIVE,
+            probeTotalBudgetOverride = 7,
+            probeBudgetPerVarOverride = 3,
+        )
+        assertEquals(7, custom.probeTotalBudget())
+        assertEquals(3, custom.probeBudgetPerVar())
+        // forLocalSearch preserves the budget override.
+        assertEquals(7, custom.forLocalSearch().probeTotalBudget())
+    }
+
+    @Test
     fun `the round engine iterates to a fixpoint`() {
         // affine x=2y+1 substituted into 2x+4y<=10 leaves a row strengthen reduces — which only
         // happens on a second round (strengthen runs before affine in the first). Re-presolving the

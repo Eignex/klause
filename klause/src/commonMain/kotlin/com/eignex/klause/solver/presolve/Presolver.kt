@@ -77,6 +77,15 @@ enum class PresolveTiming {
 /** Round cap for the iterating emphasis levels; the fixpoint is almost always reached well before. */
 private const val MAX_PRESOLVE_ROUNDS = 16
 
+/** Bake-time SAC probe budgets (the only EXHAUSTIVE-tier work). The unit is a `propagate` call.
+ *  The capped tier bounds an EXHAUSTIVE pass turned on by an explicit override under a non-aggressive
+ *  level so it can't dominate presolve time; the aggressive tier is larger but still bounded so a big
+ *  instance with wide domains terminates. SCIP analog: per-presolver work limits. Tuned by #461. */
+private const val CAPPED_PROBE_BUDGET_PER_VAR = 256
+private const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
+private const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
+private const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
+
 /** Diminishing-returns abort threshold (SCIP `abortfac`): a round that reduces the problem by less
  *  than this fraction ends the loop. Tiny, so it only trips on marginal spinning, never real work. */
 private const val PRESOLVE_ABORT_FRACTION = 0.001
@@ -233,20 +242,33 @@ enum class PresolveEmphasis(
     val timings: Set<PresolveTiming>,
     /** Round-to-fixpoint cap (`0` = no presolve, `1` = a single non-iterating pass). */
     val maxRounds: Int,
+    /** Per-var cap on bake-time SAC `propagate` calls — the EXHAUSTIVE-tier work budget. */
+    val probeBudgetPerVar: Int,
+    /** Total cap on bake-time SAC `propagate` calls across all vars. */
+    val probeTotalBudget: Int,
     /** Accepted spellings besides [id]. */
     private val aliases: List<String> = emptyList(),
 ) {
     /** No presolve. */
-    OFF("off", emptySet(), 0, aliases = listOf("none")),
+    OFF("off", emptySet(), 0, CAPPED_PROBE_BUDGET_PER_VAR, CAPPED_PROBE_TOTAL_BUDGET, aliases = listOf("none")),
 
     /** Cheap FAST reductions only, applied once — no symmetry, no iteration. */
-    CONSERVATIVE("conservative", setOf(PresolveTiming.FAST), 1, aliases = listOf("fast")),
+    CONSERVATIVE(
+        "conservative",
+        setOf(PresolveTiming.FAST),
+        1,
+        CAPPED_PROBE_BUDGET_PER_VAR,
+        CAPPED_PROBE_TOTAL_BUDGET,
+        aliases = listOf("fast"),
+    ),
 
     /** FAST + MEDIUM (adds symmetry), iterated to a fixpoint. The shipped default. */
     DEFAULT(
         "default",
         setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM),
         MAX_PRESOLVE_ROUNDS,
+        CAPPED_PROBE_BUDGET_PER_VAR,
+        CAPPED_PROBE_TOTAL_BUDGET,
         aliases = listOf("auto"),
     ),
 
@@ -255,6 +277,8 @@ enum class PresolveEmphasis(
         "aggressive",
         setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM, PresolveTiming.EXHAUSTIVE),
         MAX_PRESOLVE_ROUNDS,
+        AGGRESSIVE_PROBE_BUDGET_PER_VAR,
+        AGGRESSIVE_PROBE_TOTAL_BUDGET,
     ),
     ;
 
@@ -284,7 +308,17 @@ enum class PresolveEmphasis(
 class PresolveConfig(
     val emphasis: PresolveEmphasis = PresolveEmphasis.DEFAULT,
     val overrides: Map<PresolvePass, Boolean> = emptyMap(),
+    /** Per-var SAC probe budget; `null` follows the [emphasis] tier. The benchmarking knob. */
+    private val probeBudgetPerVarOverride: Int? = null,
+    /** Total SAC probe budget; `null` follows the [emphasis] tier. */
+    private val probeTotalBudgetOverride: Int? = null,
 ) {
+
+    /** Per-var cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
+    fun probeBudgetPerVar(): Int = probeBudgetPerVarOverride ?: emphasis.probeBudgetPerVar
+
+    /** Total cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
+    fun probeTotalBudget(): Int = probeTotalBudgetOverride ?: emphasis.probeTotalBudget
 
     /** Whether [pass] runs under [context]: an explicit override wins, else the emphasis rule. */
     fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = overrides[pass] ?: auto(pass, context)
@@ -306,6 +340,8 @@ class PresolveConfig(
     fun forLocalSearch(): PresolveConfig = PresolveConfig(
         emphasis,
         overrides + PresolvePass.entries.filter { !it.preservesSolutionSet }.associateWith { false },
+        probeBudgetPerVarOverride,
+        probeTotalBudgetOverride,
     )
 
     /** Predefined configs and the spec-string [parse]r. */
