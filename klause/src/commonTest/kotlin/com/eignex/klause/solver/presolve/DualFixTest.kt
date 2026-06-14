@@ -2,8 +2,11 @@ package com.eignex.klause.solver.presolve
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -130,5 +133,67 @@ class DualFixTest {
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
         checkDualFix("global-excluded", problem, emptyMap(), emptySet())
+    }
+
+    // ---- Boolean dual fixing (#469) ----
+
+    private fun pos(v: Int) = Lit.make(v, true)
+
+    /** Minimum of `Σ weights·b` over the feasible Boolean assignments, or `null` if infeasible. */
+    private fun minObjectiveBools(problem: Problem, weights: Map<Int, Long>): Long? {
+        val nb = problem.numBoolVars
+        var best: Long? = null
+        for (mask in 0 until (1 shl nb)) {
+            var a = Assumptions.None
+            val bits = BooleanArray(nb) { (mask shr it) and 1 == 1 }
+            for (v in 0 until nb) a = a.withBool(v, bits[v])
+            if (problem.propagate(a) is PropagationResult.Unsat) continue
+            var obj = 0L
+            for (v in 0 until nb) if (bits[v]) obj += weights[v] ?: 0L
+            if (best == null || obj < best) best = obj
+        }
+        return best
+    }
+
+    private fun hasUnit(problem: Problem, lit: Int) =
+        problem.factors.any { it is Clause && it.literals.size == 1 && it.literals[0] == lit }
+
+    @Test
+    fun `pure-positive boolean is fixed true`() {
+        // b0, b1 appear only positively (in a single clause) ⇒ setting them true satisfies it and is
+        // always safe ⇒ both pinned true with a unit clause; the optimum (no objective) is preserved.
+        val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1)))))
+        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
+        assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
+        assertTrue(hasUnit(out, Lit.make(1, true)), "b1 should be pinned true")
+    }
+
+    @Test
+    fun `positive-cost pure-positive boolean stays free`() {
+        // b0 is pure-positive (true is safe) but costs +2, and false is unsafe (the clause may need it)
+        // ⇒ it cannot be pinned either way. b1 (zero cost) is still pinned true.
+        val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1)))))
+        val coeffs = mapOf(0 to 2L)
+        val out = Presolve.fixDominatedVariables(problem, emptyMap(), coeffs)
+        assertEquals(minObjectiveBools(problem, coeffs), minObjectiveBools(out, coeffs), "optimum changed")
+        assertTrue(!hasUnit(out, Lit.make(0, true)) && !hasUnit(out, Lit.make(0, false)), "b0 must stay free")
+    }
+
+    @Test
+    fun `negative-cost pure-positive boolean is fixed true`() {
+        // c0 = −1 (true is beneficial) and true is safe ⇒ pin b0 true.
+        val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1)))))
+        val coeffs = mapOf(0 to -1L)
+        val out = Presolve.fixDominatedVariables(problem, emptyMap(), coeffs)
+        assertEquals(minObjectiveBools(problem, coeffs), minObjectiveBools(out, coeffs), "optimum changed")
+        assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
+    }
+
+    @Test
+    fun `booleans in a cardinality are excluded`() {
+        // A cardinality constraint isn't monotone in a single literal ⇒ its bools can't be dual-fixed.
+        val problem = Problem(2, 0, emptyArray(), listOf(Cardinality(intArrayOf(pos(0), pos(1)), min = 1, max = 2)))
+        assertSame(problem, Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()), "expected no fixing")
     }
 }
