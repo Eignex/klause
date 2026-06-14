@@ -111,8 +111,12 @@ class FznDecomposedGlobalsTest {
         val src = decl(2) + "var 0..3: c;\nconstraint klause_count_eq([x1, x2, x3], 1, c);\nsolve satisfy;"
         val found = enumerate(src, names + "c")
         val expected = HashSet<List<Int>>()
-        for (a in 0..2) for (b in 0..2) for (d in 0..2) {
+        for (a in 0..2) {
+            for (b in 0..2) {
+                for (d in 0..2) {
             expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 }))
+        }
+            }
         }
         assertEquals(expected, found)
     }
@@ -130,8 +134,12 @@ class FznDecomposedGlobalsTest {
         val src = decl(2) + "var 0..3: n;\nconstraint fzn_among(n, [x1, x2, x3], {1, 2});\nsolve satisfy;"
         val found = enumerate(src, names + "n")
         val expected = HashSet<List<Int>>()
-        for (a in 0..2) for (b in 0..2) for (d in 0..2) {
+        for (a in 0..2) {
+            for (b in 0..2) {
+                for (d in 0..2) {
             expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
+        }
+            }
         }
         assertEquals(expected, found)
     }
@@ -143,8 +151,12 @@ class FznDecomposedGlobalsTest {
         val src = decl(2) + "var 0..3: n;\nconstraint fzn_among(n, [x1, x2, x3], 1..2);\nsolve satisfy;"
         val found = enumerate(src, names + "n")
         val expected = HashSet<List<Int>>()
-        for (a in 0..2) for (b in 0..2) for (d in 0..2) {
+        for (a in 0..2) {
+            for (b in 0..2) {
+                for (d in 0..2) {
             expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
+        }
+            }
         }
         assertEquals(expected, found)
     }
