@@ -115,6 +115,55 @@ class SymmetryBreakingTest {
     }
 
     @Test
+    fun `value precedence fires on graph coloring with binary disequalities`() {
+        // `col[a] != col[b]` compiles to a binary Linear with op NE — a pure disequality, which is
+        // value-anonymous (#501): the colors are interchangeable. A triangle over 3 colors has 3!=6
+        // proper colorings (all distinct); precedence keeps the single canonical labeling 0,1,2.
+        val edges = listOf(0 to 1, 0 to 2, 1 to 2)
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            edges.map { (a, b) -> Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.NE, 0) },
+        )
+        assertEquals(6, countFeasible(problem))
+        assertEquals(
+            1,
+            countFeasible(Presolve.breakValuePrecedence(problem)),
+            "coloring value symmetry should collapse to one labeling",
+        )
+    }
+
+    @Test
+    fun `value symmetry breaking is sound on a partial graph coloring`() {
+        // Path 0-1-2 over 3 colors: 12 proper colorings, colors still interchangeable. The single-var
+        // value pin (breakSymmetries) must only remove solutions, never change satisfiability.
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.NE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.NE, 0),
+            ),
+        )
+        checkSound("path-coloring", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `an ordering linear is not value-anonymous`() {
+        // `x - y <= 0` is an ordering, not a disequality — relabeling values breaks it, so value
+        // symmetry must stay off (regression guard for the #501 binary-relation detection).
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 2) },
+            listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
+        )
+        assertSame(problem, Presolve.breakValuePrecedence(problem), "ordering ⇒ no value symmetry")
+    }
+
+    @Test
     fun `law-lee precedence fires over a verified non-anonymous orbit`() {
         // A global_cardinality with equal per-value bounds is NOT value-anonymous, but its cover values
         // are interchangeable — verified via remapValues (#442). Precedence over the fully-internal
