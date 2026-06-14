@@ -43,6 +43,20 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
+    fun `annotated search enables phase saving so re-descents reuse the last working values`() {
+        val src = """
+            var 0..5: x;
+            constraint int_lin_le([1], [x], 3);
+            solve :: int_search([x], first_fail, indomain_min, complete) satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        assertTrue(
+            assertNotNull(program.defaultBacktrackParams).phaseSaving,
+            "annotated track should phase-save (#543)",
+        )
+    }
+
+    @Test
     fun `max_regret and indomain_median map to their own selectors not approximations`() {
         val src = """
             var 0..5: x;

@@ -58,6 +58,14 @@ internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
     return BacktrackParams(
         variableSelector = TieredVariableSelector(tiers, fallbackVar),
         valueSelector = wrappedValH,
+        // Phase saving on top of the annotation: each variable's last successfully-pinned value
+        // is retried first on re-descent, with the annotation's value order filling the rest.
+        // The first descent is therefore unchanged (no saved phase yet), so the annotation is
+        // still honoured; only post-backtrack re-descents are biased toward the values that
+        // last worked. On scheduling-style models this lets the search rebuild good partial
+        // assignments instead of re-deriving them from the annotation default every time, which
+        // is the difference between thrashing and conflict-driven progress (#543).
+        phaseSaving = true,
     )
 }
 
