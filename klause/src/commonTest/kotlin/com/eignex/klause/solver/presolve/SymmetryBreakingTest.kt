@@ -115,6 +115,31 @@ class SymmetryBreakingTest {
     }
 
     @Test
+    fun `law-lee precedence fires over a verified non-anonymous orbit`() {
+        // A global_cardinality with equal per-value bounds is NOT value-anonymous, but its cover values
+        // are interchangeable — verified via remapValues (#442). Precedence over the fully-internal
+        // vars then collapses the value-symmetric solutions, where the old anonymity gate gave up.
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            listOf(
+                GlobalCardinality(
+                    xs = intArrayOf(0, 1, 2),
+                    cover = intArrayOf(0, 1, 2),
+                    countLow = intArrayOf(0, 0, 0),
+                    countHigh = intArrayOf(3, 3, 3),
+                ),
+            ),
+        )
+        val broken = Presolve.breakValuePrecedence(problem)
+        val orig = countFeasible(problem)
+        val after = countFeasible(broken)
+        assertTrue(after < orig, "expected reduction: $orig -> $after")
+        assertEquals(orig > 0, after > 0)
+    }
+
+    @Test
     fun `value symmetry pins an interchangeable-value variable`() {
         // x0,x1: AllDifferent over {0,1,2}. x2 ∈ {3,4} appears in no factor, so its two values are an
         // interchangeable-value orbit (value-anonymous problem) — pinned to the orbit minimum (3).
