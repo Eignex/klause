@@ -113,18 +113,18 @@ internal fun FlatZincCompiler.emitBoolCmp(c: FznConstraint, lt: Boolean, reified
 }
 
 /** Reified bool comparison: `r ↔ (a ⟨op⟩ b)`. */
-internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, eq: Boolean, le: Boolean, lt: Boolean) {
+internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, op: BoolCmpOp) {
     require(c.args.size == 3)
     val a = resolveBoolLit(c.args[0])
     val b = resolveBoolLit(c.args[1])
     val r = resolveBoolLit(c.args[2])
-    when {
-        eq -> {
+    when (op) {
+        BoolCmpOp.EQ -> {
             // r ↔ (a = b) ⇔ ¬(a ⊕ b). Equivalent to bool_xor(a, b, ¬r).
             factors.add(Xor(intArrayOf(a, b, Lit.negate(r)), targetParity = 0))
         }
 
-        le -> {
+        BoolCmpOp.LE -> {
             // r ↔ (a → b) ⇔ r ↔ (¬a ∨ b).
             // (¬r ∨ ¬a ∨ b), (r ∨ a), (r ∨ ¬b)
             factors.add(Clause(intArrayOf(Lit.negate(r), Lit.negate(a), b)))
@@ -132,7 +132,7 @@ internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, eq: Boolean, le:
             factors.add(Clause(intArrayOf(r, Lit.negate(b))))
         }
 
-        lt -> {
+        BoolCmpOp.LT -> {
             // r ↔ (¬a ∧ b).
             // r → ¬a:  (¬r ∨ ¬a)
             // r → b:   (¬r ∨ b)
@@ -211,20 +211,20 @@ internal fun FlatZincCompiler.channelBoolsToInts(lits: IntArray, tag: String): I
     ch
 }
 
-internal fun FlatZincCompiler.emitMonotoneBool(c: FznConstraint, ascending: Boolean, strict: Boolean) {
+internal fun FlatZincCompiler.emitMonotoneBool(c: FznConstraint, op: MonotoneOp) {
     require(c.args.size == 1)
     val lits = evalBoolVarArray(c.args[0])
     if (lits.size < 2) return
     val ints = channelBoolsToInts(lits, "mono")
-    emitMonotoneChain(ints, ascending, strict)
+    emitMonotoneChain(ints, op)
 }
 
 /** (in/de)creasing(xs) → adjacent Linear comparisons. Ascending non-strict `xs(i+1)-xs(i) ≥ 0`,
  *  strict `≥ 1`; descending swaps the pair. Bounds propagation on the chain is complete. */
-private fun FlatZincCompiler.emitMonotoneChain(xs: IntArray, ascending: Boolean, strict: Boolean) {
-    val bound = if (strict) 1 else 0
+private fun FlatZincCompiler.emitMonotoneChain(xs: IntArray, op: MonotoneOp) {
+    val bound = if (op.strict) 1 else 0
     for (i in 0 until xs.size - 1) {
-        val (a, b) = if (ascending) xs[i + 1] to xs[i] else xs[i] to xs[i + 1]
+        val (a, b) = if (op.ascending) xs[i + 1] to xs[i] else xs[i] to xs[i + 1]
         factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.GE, bound))
     }
 }
@@ -247,9 +247,9 @@ internal fun FlatZincCompiler.emitTableBool(c: FznConstraint) {
     factors.add(Table(xs, tuples))
 }
 
-internal fun FlatZincCompiler.emitMonotone(c: FznConstraint, ascending: Boolean, strict: Boolean) {
+internal fun FlatZincCompiler.emitMonotone(c: FznConstraint, op: MonotoneOp) {
     require(c.args.size == 1)
     val xs = evalIntVarArray(c.args[0])
     if (xs.size < 2) return // 0- or 1-element array is trivially monotone.
-    emitMonotoneChain(xs, ascending, strict)
+    emitMonotoneChain(xs, op)
 }
