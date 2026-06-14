@@ -19,6 +19,35 @@ import kotlin.test.assertTrue
  */
 class PresolveTest {
 
+    @Test
+    fun `coefficient lifting is probing-informed - SAC-tightened bounds give a tighter lift`() {
+        // The lift target 2*x0 + 5*x2 <= 8 with x0 in [0,3], x2 in [0,1]: its lift clamps coefficients
+        // to d = (max activity) - bound. SAC probing tightens x0's upper bound, shrinking the activity
+        // and so the clamp — i.e. lifting reads the *baked* (probed) domains, not the declared ones.
+        fun strengthenedTarget(probe: Boolean): Linear {
+            val p = Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 1)),
+                factors = listOf(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0), // x0 = x1
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4), // x0 + x1 <= 4 (SAC: x0 <= 2)
+                    Linear(intArrayOf(2, 5), intArrayOf(0, 2), LinearOp.LE, 8), // lift target
+                ),
+                probeIntBounds = probe,
+            )
+            val out = Presolve.strengthenCoefficients(p)
+            return out.factors.filterIsInstance<Linear>().single { 0 in it.vars && 2 in it.vars }
+        }
+        // Probing off: root propagation leaves x0 in [0,3] ⇒ d = 2*3 + 5*1 - 8 = 3, x2's 5 clamps to 3.
+        val off = strengthenedTarget(probe = false)
+        assertEquals(3, off.coeffs[off.vars.indexOf(2)], "without probing, x2's coefficient clamps to 3")
+        // Probing on: SAC tightens x0 to [0,2] ⇒ d = 2*2 + 5*1 - 8 = 1, both coefficients clamp to 1.
+        val on = strengthenedTarget(probe = true)
+        assertEquals(1, on.coeffs[on.vars.indexOf(2)], "with probing, x2's coefficient clamps to 1")
+        assertEquals(1, on.coeffs[on.vars.indexOf(0)], "with probing, x0's coefficient clamps to 1")
+    }
+
     private fun evalLinear(f: Linear, assign: IntArray): Boolean {
         var sum = 0L
         for (i in f.vars.indices) sum += f.coeffs[i].toLong() * assign[f.vars[i]]
