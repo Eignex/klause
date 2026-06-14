@@ -83,8 +83,11 @@ internal fun FlatZincCompiler.emitSort(c: FznConstraint) {
 internal fun FlatZincCompiler.emitSymmetricAllDifferent(c: FznConstraint) {
     require(c.args.size == 1)
     val xs = evalIntVarArray(c.args[0])
-    val offset = if (xs.isNotEmpty()) intDomains[xs[0]].min else 0
-    factors.add(SymmetricAllDifferent(xs, indexOffset = offset))
+    // Self-inverse permutation over FlatZinc array index sets (always 1-based via MiniZinc's
+    // `index2int`), so the index base is structurally 1 — not something to read off a variable's
+    // domain. Inferring it from `intDomains[xs[0]].min` is wrong once MiniZinc tightens the first
+    // element's domain, the same root false-UNSAT bug fixed for inverse (#389).
+    factors.add(SymmetricAllDifferent(xs, indexOffset = 1))
 }
 
 /**
@@ -274,11 +277,15 @@ internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean
         require(c.args.size == 2)
         val f = evalIntVarArray(c.args[0])
         val g = evalIntVarArray(c.args[1])
-        // MiniZinc emits inverse with 1-based indexing by default; infer offset from
-        // domain.min of the first var of each array (typical FZN convention).
-        val fOff = if (f.isNotEmpty()) intDomains[f[0]].min else 0
-        val gOff = if (g.isNotEmpty()) intDomains[g[0]].min else 0
-        factors.add(Inverse(f, g, fOff, gOff))
+        // The bare `fzn_inverse(f, invf)` is `f[i] ∈ index_set(invf) ∧ invf[f[i]] = i` (and
+        // symmetrically), over FlatZinc array index sets — which are always 1-based, since
+        // MiniZinc's `index2int` normalises them before emitting. So the index base (offset) is
+        // structurally 1, NOT something to infer from a variable's domain: inferring it from
+        // `intDomains[f[0]].min` is wrong whenever MiniZinc has tightened the first element's
+        // domain (e.g. a `row[t] in 1..7` group split), which produced a root false-UNSAT on
+        // elitserien/handball (#389). The explicit-offset `inverse_offsets` form carries real
+        // offsets and takes the branch above.
+        factors.add(Inverse(f, g, fOffset = 1, gOffset = 1))
     }
 }
 
