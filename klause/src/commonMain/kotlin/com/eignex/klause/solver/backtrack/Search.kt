@@ -444,8 +444,6 @@ internal fun BacktrackSolver.driveSearch(
                     }
 
                     is AdvanceOutcome.Backjump -> {
-                        sink?.observeFail()
-                        sink?.observeLearn()
                         if (touchedSeedLevels != null) {
                             for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
                         }
