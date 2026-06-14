@@ -243,6 +243,14 @@ class Mdd(
      *  on push the engine clones the array, on pop the prior level's refs are restored. */
     private class MddState(val cachedSeq: Array<IntDomain?>, var cachedCost: IntDomain?) :
         PropagationState.SnapshottablePayload {
+        // Reusable forward / backward layer-bitset buffers for the slow-path sweep, refilled from
+        // zero each fire (so reuse drops the two per-call `Array(n+1){LongArray}` allocations).
+        // Deliberately NOT carried through [snapshotCopy]: they hold no level state — only scratch
+        // recomputed every fire — so copying them would just bloat each snapshot. They re-allocate
+        // lazily after a restore, and stay reused across fires within a level.
+        var fwd: Array<LongArray>? = null
+        var bwd: Array<LongArray>? = null
+
         override fun snapshotCopy(): MddState = MddState(cachedSeq.copyOf(), cachedCost)
     }
 
@@ -267,7 +275,9 @@ class Mdd(
         val ant = state.composeIntVarAtomAntecedents(intVars)
         // Forward reachability: fwd[i] is a packed bitset over [0, numStatesPerLayer[i]).
         // Each layer stores `(numStates + 63) / 64` longs; bit s tests layer-s reachability.
-        val fwd = Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
+        val fwd = payload.fwd ?: Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
+            .also { payload.fwd = it }
+        for (layer in fwd) layer.fill(0L)
         if (initial < 0 || initial >= numStatesPerLayer[0]) return false
         fwd[0][initial ushr 6] = fwd[0][initial ushr 6] or (1L shl (initial and 63))
         for (i in 0 until n) {
@@ -305,7 +315,9 @@ class Mdd(
         if (!anyAccepting) return false
 
         // Backward reachability.
-        val bwd = Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
+        val bwd = payload.bwd ?: Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
+            .also { payload.bwd = it }
+        for (layer in bwd) layer.fill(0L)
         for (s in accepting) {
             if (s in 0 until numStatesPerLayer[n] &&
                 ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L

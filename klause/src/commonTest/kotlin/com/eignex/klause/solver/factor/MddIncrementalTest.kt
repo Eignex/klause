@@ -4,8 +4,12 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Sanity check that the cached-domain-ref incremental path doesn't break correctness. */
@@ -40,5 +44,51 @@ class MddIncrementalTest {
         // Pinning seq[0] = 1 narrows domain; re-propagate — must still succeed and prune nothing further.
         val r2 = problem.propagate(Assumptions(ints = mapOf(0 to 1)))
         assertTrue(r2 is PropagationResult.Implied, "second fire with pin should still propagate; got $r2")
+    }
+
+    @Test
+    fun `backtrack enumeration over the MDD equals brute force`() {
+        // 2-var MDD accepting exactly (1,2) and (2,1). Unlike the single-shot oracle, enumerating
+        // under the CDCL backtracker fires propagate repeatedly on ONE PropagationState — exercising
+        // the reused fwd/bwd buffers (refilled from zero each fire) — and pushes/pops decision levels,
+        // exercising MddState snapshot/restore now that it carries the non-snapshotted scratch fields.
+        fun mddFactor(): Factor = Mdd(
+            seq = intArrayOf(0, 1),
+            numStatesPerLayer = intArrayOf(1, 2, 1),
+            layerStarts = intArrayOf(0, 6, 12),
+            transitions = intArrayOf(
+                0, 1, 0, 0, 2, 1, // layer 0: s0 --1--> s0, --2--> s1
+                0, 2, 0, 1, 1, 0, // layer 1: s0 --2--> term, s1 --1--> term
+            ),
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 3,
+        )
+        fun accepts(a: Int, b: Int): Boolean = (a == 1 && b == 2) || (a == 2 && b == 1)
+        // Per-instance (seq0 range, seq1 range): free, then each variable pinned to each value.
+        val instances = listOf(
+            Pair(1, 2) to Pair(1, 2),
+            Pair(1, 1) to Pair(1, 2),
+            Pair(2, 2) to Pair(1, 2),
+            Pair(1, 2) to Pair(2, 2),
+            Pair(1, 1) to Pair(1, 1), // (1,1) rejected → UNSAT, exercises the no-accepting path
+        )
+        for ((idx, ranges) in instances.withIndex()) {
+            val (r0, r1) = ranges
+            val brute = HashSet<List<Int>>()
+            for (a in r0.first..r0.second) {
+                for (b in r1.first..r1.second) if (accepts(a, b)) brute.add(listOf(a, b))
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2,
+                intDomains = arrayOf(IntDomain(r0.first, r0.second), IntDomain(r1.first, r1.second)),
+                factors = arrayOf(mddFactor()),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "mdd instance #$idx: backtrack solution set must equal brute force")
+        }
     }
 }
