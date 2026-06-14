@@ -95,9 +95,13 @@ internal object MiniZincMode : CliMode {
                         objVarId = objVarId,
                         definitionalSweep = program.definitionalSweep,
                         render = render,
-                        // MiniZinc reports the objective inside the rendered solution, so the
-                        // protocol never needs a separate value — keep it null.
-                        objectiveValue = null,
+                        // The objective variable's value, in the model's orientation (the FlatZinc
+                        // `minimize`/`maximize` var is the real objective; its raw value is the model
+                        // objective regardless of the internal maximize negation). [MiniZincOutput]
+                        // emits it as a `_objective` line per solution so the value is always in the
+                        // stream — a model whose objective var isn't in its own `output` section would
+                        // otherwise print no objective at all (#477).
+                        objectiveValue = { sample -> sample.ints[objVarId].toLong() },
                         annotatedBacktrackParams = program.defaultBacktrackParams,
                     )
                 }
@@ -111,8 +115,11 @@ internal object MiniZincMode : CliMode {
 /** MiniZinc's standard FZN solution protocol. */
 internal class MiniZincOutput : OutputProtocol {
     override fun onSolution(rendered: String, objective: Long?) {
-        // `writeFlatZincSolution` / `OznApplier.render` already include the per-solution
-        // `----------` terminator; objective is carried in the rendered text.
+        // Emit the objective as a standard `_objective` line (what `minizinc --output-objective`
+        // produces) so it is always in the stream, even when the model's own `output` omits the
+        // objective variable (#477). `writeFlatZincSolution` / `OznApplier.render` already include
+        // the per-solution `----------` terminator, so the `_objective` line precedes it.
+        if (objective != null) println("_objective = $objective;")
         print(rendered)
     }
 
