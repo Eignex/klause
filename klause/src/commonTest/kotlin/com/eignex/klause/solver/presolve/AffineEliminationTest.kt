@@ -45,6 +45,51 @@ class AffineEliminationTest {
         }
     }
 
+    /** Brute feasible-set preservation: every feasible assignment of the reduced problem reconstructs
+     *  to a feasible assignment of the original, and the reconstructed set is *exactly* the original's
+     *  feasible set (no solution lost, none invented). Small domains only — full enumeration. */
+    private fun checkFeasibleSetPreserved(name: String, original: Problem) {
+        val elim = Presolve.eliminateAffineSingletons(original)
+        assertTrue(elim.problem !== original, "$name: expected an elimination")
+        val origFeasible = feasibleSet(original)
+        val reconstructed = HashSet<List<Int>>()
+        enumerate(elim.problem.intDomains) { assign ->
+            if (isFeasible(elim.problem, Sample(BooleanArray(0), assign))) {
+                val full = elim.reconstruct(Sample(BooleanArray(0), assign.copyOf()))
+                assertTrue(isFeasible(original, full), "$name: reconstructed $full infeasible in original")
+                reconstructed.add(full.ints.toList())
+            }
+        }
+        assertEquals(origFeasible, reconstructed, "$name: feasible set not preserved")
+    }
+
+    private fun feasibleSet(problem: Problem): Set<List<Int>> {
+        val out = HashSet<List<Int>>()
+        enumerate(problem.intDomains) { assign ->
+            if (isFeasible(problem, Sample(BooleanArray(0), assign))) out.add(assign.toList())
+        }
+        return out
+    }
+
+    /** Enumerate every integer assignment over [domains] (bounds only; small domains). */
+    private fun enumerate(domains: Array<IntDomain>, body: (IntArray) -> Unit) {
+        val n = domains.size
+        val assign = IntArray(n) { domains[it].min }
+        while (true) {
+            body(assign)
+            var i = 0
+            while (i < n) {
+                if (assign[i] < domains[i].max) {
+                    assign[i]++
+                    break
+                }
+                assign[i] = domains[i].min
+                i++
+            }
+            if (i == n) return
+        }
+    }
+
     @Test
     fun `eliminates x = 2y + 1 defined only by its equality`() {
         // x (0) defined by x - 2y = 1; y (1) also bounded y >= 1. x used nowhere else.
@@ -131,6 +176,60 @@ class AffineEliminationTest {
             ),
         )
         checkRoundTrip("chain", problem, expectEliminated = true, expectSat = true)
+    }
+
+    @Test
+    fun `eliminates an n-term unit-defined variable used nowhere else`() {
+        // x0 = x1 + x2 - x3 (x0 - x1 - x2 + x3 = 0), x0 implied-free (appears in no other factor).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = listOf(Linear(intArrayOf(1, -1, -1, 1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0)),
+        )
+        checkRoundTrip("n-term-contained", problem, expectEliminated = true, expectSat = true)
+        checkFeasibleSetPreserved("n-term-contained", problem)
+    }
+
+    @Test
+    fun `folds an n-term affine relation into another linear factor`() {
+        // x0 = x1 + x2 (x0 - x1 - x2 = 0) and x0 also appears in x0 <= 3 → folds to x1 + x2 <= 3.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 6), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+            ),
+        )
+        checkRoundTrip("n-term-fold", problem, expectEliminated = true, expectSat = true)
+        checkFeasibleSetPreserved("n-term-fold", problem)
+    }
+
+    @Test
+    fun `eliminates an n-term relation with a negative unit pivot`() {
+        // -x0 + x1 + x2 = 1  ⇒  x0 = x1 + x2 - 1.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(-1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1)),
+        )
+        checkRoundTrip("n-term-neg-pivot", problem, expectEliminated = true, expectSat = true)
+        checkFeasibleSetPreserved("n-term-neg-pivot", problem)
+    }
+
+    @Test
+    fun `does not eliminate an n-term equality with no unit pivot`() {
+        // 2x0 + 3x1 + 4x2 = 12: no coefficient is +/-1, so no variable can be projected out integrally.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 6), IntDomain(0, 4), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.EQ, 12)),
+        )
+        checkRoundTrip("n-term-no-unit", problem, expectEliminated = false, expectSat = true)
     }
 
     @Test

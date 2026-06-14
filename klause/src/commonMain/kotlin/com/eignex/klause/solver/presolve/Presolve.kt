@@ -71,19 +71,25 @@ object Presolve {
     }
 
     /**
-     * Affine variable elimination (#318/#335). Eliminates an integer variable `x` defined by a
-     * two-term equality `c_x·x + c_y·y = b` with `|c_x| = 1`, i.e. `x = A·y + B` where `A = −c_x·c_y`
-     * and `B = c_x·b`. The defining equality is dropped, the affine relation is folded into every
-     * other factor that mentions `x`, and bounds on `y` are added so `x` stays inside its declared
-     * domain; `x` becomes unconstrained and is rebuilt from the solution via
-     * [AffineElimination.reconstruct].
+     * Affine variable elimination (#318/#335/#445). Eliminates an integer variable `x` defined by an
+     * `n`-term equality `c_x·x + Σ_j c_j·y_j = b` with a **unit** pivot coefficient `|c_x| = 1`, i.e.
+     * `x = B + Σ_j A_j·y_j` where `A_j = −c_x·c_j` and `B = c_x·b`. The defining equality is dropped,
+     * the affine relation is folded into every other [Linear] that mentions `x`, and bounds on the
+     * `y_j` are added so `x` stays inside its declared domain; `x` becomes unconstrained and is
+     * rebuilt from the solution via [AffineElimination.reconstruct].
      *
-     * For the **alias** case `x = y` (`A = 1`, `B = 0`) the substitution `x → y` is a plain variable
-     * rename, applied to *every* factor via [Factor.remap] regardless of type (#364). Otherwise the
-     * relation can only fold into a weighted sum, so `x` is eliminated only when its other
-     * occurrences are all [Linear] — a global constraint (AllDifferent, Element, …) needs `x` as a
-     * genuine variable and cannot absorb `A·y + B` for non-unit `A` / non-zero `B`. The #318
-     * contained slice (`x` in no other factor) is the zero-fold special case.
+     * Two-term equalities are the common case (an alias or a one-partner definition); the `n`-term
+     * generalisation (#445) projects out an *implied-free* variable defined by a longer sum (e.g. an
+     * auxiliary `x = y1 + y2 − y3` used nowhere a global needs it). The unit-pivot restriction keeps
+     * every folded coefficient integral; a non-unit pivot would need residue-class reasoning and is a
+     * follow-up.
+     *
+     * For the **alias** case `x = y` (`n = 2`, `A = 1`, `B = 0`) the substitution `x → y` is a plain
+     * variable rename, applied to *every* factor via [Factor.remap] regardless of type (#364).
+     * Otherwise the relation can only fold into a weighted sum, so `x` is eliminated only when its
+     * other occurrences are all [Linear] — a global constraint (AllDifferent, Element, …) needs `x` as
+     * a genuine variable and cannot absorb `B + Σ A_j·y_j`. The #318 contained slice (`x` in no other
+     * factor) is the zero-fold special case, and is what lets an `n`-term definition be projected out.
      *
      * Variables in [objectiveIntVars] are never eliminated: the objective reads them directly and
      * the engine optimises over the presolved problem where an eliminated variable is unconstrained.
@@ -97,16 +103,23 @@ object Presolve {
             val cand = findAffineCandidate(factors, eliminated, objectiveIntVars) ?: break
             factors = foldOutVariable(problem, factors, cand)
             eliminated[cand.x] = true
-            subs.add(AffineSub(cand.x, cand.cx, cand.cy, cand.y, cand.bound))
+            subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
         }
         if (subs.isEmpty()) return AffineElimination(problem, emptyList())
         return AffineElimination(rebuildProblem(problem, factors), subs)
     }
 
-    /** A 2-term `EQ` [Linear] at [defIdx] defining `x` (unit coefficient). The other occurrences of
-     *  `x` are either all foldable (Linear) or — for the alias case `x = y` — substituted via
-     *  [Factor.remap] into any factor type. */
-    private class AffineCandidate(val defIdx: Int, val x: Int, val cx: Int, val y: Int, val cy: Int, val bound: Int)
+    /** An `EQ` [Linear] at [defIdx] defining `x = constTerm + Σ termCoeffs·termVars` (unit pivot). The
+     *  other occurrences of `x` are either all foldable (Linear) or — for the alias case `x = y` —
+     *  substituted via [Factor.remap] into any factor type. */
+    private class AffineCandidate(
+        val defIdx: Int,
+        val x: Int,
+        val constTerm: Int,
+        val termVars: IntArray,
+        val termCoeffs: IntArray,
+        val isAlias: Boolean,
+    )
 
     private fun findAffineCandidate(
         factors: List<Factor>,
@@ -115,17 +128,30 @@ object Presolve {
     ): AffineCandidate? {
         for (di in factors.indices) {
             val f = factors[di]
-            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) continue
-            for (xi in 0..1) {
+            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) continue
+            for (xi in f.vars.indices) {
                 val x = f.vars[xi]
-                val y = f.vars[1 - xi]
                 val cx = f.coeffs[xi]
-                if ((cx != 1 && cx != -1) || eliminated[x] || eliminated[y] || x == y || x in objectiveIntVars) continue
-                // x = A·y + B; the alias case (A=1, B=0, i.e. x = y) substitutes into ANY factor via
-                // remap, otherwise x must occur only in foldable Linear factors.
-                val isAlias = -cx * f.coeffs[1 - xi] == 1 && cx * f.bound == 0
+                if ((cx != 1 && cx != -1) || eliminated[x] || x in objectiveIntVars) continue
+                // x = B + Σ A_j·y_j, with B = c_x·bound and A_j = −c_x·c_j for the other terms y_j.
+                val termVars = IntArray(f.vars.size - 1)
+                val termCoeffs = IntArray(f.vars.size - 1)
+                var w = 0
+                var partnerEliminated = false
+                for (j in f.vars.indices) {
+                    if (j == xi) continue
+                    if (eliminated[f.vars[j]]) partnerEliminated = true
+                    termVars[w] = f.vars[j]
+                    termCoeffs[w] = -cx * f.coeffs[j]
+                    w++
+                }
+                if (partnerEliminated) continue
+                val constTerm = cx * f.bound
+                // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
+                // remap; otherwise x must occur only in foldable Linear factors.
+                val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
                 if (isAlias || otherOccurrencesAllLinear(factors, di, x)) {
-                    return AffineCandidate(di, x, cx, y, f.coeffs[1 - xi], f.bound)
+                    return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
                 }
             }
         }
@@ -141,36 +167,35 @@ object Presolve {
     }
 
     /** Drop the defining equality and remove `x`: for the alias case `x = y`, substitute `x → y`
-     *  into every other factor via [Factor.remap] (any factor type); otherwise fold `x = A·y + B`
-     *  into every other Linear mentioning `x`. In both cases bounds on `y` keep `x` within its
-     *  domain. */
+     *  into every other factor via [Factor.remap] (any factor type); otherwise fold
+     *  `x = constTerm + Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases
+     *  bounds on the term vars keep `x` within its domain. */
     private fun foldOutVariable(problem: Problem, factors: List<Factor>, c: AffineCandidate): List<Factor> {
-        val a = -c.cx * c.cy
-        val b = c.cx * c.bound
         val out = ArrayList<Factor>(factors.size + 1)
-        if (a == 1 && b == 0) {
+        if (c.isAlias) {
             val boolMap = IntArray(problem.numBoolVars) { it }
             val intMap = IntArray(problem.numIntVars) { it }
-            intMap[c.x] = c.y
+            intMap[c.x] = c.termVars[0]
             for (i in factors.indices) if (i != c.defIdx) out.add(factors[i].remap(boolMap, intMap))
         } else {
             for (i in factors.indices) {
                 if (i == c.defIdx) continue
                 val f = factors[i]
-                out.add(if (f is Linear && c.x in f.vars) foldAffineIntoLinear(f, c.x, c.y, a, b) else f)
+                out.add(if (f is Linear && c.x in f.vars) foldAffineIntoLinear(f, c) else f)
             }
         }
-        out.addAll(domainBoundsOnY(problem.intDomains[c.x], c.cx, c.cy, c.y, c.bound))
+        out.addAll(domainBoundsOnTerms(problem.intDomains[c.x], c))
         return out
     }
 
-    /** [l] with `x` replaced by `A·y + B`: drop `x`'s term, add `A·coeff_x` to `y`, shift the bound
-     *  by `−B·coeff_x`. The [Linear] constructor re-coalesces `y` with any existing `y` term. */
-    private fun foldAffineIntoLinear(l: Linear, x: Int, y: Int, a: Int, b: Int): Linear {
-        val ix = l.vars.indexOf(x)
+    /** [l] with `x` replaced by `constTerm + Σ A_j·y_j`: drop `x`'s term, add `coeff_x·A_j` to each
+     *  term var `y_j`, shift the bound by `−coeff_x·constTerm`. The [Linear] constructor re-coalesces
+     *  any term var that already occurs in [l]. */
+    private fun foldAffineIntoLinear(l: Linear, c: AffineCandidate): Linear {
+        val ix = l.vars.indexOf(c.x)
         val cX = l.coeffs[ix]
-        val newVars = IntArray(l.vars.size)
-        val newCoeffs = IntArray(l.vars.size)
+        val newVars = IntArray(l.vars.size - 1 + c.termVars.size)
+        val newCoeffs = IntArray(newVars.size)
         var w = 0
         for (j in l.vars.indices) {
             if (j == ix) continue
@@ -178,19 +203,20 @@ object Presolve {
             newCoeffs[w] = l.coeffs[j]
             w++
         }
-        newVars[w] = y
-        newCoeffs[w] = cX * a
-        return Linear(newCoeffs, newVars, l.op, l.bound - cX * b)
+        for (k in c.termVars.indices) {
+            newVars[w] = c.termVars[k]
+            newCoeffs[w] = cX * c.termCoeffs[k]
+            w++
+        }
+        return Linear(newCoeffs, newVars, l.op, l.bound - cX * c.constTerm)
     }
 
-    /** Bounds on `y` enforcing that `x = c_x·b − c_x·c_y·y` stays within `x`'s domain [domX]. */
-    private fun domainBoundsOnY(domX: IntDomain, cx: Int, cy: Int, y: Int, b: Int): List<Factor> {
-        val coeff = -cx * cy // coefficient of y in the expression for x
-        return listOf(
-            Linear(intArrayOf(coeff), intArrayOf(y), LinearOp.LE, domX.max - cx * b),
-            Linear(intArrayOf(coeff), intArrayOf(y), LinearOp.GE, domX.min - cx * b),
-        )
-    }
+    /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within
+     *  `x`'s domain [domX]. */
+    private fun domainBoundsOnTerms(domX: IntDomain, c: AffineCandidate): List<Factor> = listOf(
+        Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.LE, domX.max - c.constTerm),
+        Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.GE, domX.min - c.constTerm),
+    )
 
     /**
      * Constraint subsumption / redundant-constraint removal (#447): drop a constraint implied by
@@ -1406,8 +1432,9 @@ object Presolve {
     }
 }
 
-/** A single affine elimination `x = c_x·b − c_x·c_y·y` recorded by [Presolve.eliminateAffineSingletons]. */
-internal data class AffineSub(val x: Int, val cx: Int, val cy: Int, val y: Int, val bound: Int)
+/** A single affine elimination `x = constTerm + Σ termCoeffs·termVars` recorded by
+ *  [Presolve.eliminateAffineSingletons]. */
+internal class AffineSub(val x: Int, val constTerm: Int, val termVars: IntArray, val termCoeffs: IntArray)
 
 /**
  * Reduced problem from [Presolve.eliminateAffineSingletons] plus the data to rebuild the
@@ -1426,7 +1453,11 @@ class AffineElimination internal constructor(
     fun reconstruct(sample: Sample): Sample {
         if (subs.isEmpty()) return sample
         val ints = sample.ints.copyOf()
-        for (s in subs.asReversed()) ints[s.x] = s.cx * s.bound - s.cx * s.cy * ints[s.y]
+        for (s in subs.asReversed()) {
+            var v = s.constTerm
+            for (k in s.termVars.indices) v += s.termCoeffs[k] * ints[s.termVars[k]]
+            ints[s.x] = v
+        }
         return Sample(sample.bools, ints)
     }
 }
