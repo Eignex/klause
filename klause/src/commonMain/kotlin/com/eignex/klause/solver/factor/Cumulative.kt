@@ -8,6 +8,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.max
 import kotlin.math.min
 
@@ -684,12 +685,12 @@ class Cumulative(
 
         // EST-ascending leaf positions. Stable on ties — choice doesn't affect the
         // envelope recurrence since equal-EST leaves anchor at the same time.
-        val estOrder = (0 until m).sortedWith(compareBy({ ests[it] }, { it })).toIntArray()
+        val estOrder = argsortByIntKey(m) { ests[it] }
         val leafPos = IntArray(m)
         for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
 
         // LCT-ascending sweep order.
-        val lctOrder = (0 until m).sortedWith(compareBy({ lcts[it] }, { it })).toIntArray()
+        val lctOrder = argsortByIntKey(m) { lcts[it] }
 
         val tree = CumulativeThetaTree(n = m, capacity = effCap)
         tree.setLeafOrder(leafPos)

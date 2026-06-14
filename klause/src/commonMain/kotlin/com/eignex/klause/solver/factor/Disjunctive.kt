@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.max
 
 /**
@@ -279,10 +280,10 @@ class Disjunctive(
         }
         val energies = LongArray(m) { durs[it].toLong() }
 
-        val estOrder = (0 until m).sortedWith(compareBy({ ests[it] }, { it })).toIntArray()
+        val estOrder = argsortByIntKey(m) { ests[it] }
         val leafPos = IntArray(m)
         for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
-        val lctOrder = (0 until m).sortedWith(compareBy({ lcts[it] }, { it })).toIntArray()
+        val lctOrder = argsortByIntKey(m) { lcts[it] }
 
         val tree = CumulativeThetaTree(n = m, capacity = 1)
         tree.setLeafOrder(leafPos)
