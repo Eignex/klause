@@ -289,4 +289,51 @@ class GlobalCardinalityTest {
         }
         assertTrue(2 in citedInts && 3 in citedInts, "reason must cite both count vars; cited $citedInts")
     }
+
+    @Test
+    fun `gcc plus a linear bound enumerates exactly the brute-force set`() {
+        // Fast-path stress: pairing a non-opt GCC with a Linear over the same xs makes the two
+        // factors re-wake each other, so GCC fires repeatedly on one PropagationState — including
+        // the no-op re-fires the unchanged-domains fast path short-circuits. An unsound skip would
+        // drop a feasible assignment, so the enumerated set must equal brute force.
+        val n = 4
+        val cover = intArrayOf(0, 1, 2)
+        val low = intArrayOf(0, 0, 0)
+        val high = intArrayOf(2, 2, 2)
+        val coverIdx = cover.withIndex().associate { (i, v) -> v to i }
+        fun gccOk(acc: IntArray): Boolean {
+            val counts = IntArray(cover.size)
+            for (i in 0 until n) coverIdx[acc[i]]?.let { counts[it]++ }
+            for (k in cover.indices) if (counts[k] < low[k] || counts[k] > high[k]) return false
+            return true
+        }
+        for (bound in intArrayOf(3, 4, 5)) {
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(n)
+            fun rec(p: Int) {
+                if (p == n) {
+                    if (gccOk(acc) && acc.sum() <= bound) brute.add(acc.toList())
+                    return
+                }
+                for (v in 0..2) {
+                    acc[p] = v
+                    rec(p + 1)
+                }
+            }
+            rec(0)
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 2) },
+                factors = arrayOf<Factor>(
+                    GlobalCardinality(xs = IntArray(n) { it }, cover = cover, countLow = low, countHigh = high),
+                    Linear(coeffs = IntArray(n) { 1 }, vars = IntArray(n) { it }, op = LinearOp.LE, bound = bound),
+                ),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "GCC+Linear (bound=$bound): solution set must equal brute force")
+        }
+    }
 }

@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -299,11 +300,39 @@ class GlobalCardinality(
      *  of those xs absent. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = withPresencePremises(
         state,
-        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? IntArray) ?: intVars),
+        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? PropCache)?.conflictVars ?: intVars),
     )
 
+    /** Per-[PropagationState] propagation scratch (so it is never shared across worker threads).
+     *  [cachedDoms] holds each [intVars] entry's domain ref at the last successful propagate, for the
+     *  non-opt unchanged-domains fast path; [conflictVars] records the sharpened pigeonhole/flow var
+     *  subset for [conflictReason]. Not snapshotted: the refs only ever *miss* (never falsely skip)
+     *  after a restore and the subset is advisory, so the slot drifts across snapshot/restore. */
+    private class PropCache(val cachedDoms: Array<IntDomain?>) {
+        var conflictVars: IntArray? = null
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        state.refPayload[factorId] = null // stale-guard; set at each pigeonhole failure point below.
+        val cache = (state.refPayload[factorId] as? PropCache) ?: run {
+            val fresh = PropCache(arrayOfNulls(intVars.size))
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        // Fast path — only when every taker is unconditionally present (no presence literals). Then
+        // the analysis reads exactly the [intVars] int domains, so if none changed since the last
+        // successful propagate the prior fixpoint still holds. (With presence bools the result also
+        // depends on bool state, which these refs don't capture, so the opt case always re-runs.)
+        if (presents.isEmpty() && intVars.isNotEmpty()) {
+            var changed = false
+            for (i in intVars.indices) {
+                if (cache.cachedDoms[i] !== state.intDomains[intVars[i]]) {
+                    changed = true
+                    break
+                }
+            }
+            if (!changed && cache.cachedDoms[0] != null) return true
+        }
+        cache.conflictVars = null // stale-guard; set at each pigeonhole failure point below.
         // ---- 1. Count tightening + closure --------------------------------------------
         // Opt-aware: filter to definitely-present xs for the flow analysis. Definitely-
         // absent xs contribute nothing; unpinned-presence xs may still go absent, so we
@@ -383,7 +412,7 @@ class GlobalCardinality(
                 // More vars pinned to cover[k] than countVars[k]'s max: the pinned vars plus
                 // the count var alone prove it (a pigeonhole over cover[k]).
                 if (!state.tightenIntMin(countVars[k], definite[k], gccAntecedents)) {
-                    state.refPayload[factorId] = pinnedTo(
+                    cache.conflictVars = pinnedTo(
                         state,
                         effectiveXs,
                         target,
@@ -395,7 +424,7 @@ class GlobalCardinality(
                 if (requireNotNull(countLow)[k] > possible[k]) return false
                 // More vars pinned to cover[k] than countHigh[k] allows: cite only those pins.
                 if (requireNotNull(countHigh)[k] < definite[k]) {
-                    state.refPayload[factorId] = pinnedTo(state, effectiveXs, target).toIntArray()
+                    cache.conflictVars = pinnedTo(state, effectiveXs, target).toIntArray()
                     return false
                 }
             }
@@ -526,7 +555,7 @@ class GlobalCardinality(
             // filtering by the cut would drop exactly the premises that matter. A count
             // var still at its root domain contributes no literal.
             if (countVars != null) for (k in 0 until m) resp.add(countVars[k])
-            if (resp.size > 0) state.refPayload[factorId] = resp.toIntArray()
+            if (resp.size > 0) cache.conflictVars = resp.toIntArray()
             return false
         }
 
@@ -562,6 +591,9 @@ class GlobalCardinality(
                 }
             }
         }
+        // Record post-propagate int-domain refs so a later no-op fire can short-circuit (non-opt only;
+        // the opt case never reads them — presence bools aren't captured here).
+        if (presents.isEmpty()) for (i in intVars.indices) cache.cachedDoms[i] = state.intDomains[intVars[i]]
         return true
     }
 
