@@ -43,6 +43,10 @@ class Subcircuit(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Subcircuit(succ.remapVars(intMap))
 
+    /** Position-faithful: `succ(i)` is node i's successor (`succ(i) = i` excludes node i), so the
+     *  array order is meaningful — the key keeps the variables in order, not sorted (#443). */
+    override fun structuralKey(): String = "subcircuit:" + succ.joinToString(",")
+
     /**
      * Graded cost for the subcircuit. 0 iff included set forms a single cycle (or is empty).
      * O(n).

@@ -2,21 +2,30 @@ package com.eignex.klause.solver.presolve
 
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedCardinality
+import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Sort
+import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -444,5 +453,122 @@ class SymmetryBreakingTest {
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
         )
         checkSound("differentDomains", problem, expectReduced = false)
+    }
+
+    @Test
+    fun `newly-keyed factors have collision-free structural keys`() {
+        // The soundness property a structuralKey must hold (#443): two factors that differ in any
+        // value-distinguishing constant get different keys, while a faithful copy keeps the same key.
+        // A too-coarse key (a dropped constant) would let symmetry detection see a false automorphism.
+        fun distinct(a: Factor, b: Factor, why: String) = assertNotEquals(a.structuralKey(), b.structuralKey(), why)
+
+        // ReifiedLinear: aux bool, op, bound, and the (var, coeff) terms all matter.
+        assertEquals(
+            ReifiedLinear(0, intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3).structuralKey(),
+            ReifiedLinear(0, intArrayOf(2, 1), intArrayOf(1, 0), LinearOp.LE, 3).structuralKey(),
+            "term order must not change the key",
+        )
+        distinct(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            "aux bool",
+        )
+        distinct(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            "bound",
+        )
+        distinct(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            "op",
+        )
+        distinct(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            "reified vs asserted linear",
+        )
+        // ReifiedCardinality / ReifiedPseudoBoolean.
+        distinct(
+            ReifiedCardinality(0, intArrayOf(pos(1), pos(2)), 1, 2),
+            ReifiedCardinality(0, intArrayOf(pos(1), pos(2)), 1, 1),
+            "cardinality max",
+        )
+        distinct(
+            ReifiedPseudoBoolean(0, intArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 4),
+            ReifiedPseudoBoolean(0, intArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 5),
+            "pb bound",
+        )
+        // Circuit / Subcircuit: position-faithful, and distinct from each other.
+        distinct(Circuit(intArrayOf(1, 0)), Circuit(intArrayOf(0, 1)), "succ order")
+        distinct(Circuit(intArrayOf(1, 0)), Subcircuit(intArrayOf(1, 0)), "circuit vs subcircuit")
+        // NValue: mode, count var, and the counted vars.
+        distinct(
+            NValue(2, intArrayOf(0, 1), NValue.Mode.Eq),
+            NValue(2, intArrayOf(0, 1), NValue.Mode.AtMost),
+            "nvalue mode",
+        )
+        distinct(NValue(2, intArrayOf(0, 1)), NValue(3, intArrayOf(0, 1)), "nvalue count var")
+        // Sort: ys is position-faithful, xs order-insensitive.
+        assertEquals(
+            Sort(intArrayOf(0, 1), intArrayOf(2, 3)).structuralKey(),
+            Sort(intArrayOf(1, 0), intArrayOf(2, 3)).structuralKey(),
+            "xs order must not change the key",
+        )
+        distinct(Sort(intArrayOf(0, 1), intArrayOf(2, 3)), Sort(intArrayOf(0, 1), intArrayOf(3, 2)), "ys order")
+    }
+
+    /** Soundness without an outcome expectation: breaking may or may not find a breakable orbit, but
+     *  it must never add solutions or flip satisfiability. Guards that a new structuralKey can't make
+     *  verified detection unsound (a too-coarse key would). */
+    private fun checkBreakingSound(name: String, problem: Problem) {
+        val broken = Presolve.breakSymmetries(problem)
+        val orig = countFeasible(problem)
+        val after = countFeasible(broken)
+        assertTrue(after <= orig, "$name: breaking ADDED solutions ($orig -> $after)")
+        assertEquals(orig > 0, after > 0, "$name: breaking changed satisfiability ($orig -> $after)")
+    }
+
+    @Test
+    fun `isomorphic nvalue factors are block-ordered`() {
+        // Two nvalue(count, xs) blocks over disjoint, equal-domain variables are interchangeable; the
+        // new nvalue structuralKey lets verified block detection order them. The count vars get domain
+        // [1,2] (the distinct count of two binary vars) so the blocks aren't degenerate. The brute gate
+        // guards the key's soundness — a too-coarse key would let a false swap through and add solutions.
+        val problem = Problem(
+            0,
+            6,
+            arrayOf(
+                IntDomain(1, 2),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(1, 2),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+            ),
+            listOf(
+                NValue(n = 0, xs = intArrayOf(1, 2)),
+                NValue(n = 3, xs = intArrayOf(4, 5)),
+            ),
+        )
+        checkSound("nvalue-blocks", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `breaking stays sound with reified rows present`() {
+        // Two reified rows b0 <-> (x0 <= 1), b1 <-> (x1 <= 1) over disjoint, equal-domain vars carry a
+        // block symmetry. The new ReifiedLinear key takes the problem off the conservative fallback;
+        // the current breaker posts no ordering across this mixed bool+int orbit, so the key's job here
+        // is purely that detection runs without ever becoming unsound.
+        val problem = Problem(
+            2,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
+            ),
+        )
+        checkBreakingSound("rlin-blocks", problem)
     }
 }

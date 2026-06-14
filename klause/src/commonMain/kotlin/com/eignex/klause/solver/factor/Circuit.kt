@@ -52,6 +52,10 @@ class Circuit(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Circuit(succ.remapVars(intMap))
 
+    /** Position-faithful: `succ(i)` is node i's successor, so the array order is meaningful — the key
+     *  keeps the variables in order rather than sorting them (#443). */
+    override fun structuralKey(): String = "circuit:" + succ.joinToString(",")
+
     /**
      * Graded cost: `|numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`.
      * Returns 0 iff the assignment (with optional override `succ[replaceAt] = replaceWith`)
