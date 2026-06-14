@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CpToLpRelaxation
@@ -109,13 +110,13 @@ internal class LpNogoodPool(private val cap: Int = 4096) {
  * conflict, which can leave every variable "already pinned" — the pin loop then never observes
  * the Unsat and would snapshot a factor-violating assignment as a feasible incumbent.
  */
-internal fun BacktrackSolver.lpRoundingProbe(objective: LinearObjective): Sample? {
+internal fun BacktrackSolver.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
     val session = PropagationSession(problem)
     if (session.isUnsatAtRoot) return null
     val relaxation = CpToLpRelaxation(problem, objective).build(session)
     if (relaxation.model.n == 0) return null
     val solution = try {
-        DualSimplex(relaxation.model).solve()
+        DualSimplex(relaxation.model, cancellation = cancellation).solve()
     } catch (_: LpOverflowException) {
         return null
     }
@@ -160,6 +161,7 @@ internal fun BacktrackSolver.harvestRootCuts(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     separators: List<CutSeparator>,
+    cancellation: Cancellation = Cancellation.Never,
 ): List<Cut> {
     if (separators.isEmpty() || session.isUnsatAtRoot) return emptyList()
     val pool = HashSet<String>()
@@ -167,11 +169,11 @@ internal fun BacktrackSolver.harvestRootCuts(
     try {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return emptyList()
-        var simplex = DualSimplex(relaxation.model)
+        var simplex = DualSimplex(relaxation.model, cancellation = cancellation)
         var solution = simplex.solve()
         var prevRows = relaxation.model.m
         var round = 0
-        while (round++ < CUT_POOL_ROUNDS && solution.status == LpStatus.OPTIMAL) {
+        while (round++ < CUT_POOL_ROUNDS && solution.status == LpStatus.OPTIMAL && !cancellation()) {
             val prevBasis = solution.basis
             val prevSimplex = simplex
             val ctx = CutContext(problem, relaxation, solution, session)
@@ -181,7 +183,7 @@ internal fun BacktrackSolver.harvestRootCuts(
             if (fresh.isEmpty()) break
             cuts.addAll(fresh)
             relaxation = relaxer.build(session, cuts)
-            simplex = DualSimplex(relaxation.model)
+            simplex = DualSimplex(relaxation.model, cancellation = cancellation)
             solution = simplex
                 .solve(extendBasisWithSlacks(prevBasis, relaxation.model, prevRows), prevSimplex)
             prevRows = relaxation.model.m
@@ -213,11 +215,12 @@ internal fun BacktrackSolver.lpBoundAndFix(
     objectiveAscending: Boolean,
     globalCuts: List<Cut>,
     seedTableau: DualSimplex?,
+    cancellation: Cancellation,
 ): LpNodeOutcome = try {
     sink.lpClockStart()
     lpBoundAndFixUnsafe(
         relaxer, session, bound, sink, warmBasis, params, separators, hints,
-        objectiveVar, objectiveAscending, globalCuts, seedTableau,
+        objectiveVar, objectiveAscending, globalCuts, seedTableau, cancellation,
     )
 } catch (_: LpOverflowException) {
     // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
@@ -239,9 +242,17 @@ private fun lpObjectiveOf(solution: LpSolution, relaxation: LpRelaxation): Doubl
  * baseline for the integrality-gap measurement surfaced in `-s`. Search bounds only from level 1
  * down, so without this one-shot solve the true root bound would never be recorded.
  */
-internal fun BacktrackSolver.rootLpRelaxationBound(relaxer: CpToLpRelaxation, globalCuts: List<Cut>): Double = try {
+internal fun BacktrackSolver.rootLpRelaxationBound(
+    relaxer: CpToLpRelaxation,
+    globalCuts: List<Cut>,
+    cancellation: Cancellation = Cancellation.Never,
+): Double = try {
     val relaxation = relaxer.build(PropagationSession(problem), globalCuts)
-    if (relaxation.model.n == 0) Double.NaN else lpObjectiveOf(DualSimplex(relaxation.model).solve(), relaxation)
+    if (relaxation.model.n == 0) {
+        Double.NaN
+    } else {
+        lpObjectiveOf(DualSimplex(relaxation.model, cancellation = cancellation).solve(), relaxation)
+    }
 } catch (_: LpOverflowException) {
     Double.NaN
 }
@@ -294,16 +305,18 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
     objectiveAscending: Boolean,
     globalCuts: List<Cut>,
     seedTableau: DualSimplex?,
+    cancellation: Cancellation,
 ): LpNodeOutcome {
     var relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
     sink.observeLpSolve()
-    var simplex = DualSimplex(relaxation.model)
+    var simplex = DualSimplex(relaxation.model, cancellation = cancellation)
     // Float fast-path (#18): with no parent basis to warm from, a quick double-precision solve
     // supplies a candidate basis for the exact solver to certify. Sound regardless — the exact
     // solve re-optimizes to the true bound, and a bad/singular basis just cold-starts. The
     // seeded tableau reload (when compatible) supersedes both.
-    val startBasis = warmBasis ?: if (params.lpFloatWarmStart) FloatSimplex(relaxation.model).basis() else null
+    val startBasis =
+        warmBasis ?: if (params.lpFloatWarmStart) FloatSimplex(relaxation.model, cancellation).basis() else null
     var solution = simplex.solve(startBasis, seedTableau)
     if (simplex.lastSolveSeeded) sink.observeLpSeeded()
     sink.observeLpPivots(solution.pivots)
@@ -363,7 +376,7 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
             cuts.addAll(fresh)
             sink.observeLpCuts(fresh.size)
             relaxation = relaxer.build(session, globalCuts + cuts)
-            simplex = DualSimplex(relaxation.model)
+            simplex = DualSimplex(relaxation.model, cancellation = cancellation)
             val warmStart = if (params.lpWarmCuts && prevBasis != null) {
                 extendBasisWithSlacks(prevBasis, relaxation.model, prevRows)
             } else {
@@ -451,7 +464,7 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
         // (identical row layout), so the re-optimisation costs a few dual pivots, not a cold solve.
         relaxation = relaxer.build(session, globalCuts + cuts)
         if (relaxation.model.n == 0) return LpNodeOutcome(false, warmCache, tableau = nodeTableau)
-        simplex = DualSimplex(relaxation.model)
+        simplex = DualSimplex(relaxation.model, cancellation = cancellation)
         val fixWarm = if (params.lpWarmCuts && prevBasis != null) {
             extendBasisWithSlacks(prevBasis, relaxation.model, prevRows)
         } else {

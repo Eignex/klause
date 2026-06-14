@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -428,8 +429,15 @@ class PresolveConfig(
 object Presolver {
 
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
-     *  reconstruct mapping its solutions back to the original. */
-    fun run(problem: Problem, config: PresolveConfig, context: PresolveContext = PresolveContext.EMPTY): Presolved {
+     *  reconstruct mapping its solutions back to the original. [cancellation] is polled between passes
+     *  and rounds: a fired deadline returns the partial result so far — every pass is individually
+     *  sound, so stopping early only forgoes further reduction, never correctness. */
+    fun run(
+        problem: Problem,
+        config: PresolveConfig,
+        context: PresolveContext = PresolveContext.EMPTY,
+        cancellation: Cancellation = Cancellation.Never,
+    ): Presolved {
         val passes = config.problemPasses(context)
         val maxRounds = config.emphasis.maxRounds
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
@@ -442,9 +450,10 @@ object Presolver {
         val ranAtVersion = HashMap<PresolvePass, Int>()
         var round = 0
         var roundStartComplexity = complexity(current)
-        while (round < maxRounds) {
+        while (round < maxRounds && !cancellation()) {
             var ranAny = false
             for (pass in passes) {
+                if (cancellation()) break
                 if (ranAtVersion[pass] == version) continue
                 ranAtVersion[pass] = version
                 ranAny = true

@@ -239,6 +239,26 @@ class PresolverTest {
     }
 
     @Test
+    fun `an already-fired cancellation makes presolve a no-op`() {
+        // Same problem the default pipeline transforms above; with the deadline already past, the round
+        // engine must not run a single pass and must return the input verbatim. The transforms are
+        // individually sound, so returning early is safe — this guards that the exit check is honoured.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 9), IntDomain(0, 3), IntDomain(0, 3)),
+            listOf(
+                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(2, 2), intArrayOf(1, 2), LinearOp.LE, 4),
+            ),
+        )
+        val pre = Presolver.run(problem, PresolveConfig.DEFAULT, cancellation = { true })
+        assertSame(problem, pre.problem, "a fired cancellation must skip every pass and return the input")
+        val s = Sample(BooleanArray(0), intArrayOf(3, 1, 0))
+        assertSame(s, pre.reconstruct(s), "no pass ran, so reconstruct is the identity")
+    }
+
+    @Test
     fun `value-precede pass posts a precedence chain and stays satisfiable`() {
         // AllDifferent over {0,1,2}: value-anonymous, so the opt-in value-precedence pass posts a
         // value_precede_chain (native ValuePrecede factors, #432) collapsing the 6 permutations to the

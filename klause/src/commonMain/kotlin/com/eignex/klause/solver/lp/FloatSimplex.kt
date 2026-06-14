@@ -1,6 +1,10 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.solver.Cancellation
 import kotlin.math.abs
+
+/** Pivots between consecutive cancellation polls in [FloatSimplex.basis]. */
+private const val CANCEL_POLL_INTERVAL = 256
 
 /**
  * Double-precision bounded-variable dual simplex (the float fast-path). It solves the same LP as
@@ -15,7 +19,13 @@ import kotlin.math.abs
  * where a float solve plus a near-zero-pivot exact certification beats a cold exact solve; on the
  * small dense per-node LPs it is off by default.
  */
-internal class FloatSimplex(private val model: LpModel) {
+internal class FloatSimplex(
+    private val model: LpModel,
+    /** Cooperative cancellation, polled every [CANCEL_POLL_INTERVAL] pivots: on a large LP even this
+     *  `maxIter`-bounded float warm-start can run long. A fired token returns null — the non-convergence
+     *  signal the caller already handles by cold-starting the exact solve. */
+    private val cancellation: Cancellation = Cancellation.Never,
+) {
     private val m = model.m
     private val numVars = model.numVars
     private val rhsCol = numVars
@@ -29,6 +39,7 @@ internal class FloatSimplex(private val model: LpModel) {
         val maxIter = 50 * (m + numVars) + 200
         var iter = 0
         while (iter++ < maxIter) {
+            if (iter % CANCEL_POLL_INTERVAL == 0 && cancellation()) return null
             val beta = DoubleArray(m)
             for (i in 0 until m) {
                 var acc = nMat[i][rhsCol]

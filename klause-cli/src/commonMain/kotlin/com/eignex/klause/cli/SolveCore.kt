@@ -56,7 +56,11 @@ internal object SolveCore {
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
         val solutionSetSensitive = !rawSolvable.optimize && (common.allSolutions || (common.solutionCap ?: 1L) > 1L)
-        val solvable = rawSolvable.presolved(config, solutionSetSensitive)
+        // The `-t` wall-clock deadline is captured once, here, and shared by every phase: presolve, the
+        // LP root build/solve inside the engine, and the search loop. Building it per-phase would let
+        // each phase restart the clock and blow the limit cumulatively.
+        val (deadline, cancel) = deadlineCancellation(common)
+        val solvable = rawSolvable.presolved(config, solutionSetSensitive, cancel)
         cliLogger(common.verbose).v {
             val p0 = rawSolvable.problem
             val p1 = solvable.problem
@@ -74,26 +78,26 @@ internal object SolveCore {
             // annotation decides the heuristic, so per-solver selector --params are rejected.
             Engine.FIXED -> {
                 rejectParallel(engine, cores, alt = null)
-                runBacktrack(solvable, common, output, useAnnotation = true, allowSelectors = false)
+                runBacktrack(solvable, common, output, cancel, deadline, useAnnotation = true, allowSelectors = false)
             }
 
             // Naked single backtrack, free search — the only engine that takes var-selector/
             // val-selector --params (for single-solver heuristic A/B).
             Engine.CP_SINGLE -> {
                 rejectParallel(engine, cores, alt = Engine.CP)
-                runBacktrack(solvable, common, output, useAnnotation = false, allowSelectors = true)
+                runBacktrack(solvable, common, output, cancel, deadline, useAnnotation = false, allowSelectors = true)
             }
 
             // Naked single local search — the only engine that takes the ls strategy --params
             // (tabu-tenure, pair-swap-budget, lambda, noise, max-flips).
             Engine.LS_SINGLE -> {
                 rejectParallel(engine, cores, alt = Engine.LS)
-                runLocalSearch(solvable, common, output)
+                runLocalSearch(solvable, common, output, cancel, deadline)
             }
 
             // The parallel-capable portfolio engines: their mix is carried on the enum.
             Engine.CP, Engine.LS, Engine.MIXED ->
-                runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix))
+                runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel)
         }
     }
 
@@ -119,6 +123,8 @@ internal object SolveCore {
         solvable: Solvable,
         common: CommonOptions,
         output: OutputProtocol,
+        cancel: Cancellation,
+        deadline: Long?,
         useAnnotation: Boolean,
         allowSelectors: Boolean,
     ) {
@@ -132,7 +138,6 @@ internal object SolveCore {
             lubyRestartBase = 100L,
             maxLearnedClauses = 20_000,
         )
-        val (_, cancel) = deadlineCancellation(common)
         // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
         // LP-success measurement under `-s`); absent ⇒ keep the base config (LP off for naked CP).
         val lpConfig = common.lp?.let {
@@ -151,12 +156,18 @@ internal object SolveCore {
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
-        runGeneric(BacktrackSolver(solvable.problem), params, solvable, common, output, complete = true)
+        runGeneric(BacktrackSolver(solvable.problem), params, solvable, common, output, complete = true, deadline)
     }
 
     /** Naked single local search (the `ls-single` engine), configured by the ls strategy --params
      *  (tabu-tenure, pair-swap-budget, lambda, noise, max-flips). */
-    private fun runLocalSearch(solvable: Solvable, common: CommonOptions, output: OutputProtocol) {
+    private fun runLocalSearch(
+        solvable: Solvable,
+        common: CommonOptions,
+        output: OutputProtocol,
+        cancel: Cancellation,
+        deadline: Long?,
+    ) {
         val (params, setup) = applyLsParams(
             LocalSearchParams(randomSeed = common.randomSeed),
             EngineParams(common.engineParams),
@@ -171,7 +182,6 @@ internal object SolveCore {
             definitionalSweep = solvable.definitionalSweep,
             perMoveInvariants = true,
         )
-        val (_, cancel) = deadlineCancellation(common)
         val cblsParams = params.copy(
             costShaping = CostShaping.Linear(lambda = setup.lambda),
             cancellation = cancel,
@@ -181,7 +191,7 @@ internal object SolveCore {
         cliLogger(common.verbose).v {
             "engine ls-single: seed=${cblsParams.randomSeed} tabu=${setup.tabuTenure} noise=${setup.noise}"
         }
-        runGeneric(solver, cblsParams, solvable, common, output, complete = false)
+        runGeneric(solver, cblsParams, solvable, common, output, complete = false, deadline)
     }
 
     private fun runPortfolio(
@@ -190,6 +200,7 @@ internal object SolveCore {
         output: OutputProtocol,
         cores: Int,
         mix: EngineMix,
+        cancel: Cancellation,
     ) {
         // Default arm-pool size: an env override, else auto-tuned from the core count (#406).
         val defaultArms = cliProp("klause.fzn.portfolio.arms")?.toIntOrNull() ?: autoArms(cores)
@@ -207,7 +218,6 @@ internal object SolveCore {
             defaultArms = defaultArms,
             lpCeiling = lpCeiling,
         )
-        val (_, cancel) = deadlineCancellation(common)
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
         val workers = PortfolioBuilder.build(
@@ -302,11 +312,12 @@ internal object SolveCore {
         common: CommonOptions,
         output: OutputProtocol,
         complete: Boolean,
+        deadline: Long?,
     ) {
         if (solvable.optimize) {
-            runOptimize(solver, params, solvable, common, output, complete)
+            runOptimize(solver, params, solvable, common, output, complete, deadline)
         } else {
-            runSatisfy(solver, params, solvable, common, output, complete)
+            runSatisfy(solver, params, solvable, common, output, complete, deadline)
         }
     }
 
@@ -317,6 +328,7 @@ internal object SolveCore {
         common: CommonOptions,
         output: OutputProtocol,
         complete: Boolean,
+        deadline: Long?,
     ) {
         val t0 = nowMillis()
         val limit = if (common.allSolutions) common.solutionCap ?: Long.MAX_VALUE else 1L
@@ -345,7 +357,6 @@ internal object SolveCore {
         }
 
         var produced = 0L
-        val deadline = common.timeLimitMs?.let { nowMillis() + it }
         var timedOut = false
         for (sample in solver.enumerate(params)) {
             if (deadline != null && nowMillis() > deadline) {
@@ -373,10 +384,11 @@ internal object SolveCore {
         common: CommonOptions,
         output: OutputProtocol,
         complete: Boolean,
+        deadline: Long?,
     ) {
         val optimizer = solver as? Optimizer<P>
         if (optimizer == null) {
-            runOptimizeViaEnumerate(solver, params, solvable, common, output, complete)
+            runOptimizeViaEnumerate(solver, params, solvable, common, output, complete, deadline)
             return
         }
         // Every backend minimises the canonical linear objective; the LS engine additionally
@@ -424,6 +436,7 @@ internal object SolveCore {
         common: CommonOptions,
         output: OutputProtocol,
         complete: Boolean,
+        deadline: Long?,
     ) {
         val objVarId = solvable.objVarId
         if (objVarId == null) {
@@ -435,7 +448,6 @@ internal object SolveCore {
         val t0 = nowMillis()
         var best: Sample? = null
         var bestObj = if (solvable.maximize) Int.MIN_VALUE else Int.MAX_VALUE
-        val deadline = common.timeLimitMs?.let { nowMillis() + it }
         for (sample in solver.enumerate(params)) {
             if (deadline != null && nowMillis() > deadline) break
             val v = sample.ints[objVarId]
