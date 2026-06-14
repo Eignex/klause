@@ -409,47 +409,39 @@ private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
     return intDomains[varId].max to varId
 }
 
-/** `exactly_int(n, xs, v)` — n equals `#{i : xs(i) = v}`. Reifies `xs(i) = v` per position
- *  and pins the count via an exact [Cardinality]. */
-internal fun FlatZincCompiler.emitExactly(c: FznConstraint) {
+/**
+ * Shared body of the `{exactly,at_least,at_most}_int(n, xs, v)` count comparisons: reify
+ * `xs(i) = v` at each position under an aux named `__${tag}_…`, then pin the number of true
+ * positions with a [Cardinality]. The bounds differ per builtin and are computed by [bounds]
+ * from the threshold `n` and the position count.
+ */
+private fun FlatZincCompiler.emitCountComparison(
+    c: FznConstraint,
+    tag: String,
+    bounds: (n: Int, count: Int) -> Pair<Int, Int>,
+) {
     require(c.args.size == 3)
     val n = evalIntConst(c.args[0]).toInt()
     val xs = evalIntVarArray(c.args[1])
     val v = evalIntConst(c.args[2]).toInt()
     val lits = IntArray(xs.size) { i ->
-        val aux = allocBool("__exactly_${xs[i]}_eq_$v")
+        val aux = allocBool("__${tag}_${xs[i]}_eq_$v")
         factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
         Lit.make(aux, true)
     }
-    factors.add(Cardinality(lits, min = n, max = n))
+    val (min, max) = bounds(n, lits.size)
+    factors.add(Cardinality(lits, min = min, max = max))
 }
 
-internal fun FlatZincCompiler.emitAtLeast(c: FznConstraint) {
-    // at_least_int(n, x(), v): at least n of x(i) = v.
-    require(c.args.size == 3)
-    val n = evalIntConst(c.args[0]).toInt()
-    val xs = evalIntVarArray(c.args[1])
-    val v = evalIntConst(c.args[2]).toInt()
-    val lits = IntArray(xs.size) { i ->
-        val aux = allocBool("__atleast_${xs[i]}_eq_$v")
-        factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
-        Lit.make(aux, true)
-    }
-    factors.add(Cardinality(lits, min = n, max = lits.size))
-}
+/** `exactly_int(n, xs, v)` — n equals `#{i : xs(i) = v}`. */
+internal fun FlatZincCompiler.emitExactly(c: FznConstraint) = emitCountComparison(c, "exactly") { n, _ -> n to n }
 
-internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) {
-    require(c.args.size == 3)
-    val n = evalIntConst(c.args[0]).toInt()
-    val xs = evalIntVarArray(c.args[1])
-    val v = evalIntConst(c.args[2]).toInt()
-    val lits = IntArray(xs.size) { i ->
-        val aux = allocBool("__atmost_${xs[i]}_eq_$v")
-        factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(xs[i]), LinearOp.EQ, v))
-        Lit.make(aux, true)
-    }
-    factors.add(Cardinality(lits, min = 0, max = n))
-}
+/** `at_least_int(n, xs, v)` — at least n of `xs(i) = v`. */
+internal fun FlatZincCompiler.emitAtLeast(c: FznConstraint) =
+    emitCountComparison(c, "atleast") { n, count -> n to count }
+
+/** `at_most_int(n, xs, v)` — at most n of `xs(i) = v`. */
+internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) = emitCountComparison(c, "atmost") { n, _ -> 0 to n }
 
 internal fun FlatZincCompiler.emitGcc(c: FznConstraint, variant: GccVariant) {
     require(c.args.size == if (variant.lowUp) 4 else 3)
