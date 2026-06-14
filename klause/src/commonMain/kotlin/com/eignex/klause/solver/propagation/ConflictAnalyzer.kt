@@ -38,6 +38,16 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private var universe = 0
     private var seen = BooleanArray(0)
 
+    // Per-analysis memo of atomLevelForConflict (#561). Within one analysis the search path is
+    // frozen — domains are never mutated, only the implication graph is walked — so an atom's
+    // bound-history-derived level is invariant. levelOf() queries it once per literal per reason
+    // (the dominant conflict-analysis cost on int-heavy models: a bound-history binary search
+    // each time), and the same atom recurs across reasons, so caching by atom id with an epoch
+    // stamp turns repeat lookups into O(1). atomLevelEpoch is bumped per analysis to invalidate.
+    private var atomLevelMemo = IntArray(0)
+    private var atomLevelStamp = IntArray(0)
+    private var atomLevelEpoch = 0
+
     // Variables already resolved out as a pivot this analysis. Int-atom antecedents are
     // walked in allocation order (atoms have no trail order), so unlike the bool implication
     // graph they can present a same-level cycle (A's reason mentions B and vice-versa). Once
@@ -209,6 +219,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         universe = numBoolVars + atomCount
         seen = scratch(seen, universe)
         resolved = scratch(resolved, universe)
+        if (atomLevelStamp.size < atomCount) {
+            atomLevelStamp = IntArray(atomCount)
+            atomLevelMemo = IntArray(atomCount)
+            atomLevelEpoch = 0 // fresh arrays read as epoch 0, so don't start at 0
+        }
+        atomLevelEpoch++
         seenAtomList.clear()
         bumpBoolVars.clear()
         bumpIntVars.clear()
@@ -245,7 +261,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 // (no-longer-seen) and duplicate entries are skipped by the `seen[v]` recheck.
                 for (k in 0 until seenAtomList.size) {
                     val v = seenAtomList[k]
-                    if (seen[v] && state.atomLevelForConflict(v - numBoolVars) == currentLevel) {
+                    if (seen[v] && cachedAtomLevel(v - numBoolVars) == currentLevel) {
                         pivot = v
                         break
                     }
@@ -549,8 +565,22 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return if (v < numBoolVars) {
             state.boolLevel[v]
         } else {
-            state.atomLevelForConflict(v - numBoolVars)
+            cachedAtomLevel(v - numBoolVars)
         }
+    }
+
+    /** [PropagationState.atomLevelForConflict] with a per-analysis memo (#561): the level is
+     *  invariant during one analysis (the path is frozen), so repeat queries — common, since the
+     *  same atom recurs across reasons — return the cached value instead of re-running the
+     *  bound-history binary search. Atoms materialised mid-analysis (id past the memo arrays)
+     *  fall through to the direct call. */
+    private fun cachedAtomLevel(id: Int): Int {
+        if (id >= atomLevelStamp.size) return state.atomLevelForConflict(id)
+        if (atomLevelStamp[id] == atomLevelEpoch) return atomLevelMemo[id]
+        val lv = state.atomLevelForConflict(id)
+        atomLevelMemo[id] = lv
+        atomLevelStamp[id] = atomLevelEpoch
+        return lv
     }
 
     /**
