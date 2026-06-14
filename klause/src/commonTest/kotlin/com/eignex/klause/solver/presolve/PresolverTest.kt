@@ -52,6 +52,24 @@ class PresolverTest {
     }
 
     @Test
+    fun `parse emphasis plus deltas toggles a single pass`() {
+        val ctx = PresolveContext.EMPTY
+        // default but symmetry breaking off — the rest of the default passes stay on.
+        val noSymmetry = PresolveConfig.parse("default,-symmetry")
+        assertEquals(PresolveEmphasis.DEFAULT, noSymmetry.emphasis)
+        assertEquals(false, noSymmetry.resolved(PresolvePass.BREAK_SYMMETRIES, ctx))
+        assertTrue(noSymmetry.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, ctx))
+        // off but symmetry breaking forced on — nothing else runs.
+        val justSymmetry = PresolveConfig.parse("off,+symmetry")
+        assertEquals(PresolveEmphasis.OFF, justSymmetry.emphasis)
+        assertEquals(true, justSymmetry.resolved(PresolvePass.BREAK_SYMMETRIES, ctx))
+        assertEquals(false, justSymmetry.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, ctx))
+        // A non-delta token after an emphasis, and an unknown pass, are both rejected.
+        assertFailsWith<IllegalStateException> { PresolveConfig.parse("default,symmetry") }
+        assertFailsWith<IllegalStateException> { PresolveConfig.parse("default,+bogus") }
+    }
+
+    @Test
     fun `auto resolution is intent-aware and SAC is opt-in`() {
         val auto = PresolveConfig.AUTO
         // Symmetry breaking is solution-set-altering: auto-on for solve, auto-off when the query

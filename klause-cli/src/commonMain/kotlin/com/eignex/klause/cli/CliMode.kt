@@ -195,7 +195,8 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.KLAUSE,
         valueLabel = "strength",
-        help = "presolve strength: " + PresolveEmphasis.entries.joinToString(" | ") { it.name.lowercase() },
+        help = "presolve strength: " + PresolveEmphasis.entries.joinToString(" | ") { it.name.lowercase() } +
+            "; append +/-<pass> to toggle one",
         default = PresolveEmphasis.DEFAULT.name.lowercase(),
     ) { o.presolve = it },
     FlagSpec(
