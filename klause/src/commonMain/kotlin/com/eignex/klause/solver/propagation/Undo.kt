@@ -88,6 +88,7 @@ internal fun PropagationState.mark(): PropagationState.LevelMark {
         ltdvSize = levelToDecisionVar.size,
         pinOrderSize = boolPinOrder.size,
         snapshottablePayloads = payloads ?: emptyPayloads,
+        revSize = revTrail.size,
     )
 }
 
@@ -159,6 +160,16 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
         i--
     }
     truncateUndo(mark.undoSize)
+    // Roll back reversible cells (incremental factor state) top-down to the mark, so a cell
+    // mutated several times since the mark lands on its mark-time value (LIFO via each cell's
+    // own prior-value stack). Independent of the bool/int cells above (disjoint state), so the
+    // replay order between the two groups is immaterial.
+    var r = revTrail.size - 1
+    while (r >= mark.revSize) {
+        revTrail[r].restore()
+        r--
+    }
+    while (revTrail.size > mark.revSize) revTrail.removeAt(revTrail.size - 1)
     boolPinOrder.truncateTo(mark.pinOrderSize)
     levelToDecisionVar.truncateTo(mark.ltdvSize)
     // Restore snapshottable per-factor payloads. Defensive snapshotCopy so a later
