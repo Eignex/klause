@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -9,6 +10,7 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -191,9 +193,91 @@ class DualFixTest {
     }
 
     @Test
-    fun `booleans in a cardinality are excluded`() {
-        // A cardinality constraint isn't monotone in a single literal ⇒ its bools can't be dual-fixed.
-        val problem = Problem(2, 0, emptyArray(), listOf(Cardinality(intArrayOf(pos(0), pos(1)), min = 1, max = 2)))
+    fun `booleans in a two-sided cardinality are excluded`() {
+        // Exactly-one (min == max == 1, both sides active) is not monotone in a single literal: both
+        // satisfying and unsatisfying a literal can violate it ⇒ its bools can't be dual-fixed.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 1)),
+        )
+        assertSame(problem, Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()), "expected no fixing")
+    }
+
+    @Test
+    fun `pure-positive booleans in an at-least cardinality are fixed true`() {
+        // `b0 + b1 + b2 >= 1` (max == #lits, only the lower side active) is monotone like a clause:
+        // unsatisfying a +literal is risky, satisfying it is always safe ⇒ pin all true (no objective).
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 3)),
+        )
+        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
+        for (b in 0..2) assertTrue(hasUnit(out, Lit.make(b, true)), "b$b should be pinned true")
+    }
+
+    @Test
+    fun `pure-positive booleans in an at-most cardinality are fixed false`() {
+        // `b0 + b1 + b2 <= 1` (min == 0, only the upper side active): satisfying a +literal is risky,
+        // unsatisfying it is always safe ⇒ pin all false (no objective).
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1)),
+        )
+        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
+        for (b in 0..2) assertTrue(hasUnit(out, Lit.make(b, false)), "b$b should be pinned false")
+    }
+
+    @Test
+    fun `boolean in a pseudo-boolean LE is fixed false and GE is fixed true`() {
+        // LE: rising sum violates ⇒ positive-weight literals are true-unsafe ⇒ pin false.
+        val le = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(intArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.LE, 4)),
+        )
+        val outLe = Presolve.fixDominatedVariables(le, emptyMap(), emptyMap())
+        assertEquals(minObjectiveBools(le, emptyMap()), minObjectiveBools(outLe, emptyMap()), "LE optimum changed")
+        assertTrue(hasUnit(outLe, Lit.make(0, false)) && hasUnit(outLe, Lit.make(1, false)), "LE bools pinned false")
+        // GE: falling sum violates ⇒ positive-weight literals are false-unsafe ⇒ pin true.
+        val ge = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(intArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.GE, 1)),
+        )
+        val outGe = Presolve.fixDominatedVariables(ge, emptyMap(), emptyMap())
+        assertEquals(minObjectiveBools(ge, emptyMap()), minObjectiveBools(outGe, emptyMap()), "GE optimum changed")
+        assertTrue(hasUnit(outGe, Lit.make(0, true)) && hasUnit(outGe, Lit.make(1, true)), "GE bools pinned true")
+    }
+
+    @Test
+    fun `negative-weight pseudo-boolean LE flips the safe direction`() {
+        // `-b0 <= 0` (always true): a rising sum violates LE, and with weight -1 the rising value is
+        // b0 = false ⇒ false-unsafe ⇒ the safe pin is true. Optimum (no objective) is preserved.
+        val problem = Problem(1, 0, emptyArray(), listOf(PseudoBoolean(intArrayOf(-1), intArrayOf(pos(0)), PbOp.LE, 0)))
+        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
+        assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
+    }
+
+    @Test
+    fun `booleans in an equality pseudo-boolean are excluded`() {
+        // `Σ = b` couples both directions ⇒ not monotone ⇒ no fixing.
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 1)),
+        )
         assertSame(problem, Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()), "expected no fixing")
     }
 }

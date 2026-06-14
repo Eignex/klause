@@ -354,11 +354,18 @@ object Presolve {
      *
      * Integers: a variable whose every occurrence is a `≤`/`≥` [Linear] (an `=`/`≠` row or non-[Linear]
      * global makes the safety undecidable, so it is excluded) is pinned by tightening its domain to a
-     * singleton. Booleans (#469): the pure-literal mirror — a `+b` literal in a [Clause] is satisfied
-     * by `b = true`, so `b = true` is safe there and `b = false` may not be; `¬b` is the reverse; any
-     * non-[Clause] bool factor excludes the variable. A safe-direction bool is pinned with a unit
-     * clause (a bool already unit-pinned is skipped, keeping the pass idempotent). Coefficients come
-     * from [objectiveIntCoeffs] / [objectiveBoolCoeffs] (minimize sense, absent ⇒ 0).
+     * singleton. Booleans (#469/#470): the pure-literal mirror, extended past [Clause] to every
+     * *monotone* pseudo-Boolean row — a [Cardinality] `min ≤ Σ ≤ max` (each active side fixes a safe
+     * direction per literal) and a [PseudoBoolean] `≤`/`≥`. In all of these, flipping a literal moves
+     * the row's sum one known way, so one value of the variable is safe; an `=` pseudo-Boolean, a
+     * reified row, or any other bool factor couples both directions and excludes the variable. A
+     * safe-direction bool is pinned with a unit clause (a bool already unit-pinned is skipped, keeping
+     * the pass idempotent). Coefficients come from [objectiveIntCoeffs] / [objectiveBoolCoeffs]
+     * (minimize sense, absent ⇒ 0).
+     *
+     * The integer side stays `≤`/`≥` [Linear] only: klause's reified rows are full biconditionals
+     * (their inner vars affect feasibility both ways) and its globals aren't monotone in a single int
+     * var, so there is no sound monotone int factor to add — see #470.
      *
      * No elimination, identity reconstruction. Solution-set altering (discards optimum-equivalent and
      * feasible-but-suboptimal assignments), so the engine runs it only for non-solution-set-sensitive
@@ -391,21 +398,7 @@ object Presolve {
             } else {
                 for (v in f.intVars) intEligible[v] = false
             }
-            if (f is Clause) {
-                if (f.literals.size == 1) alreadyPinned.add(Lit.variable(f.literals[0]))
-                for (lit in f.literals) {
-                    if (Lit.isPositive(
-                            lit,
-                        )
-                    ) {
-                        falseSafe[Lit.variable(lit)] = false
-                    } else {
-                        trueSafe[Lit.variable(lit)] = false
-                    }
-                }
-            } else {
-                for (v in f.boolVars) boolEligible[v] = false
-            }
+            markBoolSafety(f, trueSafe, falseSafe, boolEligible, alreadyPinned)
         }
         var changed = false
         val domains = problem.intDomains.copyOf()
@@ -439,6 +432,65 @@ object Presolve {
         }
         if (!changed) return problem
         return rebuildProblem(problem, problem.factors.toList() + extra, domains)
+    }
+
+    /** Fold [f]'s contribution to the Boolean pure-literal safety analysis (#469/#470). A bool var is
+     *  pinnable only if it occurs solely in *monotone* rows — [Clause] (an at-least-one lower bound),
+     *  [Cardinality] (its active lower/upper sides), and [PseudoBoolean] `≤`/`≥` — where flipping a
+     *  literal moves the row's sum in one known direction. Any other bool factor (a reified row, a
+     *  `=` pseudo-Boolean, …) couples the two directions, so it excludes its bool vars outright. */
+    private fun markBoolSafety(
+        f: Factor,
+        trueSafe: BooleanArray,
+        falseSafe: BooleanArray,
+        boolEligible: BooleanArray,
+        alreadyPinned: HashSet<Int>,
+    ) {
+        when {
+            f is Clause -> {
+                if (f.literals.size == 1) alreadyPinned.add(Lit.variable(f.literals[0]))
+                // A clause is `Σ lit ≥ 1`: unsatisfying a literal lowers the count toward violation.
+                for (lit in f.literals) markBoolMonotoneLiteral(lit, 1, false, fallUnsafe = true, trueSafe, falseSafe)
+            }
+
+            f is Cardinality -> {
+                // `min ≤ Σ lit ≤ max`: the lower side (min > 0) makes unsatisfying risky, the upper
+                // side (max < #lits) makes satisfying risky. A two-sided row clears both directions.
+                val fallUnsafe = f.min > 0
+                val riseUnsafe = f.max < f.literals.size
+                for (lit in f.literals) markBoolMonotoneLiteral(lit, 1, riseUnsafe, fallUnsafe, trueSafe, falseSafe)
+            }
+
+            f is PseudoBoolean && (f.op == PbOp.LE || f.op == PbOp.GE) -> {
+                // `Σ w·lit ≤ b` (rising sum violates) / `≥ b` (falling sum violates).
+                val riseUnsafe = f.op == PbOp.LE
+                for (i in f.literals.indices) {
+                    markBoolMonotoneLiteral(f.literals[i], f.weights[i], riseUnsafe, !riseUnsafe, trueSafe, falseSafe)
+                }
+            }
+
+            else -> for (v in f.boolVars) boolEligible[v] = false
+        }
+    }
+
+    /** Clear the unsafe pin direction(s) for the variable behind [lit] in a monotone row. [weight] is
+     *  the literal's coefficient (1 for clause/cardinality); the signed weight `w·polarity` is how the
+     *  row's sum changes when the variable flips false→true. [riseUnsafe] / [fallUnsafe] say whether a
+     *  rising / falling sum can violate the row, so the value that moves the sum that way is unsafe. */
+    private fun markBoolMonotoneLiteral(
+        lit: Int,
+        weight: Int,
+        riseUnsafe: Boolean,
+        fallUnsafe: Boolean,
+        trueSafe: BooleanArray,
+        falseSafe: BooleanArray,
+    ) {
+        val v = Lit.variable(lit)
+        val signedW = if (Lit.isPositive(lit)) weight else -weight
+        if (signedW == 0) return
+        // The value that raises the sum: true if signedW > 0, else false. Mirror for lowering.
+        if (riseUnsafe) (if (signedW > 0) trueSafe else falseSafe)[v] = false
+        if (fallUnsafe) (if (signedW > 0) falseSafe else trueSafe)[v] = false
     }
 
     private fun rebuildProblem(
