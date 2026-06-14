@@ -21,6 +21,28 @@ class CliTest {
     }
 
     @Test
+    fun `cp-single accepts every var- and val-selector value the enums expose`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        // Every exposed selector must construct and solve — guards the enum→selector mappings,
+        // including the newly added ones (largest-domain, median, split, …).
+        for (v in VarSelectorKind.entries) {
+            val out = capture {
+                main(arrayOf("-e", "cp-single", "--param", "var-selector=${v.id}", "-t", "5000", fzn.absolutePath))
+            }
+            assertTrue("x = " in out, "var-selector=${v.id}:\n$out")
+        }
+        for (v in ValSelectorKind.entries) {
+            val out = capture {
+                main(arrayOf("-e", "cp-single", "--param", "val-selector=${v.id}", "-t", "5000", fzn.absolutePath))
+            }
+            assertTrue("x = " in out, "val-selector=${v.id}:\n$out")
+        }
+    }
+
+    @Test
     fun `parser accepts attached short values, bundled shorts, long=value, and -- terminator`() {
         val opts = CommonOptions()
         val positionals = mutableListOf<String>()
@@ -45,11 +67,11 @@ class CliTest {
 
     @Test
     fun `default engine is mixed and is overridable via the KLAUSE_FZN_ENGINE property`() {
-        assertTrue(defaultEngine() == "mixed", defaultEngine())
+        assertTrue(defaultEngine() == Engine.MIXED, defaultEngine().id)
         // cliProp reads the system property first on the JVM, so it stands in for the env var.
         System.setProperty("klause.fzn.engine", "fixed")
         try {
-            assertTrue(defaultEngine() == "fixed", defaultEngine())
+            assertTrue(defaultEngine() == Engine.FIXED, defaultEngine().id)
             // The override must surface in --help so a packaged image's default is visible.
             val out = capture { main(arrayOf("--help")) }
             assertTrue("default: fixed" in out, out)
