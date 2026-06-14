@@ -126,6 +126,22 @@ class SubcircuitTest {
     }
 
     @Test
+    fun `propagation rejects a larger pinned sub-cycle that strands an included node`() {
+        // N=5: pin a closed 3-cycle 0->1->2->0 and force node 3 onto the cycle (succ[3]=4, a
+        // non-self successor makes 3 definitely included). The sealed 3-cycle can't absorb the
+        // extra included node, so the singleton-walk check (includedCount > cycleLen 3) fails.
+        val factor = Subcircuit(succ = intArrayOf(0, 1, 2, 3, 4))
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(factor),
+        )
+        val result = problem.propagate(Assumptions(ints = mapOf(0 to 1, 1 to 2, 2 to 0, 3 to 4)))
+        assertTrue(result is Unsat, "a sealed 3-cycle stranding an included node should be Unsat; got $result")
+    }
+
+    @Test
     fun `LS solver finds a valid subcircuit`() {
         val problem = fourNodeProblem()
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))

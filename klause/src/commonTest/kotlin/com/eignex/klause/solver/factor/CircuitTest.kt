@@ -186,6 +186,37 @@ class CircuitTest {
         )
     }
 
+    /** 5-node Circuit, succ var ids 0..4 each over `[0,4]`. */
+    private fun fiveNodeProblem(): Problem {
+        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3, 4))
+        return Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(factor),
+        )
+    }
+
+    @Test
+    fun `propagator detects a pinned sub-cycle shorter than N`() {
+        // Pin 0->1->2->0: a closed 3-cycle among {0,1,2} while N=5, so nodes 3 and 4 can never
+        // join it. The singleton-walk sub-cycle check (cycleLen 3 < n 5) must report infeasible.
+        val problem = fiveNodeProblem()
+        val result = problem.propagate(Assumptions(ints = mapOf(0 to 1, 1 to 2, 2 to 0)))
+        assertTrue(result is Unsat, "a closed 3-cycle in a 5-node circuit should be Unsat; got $result")
+    }
+
+    @Test
+    fun `propagator accepts a Hamiltonian chain prefix without a false sub-cycle`() {
+        // Pin the open chain 0->1->2->3->4 (succ[4] still free). The walk reaches a non-singleton
+        // and ends without closing a cycle, so this must NOT be rejected — and the closing edge
+        // succ[4]=0 is forced. Guards the per-walk reset against false positives.
+        val problem = fiveNodeProblem()
+        val result = problem.propagate(Assumptions(ints = mapOf(0 to 1, 1 to 2, 2 to 3, 3 to 4)))
+        assertTrue(result is Implied, "an open Hamiltonian chain prefix must propagate, not fail; got $result")
+        assertEquals(0, result.ints[4], "succ[4] should be forced to 0 to close the cycle; got ${result.ints}")
+    }
+
     @Test
     fun `LS solver finds Hamiltonian cycle on N=4`() {
         val problem = fourNodeProblem()
