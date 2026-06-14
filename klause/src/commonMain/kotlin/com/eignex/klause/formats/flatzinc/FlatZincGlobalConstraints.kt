@@ -303,7 +303,10 @@ internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
         if (d.min < lo) lo = d.min
         if (d.max > hi) hi = d.max
     }
-    factors.add(AllDifferent(vars = vars, domainMin = lo, domainSize = hi - lo + 1))
+    // Honour the `::bounds` annotation: the modeller asked for bounds-consistency, not
+    // full GAC, so use AllDifferent's cheap forward-checking path instead of Régin matching.
+    val bc = c.annotations.any { it.name == "bounds" }
+    factors.add(AllDifferent(vars = vars, domainMin = lo, domainSize = hi - lo + 1, boundsConsistent = bc))
 }
 
 /**
