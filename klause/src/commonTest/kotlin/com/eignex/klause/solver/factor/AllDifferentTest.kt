@@ -41,6 +41,10 @@ class AllDifferentTest {
             listOf(1 to 3, 2 to 3, 3 to 3, 0 to 3), // cascading singleton
             listOf(0 to 2, 1 to 2, 0 to 1, 0 to 2), // overlapping tight set
             listOf(0 to 2, 1 to 3, 2 to 4, 0 to 4, 0 to 4), // 5 vars, mixed widths
+            // 6 vars over a wide shared range: large Régin value graph (total = 12) that shrinks as
+            // decisions pin vars, firing reginFilter many times on one reused ReginCache — stresses
+            // the reused adjacency buffers' grow + per-fire clear across push/pop.
+            listOf(0 to 5, 0 to 5, 0 to 5, 0 to 5, 0 to 5, 0 to 5),
         )
         for ((idx, ranges) in instances.withIndex()) {
             val k = ranges.size

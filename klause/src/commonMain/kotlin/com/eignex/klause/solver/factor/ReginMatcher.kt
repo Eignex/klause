@@ -124,8 +124,10 @@ internal fun reginFilter(
 
     // ---- Oriented graph: matched value→var, unmatched var→value (vars 0..n-1, values after). ----
     val total = n + numValues
-    val adj = Array(total) { IntArrayList() }
-    val radj = Array(total) { IntArrayList() } // reverse of adj
+    // Reuse the per-session adjacency buffers (cleared to `total`) instead of allocating
+    // 2·total fresh IntArrayLists every fire; fall back to fresh arrays when no cache is supplied.
+    val (adj, radj) = cache?.graphBuffers(total)
+        ?: (Array(total) { IntArrayList() } to Array(total) { IntArrayList() })
     for (i in 0 until n) {
         for (vid in valuesPerVar[i]) {
             if (matchVar[i] == vid) {
@@ -225,6 +227,30 @@ internal fun reginFilter(
  *  correctness, only the number of augmenting searches. Backtrack-safe via [snapshotCopy]. */
 internal class ReginCache : PropagationState.SnapshottablePayload {
     val matchedValue = MutableIntIntMap()
+
+    // Reusable oriented-graph adjacency buffers for [reginFilter] — the dominant per-fire
+    // allocation (2·(n + numValues) IntArrayLists). Grown on demand, and the live `[0, total)`
+    // lists are cleared and refilled every fire, so reuse is behaviour-identical. Deliberately
+    // excluded from [snapshotCopy] (they hold no level state, only scratch rebuilt every fire), so
+    // they re-allocate lazily after a restore — like the matching seed, correctness never depends
+    // on their contents surviving.
+    private var adjBuf: Array<IntArrayList> = emptyArray()
+    private var radjBuf: Array<IntArrayList> = emptyArray()
+
+    /** Forward/reverse adjacency arrays sized `>= total`, with the `[0, total)` lists cleared. */
+    fun graphBuffers(total: Int): Pair<Array<IntArrayList>, Array<IntArrayList>> {
+        if (adjBuf.size < total) {
+            val oldA = adjBuf
+            val oldR = radjBuf
+            adjBuf = Array(total) { if (it < oldA.size) oldA[it] else IntArrayList() }
+            radjBuf = Array(total) { if (it < oldR.size) oldR[it] else IntArrayList() }
+        }
+        for (i in 0 until total) {
+            adjBuf[i].clear()
+            radjBuf[i].clear()
+        }
+        return adjBuf to radjBuf
+    }
 
     /** The Hall violator behind the most recent propagate failure on this session — written
      *  at the failing point, read immediately afterwards by the analyzer via the factor's
