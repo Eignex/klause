@@ -730,6 +730,18 @@ internal class CpToLpRelaxation(
          * so the rows are globally valid; the resource ceiling uses the declared **max** capacity and
          * the **min** demand, so it is a sound relaxation. Columns are O(n·H) — hard-gated on
          * [MAX_TI_HORIZON] and [MAX_TI_COLS]; above either the model is skipped (only loosens).
+         *
+         * ## No separate makespan row (#472)
+         * There is deliberately no disaggregated makespan row here. The makespan links through the
+         * start channel and the model's own `M ≥ startᵢ + durᵢ` `Linear`s, so the LP makespan is
+         * `Σ_t t·x_{i,t} + durᵢ` — the *expected* completion under a fractional `x`. The disaggregated
+         * `M ≥ (t+durᵢ)·x_{i,t}` rows the issue weighed (and the completion-indicator step variant)
+         * cannot tighten that: any makespan lower bound linear in one task's `x` is dominated by the
+         * expected-completion value, which `M ≥ startᵢ + durᵢ` already attains exactly (verified — the
+         * disaggregated rows raised the bound on 0 of 2623 structured instances). The only makespan
+         * lever is the *cross-task* resource coupling above, which already lifts the bound past the
+         * energetic windowed row (#430) on multi-capacity profiles. So the model is not redundant with
+         * #430 for makespan, but the disaggregated strengthening would be; #472 closed as such.
          */
         private fun buildCumulativeTimeIndexed(view: SchedulingView) {
             val n = view.starts.size
