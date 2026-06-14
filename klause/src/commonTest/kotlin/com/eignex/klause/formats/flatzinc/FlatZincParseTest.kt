@@ -62,6 +62,48 @@ class FlatZincParseTest {
     }
 
     @Test
+    fun `scalar var alias is bound to its target, not a free var`() {
+        // `var T: name = <var>;` aliases name to another var. The compiler used to drop the
+        // binding and allocate a fresh, disconnected var — so an aliased objective output var
+        // floated at its domain minimum regardless of the real objective (#478). Here `obj`
+        // aliases the int_max output `m`; after solving, both must hold the same value.
+        val src = """
+            var 0..100: a;
+            var 0..100: b;
+            var 1..101: m :: is_defined_var;
+            var 1..101: obj = m;
+            constraint int_eq(a, 30);
+            constraint int_eq(b, 40);
+            constraint int_max(a, b, m) :: defines_var(m);
+            solve satisfy;
+            output ["obj=", show(obj), " m=", show(m)];
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        // The alias shares its target's var id — no fresh var allocated for `obj`.
+        assertEquals(program.intVarsByName["m"], program.intVarsByName["obj"])
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment!!
+        val obj = sample.ints[program.intVarsByName.getValue("obj")]
+        assertEquals(40, obj, "aliased obj must equal max(30,40)=40, got $obj")
+        assertTrue(writeFlatZincSolution(program, sample).contains("obj=40 m=40"))
+    }
+
+    @Test
+    fun `scalar int alias narrows the shared domain`() {
+        // An alias may declare a tighter range than its target; that range must constrain the
+        // shared variable (widening would be unsound).
+        val src = """
+            var 0..100: x;
+            var 0..5: y = x;
+            constraint int_lin_le([-1], [x], -3);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment!!
+        val v = sample.ints[program.intVarsByName.getValue("x")]
+        assertTrue(v in 3..5, "x must be in 3..5 (alias y:0..5 ∧ x>=3), got $v")
+    }
+
+    @Test
     fun `output renders default when no output clause`() {
         val src = """
             var bool: x;
