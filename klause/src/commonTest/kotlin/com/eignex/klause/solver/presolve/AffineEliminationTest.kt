@@ -133,18 +133,19 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `does not eliminate when x appears in a non-linear factor`() {
-        // x (0) appears in an AllDifferent — an affine expression can't be folded into a global.
+    fun `does not eliminate when both equation vars appear in a non-linear factor`() {
+        // x (0) and y (1) both appear in an AllDifferent — neither the unit fold (x is in a global) nor
+        // the residue elimination (y is not contained) can act, so nothing is eliminated.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 3), IntDomain(0, 5)),
             factors = listOf(
                 Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1), // x = 2y+1
-                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 6), // x in a global
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6), // both in a global
             ),
         )
-        checkRoundTrip("x-in-global", problem, expectEliminated = false, expectSat = true)
+        checkRoundTrip("vars-in-global", problem, expectEliminated = false, expectSat = true)
     }
 
     @Test
@@ -230,6 +231,50 @@ class AffineEliminationTest {
             factors = listOf(Linear(intArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.EQ, 12)),
         )
         checkRoundTrip("n-term-no-unit", problem, expectEliminated = false, expectSat = true)
+    }
+
+    @Test
+    fun `eliminates a non-unit doubleton via residue-class restriction`() {
+        // 2x + 3y = 12 has no unit pivot, but x is contained, so x = (12 - 3y)/2 — an integer only for
+        // even y. Eliminate x, restrict y to {0,2,4} (the residue class keeping x in [0,6]), and
+        // reconstruct x with the divisor (#522).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 6), IntDomain(0, 4)),
+            factors = listOf(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 12)),
+        )
+        checkRoundTrip("residue", problem, expectEliminated = true, expectSat = true)
+        checkFeasibleSetPreserved("residue", problem)
+    }
+
+    @Test
+    fun `residue elimination preserves an unsatisfiable doubleton`() {
+        // 2x + 2y = 3 has an odd right-hand side, so no y admits an integer x — no residue class exists,
+        // nothing is eliminated, and the (correctly unsatisfiable) verdict is preserved.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.EQ, 3)),
+        )
+        checkRoundTrip("residue-unsat", problem, expectEliminated = false, expectSat = false)
+    }
+
+    @Test
+    fun `does not residue-eliminate a non-unit doubleton when neither var is contained`() {
+        // 2x + 3y = 12 with both x and y also pinned into a global: neither is contained, so no
+        // non-integer fold is possible and nothing is eliminated.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 6), IntDomain(0, 4), IntDomain(0, 6)),
+            factors = listOf(
+                Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 12),
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 7),
+            ),
+        )
+        checkRoundTrip("residue-not-contained", problem, expectEliminated = false, expectSat = true)
     }
 
     @Test
