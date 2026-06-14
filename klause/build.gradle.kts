@@ -13,9 +13,10 @@ eignexPublish {
     githubRepo.set("Eignex/klause")
 }
 
-// PR/main CI passes -Ptargets.hostOnly: only the targets whose tests run on the linux
-// runner. The full matrix builds and tests on release and locally.
-val hostTargetsOnly = providers.gradleProperty("targets.hostOnly").isPresent
+// Default is host-only (jvm + linuxX64): the targets whose tests run on the linux runner, so
+// local `./gradlew build`/`check` and PR/main CI stay fast and mirror each other. Only the
+// release does the full sweep — it opts in via -Ptargets.full.
+val fullTargets = providers.gradleProperty("targets.full").isPresent
 
 kotlin {
     // The parallel Portfolio needs real threads, which commonMain (shared with the single-threaded
@@ -36,7 +37,7 @@ kotlin {
 
     jvm()
     linuxX64()
-    if (!hostTargetsOnly) {
+    if (fullTargets) {
         // Solver tests are compute-heavy; Mocha's default 2s timeout is far too tight for
         // the single-threaded JS/wasm targets. Tests must also avoid multi-second busy
         // loops — ChromeHeadless kills the page.
