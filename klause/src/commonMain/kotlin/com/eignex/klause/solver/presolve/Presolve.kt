@@ -154,7 +154,10 @@ object Presolve {
                 val b = f.coeffs[1 - xi]
                 // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
                 // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
-                if (a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y || x in objectiveIntVars) continue
+                // `y`'s domain is restricted below, so it too must stay clear of the objective — the
+                // pass leaves every objective variable untouched.
+                if (a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
+                if (x in objectiveIntVars || y in objectiveIntVars) continue
                 if (!isContained(factors, di, x)) continue
                 val domY = domains[y]
                 if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
