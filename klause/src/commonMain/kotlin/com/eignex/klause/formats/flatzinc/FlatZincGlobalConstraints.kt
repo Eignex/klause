@@ -506,6 +506,74 @@ internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
     factors.add(GlobalCardinality(xs = base, cover = value, countVars = card))
 }
 
+/**
+ * `klause_count_eq(x, y, c)` — `c = #{i : x(i) = y}` for a **fixed** value `y` (the klause-lib
+ * `fzn_count_eq` override routes only the fixed-value form here; a variable `y` keeps the std
+ * reified-sum decomposition). Modelled as a single-value [GlobalCardinality] so the count is
+ * propagated by GCC flow reasoning rather than a reified-equality sum. The count `c` may be a
+ * var (→ `countVars`) or a constant (→ `countLow == countHigh`). (#517)
+ */
+internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
+    require(c.args.size == 3)
+    val xs = evalIntVarArray(c.args[0])
+    val value = evalIntConst(c.args[1]).toInt()
+    val (countConst, countVar) = resolveIntConstOrVar(c.args[2])
+    if (xs.isEmpty()) {
+        // No variables ⇒ zero occurrences; pin a count var to 0 (a constant count is already 0
+        // in any satisfiable model, so nothing to emit there).
+        if (countVar >= 0) factors.add(Linear(intArrayOf(1), intArrayOf(countVar), LinearOp.EQ, 0))
+        return
+    }
+    if (countVar >= 0) {
+        factors.add(GlobalCardinality(xs = xs, cover = intArrayOf(value), countVars = intArrayOf(countVar)))
+    } else {
+        factors.add(
+            GlobalCardinality(
+                xs = xs,
+                cover = intArrayOf(value),
+                countLow = intArrayOf(countConst),
+                countHigh = intArrayOf(countConst),
+            ),
+        )
+    }
+}
+
+/**
+ * `among(n, x, v)` — `n = #{i : x(i) ∈ v}` for a **constant** value set `v`. Modelled as a
+ * [GlobalCardinality] over the set's values (each with its own count var) plus a [Linear] tying
+ * `n` to the sum of those counts, so membership counting is propagated by GCC flow reasoning
+ * instead of a per-position set-membership reified sum. Values outside the union span of the
+ * `x` domains can never occur, so they are dropped from the cover to save count vars. (#517)
+ */
+internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
+    require(c.args.size == 3)
+    val n = resolveIntVar(c.args[0])
+    val xs = evalIntVarArray(c.args[1])
+    val setValues = resolveSetLiteral(c.args[2])
+    val cover = if (xs.isEmpty()) {
+        IntArray(0)
+    } else {
+        var lo = Int.MAX_VALUE
+        var hi = Int.MIN_VALUE
+        for (v in xs) {
+            val d = intDomains[v]
+            if (d.min < lo) lo = d.min
+            if (d.max > hi) hi = d.max
+        }
+        setValues.filter { it in lo..hi }.toIntArray()
+    }
+    if (cover.isEmpty()) {
+        // No reachable counted value ⇒ n = 0.
+        factors.add(Linear(intArrayOf(1), intArrayOf(n), LinearOp.EQ, 0))
+        return
+    }
+    val counts = IntArray(cover.size) { allocInt("__among_cnt_${cover[it]}_${factors.size}", 0, xs.size) }
+    factors.add(GlobalCardinality(xs = xs, cover = cover, countVars = counts))
+    // n = Σ counts.
+    val coeffs = IntArray(cover.size + 1) { if (it < cover.size) 1 else -1 }
+    factors.add(Linear(coeffs = coeffs, vars = counts + n, op = LinearOp.EQ, bound = 0))
+}
+
 internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
     if (forLocalSearch) return
     require(c.args.size == 1) { "${c.name} expects 1 arg" }

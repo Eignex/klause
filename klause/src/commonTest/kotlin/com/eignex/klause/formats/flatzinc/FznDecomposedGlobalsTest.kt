@@ -84,6 +84,72 @@ class FznDecomposedGlobalsTest {
     }
 
     @Test
+    fun `at_most matches brute force`() {
+        // fzn_at_most_int(n, x, v): at most n of x equal v.
+        val found = enumerate(decl(2) + "constraint fzn_at_most_int(1, [x1, x2, x3], 1);\nsolve satisfy;", names)
+        assertEquals(brute(3, 2) { t -> t.count { it == 1 } <= 1 }, found)
+    }
+
+    @Test
+    fun `at_least matches brute force`() {
+        // fzn_at_least_int(n, x, v): at least n of x equal v.
+        val found = enumerate(decl(2) + "constraint fzn_at_least_int(2, [x1, x2, x3], 1);\nsolve satisfy;", names)
+        assertEquals(brute(3, 2) { t -> t.count { it == 1 } >= 2 }, found)
+    }
+
+    @Test
+    fun `exactly matches brute force`() {
+        // fzn_exactly_int(n, x, v): exactly n of x equal v.
+        val found = enumerate(decl(2) + "constraint fzn_exactly_int(2, [x1, x2, x3], 1);\nsolve satisfy;", names)
+        assertEquals(brute(3, 2) { t -> t.count { it == 1 } == 2 }, found)
+    }
+
+    @Test
+    fun `count_eq with a var count matches brute force`() {
+        // klause_count_eq(x, y, c): c = #{i : x(i) = y}, fixed value y, count var c. Project onto
+        // the x vars plus c; c is functionally determined, so exactly one c per x assignment.
+        val src = decl(2) + "var 0..3: c;\nconstraint klause_count_eq([x1, x2, x3], 1, c);\nsolve satisfy;"
+        val found = enumerate(src, names + "c")
+        val expected = HashSet<List<Int>>()
+        for (a in 0..2) for (b in 0..2) for (d in 0..2) {
+            expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 }))
+        }
+        assertEquals(expected, found)
+    }
+
+    @Test
+    fun `count_eq with a fixed count matches brute force`() {
+        // Constant count form (countLow == countHigh): #{i : x(i) = 1} = 2.
+        val found = enumerate(decl(2) + "constraint klause_count_eq([x1, x2, x3], 1, 2);\nsolve satisfy;", names)
+        assertEquals(brute(3, 2) { t -> t.count { it == 1 } == 2 }, found)
+    }
+
+    @Test
+    fun `among matches brute force`() {
+        // fzn_among(n, x, v): n = #{i : x(i) in v}, constant value set v, count var n.
+        val src = decl(2) + "var 0..3: n;\nconstraint fzn_among(n, [x1, x2, x3], {1, 2});\nsolve satisfy;"
+        val found = enumerate(src, names + "n")
+        val expected = HashSet<List<Int>>()
+        for (a in 0..2) for (b in 0..2) for (d in 0..2) {
+            expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
+        }
+        assertEquals(expected, found)
+    }
+
+    @Test
+    fun `among over a range set matches brute force`() {
+        // MiniZinc emits a contiguous value set as a range literal (e.g. 1..2), which the set
+        // resolver must accept just like {1, 2}.
+        val src = decl(2) + "var 0..3: n;\nconstraint fzn_among(n, [x1, x2, x3], 1..2);\nsolve satisfy;"
+        val found = enumerate(src, names + "n")
+        val expected = HashSet<List<Int>>()
+        for (a in 0..2) for (b in 0..2) for (d in 0..2) {
+            expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
+        }
+        assertEquals(expected, found)
+    }
+
+    @Test
     fun `value_precede matches brute force`() {
         // value 1 may appear only after value 2 has appeared earlier (s=2 precedes t=1).
         val found = enumerate(decl(2) + "constraint value_precede_int(2, 1, [x1, x2, x3]);\nsolve satisfy;", names)
