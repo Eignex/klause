@@ -21,7 +21,7 @@ internal class FloatSimplex(private val model: LpModel) {
     private val rhsCol = numVars
     private val nMat = Array(m) { DoubleArray(numVars + 1) }
     private val basicVar = IntArray(m)
-    private val status = IntArray(numVars)
+    private val status = Array(numVars) { VarStatus.BASIC }
 
     /** Solve in double precision and return the basis reached, or null if it did not converge. */
     fun basis(): Basis? {

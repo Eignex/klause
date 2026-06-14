@@ -249,7 +249,7 @@ internal fun BacktrackSolver.extendBasisWithSlacks(prev: Basis, model: LpModel, 
     }
     val basicVars = IntArray(newRows)
     prev.basicVars.copyInto(basicVars)
-    val status = IntArray(model.numVars)
+    val status = Array(model.numVars) { VarStatus.BASIC }
     prev.status.copyInto(status)
     for (i in prevRows until newRows) {
         basicVars[i] = n + i // the new row i's slack column
@@ -604,7 +604,7 @@ internal fun BacktrackSolver.applyReducedCostFixing(
                 }
             }
 
-            else -> continue
+            VarStatus.BASIC -> continue
         }
         if (res is PropagationResult.Unsat) {
             sink.observeLpPrune()
