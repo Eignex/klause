@@ -223,10 +223,12 @@ class AllFactorsOracleTest {
         )
     }
 
-    @Test fun `element with a constant array passes the propagation and repair oracles with an exact probe`() {
-        // result(0) = arr[idx(1)], arr = [5,7,9] constants, idx 1-based ∈ [1,3].
+    @Test fun `element with a constant array is GAC and passes the repair oracle with an exact probe`() {
+        // result(0) = arr[idx(1)], arr = [5,7,9] constants, idx 1-based ∈ [1,3]. The constant
+        // array is filtered to full GAC: result loses the gaps 6 and 8 (no position holds them),
+        // and an idx position is dropped whenever its constant falls in a result hole.
         val f = Element(idx = 1, result = 0, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1)
-        check(f, intDomains = arrayOf(IntDomain(4, 10), IntDomain(0, 4)), exactProbe = true)
+        check(f, intDomains = arrayOf(IntDomain(4, 10), IntDomain(0, 4)), exactProbe = true, gac = true)
     }
 
     @Test fun `element with a variable array passes the propagation and repair oracles with an exact probe`() {
