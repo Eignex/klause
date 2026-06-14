@@ -43,10 +43,10 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       - name: Assemble
-        run: ./gradlew --no-daemon assemble -PciVersion=${{ env.RELEASE_VERSION }}
+        run: ./gradlew --no-daemon assemble -Ptargets.full -PciVersion=${{ env.RELEASE_VERSION }}
 
       - name: Build and Test
-        run: ./gradlew --no-daemon build -PciVersion=${{ env.RELEASE_VERSION }} --max-workers=2
+        run: ./gradlew --no-daemon build -Ptargets.full -PciVersion=${{ env.RELEASE_VERSION }} --max-workers=2
         env:
           CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
 
@@ -72,7 +72,7 @@ jobs:
       # CLI release assets: stripped native executables (linux x64/arm64 — the
       # host-linkable targets), the JVM dist zip, and SHA256SUMS.
       - name: Build CLI release assets
-        run: ./gradlew --no-daemon :klause-cli:releaseAssets -PciVersion=${{ env.RELEASE_VERSION }}
+        run: ./gradlew --no-daemon :klause-cli:releaseAssets -Ptargets.full -PciVersion=${{ env.RELEASE_VERSION }}
 
       - name: Detect pre-release
         run: |
