@@ -19,6 +19,11 @@ class ReifiedPseudoBoolean(override val auxBoolVar: Int, weights: IntArray, lite
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
 
+    /** [PseudoBoolean.structuralKey] plus the reifying [auxBoolVar]; the `rpb` prefix keeps it disjoint
+     *  from a bare pseudo-Boolean's key (#443). */
+    override fun structuralKey(): String = "rpb:$auxBoolVar:$op:$bound:" +
+        literals.indices.sortedBy { literals[it] }.joinToString(",") { "${literals[it]}=${weights[it]}" }
+
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
 
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])

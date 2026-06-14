@@ -55,6 +55,12 @@ class NValue(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         NValue(intMap[n], xs.remapVars(intMap), mode, presents.remapLits(boolMap))
 
+    /** The distinct-value count ignores the order of [xs], so the counted vars are sorted (paired with
+     *  their presence literal to keep an opt position with its presence); [n] (the count var) and
+     *  [mode] are positional constants (#443). */
+    override fun structuralKey(): String = "nvalue:$mode:$n:" +
+        xs.indices.sortedBy { xs[it] }.joinToString(",") { "${xs[it]}/${presents.getOrElse(it) { -1 }}" }
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = xs + intArrayOf(n)
 

@@ -20,6 +20,10 @@ class ReifiedCardinality(override val auxBoolVar: Int, literals: IntArray, min: 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)
 
+    /** [Cardinality.structuralKey] plus the reifying [auxBoolVar]; the `rcard` prefix keeps it disjoint
+     *  from a bare cardinality's key (#443). */
+    override fun structuralKey(): String = "rcard:$auxBoolVar:$min:$max:" + literals.sorted().joinToString(",")
+
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
 
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])

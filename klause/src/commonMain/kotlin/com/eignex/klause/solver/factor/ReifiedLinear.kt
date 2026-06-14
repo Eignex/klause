@@ -33,6 +33,13 @@ class ReifiedLinear private constructor(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedLinear(boolMap[auxBoolVar], coeffs, vars.remapVars(intMap), op, bound)
 
+    /** [Linear.structuralKey] plus the reifying [auxBoolVar]; the `rlin` prefix keeps it disjoint from
+     *  a bare linear's key, so a reified row and an asserted one never share a bucket (#443). */
+    override fun structuralKey(): String =
+        "rlin:$auxBoolVar:$op:$bound:" + vars.indices.sortedBy { vars[it] }.joinToString(
+            ",",
+        ) { "${vars[it]}=${coeffs[it]}" }
+
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
 
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
