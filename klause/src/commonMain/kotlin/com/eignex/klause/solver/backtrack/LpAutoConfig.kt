@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
@@ -52,8 +53,9 @@ import com.eignex.klause.solver.lp.schedulingViews
  *
  * The LP-relaxation flags are additionally gated by a **size guard**: the dual simplex keeps a
  * dense `m × (n + m + 1)` Long tableau per node, so the auto path declines models whose estimated
- * tableau exceeds [MAX_AUTO_TABLEAU_CELLS] (a memory/feasibility bound, not a tuning judgement —
- * the engine is purpose-built for small dense per-node LPs). The estimate folds in each enabled
+ * tableau exceeds [KlauseConfig.lpMaxTableauCells] (a memory/feasibility bound, not a tuning
+ * judgement — the engine is purpose-built for small dense per-node LPs; raise the cap via its env
+ * once a sparser solve can afford bigger relaxations). The estimate folds in each enabled
  * gated hull's columns/rows (circuit / element / table / nvalue / time-indexed) and accepts them
  * smallest-first under the budget, so a stack of hulls is shed rather than allowed to defeat the
  * guard (#484). The Lagrangian and energetic bounds have their own internal caps and are not
@@ -64,14 +66,6 @@ import com.eignex.klause.solver.lp.schedulingViews
  * directly for ahead-of-time configuration (the bench's auto mode).
  */
 object LpAutoConfig {
-
-    /**
-     * Auto-enable ceiling on the estimated dense-tableau size `rows × (cols + rows + 1)`, in Long
-     * cells (8 bytes each — the cap is ~8 MB per node LP). The estimate counts the base relaxation's
-     * rows/cols **and** every enabled gated-hull's columns/rows (#484); cut rows are separated lazily
-     * per node and bounded by the cut-round caps, so they are not pre-counted here.
-     */
-    const val MAX_AUTO_TABLEAU_CELLS: Long = 1L shl 20
 
     /**
      * Per-check operation budget the auto-derived [BacktrackParams.energeticEvery] normalises to:
@@ -163,7 +157,9 @@ object LpAutoConfig {
         val makespanPlans = if (scheduling) CumulativeRelaxation(problem).plans.size else 0
         rows += makespanPlans.toLong()
         val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
-        val baseFits = tableauCells(rows, baseCols) <= MAX_AUTO_TABLEAU_CELLS
+        // Cost guard: the configurable dense-tableau ceiling (env-tunable via KlauseConfig).
+        val maxCells = KlauseConfig.current.lpMaxTableauCells
+        val baseFits = tableauCells(rows, baseCols) <= maxCells
 
         val cutEligible = allDifferent || globalCardinality
         val makespanLp = baseFits && makespanPlans > 0
@@ -192,7 +188,7 @@ object LpAutoConfig {
                 }
             }
         }
-        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates)
+        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, maxCells)
 
         val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
@@ -233,14 +229,19 @@ object LpAutoConfig {
     private class HullEstimate(val key: LpTechnique, val cols: Long, val rows: Long)
 
     /** Accept hulls smallest-first while the combined `base + accepted` tableau stays under
-     *  [MAX_AUTO_TABLEAU_CELLS]; the rest are shed (their flag stays off), so a stack of hulls can't
-     *  push the per-node LP past the budget (#484). */
-    private fun acceptUnderBudget(baseRows: Long, baseCols: Long, candidates: List<HullEstimate>): Set<LpTechnique> {
+     *  [maxCells] (the configurable [KlauseConfig.lpMaxTableauCells]); the rest are shed (their flag
+     *  stays off), so a stack of hulls can't push the per-node LP past the budget (#484). */
+    private fun acceptUnderBudget(
+        baseRows: Long,
+        baseCols: Long,
+        candidates: List<HullEstimate>,
+        maxCells: Long,
+    ): Set<LpTechnique> {
         var r = baseRows
         var c = baseCols
         val accepted = HashSet<LpTechnique>()
         for (h in candidates.sortedBy { it.cols + it.rows }) {
-            if (tableauCells(r + h.rows, c + h.cols) <= MAX_AUTO_TABLEAU_CELLS) {
+            if (tableauCells(r + h.rows, c + h.cols) <= maxCells) {
                 r += h.rows
                 c += h.cols
                 accepted.add(h.key)

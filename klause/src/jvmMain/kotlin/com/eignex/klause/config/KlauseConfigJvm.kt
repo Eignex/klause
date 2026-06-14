@@ -28,6 +28,11 @@ fun klauseConfigFromEnv(base: KlauseConfig = KlauseConfig.current): KlauseConfig
         unboundedIntHi = int("klause.fzn.unboundedIntHi", "KLAUSE_FZN_UNBOUNDED_INT_HI", base.unboundedIntHi),
         floatBuckets = int("klause.floatBuckets", "KLAUSE_FLOAT_BUCKETS", base.floatBuckets),
         floatScale = long("klause.floatScale", "KLAUSE_FLOAT_SCALE", base.floatScale),
+        lpMaxTableauCells = long(
+            "klause.fzn.lpMaxTableauCells",
+            "KLAUSE_FZN_LP_MAX_TABLEAU_CELLS",
+            base.lpMaxTableauCells,
+        ),
     )
 }
 

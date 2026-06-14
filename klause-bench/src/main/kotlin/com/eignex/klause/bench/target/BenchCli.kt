@@ -40,11 +40,8 @@ object BenchCli {
     fun main(args: Array<String>) {
         when (val cmd = args.firstOrNull() ?: "list") {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
-
             "solve" -> run(args.drop(1), preview = false)
-
             "preview" -> run(args.drop(1), preview = true)
-
             else -> error("unknown command '$cmd' (commands: solve, preview, list)")
         }
     }
