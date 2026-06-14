@@ -20,6 +20,12 @@ const val DEFAULT_FLOAT_BUCKETS: Int = 1024
  *  bounds are multiplied by this and rounded to integers. */
 const val DEFAULT_FLOAT_SCALE: Long = 1_000_000L
 
+/** Default ceiling on the estimated dense per-node LP tableau (`rows × (cols + rows + 1)` cells)
+ *  above which `LpAutoConfig` declines to auto-enable LP bounding — a memory/throughput bound for
+ *  the dense simplex (~8 MB/node at `2^20`). Raise it (env below) once a sparser solve can afford
+ *  bigger relaxations; the bound stays sound either way, so the ceiling is purely a cost guard. */
+const val DEFAULT_LP_MAX_TABLEAU_CELLS: Long = 1L shl 20
+
 /**
  * Central, process-wide configuration for klause's core (compiler + frontends).
  *
@@ -72,6 +78,12 @@ data class KlauseConfig(
     /** Fixed-point scale used by the FlatZinc float-linear lowering (real coefficients and
      *  bounds are multiplied by this and rounded to integers). Env: `KLAUSE_FLOAT_SCALE`. */
     val floatScale: Long = DEFAULT_FLOAT_SCALE,
+
+    /** Ceiling on the estimated dense per-node LP tableau cell count above which `LpAutoConfig`
+     *  declines to auto-enable LP bounding (see [DEFAULT_LP_MAX_TABLEAU_CELLS]). A pure cost guard —
+     *  the bound is always sound — so raising it trades node throughput for LP reach on big models.
+     *  Env: `KLAUSE_FZN_LP_MAX_TABLEAU_CELLS` / `klause.fzn.lpMaxTableauCells`. */
+    val lpMaxTableauCells: Long = DEFAULT_LP_MAX_TABLEAU_CELLS,
 
     // Presolve: an emphasis level plus one tri-state override knob per pass (`true` forces the pass
     // on, `false` off, `null` defers to the emphasis). Assembled into a [PresolveConfig] via

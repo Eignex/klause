@@ -1,10 +1,10 @@
 package com.eignex.klause.bench.tools
 
 import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.le
 import com.eignex.klause.schema.not
-import com.eignex.klause.schema.VariableSchema
 import com.eignex.skema.SchemaDef
 import com.eignex.skema.schemaJsonConfig
 import kotlinx.serialization.json.Json

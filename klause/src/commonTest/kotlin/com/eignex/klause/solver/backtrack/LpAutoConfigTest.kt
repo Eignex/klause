@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -42,6 +43,23 @@ class LpAutoConfigTest {
         assertFalse(r.lpCutPool)
         assertFalse(r.lagrangian)
         assertFalse(r.energeticReasoning)
+    }
+
+    @Test
+    fun `the configurable tableau cap gates auto bounding`() {
+        // #570: KlauseConfig.lpMaxTableauCells is the env-tunable dense-tableau ceiling. A tiny cap
+        // disables auto LP even on linear structure; a huge cap re-enables it. The bound is sound
+        // either way — this is purely the cost guard.
+        val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L)
+            assertFalse(LpAutoConfig.recommend(p).lpBounding, "a 1-cell cap must disable auto LP")
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
+            assertTrue(LpAutoConfig.recommend(p).lpBounding, "an unbounded cap must enable auto LP")
+        } finally {
+            KlauseConfig.current = saved
+        }
     }
 
     @Test

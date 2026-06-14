@@ -274,8 +274,4 @@ internal object SolverInvocation {
  *  which it was found. The ordered list across a solve is the per-arm credit signal (which arm got
  *  the first incumbent, held the last/best, how many it contributed). */
 @Serializable
-internal data class Attribution(
-    val label: String,
-    val objective: Double?,
-    val elapsedMs: Long,
-)
+internal data class Attribution(val label: String, val objective: Double?, val elapsedMs: Long)
