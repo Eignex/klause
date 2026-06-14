@@ -215,7 +215,7 @@ enum class PresolvePass(
         /** The pass whose [id] equals [id], or `null` if none matches. */
         fun fromId(id: String): PresolvePass? = entries.firstOrNull { it.id == id }
 
-        /** Canonical ids joined for error messages: `strengthen | affine | … | symmetry | …`. */
+        /** Canonical pass ids joined for `--help` / error messages: `strengthen | affine | …`. */
         fun ids(): String = entries.joinToString(" | ") { it.id }
     }
 }
@@ -227,35 +227,51 @@ enum class PresolvePass(
  * [PresolveConfig] sit on top of the level.
  */
 enum class PresolveEmphasis(
+    /** Canonical token shown in `--presolve` / `--help` and error messages. */
+    val id: String,
     /** Cost tiers this level lets run. */
     val timings: Set<PresolveTiming>,
     /** Round-to-fixpoint cap (`0` = no presolve, `1` = a single non-iterating pass). */
     val maxRounds: Int,
+    /** Accepted spellings besides [id]. */
+    private val aliases: List<String> = emptyList(),
 ) {
     /** No presolve. */
-    OFF(emptySet(), 0),
+    OFF("off", emptySet(), 0, aliases = listOf("none")),
 
     /** Cheap FAST reductions only, applied once — no symmetry, no iteration. */
-    CONSERVATIVE(setOf(PresolveTiming.FAST), 1),
+    CONSERVATIVE("conservative", setOf(PresolveTiming.FAST), 1, aliases = listOf("fast")),
 
     /** FAST + MEDIUM (adds symmetry), iterated to a fixpoint. The shipped default. */
-    DEFAULT(setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM), MAX_PRESOLVE_ROUNDS),
+    DEFAULT(
+        "default",
+        setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM),
+        MAX_PRESOLVE_ROUNDS,
+        aliases = listOf("auto"),
+    ),
 
     /** FAST + MEDIUM + EXHAUSTIVE (adds SAC probing), iterated to a fixpoint. */
-    AGGRESSIVE(setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM, PresolveTiming.EXHAUSTIVE), MAX_PRESOLVE_ROUNDS),
+    AGGRESSIVE(
+        "aggressive",
+        setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM, PresolveTiming.EXHAUSTIVE),
+        MAX_PRESOLVE_ROUNDS,
+    ),
     ;
 
-    /** Spec-string parsing for the emphasis level. */
+    /** Token lookup and the id listing for spec parsing / help (single source of truth). */
     companion object {
+        private val byToken: Map<String, PresolveEmphasis> =
+            entries.flatMap { e -> (listOf(e.id) + e.aliases).map { it to e } }.toMap()
+
         /** `null`/blank/`default`/`auto` → [DEFAULT]; `off`/`none` → [OFF]; `conservative`/`fast` →
          *  [CONSERVATIVE]; `aggressive` → [AGGRESSIVE]; otherwise `null`. */
-        fun fromId(id: String?): PresolveEmphasis? = when (id?.trim()?.lowercase()) {
-            null, "", "default", "auto" -> DEFAULT
-            "off", "none" -> OFF
-            "conservative", "fast" -> CONSERVATIVE
-            "aggressive" -> AGGRESSIVE
-            else -> null
+        fun fromId(id: String?): PresolveEmphasis? {
+            val token = id?.trim()?.lowercase()
+            return if (token.isNullOrEmpty()) DEFAULT else byToken[token]
         }
+
+        /** Canonical ids joined for `--help` / error messages: `off | conservative | default | aggressive`. */
+        fun ids(): String = entries.joinToString(" | ") { it.id }
     }
 }
 
