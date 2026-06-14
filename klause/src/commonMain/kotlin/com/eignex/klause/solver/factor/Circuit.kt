@@ -132,14 +132,19 @@ class Circuit(
         //    can never be extended into a Hamiltonian — fail. This also catches
         //    "all-singletons assignments" that the search committed to.
         val visited = BooleanArray(n)
+        // `posOnPath[node]` = its index in the current walk, or -1 if not on it. A dense marker
+        // hoisted out of the loop: it both replaces the per-start `onPath` BooleanArray (one alloc
+        // total, not one per start) and yields the cycle-start index in O(1), versus the old
+        // `path.indexOf(cur)` linear scan. Only the touched nodes are reset between walks.
+        val posOnPath = IntArray(n) { -1 }
+        val path = IntArrayList()
         for (start in 0 until n) {
             if (visited[start]) continue
-            val path = IntArrayList()
-            val onPath = BooleanArray(n)
+            path.clear()
             var cur = start
-            while (cur in 0 until n && !visited[cur] && !onPath[cur]) {
+            while (cur in 0 until n && !visited[cur] && posOnPath[cur] < 0) {
+                posOnPath[cur] = path.size
                 path.add(cur)
-                onPath[cur] = true
                 val sV = succ[cur]
                 val sD = state.intDomains[sV]
                 if (sD.min != sD.max) {
@@ -148,12 +153,14 @@ class Circuit(
                 } // not singleton; chain ends here
                 cur = sD.min
             }
-            if (cur in 0 until n && onPath[cur]) {
-                val cycleStartIdx = path.indexOf(cur)
-                val cycleLen = path.size - cycleStartIdx
+            if (cur in 0 until n && posOnPath[cur] >= 0) {
+                val cycleLen = path.size - posOnPath[cur]
                 if (cycleLen < n) return false
             }
-            for (k in 0 until path.size) visited[path[k]] = true
+            for (k in 0 until path.size) {
+                visited[path[k]] = true
+                posOnPath[path[k]] = -1
+            }
         }
         // 6. Chain analysis: for each non-singleton, walk backward via pred[] to chain
         //    start; forbid (or force) chain start as successor.
@@ -237,21 +244,28 @@ class Circuit(
             val s = state.assignment.intValue(succ[i])
             if (s < 0 || s >= n || s == i) -1 else s
         }
+        // `posOnPath[node]` = its index in the current walk, -1 if not on it. Replaces the
+        // `pathBuf.contains(cur)` per-step O(n) scan (and the `indexOf`) with O(1) lookups; one
+        // shared array reset only on touched nodes, instead of an IntArrayList per start.
+        val posOnPath = IntArray(n) { -1 }
+        val pathBuf = IntArrayList()
         for (start in 0 until n) {
             if (cycleOf[start] != unvisited) continue
             // Walk; detect cycle.
-            val pathBuf = IntArrayList()
+            pathBuf.clear()
             var cur = start
-            while (cur >= 0 && cycleOf[cur] == unvisited && !pathBuf.contains(cur)) {
+            while (cur >= 0 && cycleOf[cur] == unvisited && posOnPath[cur] < 0) {
+                posOnPath[cur] = pathBuf.size
                 pathBuf.add(cur)
                 cur = effective[cur]
             }
-            if (cur >= 0 && pathBuf.contains(cur)) {
-                val cycleStartIdx = pathBuf.indexOf(cur)
+            if (cur >= 0 && posOnPath[cur] >= 0) {
+                val cycleStartIdx = posOnPath[cur]
                 for (idx in cycleStartIdx until pathBuf.size) cycleOf[pathBuf[idx]] = cycleId
                 cycleId++
             }
             // Nodes outside any cycle (in tails) stay at unvisited; ignored for swaps.
+            for (k in 0 until pathBuf.size) posOnPath[pathBuf[k]] = -1
         }
         if (cycleId < 2) return // single cycle (or none) — no merge swaps.
         // Pick up to MAX_SWAP_CANDIDATES cross-cycle pairs.

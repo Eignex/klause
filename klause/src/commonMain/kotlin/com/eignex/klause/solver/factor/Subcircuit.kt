@@ -136,23 +136,31 @@ class Subcircuit(
         //    included they can never join it, so the assignment is infeasible. Catches premature
         //    fully-pinned cycles, including two disjoint pinned cycles.
         val visited = BooleanArray(n)
+        // `posOnPath[node]` = its index in the current walk, or -1 if not on it. A dense marker
+        // hoisted out of the loop: replaces the per-start `onPath` BooleanArray (one alloc total)
+        // and gives the cycle-start index in O(1) instead of `path.indexOf(cur)`. Only the touched
+        // nodes are reset between walks.
+        val posOnPath = IntArray(n) { -1 }
+        val path = IntArrayList()
         for (s in 0 until n) {
             if (visited[s]) continue
-            val path = IntArrayList()
-            val onPath = BooleanArray(n)
+            path.clear()
             var cur = s
-            while (cur in 0 until n && !visited[cur] && !onPath[cur]) {
+            while (cur in 0 until n && !visited[cur] && posOnPath[cur] < 0) {
                 val d = state.intDomains[succ[cur]]
                 if (d.min != d.max || d.min == cur) break // non-singleton or self-loop ends the chain
+                posOnPath[cur] = path.size
                 path.add(cur)
-                onPath[cur] = true
                 cur = d.min
             }
-            if (cur in 0 until n && onPath[cur]) {
-                val cycleLen = path.size - path.indexOf(cur)
+            if (cur in 0 until n && posOnPath[cur] >= 0) {
+                val cycleLen = path.size - posOnPath[cur]
                 if (includedCount > cycleLen) return false
             }
-            for (k in 0 until path.size) visited[path[k]] = true
+            for (k in 0 until path.size) {
+                visited[path[k]] = true
+                posOnPath[path[k]] = -1
+            }
         }
         // 6. Chain-walk forbid: for each open (non-singleton) node, follow its fixed-predecessor
         //    chain back to the start. Closing succ[i] onto that start would seal a cycle of
