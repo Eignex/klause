@@ -515,6 +515,10 @@ class BacktrackSolver(override val problem: Problem) :
                     // Import any nogoods already in the shared pool (cross-arm); the session persists for
                     // the whole search, so this arm's own clauses are never lost between slices.
                     params.clauseExchange?.onSearchStart(session)
+                    // Record the pre-search root LP bound once for the integrality-gap metric: search
+                    // only bounds from level 1 down, so this one-shot solve is the sole root capture.
+                    val relaxer = lpRelaxer
+                    if (relaxer != null) sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts))
                 }
             }
         }

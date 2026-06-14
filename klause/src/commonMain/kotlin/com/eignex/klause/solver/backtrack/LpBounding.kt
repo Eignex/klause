@@ -214,6 +214,7 @@ internal fun BacktrackSolver.lpBoundAndFix(
     globalCuts: List<Cut>,
     seedTableau: DualSimplex?,
 ): LpNodeOutcome = try {
+    sink.lpClockStart()
     lpBoundAndFixUnsafe(
         relaxer, session, bound, sink, warmBasis, params, separators, hints,
         objectiveVar, objectiveAscending, globalCuts, seedTableau,
@@ -222,6 +223,27 @@ internal fun BacktrackSolver.lpBoundAndFix(
     // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
     // bound or reduction only loses pruning, never soundness — keep the node and move on.
     LpNodeOutcome(false, null)
+} finally {
+    sink.lpClockStop()
+}
+
+/** The LP relaxation's objective value (optimum + constant) when optimal, else NaN — the value
+ *  [SolveStatsSink.observeRootLpBound] records as the root bound. */
+private fun lpObjectiveOf(solution: LpSolution, relaxation: LpRelaxation): Double =
+    if (solution.status == LpStatus.OPTIMAL) solution.objectiveValue + relaxation.objectiveConstant else Double.NaN
+
+/**
+ * The root-node LP relaxation objective (with the harvested [globalCuts]) on the undecided problem,
+ * or NaN when the relaxation is empty / not optimal / overflows. Solved once before search, so no
+ * decision tightens a domain and the value is a sound *global* lower bound on the objective — the
+ * baseline for the integrality-gap measurement surfaced in `-s`. Search bounds only from level 1
+ * down, so without this one-shot solve the true root bound would never be recorded.
+ */
+internal fun BacktrackSolver.rootLpRelaxationBound(relaxer: CpToLpRelaxation, globalCuts: List<Cut>): Double = try {
+    val relaxation = relaxer.build(PropagationSession(problem), globalCuts)
+    if (relaxation.model.n == 0) Double.NaN else lpObjectiveOf(DualSimplex(relaxation.model).solve(), relaxation)
+} catch (_: LpOverflowException) {
+    Double.NaN
 }
 
 /** The Farkas nogood for an infeasible node LP (#247), or null when learning is off / no
@@ -275,6 +297,7 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
 ): LpNodeOutcome {
     var relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null) // empty relaxation
+    sink.observeLpSolve()
     var simplex = DualSimplex(relaxation.model)
     // Float fast-path (#18): with no parent basis to warm from, a quick double-precision solve
     // supplies a candidate basis for the exact solver to certify. Sound regardless — the exact
@@ -284,6 +307,7 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
     var solution = simplex.solve(startBasis, seedTableau)
     if (simplex.lastSolveSeeded) sink.observeLpSeeded()
     sink.observeLpPivots(solution.pivots)
+    sink.observeRootLpBound(session.decisionLevel, lpObjectiveOf(solution, relaxation))
     // Warm-start children from the initial (pre-cut) basis and tableau: cut rows vary per node,
     // but the base model structure is identical across nodes, so only this state transfers.
     val warmCache = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
@@ -295,7 +319,7 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
 
     when (solution.status) {
         LpStatus.INFEASIBLE -> {
-            sink.observeLpPrune()
+            sink.observeLpInfeasiblePrune()
             return LpNodeOutcome(true, null, lpExplanation(params, relaxation, solution, session))
         }
 
@@ -348,11 +372,12 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
             solution = simplex.solve(warmStart, lastSimplex)
             if (simplex.lastSolveSeeded) sink.observeLpSeeded()
             sink.observeLpPivots(solution.pivots)
+            sink.observeRootLpBound(session.decisionLevel, lpObjectiveOf(solution, relaxation))
             prevBasis = if (solution.status == LpStatus.OPTIMAL) solution.basis else null
             prevRows = relaxation.model.m
             if (solution.status == LpStatus.OPTIMAL) lastSimplex = simplex
             if (solution.status == LpStatus.INFEASIBLE) {
-                sink.observeLpPrune()
+                sink.observeLpInfeasiblePrune()
                 return LpNodeOutcome(
                     true,
                     warmCache,
@@ -440,9 +465,10 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
         prevRows = relaxation.model.m
         if (solution.status == LpStatus.OPTIMAL) lastSimplex = simplex
         sink.observeLpPivots(solution.pivots)
+        sink.observeRootLpBound(session.decisionLevel, lpObjectiveOf(solution, relaxation))
         when (solution.status) {
             LpStatus.INFEASIBLE -> {
-                sink.observeLpPrune()
+                sink.observeLpInfeasiblePrune()
                 return LpNodeOutcome(
                     true,
                     warmCache,

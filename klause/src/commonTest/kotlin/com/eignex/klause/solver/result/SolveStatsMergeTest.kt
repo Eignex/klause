@@ -41,6 +41,34 @@ class SolveStatsMergeTest {
     }
 
     @Test
+    fun `lp counters add and root bound takes the tightest finite`() {
+        val a = SolveStats(
+            backend = "backtrack",
+            lpSolves = SumResult(8.0),
+            lpPruned = SumResult(5.0),
+            lpInfeasible = SumResult(2.0),
+            rootLpBound = 12.0,
+            lpMs = 4L,
+        )
+        val b = SolveStats(
+            backend = "backtrack",
+            lpSolves = SumResult(3.0),
+            lpPruned = SumResult(1.0),
+            lpInfeasible = SumResult(1.0),
+            rootLpBound = 15.0,
+            lpMs = 6L,
+        )
+        val m = a.mergedWith(b)
+        assertEquals(11.0, m.lpSolves.sum)
+        assertEquals(6.0, m.lpPruned.sum)
+        assertEquals(3.0, m.lpInfeasible.sum)
+        assertEquals(15.0, m.rootLpBound) // same root across workers ⇒ tightest finite bound
+        assertEquals(10L, m.lpMs)
+        // NaN root bound defers to the finite side.
+        assertEquals(12.0, a.mergedWith(SolveStats(backend = "backtrack", lpSolves = SumResult(1.0))).rootLpBound)
+    }
+
+    @Test
     fun `zero-weight mean defers to the populated side`() {
         val a = stats("ls", nodes = 0.0, peak = Double.NEGATIVE_INFINITY, weights = 0.0, mean = Double.NaN, wallMs = 5L)
         val b = stats("ls", nodes = 2.0, peak = 3.0, weights = 4.0, mean = 1.5, wallMs = 1L)
