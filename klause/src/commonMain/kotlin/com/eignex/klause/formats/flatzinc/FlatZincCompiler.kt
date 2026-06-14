@@ -100,6 +100,8 @@ internal class FlatZincCompiler(
             probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
             probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
             probeIntHoles = holes,
+            probeBudgetPerVar = presolve.probeBudgetPerVar(),
+            probeTotalBudget = presolve.probeTotalBudget(),
         )
         return FlatZincProgram(
             problem = problem,
