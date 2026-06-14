@@ -31,6 +31,7 @@ import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -86,6 +87,15 @@ class SymmetryBreakingTest {
     }
 
     private fun pos(v: Int) = Lit.make(v, true)
+
+    /** The value transposition `(v w)` as a relabel map. */
+    private fun swap(v: Int, w: Int): (Int) -> Int = { x ->
+        when (x) {
+            v -> w
+            w -> v
+            else -> x
+        }
+    }
 
     @Test
     fun `law-lee value precedence collapses value-symmetric solutions`() {
@@ -655,5 +665,92 @@ class SymmetryBreakingTest {
             ),
         )
         checkBreakingSound("disjunctive-blocks", problem)
+    }
+
+    @Test
+    fun `regular remapValues permutes the symbol axis`() {
+        // δ(1,1)=2, δ(1,2)=1, δ(2,*)=0. Swapping symbols 1↔2 swaps the two columns of each state row
+        // (#536): new δ(1,1)=old δ(1,2)=1, new δ(1,2)=old δ(1,1)=2.
+        val r = Regular(
+            intArrayOf(0),
+            numStates = 2,
+            alphabetSize = 2,
+            transitions = intArrayOf(2, 1, 0, 0),
+            q0 = 1,
+            accepting = intArrayOf(2),
+        )
+        val swapped = r.remapValues(swap(1, 2)) as Regular
+        assertEquals(listOf(1, 2, 0, 0), swapped.transitions.toList())
+        // A non-permutation of 1..alphabetSize can't relabel the columns ⇒ null.
+        assertNull(r.remapValues { 1 })
+    }
+
+    @Test
+    fun `mdd remapValues relabels record symbols`() {
+        // One record (from=0, symbol=1, to=0); swapping 1↔2 maps the symbol field to 2 (#536).
+        val m = Mdd(
+            intArrayOf(0),
+            intArrayOf(1, 1),
+            intArrayOf(0, 1),
+            intArrayOf(0, 1, 0),
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 3,
+        )
+        val swapped = m.remapValues(swap(1, 2)) as Mdd
+        assertEquals(listOf(0, 2, 0), swapped.transitions.toList())
+    }
+
+    @Test
+    fun `value symmetry fires on a symbol-symmetric regular`() {
+        // A 1-state automaton that self-loops on both symbols accepts every sequence, so symbols 1,2
+        // are interchangeable. Regular.remapValues (column swap) verifies the swap, and the value
+        // symmetry pins an internal seq var to the orbit minimum (#536).
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
+            listOf(
+                Regular(
+                    intArrayOf(0, 1),
+                    numStates = 1,
+                    alphabetSize = 2,
+                    transitions = intArrayOf(1, 1),
+                    q0 = 1,
+                    accepting = intArrayOf(1),
+                ),
+            ),
+        )
+        checkSound("regular-value", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `an asymmetric regular has no value symmetry`() {
+        // δ(1,1)=1 (stay accepting), δ(1,2)=0 (dead): only symbol 1 is ever valid, so swapping 1↔2 is
+        // not a symmetry — nothing is broken. (seq var 1 stays free of the accepting constraint.)
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(1, 2)),
+            listOf(
+                Regular(
+                    intArrayOf(0),
+                    numStates = 1,
+                    alphabetSize = 2,
+                    transitions = intArrayOf(1, 0),
+                    q0 = 1,
+                    accepting = intArrayOf(1),
+                ),
+            ),
+        )
+        checkSound("regular-asymmetric", problem, expectReduced = false)
+    }
+
+    @Test
+    fun `element does not support value relabeling`() {
+        // Element's idx is a variable that selects which constant is read; the value-symmetry verifier
+        // relabels constants and can't model that coupling, so remapValues must stay null (#536).
+        val e = Element(idx = 0, result = 1, arr = intArrayOf(7, 8), arrIsVars = false, indexOffset = 1)
+        assertNull(e.remapValues { it })
     }
 }

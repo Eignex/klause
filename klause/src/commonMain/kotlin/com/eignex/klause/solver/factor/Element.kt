@@ -51,6 +51,14 @@ class Element(
     // Elements never collide (a coarser key would let symmetry verification accept a false swap).
     override fun structuralKey(): String = "element:$arrIsVars:$indexOffset:$idx:$result:" + arr.joinToString(",")
 
+    // No remapValues override (value symmetry stays blocked when an Element is present, #536): the
+    // value-symmetry verifier relabels a factor's value *constants* and compares keys, but `idx` is a
+    // *variable* whose value selects which constant is read. A swap of two idx positions leaves the
+    // constant array unchanged, so the verifier would (wrongly) accept it as a value symmetry. Since
+    // remapValues only sees the factor, not idx's domain, it can't tell positions from values — so it
+    // must conservatively return `null` (the default). Regular/Mdd are sound because their seq values
+    // *are* the relabelable symbols, with no such positional coupling.
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)

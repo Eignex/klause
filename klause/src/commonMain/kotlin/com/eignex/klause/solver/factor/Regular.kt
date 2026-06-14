@@ -56,9 +56,32 @@ class Regular(
 
     /** Position-faithful (seq position i matters): keeps the sequence vars in order and folds in the
      *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting states
-     *  (#531). The symbol-relabeling value side is left to a follow-up. */
+     *  (#531). */
     override fun structuralKey(): String = "regular:$numStates:$alphabetSize:$q0:${transitions.joinToString(",")}:" +
         "${accepting.joinToString(",")}:${seq.joinToString(",")}"
+
+    /** Symbol-alphabet relabeling (#536): the `seq` values *are* the symbols, so a value permutation
+     *  permutes the transition table's symbol axis — `δ'(q, valueMap(s)) = δ(q, s)`. Sound because
+     *  Regular has no positional-variable/constant coupling (unlike Element): swapping symbol values in
+     *  a sequence and the matching columns preserves acceptance exactly. Returns `null` if [valueMap]
+     *  is not a permutation of `1..alphabetSize` (then it can't relabel this automaton's columns). */
+    override fun remapValues(valueMap: (Int) -> Int): Factor? {
+        val target = IntArray(alphabetSize + 1) // 1-based symbols
+        val seen = BooleanArray(alphabetSize + 1)
+        for (s in 1..alphabetSize) {
+            val t = valueMap(s)
+            if (t < 1 || t > alphabetSize || seen[t]) return null
+            seen[t] = true
+            target[s] = t
+        }
+        val newTransitions = IntArray(transitions.size)
+        for (q in 1..numStates) {
+            for (s in 1..alphabetSize) {
+                newTransitions[(q - 1) * alphabetSize + (target[s] - 1)] = transitions[(q - 1) * alphabetSize + (s - 1)]
+            }
+        }
+        return Regular(seq, numStates, alphabetSize, newTransitions, q0, accepting)
+    }
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = seq

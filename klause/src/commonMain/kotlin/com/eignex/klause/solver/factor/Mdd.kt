@@ -71,6 +71,21 @@ class Mdd(
         "${layerStarts.joinToString(",")}:${transitions.joinToString(",")}:" +
         "${accepting.joinToString(",")}:${seq.joinToString(",")}"
 
+    /** Symbol relabeling (#536): each transition record is `(fromState, symbol, toState[, cost])`, so a
+     *  value permutation maps the symbol field of every record. Sound — the `seq` values are the
+     *  symbols and there is no positional-variable/constant coupling (unlike Element). No bijection
+     *  check is needed: records carry the symbol explicitly, so any map yields a valid diagram and the
+     *  verification's key comparison decides whether the relabeling is actually a symmetry. */
+    override fun remapValues(valueMap: (Int) -> Int): Factor {
+        val newTransitions = transitions.copyOf()
+        var p = 0
+        while (p < newTransitions.size) {
+            newTransitions[p + 1] = valueMap(newTransitions[p + 1])
+            p += recordStride
+        }
+        return Mdd(seq, numStatesPerLayer, layerStarts, newTransitions, initial, accepting, recordStride, cost)
+    }
+
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
 
