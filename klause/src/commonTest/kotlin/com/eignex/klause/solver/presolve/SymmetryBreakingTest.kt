@@ -9,13 +9,18 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
+import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Diffn
+import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Inverse
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
@@ -570,5 +575,85 @@ class SymmetryBreakingTest {
             ),
         )
         checkBreakingSound("rlin-blocks", problem)
+    }
+
+    @Test
+    fun `global factors have collision-free structural keys`() {
+        // #531: keys for the scheduling / automaton globals must distinguish every constant and the
+        // variable order, or symmetry verification could accept a false automorphism.
+        fun distinct(a: Factor, b: Factor, why: String) = assertNotEquals(a.structuralKey(), b.structuralKey(), why)
+
+        // Cumulative: capacity, the constant duration/resource arrays, the var/const split, and order.
+        val cum = Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(1, 1), 2)
+        distinct(cum, Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(1, 1), 3), "capacity")
+        distinct(cum, Cumulative(intArrayOf(0, 1), intArrayOf(1, 2), intArrayOf(1, 1), 2), "duration")
+        distinct(cum, Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(2, 1), 2), "resource")
+        distinct(cum, Cumulative(intArrayOf(1, 0), intArrayOf(1, 1), intArrayOf(1, 1), 2), "start order")
+        distinct(
+            cum,
+            Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(1, 1), 2, capacityVar = 5),
+            "capacityVar",
+        )
+
+        // Disjunctive.
+        val dis = Disjunctive(intArrayOf(0, 1), intArrayOf(1, 1))
+        distinct(dis, Disjunctive(intArrayOf(0, 1), intArrayOf(1, 2)), "duration")
+        distinct(dis, Disjunctive(intArrayOf(1, 0), intArrayOf(1, 1)), "start order")
+        distinct(dis, cum, "disjunctive vs cumulative")
+
+        // Diffn: the nonStrict flag, constant sizes, and coordinate order.
+        val diffn = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1))
+        distinct(
+            diffn,
+            Diffn(intArrayOf(0, 1), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1), nonStrict = true),
+            "nonStrict",
+        )
+        distinct(diffn, Diffn(intArrayOf(0, 1), intArrayOf(2, 3), intArrayOf(2, 1), intArrayOf(1, 1)), "width")
+        distinct(diffn, Diffn(intArrayOf(1, 0), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1)), "x order")
+
+        // Regular: automaton size, transition table, q0, accepting, sequence order.
+        val reg = Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 2, 2, 1), 1, intArrayOf(2))
+        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 1, 2, 1), 1, intArrayOf(2)), "transition")
+        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 2, 2, 1), 2, intArrayOf(2)), "q0")
+        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 2, 2, 1), 1, intArrayOf(1)), "accepting")
+        distinct(reg, Regular(intArrayOf(1, 0), 2, 2, intArrayOf(1, 2, 2, 1), 1, intArrayOf(2)), "seq order")
+
+        // Mdd: initial, transition records, cost var, sequence order.
+        val mdd = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), intArrayOf(0, 0, 1), 0, intArrayOf(0), 3)
+        distinct(
+            mdd,
+            Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), intArrayOf(0, 1, 1), 0, intArrayOf(0), 3),
+            "transition",
+        )
+        distinct(
+            mdd,
+            Mdd(
+                intArrayOf(0),
+                intArrayOf(1, 1),
+                intArrayOf(0, 1),
+                intArrayOf(0, 0, 1, 0),
+                0,
+                intArrayOf(0),
+                4,
+                cost = 7,
+            ),
+            "cost stride",
+        )
+    }
+
+    @Test
+    fun `breaking stays sound with disjunctive blocks present`() {
+        // Two disjoint identical disjunctive blocks over equal-domain start vars carry a block symmetry;
+        // the new key takes the problem off the conservative fallback. Soundness is the guarantee.
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            listOf(
+                Disjunctive(intArrayOf(0, 1), intArrayOf(1, 1)),
+                Disjunctive(intArrayOf(2, 3), intArrayOf(1, 1)),
+            ),
+        )
+        checkBreakingSound("disjunctive-blocks", problem)
     }
 }

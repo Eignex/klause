@@ -114,8 +114,8 @@ class FznDecomposedGlobalsTest {
         for (a in 0..2) {
             for (b in 0..2) {
                 for (d in 0..2) {
-            expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 }))
-        }
+                    expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 }))
+                }
             }
         }
         assertEquals(expected, found)
@@ -137,8 +137,8 @@ class FznDecomposedGlobalsTest {
         for (a in 0..2) {
             for (b in 0..2) {
                 for (d in 0..2) {
-            expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
-        }
+                    expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
+                }
             }
         }
         assertEquals(expected, found)
@@ -154,8 +154,8 @@ class FznDecomposedGlobalsTest {
         for (a in 0..2) {
             for (b in 0..2) {
                 for (d in 0..2) {
-            expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
-        }
+                    expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
+                }
             }
         }
         assertEquals(expected, found)

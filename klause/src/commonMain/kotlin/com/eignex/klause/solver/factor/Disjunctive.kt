@@ -72,6 +72,11 @@ class Disjunctive(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         Disjunctive(starts.remapVars(intMap), durations, presents.remapLits(boolMap), durationVars.remapVars(intMap))
 
+    /** Position-faithful: keeps the task arrays in order and folds in the constant durations and the
+     *  var/const split (#531). */
+    override fun structuralKey(): String = "disjunctive:${durations.joinToString(",")}:" +
+        "${starts.joinToString(",")}:${presents.joinToString(",")}:${durationVars.joinToString(",")}"
+
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = if (durationVars.isEmpty()) starts else starts + durationVars
 
