@@ -72,14 +72,37 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
         }
     }
 
+    /** Per-[PropagationState] reusable Gauss-Jordan scratch (never shared across worker threads).
+     *  [mask] / [reason] are the residual matrix + per-row reason bitsets and [rhs] the right-hand
+     *  sides — all fixed size (rows × words), refilled from the constant [rowMask] / [rowRhs] on
+     *  every fire, so reuse drops the per-fire matrix allocation. [conflictVars] carries the failure
+     *  reason for [conflictReason]. Not snapshotted: pure per-fire scratch, fully rebuilt each fire. */
+    private class GaussCache(n: Int, words: Int) {
+        val mask = Array(n) { LongArray(words) }
+        val reason = Array(n) { LongArray(words) }
+        val rhs = IntArray(n)
+        var conflictVars: IntArray? = null
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = rowMask.size
         // Residual system over the *unassigned* variables: substitute current assignments. For each
         // row we also track `reason` — the bitset of assigned variables whose values determine that
         // row's right-hand side — so forced pins and conflicts get a sharp (asserting) explanation.
-        val mask = Array(n) { LongArray(words) }
-        val reason = Array(n) { LongArray(words) }
-        val rhs = rowRhs.copyOf()
+        // Reuse the per-session scratch (cleared back to the constant rowMask/rowRhs) instead of
+        // allocating the residual matrix fresh every fire.
+        val cache = (state.refPayload[factorId] as? GaussCache) ?: GaussCache(n, words).also {
+            state.refPayload[factorId] = it
+        }
+        cache.conflictVars = null
+        val mask = cache.mask
+        val reason = cache.reason
+        val rhs = cache.rhs
+        for (r in 0 until n) {
+            mask[r].fill(0L)
+            reason[r].fill(0L)
+        }
+        rowRhs.copyInto(rhs)
         for (r in 0 until n) {
             // Iterate only the row's *set* bits (its member variables) word by word, rather than
             // testing getBit for every variable — XOR rows are sparse, so this turns the per-fire
@@ -128,7 +151,7 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
             val pop = popcount(mask[r])
             if (pop == 0) {
                 if (rhs[r] == 1) { // 0 = 1
-                    state.refPayload[factorId] = reasonLiterals(state, reason[r], excludeCol = -1)
+                    cache.conflictVars = reasonLiterals(state, reason[r], excludeCol = -1)
                     return false
                 }
                 continue
@@ -147,7 +170,7 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.refPayload[factorId] as? IntArray
+        (state.refPayload[factorId] as? GaussCache)?.conflictVars
 
     /**
      * Clause-form reason for a forced pin or conflict: one currently-false literal per assigned
