@@ -259,14 +259,8 @@ internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
     if (lifted.all { it is IntRef }) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
-            var dMin = intDomains[ids[0]].min
-            var dMax = intDomains[ids[0]].max
-            for (id in ids) {
-                val d = intDomains[id]
-                if (d.min < dMin) dMin = d.min
-                if (d.max > dMax) dMax = d.max
-            }
-            factors += AllDifferentFactor(ids, dMin, dMax - dMin + 1)
+            val (dMin, span) = domainMinAndSpan(ids)
+            factors += AllDifferentFactor(ids, dMin, span)
             return
         }
     }
@@ -286,6 +280,30 @@ internal fun Lowering.varIdOfLifted(e: IntExpr): Int {
     val aux = newAuxIntVar(domainOf(lifted))
     assertExpr(IntCompare(IntRef(aux), IntCmpOp.EQ, lifted))
     return intVarOf(aux)
+}
+
+/** Lift each operand to a bare [IntRef] and resolve it to its int-var id. Globals only accept
+ *  bare variable references (no arithmetic residual); a non-bare operand fails with a
+ *  [context]-tagged message naming the operand role [term]. */
+private fun Lowering.liftToIntRefIds(exprs: List<IntExpr>, context: String, term: String = "start"): IntArray {
+    val lifted = exprs.map { lift(it) }
+    require(lifted.all { it is IntRef }) {
+        "$context: every $term term must be a bare variable reference (no arithmetic)."
+    }
+    return IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+}
+
+/** Smallest domain min and total value span (`max − min + 1`) across [ids]' current domains —
+ *  the value-occurrence range an [AllDifferentFactor] indexes over. */
+private fun Lowering.domainMinAndSpan(ids: IntArray): Pair<Int, Int> {
+    var dMin = intDomains[ids[0]].min
+    var dMax = intDomains[ids[0]].max
+    for (id in ids) {
+        val d = intDomains[id]
+        if (d.min < dMin) dMin = d.min
+        if (d.max > dMax) dMax = d.max
+    }
+    return dMin to (dMax - dMin + 1)
 }
 
 internal fun Lowering.assertSymmetricAllDifferent(expr: SymmetricAllDifferent) {
@@ -332,11 +350,7 @@ internal fun Lowering.assertCircuit(succ: List<IntExpr>, valueOffset: Int, sub: 
 }
 
 internal fun Lowering.assertCumulative(expr: CumulativeExpr) {
-    val lifted = expr.starts.map { lift(it) }
-    require(lifted.all { it is IntRef }) {
-        "cumulative: every start term must be a bare variable reference (no arithmetic)."
-    }
-    val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    val ids = liftToIntRefIds(expr.starts, "cumulative")
     factors += CumulativeFactor(
         starts = ids,
         durations = expr.durations.toIntArray(),
@@ -363,14 +377,8 @@ internal fun Lowering.assertAllDifferentOpt(expr: AllDifferentOpt) {
     if (lifted.all { it is IntRef }) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
-            var dMin = intDomains[ids[0]].min
-            var dMax = intDomains[ids[0]].max
-            for (id in ids) {
-                val d = intDomains[id]
-                if (d.min < dMin) dMin = d.min
-                if (d.max > dMax) dMax = d.max
-            }
-            factors += AllDifferentFactor(ids, dMin, dMax - dMin + 1, presents = presentLits)
+            val (dMin, span) = domainMinAndSpan(ids)
+            factors += AllDifferentFactor(ids, dMin, span, presents = presentLits)
             return
         }
     }
@@ -397,11 +405,7 @@ private fun Lowering.boolFromLit(lit: Int): BoolExpr {
 }
 
 internal fun Lowering.assertCumulativeOpt(expr: CumulativeExprOpt) {
-    val lifted = expr.starts.map { lift(it) }
-    require(lifted.all { it is IntRef }) {
-        "cumulativeOpt: every start term must be a bare variable reference (no arithmetic)."
-    }
-    val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    val ids = liftToIntRefIds(expr.starts, "cumulativeOpt")
     factors += CumulativeFactor(
         starts = ids,
         durations = expr.durations.toIntArray(),
@@ -412,11 +416,7 @@ internal fun Lowering.assertCumulativeOpt(expr: CumulativeExprOpt) {
 }
 
 internal fun Lowering.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
-    val lifted = expr.starts.map { lift(it) }
-    require(lifted.all { it is IntRef }) {
-        "disjunctiveOpt: every start term must be a bare variable reference (no arithmetic)."
-    }
-    val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    val ids = liftToIntRefIds(expr.starts, "disjunctiveOpt")
     factors += DisjunctiveFactor(
         starts = ids,
         durations = expr.durations.toIntArray(),
@@ -425,11 +425,7 @@ internal fun Lowering.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
 }
 
 internal fun Lowering.assertNValueOpt(expr: NValueExprOpt) {
-    val xsLifted = expr.xs.map { lift(it) }
-    require(xsLifted.all { it is IntRef }) {
-        "nvalueOpt: every xs term must be a bare variable reference (no arithmetic)."
-    }
-    val xsIds = IntArray(xsLifted.size) { intVarOf((xsLifted[it] as IntRef).name) }
+    val xsIds = liftToIntRefIds(expr.xs, "nvalueOpt", term = "xs")
     val nLifted = lift(expr.n)
     require(nLifted is IntRef) { "nvalueOpt: n must be a bare variable reference." }
     val nId = intVarOf(nLifted.name)
@@ -447,11 +443,7 @@ internal fun Lowering.assertNValueOpt(expr: NValueExprOpt) {
 }
 
 internal fun Lowering.assertGccOpt(expr: GccExprOpt) {
-    val xsLifted = expr.xs.map { lift(it) }
-    require(xsLifted.all { it is IntRef }) {
-        "gccOpt: every xs term must be a bare variable reference (no arithmetic)."
-    }
-    val xsIds = IntArray(xsLifted.size) { intVarOf((xsLifted[it] as IntRef).name) }
+    val xsIds = liftToIntRefIds(expr.xs, "gccOpt", term = "xs")
     factors += GccFactor(
         xs = xsIds,
         cover = expr.cover.toIntArray(),
@@ -463,11 +455,7 @@ internal fun Lowering.assertGccOpt(expr: GccExprOpt) {
 }
 
 internal fun Lowering.assertDisjunctive(expr: DisjunctiveExpr) {
-    val lifted = expr.starts.map { lift(it) }
-    require(lifted.all { it is IntRef }) {
-        "disjunctive: every start term must be a bare variable reference (no arithmetic)."
-    }
-    val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    val ids = liftToIntRefIds(expr.starts, "disjunctive")
     factors += DisjunctiveFactor(
         starts = ids,
         durations = expr.durations.toIntArray(),
