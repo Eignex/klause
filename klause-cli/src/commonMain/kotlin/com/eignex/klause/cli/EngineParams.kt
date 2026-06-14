@@ -4,6 +4,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.LpEmphasis
 import com.eignex.klause.solver.backtrack.selector.Chb
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
 import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
@@ -174,6 +175,7 @@ internal fun buildPortfolioScenario(
     kind: Kind,
     defaultEngine: EngineMix,
     defaultArms: Int,
+    lpCeiling: LpEmphasis = LpEmphasis.AGGRESSIVE,
 ): PortfolioScenario {
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
     val lambda = p.double("lambda") ?: 1.0
@@ -205,6 +207,7 @@ internal fun buildPortfolioScenario(
         engine = engine,
         seed = seed,
         lsLambda = lambda,
+        lpCeiling = lpCeiling,
     )
 }
 

@@ -163,15 +163,15 @@ data class BacktrackParams(
      */
     val objectiveBoundSupplier: (() -> Double)? = null,
     /**
-     * One-flag enablement of the whole LP-relaxation family: when true, `minimize`/`improvements`
-     * first pass these params through [LpAutoConfig.recommend], which ORs on exactly the LP
-     * techniques whose target structure the problem contains ([lpBounding], [lpCuts] + the cut
-     * pool and learning machinery, the hull relaxations, [lagrangian], [energeticReasoning] — see
-     * [LpAutoConfig]). Explicitly set flags are never turned *off*, so this composes with manual
-     * tuning. This is the single knob an LP-focused portfolio arm sets; off by default so the
-     * plain backtrack arms keep their lean per-node cost.
+     * The emphasis-driven LP-relaxation selector (#429): an [LpEmphasis] cost ceiling + per-technique
+     * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]
+     * at `minimize`/`improvements`. `null` (the raw default) uses the explicit per-technique flags
+     * below verbatim — no LP unless one is set; the user-facing entry points (`--lp`, the portfolio
+     * arms) supply an [LpConfig] so LP is on by default with the emphasis level as the only dial.
+     * `LpConfig.AGGRESSIVE` reproduces the old structural "enable everything applicable" auto-config.
+     * Resolved flags are OR-ed onto any explicit ones, so an explicit flag is never turned off.
      */
-    val lpAuto: Boolean = false,
+    val lpConfig: LpConfig? = null,
     /**
      * Native LP-relaxation bounding for branch-and-bound minimisation (#20). When true, scheduled
      * nodes solve an exact integer LP relaxation of the live problem and prune when the relaxation

@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpConfig
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Disjunctive
@@ -201,9 +202,9 @@ class CumulativeRelaxationTest {
     }
 
     @Test
-    fun `branch and bound preserves the scheduling optimum under lpAuto`() {
+    fun `branch and bound preserves the scheduling optimum under an LP emphasis`() {
         // End-to-end: the non-global makespan row (live earliest-starts + premises) fires during
-        // search, so a wrong premise would corrupt the optimum. lpAuto turns on lpCumulative plus
+        // search, so a wrong premise would corrupt the optimum. The AGGRESSIVE emphasis turns on lpCumulative plus
         // the full LP learning stack, exactly the path that consumes the row's premises.
         val rng = Random(20260613)
         var optimal = 0
@@ -218,7 +219,7 @@ class CumulativeRelaxationTest {
             val p = makespanProblem(starts, durations, resources, capacity, horizon)
             val optimum = bruteOptimum(n, starts, durations, resources, capacity)
             val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
-            val params = BacktrackParams(randomSeed = 7L, lubyRestartBase = 8L, lpAuto = true)
+            val params = BacktrackParams(randomSeed = 7L, lubyRestartBase = 8L, lpConfig = LpConfig.AGGRESSIVE)
             when (val res = BacktrackSolver(p).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {
                     optimal++

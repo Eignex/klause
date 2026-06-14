@@ -48,6 +48,11 @@ internal class CommonOptions {
      *  `aggressive`. Parsed into a `PresolveConfig` by `PresolveConfig.parse`. */
     var presolve: String? = null
 
+    /** `--lp CEILING`: the LP-relaxation emphasis ceiling for the portfolio — `off` | `conservative`
+     *  | `default` | `aggressive`. Absent ⇒ uncapped (the pool spreads the LP intensity itself, so LP
+     *  is on by default); `off` disables LP across the portfolio. Parsed by `LpEmphasis.fromId`. */
+    var lp: String? = null
+
     /** Raw repeatable `--param key=value` engine params; interpreted per engine (see [EngineParams]). */
     val engineParams = mutableListOf<String>()
 
@@ -185,6 +190,13 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         valueLabel = "strength",
         help = "presolve strength: off | conservative | default | aggressive",
     ) { o.presolve = it },
+    FlagSpec(
+        listOf("--lp"),
+        true,
+        FlagGroup.KLAUSE,
+        valueLabel = "ceiling",
+        help = "LP relaxation ceiling: off | conservative | default | aggressive",
+    ) { o.lp = it },
     FlagSpec(
         listOf("-h", "--help"),
         false,

@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpEmphasis
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
 import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
 import com.eignex.klause.solver.backtrack.selector.InputOrder
@@ -35,17 +36,39 @@ import kotlin.time.TimeSource
 class PortfolioTest {
 
     @Test
-    fun `cop backtrack palette includes the lp-focused arm and csp does not`() {
+    fun `cop backtrack palette spreads lp-intensity arms and csp has none`() {
         val cop = BacktrackWorkerConfig.ranked(Kind.COP).map { it.label }
-        assertTrue("lp" in cop, "COP palette must carry the LP-focused arm, got $cop")
-        // The arm's params carry the one-flag LP enablement.
-        val lpArm = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp" }
-        assertTrue(lpArm.build(1L, null).lpAuto)
+        // The spectrum: an AGGRESSIVE and a DEFAULT LP arm hedged by the OFF (no-LP) arms (#429).
+        assertTrue("lp-aggressive" in cop && "lp-default" in cop, "COP palette must carry the LP arms, got $cop")
+        val aggressive = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-aggressive" }
+        assertEquals(LpEmphasis.AGGRESSIVE, aggressive.build(1L, null).lpConfig?.emphasis)
+        val default = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-default" }
+        assertEquals(LpEmphasis.DEFAULT, default.build(1L, null).lpConfig?.emphasis)
         // The #117 guard stays at slot 0.
         assertEquals("satOptimized", cop.first())
 
         val csp = BacktrackWorkerConfig.ranked(Kind.CSP).map { it.label }
-        assertTrue("lp" !in csp, "the LP machinery lives on the minimisation path; CSP skips it")
+        assertTrue(csp.none { it.startsWith("lp-") }, "the LP machinery lives on the minimisation path; CSP skips it")
+    }
+
+    @Test
+    fun `lp ceiling caps the portfolio arms`() {
+        // --lp off disables LP across the pool; --lp default caps the AGGRESSIVE arm down to DEFAULT.
+        val off = BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = LpEmphasis.OFF)
+        assertTrue(
+            off.all { (it.build(1L, null).lpConfig?.emphasis ?: LpEmphasis.OFF) == LpEmphasis.OFF },
+            "an OFF ceiling must leave no arm running LP",
+        )
+        val capped = BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = LpEmphasis.DEFAULT)
+        assertTrue(
+            capped.mapNotNull {
+                it.build(
+                    1L,
+                    null,
+                ).lpConfig?.emphasis
+            }.all { it.ordinal <= LpEmphasis.DEFAULT.ordinal },
+            "no arm may exceed the supplied ceiling",
+        )
     }
 
     @Test

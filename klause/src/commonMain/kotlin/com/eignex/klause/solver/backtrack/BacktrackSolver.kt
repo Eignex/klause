@@ -201,15 +201,15 @@ class BacktrackSolver(override val problem: Problem) :
      * [minimize]; just exposes the search's intermediate bests as they land instead of
      * collapsing them into a single return value.
      *
-     * With [BacktrackParams.lpAuto] the LP-relaxation family is enabled here, structurally:
-     * [LpAutoConfig.recommend] ORs on exactly the techniques whose target structure the problem
-     * contains. The objective is statically linear, so no objective-shape check is involved —
+     * With [BacktrackParams.lpConfig] the LP-relaxation family is enabled here, structurally:
+     * [LpAutoConfig.resolve] ORs on the techniques the emphasis permits whose target structure the
+     * problem contains. The objective is statically linear, so no objective-shape check is involved —
      * LP enablement is purely a params decision.
      */
     override fun improvements(objective: LinearObjective, baseParams: BacktrackParams): Sequence<MinimizeResult> =
         sequence {
             // The single B&B orchestration ([ResumableMinimize]), driven lazily: one incumbent surfaced
-            // per step, then the terminal verdict. lpAuto is resolved inside the search. `pausable = false`
+            // per step, then the terminal verdict. lpConfig is resolved inside the search. `pausable = false`
             // makes a fired cancellation a hard terminal stop (no resume) — a one-shot stream's contract.
             val search = ResumableMinimize(objective, baseParams, pausable = false)
             while (true) {
@@ -258,9 +258,12 @@ class BacktrackSolver(override val problem: Problem) :
         // ways this one engine is driven.
         private val pausable: Boolean = true,
     ) : ResumableSearch {
-        // lpAuto resolves the LP-relaxation family structurally, exactly as [improvements]. The slice
-        // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
-        private val resolvedParams0 = if (params0.lpAuto) LpAutoConfig.recommend(problem, params0) else params0
+        // #429: the LP emphasis selector resolves the LP-relaxation family against the problem's
+        // structure; a null [BacktrackParams.lpConfig] uses the explicit per-technique flags verbatim.
+        // The slice cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed
+        // in runSlice.
+        private val resolvedParams0 = params0.lpConfig
+            ?.let { LpAutoConfig.resolve(problem, it, params0) } ?: params0
 
         // The caller's own token (drives the non-pausable one-shot path); superseded by the slice in
         // pausable mode.
