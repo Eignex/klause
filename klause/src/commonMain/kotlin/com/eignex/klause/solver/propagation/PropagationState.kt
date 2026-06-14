@@ -662,6 +662,12 @@ class PropagationState(
     internal val undoMaxHistLen = IntArrayList() // int: prior maxHist length for the var
     internal val undoHoleHistLen = IntArrayList() // int: prior holeHist length for the var
 
+    /** Separate trail for [Trailed] reversible cells (incremental factor state). Kept apart from the
+     *  bool/int undo columns above so the hot domain-mutation path pays nothing; a [LevelMark]
+     *  captures its size, [undoTo] replays it top-down. Each entry is a cell that changed (the cell
+     *  holds its own typed prior-value stack), so restore is box-free. See [Trailed] / `Reversible.kt`. */
+    internal val revTrail = ArrayList<Trailed>()
+
     /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
      *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
      *  a singleton, so this never allocates. Read-only: [undoTo] only iterates it. */
@@ -759,6 +765,12 @@ class PropagationState(
         fun snapshotCopy(): SnapshottablePayload
     }
 
+    /** Append a reversible cell to [revTrail] so its latest mutation is undone on the next
+     *  [undoTo] past this point. Called by [RevInt] / [RevRef] / [RevIntArray] on each logged write. */
+    internal fun logReversible(cell: Trailed) {
+        revTrail.add(cell)
+    }
+
     /**
      * Lightweight per-level marker. Records only the *positions* a pop must rewind to: the
      * undo-log size and the three append-only stacks' sizes, plus snapshot copies of any
@@ -772,6 +784,7 @@ class PropagationState(
         internal val ltdvSize: Int,
         internal val pinOrderSize: Int,
         internal val snapshottablePayloads: Map<Int, SnapshottablePayload>,
+        internal val revSize: Int,
     )
 
     /**

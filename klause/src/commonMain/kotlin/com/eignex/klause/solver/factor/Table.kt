@@ -6,6 +6,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.RevInt
 
 /**
  * `table_int(xs, tuples)` — the vector of `xs(i)` values must equal one of the rows of
@@ -56,18 +57,27 @@ class Table(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
-    /** STR2 sparse-set state. [validTuples] holds tuple indices; the prefix
-     *  `[0, numValid)` is live (still feasible). On push the engine clones via
-     *  [snapshotCopy]; on pop the cloned state is restored, so [numValid] correctly
-     *  reflects the level we backjumped to. */
+    /** STR2 sparse-set state. [validTuples] holds tuple indices; the prefix `[0, numValid)` is live
+     *  (still feasible). [numValid] is a [RevInt] on the engine's reversible trail, so backtrack
+     *  restores it in O(1); the sparse-set invariant — removals only swap a dead tuple to the
+     *  current end and decrement — means restoring [numValid] alone restores the exact live *set*
+     *  (the suffix `[numValid, oldNumValid)` holds precisely the tuples removed since the mark, in
+     *  some order), so [validTuples] needs no copy or undo. This factor therefore no longer
+     *  implements `SnapshottablePayload` — the O(numTuples) per-push snapshot is gone.
+     *
+     *  [cachedDoms] (unchanged-domains fast path) deliberately drifts across snapshot/restore: after
+     *  a backtrack its stale refs simply fail to match the restored domains, so the fast path misses
+     *  and a full STR2 sweep runs — never a false skip. */
     private class Str2State(
         val validTuples: IntArray,
-        var numValid: Int,
-        /** Column domain refs at the last successful propagate, for the unchanged-domains fast
-         *  path. Snapshotted so the check reflects the level's fixpoint after a backtrack. */
+        numValidInit: Int,
+        state: PropagationState,
         val cachedDoms: Array<IntDomain?>,
-    ) : PropagationState.SnapshottablePayload {
-        override fun snapshotCopy(): Str2State = Str2State(validTuples.copyOf(), numValid, cachedDoms.copyOf())
+    ) {
+        private val numValidCell = RevInt(state, numValidInit)
+        var numValid: Int
+            get() = numValidCell.value
+            set(value) = numValidCell.set(value)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -158,15 +168,15 @@ class Table(
      * STR2 (Lecoutre 2011). The propagator maintains a sparse set of currently-feasible
      * tuple indices in [Str2State] across propagator calls; on each fire it sweeps only
      * the live prefix to drop newly-infeasible tuples and gather column supports.
-     * Backtrack correctness comes from [PropagationState.SnapshottablePayload]: push
-     * clones the state, pop restores it.
+     * Backtrack correctness comes from [Str2State.numValid] being a reversible cell on the engine's
+     * undo trail: a pop restores the live-set size (hence the live set) in O(1).
      *
      * Per-prune antecedents and the conflict reason are hole-aware via
      * [collectHoleAndBoundAntecedents].
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val s = (state.refPayload[factorId] as? Str2State) ?: run {
-            val fresh = Str2State(IntArray(numTuples) { it }, numTuples, arrayOfNulls(arity))
+            val fresh = Str2State(IntArray(numTuples) { it }, numTuples, state, arrayOfNulls(arity))
             state.refPayload[factorId] = fresh
             fresh
         }
