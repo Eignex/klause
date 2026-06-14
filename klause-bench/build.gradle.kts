@@ -85,6 +85,11 @@ abstract class InstallChocoTask : DefaultTask() {
         }
         // Point the official wrapper at the cached jar and make it runnable.
         exec.exec { commandLine("sed", "-i", "s#^JAR_FILE=.*#JAR_FILE='${jar.absolutePath}'#", py.absolutePath) }
+        // Always run Choco with lazy clause generation (-lcg). klause is itself an LCG/CDCL engine,
+        // so an LCG Choco is the apples-to-apples reference; classic-CP Choco is unfairly strong on
+        // pure-CP models (e.g. Golomb) and understates klause. ChocoFZN forwards the extra flag, and
+        // -lcg is sound with the fixed/annotation track in Choco 6.0.1.
+        sh.writeText("#!/bin/bash\nexec python3 \"\$(dirname \"\$0\")/fzn-choco.py\" -lcg \"\$@\"\n")
         exec.exec { commandLine("chmod", "+x", sh.absolutePath, py.absolutePath) }
         // Write the solver config and register it so `minizinc --solver choco` resolves.
         val msc = cache.resolve("choco.msc")
