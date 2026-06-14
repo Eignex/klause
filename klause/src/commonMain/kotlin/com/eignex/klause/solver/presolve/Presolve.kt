@@ -225,16 +225,19 @@ object Presolve {
      *  1. **Exact duplicates** — any factor whose [Factor.structuralKey] equals an earlier kept one is
      *     redundant (the keys are collision-free up to variable identity, so an equal key means an
      *     equal constraint). Unkeyed factors (`null` key) are never matched and always kept.
-     *  2. **Linear inequality domination** — over the [Linear] inequalities, normalising each `≥` to a
-     *     `≤` (negating coefficients and bound), constraints sharing a coefficient vector are
-     *     comparable: the tightest (smallest `≤` bound) implies the rest, so only it is kept. An `=`
-     *     over the same coefficients contributes its bound to *both* directions and implies (drops)
-     *     any looser `≤` / `≥`, but is itself never dropped here.
+     *  2. **Same-vector domination** — over the [Linear] / [PseudoBoolean] inequalities, normalising
+     *     each `≥` to a `≤` (negating coefficients and bound) and GCD-reducing it, constraints sharing
+     *     a reduced coefficient vector are comparable: the tightest (smallest `≤` bound) implies the
+     *     rest, so only it is kept. An `=` over the same vector contributes its bound to *both*
+     *     directions and implies (drops) any looser `≤` / `≥`, but is itself never dropped here.
+     *  3. **Variable-subset / proportional domination** ([dropSubsetDominated], #466) — a `≤`-row whose
+     *     support is a strict subset of another's, with coefficients a positive multiple of it on the
+     *     shared variables and a bound that implies the larger row's (after charging the extra terms
+     *     their maximal activity), drops the larger row across *different* supports.
      *
-     * Meant to run after [strengthenCoefficients] so proportional rows are already GCD-normalised to a
-     * shared coefficient vector (run standalone it simply matches fewer). Self-redundant rows (maximal
-     * activity already within the bound) are dropped by the strengthen lift, so this pass is purely
-     * cross-constraint. PseudoBoolean domination and variable-subset domination are follow-ups.
+     * The GCD reduction in step 2 makes the pass effective standalone — proportional rows match even
+     * when [strengthenCoefficients] hasn't run first. Self-redundant rows (maximal activity already
+     * within the bound) are dropped by the strengthen lift, so this pass is purely cross-constraint.
      */
     fun removeRedundantConstraints(problem: Problem): Problem {
         val factors = problem.factors
@@ -286,46 +289,152 @@ object Presolve {
             }
             if (keep) out.add(f)
         }
-        if (out.size == factors.size) return problem
-        return rebuildProblem(problem, out)
+        // Phase 3: variable-subset / proportional domination across different supports (#466).
+        val out3 = dropSubsetDominated(problem, out)
+        if (out3.size == factors.size) return problem
+        return rebuildProblem(problem, out3)
+    }
+
+    /** Cap on the `≤`-rows Phase 3 compares pairwise, to keep the domination scan from going quadratic
+     *  on a huge linear system; above it the scan is skipped (sound — it only means fewer drops). */
+    private const val SUBSET_DOMINATION_ROW_CAP = 1500
+
+    /** Magnitude past which a Phase-3 activity sum is treated as non-dominating, so the `Long`
+     *  comparison can't wrap (real bounds are far below this). */
+    private const val OVERFLOW_GUARD = 1_000_000_000_000_000L
+
+    /** A `Σ coeffs·x ≤ bound` row as a reduced per-variable coefficient map (GCD-normalised), or `null`
+     *  for non-(`≤`/`≥`) Linear factors. The map keys are variable ids; the value is the reduced
+     *  coefficient. */
+    private class LeRow(val factorIndex: Int, val coeffByVar: Map<Int, Int>, val bound: Long)
+
+    private fun leRowOf(f: Linear, factorIndex: Int): LeRow? {
+        val (coeffs, bound) = when (f.op) {
+            LinearOp.LE -> f.coeffs to f.bound.toLong()
+            LinearOp.GE -> negated(f.coeffs) to -f.bound.toLong()
+            else -> return null
+        }
+        val g = gcdOf(coeffs)
+        val map = HashMap<Int, Int>(f.vars.size)
+        // Coalesced Linear has distinct vars, so a plain put per index is faithful.
+        for (i in f.vars.indices) map[f.vars[i]] = if (g <= 1) coeffs[i] else coeffs[i] / g
+        return LeRow(factorIndex, map, if (g <= 1) bound else bound.floorDiv(g.toLong()))
+    }
+
+    /**
+     * Variable-subset / proportional constraint domination (#466). Drop a `≤`-row `B` when another
+     * `≤`-row `A` has a support that is a strict subset of `B`'s with coefficients a positive integer
+     * multiple `k` of `B`'s on the shared variables, and `k·boundA + maxActivity(B-only terms) ≤
+     * boundB`. Then `A ⟹ B`: from `Σ_S a·x ≤ boundA` we get `Σ_S k·a·x ≤ k·boundA`, and adding the
+     * maximal activity of `B`'s extra terms still stays within `boundB`, so `B` is redundant.
+     *
+     * Sound even when the dominator `A` is itself dropped by a yet-smaller row: domination by strictly
+     * smaller support is transitive, so every dropped row is implied by a surviving minimal one. Only
+     * `≤`/`≥` [Linear] rows take part; equalities and globals are untouched. Bounded by
+     * [SUBSET_DOMINATION_ROW_CAP] so the pairwise scan can't blow up.
+     */
+    private fun dropSubsetDominated(problem: Problem, factors: List<Factor>): List<Factor> {
+        val rows = ArrayList<LeRow>()
+        for (i in factors.indices) {
+            val f = factors[i]
+            if (f is Linear) leRowOf(f, i)?.let { rows.add(it) }
+        }
+        if (rows.size < 2 || rows.size > SUBSET_DOMINATION_ROW_CAP) return factors
+        val dropped = HashSet<Int>()
+        for (b in rows) {
+            for (a in rows) {
+                if (a.factorIndex == b.factorIndex || a.coeffByVar.size >= b.coeffByVar.size) continue
+                if (dominates(problem, a, b)) {
+                    dropped.add(b.factorIndex)
+                    break
+                }
+            }
+        }
+        if (dropped.isEmpty()) return factors
+        return factors.filterIndexed { i, _ -> i !in dropped }
+    }
+
+    /** Whether `≤`-row [a] (strict-subset support) dominates [b]: matching coefficients up to a single
+     *  positive integer multiple `k` on the shared variables, and `k·boundA + maxExtra ≤ boundB`. */
+    private fun dominates(problem: Problem, a: LeRow, b: LeRow): Boolean {
+        var k = 0L
+        for ((v, ca) in a.coeffByVar) {
+            val cb = b.coeffByVar[v] ?: return false // a's support must be ⊆ b's
+            if (cb % ca != 0) return false
+            val ratio = (cb / ca).toLong()
+            if (ratio <= 0) return false // k must be a single positive multiple
+            if (k == 0L) {
+                k = ratio
+            } else if (k != ratio) {
+                return false
+            }
+        }
+        if (k == 0L) return false
+        var maxExtra = 0L
+        for ((v, cb) in b.coeffByVar) {
+            if (v in a.coeffByVar) continue
+            val d = problem.intDomains[v]
+            maxExtra += if (cb >= 0) cb.toLong() * d.max else cb.toLong() * d.min
+            // Conservative overflow guard: an extra activity this large can't be dominated by a
+            // small-bound row anyway, so bail rather than risk a wrapped Long comparison.
+            if (maxExtra > OVERFLOW_GUARD || maxExtra < -OVERFLOW_GUARD) return false
+        }
+        return k * a.bound + maxExtra <= b.bound
     }
 
     /** A linear / pseudo-Boolean constraint as a `≤`-normalised bucket contribution: [key] is the
      *  coefficient vector (a `≥` folds to `≤` by negating), [bound] the `≤` right-hand side. [fromEq]
      *  marks an equality (it also contributes its [opposite] direction and is never itself dropped).
      *  `null` for `≠` and non-(Linear/PseudoBoolean) factors, which take no part in domination. */
-    private class IneqForm(val key: String, val bound: Long, val fromEq: Boolean, val opposite: IneqForm? = null)
+    private class IneqForm(val key: String, val bound: Long, val fromEq: Boolean, val opposite: IneqForm? = null) {
+        fun copyWithOpposite(opp: IneqForm) = IneqForm(key, bound, fromEq, opp)
+    }
 
     private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {
         is Linear -> when (f.op) {
-            LinearOp.LE -> IneqForm(leKey(f.vars, f.coeffs, negate = false), f.bound.toLong(), fromEq = false)
+            LinearOp.LE -> reducedIneq(f.vars, f.coeffs, f.bound.toLong(), ::leKey, fromEq = false)
 
-            LinearOp.GE -> IneqForm(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = false)
+            LinearOp.GE -> reducedIneq(f.vars, negated(f.coeffs), -f.bound.toLong(), ::leKey, fromEq = false)
 
-            LinearOp.EQ -> IneqForm(
-                leKey(f.vars, f.coeffs, negate = false),
-                f.bound.toLong(),
-                fromEq = true,
-                opposite = IneqForm(leKey(f.vars, f.coeffs, negate = true), -f.bound.toLong(), fromEq = true),
+            LinearOp.EQ -> reducedIneq(f.vars, f.coeffs, f.bound.toLong(), ::leKey, fromEq = true).copyWithOpposite(
+                reducedIneq(f.vars, negated(f.coeffs), -f.bound.toLong(), ::leKey, fromEq = true),
             )
 
             LinearOp.NE -> null
         }
 
         is PseudoBoolean -> when (f.op) {
-            PbOp.LE -> IneqForm(pbKey(f.literals, f.weights, negate = false), f.bound.toLong(), fromEq = false)
+            PbOp.LE -> reducedIneq(f.literals, f.weights, f.bound.toLong(), ::pbKey, fromEq = false)
 
-            PbOp.GE -> IneqForm(pbKey(f.literals, f.weights, negate = true), -f.bound.toLong(), fromEq = false)
+            PbOp.GE -> reducedIneq(f.literals, negated(f.weights), -f.bound.toLong(), ::pbKey, fromEq = false)
 
-            PbOp.EQ -> IneqForm(
-                pbKey(f.literals, f.weights, negate = false),
-                f.bound.toLong(),
-                fromEq = true,
-                opposite = IneqForm(pbKey(f.literals, f.weights, negate = true), -f.bound.toLong(), fromEq = true),
+            PbOp.EQ -> reducedIneq(f.literals, f.weights, f.bound.toLong(), ::pbKey, fromEq = true).copyWithOpposite(
+                reducedIneq(f.literals, negated(f.weights), -f.bound.toLong(), ::pbKey, fromEq = true),
             )
         }
 
         else -> null
+    }
+
+    private fun negated(xs: IntArray): IntArray = IntArray(xs.size) { -xs[it] }
+
+    /** A `≤`-form `Σ coeffs·terms ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and
+     *  `2x+2y ≤ 4`) share a bucket even when [strengthenCoefficients] hasn't normalised them first
+     *  (#466). Dividing by the coefficient GCD `g` and flooring the bound is exact: the left side is a
+     *  multiple of `g`, so `Σ c·t ≤ b ⟺ Σ (c/g)·t ≤ ⌊b/g⌋`. [keyOf] builds the (linear / pb) key. */
+    private fun reducedIneq(
+        terms: IntArray,
+        coeffs: IntArray,
+        bound: Long,
+        keyOf: (IntArray, IntArray, Boolean) -> String,
+        fromEq: Boolean,
+    ): IneqForm {
+        val g = gcdOf(coeffs)
+        return if (g <= 1) {
+            IneqForm(keyOf(terms, coeffs, false), bound, fromEq)
+        } else {
+            IneqForm(keyOf(terms, IntArray(coeffs.size) { coeffs[it] / g }, false), bound.floorDiv(g.toLong()), fromEq)
+        }
     }
 
     /** Canonical key for a linear inequality's `≤`-normal-form coefficient vector: the `(var, coeff)`

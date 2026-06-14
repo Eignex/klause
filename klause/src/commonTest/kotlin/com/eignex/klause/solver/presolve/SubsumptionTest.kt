@@ -156,6 +156,52 @@ class SubsumptionTest {
         assertTrue(out.factors.single() in factorsBefore, "a surviving original is kept verbatim")
     }
 
+    @Test
+    fun `proportional rows match standalone via GCD normalization`() {
+        // x+y<=2 and 2x+2y<=4 are the same constraint. GCD-reducing inside the pass buckets them even
+        // without strengthen running first, so the duplicate drops (#466).
+        val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 1, 1, 1), le(4, 0, 2, 1, 2)))
+        val out = checkPreserved("proportional-dup", problem, expectDrop = true)
+        assertEquals(1, out.factors.size)
+    }
+
+    @Test
+    fun `a proportional looser row is dominated standalone`() {
+        // 2x+2y<=6 reduces to x+y<=3, dominated by the tighter x+y<=2.
+        val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 1, 1, 1), le(6, 0, 2, 1, 2)))
+        val out = checkPreserved("proportional-loose", problem, expectDrop = true)
+        assertEquals(2, (out.factors.single() as Linear).bound, "the tighter reduced bound survives")
+    }
+
+    @Test
+    fun `variable-subset row is dominated`() {
+        // x+y<=2 implies x+y+z<=5 because z<=3, so the larger-support row drops (#466).
+        val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(5, 0, 1, 1, 1, 2, 1)))
+        checkPreserved("subset-le", problem, expectDrop = true)
+    }
+
+    @Test
+    fun `proportional variable-subset row is dominated`() {
+        // x+y<=2 implies 2x+2y+z<=10: 2(x+y)<=4 and z<=3 give a sum <= 7 <= 10. Coefficients on the
+        // shared vars are a positive multiple (k=2) of the dominator's.
+        val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(10, 0, 2, 1, 2, 2, 1)))
+        checkPreserved("subset-proportional", problem, expectDrop = true)
+    }
+
+    @Test
+    fun `variable-subset row with a negative extra term is dominated`() {
+        // x+y<=2 implies x+y-z<=2 because z>=0 (the extra term's maximal activity is 0).
+        val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(2, 0, 1, 1, 1, 2, -1)))
+        checkPreserved("subset-negative-extra", problem, expectDrop = true)
+    }
+
+    @Test
+    fun `variable-subset row is kept when extra activity exceeds the slack`() {
+        // x+y<=2 does NOT imply x+y+z<=3 (z can be 3, sum 5 > 3), so nothing drops — soundness guard.
+        val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(3, 0, 1, 1, 1, 2, 1)))
+        checkPreserved("subset-not-dominated", problem, expectDrop = false)
+    }
+
     private fun pos(v: Int) = Lit.make(v, true)
 
     private fun feasibleCountBools(problem: Problem): Int {
