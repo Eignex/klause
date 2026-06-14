@@ -89,6 +89,26 @@ class CliTest {
     }
 
     @Test
+    fun `--output-objective emits the _objective line per solution, off by default`() {
+        // Objective var X_INTRODUCED_0_ is not in the output section, so the only way a parser
+        // scraping the solution stream can read the optimised objective is the _objective line.
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText(
+                "var 0..9: x:: output_var;\n" +
+                    "var 0..9: X_INTRODUCED_0_;\n" +
+                    "constraint int_lin_eq([1,-1],[x,X_INTRODUCED_0_],0);\n" +
+                    "solve maximize X_INTRODUCED_0_;\n",
+            )
+            deleteOnExit()
+        }
+        val withFlag = capture { main(arrayOf("--output-objective", "-t", "5000", fzn.absolutePath)) }
+        assertTrue("_objective = 9;" in withFlag, withFlag)
+
+        val without = capture { main(arrayOf("-t", "5000", fzn.absolutePath)) }
+        assertTrue("_objective" !in without, without)
+    }
+
+    @Test
     fun `xcsp3 csp emits competition SATISFIABLE protocol with named instantiation`() {
         val xml = File.createTempFile("cli", ".xml").apply {
             writeText(

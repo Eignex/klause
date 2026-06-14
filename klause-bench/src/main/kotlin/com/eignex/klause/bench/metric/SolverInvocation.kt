@@ -108,7 +108,14 @@ internal object SolverInvocation {
             add("-r")
             add(s.seed.toString())
             add("-s")
-            if (optimize) add("-a")
+            if (optimize) {
+                add("-a")
+                // Emit `_objective = <value>;` per solution (parity with the reference path's
+                // `minizinc --output-objective`). The objective var is usually not in the model's
+                // `output` section, so without this the parser records objective=null even when
+                // klause proves the optimum (#477).
+                add("--output-objective")
+            }
             // No -f for klause: the engine enum encodes free vs fixed (cp/mixed/ls/cp-single = free,
             // fixed = annotation). -f is only for references (minizincCommand).
             s.engine?.let {
