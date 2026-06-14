@@ -135,6 +135,18 @@ internal class FlatZincCompiler(
             }
             return
         }
+        // A scalar `var T: name = <rhs>;` aliases `name` to another var (or pins it to a
+        // constant) — MiniZinc emits these for objective aliases and propagated equalities.
+        // Bind `name` to the RHS's existing var id (sharing it, like array-element aliases)
+        // instead of allocating a fresh, disconnected var: dropping the binding silently
+        // detaches `name` from its definition, so e.g. an aliased objective output var floats
+        // at its domain minimum regardless of the real objective (#478). Arrays / set vars
+        // already consume their initializer below, so they keep their own paths.
+        if (d.isVar && d.value != null && d.type !is FznType.Array && d.type !is FznType.SetOfInt) {
+            aliasScalarVar(d.name, d.type, d.value)
+            recordEnumLabels(d)
+            return
+        }
         when (val t = d.type) {
             FznType.Bool -> allocBool(d.name)
             FznType.IntAny -> allocInt(d.name, unboundedIntLo, unboundedIntHi)
@@ -146,6 +158,39 @@ internal class FlatZincCompiler(
             is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar)
         }
         recordEnumLabels(d)
+    }
+
+    /**
+     * Bind a scalar `var T: name = <rhs>;` declaration. [rhs] is either another variable
+     * (alias) or a constant; resolve it to its var id and register [name] under that same id,
+     * so [name] reads the RHS's solved value. For a bounded-int alias the declared range is
+     * intersected into the shared target's domain — an alias may legitimately narrow it, and
+     * silently widening would be unsound.
+     */
+    internal fun aliasScalarVar(name: String, type: FznType, rhs: FznExpr) {
+        when (type) {
+            FznType.Bool -> boolVars[name] = Lit.variable(resolveBoolLit(rhs))
+
+            FznType.IntAny, is FznType.IntSet -> intVars[name] = resolveIntVar(rhs)
+
+            is FznType.IntRange -> {
+                val id = resolveIntVar(rhs)
+                intDomains[id] = intDomains[id].withMinAtLeast(type.lo.toInt()).withMaxAtMost(type.hi.toInt())
+                intVars[name] = id
+            }
+
+            is FznType.FloatRange, FznType.FloatAny -> {
+                val src = (rhs as? FznExpr.Ident)?.name
+                    ?: failHere("float var `$name`: alias initializer must be a variable reference")
+                val fb = floatVars[src] ?: failHere("float var `$name`: undefined float alias target `$src`")
+                intVars[name] = fb.varId
+                floatVars[name] = fb
+            }
+
+            is FznType.SetOfInt, is FznType.Array -> failHere(
+                "`$name`: unexpected aliased type ${type::class.simpleName}",
+            )
+        }
     }
 
     /**
