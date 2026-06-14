@@ -91,6 +91,7 @@ internal object SolveMetric {
         solverId: String = SolverInvocation.KLAUSE,
         search: KlauseSearch = KlauseSearch(),
         profile: ProfileConfig? = null,
+        label: String? = null,
     ) {
         if (profile != null) {
             profileEngine(entries, budget, solverId, search, profile)
@@ -103,7 +104,7 @@ internal object SolveMetric {
             seed = SOLVE_SEED,
             params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
         )
-        val tag = configTag(solverId, settings, budget)
+        val tag = configTag(solverId, settings, budget, label)
         val outDir = File("output", tag).apply { mkdirs() }
         val timestamp = Instant.now().toString()
         val sha = Reports.readGitSha()
@@ -144,7 +145,12 @@ internal object SolveMetric {
      *  cache key (via [BenchCache.keyFor], which additionally hashes the per-instance model+data), so
      *  a cache hit requires byte-identical settings. Two runs differing in any of these get distinct
      *  dirs/keys (so `param=var-selector=vsids` and `param=var-selector=chb` never clobber). */
-    private fun configTag(solverId: String, s: SolverInvocation.Settings, budget: Budget): String = buildString {
+    private fun configTag(
+        solverId: String,
+        s: SolverInvocation.Settings,
+        budget: Budget,
+        label: String? = null,
+    ): String = buildString {
         append(solverId)
         s.engine?.let { append('-').append(it) }
         append("-p").append(s.processors ?: 1) // unset ⇒ the solver default (single-core)
@@ -155,6 +161,9 @@ internal object SolveMetric {
         if (s.params.isNotEmpty()) {
             append('-').append(s.params.joinToString("_") { it.replace('=', '-') })
         }
+        // Free-form run [label] (e.g. a klause version / fix name) so re-runs of the same config
+        // coexist as distinct dirs+cache namespaces instead of overwriting. Filesystem-sanitised.
+        label?.trim()?.takeIf { it.isNotEmpty() }?.let { append('-').append(it.replace(Regex("[^A-Za-z0-9._-]"), "-")) }
     }
 
     private fun flat(entry: ResolvedProblem): String = entry.name.replace('/', '_')

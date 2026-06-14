@@ -26,6 +26,7 @@ import com.eignex.klause.bench.tools.ProfileScope
  * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
  * `backend=choco|gecode|yuck` (the solver; default klause) `timeout=<ms>`
  * `engine=fixed|cp|mixed|ls|cp-single|ls-single` `processors=N` `fixed=true` (references) `param=key=value`
+ * `label=<name>` (tag the run — e.g. a klause version — so re-runs coexist instead of overwriting)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
@@ -78,6 +79,7 @@ object BenchCli {
             backend ?: SolverInvocation.KLAUSE,
             search ?: KlauseSearch(),
             profile,
+            label = f["label"],
         )
     }
 
@@ -202,6 +204,7 @@ object BenchCli {
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
             |         engine=fixed|cp|mixed|ls|cp-single|ls-single processors=N (klause search for solve)
             |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; cp-single only for var-/val-selector)
+            |         label=<name> (tag the run, e.g. a klause version, so re-runs coexist as distinct dirs)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
             |Examples:

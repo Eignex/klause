@@ -39,6 +39,7 @@ bench list [<suite>]                 list suites, or the problems in one suite
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance solve budget |
+| `label=<name>` | free-form run tag folded into the `<config>` dir name (e.g. a klause version / fix name), so re-running the same config coexists as a distinct dir instead of overwriting — then `compare.sh` the two. References are version-stable, so this is mainly for klause across updates |
 | `engine=fixed\|cp\|mixed\|ls\|cp-single\|ls-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). `engine` unset ⇒ no `-e`, so klause follows the cli's own default engine (the bench has no engine default of its own). `fixed=true` is a *separate* reference-only `-f` toggle |
 | `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` apply only to `engine=cp-single` (a single backtrack solver) — the way to A/B a heuristic: run `solve` twice with different `cp-single` params, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
@@ -68,6 +69,13 @@ bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck ba
 bench solve suite=core kind=cop engine=cp-single param=var-selector=vsids timeout=30000
 bench solve suite=core kind=cop engine=cp-single param=var-selector=chb   timeout=30000
 # output/compare.sh output/klause-cp-single-p1-t30s-var-selector-vsids output/klause-cp-single-p1-t30s-var-selector-chb
+
+# tracking klause across updates: rebuild klause, re-run with a version label, then compare to the
+# prior version. References don't change, so only klause is re-run; old labelled dirs stay put.
+bench solve suite=mzn-bench engine=cp label=pre-count-native timeout=300000   # before a fix
+# … land the fix, ./gradlew :klause-cli:installJvmDist :klause-bench:installDist …
+bench solve suite=mzn-bench engine=cp label=count-native     timeout=300000   # after
+# output/compare.sh output/klause-cp-p1-t300s-count-native output/klause-cp-p1-t300s-pre-count-native
 ```
 
 ### Solve: klause competition tracks as filter combinations
