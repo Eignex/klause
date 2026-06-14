@@ -42,6 +42,8 @@ internal object SolverInvocation {
         val free: Boolean = true,
         val seed: Long = 3L,
         val params: List<String> = emptyList(),
+        /** klause-cli `--lp CEILING` (LP-relaxation emphasis); klause only, null = unset. */
+        val lp: String? = null,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -125,6 +127,10 @@ internal object SolverInvocation {
             s.processors?.takeIf { it > 1 }?.let {
                 add("-p")
                 add(it.toString())
+            }
+            s.lp?.let {
+                add("--lp")
+                add(it)
             }
             for (param in s.params) {
                 add("--param")
