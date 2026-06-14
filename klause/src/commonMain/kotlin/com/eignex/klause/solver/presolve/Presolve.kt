@@ -105,8 +105,96 @@ object Presolve {
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
         }
+        // Residue-class doubletons (#522): a 2-term `a·x + b·y = c` with no unit pivot, where `x` is
+        // contained, determines `x = (c − b·y)/a` only for the `y` values keeping it an in-domain
+        // integer. Restrict `y` to those values (a domain modification, not a folded factor) and
+        // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
+        // is always a surviving variable.
+        val domains = problem.intDomains.copyOf()
+        while (true) {
+            val r = findResidueCandidate(factors, eliminated, objectiveIntVars, domains) ?: break
+            factors = factors.filterIndexed { i, _ -> i != r.defIdx }
+            domains[r.y] = r.restrictedY
+            eliminated[r.x] = true
+            subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), intArrayOf(r.coeffY), divisor = r.divisor))
+        }
         if (subs.isEmpty()) return AffineElimination(problem, emptyList())
-        return AffineElimination(rebuildProblem(problem, factors), subs)
+        return AffineElimination(rebuildProblem(problem, factors, domains), subs)
+    }
+
+    /** Cap on a residue partner's domain span: scanning each value to build the restricted domain is
+     *  O(span), and a residue class on a very wide domain would flood it with holes, so skip above it. */
+    private const val RESIDUE_DOMAIN_SPAN_CAP = 1024
+
+    /** A residue-class doubleton `a·x + b·y = c` (no unit pivot) at [defIdx]: `x` is contained and
+     *  reconstructed as `(constTerm + coeffY·y) / divisor` over the [restrictedY] partner domain. */
+    private class ResidueCandidate(
+        val defIdx: Int,
+        val x: Int,
+        val y: Int,
+        val constTerm: Int,
+        val coeffY: Int,
+        val divisor: Int,
+        val restrictedY: IntDomain,
+    )
+
+    private fun findResidueCandidate(
+        factors: List<Factor>,
+        eliminated: BooleanArray,
+        objectiveIntVars: Set<Int>,
+        domains: Array<IntDomain>,
+    ): ResidueCandidate? {
+        for (di in factors.indices) {
+            val f = factors[di]
+            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) continue
+            for (xi in 0..1) {
+                val x = f.vars[xi]
+                val y = f.vars[1 - xi]
+                val a = f.coeffs[xi]
+                val b = f.coeffs[1 - xi]
+                // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
+                // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
+                if (a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y || x in objectiveIntVars) continue
+                if (!isContained(factors, di, x)) continue
+                val domY = domains[y]
+                if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
+                val restricted = restrictPartnerDomain(domY, domains[x], a, b, f.bound) ?: continue
+                return ResidueCandidate(
+                    di,
+                    x,
+                    y,
+                    constTerm = f.bound,
+                    coeffY = -b,
+                    divisor = a,
+                    restrictedY = restricted,
+                )
+            }
+        }
+        return null
+    }
+
+    /** Whether [x] occurs in no factor other than [defIdx]. */
+    private fun isContained(factors: List<Factor>, defIdx: Int, x: Int): Boolean {
+        for (i in factors.indices) if (i != defIdx && x in factors[i].intVars) return false
+        return true
+    }
+
+    /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
+     *  inside [domX], or `null` if no such `y` exists (leave the constraint for propagation to fail). */
+    private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Int, b: Int, c: Int): IntDomain? {
+        val valid = ArrayList<Int>()
+        for (y in domY.min..domY.max) {
+            if (y !in domY) continue
+            val num = c - b * y
+            if (num % a != 0) continue
+            val x = num / a
+            if (x in domX) valid.add(y)
+        }
+        if (valid.isEmpty()) return null
+        var d = domY.withMinAtLeast(valid.first()).withMaxAtMost(valid.last())
+        val keep = valid.toHashSet()
+        for (y in valid.first()..valid.last()) if (y !in keep && y in d) d = d.excludeValue(y)
+        return d
     }
 
     /** An `EQ` [Linear] at [defIdx] defining `x = constTerm + Σ termCoeffs·termVars` (unit pivot). The
@@ -1659,9 +1747,17 @@ object Presolve {
     }
 }
 
-/** A single affine elimination `x = constTerm + Σ termCoeffs·termVars` recorded by
- *  [Presolve.eliminateAffineSingletons]. */
-internal class AffineSub(val x: Int, val constTerm: Int, val termVars: IntArray, val termCoeffs: IntArray)
+/** A single affine elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded by
+ *  [Presolve.eliminateAffineSingletons]. [divisor] is `1` for the unit-pivot cases and the
+ *  pivot coefficient for a residue-class doubleton (#522), where the division is always exact on the
+ *  values the partner's restricted domain admits. */
+internal class AffineSub(
+    val x: Int,
+    val constTerm: Int,
+    val termVars: IntArray,
+    val termCoeffs: IntArray,
+    val divisor: Int = 1,
+)
 
 /**
  * Reduced problem from [Presolve.eliminateAffineSingletons] plus the data to rebuild the
@@ -1683,7 +1779,7 @@ class AffineElimination internal constructor(
         for (s in subs.asReversed()) {
             var v = s.constTerm
             for (k in s.termVars.indices) v += s.termCoeffs[k] * ints[s.termVars[k]]
-            ints[s.x] = v
+            ints[s.x] = if (s.divisor == 1) v else v / s.divisor
         }
         return Sample(sample.bools, ints)
     }
