@@ -6,6 +6,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `inverse(f, g)` with optional offsets: `f(i) = j  ⇔  g(j - gOffset + fOffset) = i`.
@@ -160,12 +161,17 @@ class Inverse(
     }
 
     /*
-     * GAC for the inverse channel: range-tighten to the legal index span, force
-     * singletons across the channel, and prune value-by-value: if `i + fOffset` is
-     * absent from `dom(g[j])`, also remove `j + gOffset` from `dom(f[i])`, and
-     * symmetrically. The bidirectional value-removal step exhausts every pruning
-     * derivable from `f[i]=j ⇔ g[j]=i`; the only stronger reasoning would be matching-
-     * based (Hall sets), which inverse's bijection structure rarely needs in practice.
+     * GAC for the inverse channel. Three layers:
+     *   1. range-tighten each f[i] / g[j] to the legal index span and force singletons across
+     *      the channel;
+     *   2. bidirectional value removal — if `i + fOffset` is absent from `dom(g[j])`, also remove
+     *      `j + gOffset` from `dom(f[i])`, and symmetrically. This is the arc-consistent closure of
+     *      `f[i]=j ⇔ g[j]=i`;
+     *   3. Hall/matching filtering on f and on g (#541). The biconditional forces f and g to be
+     *      bijections (`f[i1]=f[i2]=j ⇒ g[j]=i1=i2`), so each side is all-different; the channel AC
+     *      alone reaches a mutual non-GAC fixpoint (e.g. it keeps `f2=0` because `g0=2` is unpruned
+     *      and vice versa). Régin matching on f and on g punches the Hall-set values the channel
+     *      misses, reusing the shared [reginFilter].
      */
 
     /** Hole-aware conflict reason, sharpened to the responsible channel var / pair captured
@@ -180,13 +186,22 @@ class Inverse(
      *  unchanged pairs were already consistent and stay so. A var pruned during a call has its
      *  cache entry nulled so its row/column is rechecked next fire — cascades are caught across
      *  fires (the engine re-queues on any prune), reaching the same fixpoint as the full sweep.
-     *  Backtrack-safe via [snapshotCopy]. */
-    private class InverseCache(val refs: Array<IntDomain?>) : PropagationState.SnapshottablePayload {
-        /** The channel var / pair behind the most recent propagate failure on this session;
-         *  propagate-to-analysis transient, so excluded from [snapshotCopy] (#182). */
+     *  [fRegin] / [gRegin] warm-start the per-side Régin matching (#541). Backtrack-safe via
+     *  [snapshotCopy]. */
+    private class InverseCache(
+        val refs: Array<IntDomain?>,
+        val fRegin: ReginCache = ReginCache(),
+        val gRegin: ReginCache = ReginCache(),
+    ) : PropagationState.SnapshottablePayload {
+        /** The channel var / pair (or Hall violator set) behind the most recent propagate failure
+         *  on this session; propagate-to-analysis transient, so excluded from [snapshotCopy] (#182). */
         var conflictVars: IntArray? = null
 
-        override fun snapshotCopy(): InverseCache = InverseCache(refs.copyOf())
+        override fun snapshotCopy(): InverseCache = InverseCache(
+            refs.copyOf(),
+            fRegin.snapshotCopy(),
+            gRegin.snapshotCopy(),
+        )
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -301,6 +316,21 @@ class Inverse(
                 if (!pair(i, gIdx)) return false
             }
         }
+        // Hall/matching filtering: f and g are each bijections, so apply Régin all-different
+        // domain consistency to each side. This prunes the Hall-set values the pairwise channel
+        // AC leaves at its mutual fixpoint. On infeasibility the returned Hall violators become
+        // this session's conflict reason. Warm-started per side via the cache (#541).
+        val fHall = reginFilter(state, f, NO_EXCEPT, cache.fRegin)
+        if (fHall != null) {
+            cache.conflictVars = fHall
+            return false
+        }
+        val gHall = reginFilter(state, g, NO_EXCEPT, cache.gRegin)
+        if (gHall != null) {
+            cache.conflictVars = gHall
+            return false
+        }
+
         // Record the post-prune baseline. A var pruned this call (ref differs from entry) is
         // nulled so its row/column is rechecked next fire, propagating cascades to fixpoint.
         for (k in intVars.indices) {
@@ -308,6 +338,13 @@ class Inverse(
             cache.refs[k] = if (entryRefs[k] !== cur) null else cur
         }
         return true
+    }
+
+    private companion object {
+        /** Empty excepted-value set for the shared [reginFilter] (inverse's f and g are plain
+         *  bijections, no shared values). [reginFilter] only reads it, so one shared instance is
+         *  safe. */
+        val NO_EXCEPT = IntHashSet()
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

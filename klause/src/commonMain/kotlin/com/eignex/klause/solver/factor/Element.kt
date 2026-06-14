@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -190,104 +191,113 @@ class Element(
         return true
     }
 
-    /** Lower / upper bound of the element value at 0-based [pos] under [state]'s domains
-     *  (a singleton for the constant table). */
-    private fun elemLow(state: PropagationState, pos: Int): Int =
-        if (arrIsVars) state.intDomains[arr[pos]].min else arr[pos]
-    private fun elemHigh(state: PropagationState, pos: Int): Int =
-        if (arrIsVars) state.intDomains[arr[pos]].max else arr[pos]
-
-    /** Element propagation. Both kinds first tighten `idx ∈ [indexOffset, indexOffset+len-1]`.
-     *  A **constant** array is then filtered to full GAC (see [propagateConstArray]); a **var**
-     *  array is filtered to idx-domain + result-bounds consistency with both-way channeling once
-     *  [idx] is fixed:
-     *   1. `idx ∈ [indexOffset, indexOffset+len-1]` (structural).
-     *   2. **Prune idx**: drop position `i` whose element range can't intersect `result`'s
-     *      domain — that position can never satisfy `result = arr(i)`.
-     *   3. **Bound result**: it must equal *some* still-reachable element, so tighten it to the
-     *      union `[min elemLow, max elemHigh]` over idx's surviving positions.
-     *   4. **idx fixed → channel** `result == arr(idx)` both ways (var array tightens the
-     *      selected element back from `result`). */
+    /** Element propagation. Both kinds first tighten `idx ∈ [indexOffset, indexOffset+len-1]`,
+     *  then filter to full GAC: a **constant** array via [propagateConstArray], a **var** array
+     *  via [propagateVarArray]. */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (!state.tightenIntMin(idx, indexOffset)) return false
         if (!state.tightenIntMax(idx, indexOffset + len - 1)) return false
+        return if (arrIsVars) propagateVarArray(state) else propagateConstArray(state)
+    }
 
-        if (!arrIsVars) return propagateConstArray(state)
-
+    /**
+     * Full GAC for a **variable** array (`arrIsVars == true`). The selected element is the live
+     * value of a var, so unlike the constant table the consistency test is hole-aware domain
+     * *membership*, not interval overlap:
+     *   - **idx**: position `i` is supported iff `dom(arr(i)) ∩ dom(result) ≠ ∅` (a position whose
+     *     element domain meets result's range only inside a mutual hole is dropped — interval
+     *     overlap would have kept it).
+     *   - **result**: value `v` is supported iff some still-reachable position `i` can take it
+     *     (`v ∈ dom(arr(i))`), so interior holes are punched for values no surviving element can
+     *     produce — not merely the bounds union over reachable positions.
+     *   - **idx fixed → channel**: `result == arr(idx)`, so the selected element loses every value
+     *     not live in `result` (the symmetric result-side prune falls out of the result pass above
+     *     when only one position survives).
+     *
+     * Each direction does a per-position / per-value domain scan (O(len · |dom|)), heavier than
+     * the constant path — see #540: gated by no instance shown element-propagation-bound, the
+     * brute-force `assertGac` oracle validates completeness.
+     */
+    private fun propagateVarArray(state: PropagationState): Boolean {
         val resultDom = state.intDomains[result]
-        // 2. Prune idx positions whose element can't equal result. Collect first (don't mutate
-        //    the domain mid-iteration), then exclude.
-        val idxDom = state.intDomains[idx]
+        // 2. Prune idx: drop a position whose element domain is disjoint (hole-aware) from result's.
         var toExclude: IntArrayList? = null
-        idxDom.forEach { iv ->
+        state.intDomains[idx].forEach { iv ->
             val pos = iv - indexOffset
-            if (pos in 0 until len) {
-                val lo = elemLow(state, pos)
-                val hi = elemHigh(state, pos)
-                // Element range [lo,hi] disjoint from result's [min,max] ⇒ position infeasible.
-                if (hi < resultDom.min || lo > resultDom.max) {
-                    (toExclude ?: IntArrayList().also { toExclude = it }).add(iv)
-                }
+            if (pos in 0 until len && !domainsIntersect(state.intDomains[arr[pos]], resultDom)) {
+                (toExclude ?: IntArrayList().also { toExclude = it }).add(iv)
             }
         }
         toExclude?.let { ex ->
-            val ant = state.composeIntVarAtomAntecedents(
-                if (arrIsVars) intArrayOf(result) + arr else intArrayOf(result),
-            )
-            for (i in 0 until ex.size) if (!state.excludeIntValue(idx, ex[i], ant)) return false
-        }
-
-        // 3. Bound result to the union of reachable element ranges over idx's surviving domain.
-        val survivor = state.intDomains[idx]
-        var unionLo = Int.MAX_VALUE
-        var unionHi = Int.MIN_VALUE
-        survivor.forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len) {
-                val lo = elemLow(state, pos)
-                val hi = elemHigh(state, pos)
-                if (lo < unionLo) unionLo = lo
-                if (hi > unionHi) unionHi = hi
+            for (i in 0 until ex.size) {
+                // Reason: the disjoint domains of result and the selected element (holes+bounds).
+                val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result, arr[ex[i] - indexOffset]))
+                if (!state.excludeIntValue(idx, ex[i], ant)) return false
             }
         }
-        if (unionLo > unionHi) return false // no reachable position — infeasible
-        // The union ranges over idx's *surviving* values, so the deduction depends on idx's
-        // interior holes, not just its bounds — e.g. when the excluded positions carried the
-        // extreme element values. A bounds-only reason under-cites and the learned clause
-        // over-prunes, so cite hole-aware antecedents instead.
-        val antIdx = collectHoleAndBoundAntecedents(
-            state,
-            if (arrIsVars) intArrayOf(idx) + arr else intArrayOf(idx),
-        )
-        if (!state.tightenIntMin(result, unionLo, antIdx)) return false
-        if (!state.tightenIntMax(result, unionHi, antIdx)) return false
 
-        // 4. idx fixed → channel result against the selected element (var array: both ways).
+        // Surviving positions (idx may have shrunk above). No reachable position ⇒ infeasible.
+        val positions = IntArrayList()
+        state.intDomains[idx].forEach { iv ->
+            val pos = iv - indexOffset
+            if (pos in 0 until len) positions.add(pos)
+        }
+        if (positions.size == 0) return false
+
+        // 3. Prune result: value v survives iff some reachable position can take it. Punch holes
+        //    for unreachable values (GAC), not just the [min, max] union of reachable elements.
+        var resExclude: IntArrayList? = null
+        state.intDomains[result].forEach { rv ->
+            var supported = false
+            for (k in 0 until positions.size) {
+                if (rv in state.intDomains[arr[positions[k]]]) {
+                    supported = true
+                    break
+                }
+            }
+            if (!supported) (resExclude ?: IntArrayList().also { resExclude = it }).add(rv)
+        }
+        resExclude?.let { ex ->
+            // Reason: idx's surviving domain (which positions remain) plus those positions'
+            // element domains — hole-aware, since a value's support is exactly its membership in
+            // one of the reachable element domains.
+            val arrVars = IntArray(positions.size) { arr[positions[it]] }
+            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx) + arrVars)
+            for (i in 0 until ex.size) if (!state.excludeIntValue(result, ex[i], ant)) return false
+        }
+
+        // 4. idx fixed → channel: result == arr(idx). The result-side prune is already done by
+        //    step 3 (single surviving position), so only the selected element needs filtering —
+        //    it loses every value not live in result.
         val d = state.intDomains[idx]
         if (d.min == d.max) {
             val pos = d.min - indexOffset
             if (pos in 0 until len) {
-                if (arrIsVars) {
-                    // The channeled bound is the OTHER var's current bound, so that var's
-                    // own trail joins the reason — citing the index pin alone would record
-                    // "idx = pos → bound" as if it held for any source value.
-                    val sel = arr[pos]
-                    val rd = state.intDomains[result]
-                    val sd = state.intDomains[sel]
-                    val antFromSel = state.composeIntVarAtomAntecedents(intArrayOf(idx, sel))
-                    if (!state.tightenIntMin(result, sd.min, antFromSel)) return false
-                    if (!state.tightenIntMax(result, sd.max, antFromSel)) return false
-                    val antFromResult = state.composeIntVarAtomAntecedents(intArrayOf(idx, result))
-                    if (!state.tightenIntMin(sel, rd.min, antFromResult)) return false
-                    if (!state.tightenIntMax(sel, rd.max, antFromResult)) return false
-                } else {
-                    val ant = state.composeIntVarAtomAntecedents(intArrayOf(idx))
-                    val v = arr[pos]
-                    if (!state.tightenIntMin(result, v, ant)) return false
-                    if (!state.tightenIntMax(result, v, ant)) return false
+                val sel = arr[pos]
+                val resD = state.intDomains[result]
+                var selExclude: IntArrayList? = null
+                state.intDomains[sel].forEach { v ->
+                    if (v !in resD) (selExclude ?: IntArrayList().also { selExclude = it }).add(v)
+                }
+                selExclude?.let { ex ->
+                    // The channeled removal depends on result's domain plus the index pin, so cite
+                    // both — citing the pin alone would record the prune as holding for any source.
+                    val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx, result))
+                    for (i in 0 until ex.size) if (!state.excludeIntValue(sel, ex[i], ant)) return false
                 }
             }
         }
         return true
+    }
+
+    /** Whether [a] and [b] share at least one live value (hole-aware). Disjoint ranges short-
+     *  circuit; otherwise the smaller domain is scanned for membership in the larger. */
+    private fun domainsIntersect(a: IntDomain, b: IntDomain): Boolean {
+        if (a.max < b.min || b.max < a.min) return false
+        val small = if (a.size <= b.size) a else b
+        val large = if (a.size <= b.size) b else a
+        var found = false
+        small.forEach { v -> if (v in large) found = true }
+        return found
     }
 }
