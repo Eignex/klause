@@ -102,6 +102,27 @@ class BigIntOracleTest {
     }
 
     @Test
+    fun `divmod with a single-limb divisor whose high bit is set`() {
+        // Regression: a one-limb divisor in [2^31, 2^32) overflowed the signed-Long `rem*2^32+limb`.
+        val rng = Random(31)
+        repeat(3000) {
+            var a = BigInt.of(rng.nextLong())
+            var oa = a.oracle()
+            repeat(rng.nextInt(0, 5)) {
+                val k = rng.nextLong()
+                a *= BigInt.of(k)
+                oa *= BigInteger.valueOf(k)
+            }
+            val dv = rng.nextLong(1L shl 31, 1L shl 32) // single 32-bit limb, high bit set
+            val d = BigInt.of(dv)
+            val (q, r) = a.divideAndRemainder(d)
+            val (oq, orr) = oa.divideAndRemainder(BigInteger.valueOf(dv))
+            assertEquals(oq.toString(), q.toString(), "q $oa / $dv")
+            assertEquals(orr.toString(), r.toString(), "r $oa % $dv")
+        }
+    }
+
+    @Test
     fun `divExact returns the exact quotient`() {
         val rng = Random(29)
         repeat(1000) {

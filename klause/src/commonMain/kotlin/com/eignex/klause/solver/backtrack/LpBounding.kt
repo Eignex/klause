@@ -8,6 +8,7 @@ import com.eignex.klause.solver.lp.Cut
 import com.eignex.klause.solver.lp.CutContext
 import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
+import com.eignex.klause.solver.lp.ExactBasisCertifier
 import com.eignex.klause.solver.lp.FloatSimplex
 import com.eignex.klause.solver.lp.LpExplanation
 import com.eignex.klause.solver.lp.LpModel
@@ -15,6 +16,7 @@ import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRelaxation
 import com.eignex.klause.solver.lp.LpSolution
 import com.eignex.klause.solver.lp.LpStatus
+import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.VarStatus
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.mulExact
@@ -223,11 +225,55 @@ internal fun BacktrackSolver.lpBoundAndFix(
         objectiveVar, objectiveAscending, globalCuts, seedTableau, cancellation,
     )
 } catch (_: LpOverflowException) {
-    // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. A missing
-    // bound or reduction only loses pruning, never soundness — keep the node and move on.
-    LpNodeOutcome(false, null)
+    // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. Instead of
+    // dropping the bound, recover a sound one via the float revised simplex + exact BigInt
+    // basis-certification pipeline (#567); a missing bound or reduction only loses pruning, never
+    // soundness, so a null/failed pipeline just keeps the node.
+    if (params.lpSparseBound) {
+        sparseCertifiedPrune(
+            relaxer,
+            session,
+            bound,
+            globalCuts,
+            sink,
+        )
+    } else {
+        LpNodeOutcome(false, null)
+    }
 } finally {
     sink.lpClockStop()
+}
+
+/**
+ * Sound objective lower bound from the float revised simplex + exact BigInt basis-certification,
+ * used when the exact `Long` path overflowed (#567). Prunes when the certified bound (plus the
+ * relaxation's objective constant) reaches the incumbent. Any failure (no incumbent, empty
+ * relaxation, non-convergence, singular basis, unbounded Lagrangian) keeps the node — sound.
+ */
+internal fun BacktrackSolver.sparseCertifiedPrune(
+    relaxer: CpToLpRelaxation,
+    session: PropagationSession,
+    bound: Double,
+    globalCuts: List<Cut>,
+    sink: SolveStatsSink,
+): LpNodeOutcome {
+    if (!bound.isFinite()) return LpNodeOutcome(false, null) // no incumbent to prune against
+    val relaxation = relaxer.build(session, globalCuts)
+    if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
+    sink.observeLpSolve()
+    val result = RevisedSimplex(relaxation.model).solve() ?: return LpNodeOutcome(false, null)
+    val lb = ExactBasisCertifier.lowerBoundCeil(relaxation.model, result.basis) ?: return LpNodeOutcome(false, null)
+    val full = try {
+        addExact(lb, relaxation.objectiveConstant)
+    } catch (_: LpOverflowException) {
+        return LpNodeOutcome(false, null)
+    }
+    return if (full.toDouble() >= bound) {
+        sink.observeLpPrune()
+        LpNodeOutcome(true, null)
+    } else {
+        LpNodeOutcome(false, null)
+    }
 }
 
 /** The LP relaxation's objective value (optimum + constant) when optimal, else NaN — the value

@@ -182,6 +182,13 @@ data class BacktrackParams(
      */
     val lpBounding: Boolean = false,
     /**
+     * Sparse-LU fallback for [lpBounding]: when the exact `Long` fraction-free dual simplex overflows
+     * 64 bits on a node (which previously lost the bound entirely), recover a sound objective lower
+     * bound via the float revised simplex + exact BigInt basis-certification pipeline and prune on it.
+     * Sound (the certified bound can only under-estimate); off by default, auto-enabled with [lpBounding].
+     */
+    val lpSparseBound: Boolean = false,
+    /**
      * Frequency policy for [lpBounding]: solve the LP at one in every [lpBoundEvery] pruning checks
      * rather than at every node, since the LP solve dominates a node's cost. `1` solves at every
      * checked node; larger values trade pruning power for throughput. Must be positive.
