@@ -67,6 +67,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private val bumpBoolVars = IntArrayList()
     private val bumpIntVars = IntArrayList()
 
+    // Atom-vars marked seen this analysis — the frontier the 1UIP atom-pivot scan walks instead of
+    // all `atomCount` atoms (O(frontier), not O(total)). A superset of the currently-seen atoms
+    // (never pruned), so the scan re-checks `seen[v]`. Cleared per analysis.
+    private val seenAtomList = IntArrayList()
+
     /** Bool vars seen during the last analysis (the VSIDS bump set). Valid only when the
      *  last call returned [AnalysisResult.Learned]; cleared at the start of each analysis. */
     fun lastBumpBoolVars(): IntArrayList = bumpBoolVars
@@ -204,6 +209,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         universe = numBoolVars + atomCount
         seen = scratch(seen, universe)
         resolved = scratch(resolved, universe)
+        seenAtomList.clear()
         bumpBoolVars.clear()
         bumpIntVars.clear()
         var currentLevelCount = 0
@@ -233,10 +239,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (pivot < 0) {
                 // Look for an atom pivot at currentLevel. Use the bound-history-derived level
                 // (not the drifted [atomLevel]) so a stale level can't hide a genuine
-                // current-level pivot or surface a spurious one (#76).
-                for (id in 0 until atomCount) {
-                    val v = numBoolVars + id
-                    if (seen[v] && state.atomLevelForConflict(id) == currentLevel) {
+                // current-level pivot or surface a spurious one. Scan only the seen-atom
+                // frontier, not all `atomCount` atoms — the bound-history level lookup is the
+                // dominant cost on int-only models, so O(frontier) ≪ O(total atoms). Stale
+                // (no-longer-seen) and duplicate entries are skipped by the `seen[v]` recheck.
+                for (k in 0 until seenAtomList.size) {
+                    val v = seenAtomList[k]
+                    if (seen[v] && state.atomLevelForConflict(v - numBoolVars) == currentLevel) {
                         pivot = v
                         break
                     }
@@ -610,6 +619,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 bumpBoolVars.add(v)
             } else {
                 bumpIntVars.add(state.atomIntVar[v - numBoolVars])
+                seenAtomList.add(v) // frontier atom — candidate for the 1UIP atom-pivot scan
             }
             if (lvl == currentLevel) {
                 bumpCurrentLevel()
