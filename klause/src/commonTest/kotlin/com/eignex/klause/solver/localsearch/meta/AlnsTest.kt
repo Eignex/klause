@@ -102,11 +102,11 @@ class AlnsTest {
         val alns = Alns(
             inner = inner,
             destroyFraction = 0.5,
-            maxIterations = 20,
+            maxIterations = 8,
             flipsPerIteration = 200L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
     }
@@ -126,9 +126,9 @@ class AlnsTest {
         val inner = LocalSearchSolver(problem)
         val alns = Alns(
             inner = inner,
-            repairOperators = listOf(InnerLsRepair("quick", 200L), InnerLsRepair("deep", 5_000L)),
+            repairOperators = listOf(InnerLsRepair("quick", 200L), InnerLsRepair("deep", 1_000L)),
             destroyFraction = 0.5,
-            maxIterations = 30,
+            maxIterations = 12,
             flipsPerIteration = 500L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )

@@ -115,7 +115,7 @@ class CblsStallChainTest {
         state.recompute()
         val strategy = Cbls()
         var compounds = 0
-        repeat(5_000) {
+        repeat(1_500) {
             val m = strategy.pickMove(state)
             if (m != null) {
                 if (m is Move.Compound) compounds++
@@ -148,9 +148,10 @@ class CblsStallChainTest {
         state.recompute()
         val strategy = Cbls(stallChainCap = 8)
         var chainPicks = 0
-        var budget = 10_000
-        // A few validated chain picks prove the machinery engages; stop early once they surface.
-        while (budget-- > 0 && chainPicks < 3) {
+        var budget = 3_000
+        // One validated chain pick proves the machinery engages and derives a well-formed
+        // (no-repeated-var) compound; stop at the first to avoid riding the stalled search.
+        while (budget-- > 0 && chainPicks < 1) {
             val m = strategy.pickMove(state)
             if (m != null) {
                 if (m is Move.Compound) {

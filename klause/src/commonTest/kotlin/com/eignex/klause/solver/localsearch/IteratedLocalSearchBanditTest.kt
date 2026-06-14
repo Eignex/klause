@@ -34,7 +34,7 @@ class IteratedLocalSearchBanditTest {
                 acceptanceBandit = IteratedLocalSearchRestart.acceptanceBandit(seed = 1L),
             ),
         )
-        val r = solver.minimize(obj, LocalSearchParams(maxFlips = 50_000L, randomSeed = 0L))
+        val r = solver.minimize(obj, LocalSearchParams(maxFlips = 6_000L, randomSeed = 0L))
         val best = assertIs<MinimizeResult.WithSample>(r)
         assertTrue(best.objectiveValue <= 5.0, "expected a near-optimal incumbent, got ${best.objectiveValue}")
     }

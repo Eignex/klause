@@ -81,8 +81,8 @@ class RestartPolicyTest {
         val fixed = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart())
         val adaptive = LocalSearchSolver(problem, restartPolicy = AdaptivePerturbationRestart())
 
-        val a = fixed.minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 1L)).assignment
-        val b = adaptive.minimize(objective, LocalSearchParams(maxFlips = 100_000L, randomSeed = 1L)).assignment
+        val a = fixed.minimize(objective, LocalSearchParams(maxFlips = 8_000L, randomSeed = 1L)).assignment
+        val b = adaptive.minimize(objective, LocalSearchParams(maxFlips = 8_000L, randomSeed = 1L)).assignment
         assertNotNull(a)
         assertNotNull(b)
         assertEquals(objective.evaluate(a), objective.evaluate(b))

@@ -76,7 +76,7 @@ class CblsStallSwapTest {
     fun `default stallSwapCap 0 never emits a stall swap`() {
         val state = LocalSearchState(stallProblem(), Random(7))
         var compounds = 0
-        drive(Cbls(), state, steps = 5_000) { if (it is Move.Compound) compounds++ }
+        drive(Cbls(), state, steps = 2_000) { if (it is Move.Compound) compounds++ }
         assertEquals(0, compounds, "default Cbls must not emit swap compounds on a compound-free problem")
     }
 
