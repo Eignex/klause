@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -59,8 +60,14 @@ class Table(
      *  `[0, numValid)` is live (still feasible). On push the engine clones via
      *  [snapshotCopy]; on pop the cloned state is restored, so [numValid] correctly
      *  reflects the level we backjumped to. */
-    private class Str2State(val validTuples: IntArray, var numValid: Int) : PropagationState.SnapshottablePayload {
-        override fun snapshotCopy(): Str2State = Str2State(validTuples.copyOf(), numValid)
+    private class Str2State(
+        val validTuples: IntArray,
+        var numValid: Int,
+        /** Column domain refs at the last successful propagate, for the unchanged-domains fast
+         *  path. Snapshotted so the check reflects the level's fixpoint after a backtrack. */
+        val cachedDoms: Array<IntDomain?>,
+    ) : PropagationState.SnapshottablePayload {
+        override fun snapshotCopy(): Str2State = Str2State(validTuples.copyOf(), numValid, cachedDoms.copyOf())
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -159,10 +166,22 @@ class Table(
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val s = (state.refPayload[factorId] as? Str2State) ?: run {
-            val fresh = Str2State(IntArray(numTuples) { it }, numTuples)
+            val fresh = Str2State(IntArray(numTuples) { it }, numTuples, arrayOfNulls(arity))
             state.refPayload[factorId] = fresh
             fresh
         }
+        // Incremental fast path: if no column's domain ref changed since the last successful
+        // propagate, STR2 already pruned to that fixpoint and would deduce nothing new. (IntDomain
+        // is immutable — a tighten allocates a fresh object — so reference identity per column means
+        // the column's domain is byte-for-byte unchanged.)
+        var changed = false
+        for (col in 0 until arity) {
+            if (s.cachedDoms[col] !== state.intDomains[xs[col]]) {
+                changed = true
+                break
+            }
+        }
+        if (!changed && s.cachedDoms[0] != null) return true
         // Per-column support bitsets: bit (value - lo[col]) is set iff some currently-feasible
         // tuple has that value at the column. Spans are bounded by the column's current
         // domain [min..max] (values outside this band cannot appear because infeasible
@@ -253,6 +272,8 @@ class Table(
                 if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
             }
         }
+        // Record the post-propagate domain refs so the next fire can short-circuit if nothing moved.
+        for (col in 0 until arity) s.cachedDoms[col] = state.intDomains[xs[col]]
         return true
     }
 }

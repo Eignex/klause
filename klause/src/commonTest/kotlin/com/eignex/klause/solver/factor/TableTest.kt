@@ -74,4 +74,35 @@ class TableTest {
             "got $ints — not a known tuple",
         )
     }
+
+    @Test
+    fun `backtrack enumeration equals the in-domain tuple set`() {
+        // Soundness gate for the unchanged-domains fast path: enumerating fires propagate
+        // repeatedly on one PropagationState — fast-path hits on no-op re-fires, misses when a
+        // decision shrinks a column — across push/pop that snapshot/restore the cached domain
+        // refs. An unsound skip (returning satisfied when a value should have been pruned) would
+        // let a forbidden tuple through, so the enumerated set must equal the brute-force set of
+        // allowed rows that lie within the domains.
+        data class Inst(val arity: Int, val lo: Int, val hi: Int, val tuples: List<List<Int>>)
+        val instances = listOf(
+            Inst(2, 0, 3, listOf(listOf(0, 1), listOf(2, 3), listOf(1, 1))),
+            Inst(3, 0, 4, listOf(listOf(1, 2, 3), listOf(1, 4, 1), listOf(3, 3, 3), listOf(0, 0, 0))),
+            Inst(3, 0, 2, listOf(listOf(0, 1, 2), listOf(2, 1, 0), listOf(1, 1, 1), listOf(0, 0, 0), listOf(2, 2, 2))),
+        )
+        for ((idx, inst) in instances.withIndex()) {
+            val varsOf = IntArray(inst.arity) { it }
+            val flat = IntArray(inst.tuples.size * inst.arity)
+            inst.tuples.forEachIndexed { r, t -> for (c in 0 until inst.arity) flat[r * inst.arity + c] = t[c] }
+            val brute = inst.tuples.filter { t -> t.all { it in inst.lo..inst.hi } }.map { it.toList() }.toHashSet()
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = inst.arity,
+                intDomains = Array(inst.arity) { IntDomain(inst.lo, inst.hi) },
+                factors = arrayOf<Factor>(Table(xs = varsOf, tuples = flat)),
+            )
+            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "table instance #$idx: enumerated solutions must equal in-domain tuples")
+        }
+    }
 }
