@@ -262,18 +262,8 @@ private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layo
         }
     }
     if (rExpr != null) {
-        val r = resolveBoolLit(rExpr)
-        // r ↔ ⋁ membershipLits.
-        val lits = membershipLits.toIntArray()
-        if (lits.isEmpty()) {
-            // No element of x's domain is in S's universe → r must be false.
-            factors.add(Clause(intArrayOf(Lit.negate(r))))
-        } else {
-            // r → ⋁ aux : (¬r ∨ aux1 ∨ ... ∨ auxn)
-            factors.add(Clause(intArrayOf(Lit.negate(r)) + lits))
-            // each auxᵢ → r : (¬auxᵢ ∨ r)
-            for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), r)))
-        }
+        // r ↔ ⋁ membershipLits — empty (no domain value lands in S's universe) forces r false.
+        reifyOrOfLits(membershipLits.toIntArray(), resolveBoolLit(rExpr))
     }
 }
 
@@ -321,10 +311,19 @@ internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) 
 }
 
 /** `r ↔ ⋀ lits`. Decomposes to one big OR (the "r false implies some lit false" direction)
- *  plus one binary clause per lit (the "r true implies lit true" direction). */
+ *  plus one binary clause per lit (the "r true implies lit true" direction). Empty [lits]
+ *  forces `r` true (the empty conjunction is true). */
 internal fun FlatZincCompiler.reifyAndOfLits(lits: IntArray, r: Int) {
     factors.add(Clause(lits.map { Lit.negate(it) }.toIntArray() + intArrayOf(r)))
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(r), l)))
+}
+
+/** `r ↔ ⋁ lits` — the De Morgan mirror of [reifyAndOfLits]. One big clause (`r true implies
+ *  some lit true`) plus one binary clause per lit (`lit true implies r true`). Empty [lits]
+ *  forces `r` false (the empty disjunction is false), via a unit `(¬r)` clause. */
+internal fun FlatZincCompiler.reifyOrOfLits(lits: IntArray, r: Int) {
+    factors.add(Clause(intArrayOf(Lit.negate(r)) + lits))
+    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), r)))
 }
 
 /** `set_eq(S, T)` / `set_eq_reif(S, T, r)`. Non-reified: per element of S ∪ T's universe,
