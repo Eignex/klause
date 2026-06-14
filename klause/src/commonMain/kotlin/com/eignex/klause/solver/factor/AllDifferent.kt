@@ -39,6 +39,11 @@ class AllDifferent(
      *  values are modelled inside [reginFilter] as capacity-n value copies, so the exact
      *  Hall/matching machinery applies unchanged. */
     val exceptSet: IntArray = EmptyIntArray,
+    /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller
+     *  asked for bounds-consistency rather than full GAC (e.g. ghoulomb's `distinct ::bounds`,
+     *  Régin's matching/SCC/Hall machinery is then skipped in favour of a much cheaper
+     *  filter, trading pruning strength for per-node throughput as the model intends. */
+    val boundsConsistent: Boolean = false,
 ) : Factor,
     OptionalFactor {
 
@@ -66,8 +71,9 @@ class AllDifferent(
 
     override fun structuralKey(): String {
         val exceptKey = if (exceptSorted.isEmpty()) "" else ":except=" + exceptSorted.joinToString(",")
+        val bcKey = if (boundsConsistent) ":bc" else ""
         return "alldiff:$domainMin:$domainSize:" +
-            vars.sorted().joinToString(",") + ":" + presents.sorted().joinToString(",") + exceptKey
+            vars.sorted().joinToString(",") + ":" + presents.sorted().joinToString(",") + exceptKey + bcKey
     }
 
     /** Plain distinctness ignores which values are used — invariant under any value relabeling
@@ -79,11 +85,24 @@ class AllDifferent(
     override fun remapValues(valueMap: (Int) -> Int): Factor = if (exceptSet.isEmpty()) {
         this
     } else {
-        AllDifferent(vars, domainMin, domainSize, presents, IntArray(exceptSet.size) { valueMap(exceptSet[it]) })
+        AllDifferent(
+            vars,
+            domainMin,
+            domainSize,
+            presents,
+            IntArray(exceptSet.size) { valueMap(exceptSet[it]) },
+            boundsConsistent,
+        )
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        AllDifferent(vars.remapVars(intMap), domainMin, domainSize, presents.remapLits(boolMap), exceptSet)
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = AllDifferent(
+        vars.remapVars(intMap),
+        domainMin,
+        domainSize,
+        presents.remapLits(boolMap),
+        exceptSet,
+        boundsConsistent,
+    )
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars
@@ -252,6 +271,18 @@ class AllDifferent(
         collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? ReginCache)?.conflictVars ?: vars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        // Bounds-consistency fast path for plain all-different (no optional positions, no
+        // excepted values — both of which need the Régin value graph). Far cheaper per node.
+        if (boundsConsistent && presents.isEmpty() && exceptSet.isEmpty()) {
+            val hall = boundsAllDifferentFilter(state, vars)
+            if (hall != null) {
+                val cache = (state.refPayload[factorId] as? ReginCache)
+                    ?: ReginCache().also { state.refPayload[factorId] = it }
+                cache.conflictVars = hall
+                return false
+            }
+            return true
+        }
         // Only the definitely-present positions participate in Régin filtering. Build a
         // local index map: filteredIdx → original position. Unpinned-presence positions
         // are dropped — they may still go absent and would otherwise force unsound prunes.

@@ -84,6 +84,18 @@ class FznDecomposedGlobalsTest {
     }
 
     @Test
+    fun `all_different with bounds annotation matches brute force`() {
+        // The `::bounds` annotation routes to AllDifferent's bounds-consistency path (#561); the
+        // enumerated solution set must still be exactly the all-different tuples (consistency level
+        // changes pruning speed, never the constraint's semantics).
+        val found = enumerate(
+            decl(2) + "constraint klause_all_different_int([x1, x2, x3]):: bounds;\nsolve satisfy;",
+            names,
+        )
+        assertEquals(brute(3, 2) { it.toSet().size == 3 }, found)
+    }
+
+    @Test
     fun `at_most matches brute force`() {
         // fzn_at_most_int(n, x, v): at most n of x equal v.
         val found = enumerate(decl(2) + "constraint fzn_at_most_int(1, [x1, x2, x3], 1);\nsolve satisfy;", names)
