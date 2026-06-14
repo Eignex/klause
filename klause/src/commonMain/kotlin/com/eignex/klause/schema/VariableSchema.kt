@@ -43,23 +43,28 @@ open class VariableSchema : Schema<SchemaEntry>() {
         register(FloatSpec(min, max, buckets)) { FloatHandle(it, min, max, buckets) }
 
     /**
+     * Shared delegate for the opt-variable builders: declares the synthetic presence Boolean
+     * `<prop>__present` plus the value variable's [valueSpec], then wires both into the typed
+     * handle built by [makeHandle] (given the value var's name and its presence handle).
+     */
+    private fun <H> optVar(valueSpec: SchemaEntry, makeHandle: (name: String, present: BoolHandle) -> H) =
+        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, H>> { thisRef, prop ->
+            val pName = presenceName(prop.name)
+            thisRef.add(pName, PresenceSpec(prop.name))
+            thisRef.add(prop.name, valueSpec)
+            val handle = makeHandle(prop.name, BoolHandle(pName))
+            ReadOnlyProperty { _, _ -> handle }
+        }
+
+    /**
      * Optional integer variable: declares a presence Boolean named `<prop>__present` alongside
      * the value variable. Compare via [OptIntHandle]'s opt-aware operators to get MiniZinc's
      * "undefined → false" semantics, or coerce to a regular [com.eignex.klause.model.IntExpr]
      * with [OptIntHandle.valueOr].
      */
-    protected fun optIntVar(min: Int, max: Int) =
-        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptIntHandle>> { thisRef, prop ->
-            val pName = presenceName(prop.name)
-            thisRef.add(pName, PresenceSpec(prop.name))
-            thisRef.add(prop.name, IntSpec(min, max))
-            val handle = OptIntHandle(
-                name = prop.name,
-                present = BoolHandle(pName),
-                value = IntHandle(prop.name, min, max),
-            )
-            ReadOnlyProperty { _, _ -> handle }
-        }
+    protected fun optIntVar(min: Int, max: Int) = optVar(IntSpec(min, max)) { name, present ->
+        OptIntHandle(name = name, present = present, value = IntHandle(name, min, max))
+    }
 
     /**
      * Optional float variable: declares a presence Boolean named `<prop>__present` alongside the
@@ -68,16 +73,8 @@ open class VariableSchema : Schema<SchemaEntry>() {
      * [com.eignex.klause.compile.CompiledProblem.decode] to read `null` when absent.
      */
     protected fun optFloatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
-        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptFloatHandle>> { thisRef, prop ->
-            val pName = presenceName(prop.name)
-            thisRef.add(pName, PresenceSpec(prop.name))
-            thisRef.add(prop.name, FloatSpec(min, max, buckets))
-            val handle = OptFloatHandle(
-                name = prop.name,
-                present = BoolHandle(pName),
-                value = FloatHandle(prop.name, min, max),
-            )
-            ReadOnlyProperty { _, _ -> handle }
+        optVar(FloatSpec(min, max, buckets)) { name, present ->
+            OptFloatHandle(name = name, present = present, value = FloatHandle(name, min, max))
         }
 
     /**
@@ -85,18 +82,9 @@ open class VariableSchema : Schema<SchemaEntry>() {
      * context the handle coerces to `present ∧ value`; access [OptBoolHandle.present] /
      * [OptBoolHandle.value] for direct manipulation.
      */
-    protected fun optBoolVar() =
-        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptBoolHandle>> { thisRef, prop ->
-            val pName = presenceName(prop.name)
-            thisRef.add(pName, PresenceSpec(prop.name))
-            thisRef.add(prop.name, BoolSpec)
-            val handle = OptBoolHandle(
-                name = prop.name,
-                present = BoolHandle(pName),
-                value = BoolHandle(prop.name),
-            )
-            ReadOnlyProperty { _, _ -> handle }
-        }
+    protected fun optBoolVar() = optVar(BoolSpec) { name, present ->
+        OptBoolHandle(name = name, present = present, value = BoolHandle(name))
+    }
 
     /**
      * Set variable over an integer universe. Internally allocates one indicator bool per
@@ -124,16 +112,8 @@ open class VariableSchema : Schema<SchemaEntry>() {
      * Comparisons via [OptNominalHandle.eq] / [OptNominalHandle.ne] fold the presence guard in.
      */
     protected fun optNominal(vararg labels: String) = labels.toList().let { ls ->
-        PropertyDelegateProvider<VariableSchema, ReadOnlyProperty<VariableSchema, OptNominalHandle>> { thisRef, prop ->
-            val pName = presenceName(prop.name)
-            thisRef.add(pName, PresenceSpec(prop.name))
-            thisRef.add(prop.name, NominalSpec(ls))
-            val handle = OptNominalHandle(
-                name = prop.name,
-                present = BoolHandle(pName),
-                value = NominalHandle(prop.name, ls),
-            )
-            ReadOnlyProperty { _, _ -> handle }
+        optVar(NominalSpec(ls)) { name, present ->
+            OptNominalHandle(name = name, present = present, value = NominalHandle(name, ls))
         }
     }
 
