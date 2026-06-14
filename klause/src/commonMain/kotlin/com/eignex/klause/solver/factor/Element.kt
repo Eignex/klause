@@ -7,6 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `result = arr(idx)` — the element constraint, native to local search rather than a
@@ -180,7 +181,7 @@ class Element(
         }
 
         // 3. Prune result to the constants still reachable through idx's surviving positions.
-        val reachable = HashSet<Int>()
+        val reachable = IntHashSet()
         state.intDomains[idx].forEach { iv ->
             val pos = iv - indexOffset
             if (pos in 0 until len) reachable.add(arr[pos])

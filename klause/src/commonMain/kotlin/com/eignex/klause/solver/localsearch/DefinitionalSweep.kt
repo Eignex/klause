@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.util.IntArrayDeque
 
 /**
  * A local-search acceleration structure (consumed by [LocalSearchSolver]): the topologically-
@@ -296,12 +297,12 @@ class InvariantNetwork internal constructor(
      */
     fun affectedNodes(seedInts: IntArray, seedBools: IntArray): IntArray {
         val marked = HashSet<Int>()
-        val work = ArrayDeque<Int>()
+        val work = IntArrayDeque()
         fun seedInt(v: Int) {
-            if (v >= 0) for (i in intReaders[v]) if (marked.add(i)) work.add(i)
+            if (v >= 0) for (i in intReaders[v]) if (marked.add(i)) work.addLast(i)
         }
         fun seedBool(v: Int) {
-            if (v >= 0) for (i in boolReaders[v]) if (marked.add(i)) work.add(i)
+            if (v >= 0) for (i in boolReaders[v]) if (marked.add(i)) work.addLast(i)
         }
         for (v in seedInts) seedInt(v)
         for (v in seedBools) seedBool(v)

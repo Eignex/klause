@@ -15,6 +15,8 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ValuePrecede
 import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Problem-level presolve transforms. Each takes a [Problem] and returns an equivalent one with
@@ -433,7 +435,7 @@ object Presolve {
             if (f is Linear) leRowOf(f, i)?.let { rows.add(it) }
         }
         if (rows.size < 2 || rows.size > SUBSET_DOMINATION_ROW_CAP) return factors
-        val dropped = HashSet<Int>()
+        val dropped = IntHashSet()
         for (b in rows) {
             for (a in rows) {
                 if (a.factorIndex == b.factorIndex || a.coeffByVar.size >= b.coeffByVar.size) continue
@@ -519,23 +521,26 @@ object Presolve {
      *  resulting activity upper bound to the bound. */
     private fun cliqueImpliesKnapsack(knapsack: PseudoBoolean, cliques: List<Set<Int>>): Boolean {
         if (knapsack.weights.any { it <= 0 }) return false
-        val weightByLit = HashMap<Int, Int>(knapsack.literals.size)
-        for (i in knapsack.literals.indices) weightByLit[knapsack.literals[i]] = knapsack.weights[i]
-        val assigned = HashSet<Int>()
+        // Every weight is > 0 (guarded above), so 0 doubles as the "literal not in the knapsack"
+        // sentinel for [MutableIntIntMap.getOrDefault].
+        val weightByLit = MutableIntIntMap(knapsack.literals.size)
+        for (i in knapsack.literals.indices) weightByLit.put(knapsack.literals[i], knapsack.weights[i])
+        val assigned = IntHashSet()
         var activity = 0L
         for (clique in cliques) {
             var maxW = 0
             var any = false
             for (lit in clique) {
                 if (lit in assigned) continue
-                val w = weightByLit[lit] ?: continue
+                val w = weightByLit.getOrDefault(lit, 0)
+                if (w == 0) continue
                 any = true
                 assigned.add(lit)
                 if (w > maxW) maxW = w
             }
             if (any) activity += maxW
         }
-        for (lit in knapsack.literals) if (lit !in assigned) activity += weightByLit.getValue(lit)
+        for (lit in knapsack.literals) if (lit !in assigned) activity += weightByLit.getOrDefault(lit, 0)
         return activity <= knapsack.bound
     }
 
@@ -650,7 +655,7 @@ object Presolve {
         val trueSafe = BooleanArray(nb) { true } // b = true never violates a constraint
         val falseSafe = BooleanArray(nb) { true } // b = false never violates a constraint
         val boolEligible = BooleanArray(nb) { true }
-        val alreadyPinned = HashSet<Int>() // bool vars already forced by a unit clause
+        val alreadyPinned = IntHashSet() // bool vars already forced by a unit clause
         for (f in problem.factors) {
             if (f is Linear && (f.op == LinearOp.LE || f.op == LinearOp.GE)) {
                 for (i in f.vars.indices) {
@@ -710,7 +715,7 @@ object Presolve {
         trueSafe: BooleanArray,
         falseSafe: BooleanArray,
         boolEligible: BooleanArray,
-        alreadyPinned: HashSet<Int>,
+        alreadyPinned: IntHashSet,
     ) {
         when {
             f is Clause -> {

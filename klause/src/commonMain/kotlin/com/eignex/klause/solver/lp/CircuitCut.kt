@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.util.IntArrayDeque
+
 /**
  * Arc-indicator model for one [com.eignex.klause.solver.factor.Circuit]: the LP columns of the
  * binary arc variables `y_ij` (1 iff `succ(i) = j`) that the base relaxation creates under the
@@ -123,8 +125,8 @@ internal class CircuitSeparator : CutSeparator {
         while (true) {
             parentEdge.fill(-1)
             parentEdge[s] = -2 // source visited; no parent edge
-            val queue = ArrayDeque<Int>()
-            queue.add(s)
+            val queue = IntArrayDeque()
+            queue.addLast(s)
             while (queue.isNotEmpty()) {
                 val u = queue.removeFirst()
                 var e = eHead[u]
@@ -132,7 +134,7 @@ internal class CircuitSeparator : CutSeparator {
                     val v = eTo[e]
                     if (parentEdge[v] == -1 && cap[e] > TOL) {
                         parentEdge[v] = e
-                        queue.add(v)
+                        queue.addLast(v)
                     }
                     e = eNext[e]
                 }
@@ -156,8 +158,8 @@ internal class CircuitSeparator : CutSeparator {
         }
         val reach = BooleanArray(n)
         reach[s] = true
-        val queue = ArrayDeque<Int>()
-        queue.add(s)
+        val queue = IntArrayDeque()
+        queue.addLast(s)
         while (queue.isNotEmpty()) {
             val u = queue.removeFirst()
             var e = eHead[u]
@@ -165,7 +167,7 @@ internal class CircuitSeparator : CutSeparator {
                 val v = eTo[e]
                 if (!reach[v] && cap[e] > TOL) {
                     reach[v] = true
-                    queue.add(v)
+                    queue.addLast(v)
                 }
                 e = eNext[e]
             }

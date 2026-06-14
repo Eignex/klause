@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -102,7 +103,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
         val dist = LongArray(nodeCount) { INF }
         val inQueue = BooleanArray(nodeCount)
         dist[source] = 0L
-        val queue = ArrayDeque<Int>()
+        val queue = IntArrayDeque()
         queue.addLast(source)
         inQueue[source] = true
         while (queue.isNotEmpty()) {

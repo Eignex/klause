@@ -7,6 +7,7 @@ import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -296,7 +297,7 @@ internal class CumulativeRelaxation(private val problem: Problem) {
 
         fun endUpperBoundsOf(start: Int, dur: Int): Set<Int> {
             val result = HashSet<Int>()
-            val queue = ArrayDeque<Int>()
+            val queue = IntArrayDeque()
             // Seed: vars directly proven ≥ start + c with c ≥ dur are ≥ the task end.
             geFrom[start]?.forEach { wc ->
                 if (wc[1] >= dur.toLong()) {
