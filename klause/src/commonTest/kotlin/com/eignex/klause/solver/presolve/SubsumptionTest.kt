@@ -6,6 +6,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.PseudoBoolean
@@ -272,5 +274,67 @@ class SubsumptionTest {
             ),
         )
         checkPbPreserved("pb-independent", problem, expectDrop = false)
+    }
+
+    @Test
+    fun `knapsack implied by an at-most-one cardinality clique is dropped`() {
+        // AMO(b0,b1,b2) caps b0+b1+b2 at 1, so b0+b1+b2 <= 2 is redundant given the clique (#527).
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1),
+                PseudoBoolean(intArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 2),
+            ),
+        )
+        checkPbPreserved("clique-implies-knapsack", problem, expectDrop = true)
+    }
+
+    @Test
+    fun `weighted knapsack implied by a partial clique cover is dropped`() {
+        // 5*b0 + 2*b1 + 2*b2 <= 7 with AMO(b1,b2): clique-aware activity = 5 + max(2,2) = 7 <= 7, so the
+        // knapsack holds for every clique-respecting assignment and is redundant.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Cardinality(intArrayOf(pos(1), pos(2)), min = 0, max = 1),
+                PseudoBoolean(intArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 7),
+            ),
+        )
+        checkPbPreserved("clique-partial-cover", problem, expectDrop = true)
+    }
+
+    @Test
+    fun `knapsack implied by a binary-clause clique is dropped`() {
+        // The clause ¬b0 ∨ ¬b1 is exactly AMO(b0,b1), so b0+b1 <= 1 is redundant given it.
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 1),
+            ),
+        )
+        checkPbPreserved("clique-from-clause", problem, expectDrop = true)
+    }
+
+    @Test
+    fun `knapsack not implied by the clique is kept`() {
+        // 5*b0 + 2*b1 + 2*b2 <= 6 with AMO(b1,b2): clique-aware activity = 5 + 2 = 7 > 6, so the
+        // knapsack genuinely forbids (b0,b1) = (1,1) and must be kept — soundness guard.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Cardinality(intArrayOf(pos(1), pos(2)), min = 0, max = 1),
+                PseudoBoolean(intArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6),
+            ),
+        )
+        checkPbPreserved("clique-not-implied", problem, expectDrop = false)
     }
 }
