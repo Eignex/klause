@@ -50,6 +50,21 @@ class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
 
+    /**
+     * A pure binary value relation `c·x ⟨=|≠⟩ c·y` — two terms with opposite-equal coefficients and a
+     * zero bound, comparing for equality or distinctness. Its allowed-tuple set (`{x = y}` / `{x ≠ y}`)
+     * is invariant under *any* uniform relabeling of values, so it is value-anonymous (#501). Every
+     * other linear is value-meaningful: an ordering (`≤`/`≥`) is not relabeling-invariant, and a
+     * nonzero bound or non-opposite coefficients tie the variables to specific magnitudes.
+     */
+    private fun isBinaryValueRelation(): Boolean = (op == LinearOp.EQ || op == LinearOp.NE) && bound == 0 &&
+        vars.size == 2 && coeffs[0] != 0 && coeffs[0] == -coeffs[1]
+
+    override fun isValueAnonymous(): Boolean = isBinaryValueRelation()
+
+    // A value-anonymous factor names no value as a constant, so a relabeling maps it to itself (#501).
+    override fun remapValues(valueMap: (Int) -> Int): Factor? = if (isBinaryValueRelation()) this else null
+
     override val boolVars: IntArray = EmptyIntArray
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !holds(state.longPayload[factorId])
