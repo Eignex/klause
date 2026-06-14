@@ -337,4 +337,30 @@ class SubsumptionTest {
         )
         checkPbPreserved("clique-not-implied", problem, expectDrop = false)
     }
+
+    @Test
+    fun `vacuous all-different over disjoint domains is dropped`() {
+        // x0 in [0,1], x1 in [2,3]: the domains can never collide, so all-different always holds and
+        // the constraint is vacuously redundant — dropped, feasible set unchanged (#553).
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(2, 3)),
+            listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
+        )
+        val out = checkPreserved("vacuous-alldiff", problem, expectDrop = true)
+        assertEquals(0, out.factors.size, "the vacuous global is removed")
+    }
+
+    @Test
+    fun `all-different over overlapping domains is kept`() {
+        // x0, x1 both in [0,1] can collide, so all-different is a real constraint — not dropped.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2)),
+        )
+        checkPreserved("real-alldiff", problem, expectDrop = false)
+    }
 }
