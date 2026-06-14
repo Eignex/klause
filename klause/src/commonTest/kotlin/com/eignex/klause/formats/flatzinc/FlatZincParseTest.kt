@@ -62,7 +62,7 @@ class FlatZincParseTest {
     }
 
     @Test
-    fun `scalar var alias is bound to its target, not a free var`() {
+    fun `scalar var alias is bound to its target not left a free var`() {
         // `var T: name = <var>;` aliases name to another var. The compiler used to drop the
         // binding and allocate a fresh, disconnected var — so an aliased objective output var
         // floated at its domain minimum regardless of the real objective (#478). Here `obj`
