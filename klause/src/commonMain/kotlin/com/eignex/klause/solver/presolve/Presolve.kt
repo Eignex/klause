@@ -834,7 +834,21 @@ object Presolve {
      */
     fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): Problem {
         val n = problem.numIntVars
-        if (n == 0 || problem.factors.any { !it.isValueAnonymous() }) return problem
+        if (n == 0) return problem
+        // Value-anonymous fast path: every value relabeling is a symmetry, so each domain-incidence
+        // group is one fully-interchangeable orbit. Otherwise verify the orbits against the
+        // value-relabelable factors (#442) — needs every factor keyed, else bail.
+        val allAnonymous = problem.factors.all { it.isValueAnonymous() }
+        val base: Map<String, Int>? = if (allAnonymous) {
+            null
+        } else {
+            val m = HashMap<String, Int>()
+            for (f in problem.factors) {
+                val k = f.structuralKey() ?: return problem
+                m[k] = (m[k] ?: 0) + 1
+            }
+            m
+        }
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
         for (d in problem.intDomains) {
@@ -849,18 +863,26 @@ object Presolve {
             if (sig.isNotEmpty()) incidence.getOrPut(sig.toString()) { ArrayList() }.add(value)
         }
         val extra = ArrayList<Factor>()
-        for (values in incidence.values) {
-            if (values.size < 2) continue
-            val orbitSet = values.toHashSet()
-            val seq = ArrayList<Int>()
-            for (x in 0 until n) {
-                if (x !in objectiveIntVars && domainWithin(problem.intDomains[x], orbitSet)) seq.add(x)
-            }
-            if (seq.size < 2) continue
-            val sortedValues = values.sorted()
-            val seqArray = seq.toIntArray()
-            for (i in 0 until sortedValues.size - 1) {
-                extra.add(ValuePrecede(sortedValues[i], sortedValues[i + 1], seqArray))
+        for (candidate in incidence.values) {
+            if (candidate.size < 2) continue
+            // A verified orbit is interchangeable; ordering its first occurrences is sound. A
+            // fully-internal variable (domain ⊆ orbit) exists only when the orbit equals the whole
+            // incidence group, so a split orbit simply posts nothing — never unsound.
+            val orbits =
+                if (allAnonymous) listOf(candidate) else verifyValueOrbits(problem, requireNotNull(base), candidate)
+            for (orbit in orbits) {
+                if (orbit.size < 2) continue
+                val orbitSet = orbit.toHashSet()
+                val seq = ArrayList<Int>()
+                for (x in 0 until n) {
+                    if (x !in objectiveIntVars && domainWithin(problem.intDomains[x], orbitSet)) seq.add(x)
+                }
+                if (seq.size < 2) continue
+                val sortedValues = orbit.sorted()
+                val seqArray = seq.toIntArray()
+                for (i in 0 until sortedValues.size - 1) {
+                    extra.add(ValuePrecede(sortedValues[i], sortedValues[i + 1], seqArray))
+                }
             }
         }
         if (extra.isEmpty()) return problem
