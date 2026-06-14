@@ -40,11 +40,11 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "bool_lt" -> emitBoolCmp(c, lt = true, reified = false)
 
-    "bool_eq_reif" -> emitBoolCmpReif(c, eq = true, le = false, lt = false)
+    "bool_eq_reif" -> emitBoolCmpReif(c, BoolCmpOp.EQ)
 
-    "bool_le_reif" -> emitBoolCmpReif(c, eq = false, le = true, lt = false)
+    "bool_le_reif" -> emitBoolCmpReif(c, BoolCmpOp.LE)
 
-    "bool_lt_reif" -> emitBoolCmpReif(c, eq = false, le = false, lt = true)
+    "bool_lt_reif" -> emitBoolCmpReif(c, BoolCmpOp.LT)
 
     // Int comparisons (binary)
     "int_le", "int_lt", "int_eq", "int_ne", "int_ge", "int_gt" -> emitIntCmp(c)
@@ -196,32 +196,26 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "at_most_int" -> emitAtMost(c)
 
-    "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, lowUp = false, closed = false)
+    "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, GccVariant.STANDARD)
 
-    "global_cardinality_closed", "fzn_global_cardinality_closed" -> emitGcc(c, lowUp = false, closed = true)
+    "global_cardinality_closed", "fzn_global_cardinality_closed" -> emitGcc(c, GccVariant.CLOSED)
 
-    "global_cardinality_low_up", "fzn_global_cardinality_low_up" -> emitGcc(c, lowUp = true, closed = false)
+    "global_cardinality_low_up", "fzn_global_cardinality_low_up" -> emitGcc(c, GccVariant.LOW_UP)
 
-    "global_cardinality_low_up_closed", "fzn_global_cardinality_low_up_closed" -> emitGcc(
-        c,
-        lowUp = true,
-        closed = true,
-    )
+    "global_cardinality_low_up_closed", "fzn_global_cardinality_low_up_closed" ->
+        emitGcc(c, GccVariant.LOW_UP_CLOSED)
 
     "distribute", "fzn_distribute" -> emitDistribute(c)
 
     // Ordering
-    "increasing_int", "fzn_increasing_int", "klause_increasing_int" -> emitMonotone(c, ascending = true, strict = false)
+    "increasing_int", "fzn_increasing_int", "klause_increasing_int" -> emitMonotone(c, MonotoneOp.INCREASING)
 
-    "decreasing_int", "fzn_decreasing_int" -> emitMonotone(c, ascending = false, strict = false)
+    "decreasing_int", "fzn_decreasing_int" -> emitMonotone(c, MonotoneOp.DECREASING)
 
-    "strictly_increasing_int", "fzn_strictly_increasing_int", "klause_strictly_increasing_int" -> emitMonotone(
-        c,
-        ascending = true,
-        strict = true,
-    )
+    "strictly_increasing_int", "fzn_strictly_increasing_int", "klause_strictly_increasing_int" ->
+        emitMonotone(c, MonotoneOp.STRICTLY_INCREASING)
 
-    "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, ascending = false, strict = true)
+    "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, MonotoneOp.STRICTLY_DECREASING)
 
     // Array min/max
     "array_int_maximum", "fzn_array_int_maximum",
@@ -237,13 +231,13 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     // Bool variants of int globals — channel each bool lit to a 0/1 int and reuse the
     // existing int factor. Channels are allocated lazily per constraint; the engine
     // handles deduplication via standard propagation.
-    "increasing_bool", "fzn_increasing_bool" -> emitMonotoneBool(c, ascending = true, strict = false)
+    "increasing_bool", "fzn_increasing_bool" -> emitMonotoneBool(c, MonotoneOp.INCREASING)
 
-    "decreasing_bool", "fzn_decreasing_bool" -> emitMonotoneBool(c, ascending = false, strict = false)
+    "decreasing_bool", "fzn_decreasing_bool" -> emitMonotoneBool(c, MonotoneOp.DECREASING)
 
-    "strictly_increasing_bool", "fzn_strictly_increasing_bool" -> emitMonotoneBool(c, ascending = true, strict = true)
+    "strictly_increasing_bool", "fzn_strictly_increasing_bool" -> emitMonotoneBool(c, MonotoneOp.STRICTLY_INCREASING)
 
-    "strictly_decreasing_bool", "fzn_strictly_decreasing_bool" -> emitMonotoneBool(c, ascending = false, strict = true)
+    "strictly_decreasing_bool", "fzn_strictly_decreasing_bool" -> emitMonotoneBool(c, MonotoneOp.STRICTLY_DECREASING)
 
     "lex_less_bool", "fzn_lex_less_bool" -> emitLexLessBool(c, strict = true)
 

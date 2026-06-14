@@ -451,11 +451,11 @@ internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) {
     factors.add(Cardinality(lits, min = 0, max = n))
 }
 
-internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: Boolean) {
-    require(c.args.size == if (lowUp) 4 else 3)
+internal fun FlatZincCompiler.emitGcc(c: FznConstraint, variant: GccVariant) {
+    require(c.args.size == if (variant.lowUp) 4 else 3)
     val xs = evalIntVarArray(c.args[0])
     val cover = evalIntConstArray(c.args[1])
-    if (lowUp) {
+    if (variant.lowUp) {
         val lo = evalIntConstArray(c.args[2])
         val up = evalIntConstArray(c.args[3])
         factors.add(
@@ -464,7 +464,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: 
                 cover = cover,
                 countLow = lo,
                 countHigh = up,
-                closed = closed,
+                closed = variant.closed,
             ),
         )
     } else {
@@ -480,7 +480,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: 
                     cover = cover,
                     countLow = countsAsConst,
                     countHigh = countsAsConst,
-                    closed = closed,
+                    closed = variant.closed,
                 ),
             )
             return
@@ -491,7 +491,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, lowUp: Boolean, closed: 
                 xs = xs,
                 cover = cover,
                 countVars = countVars,
-                closed = closed,
+                closed = variant.closed,
             ),
         )
     }
