@@ -124,6 +124,10 @@ internal class LpBuilder {
     /** Number of structural variables added so far; valid column indices are `0 until varCount`. */
     val varCount: Int get() = lo.size
 
+    /** Number of rows added so far; valid row indices are `0 until rowCount`. Lets a caller record
+     *  which rows a given producer emitted (#564 relaxation cache). */
+    val rowCount: Int get() = rows.size
+
     /**
      * Add a structural variable with domain `[lower, upper]` and objective coefficient [cost].
      * [tag] is an opaque caller identifier (e.g. an encoded `(varId, value)`) carried through to
@@ -175,21 +179,39 @@ internal class LpBuilder {
      * Materialize the normalized [LpModel] for the given [sense]. Maximization is converted to
      * minimization by negating the objective; the reported objective re-applies the sign.
      */
-    fun build(sense: Sense): LpModel {
+    fun build(sense: Sense): LpModel = buildShared(sense, sharedRows = null)
+
+    /**
+     * As [build], but reuses pre-densified coefficient rows for the rows that did not change since a
+     * prior build (#564). For row `i`, a non-null `sharedRows[i]` is used as the row's dense
+     * coefficient array *verbatim* — its scatter is skipped — and only the right-hand-side shift is
+     * recomputed from the live lower bounds; a null entry (or an index past `sharedRows.size`, e.g. a
+     * freshly appended cut) is densified normally. The caller is responsible for only sharing rows
+     * whose coefficients are genuinely bound-invariant (every klause row except live-big-M reified
+     * rows and locally separated cuts); the shared arrays are treated as read-only here and by the
+     * simplex, so they can be aliased across nodes. The result is field-for-field identical to a
+     * full [build]; sharing only avoids reallocating and re-zeroing the dense `m × n` matrix, which
+     * dominates the per-node relaxation rebuild on sparse models.
+     */
+    fun buildShared(sense: Sense, sharedRows: Array<LongArray?>?): LpModel {
         val n = lo.size
         val m = rows.size
-        val a = Array(m) { LongArray(n) }
+        val a = Array(m) { i ->
+            val shared = if (sharedRows != null && i < sharedRows.size) sharedRows[i] else null
+            shared ?: LongArray(n)
+        }
         val rhs = LongArray(m)
         val loShift = LongArray(n) { lo[it] }
 
         for ((i, row) in rows.withIndex()) {
+            val reused = sharedRows != null && i < sharedRows.size && sharedRows[i] != null
             // Normalize >= to <= by negating both sides; == stays put (its slack is fixed at zero).
             val flip = row.rel == Relation.GE
             var b = if (flip) -row.rhs else row.rhs
             for (k in row.cols.indices) {
                 val j = row.cols[k]
                 val coeff = if (flip) -row.vals[k] else row.vals[k]
-                a[i][j] = addExact(a[i][j], coeff) // sum repeated columns
+                if (!reused) a[i][j] = addExact(a[i][j], coeff) // sum repeated columns
                 // Apply the lower-bound shift: substituting x_j = x'_j + lo_j moves the constant
                 // coeff*lo_j across to the right-hand side.
                 b = subExact(b, mulExact(coeff, lo[j]))
