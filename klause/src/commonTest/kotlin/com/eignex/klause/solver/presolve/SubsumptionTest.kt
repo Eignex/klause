@@ -198,6 +198,16 @@ class SubsumptionTest {
     }
 
     @Test
+    fun `a zero coefficient carries no support and never divides by zero`() {
+        // 0·x + y <= 2 has a zero coeff on x: its genuine support is {y}, a strict subset of x+y<=5's.
+        // y<=2 and x<=3 give x+y<=5, so the larger row drops. Before #653 the zero coeff stayed in the
+        // support map and the dominance ratio check did cb % 0, crashing on the cargo challenge instance.
+        val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 0, 1, 1), le(5, 0, 1, 1, 1)))
+        val out = checkPreserved("zero-coeff-subset", problem, expectDrop = true)
+        assertEquals(1, out.factors.size)
+    }
+
+    @Test
     fun `variable-subset row is kept when extra activity exceeds the slack`() {
         // x+y<=2 does NOT imply x+y+z<=3 (z can be 3, sum 5 > 3), so nothing drops — soundness guard.
         val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(3, 0, 1, 1, 1, 2, 1)))
