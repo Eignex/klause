@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.extractConflictBools
@@ -164,6 +165,34 @@ class Problem(
             Array(numBoolVars) { v ->
                 boolOccurrences[v].filter { !watcherFid[it] }.toIntArray()
             }
+        }
+    }
+
+    /** True iff some factor opts into typed int-domain event wakeup
+     *  ([Factor.initialIntEventWatches]). When false, the engine skips all int-event bookkeeping
+     *  and [nonIntEventWatcherIntOccurrences] aliases [intOccurrences]. */
+    val usesIntEventWatchers: Boolean = factors.any { it.initialIntEventWatches != null }
+
+    /**
+     * [intOccurrences] minus, per variable, the factors that subscribe to a typed int-event on
+     * *that* variable (see [Factor.initialIntEventWatches]). The propagation engine walks this list
+     * for occurrence-driven int wakeup; a subscribing factor is woken for its subscribed variables
+     * via the per-`(var, kind)`
+     * [com.eignex.klause.solver.propagation.PropagationState.intEventWatchersBySlot] index instead.
+     *
+     * Exclusion is per `(factor, variable)`, not all-or-nothing: a factor that subscribes to events
+     * on variable `a` but not `b` (both in its [Factor.intVars]) is dropped from `a`'s list yet kept
+     * on `b`'s, so `b` still wakes it the normal way. Identical to [intOccurrences] when no factor
+     * opts in.
+     */
+    val nonIntEventWatcherIntOccurrences: Array<IntArray> = if (!usesIntEventWatchers) {
+        intOccurrences
+    } else {
+        Array(numIntVars) { v ->
+            intOccurrences[v].filter { fid ->
+                val watches = factors[fid].initialIntEventWatches
+                watches == null || watches.none { IntEvent.intVarOf(it) == v }
+            }.toIntArray()
         }
     }
 

@@ -190,7 +190,7 @@ internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Int, antecedents: In
     intMinLevel[v] = currentLevel
     intMinReason[v] = currentFactor
     intMinAntecedents[v] = ant
-    dirtyInts.addLast(v)
+    markIntDirty(v, IntEvent.LB_RAISED_BIT)
     propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMin = lo, oldMin = d.min, oldMax = d.max)
     return true
 }
@@ -222,7 +222,7 @@ internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: In
     intMaxLevel[v] = currentLevel
     intMaxReason[v] = currentFactor
     intMaxAntecedents[v] = ant
-    dirtyInts.addLast(v)
+    markIntDirty(v, IntEvent.UB_LOWERED_BIT)
     propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMax = hi, oldMin = d.min, oldMax = d.max)
     return true
 }
@@ -302,7 +302,13 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedent
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = ant
     }
-    dirtyInts.addLast(v)
+    // Edge exclusions advance a bound (LB/UB); a pure interior carve leaves both intact.
+    val kindBit = when {
+        newDomain.min != d.min -> IntEvent.LB_RAISED_BIT
+        newDomain.max != d.max -> IntEvent.UB_LOWERED_BIT
+        else -> IntEvent.VALUE_REMOVED_BIT
+    }
+    markIntDirty(v, kindBit)
     when {
         newDomain.min != d.min ->
             propagateAtomsForVar(

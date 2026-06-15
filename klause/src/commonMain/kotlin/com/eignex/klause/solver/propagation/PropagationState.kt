@@ -2,6 +2,7 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -87,6 +88,21 @@ class PropagationState(
         IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
     internal val dirtyInts: IntArrayDeque =
         IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
+
+    /**
+     * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last
+     * drained — recorded by `markIntDirty` alongside [dirtyInts] and consumed (then cleared) by
+     * [enqueueForIntChange] to wake exactly the subscribed advisors. Empty (aliasing the shared
+     * [com.eignex.klause.solver.EmptyIntArray]) when no factor subscribes to typed int events, so
+     * the common case allocates nothing and skips the bookkeeping entirely.
+     *
+     * Sound to over-set (extra bit ⇒ harmless extra wake) but never under-set (a missing bit drops
+     * a wake a subscriber relied on). Mark and drain are paired through [dirtyInts]; since the
+     * driver only marks/undoes between propagation cycles — when [dirtyInts] is empty and thus every
+     * mask already cleared — no stale bits survive a backtrack.
+     */
+    internal val dirtyIntKinds: IntArray =
+        if (problem.usesIntEventWatchers) IntArray(problem.numIntVars) else EmptyIntArray
 
     // -------- Reusable propagation worklist (was allocated fresh per runToFixpoint) --------
     //
@@ -404,6 +420,22 @@ class PropagationState(
      * remove the wrong watcher (the soundness hazard called out in #42).
      */
     internal val boolWatchPos: MutableLongIntMap = MutableLongIntMap()
+
+    /**
+     * Per-`(intVar, kind)` advisor index, the int-side analog of [boolWatchersByLit]: slot
+     * `[IntEvent.pack(v, kind)]` lists the factor ids that subscribed to that event via
+     * [com.eignex.klause.solver.Factor.initialIntEventWatches], so [enqueueForIntChange] can wake
+     * only the factors that care about the kind of change that just happened. Sized
+     * `numIntVars * IntEvent.COUNT` and populated once at construction; empty when no factor opts in
+     * (the subscriptions are static — a propagator that loses interest in a variable simply ignores
+     * the wake, which is sound).
+     */
+    internal val intEventWatchersBySlot: Array<IntArrayList> =
+        if (problem.usesIntEventWatchers) {
+            Array(problem.numIntVars * IntEvent.COUNT) { IntArrayList(initialCapacity = 1) }
+        } else {
+            emptyArray()
+        }
 
     /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
@@ -733,6 +765,15 @@ class PropagationState(
     }
 
     init {
+        if (problem.usesIntEventWatchers) {
+            for (fid in 0 until problem.numFactors) {
+                val watches = problem.factors[fid].initialIntEventWatches ?: continue
+                for (packed in watches) intEventWatchersBySlot[packed].add(fid)
+            }
+        }
+    }
+
+    init {
         seeded = seedAssumptions(assumptions)
     }
 
@@ -855,7 +896,7 @@ class PropagationState(
             while (true) {
                 val v = pollDirtyInt()
                 if (v < 0) break
-                for (fid in problem.intOccurrences[v]) propEnq(fid)
+                enqueueForIntChange(v)
             }
             // Atom-lit watchers woken by int tightens before runToFixpoint was called.
             while (dirtyAtomFactors.isNotEmpty()) {
@@ -910,7 +951,7 @@ class PropagationState(
             while (true) {
                 val v = pollDirtyInt()
                 if (v < 0) break
-                for (other in problem.intOccurrences[v]) propEnq(other)
+                enqueueForIntChange(v)
             }
             // Wake factors registered as atom-lit watchers whose atom truth just flipped.
             while (dirtyAtomFactors.isNotEmpty()) {
@@ -943,6 +984,46 @@ class PropagationState(
             val blocker = blockers[i]
             if (blocker != NO_BLOCKER && litTrue(blocker)) continue
             propEnq(watchers[i])
+        }
+    }
+
+    /**
+     * Record that int var [v] just changed: add it to [dirtyInts] and, when typed int-event
+     * watchers are active, OR the [kindMask] (one or more `IntEvent.*_BIT`s) into [dirtyIntKinds]`[v]`
+     * so [enqueueForIntChange] wakes the right advisors. [IntEvent.FIXED_BIT] is added automatically
+     * when the post-mutation domain is a singleton, so a mutator only passes the bound/value kind it
+     * caused. No-op beyond the dirty enqueue when no factor subscribes (the mask array is empty).
+     */
+    internal fun markIntDirty(v: Int, kindMask: Int) {
+        dirtyInts.addLast(v)
+        if (dirtyIntKinds.isEmpty()) return
+        val d = intDomains[v]
+        val mask = if (d.min == d.max) kindMask or IntEvent.FIXED_BIT else kindMask
+        dirtyIntKinds[v] = dirtyIntKinds[v] or mask
+    }
+
+    /**
+     * Enqueue every factor that should fire on `v`'s domain change, mirroring [enqueueForBoolChange]
+     * on the int side: the occurrence-list factors that don't subscribe to typed events on `v`
+     * ([com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences]), plus — for each
+     * [IntEvent] kind that actually occurred (read from [dirtyIntKinds]) — the advisors registered
+     * in [intEventWatchersBySlot]. The kind mask is cleared after dispatch so it doesn't leak into a
+     * later change to the same variable. When no factor subscribes this reduces to the plain
+     * occurrence-list walk over [com.eignex.klause.solver.Problem.intOccurrences].
+     */
+    private fun enqueueForIntChange(v: Int) {
+        for (fid in problem.nonIntEventWatcherIntOccurrences[v]) propEnq(fid)
+        if (dirtyIntKinds.isEmpty()) return
+        val mask = dirtyIntKinds[v]
+        if (mask == 0) return
+        dirtyIntKinds[v] = 0
+        var kind = 0
+        while (kind < IntEvent.COUNT) {
+            if (mask and (1 shl kind) != 0) {
+                val list = intEventWatchersBySlot[IntEvent.pack(v, kind)]
+                for (i in 0 until list.size) propEnq(list[i])
+            }
+            kind++
         }
     }
 }

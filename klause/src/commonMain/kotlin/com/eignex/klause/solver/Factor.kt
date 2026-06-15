@@ -131,6 +131,31 @@ interface Factor {
     val initialBoolWatcherBlockers: IntArray? get() = null
 
     /**
+     * Typed integer-domain events this factor wants advisor-style wakeup on, or `null` (the
+     * default) for the occurrence-list wakeup — fire on *any* change to a variable in [intVars].
+     * Each entry encodes a `(intVar, kind)` pair via
+     * [com.eignex.klause.solver.propagation.IntEvent.pack], where `kind` is one of
+     * `IntEvent.LB_RAISED` / `UB_LOWERED` / `VALUE_REMOVED` / `FIXED`. When non-null, the engine
+     * routes wakeup for the subscribed variables through the per-`(var, kind)` index
+     * (`PropagationState.intEventWatchersBySlot`) instead of through [intVars]: the factor fires
+     * only when a kind it subscribed to actually occurs on that variable.
+     *
+     * This is the int-side analog of [initialBoolWatchers] and the scheduling substrate for
+     * incremental propagators (epic #619): a bounds-consistent factor can subscribe to only
+     * [com.eignex.klause.solver.propagation.IntEvent.LB_RAISED] / `UB_LOWERED` and skip waking on
+     * interior value removals it cannot act on; a factor that only reacts to assignment can
+     * subscribe to `FIXED` alone. A variable named here is removed from this factor's
+     * occurrence-list wakeup (see [com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences])
+     * — so the subscription must cover every kind the factor needs to stay correct; an under-broad
+     * subscription silently drops a wake. A variable in [intVars] but *not* named here keeps its
+     * normal occurrence-list wakeup.
+     *
+     * Default is `null` — preserves the current "wake on any intVars change" semantics for every
+     * factor that hasn't opted in (and the engine pays nothing when no factor in the problem does).
+     */
+    val initialIntEventWatches: IntArray? get() = null
+
+    /**
      * If this factor just returned `false` from [propagate], the clause-form explanation
      * of why — i.e. an array of literals, all currently *false* in [state], whose
      * disjunction is unsatisfied. The propagation-graph conflict analyzer seeds its
