@@ -4,6 +4,7 @@ import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.formats.minizinc.OznApplier
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.maximizeInt
 import com.eignex.klause.solver.objective.minimizeInt
@@ -50,12 +51,17 @@ internal object MiniZincMode : CliMode {
             // resolution: CLI flag → KlauseConfig → built-in default (matches Gecode/Chuffed).
             val config = installCliConfig()
             val source = readTextFile(path)
+            // Honor `-t` during the construction-time bake (Problem.computeBaked): a wide-domain
+            // model can otherwise wedge the bake before any solver/cancellation exists.
+            val bakeCancel =
+                common.deadlineAtMs?.let { d -> Cancellation { nowMillis() > d } } ?: Cancellation.Never
             val program = parseFlatZinc(
                 source = source,
                 floatBuckets = config.floatBuckets,
                 floatScale = config.floatScale,
                 unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo,
                 unboundedIntHi = unboundedIntHi ?: config.unboundedIntHi,
+                cancellation = bakeCancel,
             )
             cliLogger(common.verbose).v {
                 "parsed $path: bools=${program.problem.numBoolVars} ints=${program.problem.numIntVars} " +

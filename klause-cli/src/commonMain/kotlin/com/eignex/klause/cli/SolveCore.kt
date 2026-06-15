@@ -109,7 +109,9 @@ internal object SolveCore {
     }
 
     private fun deadlineCancellation(common: CommonOptions): Pair<Long?, Cancellation> {
-        val deadline = common.timeLimitMs?.let { nowMillis() + it }
+        // Anchored once at process start (see CommonOptions.deadlineAtMs) so the bake and the
+        // solve share one budget; fall back to a fresh anchor if it was never set.
+        val deadline = common.deadlineAtMs ?: common.timeLimitMs?.let { nowMillis() + it }
         val cancel = if (deadline != null) Cancellation { nowMillis() > deadline } else Cancellation.Never
         return deadline to cancel
     }

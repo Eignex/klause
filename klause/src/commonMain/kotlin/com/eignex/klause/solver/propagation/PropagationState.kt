@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -18,6 +19,10 @@ internal const val NO_CARVE: Int = Int.MIN_VALUE
 /** Blocking-literal slot with no blocker (#200): the watcher always fires. Lit ids are
  *  non-negative ([Lit.make] = `var shl 1 | sign`), so −1 is a safe sentinel. */
 internal const val NO_BLOCKER: Int = -1
+
+/** Poll the cancellation token once every `CANCEL_POLL_MASK + 1` factor fires on the
+ *  full-propagation path (power-of-two minus one so the gate is a single `and`). */
+private const val CANCEL_POLL_MASK: Int = 1023
 
 /**
  * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
@@ -794,13 +799,26 @@ class PropagationState(
      * by a session that just applied a pin and wants to extend the fixpoint.
      *
      * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
+     *
+     * [cancellation] is polled only on the full-propagation ([allFactors]) path — the one-time
+     * bake / session-init fixpoint, the one place an uncancellable run can wedge on a slow
+     * propagator over wide domains. The per-node search path always passes
+     * `allFactors == false`, so the counter and the token call below are never reached there:
+     * the BCP hot loop pays nothing beyond a dead, perfectly-predicted branch. When the token
+     * fires the drain stops early and returns `null`; the partial fixpoint is sound (it only
+     * ever tightens), and the deadline that fired it makes the caller abort promptly anyway.
      */
-    internal fun runToFixpoint(allFactors: Boolean, initialFactor: Int = -1): IntArray? {
+    internal fun runToFixpoint(
+        allFactors: Boolean,
+        initialFactor: Int = -1,
+        cancellation: Cancellation = Cancellation.Never,
+    ): IntArray? {
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
         // would otherwise mix old seeds into a new conflict's core.
         conflictSeedFactors.clear()
         val factorCount = totalFactorCount
         propBegin(factorCount)
+        var fireCount = 0
         if (allFactors) {
             for (fid in 0 until factorCount) propEnq(fid)
         } else {
@@ -826,6 +844,7 @@ class PropagationState(
             if (initialFactor in 0 until factorCount) propEnq(initialFactor)
         }
         while (propQueue.isNotEmpty()) {
+            if (allFactors && (fireCount++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)

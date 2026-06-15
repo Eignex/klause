@@ -4,6 +4,7 @@ import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -44,6 +45,11 @@ internal class FlatZincCompiler(
      */
     internal val unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
     internal val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+    /**
+     * Cooperative-cancellation token forwarded to the constructed [Problem] so its
+     * construction-time bake honors a `-t` deadline. Defaults to [Cancellation.Never].
+     */
+    internal val cancellation: Cancellation = Cancellation.Never,
 ) {
     // State is `internal` (not `private`) so the extension functions in
     // `FlatZincExprEval.kt` / `FlatZincConstraints.kt` / `FlatZincSolveOutput.kt` can
@@ -102,6 +108,7 @@ internal class FlatZincCompiler(
             probeIntHoles = holes,
             probeBudgetPerVar = presolve.probeBudgetPerVar(),
             probeTotalBudget = presolve.probeTotalBudget(),
+            cancellation = cancellation,
         )
         return FlatZincProgram(
             problem = problem,
@@ -580,6 +587,7 @@ fun parseFlatZinc(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+    cancellation: Cancellation = Cancellation.Never,
 ): FlatZincProgram {
     val tokens = FlatZincLexer(source).tokenize()
     val model = FlatZincParser(tokens).parse()
@@ -590,5 +598,6 @@ fun parseFlatZinc(
         forLocalSearch = forLocalSearch,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
+        cancellation = cancellation,
     ).compile()
 }
