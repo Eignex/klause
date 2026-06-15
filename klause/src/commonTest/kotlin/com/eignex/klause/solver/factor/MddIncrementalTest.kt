@@ -49,9 +49,9 @@ class MddIncrementalTest {
     @Test
     fun `backtrack enumeration over the MDD equals brute force`() {
         // 2-var MDD accepting exactly (1,2) and (2,1). Unlike the single-shot oracle, enumerating
-        // under the CDCL backtracker fires propagate repeatedly on ONE PropagationState — exercising
-        // the reused fwd/bwd buffers (refilled from zero each fire) — and pushes/pops decision levels,
-        // exercising MddState snapshot/restore now that it carries the non-snapshotted scratch fields.
+        // under the CDCL backtracker fires propagate repeatedly on ONE PropagationState and pushes /
+        // pops decision levels — exercising the reversible forward/backward layer bitsets and the
+        // delta-driven cascade of the incremental propagator across deep backtracking.
         fun mddFactor(): Factor = Mdd(
             seq = intArrayOf(0, 1),
             numStatesPerLayer = intArrayOf(1, 2, 1),
@@ -89,6 +89,48 @@ class MddIncrementalTest {
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
                 .map { it.ints.toList() }.toHashSet()
             assertEquals(brute, found, "mdd instance #$idx: backtrack solution set must equal brute force")
+        }
+    }
+
+    @Test
+    fun `cost MDD enumeration equals brute force across deep backtracking`() {
+        // Cost MDD (stride 4): single state, accepts any length-2 word over {1,2}; each edge's weight
+        // is its symbol, so the path cost is seq0 + seq1, and the cost variable equals that sum. At a
+        // complete assignment the forward lattice is a single path (minCost == maxCost), so the
+        // incremental cost-bound derivation forces cost to the exact path sum — the enumeration must
+        // therefore equal the true { accepting ∧ cost == seq0 + seq1 } set, exercising tightenCost and
+        // the reversible cascade under push/pop.
+        fun costMdd(): Factor = Mdd(
+            seq = intArrayOf(0, 1),
+            numStatesPerLayer = intArrayOf(1, 1, 1),
+            layerStarts = intArrayOf(0, 8, 16),
+            transitions = intArrayOf(
+                0, 1, 0, 1, 0, 2, 0, 2, // layer 0: --1--> (w1), --2--> (w2)
+                0, 1, 0, 1, 0, 2, 0, 2, // layer 1: --1--> (w1), --2--> (w2)
+            ),
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 4,
+            cost = 2,
+        )
+        for (costRange in listOf(0 to 5, 3 to 3, 2 to 3, 4 to 5)) {
+            val brute = HashSet<List<Int>>()
+            for (a in 1..2) {
+                for (b in 1..2) {
+                    val c = a + b
+                    if (c in costRange.first..costRange.second) brute.add(listOf(a, b, c))
+                }
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(costRange.first, costRange.second)),
+                factors = arrayOf(costMdd()),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "cost MDD (cost∈$costRange): solution set must equal brute force")
         }
     }
 }
