@@ -4,7 +4,9 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.RevInt
 
 /**
  * `value_precede(s, t, xs)` (#432): value [t] may appear in [xs] only at a position after value [s]
@@ -41,6 +43,35 @@ class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
+
+    /** Advisor subscription (#623): membership-sensitive (the prefix scan tests `s ∈ dom` and
+     *  forced-`t`), so subscribe to every kind on every sequence variable and consume the dirty-
+     *  variable delta (#624). The reversible `α`/`prunedUpTo` state ([VpState]) advances only over the
+     *  changed prefix instead of rescanning the whole sequence each fire. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = xs.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
+
+    /** Reversible incremental state. [alpha] is the first index where [s] is still possible — it only
+     *  ever advances forward as [s] is removed from early positions (a backtrack restores it via the
+     *  trail). [prunedUpTo] records that Rule A has already pruned [t] from positions `[0, prunedUpTo)`,
+     *  so each fire prunes only the newly-covered suffix. [started] gates the first full pass. */
+    private class VpState(state: PropagationState) {
+        var started: Boolean = false
+        val alpha = RevInt(state, 0)
+        val prunedUpTo = RevInt(state, 0)
+    }
 
     /** Index of the first `xs` position whose current value is [s] or [t], or `-1` if none — the
      *  position that decides the constraint. */
@@ -124,14 +155,15 @@ class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = xs.size
         if (n == 0) return true
-        // α: first index where s is still possible (n if s is impossible everywhere).
-        var alpha = n
-        for (i in 0 until n) {
-            if (s in state.intDomains[xs[i]]) {
-                alpha = i
-                break
-            }
+        val st = (state.refPayload[factorId] as? VpState) ?: run {
+            val fresh = VpState(state)
+            state.refPayload[factorId] = fresh
+            fresh
         }
+        // Fast path (#624): a fire that drains an empty dirty-variable delta saw no change since the
+        // last pass, so α / the prunes are still at their fixpoint. The first fire always runs.
+        val dirty = state.drainIntEventDirtyVars(factorId)
+        if (st.started && dirty.isEmpty()) return true
         // One shared start-of-call reason: the deductions all rest on the s-positions / forced-t in
         // the pre-prune domains, so a single hole/bound snapshot soundly justifies each.
         var reason: IntArray? = null
@@ -143,12 +175,19 @@ class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
             }
             return reason
         }
+        // α: first index where s is still possible (n if s is impossible everywhere). Monotone — it
+        // only advances as s is removed from early positions — so resume from the reversible cell.
+        var alpha = st.alpha.value
+        while (alpha < n && s !in state.intDomains[xs[alpha]]) alpha++
+        if (alpha != st.alpha.value) st.alpha.set(alpha)
         // Rule A: no position ≤ α can be t. (If s is impossible everywhere, α = n ⇒ t pruned all.)
+        // Prune only the suffix not yet covered by an earlier fire's Rule A.
         val upTo = if (alpha == n) n - 1 else alpha
-        for (j in 0..upTo) {
+        for (j in st.prunedUpTo.value..upTo) {
             val v = xs[j]
             if (t in state.intDomains[v] && !state.excludeIntValue(v, t, reason())) return false
         }
+        if (upTo + 1 > st.prunedUpTo.value) st.prunedUpTo.set(upTo + 1)
         // Rule B: s must occur before the earliest position fixed to t.
         var firstForcedT = -1
         for (j in 0 until n) {
@@ -175,6 +214,7 @@ class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
                 if (!state.tightenIntMax(v, s, reason())) return false
             }
         }
+        st.started = true
         return true
     }
 }
