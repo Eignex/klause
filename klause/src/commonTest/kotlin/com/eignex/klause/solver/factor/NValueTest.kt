@@ -111,4 +111,48 @@ class NValueTest {
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
     }
+
+    @Test
+    fun `backtrack enumeration over nvalue equals brute force for every mode`() {
+        // Soundness gate for the delta-gated propagator: enumerating under the CDCL backtracker fires
+        // propagate repeatedly on one PropagationState — the delta fast path skips no-op re-fires, a
+        // domain change re-wakes it — across deep push/pop. At a complete assignment min == max
+        // distinct, so n is forced exactly; the enumerated (xs..., n) set must equal the true
+        // mode-relation set. An unsound skip would drop or admit an assignment.
+        val xsCount = 3
+        val xsHi = 3
+        val nHi = 3
+        for (mode in NValue.Mode.entries) {
+            fun relates(nv: Int, distinct: Int): Boolean = when (mode) {
+                NValue.Mode.Eq -> nv == distinct
+                NValue.Mode.AtLeast -> nv <= distinct
+                NValue.Mode.AtMost -> nv >= distinct
+            }
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(xsCount)
+            fun rec(p: Int) {
+                if (p == xsCount) {
+                    val distinct = acc.toHashSet().size
+                    for (nv in 1..nHi) if (relates(nv, distinct)) brute.add(acc.toList() + nv)
+                    return
+                }
+                for (v in 1..xsHi) {
+                    acc[p] = v;
+                    rec(p + 1)
+                }
+            }
+            rec(0)
+            // var ids: xs = 0..xsCount-1, n = xsCount.
+            val doms = Array(xsCount + 1) { if (it < xsCount) IntDomain(1, xsHi) else IntDomain(1, nHi) }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = xsCount + 1,
+                intDomains = doms,
+                factors = arrayOf<Factor>(NValue(n = xsCount, xs = IntArray(xsCount) { it }, mode = mode)),
+            )
+            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "mode=$mode: enumerated (xs, n) set must equal brute force")
+        }
+    }
 }

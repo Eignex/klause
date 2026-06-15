@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -63,6 +64,36 @@ class NValue(
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = xs + intArrayOf(n)
+
+    /** Advisor subscription (#623) for the non-optional variant: the distinct-count bounds read each
+     *  variable's full domain (union membership + domain-overlap disjointness), so subscribe to every
+     *  kind and consume the dirty-variable delta (#624) to skip fires where nothing changed. The
+     *  optional variant keeps occurrence wakeup — a presence-bool flip changes the count but is not in
+     *  the int-domain delta, so it must not be gated out. */
+    override val initialIntEventWatches: IntArray? = if (presents.isNotEmpty()) {
+        null
+    } else {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = presents.isEmpty()
+
+    /** CP-side gate flag for the delta fast path (non-optional variant). Lives in the propagation
+     *  state's refPayload, distinct from the local-search [State]. Drifts across push/pop — a stale
+     *  `true` is harmless because any forward narrowing re-wakes via its event, and the bounds are
+     *  recomputed from the (engine-restored) current domains. */
+    private class CpGate {
+        var started: Boolean = false
+    }
 
     /** Maintains a per-value count over the assignment. `distinctCount` = number of values
      *  whose count is > 0. */
@@ -273,6 +304,20 @@ class NValue(
         collectHoleAndBoundAntecedents(state, intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        // Delta fast path (#624, non-optional variant only): a fire that drains an empty dirty-variable
+        // delta saw no domain change since the last bound recompute, so n is already at the tightest
+        // bounds this constraint can derive. The first fire always recomputes. (The greedy independent-
+        // set lower bound has no sound incremental form, so the recompute below stays full.)
+        if (presents.isEmpty()) {
+            val gate = (state.refPayload[factorId] as? CpGate) ?: run {
+                val fresh = CpGate()
+                state.refPayload[factorId] = fresh
+                fresh
+            }
+            val dirty = state.drainIntEventDirtyVars(factorId)
+            if (gate.started && dirty.isEmpty()) return true
+            gate.started = true
+        }
         // Upper bound: |∪ dom(xs[i])| for indices that aren't definitely absent.
         val unionValues = IntHashSet()
         for (i in xs.indices) {
