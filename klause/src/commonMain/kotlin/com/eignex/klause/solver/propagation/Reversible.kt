@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.propagation
 
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
 
 /*
@@ -90,5 +91,30 @@ internal class RevIntArray(private val state: PropagationState, size: Int, init:
         data[i] = priorVal.last()
         priorIdx.truncateTo(priorIdx.size - 1)
         priorVal.truncateTo(priorVal.size - 1)
+    }
+}
+
+/**
+ * Per-variable forward-delta cursor for an incremental propagator: reports the values removed from a
+ * watched int var since the propagator's previous fire, and rolls back with the search so a re-fire
+ * after a backtrack sees the correct delta. The cursor snapshot is a [RevRef] on the engine trail;
+ * the removal set is the immutable-domain diff "present at the snapshot, absent now".
+ *
+ * Only *forward* removals are reported. A propagator built on reversible state has its own structure
+ * restored on backtrack, so it never needs an "added-back" delta — it only processes what newly left
+ * while descending. Wake it however you like (the default wake-on-any-change is fine); the cursor
+ * accumulates every removal since its last fire, so multiple intervening changes coalesce correctly.
+ */
+internal class DomainDelta(state: PropagationState, initial: IntDomain) {
+    @PublishedApi internal val snapshot = RevRef(state, initial)
+
+    /** Invoke [removed] for each value present at the cursor's last advance but absent from
+     *  [current], then advance the cursor to [current]. No work / no trail write when nothing
+     *  changed (the domain object is identity-unchanged since the last advance). */
+    inline fun forEachRemoved(current: IntDomain, removed: (Int) -> Unit) {
+        val before = snapshot.value
+        if (before === current) return
+        before.forEach { v -> if (v !in current) removed(v) }
+        snapshot.set(current)
     }
 }
