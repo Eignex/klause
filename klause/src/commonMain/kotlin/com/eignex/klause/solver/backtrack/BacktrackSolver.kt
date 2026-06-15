@@ -361,6 +361,13 @@ class BacktrackSolver(override val problem: Problem) :
         private var lpCheckCounter = 0
         private var energeticCheckCounter = 0
         private var cumulativeFlowCheckCounter = 0
+
+        // Dynamic LP auto-off (#562): if the per-node LP never prunes over a warmup window, disable it
+        // for the rest of this solve — it is pure overhead there (loose / too-expensive bound). Sound:
+        // dropping a bound only loses pruning, never correctness.
+        private var lpDisabled = false
+        private var lpSolveCount = 0
+        private var lpPruneCount = 0
         private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
         private val lpBasisByDepth = ArrayList<Basis?>()
         private var lpHotTableau: DualSimplex? = null
@@ -412,7 +419,7 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                 } -> true
 
-                lpRelaxerL != null &&
+                lpRelaxerL != null && !lpDisabled &&
                     session.decisionLevel <= params.lpBoundMaxDepth &&
                     ++lpCheckCounter % params.lpBoundEvery == 0 -> {
                     val depth = session.decisionLevel
@@ -444,6 +451,9 @@ class BacktrackSolver(override val problem: Problem) :
                             )
                         }
                     }
+                    lpSolveCount++
+                    if (outcome.prune) lpPruneCount++
+                    if (lpSolveCount >= LP_AUTO_OFF_WARMUP && lpPruneCount == 0) lpDisabled = true
                     outcome.prune
                 }
 
@@ -895,6 +905,9 @@ class BacktrackSolver(override val problem: Problem) :
         }
     }
 }
+
+/** Node LP-bounding passes with no prune after which the dynamic auto-off (#562) disables LP. */
+private const val LP_AUTO_OFF_WARMUP = 64
 
 /** Ceiling on the adaptive cancellation cadence (nodes between deadline polls). Fast instances
  *  settle here — a few microseconds per check at worst; slow ones adapt below it. See

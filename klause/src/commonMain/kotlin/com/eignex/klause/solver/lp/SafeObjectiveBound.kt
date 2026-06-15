@@ -10,8 +10,10 @@ import kotlin.math.abs
  * rigorous by *worst-casing*: each reduced cost is pushed down by a magnitude-scaled rounding-error
  * term before its box minimum is taken, and the final sum is reduced by its own rounding error. The
  * result can therefore only *under*-estimate the true bound — never over-estimate it — so pruning on
- * `result ≥ incumbent` is sound. Returns null when the relaxation is unbounded below (a strictly
- * negative reduced cost on a variable with no finite upper bound) or when [y] is non-finite.
+ * `result ≥ incumbent` is sound. The lower-bound-shift constant `c·lo` ([LpModel.objConstant]) is
+ * re-added (as [DualSimplex] does) so the bound is on the true objective at branched nodes, not the
+ * shifted one. Returns null when the relaxation is unbounded below (a strictly negative reduced cost
+ * on a variable with no finite upper bound) or when [y] is non-finite.
  *
  * This is the cheap pruning bound; [DualSimplex] / exact certification give the tight authoritative
  * one. A loose result here only costs a missed prune, never correctness.
@@ -60,7 +62,8 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
         }
     }
     val sumErr = (m + model.numVars + 2).toDouble() * EPS * sumMag
-    val safe = bound - sumErr
+    // Re-add the lower-bound-shift constant the relaxation folded out (exact; matches DualSimplex).
+    val safe = bound - sumErr + model.objConstant.toDouble()
     return if (safe.isFinite()) safe else null
 }
 
