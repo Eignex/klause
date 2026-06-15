@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -103,7 +104,7 @@ class LocalSearchImprovementsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val result = LocalSearchSolver(problem).solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
-        val sat = assertIs<com.eignex.klause.solver.SolveResult.Sat>(result)
+        val sat = assertIs<SolveResult.Sat>(result)
         assertEquals("ls", sat.stats.backend)
         // Satisfy mode has no objective, so the incumbent fingerprint is feasibility alone.
         assertEquals(0.0, sat.stats.incumbentViolation, "a satisfied instance has zero violation")
