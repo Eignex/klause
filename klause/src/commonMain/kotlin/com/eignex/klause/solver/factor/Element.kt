@@ -6,9 +6,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.propagation.excludeIntValues
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 
 /**
  * `result = arr(idx)` — the element constraint, native to local search rather than a
@@ -154,54 +152,6 @@ class Element(
         }
     }
 
-    /**
-     * Full GAC for a **constant** array (`arrIsVars == false`). The element value at each position
-     * is a fixed constant, so the constraint is generalized-arc-consistent exactly when:
-     *   - **idx**: position `i` is supported iff its constant `arr(i)` is a live value of `result`
-     *     (membership, hole-aware — not merely inside result's `[min, max]`); and
-     *   - **result**: value `v` is supported iff some still-reachable position holds the constant
-     *     `v`, so every result value outside the reachable constant set is pruned (interior holes
-     *     included).
-     * Both directions are cheap (O(len) over the array, no domain scan), so unlike the var-array
-     * union this adds no per-position domain-walk cost.
-     */
-    private fun propagateConstArray(state: PropagationState): Boolean {
-        val resultDom = state.intDomains[result]
-        // 2. Prune idx: a position whose constant is not a live result value can never satisfy
-        //    result = arr(i). Reason: result's domain state (holes + bounds) excludes that constant.
-        var toExclude: IntArrayList? = null
-        state.intDomains[idx].forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len && arr[pos] !in resultDom) {
-                (toExclude ?: IntArrayList().also { toExclude = it }).add(iv)
-            }
-        }
-        toExclude?.let { ex ->
-            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
-            // forEach yields ascending distinct values, so the list is a valid batch input.
-            if (!state.excludeIntValues(idx, ex.toIntArray(), ant)) return false
-        }
-
-        // 3. Prune result to the constants still reachable through idx's surviving positions.
-        val reachable = IntHashSet()
-        state.intDomains[idx].forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len) reachable.add(arr[pos])
-        }
-        if (reachable.isEmpty()) return false // no reachable position — infeasible
-        var resExclude: IntArrayList? = null
-        state.intDomains[result].forEach { rv ->
-            if (rv !in reachable) (resExclude ?: IntArrayList().also { resExclude = it }).add(rv)
-        }
-        resExclude?.let { ex ->
-            // Reason: idx's surviving domain (which positions remain) — hole-aware, since dropping
-            // an interior position is what removes a value's support.
-            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx))
-            if (!state.excludeIntValues(result, ex.toIntArray(), ant)) return false
-        }
-        return true
-    }
-
     /** Cached domain refs of every [intVars] entry at the last successful propagate, for the
      *  unchanged-domains fast path. NOT a [PropagationState.SnapshottablePayload]: Element fires
      *  often and its var-array `intVars` can be long, so per-push snapshot copies would cost more
@@ -220,6 +170,18 @@ class Element(
      *  so it returns immediately — skipping the var-array path's O(len · |dom|) per-position scan on
      *  the redundant re-fires that fixpoint iteration produces. */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        if (!state.tightenIntMin(idx, indexOffset)) return false
+        if (!state.tightenIntMax(idx, indexOffset + len - 1)) return false
+        if (!arrIsVars) {
+            // Constant array: reversible, delta-driven GAC (see [ElementConstState]). Its own
+            // domain-ref fast path short-circuits an unchanged fire; the bound tighten above is a
+            // no-op after the first fire.
+            val st = (state.refPayload[factorId] as? ElementConstState)
+                ?: ElementConstState(state, idx, result, arr, indexOffset).also { state.refPayload[factorId] = it }
+            return st.propagate(state)
+        }
+        // Variable array: full GAC with the unchanged-domains fast path (per-position scans are
+        // expensive enough that the redundant fixpoint re-fires must be skipped).
         val cache = (state.refPayload[factorId] as? Cache) ?: run {
             val fresh = Cache(arrayOfNulls(intVars.size))
             state.refPayload[factorId] = fresh
@@ -233,10 +195,7 @@ class Element(
             }
         }
         if (!changed && cache.cachedDoms[0] != null) return true
-
-        if (!state.tightenIntMin(idx, indexOffset)) return false
-        if (!state.tightenIntMax(idx, indexOffset + len - 1)) return false
-        if (!(if (arrIsVars) propagateVarArray(state) else propagateConstArray(state))) return false
+        if (!propagateVarArray(state)) return false
         // Record post-propagate refs so the next (often no-op) fire can short-circuit.
         for (k in intVars.indices) cache.cachedDoms[k] = state.intDomains[intVars[k]]
         return true
