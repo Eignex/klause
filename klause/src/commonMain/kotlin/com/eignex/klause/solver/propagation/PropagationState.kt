@@ -1066,7 +1066,8 @@ class PropagationState(
     private fun accumulateDirtyVar(fid: Int, v: Int) {
         if (eventDirtyMark.isEmpty()) return
         val mark = eventDirtyMark[fid] ?: return
-        if (mark.add(v)) eventDirtyVars[fid]!!.add(v)
+        val vars = eventDirtyVars[fid] ?: return
+        if (mark.add(v)) vars.add(v)
     }
 
     /**
@@ -1084,7 +1085,7 @@ class PropagationState(
         if (list.size == 0) return EmptyIntArray
         val out = list.toIntArray()
         list.clear()
-        eventDirtyMark[factorId]!!.clear()
+        eventDirtyMark[factorId]?.clear()
         return out
     }
 }
