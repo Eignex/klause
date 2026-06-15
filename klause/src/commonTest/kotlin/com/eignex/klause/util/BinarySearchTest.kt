@@ -31,9 +31,9 @@ class BinarySearchTest {
     @Test
     fun `absent element returns negative insertion point`() {
         val a = intArrayOf(1, 3, 5, 7, 9)
-        assertEquals(-1, a.binarySearchInt(0)) // insert at 0
-        assertEquals(-2, a.binarySearchInt(2)) // insert at 1
-        assertEquals(-(5 + 1), a.binarySearchInt(10)) // insert at 5 (end)
+        assertEquals(-1, a.binarySearchInt(0))
+        assertEquals(-2, a.binarySearchInt(2))
+        assertEquals(-(5 + 1), a.binarySearchInt(10))
         val idx = a.binarySearchInt(4)
         assertTrue(idx < 0)
         assertEquals(2, -(idx + 1), "4 inserts between 3 and 5, at index 2")

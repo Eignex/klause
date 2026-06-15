@@ -97,9 +97,8 @@ class PresolverTest {
 
     @Test
     fun `every pass self-registers and is dispatchable`() {
-        // The enum is the registry: a new entry must declare metadata + apply to compile, lands in
-        // `entries` automatically, and the engine dispatches it polymorphically (no central `when`).
-        // This guards the remaining conventions so a malformed addition fails loudly.
+        // The enum is the registry: ids must be unique and round-trip through fromId, and every
+        // problem-stage pass must apply cleanly (no unhandled entry) — a malformed addition fails loudly.
         val ids = PresolvePass.entries.map { it.id }
         assertEquals(ids.size, ids.toSet().size, "pass ids must be unique")
         for (p in PresolvePass.entries) {

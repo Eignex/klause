@@ -90,7 +90,7 @@ class SubcircuitTest {
     @Test
     fun `propagation rejects a successor pointing to a pinned-excluded node`() {
         // #90: succ[0] = 2 but node 2 is pinned excluded (succ[2] = 2). An excluded node has no
-        // predecessor in the cycle, so this is now a propagated conflict (was only graded in LS).
+        // predecessor in the cycle, so this is a propagated conflict.
         val problem = fourNodeProblem()
         val result = problem.propagate(Assumptions(ints = mapOf(0 to 2, 2 to 2)))
         assertTrue(result is Unsat, "pointing at a pinned-excluded node should be Unsat; got $result")

@@ -19,7 +19,7 @@ class ApproxMCTest {
 
     @Test
     fun `small problem is counted exactly without hashing`() {
-        val p = unconstrained(3) // 2^3 = 8 models, below the threshold
+        val p = unconstrained(3) // 8 models, below the hashing threshold
         val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 0L))
         assertTrue(r.exact, "small instance should short-circuit to an exact count")
         assertEquals(8L, r.estimate)
@@ -27,10 +27,9 @@ class ApproxMCTest {
 
     @Test
     fun `large free instance is within the epsilon band of the exact count`() {
-        // Deliberately the cheapest configuration that still hashes — this is a smoke of the
-        // hashed pipeline, not of the (ε, δ) guarantee. ε=2 shrinks the cell threshold to ≈38
-        // (128 models still exceed it) and δ=0.99 floors the iteration count; the band assert
-        // is correspondingly loose, and the pinned seed keeps the outcome deterministic.
+        // Cheapest config that still hashes: a smoke of the hashed pipeline, not the (ε, δ)
+        // guarantee. ε=2 shrinks the cell threshold to ≈38 (128 models exceed it), δ=0.99 floors
+        // the iteration count; band is correspondingly loose, seed pinned for determinism.
         val p = unconstrained(7)
         val exact = exactCount(p)
         val eps = 2.0
@@ -43,9 +42,8 @@ class ApproxMCTest {
 
     @Test
     fun `constrained instance is within the epsilon band`() {
-        // 7 free vars, one clause (x0 v x1) removes the 2^5 assignments with x0=x1=false:
-        // 96 models, above the ε=2 cell threshold (≈38) so the constrained hashed path runs
-        // at the cheapest smoke configuration (see the free-instance case above).
+        // (x0 v x1) removes the 2^5 assignments with x0=x1=false: 96 models, above the ε=2 cell
+        // threshold (≈38) so the constrained hashed path runs (cheapest smoke config, as above).
         val n = 7
         val p = Problem(
             numBoolVars = n,
@@ -63,8 +61,8 @@ class ApproxMCTest {
 
     @Test
     fun `projected count over a subset of variables`() {
-        // 6 vars, project onto the first 4: every projection is reachable -> 2^4 = 16, below
-        // the cell threshold so the projection short-circuits to an exact enumeration.
+        // Project 6 vars onto the first 4: 2^4 = 16 reachable projections, below the cell
+        // threshold so the projection short-circuits to an exact enumeration.
         val p = unconstrained(6)
         val r = BacktrackSolver(p).approximateCount(
             ApproxCountConfig(epsilon = 0.8, delta = 0.35, samplingSet = intArrayOf(0, 1, 2, 3), seed = 5L),

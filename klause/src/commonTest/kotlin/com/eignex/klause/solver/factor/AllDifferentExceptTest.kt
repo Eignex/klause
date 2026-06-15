@@ -16,9 +16,8 @@ import kotlin.test.assertIs
  * #433). Excepted values route through the shared [reginFilter] matching pass modelled as
  * capacity-n value copies, so enumeration under CDCL learning (VSIDS + clause forgetting,
  * exercising the hole-aware Hall-set antecedents) must equal the brute-force solution set — the
- * bounds-only antecedents #99 fixed used to drop solutions here. Restored from the deleted
- * `AllDifferentExceptTest` after #209 dropped the dedicated factor; the except logic now lives on
- * [AllDifferent] itself.
+ * bounds-only antecedents #99 fixed used to drop solutions here. The except logic lives on
+ * [AllDifferent] itself (no dedicated factor).
  */
 class AllDifferentExceptTest {
 

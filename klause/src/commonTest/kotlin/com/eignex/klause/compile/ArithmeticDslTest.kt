@@ -88,7 +88,6 @@ class ArithmeticDslTest {
             val capWhenFlag by constraint { flag implies (budget le 50) }
         }
         val compiled = S().compile()
-        // The single-var reified compare emits a ReifiedLinear with one term.
         assertTrue(compiled.problem.factors.any { it is ReifiedLinear && it.vars.size == 1 })
     }
 

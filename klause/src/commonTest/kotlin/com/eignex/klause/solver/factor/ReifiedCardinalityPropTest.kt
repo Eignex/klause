@@ -27,9 +27,7 @@ class ReifiedCardinalityPropTest {
             numIntVars = 0,
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(
-                // Force v0 = true.
-                Clause(intArrayOf(Lit.make(0, true))),
-                // ReifiedCardinality: aux=v3, lits=[v0, v1, v2], min=1, max=2.
+                Clause(intArrayOf(Lit.make(0, true))), // force v0 = true
                 ReifiedCardinality(
                     auxBoolVar = 3,
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
@@ -38,10 +36,9 @@ class ReifiedCardinalityPropTest {
                 ),
             ),
         )
-        // Pin aux to false externally.
         val session = PropagationSession(problem)
         assertIs<PropagationResult.Implied>(session.pinBool(3, false))
-        // Expect: v1 and v2 forced true (so count = 3 > max = 2).
+        // v1 and v2 forced true (so count = 3 > max = 2).
         assertEquals(true, session.boolValue(1), "v1 should be forced true")
         assertEquals(true, session.boolValue(2), "v2 should be forced true")
     }

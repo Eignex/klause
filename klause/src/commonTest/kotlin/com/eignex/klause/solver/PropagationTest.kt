@@ -326,17 +326,8 @@ class PropagationTest {
     @Test
     fun `Linear negative coefficient tightens correctly`() {
         // -2x + y ≤ -5, x in [0..10], y in [0..0]. y = 0 → -2x ≤ -5 → x ≥ 3 (ceil(-5/-2) = 3).
+        // The extra x ≤ 3 pins x to a singleton so the lower-bound tightening is observable.
         val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 0)),
-            factors = arrayOf<Factor>(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.LE, -5)),
-        )
-        implied(p.propagate())
-        // y forced to 0, x's domain narrowed: 0 already pinned for y. Force
-        // Linear(intArrayOf(1), intArrayOf(x), LinearOp.LE, 3) to get singleton
-        // — instead just check x's lower bound by adding IntLeq.
-        val p2 = Problem(
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 0)),
@@ -345,8 +336,8 @@ class PropagationTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
             ),
         )
-        val r2 = implied(p2.propagate())
-        assertEquals(mapOf(0 to 3, 1 to 0), r2.ints)
+        val r = implied(p.propagate())
+        assertEquals(mapOf(0 to 3, 1 to 0), r.ints)
     }
 
     @Test
@@ -435,24 +426,8 @@ class PropagationTest {
     @Test
     fun `ReifiedLinear aux true tightens variable domains`() {
         // aux ↔ (x + y ≤ 5); pin aux=true, x in [0..10], y in [3..3] → x ≤ 2.
+        // The extra x ≥ 2 pins x to a singleton so the upper-bound tightening is observable.
         val p = Problem(
-            numBoolVars = 1,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 10), IntDomain(3, 3)),
-            factors = arrayOf<Factor>(
-                ReifiedLinear(
-                    auxBoolVar = 0,
-                    coeffs = intArrayOf(1, 1),
-                    vars = intArrayOf(0, 1),
-                    op = LinearOp.LE,
-                    bound = 5,
-                ),
-            ),
-        )
-        implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
-        // x's domain is now [0..2], y is pinned at 3. y returns as 3 in Implied; x not yet singleton.
-        // Add Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 2) to force singleton x=2.
-        val p2 = Problem(
             numBoolVars = 1,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(3, 3)),
@@ -461,8 +436,8 @@ class PropagationTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
             ),
         )
-        val r2 = implied(p2.propagate(Assumptions(bools = mapOf(0 to true))))
-        assertEquals(2, r2.ints[0])
+        val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
+        assertEquals(2, r.ints[0])
     }
 
     @Test

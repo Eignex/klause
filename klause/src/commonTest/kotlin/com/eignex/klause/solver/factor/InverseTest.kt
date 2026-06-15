@@ -77,7 +77,6 @@ class InverseTest {
 
     @Test
     fun `0-based inverse pair`() {
-        // 3 vars on each side, 0-based. Any valid permutation pair satisfies.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 6,

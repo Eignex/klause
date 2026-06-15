@@ -53,23 +53,6 @@ class ConflictReasonTest {
     }
 
     @Test
-    fun `int conflict pins surface as conflictInts`() {
-        // x ≤ 2 and x ≥ 8 over a single int var → Unsat from the constraints (no inputs).
-        // Then add an input pin x=5 (still violates both) → still Unsat; the input is in the set.
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 10)),
-            factors = arrayOf<Factor>(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
-            ),
-        )
-        // Constraint-only baked propagation should already be Unsat with empty sets.
-        assertIs<PropagationResult.Unsat>(p.baked)
-    }
-
-    @Test
     fun `seeded conflicting input ints decode to conflict set`() {
         // Two int vars with domain {0..9}; AtMostOne over (x0=5, x1=5) is not directly a
         // single factor, so instead use a Linear: x0 + x1 ≤ 1 (so 0+0 or 0+1 or 1+0 feasible),

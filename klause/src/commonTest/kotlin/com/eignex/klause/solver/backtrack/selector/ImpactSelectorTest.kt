@@ -97,7 +97,6 @@ class ImpactSelectorTest {
 
     @Test
     fun `impact restores trail level after probing`() {
-        // Sanity: after Impact.values() returns, decisionLevel must be unchanged.
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 2,

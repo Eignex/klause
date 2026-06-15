@@ -11,10 +11,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Tests asserting Régin-style GAC pruning — strictly stronger than the Hall-interval
- * bound consistency the propagators used before. Each test sets up a scenario where
- * bound consistency would leave some inferable value untouched, then asserts Régin
- * prunes it.
+ * Tests asserting Régin-style GAC pruning — strictly stronger than Hall-interval bound
+ * consistency. Each test sets up a scenario where bound consistency would leave some
+ * inferable value untouched, then asserts Régin prunes it.
  */
 class ReginGacTest {
 
@@ -40,9 +39,9 @@ class ReginGacTest {
 
     @Test
     fun `AllDifferent non-contiguous Hall set prunes interior value`() {
-        // x0, x1 ∈ {1, 3} (sparse). x2 ∈ {1, 2, 3}. {1, 3} is a Hall set monopolised by
-        // x0+x1 — Régin must prune both 1 and 3 from x2, leaving {2}. Old Hall-interval
-        // code only checked contiguous intervals and would miss this.
+        // x0, x1 ∈ {1, 3} (sparse). x2 ∈ {1, 2, 3}. {1, 3} is a non-contiguous Hall set
+        // monopolised by x0+x1 — Régin must prune both 1 and 3 from x2, leaving {2}. Bound
+        // consistency only checks contiguous intervals and misses this.
         val d01 = IntDomain(1, 3).excludeValue(2) // sparse {1, 3}
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 3)
         val state = stateWith(factor, arrayOf(d01, d01, IntDomain(1, 3)))
@@ -54,8 +53,8 @@ class ReginGacTest {
 
     @Test
     fun `AllDifferent Hall set prunes interior of spanning var`() {
-        // Classic case retained: x0, x1 ∈ {1, 2}, x2 ∈ {1, 2, 3, 4, 5}. Hall set {1, 2}
-        // monopolised; Régin removes both from x2.
+        // x0, x1 ∈ {1, 2}, x2 ∈ {1, 2, 3, 4, 5}. Hall set {1, 2} monopolised; Régin removes
+        // both from x2.
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 5)
         val state = stateWith(
             factor,

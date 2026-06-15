@@ -22,7 +22,7 @@ class IntVarLiftTest {
 
     @Test
     fun `exact count over a few integer variables`() {
-        // 3 int vars over 0..3 → 4^3 = 64 value combinations, below the hashing threshold.
+        // 4^3 = 64 value combinations, below the hashing threshold.
         val p = intVars(3, 0, 3)
         val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 0L))
         assertTrue(r.exact, "small integer projection should count exactly")
@@ -31,10 +31,9 @@ class IntVarLiftTest {
 
     @Test
     fun `hashed count over integer variables is within the epsilon band`() {
-        // 3 int vars over 0..4 → 125 combinations, above the ε=2 cell threshold (≈38), forcing
-        // XOR hashing over the bits at the cheapest smoke configuration: ε=2/δ=0.99 floor the
-        // cell size and iteration count, the loose band still pins the hashed-lift plumbing,
-        // and the pinned seed keeps the outcome deterministic.
+        // 125 combinations, above the ε=2 cell threshold (≈38), forcing XOR hashing over the
+        // bits at the cheapest smoke config (ε=2/δ=0.99); loose band pins the hashed-lift
+        // plumbing, seed pinned for determinism.
         val p = intVars(3, 0, 4)
         val eps = 2.0
         val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 7L))

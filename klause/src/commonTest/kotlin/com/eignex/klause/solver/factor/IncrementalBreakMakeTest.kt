@@ -25,11 +25,8 @@ class IncrementalBreakMakeTest {
 
     private fun assertConsistent(problem: Problem, seed: Long = 0L) {
         val state = LocalSearchState(problem, Random(seed))
-        // Initialize from a deterministic non-trivial assignment: alternating booleans.
         for (v in 0 until problem.numBoolVars) state.assignment.setBool(v, v and 1 == 0)
         state.recompute()
-        // Flip each var once and verify the incremental break/make vectors agree with
-        // a fresh recompute that uses the brute-force deltaIfBoolFlipped walk.
         for (v in 0 until problem.numBoolVars) {
             state.apply(BoolFlip(v))
             val incBreak = state.boolBreakCountSnapshot()
@@ -242,8 +239,6 @@ class IncrementalBreakMakeTest {
         val state = LocalSearchState(problem, Random(0))
         for (i in 0 until 3) state.assignment.setInt(i, i + 1)
         state.recompute()
-        // Sweep each int var across its domain via the engine and verify break/make
-        // tracks the brute-force result after every step.
         for (round in 0 until 10) {
             val v = round % 3
             val cur = state.assignment.intValue(v)
@@ -281,7 +276,6 @@ class IncrementalBreakMakeTest {
         val state = LocalSearchState(problem, Random(0))
         for (i in 0 until 3) state.assignment.setInt(i, i + 1)
         state.recompute()
-        // Repeatedly flip the aux through the engine and verify against a fresh recompute().
         repeat(4) {
             state.apply(BoolFlip(0))
             val incBreak = state.boolBreakCountSnapshot()
