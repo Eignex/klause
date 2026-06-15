@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -41,6 +42,15 @@ class ReifiedLinear private constructor(
         ) { "${vars[it]}=${coeffs[it]}" }
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
+
+    /**
+     * Advisor subscription (#623): like [Linear], the integer reasoning is purely interval-based —
+     * `propagate` reads `linearSumRange` (the `[c·min, c·max]` envelope) to decide whether the body
+     * is forced and then delegates to `propagateLinearBounds`, never inspecting interior holes. So it
+     * subscribes its term variables to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] and skips interior
+     * `VALUE_REMOVED` wakes. The indicator [auxBoolVar] keeps its separate Boolean wakeup.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
 

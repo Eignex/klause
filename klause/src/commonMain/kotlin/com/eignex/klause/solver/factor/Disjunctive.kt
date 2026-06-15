@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortByIntKey
@@ -80,6 +81,14 @@ class Disjunctive(
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = if (durationVars.isEmpty()) starts else starts + durationVars
+
+    /**
+     * Advisor subscription (#623): disjunctive scheduling (mandatory profile + Θ-tree edge-finding /
+     * not-first/not-last) reads only each start/duration variable's `min`/`max`, with duration vars
+     * consulted once fixed. It never inspects interior holes, so it subscribes to [IntEvent.LB_RAISED]
+     * / [IntEvent.UB_LOWERED] per variable and skips interior `VALUE_REMOVED` wakes.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     private val n: Int = starts.size
 
