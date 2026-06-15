@@ -65,6 +65,33 @@ internal class RevRef<T>(private val state: PropagationState, initial: T) : Trai
     }
 }
 
+/** A backtrackable `LongArray`: per-element writes are individually trailed and rolled back. */
+internal class RevLongArray(private val state: PropagationState, size: Int, init: Long = 0L) : Trailed {
+    private val data = LongArray(size) { init }
+    private val priorIdx = IntArrayList()
+    private val priorVal = ArrayList<Long>()
+
+    val size: Int get() = data.size
+
+    operator fun get(i: Int): Long = data[i]
+
+    operator fun set(i: Int, v: Long) {
+        if (v == data[i]) return
+        if (state.undoLogging) {
+            priorIdx.add(i)
+            priorVal.add(data[i])
+            state.logReversible(this)
+        }
+        data[i] = v
+    }
+
+    override fun restore() {
+        val i = priorIdx.last()
+        data[i] = priorVal.removeAt(priorVal.size - 1)
+        priorIdx.truncateTo(priorIdx.size - 1)
+    }
+}
+
 /** A backtrackable `IntArray`: per-element writes are individually trailed and rolled back. */
 internal class RevIntArray(private val state: PropagationState, size: Int, init: Int = 0) : Trailed {
     private val data = IntArray(size) { init }
