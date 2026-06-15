@@ -2,6 +2,9 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.RevInt
+import com.eignex.klause.solver.propagation.RevIntArray
+import com.eignex.klause.solver.propagation.RevRef
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
@@ -46,6 +49,12 @@ internal fun reginFilter(
     // the refs only ever *miss* after a backtrack restores a different IntDomain (never falsely
     // match), so no reversible/snapshot is needed (cf. GCC #584, Table #580, Element #581).
     if (cache != null && cache.fixpointHolds(state, filteredVars)) return null
+
+    // Incremental path: plain alldifferent (no excepted values) with a cache carries reversible
+    // matching + SCC state across fires (stable value-id universe), patching only the components
+    // touched by the values that left since the last fire. The except/no-cache cases keep the
+    // full per-fire rebuild below.
+    if (cache != null && exceptSet.isEmpty()) return reginIncremental(state, filteredVars, cache)
 
     // Compact value-id mapping + per-var value-id lists (hole-aware). Non-except values get one
     // id; each except value gets `n` capacity-1 copies (contiguous ids) so up to n vars share it.
@@ -263,6 +272,40 @@ internal class ReginCache {
         for (i in vars.indices) lastDoms[i] = state.intDomains[vars[i]]
     }
 
+    // ---- Incremental Régin: a persistent grow-only value universe + the reversible matching/SCC
+    //      state, used by [reginIncremental] for the no-except, stable-var-set path. The universe
+    //      gives values stable node ids across fires (the per-fire compaction in [reginFilter] does
+    //      not), which is the prerequisite for carrying reversible graph state across fires. ----
+    private val idOfValue = MutableIntIntMap()
+    val valueOfId = IntArrayList()
+
+    /** Stable id for a domain [value] (grows the universe on first sight). */
+    fun idFor(value: Int): Int {
+        var id = idOfValue.getOrDefault(value, -1)
+        if (id < 0) {
+            id = valueOfId.size
+            valueOfId.add(value)
+            idOfValue.put(value, id)
+        }
+        return id
+    }
+
+    private var inc: ReginIncrementalState? = null
+
+    /** The incremental state for var set [vars], (re)created when the var set changes or the value
+     *  universe outgrows the current capacity. A fresh state starts invalid ([ReginIncrementalState.valid]
+     *  == 0), forcing a full rebuild that re-seeds it. */
+    fun incremental(state: PropagationState, vars: IntArray): ReginIncrementalState {
+        for (vi in vars) state.intDomains[vi].forEach { v -> idFor(v) }
+        val need = valueOfId.size
+        val cur = inc
+        if (cur == null || !cur.vars.contentEquals(vars) || cur.valueCap < need) {
+            val cap = maxOf(need, cur?.valueCap ?: 0)
+            return ReginIncrementalState(state, vars, cap).also { inc = it }
+        }
+        return cur
+    }
+
     // Reusable oriented-graph adjacency buffers for [reginFilter] — the dominant per-fire
     // allocation (2·(n + numValues) IntArrayLists). Grown on demand, and the live `[0, total)`
     // lists are cleared and refilled every fire, so reuse is behaviour-identical; they hold no
@@ -293,9 +336,37 @@ internal class ReginCache {
     var conflictVars: IntArray? = null
 }
 
+/** Reversible, delta-driven incremental-Régin state for one stable variable set (plain
+ *  alldifferent), driven by [reginIncremental]. The maximum matching and canonical SCC labels ride
+ *  the engine undo trail, so a backtrack restores them in O(changes); [valid] (also reversible)
+ *  drops to 0 when a backtrack lands above the level that seeded the state, forcing a fresh rebuild.
+ *  Node space is stable: variable `i` is node `i`, value-id `j` is node `n + j`. */
+internal class ReginIncrementalState(state: PropagationState, val vars: IntArray, val valueCap: Int) {
+    val n = vars.size
+    val total = n + valueCap
+
+    /** 1 once [reginIncremental]'s rebuild has seeded this state at the current (or an ancestor)
+     *  level; reversible, so a backtrack above the seeding level resets it to 0 → rebuild. */
+    val valid = RevInt(state, 0)
+
+    /** Maximum matching: `matchVar[i]` = the value-id var `i` is matched to (-1 if unmatched);
+     *  `matchVal[j]` = the var matched to value-id `j` (-1 if free). Reversible. */
+    val matchVar = RevIntArray(state, n, -1)
+    val matchVal = RevIntArray(state, valueCap, -1)
+
+    /** Canonical SCC label per node (`0 until total`) — each component labelled by its min node id.
+     *  Reversible. */
+    val sccId = RevIntArray(state, total, -1)
+
+    /** Each var's [IntDomain] at the end of its last fire — the delta base. Reversible, so it rolls
+     *  back with the domains and the `current` ⊆ `domRef` (deletions-only) invariant always holds. */
+    val domRef = Array(n) { RevRef<IntDomain?>(state, null) }
+}
+
 /** Augmenting-path search for maximum bipartite matching. Returns true iff variable `i` can be
- *  matched (possibly re-routing earlier matches). */
-private fun reginTryAugment(
+ *  matched (possibly re-routing earlier matches). Shared with the incremental path
+ *  ([reginIncremental]), which seeds from the reversible matching and completes it here. */
+internal fun reginTryAugment(
     i: Int,
     valuesPerVar: Array<IntArray>,
     matchVar: IntArray,
