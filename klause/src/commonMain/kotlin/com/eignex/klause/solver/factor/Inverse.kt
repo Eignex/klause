@@ -2,11 +2,12 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `inverse(f, g)` with optional offsets: `f(i) = j  ⇔  g(j - gOffset + fOffset) = i`.
@@ -46,6 +47,29 @@ class Inverse(
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = f + g
+
+    /** Advisor subscription (#623): channel GAC over interior domains, so subscribe to every kind on
+     *  every (distinct) channel variable and consume the dirty-variable delta (#624) — the propagator
+     *  scopes its O(n²) channel sweep to the rows/columns whose domain actually changed. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
+
+    /** var id → its index in [f] / [g] (`-1` when absent), so the dirty-variable delta (var ids)
+     *  maps to changed channel rows / columns without an O(n) domain-ref scan. */
+    private val fIndexOf: IntIntMap = IntIntMap.build(f, IntArray(f.size) { it }, absent = -1)
+    private val gIndexOf: IntIntMap = IntIntMap.build(g, IntArray(g.size) { it }, absent = -1)
 
     private fun fValueToGIndex(j: Int): Int = j - gOffset
     private fun gValueToFIndex(i: Int): Int = i - fOffset
@@ -181,22 +205,15 @@ class Inverse(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars)
 
-    /** Cached domain refs (f then g) at the last successful propagate. The O(n²) value-removal
-     *  sweep reprocesses only rows/columns whose domain reference changed since this baseline;
-     *  unchanged pairs were already consistent and stay so. A var pruned during a call has its
-     *  cache entry nulled so its row/column is rechecked next fire — cascades are caught across
-     *  fires (the engine re-queues on any prune), reaching the same fixpoint as the full sweep.
-     *  [fRegin] / [gRegin] warm-start the per-side Régin matching (#541). All of this is cache /
-     *  warm-start, not level state, so it **drifts** across push/pop (no longer a
-     *  [PropagationState.SnapshottablePayload]): after a backtrack the stale [refs] baseline just
-     *  makes the incremental sweep reprocess *more* pairs (the restored domain refs differ from the
-     *  deeper cached ones), reaching the same fixpoint — never an unsound skip; the Régin seeds are
-     *  revalidated against current domains regardless. */
-    private class InverseCache(
-        val refs: Array<IntDomain?>,
-        val fRegin: ReginCache = ReginCache(),
-        val gRegin: ReginCache = ReginCache(),
-    ) {
+    /** Per-session warm-start / scoping cache (not level state — it **drifts** across push/pop, so it
+     *  is no longer a [PropagationState.SnapshottablePayload]). [initialized] gates the first full
+     *  channel sweep; afterwards the O(n²) value-removal sweep reprocesses only the rows/columns the
+     *  dirty-variable delta reports changed (a prune re-wakes its var, so cascades are caught across
+     *  fires). [fRegin] / [gRegin] warm-start the per-side Régin matching (#541), revalidated against
+     *  current domains every call, so a drifted seed is at worst a missed warm-start, never unsound. */
+    private class InverseCache(val fRegin: ReginCache = ReginCache(), val gRegin: ReginCache = ReginCache()) {
+        var initialized: Boolean = false
+
         /** The channel var / pair (or Hall violator set) behind the most recent propagate failure
          *  on this session; propagate-to-analysis transient, never needs to survive a backtrack. */
         var conflictVars: IntArray? = null
@@ -204,12 +221,27 @@ class Inverse(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val cache = (state.refPayload[factorId] as? InverseCache) ?: run {
-            val fresh = InverseCache(arrayOfNulls(intVars.size))
+            val fresh = InverseCache()
             state.refPayload[factorId] = fresh
             fresh
         }
         cache.conflictVars = null // stale-guard; set at each failure point below.
-        val entryRefs = Array(intVars.size) { state.intDomains[intVars[it]] }
+        // Map the dirty-variable delta to changed channel rows / columns. The first fire (and any
+        // uninitialised cache) sweeps every pair; afterwards only changed rows / columns are revisited
+        // — a prune re-wakes its variable, so the delta carries cascades across fires.
+        val full = !cache.initialized
+        val fDirty = BooleanArray(f.size)
+        val gDirty = BooleanArray(g.size)
+        if (!full) {
+            for (v in state.drainIntEventDirtyVars(factorId)) {
+                val fi = fIndexOf[v]
+                if (fi >= 0) fDirty[fi] = true
+                val gi = gIndexOf[v]
+                if (gi >= 0) gDirty[gi] = true
+            }
+        } else {
+            state.drainIntEventDirtyVars(factorId) // clear the accumulator; the full sweep covers all
+        }
         // Range tightens are structural (no input antecedents). A failure means that one var
         // alone cannot reach the legal index span, so it is the sole reason.
         val gLo = gOffset
@@ -280,9 +312,8 @@ class Inverse(
         // implicates exactly the channel pair (f[i], g[gIdx]). Incremental: a pair only needs
         // reprocessing when one of its two endpoints' domains changed vs the cached baseline,
         // so we sweep only changed rows and changed columns (each pair once).
-        val fn = f.size
-        fun fChanged(i: Int) = cache.refs[i] !== state.intDomains[f[i]]
-        fun gChanged(j: Int) = cache.refs[fn + j] !== state.intDomains[g[j]]
+        fun fChanged(i: Int) = full || fDirty[i]
+        fun gChanged(j: Int) = full || gDirty[j]
         fun pair(i: Int, gIdx: Int): Boolean {
             val jVal = gIdx + gOffset // value f[i] would take to point to g[gIdx]
             val iVal = i + fOffset // value g[gIdx] would take to point back to f[i]
@@ -329,12 +360,7 @@ class Inverse(
             return false
         }
 
-        // Record the post-prune baseline. A var pruned this call (ref differs from entry) is
-        // nulled so its row/column is rechecked next fire, propagating cascades to fixpoint.
-        for (k in intVars.indices) {
-            val cur = state.intDomains[intVars[k]]
-            cache.refs[k] = if (entryRefs[k] !== cur) null else cur
-        }
+        cache.initialized = true
         return true
     }
 

@@ -9,6 +9,7 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.propagation.PropagationResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -150,5 +151,78 @@ class InverseTest {
         val impl = assertIs<PropagationResult.Implied>(problem.propagate(Assumptions.None))
         assertEquals(1, impl.intValueOrNull(0), "f[0] must lose 0 (g[0]≠0) and pin to 1")
         assertEquals(0, impl.intValueOrNull(3), "cascade: f[0]=1 ⟹ g[1]=0")
+    }
+
+    /**
+     * Soundness gate for the reversible, delta-driven channel sweep: random Inverse instances
+     * (varied sizes, random per-variable domains, both 0- and 1-based offsets) enumerated under full
+     * CDCL — which branches, prunes and backtracks deeply, exercising the dirty-variable delta scoping
+     * and the across-fire cascade — must equal the brute-force mutual-inverse set. A missed changed
+     * row/column or a botched cascade would drop or admit an assignment.
+     */
+    @Test
+    fun `randomized inverse enumerates exactly the brute-force set across deep backtracking`() {
+        val rng = Random(0x1234)
+        repeat(80) { trial ->
+            val n = rng.nextInt(3, 6)
+            val off = if (rng.nextBoolean()) 0 else 1
+            val lo = off
+            val hi = off + n - 1
+            // Random per-variable subdomain within the legal index span [lo, hi].
+            val fr = Array(n) {
+                val a = rng.nextInt(lo, hi + 1)
+                val b = rng.nextInt(a, hi + 1)
+                a to b
+            }
+            val gr = Array(n) {
+                val a = rng.nextInt(lo, hi + 1)
+                val b = rng.nextInt(a, hi + 1)
+                a to b
+            }
+            val k = 2 * n
+            val acc = IntArray(k)
+            fun ok(): Boolean {
+                for (i in 0 until n) {
+                    val j = acc[i] - off
+                    if (j !in 0 until n || acc[n + j] != i + off) return false
+                }
+                for (i in 0 until n) {
+                    val j = acc[n + i] - off
+                    if (j !in 0 until n || acc[j] != i + off) return false
+                }
+                return true
+            }
+            val brute = HashSet<List<Int>>()
+            fun rec(p: Int) {
+                if (p == k) {
+                    if (ok()) brute.add(acc.toList())
+                    return
+                }
+                val range = if (p < n) fr[p] else gr[p - n]
+                for (v in range.first..range.second) {
+                    acc[p] = v
+                    rec(p + 1)
+                }
+            }
+            rec(0)
+            val doms = Array(k) {
+                if (it < n) IntDomain(fr[it].first, fr[it].second) else IntDomain(gr[it - n].first, gr[it - n].second)
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = k,
+                intDomains = doms,
+                factors = arrayOf<Factor>(
+                    Inverse(f = IntArray(n) { it }, g = IntArray(n) { n + it }, fOffset = off, gOffset = off),
+                ),
+            )
+            val params = BacktrackParams(
+                randomSeed = (trial + 1).toLong(),
+                variableSelector = Vsids(),
+                maxLearnedClauses = 500,
+            )
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000).map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "trial #$trial (n=$n off=$off): must equal brute force")
+        }
     }
 }
