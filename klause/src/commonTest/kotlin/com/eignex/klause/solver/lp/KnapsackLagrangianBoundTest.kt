@@ -58,11 +58,11 @@ class KnapsackLagrangianBoundTest {
             val factors = ArrayList<Factor>()
             data class Knap(val w: IntArray, val cap: Int)
             val knaps = ArrayList<Knap>()
-            repeat(numKnap) {
+            repeat(numKnap) { _ ->
                 val w = IntArray(n) { rng.nextInt(1, 5) }
                 val cap = rng.nextInt(n, n * 4)
                 knaps.add(Knap(w, cap))
-                factors.add(pb(w, IntArray(n) { it }, PbOp.LE, cap))
+                factors.add(pb(w, IntArray(n) { v -> v }, PbOp.LE, cap))
             }
             val c = LongArray(n) { rng.nextInt(-4, 3).toLong() } // some negative ⇒ selection is nontrivial
             val prob = Problem(
@@ -90,7 +90,8 @@ class KnapsackLagrangianBoundTest {
                 if (!ok) continue
                 var o = 0L
                 for (b in 0 until n) if ((mask shr b) and 1 == 1) o += c[b]
-                if (trueOpt == null || o < trueOpt!!) trueOpt = o
+                val cur = trueOpt
+                if (cur == null || o < cur) trueOpt = o
             }
             val opt = trueOpt ?: return@repeat // x=0 always feasible, so this never triggers
             val incumbent = opt.toDouble() + 1000.0
