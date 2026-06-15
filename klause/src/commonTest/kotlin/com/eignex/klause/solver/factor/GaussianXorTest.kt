@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -65,7 +66,7 @@ class GaussianXorTest {
     fun `randomized xor systems enumerate exactly the brute-force set across backtracking`() {
         val n = 8
         for (seed in 1L..40L) {
-            val rng = kotlin.random.Random(seed)
+            val rng = Random(seed)
             val rowCount = 2 + rng.nextInt(6) // 2..7 parity rows
             val rows = ArrayList<Pair<IntArray, Int>>(rowCount)
             repeat(rowCount) {
