@@ -354,16 +354,18 @@ internal fun PropagationState.citeCrossedSearchHoles(
 ): IntArray? {
     var out: IntArrayList? = null
     val root = problem.intDomains[v]
-    var value = from
-    while (value < until) {
-        if (value !in prior && value in root) {
+    // Walk only the holes [prior] already carries in the range (values absent from [prior] but
+    // inside its bounds), not every integer — over a wide result-prune the crossed span is
+    // thousands wide while the holes in it are few. A value still present in [prior] is one this
+    // batch excludes, covered by [base], and is never reported as a hole here. (#612)
+    prior.forEachHoleInRange(from, until - 1) { value ->
+        if (value in root) {
             val o = out ?: IntArrayList().also { fresh ->
                 out = fresh
                 base?.forEach { fresh.add(it) }
             }
             o.add(Lit.make(atomVarEq(v, value), true))
         }
-        value++
     }
     return out?.toIntArray() ?: base
 }
