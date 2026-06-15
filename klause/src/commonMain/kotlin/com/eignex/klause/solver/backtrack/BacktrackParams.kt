@@ -395,7 +395,17 @@ data class BacktrackParams(
      * Independent of [lpBounding]; off by default; a no-op when no eligible AllDifferent exists.
      */
     val lagrangian: Boolean = false,
-    /** Subgradient ascent iterations per node for [lagrangian]; more iterations tighten the bound. */
+    /**
+     * 0/1 multi-knapsack subgradient Lagrangian bounding (#632). When true and the objective is a
+     * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound for
+     * problems with several `PseudoBoolean` capacity rows: one capacity row is kept and solved **exactly**
+     * by 0/1-knapsack DP while the rest are dualized, so the bound captures integrality the monolithic LP
+     * relaxes away. Shares [lagrangianIterations]. Independent of [lpBounding]; off by default; a no-op
+     * unless a clean capacity `PseudoBoolean` (positive literals/weights, `≤`) is present.
+     */
+    val lpKnapsackLagrangian: Boolean = false,
+    /** Subgradient ascent iterations per node for [lagrangian] / [lpKnapsackLagrangian]; more iterations
+     *  tighten the bound. */
     val lagrangianIterations: Int = 15,
     /**
      * Energetic-reasoning infeasibility check for Cumulative globals (#22/#23). When true, a node is
