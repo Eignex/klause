@@ -27,6 +27,7 @@ import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.IntArrayList
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.round
 
@@ -442,7 +443,12 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
         } else {
             params.lpCutRounds
         }
+        // #565 staleness baseline: the LP bound before any cuts, to measure each round's gain against.
+        var lastObj = lpObjectiveOf(solution, relaxation)
         while (round++ < maxRounds) {
+            // #565 budget: stop before separating once this node's live cut pool is full.
+            val room = params.lpMaxCutsPerNode - cuts.size
+            if (room <= 0) break
             val ctx = CutContext(problem, relaxation, solution, session)
             // Structure-based separators run on the LP point; Gomory cuts come from the tableau.
             val separated = separators.flatMap { it.separate(ctx) }
@@ -450,8 +456,10 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
                 if (params.lpCuts && params.lpGomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
             val mir =
                 if (params.lpCuts && params.lpMir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-            val fresh = (separated + gomory + mir).filter { pool.add(it.key()) }
-            if (fresh.isEmpty()) break
+            val deduped = (separated + gomory + mir).filter { pool.add(it.key()) }
+            if (deduped.isEmpty()) break
+            // Trim the round to the remaining budget so one node's pool can never blow past the cap.
+            val fresh = if (deduped.size > room) deduped.subList(0, room) else deduped
             cuts.addAll(fresh)
             sink.observeLpCuts(fresh.size)
             relaxation = relaxer.build(session, globalCuts + cuts)
@@ -481,6 +489,14 @@ internal fun BacktrackSolver.lpBoundAndFixUnsafe(
             if (boundPrunes(solution, relaxation, bound)) {
                 sink.observeLpPrune()
                 return LpNodeOutcome(true, warmCache, tableau = nodeTableau)
+            }
+            // #565 staleness: once a round stops moving the LP bound (diminishing returns), stop
+            // separating and give the time back to search — more cuts here would not prune.
+            if (params.lpCutMinGain > 0.0) {
+                val newObj = lpObjectiveOf(solution, relaxation)
+                val gain = if (newObj.isFinite() && lastObj.isFinite()) newObj - lastObj else Double.POSITIVE_INFINITY
+                lastObj = newObj
+                if (gain.isFinite() && gain < params.lpCutMinGain * maxOf(1.0, abs(lastObj))) break
             }
         }
     }
