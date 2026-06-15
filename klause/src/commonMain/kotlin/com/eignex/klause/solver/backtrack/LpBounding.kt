@@ -20,6 +20,7 @@ import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.VarStatus
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.mulExact
+import com.eignex.klause.solver.lp.safeObjectiveLowerBound
 import com.eignex.klause.solver.lp.subExact
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -222,8 +223,9 @@ internal fun BacktrackSolver.lpBoundAndFix(
     sink.lpClockStart()
     if (params.lpSparsePrimary) {
         // Over the dense-tableau cap (#602): take the bound-only sparse pipeline directly, never
-        // allocating the dense tableau the guard protects against.
-        sparseCertifiedPrune(relaxer, session, bound, globalCuts, sink, cancellation)
+        // allocating the dense tableau. Uses the cheap O(nnz) Neumaier–Shcherbina safe bound (not the
+        // O(m³) exact certify) so the per-node cost is bounded and the `-t` deadline is honored.
+        sparseSafePrune(relaxer, session, bound, globalCuts, sink, cancellation)
     } else {
         lpBoundAndFixUnsafe(
             relaxer, session, bound, sink, warmBasis, params, separators, hints,
@@ -242,6 +244,35 @@ internal fun BacktrackSolver.lpBoundAndFix(
     }
 } finally {
     sink.lpClockStop()
+}
+
+/**
+ * Cheap sound prune for the over-cap sparse-primary path (#602/#562): float revised simplex for the
+ * duals, then the O(nnz) Neumaier–Shcherbina safe bound — no exact BigInt certify, so the per-node
+ * cost is bounded and `-t` is honored (the simplex itself polls cancellation). Prunes when the safe
+ * bound (+ the relaxation's objective constant) reaches the incumbent; any failure keeps the node.
+ */
+internal fun BacktrackSolver.sparseSafePrune(
+    relaxer: CpToLpRelaxation,
+    session: PropagationSession,
+    bound: Double,
+    globalCuts: List<Cut>,
+    sink: SolveStatsSink,
+    cancellation: Cancellation,
+): LpNodeOutcome {
+    if (!bound.isFinite()) return LpNodeOutcome(false, null)
+    val relaxation = relaxer.build(session, globalCuts)
+    if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
+    sink.observeLpSolve()
+    val result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
+    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return LpNodeOutcome(false, null)
+    val full = safe + relaxation.objectiveConstant.toDouble()
+    return if (full >= bound) {
+        sink.observeLpPrune()
+        LpNodeOutcome(true, null)
+    } else {
+        LpNodeOutcome(false, null)
+    }
 }
 
 /**
