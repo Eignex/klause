@@ -52,4 +52,24 @@ internal object IntEvent {
 
     /** The event kind of a [pack]ed subscription / slot. */
     fun kindOf(packed: Int): Int = packed % COUNT
+
+    /**
+     * The standard advisor subscription for a bounds-consistent / interval propagator: [LB_RAISED]
+     * and [UB_LOWERED] on every distinct variable in [vars], and nothing else. A factor whose
+     * `propagate` reads only each variable's `min`/`max` (Linear, Product, ArrayMinMax, bounds
+     * `AllDifferent`, …) returns this from
+     * [com.eignex.klause.solver.Factor.initialIntEventWatches] so it wakes on bound moves but not on
+     * interior [VALUE_REMOVED] carves it could not act on. Duplicate ids in [vars] are subscribed
+     * once (bound subscriptions are idempotent), so aliased operands are handled cleanly.
+     */
+    fun boundEventWatches(vars: IntArray): IntArray {
+        val distinct = vars.toHashSet()
+        val out = IntArray(distinct.size * 2)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = pack(v, LB_RAISED)
+            out[w++] = pack(v, UB_LOWERED)
+        }
+        return out
+    }
 }
