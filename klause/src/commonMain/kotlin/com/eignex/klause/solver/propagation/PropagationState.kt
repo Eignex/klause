@@ -482,7 +482,7 @@ class PropagationState(
      *  from [intDomains] on every clause touch (the #588 profile's dominant cost, `atomTruthOf`).
      *  0 = unassigned, 1 = true, 2 = false. Set by [wakeAtom] the instant a bound move crosses the
      *  threshold (which is exactly when the truth flips, since [propagateAtomsForVar] now visits
-     *  every materialized atom of the var), cleared to 0 on backtrack by [resetAtomSlots]. A 0 slot
+     *  every materialized atom of the var), cleared to 0 on backtrack by [resetAtomTrailFor]. A 0 slot
      *  on a determined atom (one materialized *after* its bound already crossed) falls back to the
      *  domain-derived [atomTruthOf] — sound, just not cached. */
     internal val atomState: IntArrayList = IntArrayList()

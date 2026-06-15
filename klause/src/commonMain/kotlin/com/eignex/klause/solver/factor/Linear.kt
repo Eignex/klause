@@ -439,15 +439,15 @@ internal fun collectLinearTightenAntecedents(
 }
 
 /**
- * Above this arity the per-variable weakest-bound relaxation ([collectLinearRelaxedAntecedents])
+ * Above this arity the per-variable reason ([collectLinearDirAntecedents], rebuilt per tighten)
  * becomes the dominant cost: a single [propagateLinearBounds] call can tighten O(arity) vars and
- * each relaxation is O(arity), so the reason work is O(arity²) per propagation — and it is pure
+ * each reason is O(arity), so the reason work is O(arity²) per propagation — and it is pure
  * waste on the large set-partitioning / `int_lin_eq` systems that drive feasibility, which run
  * with essentially no conflicts (the reasons are never consumed). For such wide constraints we
  * fall back to a single shared start-of-call reason ([collectLinearStartBoundAntecedents], O(arity)
- * built once and reused across every tighten in the call). Below the threshold the relaxation is
- * cheap and its sharper, more reusable clauses are worth keeping, so small constraints are
- * unaffected.
+ * built once and reused across every tighten in the call). Below the threshold the per-tighten
+ * reason is cheap and its sharper, more reusable clauses are worth keeping, so small constraints
+ * are unaffected.
  */
 private const val LINEAR_SHARED_REASON_ARITY = 32
 
@@ -461,9 +461,9 @@ private const val LINEAR_SHARED_REASON_ARITY = 32
  * which keeps the array shareable across all tightens. Vars at their root bound are global facts
  * and cited nothing; [extraLit], when non-zero, is prepended.
  *
- * This is the wide-constraint counterpart to [collectLinearRelaxedAntecedents]: it drops the
- * weakest-bound relaxation (slightly less general learned clauses) in exchange for O(arity) total
- * instead of O(arity²) per propagation. See [LINEAR_SHARED_REASON_ARITY].
+ * This is the wide-constraint counterpart to the per-tighten [collectLinearDirAntecedents]: one
+ * shared reason (slightly less precise) in exchange for O(arity) total instead of O(arity²) per
+ * propagation. See [LINEAR_SHARED_REASON_ARITY].
  */
 internal fun collectLinearStartBoundAntecedents(
     state: PropagationState,
