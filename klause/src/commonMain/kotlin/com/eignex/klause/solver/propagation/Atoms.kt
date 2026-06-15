@@ -170,14 +170,11 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
     atomIntVar.add(intVar)
     atomKind.add(kind)
     atomThreshold.add(threshold)
-    // Trail slots default to "not established on the current path"; channeling (a bound
-    // move crossing this threshold) and lazy reconstruction in [reconstructAtomTrail]
-    // populate them.
-    // Snapshot the atom's current truth so it is canonical from birth — a determined-at-
-    // materialization atom (its bound already crossed) carries stored truth without any
-    // derive fallback, letting [atomCurrentTruth] read the bit instead of recomputing from
-    // the domain. Maintained on every crossing ([wakeAtom]) and recomputed on backtrack
-    // ([resetAtomSlots] after the domain is restored).
+    // Snapshot the atom's current truth/level/reason so it is canonical from birth — a
+    // determined-at-materialization atom (its bound already crossed) carries stored state
+    // without any derive fallback, letting atomCurrentTruth read the bit instead of
+    // recomputing from the domain. Maintained on every crossing (wakeAtom) and recomputed on
+    // backtrack (resetAtomTrailFor after the domain is restored).
     val st = stateOfTruth(atomTruthOf(intVar, kind, threshold))
     atomState.add(st)
     atomLvl.add(reconstructCurrentBoundLevel(intVar, kind, threshold, st))
@@ -355,7 +352,7 @@ internal inline fun PropagationState.visitAtomRange(
 /** Wake the watchers of [atomId]'s now-false literal after its truth flipped to
  *  [newT]. Truth itself is never stored — it is derived from the domains on read — but
  *  the **level** the atom became determined at is recorded on its trail slot: this move
- *  crossed the atom's threshold, so its truth was established at the move's [currentLevel].
+ *  crossed the atom's threshold, so its truth was established at the move's [PropagationState.currentLevel].
  *  That stored level is the trail-resident replacement for the bound-history binary search
  *  in [atomLevelForConflict] (provably equal: a crossing at level L *is* the level the
  *  bound first reached the threshold). Reset to -1 on backtrack of the underlying var. */
@@ -411,7 +408,7 @@ private fun PropagationState.clearEqIfFreed(atomId: Int) {
  * retains a trail-resident level+reason and conflict analysis never needs a bound history.
  *
  * [oldMin]/[oldMax] are the *tight* bounds from before the domain was restored; the current
- * [intDomains] holds the restored (wider) domain. Mirrors [propagateAtomsForVar]'s ranges
+ * [PropagationState.intDomains] holds the restored (wider) domain. Mirrors [propagateAtomsForVar]'s ranges
  * exactly (off-by-one parity matters: [atomCurrentTruth] has no derive fallback, so a missed
  * flip would leave a stale truth bit).
  */
