@@ -23,6 +23,7 @@ import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.DualSimplex
 import com.eignex.klause.solver.lp.GccSeparator
 import com.eignex.klause.solver.lp.KnapsackCoverSeparator
+import com.eignex.klause.solver.lp.KnapsackLagrangianBound
 import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
@@ -349,6 +350,12 @@ class BacktrackSolver(override val problem: Problem) :
             null
         }
         private var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
+        private val knapsackLagBound = if (params.lpKnapsackLagrangian) {
+            KnapsackLagrangianBound(problem, objective).takeIf { it.applicable }
+        } else {
+            null
+        }
+        private var knapsackLagMultipliers = LongArray(knapsackLagBound?.multiplierCount ?: 0)
         private val energeticBound = if (params.energeticReasoning) {
             CumulativeEnergeticBound(problem).takeIf { it.applicable }
         } else {
@@ -382,6 +389,7 @@ class BacktrackSolver(override val problem: Problem) :
             // read across a lambda boundary does not on its own).
             val lpRelaxerL = lpRelaxer
             val lagBoundL = lagBound
+            val knapsackLagBoundL = knapsackLagBound
             val energeticBoundL = energeticBound
             val cumulativeFlowBoundL = cumulativeFlowBound
             val lpNogoodsL = lpNogoods
@@ -414,6 +422,22 @@ class BacktrackSolver(override val problem: Problem) :
                     )
                     if (res != null) {
                         lagMultipliers = res.multipliers
+                        if (res.prune) sink.observeLagrangianPrune()
+                        res.prune
+                    } else {
+                        false
+                    }
+                } -> true
+
+                knapsackLagBoundL != null && run {
+                    val res = knapsackLagBoundL.computeBound(
+                        session,
+                        effectiveBound,
+                        knapsackLagMultipliers,
+                        params.lagrangianIterations,
+                    )
+                    if (res != null) {
+                        knapsackLagMultipliers = res.multipliers
                         if (res.prune) sink.observeLagrangianPrune()
                         res.prune
                     } else {

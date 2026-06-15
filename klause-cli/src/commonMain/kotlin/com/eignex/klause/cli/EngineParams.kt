@@ -132,6 +132,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
     p.int("vivify-batch")?.let { out = out.copy(vivifyBatch = it) }
     p.bool("lp-objective-cone")?.let { out = out.copy(lpObjectiveCone = it) }
     p.bool("lp-auto-off-reprobe")?.let { out = out.copy(lpAutoOffReprobe = it) }
+    p.bool("lp-knapsack-lagrangian")?.let { out = out.copy(lpKnapsackLagrangian = it) }
     if (allowSelectors) {
         p.varSelector("var-selector", out.randomSeed)?.let { out = out.copy(variableSelector = it) }
         p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }
@@ -140,7 +141,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
         "cp",
         "seed, max-decisions, luby, adaptive-restart, phase-saving, target-phasing, " +
             "rephase-interval, max-learned, lbd-glue, tiered-db, mid-lbd, vivification, vivify-batch, " +
-            "lp-objective-cone, lp-auto-off-reprobe" +
+            "lp-objective-cone, lp-auto-off-reprobe, lp-knapsack-lagrangian" +
             (if (allowSelectors) ", var-selector, val-selector" else ""),
     )
     return out
