@@ -187,12 +187,9 @@ internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Int, antecedents: In
     }
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
+    intMinLevel[v] = currentLevel
     intMinReason[v] = currentFactor
     intMinAntecedents[v] = ant
-    // Record the post-snap bound, not the requested one: when the landing value sits in
-    // a hole the actual min jumps further, and minLevelForGe must attribute every value
-    // in the jumped-over range to this level.
-    pushMinHist(v, newDomain.min, currentLevel, antecedents, ant, lo)
     dirtyInts.addLast(v)
     propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMin = lo, oldMin = d.min, oldMax = d.max)
     return true
@@ -222,10 +219,9 @@ internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: In
     }
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
+    intMaxLevel[v] = currentLevel
     intMaxReason[v] = currentFactor
     intMaxAntecedents[v] = ant
-    // Post-snap bound for the same reason as the min side.
-    pushMaxHist(v, newDomain.max, currentLevel, antecedents, ant, hi)
     dirtyInts.addLast(v)
     propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMax = hi, oldMin = d.min, oldMax = d.max)
     return true
@@ -288,23 +284,21 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedent
     }
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
-    // History upkeep mirrors the tighten paths: an edge carve joins the bound history
-    // (this path bypasses tightenInt*Impl), an interior carve the hole history —
-    // without the record the level lookups mis-attribute the change.
-    when {
-        newDomain.min != d.min -> pushMinHist(v, newDomain.min, currentLevel, antNear, ant, value + 1)
-        newDomain.max != d.max -> pushMaxHist(v, newDomain.max, currentLevel, antNear, ant, value - 1)
-        else -> pushHoleHist(v, value, currentLevel, antecedents)
-    }
+    // An interior carve (no endpoint moved) records the hole history — still the level/reason
+    // source for an eq atom materialized after its value was already carved (bound moves keep
+    // their level/reason on the order literals themselves now, so no bound history is needed).
+    if (newDomain.min == d.min && newDomain.max == d.max) pushHoleHist(v, value, currentLevel, antecedents)
     // Reason attribution: which side (min/max) "moved" depends on where the hole
     // landed. Pure interior holes don't shift either endpoint; in that case the
     // current factor still becomes the relevant reason for any future propagator
     // walking back through this variable.
     if (newDomain.min != d.min) {
+        intMinLevel[v] = currentLevel
         intMinReason[v] = currentFactor
         intMinAntecedents[v] = ant
     }
     if (newDomain.max != d.max) {
+        intMaxLevel[v] = currentLevel
         intMaxReason[v] = currentFactor
         intMaxAntecedents[v] = ant
     }

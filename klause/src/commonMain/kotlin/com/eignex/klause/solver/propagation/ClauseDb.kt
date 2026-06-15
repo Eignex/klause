@@ -184,7 +184,8 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // bound atom registers here, not in the bool-var lists. Skipping this remap left
     // stale fids pointing past the compacted clause array, crashing the next atom wake
     // on any model whose conflicts learn atom-literal clauses.
-    for (list in atomWatchersByLit.values) {
+    for (list in atomWatchersByLit) {
+        if (list == null) continue
         var wi = 0
         for (r in 0 until list.size) {
             val fid = list[r]

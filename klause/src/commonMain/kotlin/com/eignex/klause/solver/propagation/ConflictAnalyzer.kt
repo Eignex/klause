@@ -247,7 +247,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             while (pinIdx >= 0) {
                 val v = state.boolPinOrder[pinIdx]
                 pinIdx--
-                if (seen[v] && state.boolLevel[v] == currentLevel) {
+                if (!seen[v]) continue
+                val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
+                if (lvl == currentLevel) {
                     pivot = v
                     break
                 }

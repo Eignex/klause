@@ -4,13 +4,13 @@ internal fun PropagationState.logBoolPin(v: Int) {
     undoTag.add(0)
     undoVar.add(v)
     undoLevel.add(0)
+    undoMinLvl.add(0)
+    undoMaxLvl.add(0)
     undoMinReason.add(0)
     undoMaxReason.add(0)
     undoDomain.add(null)
     undoMinAnt.add(null)
     undoMaxAnt.add(null)
-    undoMinHistLen.add(0)
-    undoMaxHistLen.add(0)
     undoHoleHistLen.add(0)
 }
 
@@ -19,13 +19,13 @@ internal fun PropagationState.logIntChange(v: Int) {
     undoTag.add(1)
     undoVar.add(v)
     undoLevel.add(intLevel[v])
+    undoMinLvl.add(intMinLevel[v])
+    undoMaxLvl.add(intMaxLevel[v])
     undoMinReason.add(intMinReason[v])
     undoMaxReason.add(intMaxReason[v])
     undoDomain.add(intDomains[v])
     undoMinAnt.add(intMinAntecedents[v])
     undoMaxAnt.add(intMaxAntecedents[v])
-    undoMinHistLen.add(minHistVal[v]?.size ?: 0)
-    undoMaxHistLen.add(maxHistVal[v]?.size ?: 0)
     undoHoleHistLen.add(holeHistVal[v]?.size ?: 0)
 }
 
@@ -38,13 +38,13 @@ internal fun PropagationState.logIntCarve(v: Int, value: Int) {
     undoTag.add(2)
     undoVar.add(v)
     undoLevel.add(intLevel[v])
+    undoMinLvl.add(intMinLevel[v])
+    undoMaxLvl.add(intMaxLevel[v])
     undoMinReason.add(value)
     undoMaxReason.add(holeHistVal[v]?.size ?: 0)
     undoDomain.add(null)
     undoMinAnt.add(null)
     undoMaxAnt.add(null)
-    undoMinHistLen.add(0)
-    undoMaxHistLen.add(0)
     undoHoleHistLen.add(0)
 }
 
@@ -52,13 +52,13 @@ internal fun PropagationState.truncateUndo(n: Int) {
     undoTag.truncateTo(n)
     undoVar.truncateTo(n)
     undoLevel.truncateTo(n)
+    undoMinLvl.truncateTo(n)
+    undoMaxLvl.truncateTo(n)
     undoMinReason.truncateTo(n)
     undoMaxReason.truncateTo(n)
     while (undoDomain.size > n) undoDomain.removeAt(undoDomain.size - 1)
     while (undoMinAnt.size > n) undoMinAnt.removeAt(undoMinAnt.size - 1)
     while (undoMaxAnt.size > n) undoMaxAnt.removeAt(undoMaxAnt.size - 1)
-    undoMinHistLen.truncateTo(n)
-    undoMaxHistLen.truncateTo(n)
     undoHoleHistLen.truncateTo(n)
 }
 
@@ -121,27 +121,26 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
             1 -> { // int change — restore the full recorded prior int-var state
                 val v = undoVar[i]
                 unassigned?.invoke(numBool + v)
+                // Tight bounds before restore — the widened range whose order literals flip
+                // back to undetermined (see [resetAtomTrailFor]).
+                val tightMin = intDomains[v].min
+                val tightMax = intDomains[v].max
                 intDomains[v] = requireNotNull(undoDomain[i])
                 intLevel[v] = undoLevel[i]
+                intMinLevel[v] = undoMinLvl[i]
+                intMaxLevel[v] = undoMaxLvl[i]
                 intMinReason[v] = undoMinReason[i]
                 intMaxReason[v] = undoMaxReason[i]
                 intMinAntecedents[v] = undoMinAnt[i]
                 intMaxAntecedents[v] = undoMaxAnt[i]
-                // Truncate the bound-change history back to its pre-mutation length so the
-                // (value, level) record stays exactly aligned with the restored domain.
-                minHistVal[v]?.truncateTo(undoMinHistLen[i])
-                minHistLvl[v]?.truncateTo(undoMinHistLen[i])
-                maxHistVal[v]?.truncateTo(undoMaxHistLen[i])
-                maxHistLvl[v]?.truncateTo(undoMaxHistLen[i])
+                // Truncate the interior-hole carve history back to its pre-mutation length so
+                // the (value, level, reason) records stay aligned with the restored domain.
                 holeHistVal[v]?.truncateTo(undoHoleHistLen[i])
                 holeHistLvl[v]?.truncateTo(undoHoleHistLen[i])
-                minHistAntNear[v]?.let { a -> while (a.size > undoMinHistLen[i]) a.removeAt(a.size - 1) }
-                minHistAntFar[v]?.let { a -> while (a.size > undoMinHistLen[i]) a.removeAt(a.size - 1) }
-                minHistReq[v]?.truncateTo(undoMinHistLen[i])
-                maxHistAntNear[v]?.let { a -> while (a.size > undoMaxHistLen[i]) a.removeAt(a.size - 1) }
-                maxHistAntFar[v]?.let { a -> while (a.size > undoMaxHistLen[i]) a.removeAt(a.size - 1) }
-                maxHistReq[v]?.truncateTo(undoMaxHistLen[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undoHoleHistLen[i]) a.removeAt(a.size - 1) }
+                // Clear only the order literals whose truth flips back to undetermined — the
+                // range the domain just widened over (tight → restored). Must run post-restore.
+                resetAtomTrailFor(v, tightMin, tightMax)
             }
 
             2 -> { // interior carve — re-insert the carved value
@@ -149,9 +148,13 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 unassigned?.invoke(numBool + v)
                 intDomains[v] = intDomains[v].includeInteriorValue(undoMinReason[i])
                 intLevel[v] = undoLevel[i]
+                intMinLevel[v] = undoMinLvl[i]
+                intMaxLevel[v] = undoMaxLvl[i]
                 holeHistVal[v]?.truncateTo(undoMaxReason[i])
                 holeHistLvl[v]?.truncateTo(undoMaxReason[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undoMaxReason[i]) a.removeAt(a.size - 1) }
+                // The re-inserted value's eq atom flips false → undetermined (bounds unchanged).
+                resetAtomTrailForCarve(v, undoMinReason[i])
             }
 
             else -> error("unknown undo tag")

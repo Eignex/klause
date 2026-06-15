@@ -149,7 +149,11 @@ internal class MiniZincOutput : OutputProtocol {
             println("%%%mzn-stat: failures=${stats.fails.sum.toLong()}")
             println("%%%mzn-stat: restarts=${stats.restarts.sum.toLong()}")
             println("%%%mzn-stat: propagations=${stats.propagations.sum.toLong()}")
+            println("%%%mzn-stat: learned=${stats.learnedClauses.sum.toLong()}")
             println("%%%mzn-stat: relearned=${stats.relearned.sum.toLong()}")
+            println("%%%mzn-stat: caNotApplicable=${stats.caNotApplicable.sum.toLong()}")
+            println("%%%mzn-stat: caNonAsserting=${stats.caNonAsserting.sum.toLong()}")
+            println("%%%mzn-stat: caRejectedTrueLit=${stats.caRejectedTrueLit.sum.toLong()}")
             if (stats.peakDepth.max.isFinite()) println("%%%mzn-stat: peakDepth=${stats.peakDepth.max.toLong()}")
             for ((k, v) in lpStatPairs(stats)) println("%%%mzn-stat: $k=$v")
         }
