@@ -20,6 +20,17 @@ abstract class SuccessorCycleFactor(
     final override val boolVars: IntArray = EmptyIntArray
     final override val intVars: IntArray = succ
 
+    /**
+     * Conflict reason: the bound atoms of every successor var. Both [Circuit] and [Subcircuit]
+     * reason globally over the whole successor array — range / self-loop shaving, the
+     * AllDifferent pigeonhole, and the sub-tour / unreachability scan — and prune only at domain
+     * endpoints (no interior holes), so the currently-tightened `succ` bounds are a sound
+     * clause-form nogood over the successor atoms. Without this the failure falls through to the
+     * coarse default bool-pins reason, which is suppressed once an int decision is on the trail.
+     */
+    final override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, succ, excludeIdx = -1, extraLit = 0)
+
     protected abstract fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int
 
     final override fun initialize(state: LocalSearchState, factorId: Int) {
