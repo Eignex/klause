@@ -320,7 +320,7 @@ class IntDomainTest {
             val picked = mutableSetOf<Int>()
             val k = rng.nextInt(0, width + 2)
             repeat(k) { picked.add(rng.nextInt(lo, hi + 1)) }
-            val values = picked.toIntArray().also { it.sort() }
+            val values = picked.toIntArray().also { arr -> arr.sort() }
 
             val folded = run {
                 var d: IntDomain? = base
