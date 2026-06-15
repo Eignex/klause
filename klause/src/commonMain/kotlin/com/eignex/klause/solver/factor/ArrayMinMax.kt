@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -26,6 +27,15 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + intArrayOf(result)
+
+    /**
+     * Advisor subscription (#623): `propagate` tightens `result` against the operands' bounds and
+     * pushes `result`'s bound back onto every operand — reading only `min`/`max`. An interior hole
+     * never moves a `min`/`max`, so the factor subscribes to [IntEvent.LB_RAISED] /
+     * [IntEvent.UB_LOWERED] on each variable and skips interior `VALUE_REMOVED` wakes. A repeated
+     * operand is subscribed once.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     /** Cached best (min/max) value across `xs` under the current assignment. */
     private class State(var bestValue: Int)
