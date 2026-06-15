@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.RevIntArray
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -314,6 +315,12 @@ class GlobalCardinality(
     private class PropCache(val cachedDoms: Array<IntDomain?>) {
         var conflictVars: IntArray? = null
         val flow = FlowBuilder()
+
+        /** Reversible per-`xs` cover-index the var's flow used at the last successful propagate
+         *  (`-1` = none / routed to the "other" arc). Replayed to warm-start [flow] each fire and
+         *  rolled back with the search, so after a backtrack the seed reflects that level's flow.
+         *  Non-opt only (indexed by `xs` position). Created lazily once [PropagationState] is known. */
+        var flowAssign: RevIntArray? = null
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -543,6 +550,21 @@ class GlobalCardinality(
             }
         }
 
+        // Warm-start (non-opt): replay the previous fire's var→cover assignment as valid
+        // augmentations, seeding the flow toward the prior solution. Each push is
+        // capacity-respecting, so the maxFlow below still reaches the true maximum regardless of
+        // how stale the replay is; the assignment is reversible, so after a backtrack it reflects
+        // that level's flow.
+        if (presents.isEmpty()) {
+            val assign = cache.flowAssign ?: RevIntArray(state, n, -1).also { cache.flowAssign = it }
+            for (i in 0 until n) {
+                val k = assign[i]
+                if (k in 0 until m && xToCovEdgeIdx[i][k] >= 0) {
+                    flow.augmentThroughEdge(superSource, superSink, varNode[i], covNode[k])
+                }
+            }
+        }
+
         // Edmonds-Karp max-flow from superSource to superSink. If the saturation of all ss-out edges
         // is less than requiredSSFlow → infeasible.
         val obtained = flow.maxFlow(superSource, superSink)
@@ -562,6 +584,21 @@ class GlobalCardinality(
             if (countVars != null) for (k in 0 until m) resp.add(countVars[k])
             if (resp.size > 0) cache.conflictVars = resp.toIntArray()
             return false
+        }
+
+        // Record the var→cover assignment of this (maximum) flow as next fire's warm-start seed.
+        cache.flowAssign?.let { assign ->
+            for (i in 0 until n) {
+                var chosen = -1
+                for (k in 0 until m) {
+                    val e = xToCovEdgeIdx[i][k]
+                    if (e >= 0 && flow.flowOf(e) > 0) {
+                        chosen = k
+                        break
+                    }
+                }
+                assign[i] = chosen
+            }
         }
 
         // ---- 3. SCC on residual graph (excluding superSource, superSink) -----------------------------
@@ -621,17 +658,91 @@ class GlobalCardinality(
         var numNodes: Int = 0
             private set
 
+        // Reusable BFS scratch for [maxFlow] / [augmentThroughEdge], grown in [reset].
+        private var parentEdge = IntArray(0)
+        private var bfsQueue = IntArray(0)
+
         /** Clear to an empty graph over [nodes] nodes, reusing existing backing where possible. */
         fun reset(nodes: Int) {
             if (adj.size < nodes) {
                 val old = adj
                 adj = Array(nodes) { if (it < old.size) old[it] else IntArrayList() }
             }
+            if (parentEdge.size < nodes) {
+                parentEdge = IntArray(nodes)
+                bfsQueue = IntArray(nodes)
+            }
             for (i in 0 until nodes) adj[i].clear()
             edgeTo.clear()
             cap.clear()
             originalCap.clear()
             numNodes = nodes
+        }
+
+        /** Push one unit (or the path bottleneck) along a residual path
+         *  `source → … → viaU → viaV → … → sink`, *forced* through the `viaU→viaV` edge. Returns
+         *  true iff such a residual path exists (and was pushed). Used to replay a cached
+         *  var→cover assignment as a valid augmentation, warm-starting [maxFlow] toward the previous
+         *  solution — any push is capacity-respecting, so the subsequent [maxFlow] still reaches the
+         *  true maximum regardless of how good the replay was. */
+        fun augmentThroughEdge(source: Int, sink: Int, viaU: Int, viaV: Int): Boolean {
+            var viaEdge = -1
+            val nu = adj[viaU]
+            for (k in 0 until nu.size) {
+                val e = nu[k]
+                if (edgeTo[e] == viaV && cap[e] > 0) {
+                    viaEdge = e
+                    break
+                }
+            }
+            if (viaEdge < 0) return false
+            val parent = parentEdge
+            parent.fill(-1, 0, numNodes)
+            parent[source] = -2
+            val q = bfsQueue
+            var h = 0
+            var t = 0
+            q[t++] = source
+            var found = false
+            while (h < t && !found) {
+                val u = q[h++]
+                if (u == viaU) {
+                    // Force the path through the chosen viaU→viaV edge only.
+                    if (parent[viaV] == -1) {
+                        parent[viaV] = viaEdge
+                        if (viaV == sink) found = true else q[t++] = viaV
+                    }
+                } else {
+                    val neigh = adj[u]
+                    for (k in 0 until neigh.size) {
+                        val e = neigh[k]
+                        val v = edgeTo[e]
+                        if (parent[v] != -1 || cap[e] <= 0) continue
+                        parent[v] = e
+                        if (v == sink) {
+                            found = true
+                            break
+                        }
+                        q[t++] = v
+                    }
+                }
+            }
+            if (!found) return false
+            var bottleneck = Int.MAX_VALUE
+            var cur = sink
+            while (cur != source) {
+                val e = parent[cur]
+                if (cap[e] < bottleneck) bottleneck = cap[e]
+                cur = edgeTo[e xor 1]
+            }
+            cur = sink
+            while (cur != source) {
+                val e = parent[cur]
+                cap[e] = cap[e] - bottleneck
+                cap[e xor 1] = cap[e xor 1] + bottleneck
+                cur = edgeTo[e xor 1]
+            }
+            return true
         }
 
         fun addEdge(u: Int, v: Int, c: Int): Int {
@@ -675,11 +786,15 @@ class GlobalCardinality(
         }
 
         fun maxFlow(source: Int, sink: Int): Int {
+            // Start from any flow already present (e.g. a warm-start seed): the value is the flow
+            // leaving `source`, so the return is the absolute maximum, not the delta this call adds.
             var total = 0
-            val parentEdge = IntArray(numNodes)
-            val queue = IntArray(numNodes)
+            val srcAdj = adj[source]
+            for (k in 0 until srcAdj.size) total += flowOf(srcAdj[k])
+            val parentEdge = this.parentEdge
+            val queue = bfsQueue
             while (true) {
-                parentEdge.fill(-1)
+                parentEdge.fill(-1, 0, numNodes)
                 parentEdge[source] = -2
                 var qHead = 0
                 var qTail = 0
