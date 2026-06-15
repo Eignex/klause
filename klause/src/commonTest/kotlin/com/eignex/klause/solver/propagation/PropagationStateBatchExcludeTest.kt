@@ -72,11 +72,11 @@ class PropagationStateBatchExcludeTest {
         val rng = Random(0xBA7C4)
         repeat(600) { trial ->
             // A random subset of 0..hi to exclude, leaving at least one survivor.
-            val picked = sortedSetOf<Int>()
+            val picked = mutableSetOf<Int>()
             val k = rng.nextInt(0, hi + 1)
             repeat(k) { picked.add(rng.nextInt(0, hi + 1)) }
-            if (picked.size > hi) picked.remove(picked.last()) // keep a survivor
-            val values = picked.toIntArray()
+            if (picked.size > hi) picked.remove(picked.first()) // keep a survivor
+            val values = picked.toIntArray().also { it.sort() }
 
             val seq = freshState(1, hi)
             materializeAllAtoms(seq, 1, hi)
@@ -140,13 +140,14 @@ class PropagationStateBatchExcludeTest {
                     if (d.min != d.max) {
                         enterLevel(s, v)
                         // Exclude a random non-empty subset of the live domain, keeping a survivor.
-                        val picked = sortedSetOf<Int>()
+                        val picked = mutableSetOf<Int>()
                         val live = ArrayList<Int>()
                         d.forEach { live.add(it) }
                         val take = rng.nextInt(1, live.size)
                         repeat(take) { picked.add(live[rng.nextInt(live.size)]) }
-                        if (picked.size >= live.size) picked.remove(picked.last())
-                        if (s.excludeIntValues(v, picked.toIntArray(), null)) marks.addLast(s.mark())
+                        if (picked.size >= live.size) picked.remove(picked.first())
+                        val values = picked.toIntArray().also { it.sort() }
+                        if (s.excludeIntValues(v, values, null)) marks.addLast(s.mark())
                     }
                 }
                 for (id in 0 until s.atomIntVar.size) {

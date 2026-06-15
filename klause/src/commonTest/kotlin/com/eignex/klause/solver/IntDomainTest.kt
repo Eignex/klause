@@ -317,10 +317,10 @@ class IntDomainTest {
             val hi = lo + width
             val base = IntDomain(lo, hi)
             // Pick a sorted, distinct subset of [lo, hi] to exclude.
-            val picked = sortedSetOf<Int>()
+            val picked = mutableSetOf<Int>()
             val k = rng.nextInt(0, width + 2)
             repeat(k) { picked.add(rng.nextInt(lo, hi + 1)) }
-            val values = picked.toIntArray()
+            val values = picked.toIntArray().also { it.sort() }
 
             val folded = run {
                 var d: IntDomain? = base

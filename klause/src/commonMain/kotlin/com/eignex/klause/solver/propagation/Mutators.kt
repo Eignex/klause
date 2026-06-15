@@ -335,7 +335,7 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedent
  * Like [antecedentsAcrossHoles] but for a batched exclusion: cite only the *pre-existing*
  * search-carved holes crossed in `[from, until)`. A value still present in [prior] is one this
  * very batch is excluding — its reason is the shared [base] (which already carries the batch's
- * [antecedents]), so citing its eq atom here would be circular. Values absent from [prior] but
+ * antecedents), so citing its eq atom here would be circular. Values absent from [prior] but
  * inside the root domain were carved by an *earlier* propagation and must be cited; values absent
  * from the root domain are global facts and need none.
  */
