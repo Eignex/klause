@@ -5,8 +5,10 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `result = arr(idx)` — the element constraint, native to local search rather than a
@@ -62,6 +64,32 @@ class Element(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)
+
+    /**
+     * Advisor subscription (#623): the **variable-array** path is full GAC over interior domains, so
+     * it subscribes to *every* kind on every variable and consumes the dirty-variable delta (#624)
+     * to scope its unchanged-domains gate to the variables that actually changed, instead of the
+     * O(`intVars.size`) ref-scan on every (often redundant fixpoint) re-fire. The **constant-array**
+     * path keeps occurrence wakeup and its own reversible `domRef` fast path in [ElementConstState]
+     * (two variables — `idx`/`result` — so a delta would buy nothing). Subscriptions cover all kinds
+     * because the var array's consistency is hole-aware membership, not just bounds.
+     */
+    override val initialIntEventWatches: IntArray? = if (!arrIsVars) {
+        null
+    } else {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = arrIsVars
 
     private val len: Int get() = arr.size
 
@@ -158,8 +186,10 @@ class Element(
      *  than they save. Soundness doesn't need snapshotting — `IntDomain` is immutable, so per-entry
      *  reference identity means that domain is unchanged; after a backtrack the restored domain
      *  objects differ from these (deeper) refs, so the check simply misses (a full propagate runs)
-     *  rather than skipping unsoundly. The slot drifts across snapshot/restore like CDCL watches. */
-    private class Cache(val cachedDoms: Array<IntDomain?>)
+     *  rather than skipping unsoundly. The slot drifts across snapshot/restore like CDCL watches.
+     *  [posOf] maps a variable id to one of its positions in [intVars], so the dirty-variable delta
+     *  (var ids) can index [cachedDoms] without an O(arity) lookup. */
+    private class Cache(val cachedDoms: Array<IntDomain?>, val posOf: IntIntMap)
 
     /** Element propagation. Both kinds first tighten `idx ∈ [indexOffset, indexOffset+len-1]`,
      *  then filter to full GAC: a **constant** array via the incremental [ElementConstState], a
@@ -183,18 +213,34 @@ class Element(
         // Variable array: full GAC with the unchanged-domains fast path (per-position scans are
         // expensive enough that the redundant fixpoint re-fires must be skipped).
         val cache = (state.refPayload[factorId] as? Cache) ?: run {
-            val fresh = Cache(arrayOfNulls(intVars.size))
+            // Map each (distinct) variable id to a position in intVars, so the dirty-variable delta
+            // (var ids) can scope the unchanged-domains check below.
+            val firstPos = HashMap<Int, Int>(intVars.size)
+            for (k in intVars.indices) firstPos.getOrPut(intVars[k]) { k }
+            val fresh = Cache(
+                arrayOfNulls(intVars.size),
+                IntIntMap.build(firstPos.keys.toIntArray(), firstPos.values.toIntArray(), absent = -1),
+            )
             state.refPayload[factorId] = fresh
             fresh
         }
-        var changed = false
-        for (k in intVars.indices) {
-            if (cache.cachedDoms[k] !== state.intDomains[intVars[k]]) {
-                changed = true
-                break
+        // Unchanged-domains gate, scoped by the dirty-variable delta (#624): the delta is a superset
+        // of the variables changed since the last successful propagate, recorded into cachedDoms in
+        // lockstep — so a real change always appears here, while a self-mutation from the previous
+        // fire shows cachedDoms === current (recorded post-mutation) and a stale backtrack entry shows
+        // no change. The first fire (cachedDoms not yet recorded) always runs a full propagate.
+        val delta = state.drainIntEventDirtyVars(factorId)
+        var changed = cache.cachedDoms[0] == null
+        if (!changed) {
+            for (vid in delta) {
+                val k = cache.posOf[vid]
+                if (k >= 0 && cache.cachedDoms[k] !== state.intDomains[vid]) {
+                    changed = true
+                    break
+                }
             }
         }
-        if (!changed && cache.cachedDoms[0] != null) return true
+        if (!changed) return true
         if (!propagateVarArray(state)) return false
         // Record post-propagate refs so the next (often no-op) fire can short-circuit.
         for (k in intVars.indices) cache.cachedDoms[k] = state.intDomains[intVars[k]]
