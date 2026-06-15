@@ -318,6 +318,7 @@ class BacktrackSolver(override val problem: Problem) :
                 cumulative = params.lpCumulative,
                 cumulativeTimeIndexed = params.lpCumulativeTimeIndexed,
                 nValueHull = params.lpNValue,
+                objectiveCone = params.lpObjectiveCone,
             )
         } else {
             null

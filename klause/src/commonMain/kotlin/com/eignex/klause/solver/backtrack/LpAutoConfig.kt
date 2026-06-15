@@ -169,11 +169,17 @@ object LpAutoConfig {
                 table || nValue || makespanPlans > 0
         // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
         // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
-        val boundingApplicable = baseFits && structApplicable
+        // #571: an explicit objective-cone request always fits the dense cap (the cone drops the
+        // disjunctive big-M rows and every variable disconnected from the objective), so it bounds on
+        // the dense path even when the *full* model is over the cap — and it must not be diverted to
+        // the sparse-primary pipeline (which would build the full relaxation instead).
+        val coneRequested = base.lpObjectiveCone
+        val boundingApplicable = (baseFits || coneRequested) && structApplicable
         val bounding = boundingApplicable && config.resolved(LpTechnique.BOUNDING)
         // Over the dense cap but within the sparse cap: route to the bound-only sparse pipeline (#602)
         // instead of disabling LP. The sparse path skips the dense tableau the guard protects against.
-        val sparsePrimary = !baseFits && structApplicable && config.resolved(LpTechnique.BOUNDING) &&
+        val sparsePrimary = !coneRequested && !baseFits && structApplicable &&
+            config.resolved(LpTechnique.BOUNDING) &&
             tableauCells(rows, baseCols) <= KlauseConfig.current.lpSparseMaxTableauCells
 
         // Only structurally-present hulls the emphasis permits compete for the budget (a forbidden
