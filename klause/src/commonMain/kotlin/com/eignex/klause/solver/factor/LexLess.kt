@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -34,6 +35,24 @@ class LexLess(
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
+
+    /**
+     * Advisor subscription (#623): lexicographic propagation is bound-only (see [propagate], which
+     * compares `min`/`max` at the deciding position and tightens bounds — its own comment notes it
+     * "can't propagate further with bound-only reasoning"). An interior hole moves no bound, so the
+     * factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
+     * interior `VALUE_REMOVED` wakes.
+     */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * 2)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+        }
+        out
+    }
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         // No payload — relation is recomputed each query in O(n).
