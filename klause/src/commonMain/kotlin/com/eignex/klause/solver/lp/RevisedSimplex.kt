@@ -20,7 +20,7 @@ internal class FloatLpResult(val basis: Basis, val objective: Double, val duals:
  * LU), so it scales to large sparse models without materializing an `m²` structure.
  *
  * Like [FloatSimplex] it is a heuristic that can return null (non-convergence / dual-unbounded /
- * singular basis); its [basis] is then certified exactly downstream, so float rounding here is never
+ * singular basis); its [FloatLpResult.basis] is then certified exactly downstream, so float rounding is never
  * safety-critical.
  *
  * NOTE: the basis is refactorized from scratch each iteration (correct and sparse; fine for the
