@@ -224,16 +224,16 @@ internal fun reginFilter(
 /** Per-factor warm-start state for [reginFilter]: the previous maximum matching as
  *  `variable id → matched value`. A seed only — [reginFilter] revalidates every edge against
  *  the current domains and completes to a maximum matching, so a stale cache never affects
- *  correctness, only the number of augmenting searches. Backtrack-safe via [snapshotCopy]. */
-internal class ReginCache : PropagationState.SnapshottablePayload {
+ *  correctness, only the number of augmenting searches. It therefore needs no backtrack snapshot:
+ *  the cache simply **drifts** across push/pop (a stale post-backtrack matching just costs a few
+ *  more augmenting searches), like CDCL watches — no longer a [PropagationState.SnapshottablePayload]. */
+internal class ReginCache {
     val matchedValue = MutableIntIntMap()
 
     // Reusable oriented-graph adjacency buffers for [reginFilter] — the dominant per-fire
     // allocation (2·(n + numValues) IntArrayLists). Grown on demand, and the live `[0, total)`
-    // lists are cleared and refilled every fire, so reuse is behaviour-identical. Deliberately
-    // excluded from [snapshotCopy] (they hold no level state, only scratch rebuilt every fire), so
-    // they re-allocate lazily after a restore — like the matching seed, correctness never depends
-    // on their contents surviving.
+    // lists are cleared and refilled every fire, so reuse is behaviour-identical; they hold no
+    // level state (scratch rebuilt every fire), so like the matching seed they need no snapshot.
     private var adjBuf: Array<IntArrayList> = emptyArray()
     private var radjBuf: Array<IntArrayList> = emptyArray()
 
@@ -256,15 +256,8 @@ internal class ReginCache : PropagationState.SnapshottablePayload {
      *  at the failing point, read immediately afterwards by the analyzer via the factor's
      *  conflictReason. Lives here (per-session payload) rather than on the factor object so
      *  portfolio workers sharing one Problem never read another session's reason (#182).
-     *  Deliberately excluded from [snapshotCopy]: it is propagate-to-analysis transient and
-     *  never survives a backtrack. */
+     *  Propagate-to-analysis transient; never needs to survive a backtrack. */
     var conflictVars: IntArray? = null
-
-    override fun snapshotCopy(): ReginCache {
-        val c = ReginCache()
-        matchedValue.forEach { k, v -> c.matchedValue.put(k, v) }
-        return c
-    }
 }
 
 /** Augmenting-path search for maximum bipartite matching. Returns true iff variable `i` can be
