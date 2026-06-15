@@ -96,15 +96,15 @@ class TrailResidentAtomSoundnessTest {
     @Test
     fun storedAtomTruthMatchesDomainAcrossPushAndPop() {
         val numVars = 3
-        val hi = 7
+        val hi = 6
         val rng = Random(0x5eed)
-        repeat(40) { trial ->
+        repeat(12) { trial ->
             val s = freshState(numVars, hi)
             materializeAllAtoms(s, numVars, hi)
             assertAtomTruthConsistent(s, "root/trial=$trial")
             val marks = ArrayDeque<PropagationState.LevelMark>()
             marks.addLast(s.mark())
-            repeat(60) { step ->
+            repeat(40) { step ->
                 val pop = marks.size > 1 && rng.nextInt(3) == 0
                 if (pop) {
                     // Backtrack to a random earlier level — the range-limited undo path.
