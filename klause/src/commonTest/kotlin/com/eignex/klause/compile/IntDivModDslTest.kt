@@ -94,7 +94,6 @@ class IntDivModDslTest {
             val nv = compiled.decode(schema.n, s)
             val dv = compiled.decode(schema.d, s)
             assertEquals(-7, nv)
-            // Kotlin's `/` is truncated-toward-zero — the convention klause now uses.
             assertEquals(-3, nv / dv, "n=$nv d=$dv")
         }
     }

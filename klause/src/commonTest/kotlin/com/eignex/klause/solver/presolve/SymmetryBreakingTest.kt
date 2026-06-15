@@ -191,7 +191,7 @@ class SymmetryBreakingTest {
     fun `law-lee precedence fires over a verified non-anonymous orbit`() {
         // A global_cardinality with equal per-value bounds is NOT value-anonymous, but its cover values
         // are interchangeable — verified via remapValues (#442). Precedence over the fully-internal
-        // vars then collapses the value-symmetric solutions, where the old anonymity gate gave up.
+        // vars then collapses the value-symmetric solutions.
         val problem = Problem(
             0,
             3,
@@ -245,8 +245,7 @@ class SymmetryBreakingTest {
     @Test
     fun `verified detection orders interchangeable vars in separate isomorphic factors`() {
         // x0 in (x0 <= 3) and x1 in (x1 <= 3): different factors, but swapping x0/x1 preserves the
-        // factor set, so they ARE interchangeable. The same-factor-set heuristic misses this;
-        // verified detection (remap + structural key) catches it and orders them.
+        // factor set, so they ARE interchangeable — verified detection (remap + structural key) orders them.
         val problem = Problem(
             0,
             2,
@@ -356,9 +355,7 @@ class SymmetryBreakingTest {
     @Test
     fun `isomorphic element factors are block-ordered`() {
         // Two element constraints v1 = arr(v0), v3 = arr(v2) over the same constant table are
-        // interchangeable as blocks. element used to be unkeyed (structuralKey == null), forcing the
-        // conservative heuristic which excludes element-touched vars and breaks nothing; with a key,
-        // verified block detection orders the rows.
+        // interchangeable as blocks; verified block detection (via Element's structuralKey) orders the rows.
         val problem = Problem(
             0,
             4,
@@ -390,9 +387,8 @@ class SymmetryBreakingTest {
 
     @Test
     fun `wl refinement splits candidate groups by structural role`() {
-        // Two rows x0 + 2·x1 ≤ 3 and x2 + 2·x3 ≤ 3, all same domain. The old grouping put all four
-        // same-domain vars in one candidate group; WL colour refinement splits them by their role —
-        // the coeff-1 cells {x0,x2} and the coeff-2 cells {x1,x3} — into two colour classes.
+        // Two rows x0 + 2·x1 ≤ 3 and x2 + 2·x3 ≤ 3, all same domain. WL colour refinement splits them
+        // by their role — the coeff-1 cells {x0,x2} and the coeff-2 cells {x1,x3} — into two colour classes.
         val problem = Problem(
             0,
             4,
@@ -411,9 +407,8 @@ class SymmetryBreakingTest {
     @Test
     fun `interchangeable values in a global cardinality are pinned`() {
         // GCC over x0,x1 ∈ {0,1}: each of values 0,1 may occur 0..2 times. The two values are
-        // interchangeable (same bounds, same domain-incidence). GCC is not value-anonymous, so the
-        // old gate switched value symmetry off; remapValues verification (#374) catches the swap and
-        // pins a fully-internal variable to the orbit minimum.
+        // interchangeable (same bounds, same domain-incidence). GCC is not value-anonymous, but
+        // remapValues verification (#374) catches the swap and pins a fully-internal var to the orbit min.
         val problem = Problem(
             0,
             2,
@@ -572,9 +567,8 @@ class SymmetryBreakingTest {
     @Test
     fun `breaking stays sound with reified rows present`() {
         // Two reified rows b0 <-> (x0 <= 1), b1 <-> (x1 <= 1) over disjoint, equal-domain vars carry a
-        // block symmetry. The new ReifiedLinear key takes the problem off the conservative fallback;
-        // the current breaker posts no ordering across this mixed bool+int orbit, so the key's job here
-        // is purely that detection runs without ever becoming unsound.
+        // block symmetry. The breaker posts no ordering across this mixed bool+int orbit, so the
+        // guarantee here is purely that ReifiedLinear-keyed detection runs without ever becoming unsound.
         val problem = Problem(
             2,
             2,
@@ -653,8 +647,8 @@ class SymmetryBreakingTest {
 
     @Test
     fun `breaking stays sound with disjunctive blocks present`() {
-        // Two disjoint identical disjunctive blocks over equal-domain start vars carry a block symmetry;
-        // the new key takes the problem off the conservative fallback. Soundness is the guarantee.
+        // Two disjoint identical disjunctive blocks over equal-domain start vars carry a block symmetry.
+        // Soundness (never adding solutions / flipping satisfiability) is the guarantee.
         val problem = Problem(
             0,
             4,

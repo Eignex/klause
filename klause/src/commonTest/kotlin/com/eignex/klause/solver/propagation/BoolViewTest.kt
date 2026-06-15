@@ -8,9 +8,9 @@ import kotlin.test.assertNull
 
 /**
  * Documents the three-valued semantics of [PropagationState.boolValues] — the [Bits]-backed
- * `BoolView` wrapper that replaced the old `Array<Boolean?>` storage. Read-write-clear is
- * the contract every factor depends on; this test pins it down so a future tweak to the
- * underlying packed storage can't silently break the null-tracking invariant.
+ * `BoolView` wrapper. Read-write-clear is the contract every factor depends on; this test pins
+ * it down so a future tweak to the underlying packed storage can't silently break the
+ * null-tracking invariant.
  */
 class BoolViewTest {
 

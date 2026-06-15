@@ -45,7 +45,6 @@ class OllTest {
     fun `recoverOptimalSample is a no-op when the witness already costs lb`() {
         val good = Sample(bools = booleanArrayOf(true, false), ints = intArrayOf())
         val recovered = Oll.recoverOptimalSample(mutex01, softs, good, lb = 1L, BacktrackParams())
-        // Already optimal — returned unchanged without a re-solve.
         assertSame(good, recovered)
     }
 }

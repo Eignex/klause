@@ -53,7 +53,6 @@ class CdclOptimizationTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = LongArray(n) { -values[it].toLong() })
-        // The previously-regressing config: VSIDS + Luby restarts + LBD learning.
         val params = BacktrackParams(
             randomSeed = 1L,
             variableSelector = Vsids(),
