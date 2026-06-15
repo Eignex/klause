@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
@@ -31,6 +32,24 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
+
+    /**
+     * Advisor subscription (#623): the sort propagator reads only each variable's `min`/`max` — the
+     * non-decreasing chain on `ys`, the first/last `ys` bounds from the `xs` extremes, the `xs`
+     * clamp to the `ys` range, and the all-fixed sanity check. None of it inspects interior holes,
+     * so the factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
+     * interior `VALUE_REMOVED` wakes.
+     */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * 2)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+        }
+        out
+    }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = mismatches(state, ov = -1, nv = 0) > 0
 
