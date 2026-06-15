@@ -83,7 +83,7 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             val index = HashMap<Int, Int>()
             val ids = IntArrayList()
             fun local(v: Int): Int = index.getOrPut(v) {
-                ids.add(v);
+                ids.add(v)
                 ids.size - 1
             }
             for (k in subProblem.literals.indices) local(Lit.variable(subProblem.literals[k]))
@@ -272,9 +272,9 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
         var bestC = rem
         for (cc in 0..rem) {
             if (dp[cc] > best) {
-            best = dp[cc]
-            bestC = cc
-        }
+                best = dp[cc]
+                bestC = cc
+            }
         }
         c = bestC
         for (t in take.indices.reversed()) {
