@@ -88,12 +88,12 @@ class IntEventDeltaTest {
             val brute = HashSet<List<Int>>()
             fun rec(i: Int, acc: IntArray, used: BooleanArray) {
                 if (i == n) {
-                    brute.add(acc.toList());
+                    brute.add(acc.toList())
                     return
                 }
                 for (v in 0 until n) {
                     if (used[v]) continue
-                    used[v] = true;
+                    used[v] = true
                     acc[i] = v
                     rec(i + 1, acc, used)
                     used[v] = false
@@ -120,8 +120,8 @@ class IntEventDeltaTest {
                 for (b in 0..3) {
                     for (c in 0..3) {
                         for (d in 0..3) {
-                if (a != b && a != c && b != c && a != d && b != d) brute.add(listOf(a, b, c, d))
-            }
+                            if (a != b && a != c && b != c && a != d && b != d) brute.add(listOf(a, b, c, d))
+                        }
                     }
                 }
             }
