@@ -22,15 +22,15 @@ class LpSparseBoundTest {
     fun `minimize with the sparse bound fallback preserves the optimum`() {
         val rng = Random(20260618)
         var optimal = 0
-        repeat(120) {
+        repeat(120) { _ ->
             val n = rng.nextInt(3, 6)
             val ub = IntArray(n) { rng.nextInt(2, 6) }
             val cost = LongArray(n) { rng.nextLong(-9, 10) }
+            val vars = IntArray(n) { it }
             // A few `≤` constraints with large coefficients (to stress the exact determinant).
             val cons = ArrayList<Triple<LongArray, IntArray, Long>>()
-            repeat(rng.nextInt(1, 4)) {
+            repeat(rng.nextInt(1, 4)) { _ ->
                 val coeffs = LongArray(n) { rng.nextLong(-40_000, 40_001) }
-                val vars = IntArray(n) { it }
                 cons.add(Triple(coeffs, vars, rng.nextLong(0, 60_000)))
             }
 
@@ -48,8 +48,8 @@ class LpSparseBoundTest {
 
             when (val res = BacktrackSolver(problem).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {
-                    assertTrue(brute != null, "solver Optimal but brute infeasible")
-                    assertEquals(brute!!.toDouble(), res.objective, 1e-9, "wrong optimum")
+                    val opt = brute ?: error("solver Optimal but brute infeasible")
+                    assertEquals(opt.toDouble(), res.objective, 1e-9, "wrong optimum")
                     optimal++
                 }
 
