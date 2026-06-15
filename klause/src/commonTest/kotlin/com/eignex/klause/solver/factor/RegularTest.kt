@@ -7,6 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -178,6 +179,79 @@ class RegularTest {
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
                 .map { it.ints.toList() }.toHashSet()
             assertEquals(brute, found, "Regular+Linear (bound=$bound): solution set must equal brute force")
+        }
+    }
+
+    /**
+     * Heavy soundness gate for the reversible, delta-driven incremental propagator: random DFAs over
+     * longer sequences, enumerated under full CDCL (which branches, prunes and backtracks deeply), must
+     * match brute force exactly. A stale reachability bit (a missed forward/backward layer recompute,
+     * a botched trail rollback, or an over-wide prune) would drop or admit an assignment.
+     */
+    @Test
+    fun `randomized DFAs enumerate exactly the brute-force set across deep backtracking`() {
+        val rng = Random(0x12345)
+        repeat(60) { trial ->
+            val numStates = rng.nextInt(2, 5)
+            val alphabet = rng.nextInt(2, 4)
+            val n = rng.nextInt(3, 7)
+            val q0 = rng.nextInt(1, numStates + 1)
+            // Random transition table (0 = dead), biased so some transitions live.
+            val transitions = IntArray(
+                numStates * alphabet,
+            ) { if (rng.nextInt(3) == 0) 0 else rng.nextInt(1, numStates + 1) }
+            val accepting = (1..numStates).filter { rng.nextBoolean() }.toIntArray()
+            if (accepting.isEmpty()) return@repeat // no accepting state → trivially unsat, skip
+            // Per-position domain: a random non-empty subset of the alphabet.
+            val ranges = Array(n) {
+                val lo = rng.nextInt(1, alphabet + 1)
+                val hi = rng.nextInt(lo, alphabet + 1)
+                lo to hi
+            }
+            fun delta(q: Int, s: Int) = if (q in 1..numStates &&
+                s in 1..alphabet
+            ) {
+                transitions[(q - 1) * alphabet + (s - 1)]
+            } else {
+                0
+            }
+            fun accepts(vals: IntArray): Boolean {
+                var q = q0
+                for (s in vals) {
+                    q = delta(q, s)
+                    if (q == 0) return false
+                }
+                return q in accepting
+            }
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(n)
+            fun rec(p: Int) {
+                if (p == n) {
+                    if (accepts(acc)) brute.add(acc.toList())
+                    return
+                }
+                for (v in ranges[p].first..ranges[p].second) {
+                    acc[p] = v
+                    rec(p + 1)
+                }
+            }
+            rec(0)
+            val domains = Array(n) { IntDomain(ranges[it].first, ranges[it].second) }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = domains,
+                factors = arrayOf<Factor>(
+                    Regular(IntArray(n) { it }, numStates, alphabet, transitions, q0, accepting),
+                ),
+            )
+            val params = BacktrackParams(
+                randomSeed = (trial + 1).toLong(),
+                variableSelector = Vsids(),
+                maxLearnedClauses = 500,
+            )
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000).map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "trial #$trial (Q=$numStates |Σ|=$alphabet n=$n q0=$q0): must equal brute force")
         }
     }
 }

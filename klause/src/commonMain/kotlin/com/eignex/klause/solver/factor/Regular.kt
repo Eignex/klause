@@ -2,11 +2,10 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -86,6 +85,24 @@ class Regular(
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = seq
+
+    /** Advisor subscription (#623): GAC over interior domains, so subscribe to every kind on every
+     *  (distinct) sequence variable and consume the dirty-variable delta (#624) — the incremental
+     *  propagator ([RegularIncrementalState]) recomputes only the layers a changed position reaches. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = seq.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
 
     /** Look up `δ(state, symbol)` with 1-based addressing. Returns 0 for the dead state. */
     private fun delta(state: Int, symbol: Int): Int {
@@ -186,151 +203,28 @@ class Regular(
         return q in acceptingSet
     }
 
-    /** Number of 64-bit words needed to bitmask `numStates`. */
-    private val stateWords: Int = (numStates + 63) ushr 6
-
     /*
-     * Pesant's layered-DAG GAC propagator, bitmask-encoded. Build the unrolled DFA
-     * across `n = seq.size` layers; per layer, a `stateWords`-long bitmask records
-     * which states are forward-reachable (resp. co-reachable from accepting).
-     *
-     * Pruning: at each layer, a symbol `s ∈ dom(seq[i])` survives iff `∃ q` forward-
-     * reachable at `i` whose transition `δ(q, s)` is co-reachable at `i+1`. Non-
-     * surviving symbols are removed from `dom(seq[i])`. Conflict iff the initial
-     * state is not co-reachable at layer 0.
-     *
-     * Memory: two `LongArray((n+1) * stateWords)` per call — `O(n · Q/64)` longs.
-     * For Q ≤ 64 this collapses to two `LongArray(n+1)`; for larger Q the multi-
-     * Long encoding still avoids per-layer object allocation.
+     * Pesant's layered-DAG GAC, now reversible and delta-driven (see [RegularIncrementalState]):
+     * per layer a state-bitset records forward-reachability from q0 and backward-co-reachability to
+     * an accepting state, both on the engine undo trail. A symbol `s ∈ dom(seq[i])` survives iff some
+     * forward-reachable state at `i` transitions on it to a co-reachable state at `i+1`; the conflict
+     * is the initial state losing co-reachability at layer 0. A fire recomputes only the layers a
+     * changed position reaches, instead of the whole `O(n · Q · |Σ|)` DFA each time.
      */
 
-    /** Hole-aware conflict reason, sharpened to the responsible prefix when [propagate]
-     *  captured a forward-collapse layer; falls back to the whole sequence otherwise. */
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? Scratch)?.conflictPrefix ?: seq)
-
-    /**
-     * Per-[PropagationState] reusable propagation scratch (so it is never shared across concurrent
-     * worker threads). [forward] / [backward] are the layer-bitset working buffers — sized once to
-     * `(seq.size + 1) * stateWords` and refilled from zero on every fire, so reusing them across
-     * calls drops the two per-call `LongArray` allocations. [conflictPrefix] records the responsible
-     * `seq` prefix when a forward layer collapses, for [conflictReason]. [cachedDoms] holds each
-     * `seq` var's domain ref at the last successful propagate, for the unchanged-domains fast path.
-     * Not a [PropagationState.SnapshottablePayload]: the buffers are recomputed every fire, the prefix
-     * is advisory, and the cached refs only ever *miss* (never falsely skip) after a restore, so the
-     * slot intentionally drifts across snapshot / restore (like CDCL watches) — avoiding the
-     * per-decision snapshot copy a long `seq` would otherwise pay.
-     */
-    private class Scratch(n: Int, w: Int) {
-        val forward = LongArray((n + 1) * w)
-        val backward = LongArray((n + 1) * w)
-        var conflictPrefix: IntArray? = null
-        val cachedDoms = arrayOfNulls<IntDomain>(n)
+    /** Hole-aware conflict reason, sharpened to the responsible prefix when [propagate] captured a
+     *  forward-collapse layer; falls back to the whole sequence otherwise. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        val prefix = (state.refPayload[factorId] as? RegularIncrementalState)?.conflictPrefix ?: seq
+        return collectHoleAndBoundAntecedents(state, prefix)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val n = seq.size
-        val w = stateWords
-        val scratch = (state.refPayload[factorId] as? Scratch) ?: run {
-            val fresh = Scratch(n, w)
+        val inc = (state.refPayload[factorId] as? RegularIncrementalState) ?: run {
+            val fresh = RegularIncrementalState(state, seq, numStates, alphabetSize, transitions, q0, accepting)
             state.refPayload[factorId] = fresh
             fresh
         }
-        // Fast path: if no seq var's domain ref changed since the last successful propagate, the
-        // prior fixpoint still holds (the whole forward/backward GAC sweep is a pure function of
-        // these domains), so skip the O(n·Q·|Σ|) recompute. IntDomain is immutable — a tighten
-        // allocates a fresh object — so per-var reference identity means that domain is unchanged.
-        var changed = false
-        for (i in 0 until n) {
-            if (scratch.cachedDoms[i] !== state.intDomains[seq[i]]) {
-                changed = true
-                break
-            }
-        }
-        if (!changed && scratch.cachedDoms[0] != null) return true
-        scratch.conflictPrefix = null // stale-guard; set at the forward-collapse failure point below.
-        val forward = scratch.forward
-        forward.fill(0L)
-        // Layer 0: only q0 is reachable.
-        setBit(forward, 0, q0 - 1)
-        for (i in 0 until n) {
-            // forward[i] empty ⇒ the prefix seq[0 until i] alone drove every state dead.
-            if (isLayerEmpty(forward, i)) {
-                scratch.conflictPrefix = seq.copyOfRange(0, i)
-                return false
-            }
-            val d = state.intDomains[seq[i]]
-            d.forEach { s ->
-                forEachStateInLayer(forward, i) { q ->
-                    val nx = delta(q, s)
-                    if (nx != 0) setBit(forward, i + 1, nx - 1)
-                }
-            }
-        }
-        val backward = scratch.backward
-        backward.fill(0L)
-        for (q in accepting) if (q in 1..numStates) setBit(backward, n, q - 1)
-        // Intersect with forward[n] so we only keep states actually reachable.
-        for (k in 0 until w) {
-            backward[n * w + k] = backward[n * w + k] and forward[n * w + k]
-        }
-        if (isLayerEmpty(backward, n)) return false
-        for (i in n - 1 downTo 0) {
-            val d = state.intDomains[seq[i]]
-            forEachStateInLayer(forward, i) { q ->
-                var alive = false
-                d.forEach { s ->
-                    val nx = delta(q, s)
-                    if (nx != 0 && testBit(backward, i + 1, nx - 1)) alive = true
-                }
-                if (alive) setBit(backward, i, q - 1)
-            }
-        }
-        if (!testBit(backward, 0, q0 - 1)) return false
-        // Per-position symbol pruning.
-        val ant = state.composeIntVarAtomAntecedents(seq)
-        for (i in 0 until n) {
-            val d = state.intDomains[seq[i]]
-            val toRemove = IntArrayList()
-            d.forEach { s ->
-                var live = false
-                forEachStateInLayer(forward, i) { q ->
-                    if (!live) {
-                        val nx = delta(q, s)
-                        if (nx != 0 && testBit(backward, i + 1, nx - 1)) live = true
-                    }
-                }
-                if (!live) toRemove.add(s)
-            }
-            for (k in 0 until toRemove.size) if (!state.excludeIntValue(seq[i], toRemove[k], ant)) return false
-        }
-        // Record post-propagate refs so the next (often no-op) fire can short-circuit.
-        for (i in 0 until n) scratch.cachedDoms[i] = state.intDomains[seq[i]]
-        return true
-    }
-
-    private fun setBit(bits: LongArray, layer: Int, bit: Int) {
-        bits[layer * stateWords + (bit ushr 6)] = bits[layer * stateWords + (bit ushr 6)] or (1L shl (bit and 63))
-    }
-
-    private fun testBit(bits: LongArray, layer: Int, bit: Int): Boolean =
-        (bits[layer * stateWords + (bit ushr 6)] and (1L shl (bit and 63))) != 0L
-
-    private fun isLayerEmpty(bits: LongArray, layer: Int): Boolean {
-        val base = layer * stateWords
-        for (k in 0 until stateWords) if (bits[base + k] != 0L) return false
-        return true
-    }
-
-    private inline fun forEachStateInLayer(bits: LongArray, layer: Int, action: (Int) -> Unit) {
-        val base = layer * stateWords
-        for (k in 0 until stateWords) {
-            var w = bits[base + k]
-            while (w != 0L) {
-                val q = (k shl 6) + w.countTrailingZeroBits() + 1
-                if (q <= numStates) action(q)
-                w = w and (w - 1)
-            }
-        }
+        return inc.propagate(state, factorId)
     }
 }
