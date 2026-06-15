@@ -237,21 +237,15 @@ class Mdd(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.composeIntVarAtomAntecedents(intVars)
 
-    /** Cached snapshot of seq domain refs at last successful propagate. When every seq
-     *  variable's IntDomain reference is unchanged, the previous fixpoint still holds and
-     *  the full sweep is skipped. Backtrack-safe via [PropagationState.SnapshottablePayload]:
-     *  on push the engine clones the array, on pop the prior level's refs are restored. */
-    private class MddState(val cachedSeq: Array<IntDomain?>, var cachedCost: IntDomain?) :
-        PropagationState.SnapshottablePayload {
-        // Reusable forward / backward layer-bitset buffers for the slow-path sweep, refilled from
-        // zero each fire (so reuse drops the two per-call `Array(n+1){LongArray}` allocations).
-        // Deliberately NOT carried through [snapshotCopy]: they hold no level state — only scratch
-        // recomputed every fire — so copying them would just bloat each snapshot. They re-allocate
-        // lazily after a restore, and stay reused across fires within a level.
+    /** Cached snapshot of seq domain refs at last successful propagate. When every seq variable's
+     *  IntDomain reference is unchanged, the previous fixpoint still holds and the full sweep is
+     *  skipped. This is a pure fast-path cache, not level state, so it **drifts** across push/pop
+     *  (no longer a [PropagationState.SnapshottablePayload]): after a backtrack its stale refs
+     *  simply fail to match the restored domains, so the fast path misses and a full sweep runs —
+     *  never a false skip. [fwd]/[bwd] are per-fire scratch (refilled from zero each fire). */
+    private class MddState(val cachedSeq: Array<IntDomain?>, var cachedCost: IntDomain?) {
         var fwd: Array<LongArray>? = null
         var bwd: Array<LongArray>? = null
-
-        override fun snapshotCopy(): MddState = MddState(cachedSeq.copyOf(), cachedCost)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {

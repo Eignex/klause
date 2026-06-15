@@ -186,22 +186,20 @@ class Inverse(
      *  unchanged pairs were already consistent and stay so. A var pruned during a call has its
      *  cache entry nulled so its row/column is rechecked next fire — cascades are caught across
      *  fires (the engine re-queues on any prune), reaching the same fixpoint as the full sweep.
-     *  [fRegin] / [gRegin] warm-start the per-side Régin matching (#541). Backtrack-safe via
-     *  [snapshotCopy]. */
+     *  [fRegin] / [gRegin] warm-start the per-side Régin matching (#541). All of this is cache /
+     *  warm-start, not level state, so it **drifts** across push/pop (no longer a
+     *  [PropagationState.SnapshottablePayload]): after a backtrack the stale [refs] baseline just
+     *  makes the incremental sweep reprocess *more* pairs (the restored domain refs differ from the
+     *  deeper cached ones), reaching the same fixpoint — never an unsound skip; the Régin seeds are
+     *  revalidated against current domains regardless. */
     private class InverseCache(
         val refs: Array<IntDomain?>,
         val fRegin: ReginCache = ReginCache(),
         val gRegin: ReginCache = ReginCache(),
-    ) : PropagationState.SnapshottablePayload {
+    ) {
         /** The channel var / pair (or Hall violator set) behind the most recent propagate failure
-         *  on this session; propagate-to-analysis transient, so excluded from [snapshotCopy] (#182). */
+         *  on this session; propagate-to-analysis transient, never needs to survive a backtrack. */
         var conflictVars: IntArray? = null
-
-        override fun snapshotCopy(): InverseCache = InverseCache(
-            refs.copyOf(),
-            fRegin.snapshotCopy(),
-            gRegin.snapshotCopy(),
-        )
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
