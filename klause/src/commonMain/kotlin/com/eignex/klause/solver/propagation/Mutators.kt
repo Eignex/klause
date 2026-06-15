@@ -2,6 +2,7 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 
@@ -327,6 +328,126 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedent
         else ->
             propagateAtomsForVar(v, antNear = antecedents, oldMin = d.min, oldMax = d.max, carved = value)
     }
+    return true
+}
+
+/**
+ * Like [antecedentsAcrossHoles] but for a batched exclusion: cite only the *pre-existing*
+ * search-carved holes crossed in `[from, until)`. A value still present in [prior] is one this
+ * very batch is excluding — its reason is the shared [base] (which already carries the batch's
+ * [antecedents]), so citing its eq atom here would be circular. Values absent from [prior] but
+ * inside the root domain were carved by an *earlier* propagation and must be cited; values absent
+ * from the root domain are global facts and need none.
+ */
+internal fun PropagationState.citeCrossedSearchHoles(
+    v: Int,
+    from: Int,
+    until: Int,
+    prior: IntDomain,
+    base: IntArray?,
+): IntArray? {
+    var out: IntArrayList? = null
+    val root = problem.intDomains[v]
+    var value = from
+    while (value < until) {
+        if (value !in prior && value in root) {
+            val o = out ?: IntArrayList().also { fresh ->
+                out = fresh
+                base?.forEach { fresh.add(it) }
+            }
+            o.add(Lit.make(atomVarEq(v, value), true))
+        }
+        value++
+    }
+    return out?.toIntArray() ?: base
+}
+
+/**
+ * Exclude every value in [values] (sorted ascending, distinct) from int var [v] in a single
+ * pass — the batched form of [excludeIntValueImpl]. Element's constant-array GAC prunes a wide
+ * result domain down to a small reachable set; doing that one value at a time rebuilds the hole
+ * array per value (O(domain^2), the #599 bake wedge), whereas [IntDomain.excludeValues] merges them
+ * in O(domain).
+ *
+ * Reasoning matches the single-value path: the two endpoints that may move each cite the prior
+ * bound, the shared [antecedents] (which justifies the whole batch — Element passes one reason for
+ * every value), and any pre-existing search holes crossed on the way ([citeCrossedSearchHoles]);
+ * interior carves each cite [antecedents]. Atom truth/level end state is identical to folding
+ * [excludeIntValueImpl] over [values]. Returns false, seeding the conflict core, when the
+ * exclusions empty the domain.
+ */
+internal fun PropagationState.excludeIntValues(v: Int, values: IntArray, antecedents: IntArray?): Boolean {
+    if (values.isEmpty()) return true
+    val d = intDomains[v]
+    val newDomain = d.excludeValues(values)
+    if (newDomain == null) { // exclusions emptied the domain
+        recordConflictLevels(intLevel[v], currentLevel)
+        seedConflictFactor(intMinReason[v])
+        seedConflictFactor(intMaxReason[v])
+        seedConflictFactor(currentFactor)
+        return false
+    }
+    if (newDomain === d) return true // nothing present was excluded
+    val newMin = newDomain.min
+    val newMax = newDomain.max
+
+    // Interior carves (strictly inside the surviving span); the rest land on a moved endpoint.
+    var interior: IntArrayList? = null
+    var excluded = 0
+    for (i in values.indices) {
+        val value = values[i]
+        if (value !in d) continue
+        excluded++
+        if (value in newMin..newMax) (interior ?: IntArrayList().also { interior = it }).add(value)
+    }
+    if (currentFactor >= 0) propagations += excluded
+
+    val root = problem.intDomains[v]
+    val antMin = if (newMin != d.min) {
+        citeCrossedSearchHoles(
+            v,
+            d.min,
+            newMin,
+            d,
+            appendPriorBound(Lit.make(atomVarGe(v, d.min), false), d.min > root.min, antecedents),
+        )
+    } else {
+        null
+    }
+    val antMax = if (newMax != d.max) {
+        citeCrossedSearchHoles(
+            v,
+            newMax + 1,
+            d.max + 1,
+            d,
+            appendPriorBound(Lit.make(atomVarLe(v, d.max), false), d.max < root.max, antecedents),
+        )
+    } else {
+        null
+    }
+
+    if (undoLogging) logIntChange(v) // one record restores the full prior domain + bound atoms
+
+    intDomains[v] = newDomain
+    intLevel[v] = maxOf(intLevel[v], currentLevel)
+    if (newMin != d.min) {
+        intMinLevel[v] = currentLevel
+        intMinReason[v] = currentFactor
+        intMinAntecedents[v] = antMin
+    }
+    if (newMax != d.max) {
+        intMaxLevel[v] = currentLevel
+        intMaxReason[v] = currentFactor
+        intMaxAntecedents[v] = antMax
+    }
+    interior?.let { iv ->
+        for (i in 0 until iv.size) {
+            pushHoleHist(v, iv[i], currentLevel, antecedents)
+            if (undoLogging) logExclusionCarveAtom(v, iv[i])
+        }
+    }
+    dirtyInts.addLast(v)
+    propagateAtomsForExclusionBatch(v, d.min, d.max, antMin, antMax, interior, antecedents)
     return true
 }
 

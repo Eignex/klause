@@ -48,6 +48,27 @@ internal fun PropagationState.logIntCarve(v: Int, value: Int) {
     undoHoleHistLen.add(0)
 }
 
+/** Journal one interior carve made by a *batched* exclusion ([excludeIntValues]) as an
+ *  atom-only reset (tag 3). The whole batch shares a single tag-1 record that restores the
+ *  prior domain, hole history and bound order literals wholesale; this record exists only to
+ *  flip the carved value's `[v = value]` eq atom back to undetermined on backtrack (tag 1's
+ *  range-limited [resetAtomTrailFor] covers the widened bounds, not interior holes). No domain
+ *  rebuild on undo, so backtracking a wide batch stays O(carves), not O(carves · holes).
+ *  Columns: [PropagationState.undoMinReason] = carved value. */
+internal fun PropagationState.logExclusionCarveAtom(v: Int, value: Int) {
+    undoTag.add(3)
+    undoVar.add(v)
+    undoLevel.add(0)
+    undoMinLvl.add(0)
+    undoMaxLvl.add(0)
+    undoMinReason.add(value)
+    undoMaxReason.add(0)
+    undoDomain.add(null)
+    undoMinAnt.add(null)
+    undoMaxAnt.add(null)
+    undoHoleHistLen.add(0)
+}
+
 internal fun PropagationState.truncateUndo(n: Int) {
     undoTag.truncateTo(n)
     undoVar.truncateTo(n)
@@ -156,6 +177,11 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 holeHistAnt[v]?.let { a -> while (a.size > undoMaxReason[i]) a.removeAt(a.size - 1) }
                 // The re-inserted value's eq atom flips false → undetermined (bounds unchanged).
                 resetAtomTrailForCarve(v, undoMinReason[i])
+            }
+
+            3 -> { // batched interior carve — domain restored by this batch's tag-1 record;
+                // only the eq atom needs flipping false → undetermined.
+                resetAtomTrailForCarve(undoVar[i], undoMinReason[i])
             }
 
             else -> error("unknown undo tag")

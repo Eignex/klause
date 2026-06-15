@@ -334,6 +334,51 @@ internal fun PropagationState.propagateAtomsForVar(
     }
 }
 
+/**
+ * Atom maintenance for a *batched* exclusion ([excludeIntValues]): the same crossing logic as
+ * [propagateAtomsForVar] for whichever endpoints moved, plus an explicit `[v = x]` → false wake
+ * for every interior hole the batch carved. Unlike the single-value path, the min and max sides
+ * may both move in one step and rest on *different* reasons ([antMin] / [antMax]); interior carves
+ * all rest on [interiorAnt]. End state is identical to folding [propagateAtomsForVar] over the same
+ * exclusions one at a time — every order literal whose truth changed is woken exactly once here.
+ */
+internal fun PropagationState.propagateAtomsForExclusionBatch(
+    v: Int,
+    oldMin: Int,
+    oldMax: Int,
+    antMin: IntArray?,
+    antMax: IntArray?,
+    interiorVals: IntArrayList?,
+    interiorAnt: IntArray?,
+) {
+    val idx = atomsByIntVar[v] ?: return
+    val d = intDomains[v]
+    val newMin = d.min
+    val newMax = d.max
+    if (newMin > oldMin) {
+        pendingMoveAnt = antMin
+        visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
+        visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+        visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+    }
+    if (newMax < oldMax) {
+        pendingMoveAnt = antMax
+        visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
+        visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+        visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+    }
+    if (interiorVals != null) {
+        pendingMoveAnt = interiorAnt
+        for (i in 0 until interiorVals.size) {
+            val x = interiorVals[i]
+            visitAtomRange(idx.eqKeys, idx.eqIds, x, x) { id -> wakeAtom(id, false) }
+        }
+    }
+    if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
+        visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
+    }
+}
+
 internal inline fun PropagationState.visitAtomRange(
     keys: IntArrayList,
     ids: IntArrayList,

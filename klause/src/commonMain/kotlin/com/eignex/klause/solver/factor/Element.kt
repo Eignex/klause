@@ -6,6 +6,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.solver.propagation.excludeIntValues
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -177,7 +178,8 @@ class Element(
         }
         toExclude?.let { ex ->
             val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
-            for (i in 0 until ex.size) if (!state.excludeIntValue(idx, ex[i], ant)) return false
+            // forEach yields ascending distinct values, so the list is a valid batch input.
+            if (!state.excludeIntValues(idx, ex.toIntArray(), ant)) return false
         }
 
         // 3. Prune result to the constants still reachable through idx's surviving positions.
@@ -195,7 +197,7 @@ class Element(
             // Reason: idx's surviving domain (which positions remain) — hole-aware, since dropping
             // an interior position is what removes a value's support.
             val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx))
-            for (i in 0 until ex.size) if (!state.excludeIntValue(result, ex[i], ant)) return false
+            if (!state.excludeIntValues(result, ex.toIntArray(), ant)) return false
         }
         return true
     }

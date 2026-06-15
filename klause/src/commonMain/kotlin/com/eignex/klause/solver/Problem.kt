@@ -195,7 +195,21 @@ class Problem(
         }
         result.forEachIntMin { v, lo -> intDomains[v] = intDomains[v].withMinAtLeast(lo) }
         result.forEachIntMax { v, hi -> intDomains[v] = intDomains[v].withMaxAtMost(hi) }
-        result.forEachIntHole { v, value -> intDomains[v] = intDomains[v].excludeValue(value) }
+        // Group the baked holes per variable and exclude each set in one merged pass. Applying a
+        // wide hole set one value at a time rebuilds the hole array per value (O(holes^2)) — the
+        // construction-time wedge on Element-heavy instances (#599). Holes are interior to the
+        // bounds folded above, so excluding them never empties a domain of an Implied bake.
+        var holesByVar: HashMap<Int, IntArrayList>? = null
+        result.forEachIntHole { v, value ->
+            val map = holesByVar ?: HashMap<Int, IntArrayList>().also { holesByVar = it }
+            map.getOrPut(v) { IntArrayList() }.add(value)
+        }
+        holesByVar?.forEach { (v, holes) ->
+            val sorted = holes.toIntArray().also { it.sort() }
+            intDomains[v] = requireNotNull(intDomains[v].excludeValues(sorted)) {
+                "baked holes emptied domain $v despite an Implied bake"
+            }
+        }
     }
 
     private fun computeBaked(): PropagationResult {
