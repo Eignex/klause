@@ -139,7 +139,9 @@ internal object SolverInvocation {
         }
     }
 
-    /** `minizinc --solver <id>` end-to-end on the original `.mzn` (+ `.dzn`). */
+    /** `minizinc --solver <id>` end-to-end on the original `.mzn` (+ `.dzn`). `-s` requests the
+     *  solver's `%%%mzn-stat` block (parity with klause's `-s`); [invoke] already parses those lines
+     *  into [Result.stats], so references carry search statistics too. */
     private fun minizincCommand(
         entry: ResolvedProblem,
         solverId: String,
@@ -160,6 +162,7 @@ internal object SolverInvocation {
             add(budget.timeoutMillis.toString())
             add("--output-mode")
             add("dzn")
+            add("-s")
             if (optimize) {
                 add("-a")
                 add("--output-objective")
