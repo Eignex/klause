@@ -79,6 +79,38 @@ class LocalSearchImprovementsTest {
     }
 
     @Test
+    fun `minimize populates native LS stats`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        val result = LocalSearchSolver(problem).minimize(obj, LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L))
+        val best = assertIs<MinimizeResult.BestFound>(result)
+        val stats = best.stats
+        assertEquals("ls", stats.backend)
+        assertTrue(stats.moves.sum > 0.0, "LS must report the moves it applied")
+        // The reached optimum is the incumbent fingerprint; it is feasible, so violation is 0.
+        assertEquals(best.objective, stats.incumbentObjective, "incumbent objective mirrors the verdict")
+        assertEquals(0.0, stats.incumbentViolation, "a feasible incumbent has zero violation")
+        assertTrue(stats.timeToBestMs >= 0L, "time-to-best is stamped once an incumbent lands")
+    }
+
+    @Test
+    fun `solve populates moves and a feasible incumbent`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val result = LocalSearchSolver(problem).solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        val sat = assertIs<com.eignex.klause.solver.SolveResult.Sat>(result)
+        assertEquals("ls", sat.stats.backend)
+        // Satisfy mode has no objective, so the incumbent fingerprint is feasibility alone.
+        assertEquals(0.0, sat.stats.incumbentViolation, "a satisfied instance has zero violation")
+        assertTrue(sat.stats.incumbentObjective.isNaN(), "no objective is tracked in satisfy mode")
+    }
+
+    @Test
     fun `improvements is lazy — consumer can take just the first event`() {
         // Build a problem where finding feasibility requires some non-trivial LS work, so
         // the first BestFound only arrives after enough flips. Taking just `first()` should

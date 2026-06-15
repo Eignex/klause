@@ -136,7 +136,7 @@ class LocalSearchSolver(
             sink.stop()
             return SolveResult.Unsat(stats = sink.snapshot())
         }
-        val sample = sampleInternal(params, eff, warm)
+        val sample = sampleInternal(params, eff, warm, sink)
         sink.stop()
         return if (sample != null) {
             SolveResult.Sat(sample, sink.snapshot())
@@ -154,8 +154,12 @@ class LocalSearchSolver(
     internal fun enumerateInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> =
         samplesInternal(params, warm)
 
-    private fun sampleInternal(params: LocalSearchParams, eff: Assumptions, warm: WarmState?): Sample? =
-        streamImpl(params, eff, warm).firstOrNull()
+    private fun sampleInternal(
+        params: LocalSearchParams,
+        eff: Assumptions,
+        warm: WarmState?,
+        sink: SolveStatsSink? = null,
+    ): Sample? = streamImpl(params, eff, warm, sink).firstOrNull()
 
     /**
      * Fold the bake-time propagation result + per-call assumptions into the effective pin set
@@ -257,6 +261,7 @@ class LocalSearchSolver(
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
         warm: WarmState? = null,
+        sink: SolveStatsSink? = null,
     ): Sequence<Sample> {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         // Tighten with the cross-backend instruction budget when set.
@@ -282,6 +287,9 @@ class LocalSearchSolver(
             // sequence.
             var flipsSinceYield = 0L
             var cancelCountdown = 0
+            var moves = 0L
+            var restartCount = 0L
+            var everFeasible = false
 
             try {
                 while (flipsSinceYield < maxFlips) {
@@ -290,6 +298,20 @@ class LocalSearchSolver(
                         cancelCountdown = CANCEL_CHECK_INTERVAL
                     }
                     if (state.cost == 0L) {
+                        if (!everFeasible) {
+                            everFeasible = true
+                            // Record at first feasibility, not in `finally`: the `firstOrNull` consumer
+                            // (a single `solve()`) suspends this coroutine at the `yield` below and never
+                            // resumes it, so `finally` would not fire on the success path. Satisfy mode has
+                            // no objective, so the incumbent fingerprint is feasibility alone, and the
+                            // counts here are exactly the work it took to reach it.
+                            sink?.recordLsWork(moves = moves, restarts = restartCount, stalls = 0L)
+                            sink?.recordLsIncumbent(
+                                objective = Double.NaN,
+                                violation = 0.0,
+                                foundAtMs = sink.elapsedMs(),
+                            )
+                        }
                         val snap = state.assignment.snapshot()
                         // Sync warm state on every yield so streaming consumers (which
                         // typically take just one or a few samples and never drain the
@@ -298,6 +320,7 @@ class LocalSearchSolver(
                         yield(snap)
                         flipsSinceYield = 0
                         restarts.restart(state, bestSoFar = null)
+                        restartCount++
                         bestCost = state.cost
                         bestSnap = state.assignment.snapshot()
                         flipsSinceRestart = 0
@@ -305,16 +328,19 @@ class LocalSearchSolver(
                     }
                     if (restarts.shouldRestart(flipsSinceRestart)) {
                         restarts.restart(state, bestSoFar = bestSnap)
+                        restartCount++
                         flipsSinceRestart = 0
                         continue
                     }
                     val move = strategy.pickMove(state)
                     if (move == null) {
                         restarts.restart(state, bestSoFar = bestSnap)
+                        restartCount++
                         flipsSinceRestart = 0
                         continue
                     }
                     state.apply(move)
+                    moves++
                     if (state.cost < bestCost) {
                         bestCost = state.cost
                         bestSnap = state.assignment.snapshot()
@@ -327,6 +353,14 @@ class LocalSearchSolver(
                 // or when the consumer cancels (sequence builder closes the coroutine). On
                 // abandoned sequences this may not fire; that's accepted loss.
                 warm?.captureFrom(state)
+                // Reached only when the sequence is fully drained or cancelled — i.e. the search never
+                // hit feasibility (the feasible path records at the yield above and suspends here). Report
+                // the lowest residual cost as the incumbent violation so an UNKNOWN run still shows how
+                // close it got. Null sink for samples/enumerate, which don't report stats.
+                if (!everFeasible) {
+                    sink?.recordLsWork(moves = moves, restarts = restartCount, stalls = 0L)
+                    sink?.recordLsIncumbent(objective = Double.NaN, violation = bestCost.toDouble(), foundAtMs = -1L)
+                }
             }
         }
     }
@@ -383,6 +417,9 @@ class LocalSearchSolver(
         var bestCostSnap: Sample? = null
         var flipsSinceRestart = 0
         var totalFlips = 0L
+        var restartCount = 0L
+        var stallCount = 0L
+        var bestFoundAtMs = -1L
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         val shaping = params.costShaping
         var cancelled = false
@@ -423,6 +460,7 @@ class LocalSearchSolver(
                 if (obj < bestObj) {
                     bestObj = obj
                     bestSample = snap
+                    bestFoundAtMs = sink.elapsedMs()
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
                     // Yield each strict improvement as the inner loop discovers it.
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
@@ -480,6 +518,8 @@ class LocalSearchSolver(
                 restarts.onLocalOptimum(state, snap, obj)
                 restarts.restart(state, bestSample)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                stallCount++
+                restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
                 continue
@@ -487,6 +527,7 @@ class LocalSearchSolver(
             if (restarts.shouldRestart(flipsSinceRestart)) {
                 restarts.restart(state, bestSample ?: bestCostSnap)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
                 continue
@@ -499,6 +540,7 @@ class LocalSearchSolver(
             if (move == null) {
                 restarts.restart(state, bestSample ?: bestCostSnap)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
                 continue
@@ -515,6 +557,18 @@ class LocalSearchSolver(
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
         sink.stop()
         sink.timedOut = reason == TerminationReason.BudgetExhausted
+        sink.recordLsWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
+        // Feasible incumbent → violation 0 at [bestObj]; otherwise carry the lowest residual cost reached.
+        // Long.MAX_VALUE means we never improved on the initial assignment, so leave the violation NaN.
+        if (bestSample != null) {
+            sink.recordLsIncumbent(objective = bestObj, violation = 0.0, foundAtMs = bestFoundAtMs)
+        } else if (bestCostInfeasible != Long.MAX_VALUE) {
+            sink.recordLsIncumbent(
+                objective = Double.NaN,
+                violation = bestCostInfeasible.toDouble(),
+                foundAtMs = -1L,
+            )
+        }
         yield(
             if (bestSample != null) {
                 MinimizeResult.BestFound(bestSample, bestObj, reason, sink.snapshot())

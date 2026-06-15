@@ -46,6 +46,34 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     return out
 }
 
+/**
+ * Local-search telemetry for `-s`, as ordered `key`/`value` pairs. Returns empty unless the LS engine
+ * actually ran — keyed off `backend == "ls"` (a pure-LS solve) or `moves > 0` (an LS arm inside a
+ * `"mixed"` portfolio), so complete-only solves print nothing here.
+ *
+ * yuck emits no runtime LS counters of its own (only the MiniZinc flattener's `flat*` keys), so these
+ * mirror no upstream schema — they're the engine's own progress fingerprint. The headline pair is
+ * `lsMoves` against `lsMovesPerSec` (raw throughput) and `lsTimeToBest` against `solveTime` (the anytime
+ * profile: how early the best incumbent landed). `lsStalls` over `lsRestarts` shows how much of the
+ * search was plateau-thrashing. `lsIncumbentViolation` is 0 once feasible, else the lowest residual cost
+ * reached — the only signal of how close an otherwise-UNKNOWN run got. Every key is `ls`-prefixed so the
+ * block is unambiguous in the flat stat stream, matching the `lp`-prefix convention.
+ */
+internal fun lsStatPairs(stats: SolveStats): List<Pair<String, String>> {
+    val moves = stats.moves.sum
+    if (stats.backend != "ls" && moves == 0.0) return emptyList()
+
+    val out = ArrayList<Pair<String, String>>()
+    out += "lsMoves" to "${moves.toLong()}"
+    out += "lsRestarts" to "${stats.restarts.sum.toLong()}"
+    out += "lsStalls" to "${stats.stalls.sum.toLong()}"
+    if (stats.wallMs > 0L) out += "lsMovesPerSec" to round4(moves / (stats.wallMs / 1000.0))
+    if (stats.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.timeToBestMs / 1000.0)
+    if (stats.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.incumbentObjective)
+    if (stats.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.incumbentViolation)
+    return out
+}
+
 /** Round to four decimals for the rate / bound lines; integral values render without a fraction. */
 private fun round4(x: Double): String {
     val r = round(x * 10000.0) / 10000.0
