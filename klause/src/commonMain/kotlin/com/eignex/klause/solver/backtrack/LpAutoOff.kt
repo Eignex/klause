@@ -36,9 +36,14 @@ internal class LpAutoOff(
     private val warmup: Int = 64,
     private val window: Int = 64,
     private val minWindowPrunes: Int = 1,
-    private val reprobeBase: Int = 64,
+    private val reprobeBase: Int = DEFAULT_REPROBE_BASE,
     private val reprobeMax: Int = 8192,
 ) {
+    companion object {
+        /** Default first backoff interval; `Int.MAX_VALUE` instead makes a disable irreversible (#562). */
+        const val DEFAULT_REPROBE_BASE: Int = 64
+    }
+
     private var active = true
     private var totalSolves = 0
 

@@ -99,6 +99,18 @@ class LpAutoOffControllerTest {
     }
 
     @Test
+    fun `an Int-MAX reprobe base makes a disable irreversible (static one-shot emulation)`() {
+        // BacktrackParams.lpAutoOffReprobe=false wires reprobeBase=Int.MAX_VALUE — the #562 behaviour.
+        val c = LpAutoOff(warmup = 4, window = 4, reprobeBase = Int.MAX_VALUE)
+        repeat(4) {
+            c.shouldRun()
+            c.record(false)
+        }
+        assertTrue(c.disabled)
+        repeat(100_000) { assertFalse(c.shouldRun()) } // never re-probed
+    }
+
+    @Test
     fun `a never-pruning LP runs only a bounded number of times over many nodes`() {
         val c = LpAutoOff() // defaults: warmup 64, window 64, reprobe 64..8192
         val runs = c.drive(100_000) { false }

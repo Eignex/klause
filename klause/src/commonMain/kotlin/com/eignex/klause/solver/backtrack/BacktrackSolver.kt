@@ -367,7 +367,9 @@ class BacktrackSolver(override val problem: Problem) :
         // rolling prune-rate window and re-probe a disabled LP on exponential backoff, so a relaxation
         // that is useless near the root but tightens deeper is recovered. Sound: gating only drops a
         // bound (loses pruning, never solutions), so `-t` is honoured (the gate only reduces work).
-        private val lpAutoOff = LpAutoOff()
+        private val lpAutoOff = LpAutoOff(
+            reprobeBase = if (params.lpAutoOffReprobe) LpAutoOff.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
+        )
         private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
         private val lpBasisByDepth = ArrayList<Basis?>()
         private var lpHotTableau: DualSimplex? = null

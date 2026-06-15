@@ -349,6 +349,13 @@ data class BacktrackParams(
      */
     val lpObjectiveCone: Boolean = false,
     /**
+     * Whether the adaptive LP auto-off (#614) may **re-probe** a disabled per-node LP on exponential
+     * backoff to recover subtrees where the relaxation becomes useful again. `true` is the adaptive
+     * default; `false` makes a disable irreversible — the static-one-shot behaviour of #562, kept as a
+     * toggle for measuring the re-probe's value. No effect when [lpBounding] is off.
+     */
+    val lpAutoOffReprobe: Boolean = true,
+    /**
      * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
      * [lpBounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
      * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
