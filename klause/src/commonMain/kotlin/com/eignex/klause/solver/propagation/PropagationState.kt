@@ -137,38 +137,21 @@ class PropagationState(
     /** Deepest decision level contributing to this int var's current domain (-1 = untouched). */
     val intLevel: IntArray = IntArray(problem.numIntVars) { -1 }
 
-    // Per-int-var bound-change history: the sequence of (value, level) at which `min` rose
-    // (resp. `max` fell) past each search-time tighten. `min` is monotone-increasing along a
-    // path, so [minHistVal] is ascending and [minHistLvl] non-decreasing (symmetric for max).
-    // Lets [minLevelForGe] / [maxLevelForLe] answer "the level v's bound *first* reached k" —
-    // the correct (often lower) level to attribute to a *relaxed* bound atom, instead of the
-    // current [intLevel] which is too high. Allocated lazily per var; only maintained while
-    // [undoLogging] (the search phase); truncated on backtrack via the undo log. Powers the
-    // weakest-bound LCG relaxation (see collectLinearRelaxedConflictAntecedents).
-    internal val minHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
-    internal val minHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
-    internal val maxHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
-    internal val maxHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    // Per-side split of [intLevel]: the decision level at which the *current* lower (resp. upper)
+    // bound was established. [intLevel] is the max of the two. Lets a current-bound order literal
+    // `[v ≥ d.min]` / `[v ≤ d.max]` reconstruct its exact (often shallower) level from a single
+    // slot — the trail-resident replacement for the bound-history binary search inside
+    // [atomLevelForConflict], so that function can become a plain stored-slot read. -1 = the bound
+    // is still at its root value (a level-0 global fact). Logged/restored by the undo trail.
+    internal val intMinLevel: IntArray = IntArray(problem.numIntVars) { -1 }
+    internal val intMaxLevel: IntArray = IntArray(problem.numIntVars) { -1 }
 
-    // Per-entry reasons alongside the bound histories: the near reason justifies the
-    // requested bound, the far reason additionally carries the hole-snap chain, and the
-    // requested value says which thresholds each covers. Together they let an atom's
-    // antecedents be derived on demand for any threshold the move crossed — the lazy
-    // replacement for storing a per-atom antecedent snapshot.
-    internal val minHistAntNear: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
-    internal val minHistAntFar: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
-    internal val minHistReq: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
-    internal val maxHistAntNear: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
-    internal val maxHistAntFar: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
-    internal val maxHistReq: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    // Per-int-var interior-hole carve history: the (value, level, reason) at which each
+    // search-time interior carve happened — the surviving per-var history (the bound histories
+    // are gone; order literals carry their own level/reason now). An eq atom ruled out by an
+    // interior hole materialized after the carve reads its level/reason from here. Lazily
+    // allocated, maintained while [undoLogging], truncated on backtrack via the undo log.
     internal val holeHistAnt: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
-
-    // Per-int-var interior-hole history: the (value, level) at which each search-time carve
-    // happened. The bound histories above cannot answer "when did k leave the domain" for a
-    // value strictly inside the bounds, and the advisory [atomLevel] drifts across pops —
-    // an eq atom falsified by an interior hole needs this record for an exact conflict
-    // level. Same lifecycle as the bound histories: lazily allocated, maintained while
-    // [undoLogging], truncated on backtrack via the undo log.
     internal val holeHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
@@ -482,23 +465,56 @@ class PropagationState(
     /** Threshold value `k` for the atom. */
     internal val atomThreshold: IntArrayList = IntArrayList()
 
+    // -------- Per-atom trail slots (LCG: order literals are trail-resident) --------
+    //
+    // Each materialized order literal carries the same trail metadata a bool var does:
+    // the decision level it was established at, the factor that forced it, and the
+    // literal-form antecedents of that force. Truth is still read from the int-domain
+    // view (the two are kept in sync by channeling), but level / reason / antecedents
+    // are *stored* at the moment the bound crosses the threshold rather than re-derived
+    // from a bound-change history. Parallel to [atomIntVar]; one slot appended per
+    // [allocAtom]. Undone on backtrack alongside the int-domain change that set them.
+    //
+    // [atomLvl] = -1 means "not established on the current path" (truth undetermined, or
+    // a root/bake fact). [atomRsn] = -1 means decision / leaf / root fact (no factor).
+
+    /** Stored truth of this order literal — the canonical, BCP-cheap replacement for deriving it
+     *  from [intDomains] on every clause touch (the #588 profile's dominant cost, `atomTruthOf`).
+     *  0 = unassigned, 1 = true, 2 = false. Set by [wakeAtom] the instant a bound move crosses the
+     *  threshold (which is exactly when the truth flips, since [propagateAtomsForVar] now visits
+     *  every materialized atom of the var), cleared to 0 on backtrack by [resetAtomSlots]. A 0 slot
+     *  on a determined atom (one materialized *after* its bound already crossed) falls back to the
+     *  domain-derived [atomTruthOf] — sound, just not cached. */
+    internal val atomState: IntArrayList = IntArrayList()
+
+    /** Decision level at which this atom's current truth was established (-1 = none). */
+    internal val atomLvl: IntArrayList = IntArrayList()
+
+    /** Factor that forced this atom's current truth (-1 = decision / leaf / root). */
+    internal val atomRsn: IntArrayList = IntArrayList()
+
+    /** Literal-form antecedents of this atom's current truth (null = leaf / root). */
+    internal val atomAnt: ArrayList<IntArray?> = ArrayList()
+
+    /** The reason of the bound move currently being channeled by [propagateAtomsForVar] — the
+     *  literals whose conjunction forced it. [wakeAtom] stores it on each crossed atom's
+     *  [atomAnt] slot (the trail-resident reason, recorded at the atom's establishment level —
+     *  the canonical replacement for re-deriving it from the bound histories at conflict time). */
+    internal var pendingMoveAnt: IntArray? = null
+
     /** Reverse lookup: packed key `(intVar << 33) | (kind << 32) | (threshold + INT_MAX)`
      *  → atomId. Allows O(1) re-allocation checks. */
     internal val atomByKey: MutableLongIntMap = MutableLongIntMap()
 
-    /** One-slot-per-`(intVar, kind)` memo in front of [atomByKey]. Reason building (the
-     *  dominant CP-engine cost) cites each var's *current* bound — `atomVarGe(v, curMin)` etc.
-     *  — so the same `(v, kind, threshold)` is looked up over and over until that var next
-     *  tightens. Caching the last `threshold → id` per slot turns the hot [allocAtom] hash
-     *  probe into an int compare. Always correct: an atom id for a given key never changes.
-     *  `atomMemoId[slot] < 0` marks an empty slot. Slot = `intVar * 3 + kind`. */
-    internal val atomMemoThr: IntArray = IntArray(problem.numIntVars * 3)
-    internal val atomMemoId: IntArray = IntArray(problem.numIntVars * 3) { -1 }
-
     /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions
      *  to false. Mirrors [boolWatchersByLit] for atoms; keyed by atom-lit id rather than
      *  fixed-array indexed because atoms are allocated dynamically. */
-    internal val atomWatchersByLit: HashMap<Int, IntArrayList> = HashMap()
+    // Array-indexed by atom-lit (two slots per atom: positive at `atomId*2`, negative at
+    // `atomId*2+1`), grown two slots per [allocAtom]. Replaces the former HashMap<lit, list>:
+    // bool-var watchers are array-indexed ([boolWatchersByLit]), and order literals are now a
+    // canonical representation, so they get the same O(1) array access in the BCP hot path
+    // instead of a boxed-Int hash probe per wake. A null slot means "no watchers".
+    internal val atomWatchersByLit: ArrayList<IntArrayList?> = ArrayList()
 
     /** For each int variable, the atoms whose truth depends on it — used to recompute
      *  atom truth and fire watchers after a successful tighten / exclude. */
@@ -540,9 +556,18 @@ class PropagationState(
      * current domain) and [level] is exactly the level it became true — both required for the
      * learned clause's backjump level to be sound.
      */
-    @Suppress("UNUSED_PARAMETER")
-    internal fun atomBoundLeafIfNew(intVar: Int, kind: AtomKind, threshold: Int, level: Int): Int =
-        allocAtom(intVar, kind = kind, threshold = threshold)
+    internal fun atomBoundLeafIfNew(intVar: Int, kind: AtomKind, threshold: Int, level: Int): Int {
+        val vVar = allocAtom(intVar, kind = kind, threshold = threshold)
+        // Store the caller-supplied establishment level on the atom's trail slot when it has no
+        // fresher channeled level. This is the trail-resident level source for a *looser*-than-
+        // current relaxed bound (the only kind whose level the per-var [intMinLevel]/[intMaxLevel]
+        // slots can't reconstruct), so [atomLevelForConflict] reads it from the slot instead of
+        // a bound-history binary search. A channeled crossing (atomLvl ≥ 0) already holds the
+        // exact level — don't clobber it.
+        val id = atomIdOf(vVar)
+        if (atomLvl[id] < 0) atomLvl[id] = level
+        return vVar
+    }
 
     /** True iff bool [v] is currently assigned (by decision or propagation). Primitive — lets
      *  hot factor loops test assignment without the `Boolean?` box that `boolValues[v]` allocates.
@@ -658,13 +683,13 @@ class PropagationState(
     internal val undoTag = IntArrayList()
     internal val undoVar = IntArrayList()
     internal val undoLevel = IntArrayList() // int: prior intLevel
+    internal val undoMinLvl = IntArrayList() // int: prior intMinLevel
+    internal val undoMaxLvl = IntArrayList() // int: prior intMaxLevel
     internal val undoMinReason = IntArrayList() // int: prior intMinReason
     internal val undoMaxReason = IntArrayList() // int: prior intMaxReason
     internal val undoDomain = ArrayList<IntDomain?>() // int: prior intDomains[v]
     internal val undoMinAnt = ArrayList<IntArray?>() // int: prior intMinAntecedents
     internal val undoMaxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents
-    internal val undoMinHistLen = IntArrayList() // int: prior minHist length for the var (history truncation)
-    internal val undoMaxHistLen = IntArrayList() // int: prior maxHist length for the var
     internal val undoHoleHistLen = IntArrayList() // int: prior holeHist length for the var
 
     /** Separate trail for [Trailed] reversible cells (incremental factor state). Kept apart from the

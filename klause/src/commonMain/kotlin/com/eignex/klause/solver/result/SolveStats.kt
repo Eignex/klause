@@ -43,6 +43,15 @@ data class SolveStats(
     val learnedClauses: SumResult = ZERO_COUNT,
     /** Clauses conflict analysis re-derived identically — a livelock indicator when large. */
     val relearned: SumResult = ZERO_COUNT,
+    /** Conflict-analysis gate breakdown (#588 diagnostic). Conflicts whose analysis produced no
+     *  usable clause (a NotApplicable seed). The sum of these three with [learnedClauses]
+     *  (asserting + taken) ≈ the conflicts that reached analysis. */
+    val caNotApplicable: SumResult = ZERO_COUNT,
+    /** Conflicts whose 1UIP clause was non-asserting (>1 literal at the conflict level), so it
+     *  could not be learned and the search fell back to chronological backtracking. */
+    val caNonAsserting: SumResult = ZERO_COUNT,
+    /** Conflicts whose asserting clause was rejected because it carried an already-true literal. */
+    val caRejectedTrueLit: SumResult = ZERO_COUNT,
     /** Node LP-bounding passes that built and solved a relaxation — the denominator for the prune /
      *  fix / pivot rates. `lpPruned` alone is meaningless without knowing how many solves it took. */
     val lpSolves: SumResult = ZERO_COUNT,
@@ -104,6 +113,9 @@ data class SolveStats(
             restarts = SumResult(restarts.sum + other.restarts.sum),
             propagations = SumResult(propagations.sum + other.propagations.sum),
             learnedClauses = SumResult(learnedClauses.sum + other.learnedClauses.sum),
+            caNotApplicable = SumResult(caNotApplicable.sum + other.caNotApplicable.sum),
+            caNonAsserting = SumResult(caNonAsserting.sum + other.caNonAsserting.sum),
+            caRejectedTrueLit = SumResult(caRejectedTrueLit.sum + other.caRejectedTrueLit.sum),
             lpSolves = SumResult(lpSolves.sum + other.lpSolves.sum),
             lpPruned = SumResult(lpPruned.sum + other.lpPruned.sum),
             lpInfeasible = SumResult(lpInfeasible.sum + other.lpInfeasible.sum),
@@ -153,6 +165,9 @@ internal class SolveStatsSink(val backend: String) {
     val propagations: CountStat = CountStat()
     val learnedClauses: CountStat = CountStat()
     val relearned: CountStat = CountStat()
+    val caNotApplicable: CountStat = CountStat()
+    val caNonAsserting: CountStat = CountStat()
+    val caRejectedTrueLit: CountStat = CountStat()
     val lpSolves: CountStat = CountStat()
     val lpPruned: CountStat = CountStat()
     val lpInfeasible: CountStat = CountStat()
@@ -218,6 +233,15 @@ internal class SolveStatsSink(val backend: String) {
      *  livelock indicator when it grows large relative to [learnedClauses]. */
     fun observeRelearn() {
         relearned.update(1.0)
+    }
+    fun observeCaNotApplicable() {
+        caNotApplicable.update(1.0)
+    }
+    fun observeCaNonAsserting() {
+        caNonAsserting.update(1.0)
+    }
+    fun observeCaRejectedTrueLit() {
+        caRejectedTrueLit.update(1.0)
     }
 
     /** One node LP-bounding pass that built and solved a relaxation (the rate denominator). */
@@ -304,6 +328,9 @@ internal class SolveStatsSink(val backend: String) {
             propagations = propagations.read(),
             learnedClauses = learnedClauses.read(),
             relearned = relearned.read(),
+            caNotApplicable = caNotApplicable.read(),
+            caNonAsserting = caNonAsserting.read(),
+            caRejectedTrueLit = caRejectedTrueLit.read(),
             lpSolves = lpSolves.read(),
             lpPruned = lpPruned.read(),
             lpInfeasible = lpInfeasible.read(),

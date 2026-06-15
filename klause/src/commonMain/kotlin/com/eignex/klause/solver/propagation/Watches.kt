@@ -18,7 +18,7 @@ internal fun PropagationState.moveBoolWatcher(factorId: Int, oldLit: Int, newLit
     if (oldV < problem.numBoolVars) {
         removeBoolWatch(factorId, oldLit)
     } else {
-        atomWatchersByLit[oldLit]?.removeValue(factorId)
+        atomWatchersByLit[atomLitWatchIndex(oldLit)]?.removeValue(factorId)
     }
     // Install on new, carrying the blocking literal supplied by the watcher-using factor
     // (#200). Defaults to NO_BLOCKER for factors that don't track blockers.

@@ -98,6 +98,14 @@ internal fun BacktrackSolver.advance(
                 sink?.observeLearn()
                 return AdvanceOutcome.Backjump(learned)
             }
+            // #588 diagnostic: classify why this conflict did NOT learn — the gate breakdown
+            // tells us which barrier (no clause / non-asserting / already-true literal) is
+            // responsible for the low asserting rate.
+            when {
+                learned == null -> sink?.observeCaNotApplicable()
+                !learned.asserting -> sink?.observeCaNonAsserting()
+                learned.literals.any { session.litTruth(it) == true } -> sink?.observeCaRejectedTrueLit()
+            }
             continue
         }
         if (pruneIf != null && pruneIf(session)) {

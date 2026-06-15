@@ -81,9 +81,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
      * **strictly ascending** (no duplicates) — the lower-bound / insertion point. Returns
      * [size] when every element is strictly below [element]. O(log size) via [binarySearchInt],
      * whose exact-or-`-(insertion)-1` result is an exact lower bound only when elements are
-     * distinct; the monotone bound-change histories this serves (each tighten pushes a strictly
-     * larger min, see [com.eignex.klause.solver.propagation.minLevelForGe]) are
-     * always distinct.
+     * distinct; the sorted per-var atom-threshold indices this serves are always distinct.
      */
     fun lowerBound(element: Int): Int {
         val idx = data.binarySearchInt(element, 0, size)
@@ -92,8 +90,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
 
     /**
      * Index of the first element `<= element` in `[0, size)`, assuming the list is sorted
-     * **descending** — the symmetric lower bound for a monotone-decreasing history (see
-     * [com.eignex.klause.solver.propagation.maxLevelForLe]). Returns [size]
+     * **descending** — the symmetric lower bound for a monotone-decreasing sequence. Returns [size]
      * when every element is strictly above [element]. O(log size).
      */
     fun lowerBoundDescending(element: Int): Int {

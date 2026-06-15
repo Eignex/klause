@@ -66,6 +66,15 @@ internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
         // assignments instead of re-deriving them from the annotation default every time, which
         // is the difference between thrashing and conflict-driven progress (#543).
         phaseSaving = true,
+        // With trail-resident order literals, conflict analysis now learns asserting clauses at
+        // a high rate (#588), so the annotated/FD track behaves like a real LCG solver and needs
+        // the same database hygiene choco-lcg uses, or the learned clauses pile up unbounded and
+        // drown BCP. Luby restarts (deterministic budget — NOT adaptive, which would bypass the
+        // Luby budget and never fire here) drive [forgetIfOverCap] to bound the database; phase
+        // saving + solution-guided value order above keep the annotation honoured on re-descent.
+        lubyRestartBase = 2_000L,
+        maxLearnedClauses = 4_000,
+        tieredLearnedDb = true,
     )
 }
 
