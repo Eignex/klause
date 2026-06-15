@@ -90,6 +90,24 @@ class ReifiedLinear private constructor(
         return degreeFor(newSum, aux, state.violationSoftCap) - degreeFor(oldSum, aux, state.violationSoftCap)
     }
 
+    /**
+     * Indicator-aware linear nogood. [ReifiedLinear] extends [LinearSumFactor], not [Linear], so it
+     * does not inherit [Linear]'s `conflictReason` override and would otherwise fall through to the
+     * coarse default bool-pins reason. Every failure path — an aux pin contradicting an
+     * already-decided indicator (always/never-holds, or a single-term EQ whose target is
+     * unreachable), or a body bound-propagation that wipes a domain under the indicator-selected
+     * direction — is driven by the current term-var bounds together with the indicator's current
+     * polarity. So the reason is the bound atoms of [vars] plus the indicator literal
+     * `¬[auxBoolVar = current]` (the same `extraLit` the body tightenings already thread). All
+     * literals are false at conflict time; the indicator lit alone is a sound unit reason when the
+     * body is infeasible at root bounds.
+     */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        val auxVal = state.boolValues[auxBoolVar]
+            ?: return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
+        return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = Lit.make(auxBoolVar, !auxVal))
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val range = linearSumRange(state, coeffs, vars)
         val sumLo = range[0]
