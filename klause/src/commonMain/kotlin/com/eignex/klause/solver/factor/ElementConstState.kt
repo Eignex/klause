@@ -166,7 +166,7 @@ internal class ElementConstState(
     }
 
     /**
-     * Drive the coupled prune to fixpoint. [idxRem]/[resRem] are the idx/result values that just left.
+     * Drive the coupled prune to fixpoint. [idxRem0]/[resRem0] are the idx/result values that just left.
      * Processing idx removals decrements support and yields newly-unsupported result values to prune;
      * processing result removals yields the idx positions holding those constants to prune. Each
      * applied prune is the next round's removal set, so the cascade runs until no value leaves.

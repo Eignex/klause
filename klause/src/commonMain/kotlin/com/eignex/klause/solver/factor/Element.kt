@@ -162,8 +162,8 @@ class Element(
     private class Cache(val cachedDoms: Array<IntDomain?>)
 
     /** Element propagation. Both kinds first tighten `idx ∈ [indexOffset, indexOffset+len-1]`,
-     *  then filter to full GAC: a **constant** array via [propagateConstArray], a **var** array
-     *  via [propagateVarArray].
+     *  then filter to full GAC: a **constant** array via the incremental [ElementConstState], a
+     *  **var** array via [propagateVarArray].
      *
      *  Fast path: if no [intVars] domain reference changed since the last successful propagate, the
      *  previous fixpoint still holds (every prune/tighten below is a pure function of these domains),
