@@ -11,9 +11,9 @@ class ExactBasisCertifierTest {
 
     private fun randomModel(m: Int, n: Int, rng: Random): LpModel {
         val b = LpBuilder()
-        for (j in 0 until n) b.addVar(0L, rng.nextLong(2, 8), cost = rng.nextLong(-6, 7))
+        repeat(n) { b.addVar(0L, rng.nextLong(2, 8), cost = rng.nextLong(-6, 7)) }
+        val cols = IntArray(n) { it }
         repeat(m) {
-            val cols = IntArray(n) { it }
             val vals = LongArray(n) { rng.nextLong(-3, 4) }
             b.addRow(cols, vals, Relation.LE, rng.nextLong(3, 20))
         }

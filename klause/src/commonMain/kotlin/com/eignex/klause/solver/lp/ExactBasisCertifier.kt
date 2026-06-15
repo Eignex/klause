@@ -81,14 +81,15 @@ internal object ExactBasisCertifier {
             }
             prev = pivot
         }
-        // Cheap O(m²) rational back-substitution on the (equivalent) upper-triangular system.
-        val x = arrayOfNulls<BigRational>(m)
+        // Cheap O(m²) rational back-substitution on the (equivalent) upper-triangular system; x[j]
+        // for j > i is already final when row i is processed (we go bottom-up), so ZERO-init is safe.
+        val x = Array(m) { BigRational.ZERO }
         for (i in m - 1 downTo 0) {
             var acc = BigRational.of(a[i][m])
-            for (j in i + 1 until m) acc -= BigRational.of(a[i][j]) * x[j]!!
+            for (j in i + 1 until m) acc -= BigRational.of(a[i][j]) * x[j]
             x[i] = acc / BigRational.of(a[i][i])
         }
-        return Array(m) { x[it]!! }
+        return x
     }
 
     /** `A_full[row][col]`: structural column → `a[row][col]`, slack column `n+s` → unit `e_s`. */

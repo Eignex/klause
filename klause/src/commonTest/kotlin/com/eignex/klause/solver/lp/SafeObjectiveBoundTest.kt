@@ -10,9 +10,9 @@ class SafeObjectiveBoundTest {
 
     private fun randomModel(m: Int, n: Int, rng: Random): LpModel {
         val b = LpBuilder()
-        for (j in 0 until n) b.addVar(0L, rng.nextLong(2, 9), cost = rng.nextLong(-6, 7))
+        repeat(n) { b.addVar(0L, rng.nextLong(2, 9), cost = rng.nextLong(-6, 7)) }
+        val cols = IntArray(n) { it }
         repeat(m) {
-            val cols = IntArray(n) { it }
             val vals = LongArray(n) { rng.nextLong(-4, 5) }
             b.addRow(cols, vals, Relation.LE, rng.nextLong(3, 25))
         }
