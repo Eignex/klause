@@ -108,6 +108,33 @@ class ProblemDomainTighteningTest {
     }
 
     @Test
+    fun `a fired cancellation makes the construction-time bake a sound no-op`() {
+        // The same x + y = 1, x,y >= 0 model that tightens both vars to [0..1] when baked to
+        // completion. With an already-fired cancellation the all-factors fixpoint bails before
+        // firing any factor: domains stay as declared and the bake is sound (Implied, not Unsat).
+        val wide = { IntDomain(-1_000_000, 1_000_000) }
+        val factors =
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+            )
+        val cancelled =
+            Problem(0, 2, arrayOf(wide(), wide()), factors, cancellation = { true })
+        assertIs<PropagationResult.Implied>(cancelled.baked)
+        for (v in 0..1) {
+            assertEquals(-1_000_000, cancelled.intDomains[v].min, "var $v min unchanged")
+            assertEquals(1_000_000, cancelled.intDomains[v].max, "var $v max unchanged")
+        }
+        // Same model with the default never-cancel token bakes to completion and tightens.
+        val baked = Problem(0, 2, arrayOf(wide(), wide()), factors)
+        for (v in 0..1) {
+            assertEquals(0, baked.intDomains[v].min, "var $v min baked")
+            assertEquals(1, baked.intDomains[v].max, "var $v max baked")
+        }
+    }
+
+    @Test
     fun `unsat bake leaves domains as declared`() {
         val p =
             Problem(

@@ -37,6 +37,12 @@ import com.eignex.klause.solver.result.SolveStats
 internal class CommonOptions {
     var engine: String? = null
     var timeLimitMs: Long? = null
+
+    /** Absolute wall-clock instant (in [nowMillis] units) at which the `-t` budget expires,
+     *  anchored once at process start. A single deadline shared by the construction-time bake
+     *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
+     *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
+    var deadlineAtMs: Long? = null
     var randomSeed: Long? = null
     var verbose = false
     var statistics = false

@@ -45,6 +45,9 @@ fun main(args: Array<String>) {
     }
 
     val path = common.inputPath ?: usageError("no input file given\n$USAGE")
+    // Anchor the `-t` budget once, before parsing/baking, so the bake and the solve share one
+    // deadline instead of each restarting the clock.
+    common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
     val mode = pickMode(common, path)
     val session = sessions.getValue(mode)
     val solvable = session.load(path, common)

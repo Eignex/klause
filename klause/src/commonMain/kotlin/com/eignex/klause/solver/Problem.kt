@@ -78,6 +78,14 @@ class Problem(
      * given seed.
      */
     val probeSeed: Long = 0L,
+    /**
+     * Cooperative-cancellation token for the construction-time bake ([baked]). Polled on the
+     * full-propagation fixpoint and between SAC passes so a `-t` deadline can abort an
+     * otherwise-uncancellable bake on a slow propagator over wide domains. The partial bake
+     * that results is sound (it only ever tightens). Defaults to [Cancellation.Never], so
+     * every consumer that doesn't pass a deadline bakes to completion exactly as before.
+     */
+    val cancellation: Cancellation = Cancellation.Never,
 ) {
     /**
      * Domain (bounds) of each integer variable, indexed by int var id. A defensive copy of
@@ -113,6 +121,7 @@ class Problem(
         probeBudgetPerVar: Int = Int.MAX_VALUE,
         probeTotalBudget: Int = Int.MAX_VALUE,
         probeSeed: Long = 0L,
+        cancellation: Cancellation = Cancellation.Never,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -124,6 +133,7 @@ class Problem(
         probeBudgetPerVar = probeBudgetPerVar,
         probeTotalBudget = probeTotalBudget,
         probeSeed = probeSeed,
+        cancellation = cancellation,
     )
 
     /** Factor ids mentioning each Boolean variable, indexed by bool var id. */
@@ -189,9 +199,12 @@ class Problem(
     }
 
     private fun computeBaked(): PropagationResult {
-        val initial = propagate(Assumptions.None)
+        val initial = propagate(Assumptions.None, cancellation)
         if (initial is PropagationResult.Unsat) return initial
         var result: PropagationResult = initial
+        // SAC probing fires `propagate` repeatedly; stop entering new probe phases once the
+        // bake deadline has passed (each phase below also polls between its own probes).
+        if (cancellation()) return result
         if (probeFailedLiterals) {
             result = probeFreeBools(result as PropagationResult.Implied)
             if (result is PropagationResult.Unsat) return result
@@ -225,6 +238,7 @@ class Problem(
         while (changed) {
             changed = false
             for (v in sacProbeOrder(acc, factorWeights, rng)) {
+                if (cancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= probeBudgetPerVar) continue
                 if (totalCalls >= probeTotalBudget) return acc
@@ -246,12 +260,12 @@ class Problem(
                     if (k in existingHoles) continue
                     perVarCalls[v]++
                     totalCalls++
-                    val pin = propagate(accAsAssumptions.withInt(v, k))
+                    val pin = propagate(accAsAssumptions.withInt(v, k), cancellation)
                     if (pin is PropagationResult.Unsat) {
                         bumpFactorWeights(pin, factorWeights)
                         perVarCalls[v]++
                         totalCalls++
-                        val r = propagate(accAsAssumptions.withIntHole(v, k))
+                        val r = propagate(accAsAssumptions.withIntHole(v, k), cancellation)
                         if (r is PropagationResult.Unsat) return r
                         acc = addHoleToImplied(acc, v, k)
                         acc = mergeImplied(acc, r as PropagationResult.Implied)
@@ -348,6 +362,7 @@ class Problem(
         while (changed) {
             changed = false
             for (v in sacProbeOrder(acc, factorWeights, rng)) {
+                if (cancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= probeBudgetPerVar) continue
                 if (totalCalls >= probeTotalBudget) return acc
@@ -358,13 +373,13 @@ class Problem(
                 val accAsAssumptions = acc.toAssumptions()
                 perVarCalls[v]++
                 totalCalls++
-                val pinMin = propagate(accAsAssumptions.withInt(v, curMin))
+                val pinMin = propagate(accAsAssumptions.withInt(v, curMin), cancellation)
                 if (pinMin is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMin, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
-                    val r = propagate(tightened)
+                    val r = propagate(tightened, cancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = addMinToImplied(acc, v, curMin + 1)
                     acc = mergeImplied(acc, r as PropagationResult.Implied)
@@ -375,13 +390,13 @@ class Problem(
                 if (totalCalls >= probeTotalBudget) return acc
                 perVarCalls[v]++
                 totalCalls++
-                val pinMax = propagate(accAsAssumptions.withInt(v, curMax))
+                val pinMax = propagate(accAsAssumptions.withInt(v, curMax), cancellation)
                 if (pinMax is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMax, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
-                    val r = propagate(tightened)
+                    val r = propagate(tightened, cancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = addMaxToImplied(acc, v, curMax - 1)
                     acc = mergeImplied(acc, r as PropagationResult.Implied)
@@ -483,18 +498,19 @@ class Problem(
         while (changed) {
             changed = false
             for (v in 0 until numBoolVars) {
+                if (cancellation()) return PropagationResult.Implied(bools, ints)
                 if (v in bools) continue
-                val tryTrue = propagate(Assumptions(bools + (v to true), ints))
+                val tryTrue = propagate(Assumptions(bools + (v to true), ints), cancellation)
                 if (tryTrue is PropagationResult.Unsat) {
-                    val r = propagate(Assumptions(bools + (v to false), ints))
+                    val r = propagate(Assumptions(bools + (v to false), ints), cancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, false, r as PropagationResult.Implied)
                     changed = true
                     continue
                 }
-                val tryFalse = propagate(Assumptions(bools + (v to false), ints))
+                val tryFalse = propagate(Assumptions(bools + (v to false), ints), cancellation)
                 if (tryFalse is PropagationResult.Unsat) {
-                    val r = propagate(Assumptions(bools + (v to true), ints))
+                    val r = propagate(Assumptions(bools + (v to true), ints), cancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, true, r as PropagationResult.Implied)
                     changed = true
@@ -525,7 +541,10 @@ class Problem(
      * This is the same routine the solver uses internally at init and at every sample / solve
      * call that carries non-empty assumptions.
      */
-    fun propagate(assumptions: Assumptions = Assumptions.None): PropagationResult {
+    fun propagate(
+        assumptions: Assumptions = Assumptions.None,
+        cancellation: Cancellation = Cancellation.Never,
+    ): PropagationResult {
         val state = PropagationState(this, assumptions)
         if (!state.seeded) {
             val lvls = state.conflictLevels ?: EmptyIntArray
@@ -537,7 +556,7 @@ class Problem(
                 lvls,
             )
         }
-        val conflict = state.runToFixpoint(allFactors = true)
+        val conflict = state.runToFixpoint(allFactors = true, cancellation = cancellation)
         if (conflict != null) {
             return PropagationResult.Unsat(
                 state.extractConflictBools(conflict),
