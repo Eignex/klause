@@ -191,6 +191,19 @@ class Element(
      *  (var ids) can index [cachedDoms] without an O(arity) lookup. */
     private class Cache(val cachedDoms: Array<IntDomain?>, val posOf: IntIntMap)
 
+    /**
+     * Conflict reason: the hole-aware bound atoms of every read int var. Element is a GAC
+     * propagator that prunes interior holes, so the reason mirrors [AllDifferent]'s Hall-style
+     * nogood ([collectHoleAndBoundAntecedents]) rather than a bounds-only one. [intVars] is exactly
+     * what the epic's spec asks for: the **variable** array cites `idx`, `result`, and the position
+     * vars (the selected-position membership that proves no value is jointly supported); the
+     * **constant** array cites only `idx` and `result` (the idx-range + result-support atoms — the
+     * table entries are literals, not vars). Without this the failure falls through to the coarse
+     * default bool-pins reason, which is suppressed once an int decision is on the trail.
+     */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, intVars)
+
     /** Element propagation. Both kinds first tighten `idx ∈ [indexOffset, indexOffset+len-1]`,
      *  then filter to full GAC: a **constant** array via the incremental [ElementConstState], a
      *  **var** array via [propagateVarArray].
