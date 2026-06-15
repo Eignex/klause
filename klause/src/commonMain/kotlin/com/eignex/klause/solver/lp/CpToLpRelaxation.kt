@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.lp
 
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.ArrayMinMax
@@ -98,6 +99,17 @@ internal class CpToLpRelaxation(
     /** When true, linearize each NValue with a one-hot value model (per-value "used" indicators) so
      *  the distinct-count target gets an LP bound. Adds O(Σ|domain|) columns, so it is gated. */
     private val nValueHull: Boolean = false,
+    /**
+     * #571: build only the **objective cone** — the rows and variables transitively connected to the
+     * objective through the linear/Boolean constraints — and **drop every big-M [ReifiedLinear] row**.
+     * The result is a small structural sub-relaxation that always fits the dense-tableau cap (no
+     * disjunctive ordering bools), yet is a genuine lower bound: for scheduling it is the
+     * critical-path / longest-path bound (precedence + objective, machine-disjunctions removed). Any
+     * subset of constraints is a relaxation, so the bound is sound; this is just a cheaper, looser one.
+     * When set, the column-heavy hull / circuit / cut / cumulative features are forced off — the cone
+     * probe is deliberately the minimal linear+Boolean relaxation.
+     */
+    private val objectiveCone: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -122,6 +134,81 @@ internal class CpToLpRelaxation(
     private var denseCache: Array<LongArray?>? = null
     private var cacheVarCount: Int = -1
     private var cacheBaseRows: Int = -1
+
+    /**
+     * #571 objective-cone membership, structural (depends only on [Problem.factors] and the
+     * objective, never on live domains), so it is computed once and reused across nodes. `first` is
+     * per-int-var, `second` per-bool-var: `true` when the variable is transitively connected to the
+     * objective through a cone-relevant factor (every LP-emittable type except the dropped big-M
+     * [ReifiedLinear]). A factor is emitted in cone mode iff it touches the cone — and by closure a
+     * factor that touches the cone has all its variables in the cone. Null when [objectiveCone] is off.
+     */
+    private val cone: Pair<BooleanArray, BooleanArray>? by lazy {
+        if (objectiveCone) computeObjectiveCone() else null
+    }
+
+    /** Fixpoint closure from the objective's support over the cone-relevant factors (see [cone]). */
+    private fun computeObjectiveCone(): Pair<BooleanArray, BooleanArray> {
+        val intIn = BooleanArray(problem.numIntVars)
+        val boolIn = BooleanArray(problem.numBoolVars)
+        objective?.let { obj ->
+            for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intIn[i] = true
+            for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolIn[b] = true
+        }
+        var changed = true
+        while (changed) {
+            changed = false
+            for (f in problem.factors) {
+                if (coneTouches(f, intIn, boolIn)) changed = coneMark(f, intIn, boolIn) || changed
+            }
+        }
+        return intIn to boolIn
+    }
+
+    /** Whether [f] (a cone-relevant, non-big-M factor) shares any variable with the current cone. */
+    private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean = when (f) {
+        is Linear -> f.vars.any { intIn[it] }
+        is ArrayMinMax -> intIn[f.result] || f.xs.any { intIn[it] }
+        is Cardinality -> f.literals.any { boolIn[Lit.variable(it)] }
+        is Clause -> f.literals.any { boolIn[Lit.variable(it)] }
+        is PseudoBoolean -> f.literals.any { boolIn[Lit.variable(it)] }
+        else -> false // ReifiedLinear (dropped) and hard globals do not extend the cone
+    }
+
+    /** Add every variable of [f] to the cone; returns true when anything was newly added. */
+    private fun coneMark(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean {
+        var changed = false
+        fun addInt(v: Int) {
+            if (!intIn[v]) {
+                intIn[v] = true
+                changed = true
+            }
+        }
+        fun addBool(lit: Int) {
+            val b = Lit.variable(lit)
+            if (!boolIn[b]) {
+                boolIn[b] = true
+                changed = true
+            }
+        }
+        when (f) {
+            is Linear -> for (v in f.vars) addInt(v)
+
+            is ArrayMinMax -> {
+                addInt(f.result)
+                for (v in f.xs) addInt(v)
+            }
+
+            is Cardinality -> for (l in f.literals) addBool(l)
+
+            is Clause -> for (l in f.literals) addBool(l)
+
+            is PseudoBoolean -> for (l in f.literals) addBool(l)
+
+            else -> Unit
+        }
+        return changed
+    }
 
     /** Per-hull dense-tableau caps. Internal so [com.eignex.klause.solver.backtrack.LpAutoConfig]'s
      *  size guard (#484) estimates each enabled hull against the *same* thresholds the builders skip
@@ -401,36 +488,44 @@ internal class CpToLpRelaxation(
                 for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intColumn(i)
                 for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolColumn(b)
             }
-            // Cut generation needs columns for the globals' variables even when nothing else
-            // references them, so a separator has something to write the cut over.
-            if (generateCuts) {
-                // The all-different family (AllDifferent, SymmetricAllDifferent, both Inverse sides)
-                // feeds the Hall-sum and assignment cuts; closed GlobalCardinality feeds the GCC cut.
-                for (group in allDifferentGroups(problem)) for (v in group) intColumn(v)
-                for (factor in problem.factors) {
-                    if (factor is GlobalCardinality && factor.closed && factor.presents.isEmpty()) {
-                        for (v in factor.xs) intColumn(v)
+            // Cone mode is the minimal linear+Boolean objective-cone probe: the column-heavy hull /
+            // circuit / cut / cumulative features are all forced off (see [objectiveCone]).
+            if (!objectiveCone) {
+                // Cut generation needs columns for the globals' variables even when nothing else
+                // references them, so a separator has something to write the cut over.
+                if (generateCuts) {
+                    // The all-different family (AllDifferent, SymmetricAllDifferent, both Inverse sides)
+                    // feeds the Hall-sum and assignment cuts; closed GlobalCardinality feeds the GCC cut.
+                    for (group in allDifferentGroups(problem)) for (v in group) intColumn(v)
+                    for (factor in problem.factors) {
+                        if (factor is GlobalCardinality && factor.closed && factor.presents.isEmpty()) {
+                            for (v in factor.xs) intColumn(v)
+                        }
                     }
                 }
-            }
-            if (circuitArcs) {
-                for (factor in problem.factors) if (factor is Circuit) buildCircuitArcs(factor)
-            }
-            if (elementHull) {
-                for (factor in problem.factors) if (factor is Element) buildElementHull(factor)
-            }
-            if (tableHull) {
-                for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
-            }
-            if (nValueHull) {
-                for (factor in problem.factors) if (factor is NValue) buildNValueHull(factor)
-            }
-            cumulativeRelaxation?.let { cumulativeRows(it) }
-            if (cumulativeTimeIndexed) {
-                for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
+                if (circuitArcs) {
+                    for (factor in problem.factors) if (factor is Circuit) buildCircuitArcs(factor)
+                }
+                if (elementHull) {
+                    for (factor in problem.factors) if (factor is Element) buildElementHull(factor)
+                }
+                if (tableHull) {
+                    for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
+                }
+                if (nValueHull) {
+                    for (factor in problem.factors) if (factor is NValue) buildNValueHull(factor)
+                }
+                cumulativeRelaxation?.let { cumulativeRows(it) }
+                if (cumulativeTimeIndexed) {
+                    for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
+                }
             }
 
+            val coneL = cone
             for (factor in problem.factors) {
+                // #571: in cone mode emit only factors connected to the objective; this also drops
+                // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
+                if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
                 when (factor) {
                     is Linear -> linearRow(factor.op, factor.vars, factor.coeffs, factor.bound.toLong())
 

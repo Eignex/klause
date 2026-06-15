@@ -338,6 +338,17 @@ data class BacktrackParams(
      */
     val lpNValue: Boolean = false,
     /**
+     * Objective-cone / precedence-only sub-relaxation (#571). When true and [lpBounding] holds, the
+     * per-node LP is built over **only** the variables and rows transitively connected to the
+     * objective, with every big-M [com.eignex.klause.solver.factor.ReifiedLinear] disjunctive row
+     * dropped — for scheduling, the critical-path / longest-path bound (precedence + objective). The
+     * point is that this subset has no disjunctive ordering bools, so it always fits the dense-tableau
+     * cap where the full relaxation does not; it is a cheaper, looser, always-sound bound (any subset
+     * of constraints is a relaxation). Forces the hull / circuit / cut / cumulative LP features off.
+     * Off by default; meant for the dense path (leave [lpSparsePrimary] false when this is set).
+     */
+    val lpObjectiveCone: Boolean = false,
+    /**
      * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
      * [lpBounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
      * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
