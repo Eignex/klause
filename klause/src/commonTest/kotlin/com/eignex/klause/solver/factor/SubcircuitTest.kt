@@ -4,6 +4,8 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -147,5 +149,53 @@ class SubcircuitTest {
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 13L)).assignment
         assertTrue(sample != null, "LS should find a valid Subcircuit configuration")
+    }
+
+    @Test
+    fun `backtrack enumeration over the subcircuit equals brute force`() {
+        // Soundness gate for the delta-gated propagator: enumerating under the CDCL backtracker fires
+        // propagate repeatedly on one PropagationState — the delta fast path skips no-op re-fires, a
+        // domain change re-wakes it — across deep push/pop. The enumerated set must equal the brute
+        // set of assignments whose included nodes (succ[i] ≠ i) form exactly one cycle (empty valid).
+        fun validSubcircuit(a: IntArray): Boolean {
+            val n = a.size
+            for (s in a) if (s < 0 || s >= n) return false
+            val included = (0 until n).filter { a[it] != it }
+            if (included.isEmpty()) return true
+            for (i in included) if (a[a[i]] == a[i]) return false // points to an excluded node
+            val start = included[0]
+            var cur = start
+            var count = 0
+            do {
+                cur = a[cur]
+                count++
+                if (count > n) return false
+            } while (cur != start)
+            return count == included.size
+        }
+        for (n in 3..4) {
+            val brute = HashSet<List<Int>>()
+            val acc = IntArray(n)
+            fun rec(p: Int) {
+                if (p == n) {
+                    if (validSubcircuit(acc)) brute.add(acc.toList())
+                    return
+                }
+                for (v in 0 until n) {
+                    acc[p] = v
+                    rec(p + 1)
+                }
+            }
+            rec(0)
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, n - 1) },
+                factors = arrayOf<Factor>(Subcircuit(succ = IntArray(n) { it })),
+            )
+            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "subcircuit n=$n: enumerated set must equal brute force")
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
@@ -46,6 +47,31 @@ class Subcircuit(
     /** Position-faithful: `succ(i)` is node i's successor (`succ(i) = i` excludes node i), so the
      *  array order is meaningful — the key keeps the variables in order, not sorted (#443). */
     override fun structuralKey(): String = "subcircuit:" + succ.joinToString(",")
+
+    /** Advisor subscription (#623): the included-cycle reasoning reacts to bound moves, fixings and
+     *  forced chain-start membership, so subscribe to every kind on every successor variable and
+     *  consume the dirty-variable delta (#624) — a fire that drains an empty delta returns at once. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = succ.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
+
+    /** CP-side gate flag for the delta fast path (in the propagation-state refPayload, separate from
+     *  the local-search cost payload). Drifts across push/pop — harmless, since any forward narrowing
+     *  re-wakes via its event and the pass recomputes from the engine-restored domains. */
+    private class CpGate {
+        var started: Boolean = false
+    }
 
     /**
      * Graded cost for the subcircuit. 0 iff included set forms a single cycle (or is empty).
@@ -100,6 +126,16 @@ class Subcircuit(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        // Delta fast path (#624): a fire that drains an empty dirty-variable delta saw no change since
+        // the last pass, so the included-cycle reasoning is still at its fixpoint. First fire runs.
+        val gate = (state.refPayload[factorId] as? CpGate) ?: run {
+            val fresh = CpGate()
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        val dirty = state.drainIntEventDirtyVars(factorId)
+        if (gate.started && dirty.isEmpty()) return true
+        gate.started = true
         // 1. Tighten domains to [0, n).
         if (!tightenSuccToRange(state)) return false
         if (n == 1) return true // single node: self-loop is the only choice, no constraint.
