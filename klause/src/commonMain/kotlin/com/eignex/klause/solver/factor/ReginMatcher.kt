@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -38,6 +39,13 @@ internal fun reginFilter(
 ): IntArray? {
     val n = filteredVars.size
     if (n < 2) return null
+
+    // Unchanged-domains fast path: if the previous fire on this var set succeeded (returned null,
+    // i.e. pruned to a GAC fixpoint) and no var's domain has changed since, that fixpoint still
+    // holds and there is nothing to prune — skip the matching/SCC rebuild entirely. Sound to drift:
+    // the refs only ever *miss* after a backtrack restores a different IntDomain (never falsely
+    // match), so no reversible/snapshot is needed (cf. GCC #584, Table #580, Element #581).
+    if (cache != null && cache.fixpointHolds(state, filteredVars)) return null
 
     // Compact value-id mapping + per-var value-id lists (hole-aware). Non-except values get one
     // id; each except value gets `n` capacity-1 copies (contiguous ids) so up to n vars share it.
@@ -211,12 +219,14 @@ internal fun reginFilter(
             }
         }
     }
-    // Persist the matching as the next call's warm-start seed.
+    // Persist the matching as the next call's warm-start seed, and record the GAC fixpoint
+    // (var set + per-var domain refs) for the unchanged-domains fast path above.
     if (cache != null) {
         cache.matchedValue.clear()
         for (i in 0 until n) {
             if (matchVar[i] != -1) cache.matchedValue.put(filteredVars[i], idToValue[matchVar[i]])
         }
+        cache.recordFixpoint(state, filteredVars)
     }
     return null
 }
@@ -229,6 +239,29 @@ internal fun reginFilter(
  *  more augmenting searches), like CDCL watches — no longer a [PropagationState.SnapshottablePayload]. */
 internal class ReginCache {
     val matchedValue = MutableIntIntMap()
+
+    // Unchanged-domains fast-path state: the var-id list and each var's [IntDomain] ref at the
+    // last successful (null-returning) fire. Drifts across backtrack — a stale entry only ever
+    // *misses* (ref-inequality against the restored domain), never falsely matches — so no
+    // reversible/snapshot is needed. `lastVars == null` means no fixpoint is on record yet.
+    private var lastVars: IntArray? = null
+    private var lastDoms: Array<IntDomain?> = emptyArray()
+
+    /** True iff the previous fire on exactly [vars] pruned to a GAC fixpoint that still holds —
+     *  same var set, and every var's [IntDomain] ref unchanged since. */
+    fun fixpointHolds(state: PropagationState, vars: IntArray): Boolean {
+        val lv = lastVars ?: return false
+        if (!lv.contentEquals(vars)) return false
+        for (i in vars.indices) if (lastDoms[i] !== state.intDomains[vars[i]]) return false
+        return true
+    }
+
+    /** Record the post-prune GAC fixpoint for the next fire's [fixpointHolds] check. */
+    fun recordFixpoint(state: PropagationState, vars: IntArray) {
+        if (lastDoms.size < vars.size) lastDoms = arrayOfNulls(vars.size)
+        lastVars = vars.copyOf()
+        for (i in vars.indices) lastDoms[i] = state.intDomains[vars[i]]
+    }
 
     // Reusable oriented-graph adjacency buffers for [reginFilter] — the dominant per-fire
     // allocation (2·(n + numValues) IntArrayLists). Grown on demand, and the live `[0, total)`
