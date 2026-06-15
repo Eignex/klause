@@ -139,6 +139,16 @@ class Disjunctive(
         return out
     }
 
+    /** Conflict reason: bound atoms of every int var the propagator reads. Like its
+     *  [Cumulative] backing, the unary failure modes — mandatory-profile overload, a
+     *  detectable-precedence cycle (neither of two tasks can be first), or a Θ-tree energetic
+     *  overload — are all driven purely by the current start `min`/`max` (and the fixed
+     *  durations when [durationVars] is non-empty). Citing those bounds yields a clause-form
+     *  nogood that survives on the int trail, where the coarse default bool-pins reason
+     *  collapses to chronological backtrack. [intVars] is starts plus any duration vars. */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
         val effDur = effDurOrNull(state) ?: return true
@@ -162,6 +172,10 @@ class Disjunctive(
             profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1)
         }
         if (!profile.build(cap = 1)) return false
+        // Cite all read int vars (starts + fixed durations) — a profile shave can be driven by
+        // another task's mandatory part and by this task's fixed duration, so the reason must
+        // cite both bounds or the learned nogood is unsound on backtrack (cf. [Cumulative]).
+        val ant = state.composeIntVarAtomAntecedents(intVars)
         // Shave non-fixed tasks against the mandatory profile. Only definitely-present
         // tasks get tightened — unpinned-presence tasks might still vanish.
         for (i in 0 until n) {
@@ -184,7 +198,7 @@ class Disjunctive(
                 }
             }
             if (newMin > state.intDomains[v].max) return false
-            if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin)) return false
+            if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
             // Tighten dom.max downward.
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
@@ -195,14 +209,7 @@ class Disjunctive(
                 }
             }
             if (newMax < state.intDomains[v].min) return false
-            if (newMax != state.intDomains[v].max && !state.tightenIntMax(
-                    v,
-                    newMax,
-                    state.composeIntVarAtomAntecedents(starts),
-                )
-            ) {
-                return false
-            }
+            if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
         }
         return true
     }
@@ -210,6 +217,7 @@ class Disjunctive(
     /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
      *  i must come strictly after j. Tighten `start_i.min ≥ est_j + dur_j`. */
     private fun detectablePrecedences(state: PropagationState, effDur: IntArray): Boolean {
+        val ant = state.composeIntVarAtomAntecedents(intVars)
         for (i in 0 until n) {
             if (effDur[i] == 0) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
@@ -228,7 +236,7 @@ class Disjunctive(
             }
             if (newMinI != di.min) {
                 if (newMinI > di.max) return false
-                if (!state.tightenIntMin(vi, newMinI, state.composeIntVarAtomAntecedents(starts))) return false
+                if (!state.tightenIntMin(vi, newMinI, ant)) return false
             }
         }
         return true
@@ -296,7 +304,7 @@ class Disjunctive(
 
         val tree = CumulativeThetaTree(n = m, capacity = 1)
         tree.setLeafOrder(leafPos)
-        val ant = state.composeIntVarAtomAntecedents(starts)
+        val ant = state.composeIntVarAtomAntecedents(intVars)
 
         var k = 0
         while (k < m) {
