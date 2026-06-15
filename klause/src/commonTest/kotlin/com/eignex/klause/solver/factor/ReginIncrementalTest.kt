@@ -84,6 +84,38 @@ class ReginIncrementalTest {
     }
 
     @Test
+    fun `large overlapping alldifferent enumerates exactly the brute set across backtracking`() {
+        // n = 6 over a shared 1..6 universe with assorted domains: one big residual SCC that splits
+        // into sub-components as decisions narrow domains and re-merges on backtrack — exercising the
+        // partial sub-Tarjan (dirty-component recompute) and the matched-edge-break rebuild path,
+        // both reversibly, many thousands of times under the CDCL backtracker.
+        val sizes = listOf(6, 6, 5, 4, 3, 2) // x_k in 1..sizes[k]
+        val brute = HashSet<List<Int>>()
+        fun rec(pos: Int, acc: MutableList<Int>) {
+            if (pos == 6) {
+                if (acc.toSet().size == 6) brute.add(acc.toList())
+                return
+            }
+            for (v in 1..sizes[pos]) {
+                acc.add(v)
+                rec(pos + 1, acc)
+                acc.removeAt(acc.size - 1)
+            }
+        }
+        rec(0, mutableListOf())
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { IntDomain(1, sizes[it]) },
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4, 5), domainMin = 1, domainSize = 6)),
+        )
+        val params = BacktrackParams(randomSeed = 7L, variableSelector = Vsids(), maxLearnedClauses = 2_000)
+        val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            .map { it.ints.toList() }.toHashSet()
+        assertEquals(brute, found, "large alldifferent: backtrack solution set must equal brute force")
+    }
+
+    @Test
     fun `first fire still reaches a fixpoint without a prior record`() {
         // Guards the lastVars == null branch: no fixpoint on record yet → full filter runs.
         val problem = Problem(
