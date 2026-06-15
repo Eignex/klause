@@ -258,6 +258,22 @@ data class BacktrackParams(
      */
     val lpRootCutRounds: Int = 16,
     /**
+     * Cut staleness tolerance (#565): end separation at a node once a round improves the LP objective
+     * bound by less than this fraction of `max(1, |bound|)` — diminishing returns. Cuts that no longer
+     * move the bound only cost per-node solve time and starve search (on ghoulomb the aggressive tier
+     * added ~15795 cuts over 24s of a 30s budget for zero prunes while the incumbent regressed). The
+     * first round whose gain falls below the tolerance ends separation for that node. `0.0` disables
+     * the check, separating to [lpCutRounds] / [lpRootCutRounds] as before.
+     */
+    val lpCutMinGain: Double = 1e-3,
+    /**
+     * Hard cap on the total cuts added at one node across all separation rounds (#565) — a backstop on
+     * the per-node solve cost of a large live cut pool (a round's fresh cuts are trimmed to fit, and
+     * reaching the cap ends separation for that node). The staleness check ([lpCutMinGain]) is the
+     * primary control; this only bounds the worst case where each round keeps moving the bound.
+     */
+    val lpMaxCutsPerNode: Int = 2048,
+    /**
      * Persistent global cut pool. When true (and [lpCuts]), the structural separators are run
      * once at the root and the cuts they find are cached and re-added to every node's relaxation,
      * instead of being re-separated per node. These cuts are computed from the root (= declared)
