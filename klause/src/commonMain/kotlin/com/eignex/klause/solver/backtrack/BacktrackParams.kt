@@ -189,6 +189,14 @@ data class BacktrackParams(
      */
     val lpSparseBound: Boolean = false,
     /**
+     * Use the sparse pipeline as the *primary* (bound-only) LP path, skipping the dense Bareiss
+     * tableau entirely. Auto-enabled by [LpAutoConfig] for models that exceed the dense-tableau cap
+     * ([com.eignex.klause.config.KlauseConfig.lpMaxTableauCells]) but fit the sparse cap — the class
+     * the guard otherwise disables LP on (big-M-heavy / bool-dominated COP). Bound-only: no cuts,
+     * reduced-cost fixing, or Farkas (those need the exact dense tableau).
+     */
+    val lpSparsePrimary: Boolean = false,
+    /**
      * Frequency policy for [lpBounding]: solve the LP at one in every [lpBoundEvery] pruning checks
      * rather than at every node, since the LP solve dominates a node's cost. `1` solves at every
      * checked node; larger values trade pruning power for throughput. Must be positive.

@@ -33,6 +33,11 @@ fun klauseConfigFromEnv(base: KlauseConfig = KlauseConfig.current): KlauseConfig
             "KLAUSE_FZN_LP_MAX_TABLEAU_CELLS",
             base.lpMaxTableauCells,
         ),
+        lpSparseMaxTableauCells = long(
+            "klause.fzn.lpSparseMaxTableauCells",
+            "KLAUSE_FZN_LP_SPARSE_MAX_TABLEAU_CELLS",
+            base.lpSparseMaxTableauCells,
+        ),
     )
 }
 

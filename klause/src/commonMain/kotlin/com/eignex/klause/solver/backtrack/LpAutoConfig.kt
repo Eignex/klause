@@ -163,14 +163,18 @@ object LpAutoConfig {
 
         val cutEligible = allDifferent || globalCardinality
         val makespanLp = baseFits && makespanPlans > 0
+        // Structural LP-amenability, independent of the size guard.
+        val structApplicable =
+            lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
+                table || nValue || makespanPlans > 0
         // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
         // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
-        val boundingApplicable = baseFits &&
-            (
-                lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
-                    table || nValue || makespanLp
-                )
+        val boundingApplicable = baseFits && structApplicable
         val bounding = boundingApplicable && config.resolved(LpTechnique.BOUNDING)
+        // Over the dense cap but within the sparse cap: route to the bound-only sparse pipeline (#602)
+        // instead of disabling LP. The sparse path skips the dense tableau the guard protects against.
+        val sparsePrimary = !baseFits && structApplicable && config.resolved(LpTechnique.BOUNDING) &&
+            tableauCells(rows, baseCols) <= KlauseConfig.current.lpSparseMaxTableauCells
 
         // Only structurally-present hulls the emphasis permits compete for the budget (a forbidden
         // hull is never built, so it costs nothing). Each estimate sums over its factors and honours
@@ -193,8 +197,9 @@ object LpAutoConfig {
         val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
-            lpBounding = base.lpBounding || bounding,
-            lpSparseBound = base.lpSparseBound || bounding,
+            lpBounding = base.lpBounding || bounding || sparsePrimary,
+            lpSparseBound = base.lpSparseBound || bounding || sparsePrimary,
+            lpSparsePrimary = base.lpSparsePrimary || sparsePrimary,
             lpCuts = base.lpCuts || cuts,
             lpCutPool = base.lpCutPool || cuts,
             lpLearn = base.lpLearn || bounding,
