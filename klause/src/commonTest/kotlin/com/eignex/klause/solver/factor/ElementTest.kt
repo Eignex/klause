@@ -107,4 +107,57 @@ class ElementTest {
             assertEquals(brute, found, "var-array Element: enumerated set must equal brute force")
         }
     }
+
+    @Test
+    fun `incremental const-array Element with duplicate constants equals brute force`() {
+        // Stresses the reversible support-count path: a constant value held by several positions has
+        // support > 1, so removing one supporting idx position must NOT unsupport the result value
+        // until the last one goes. Wide-ish domains + branching exercise rebuild / delta / cascade
+        // and the trail rollback of the counts across deep backtracking.
+        val arr = intArrayOf(5, 7, 5, 9, 7, 5) // 5×3, 7×2, 9×1
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 12), IntDomain(1, 6)),
+            factors = arrayOf<Factor>(Element(idx = 1, result = 0, arr = arr, arrIsVars = false, indexOffset = 1)),
+        )
+        val brute = HashSet<List<Int>>()
+        for (res in 0..12) {
+            for (idxV in 1..6) {
+                if (res == arr[idxV - 1]) brute.add(listOf(res, idxV))
+            }
+        }
+        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 3L)).take(100_000)
+            .map { it.ints.toList() }.toHashSet()
+        assertEquals(brute, found, "duplicate-constant const Element: enumerated set must equal brute force")
+    }
+
+    @Test
+    fun `two coupled const-array Elements share a result equals brute force`() {
+        // Two const Elements sharing the result var: each fire's prune feeds the other (cross-factor
+        // cascade), and the incremental state of each must stay sound under interleaved push/pop.
+        // result(0) = arrA[idxA(1)] and result(0) = arrB[idxB(2)], overlapping constant sets.
+        val arrA = intArrayOf(2, 4, 6, 4) // values {2,4,6}
+        val arrB = intArrayOf(4, 6, 6, 8) // values {4,6,8}; overlap {4,6}
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(1, 4), IntDomain(1, 4)),
+            factors = arrayOf<Factor>(
+                Element(idx = 1, result = 0, arr = arrA, arrIsVars = false, indexOffset = 1),
+                Element(idx = 2, result = 0, arr = arrB, arrIsVars = false, indexOffset = 1),
+            ),
+        )
+        val brute = HashSet<List<Int>>()
+        for (res in 0..9) {
+            for (ia in 1..4) {
+                for (ib in 1..4) {
+                    if (res == arrA[ia - 1] && res == arrB[ib - 1]) brute.add(listOf(res, ia, ib))
+                }
+            }
+        }
+        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 5L)).take(100_000)
+            .map { it.ints.toList() }.toHashSet()
+        assertEquals(brute, found, "coupled const Elements: enumerated set must equal brute force")
+    }
 }
