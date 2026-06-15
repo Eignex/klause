@@ -363,12 +363,11 @@ class BacktrackSolver(override val problem: Problem) :
         private var energeticCheckCounter = 0
         private var cumulativeFlowCheckCounter = 0
 
-        // Dynamic LP auto-off (#562): if the per-node LP never prunes over a warmup window, disable it
-        // for the rest of this solve — it is pure overhead there (loose / too-expensive bound). Sound:
-        // dropping a bound only loses pruning, never correctness.
-        private var lpDisabled = false
-        private var lpSolveCount = 0
-        private var lpPruneCount = 0
+        // Adaptive LP auto-off (#614, superseding the static #562 one-shot): gate the per-node LP on a
+        // rolling prune-rate window and re-probe a disabled LP on exponential backoff, so a relaxation
+        // that is useless near the root but tightens deeper is recovered. Sound: gating only drops a
+        // bound (loses pruning, never solutions), so `-t` is honoured (the gate only reduces work).
+        private val lpAutoOff = LpAutoOff()
         private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
         private val lpBasisByDepth = ArrayList<Basis?>()
         private var lpHotTableau: DualSimplex? = null
@@ -420,9 +419,10 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                 } -> true
 
-                lpRelaxerL != null && !lpDisabled &&
+                lpRelaxerL != null &&
                     session.decisionLevel <= params.lpBoundMaxDepth &&
-                    ++lpCheckCounter % params.lpBoundEvery == 0 -> {
+                    ++lpCheckCounter % params.lpBoundEvery == 0 &&
+                    lpAutoOff.shouldRun() -> {
                     val depth = session.decisionLevel
                     val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
                         lpBasisByDepth[depth - 1]
@@ -452,9 +452,7 @@ class BacktrackSolver(override val problem: Problem) :
                             )
                         }
                     }
-                    lpSolveCount++
-                    if (outcome.prune) lpPruneCount++
-                    if (lpSolveCount >= LP_AUTO_OFF_WARMUP && lpPruneCount == 0) lpDisabled = true
+                    lpAutoOff.record(outcome.prune)
                     outcome.prune
                 }
 
@@ -906,9 +904,6 @@ class BacktrackSolver(override val problem: Problem) :
         }
     }
 }
-
-/** Node LP-bounding passes with no prune after which the dynamic auto-off (#562) disables LP. */
-private const val LP_AUTO_OFF_WARMUP = 64
 
 /** Ceiling on the adaptive cancellation cadence (nodes between deadline polls). Fast instances
  *  settle here — a few microseconds per check at worst; slow ones adapt below it. See
