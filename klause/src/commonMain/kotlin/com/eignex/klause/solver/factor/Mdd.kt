@@ -2,9 +2,9 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -88,6 +88,15 @@ class Mdd(
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
+
+    /** Advisor subscription (#623): the layered reachability sweep reads each sequence variable's
+     *  bounds (`sym in min..max`), not interior holes, so it wakes on bound moves only — interior
+     *  [IntEvent.VALUE_REMOVED] carves cannot change the reachability bitsets. Consumes the dirty-
+     *  variable delta (#624); the incremental propagator ([MddIncrementalState]) recomputes only the
+     *  layers a changed position reaches. */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+
+    override val consumesIntEventDelta: Boolean = true
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !pathExists(state, -1, 0)
 
@@ -237,208 +246,14 @@ class Mdd(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.composeIntVarAtomAntecedents(intVars)
 
-    /** Cached snapshot of seq domain refs at last successful propagate. When every seq variable's
-     *  IntDomain reference is unchanged, the previous fixpoint still holds and the full sweep is
-     *  skipped. This is a pure fast-path cache, not level state, so it **drifts** across push/pop
-     *  (no longer a [PropagationState.SnapshottablePayload]): after a backtrack its stale refs
-     *  simply fail to match the restored domains, so the fast path misses and a full sweep runs —
-     *  never a false skip. [fwd]/[bwd] are per-fire scratch (refilled from zero each fire). */
-    private class MddState(val cachedSeq: Array<IntDomain?>, var cachedCost: IntDomain?) {
-        var fwd: Array<LongArray>? = null
-        var bwd: Array<LongArray>? = null
-    }
-
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val n = seq.size
-        // Incremental fast path: if nothing relevant has changed since the last fire, the
-        // previous propagator pass already reached fixpoint and we can return immediately.
-        val payload = (state.refPayload[factorId] as? MddState) ?: run {
-            val fresh = MddState(arrayOfNulls(n), null)
+        val inc = (state.refPayload[factorId] as? MddIncrementalState) ?: run {
+            val fresh = MddIncrementalState(
+                state, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
+            )
             state.refPayload[factorId] = fresh
             fresh
         }
-        var changed = false
-        for (i in 0 until n) {
-            if (payload.cachedSeq[i] !== state.intDomains[seq[i]]) {
-                changed = true
-                break
-            }
-        }
-        if (!changed && cost >= 0 && payload.cachedCost !== state.intDomains[cost]) changed = true
-        if (!changed && payload.cachedSeq[0] != null) return true
-        val ant = state.composeIntVarAtomAntecedents(intVars)
-        // Forward reachability: fwd[i] is a packed bitset over [0, numStatesPerLayer[i]).
-        // Each layer stores `(numStates + 63) / 64` longs; bit s tests layer-s reachability.
-        val fwd = payload.fwd ?: Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
-            .also { payload.fwd = it }
-        for (layer in fwd) layer.fill(0L)
-        if (initial < 0 || initial >= numStatesPerLayer[0]) return false
-        fwd[0][initial ushr 6] = fwd[0][initial ushr 6] or (1L shl (initial and 63))
-        for (i in 0 until n) {
-            val sDom = state.intDomains[seq[i]]
-            val numNext = numStatesPerLayer[i + 1]
-            val fwdI = fwd[i]
-            val fwdN = fwd[i + 1]
-            val k = layerStarts[i]
-            val end = layerStarts[i + 1]
-            var p = k
-            while (p < end) {
-                val src = transitions[p]
-                val sym = transitions[p + 1]
-                val dst = transitions[p + 2]
-                if (src >= 0 && src < numStatesPerLayer[i] &&
-                    ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L &&
-                    sym in sDom.min..sDom.max &&
-                    dst in 0 until numNext
-                ) {
-                    fwdN[dst ushr 6] = fwdN[dst ushr 6] or (1L shl (dst and 63))
-                }
-                p += recordStride
-            }
-        }
-        // Check acceptance: any accepting state with its fwd-bit set.
-        var anyAccepting = false
-        for (s in accepting) {
-            if (s in 0 until numStatesPerLayer[n] &&
-                ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L
-            ) {
-                anyAccepting = true
-                break
-            }
-        }
-        if (!anyAccepting) return false
-
-        // Backward reachability.
-        val bwd = payload.bwd ?: Array(n + 1) { LongArray((numStatesPerLayer[it] + 63) ushr 6) }
-            .also { payload.bwd = it }
-        for (layer in bwd) layer.fill(0L)
-        for (s in accepting) {
-            if (s in 0 until numStatesPerLayer[n] &&
-                ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L
-            ) {
-                bwd[n][s ushr 6] = bwd[n][s ushr 6] or (1L shl (s and 63))
-            }
-        }
-        for (i in n - 1 downTo 0) {
-            val sDom = state.intDomains[seq[i]]
-            val numI = numStatesPerLayer[i]
-            val numN = numStatesPerLayer[i + 1]
-            val bwdI = bwd[i]
-            val bwdN = bwd[i + 1]
-            val fwdI = fwd[i]
-            val k = layerStarts[i]
-            val end = layerStarts[i + 1]
-            var p = k
-            while (p < end) {
-                val src = transitions[p]
-                val sym = transitions[p + 1]
-                val dst = transitions[p + 2]
-                if (src in 0 until numI && dst in 0 until numN &&
-                    ((bwdN[dst ushr 6] ushr (dst and 63)) and 1L) != 0L &&
-                    ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L &&
-                    sym in sDom.min..sDom.max
-                ) {
-                    bwdI[src ushr 6] = bwdI[src ushr 6] or (1L shl (src and 63))
-                }
-                p += recordStride
-            }
-        }
-        // Prune seq[i] values that have no fwd∩bwd transition.
-        for (i in 0 until n) {
-            val sDom = state.intDomains[seq[i]]
-            val span = sDom.max - sDom.min + 1
-            val survives = LongArray((span + 63) ushr 6)
-            val numI = numStatesPerLayer[i]
-            val numN = numStatesPerLayer[i + 1]
-            val fwdI = fwd[i]
-            val bwdN = bwd[i + 1]
-            val k = layerStarts[i]
-            val end = layerStarts[i + 1]
-            var p = k
-            while (p < end) {
-                val src = transitions[p]
-                val sym = transitions[p + 1]
-                val dst = transitions[p + 2]
-                if (sym in sDom.min..sDom.max &&
-                    src in 0 until numI &&
-                    ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L &&
-                    dst in 0 until numN &&
-                    ((bwdN[dst ushr 6] ushr (dst and 63)) and 1L) != 0L
-                ) {
-                    val off = sym - sDom.min
-                    survives[off ushr 6] = survives[off ushr 6] or (1L shl (off and 63))
-                }
-                p += recordStride
-            }
-            for (s in sDom.min..sDom.max) {
-                val off = s - sDom.min
-                if (((survives[off ushr 6] ushr (off and 63)) and 1L) == 0L) {
-                    if (!state.excludeIntValue(seq[i], s, ant)) return false
-                }
-            }
-        }
-
-        if (cost >= 0) {
-            // Compute min/max path cost over fwd∩bwd reachable graph.
-            val inf = Long.MAX_VALUE / 4
-            val minCost = Array(n + 1) { LongArray(numStatesPerLayer[it]) { inf } }
-            val maxCost = Array(n + 1) { LongArray(numStatesPerLayer[it]) { -inf } }
-            minCost[0][initial] = 0L
-            maxCost[0][initial] = 0L
-            for (i in 0 until n) {
-                val sDom = state.intDomains[seq[i]]
-                val numI = numStatesPerLayer[i]
-                val numN = numStatesPerLayer[i + 1]
-                val fwdI = fwd[i]
-                val fwdN = fwd[i + 1]
-                var p = layerStarts[i]
-                val end = layerStarts[i + 1]
-                while (p < end) {
-                    val src = transitions[p]
-                    val sym = transitions[p + 1]
-                    val dst = transitions[p + 2]
-                    val w = transitions[p + 3].toLong()
-                    if (sym in sDom.min..sDom.max &&
-                        src in 0 until numI &&
-                        ((fwdI[src ushr 6] ushr (src and 63)) and 1L) != 0L &&
-                        dst in 0 until numN &&
-                        ((fwdN[dst ushr 6] ushr (dst and 63)) and 1L) != 0L
-                    ) {
-                        val nm = minCost[i][src] + w
-                        if (nm < minCost[i + 1][dst]) minCost[i + 1][dst] = nm
-                        val nM = maxCost[i][src] + w
-                        if (nM > maxCost[i + 1][dst]) maxCost[i + 1][dst] = nM
-                    }
-                    p += recordStride
-                }
-            }
-            var bestLo = inf
-            var bestHi = -inf
-            for (s in accepting) {
-                if (s in 0 until numStatesPerLayer[n] &&
-                    ((fwd[n][s ushr 6] ushr (s and 63)) and 1L) != 0L
-                ) {
-                    if (minCost[n][s] < bestLo) bestLo = minCost[n][s]
-                    if (maxCost[n][s] > bestHi) bestHi = maxCost[n][s]
-                }
-            }
-            if (bestLo == inf) return false
-            // Cost var is Int-typed: if the min path cost exceeds Int.MAX_VALUE (or the max
-            // path cost is below Int.MIN_VALUE), the constraint is unsatisfiable. Clamping
-            // bestLo down to Int.MAX_VALUE would otherwise leave Int.MAX_VALUE in the domain
-            // as a spurious feasible value.
-            if (bestLo > Int.MAX_VALUE.toLong()) return false
-            if (bestHi < Int.MIN_VALUE.toLong()) return false
-            val loBound = if (bestLo < Int.MIN_VALUE.toLong()) Int.MIN_VALUE else bestLo.toInt()
-            val hiBound = if (bestHi > Int.MAX_VALUE.toLong()) Int.MAX_VALUE else bestHi.toInt()
-            if (!state.tightenIntMin(cost, loBound, ant)) return false
-            if (!state.tightenIntMax(cost, hiBound, ant)) return false
-        }
-        // Record the post-propagation domain refs so the next fire can skip a redundant
-        // sweep. Any pruning above will have produced fresh IntDomain refs in state.intDomains;
-        // capture them after all tightening so the fast path only fires on a real no-op.
-        for (i in 0 until n) payload.cachedSeq[i] = state.intDomains[seq[i]]
-        if (cost >= 0) payload.cachedCost = state.intDomains[cost]
-        return true
+        return inc.propagate(state, factorId)
     }
 }
