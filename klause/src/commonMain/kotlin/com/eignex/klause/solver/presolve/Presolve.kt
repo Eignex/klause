@@ -430,8 +430,12 @@ object Presolve {
         }
         val g = gcdOf(coeffs)
         val map = HashMap<Int, Int>(f.vars.size)
-        // Coalesced Linear has distinct vars, so a plain put per index is faithful.
-        for (i in f.vars.indices) map[f.vars[i]] = if (g <= 1) coeffs[i] else coeffs[i] / g
+        // Coalesced Linear has distinct vars, so a plain put per index is faithful. Zero coefficients
+        // carry no support and would otherwise divide by zero in the dominance ratio check, so skip them.
+        for (i in f.vars.indices) {
+            if (coeffs[i] == 0) continue
+            map[f.vars[i]] = if (g <= 1) coeffs[i] else coeffs[i] / g
+        }
         return LeRow(factorIndex, map, if (g <= 1) bound else bound.floorDiv(g.toLong()))
     }
 
