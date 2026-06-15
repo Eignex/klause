@@ -82,6 +82,21 @@ data class SolveStats(
     val lagrangianPruned: SumResult = ZERO_COUNT,
     /** Nodes pruned by the Cumulative energetic-reasoning check (#22/#23). */
     val energeticPruned: SumResult = ZERO_COUNT,
+    /** Local-search moves applied (bool flips / int sets / compounds + restart work units) — the LS
+     *  analogue of [nodes], and the denominator for moves-per-second. Zero for complete backends. */
+    val moves: SumResult = ZERO_COUNT,
+    /** Local-search descents that hit a local optimum / plateau and triggered a restart — the stall rate
+     *  against [moves] tells whether the search is making progress or thrashing. */
+    val stalls: SumResult = ZERO_COUNT,
+    /** Wall ms from solve start to when the best incumbent was found, or -1 when no incumbent was
+     *  established. Against [wallMs] this is the anytime profile: a small ratio means the search found its
+     *  best early and spent the rest stuck. */
+    val timeToBestMs: Long = -1L,
+    /** Objective value at the best incumbent the LS engine reached, or NaN when none was feasible. */
+    val incumbentObjective: Double = Double.NaN,
+    /** Total constraint violation (LS cost) at the best incumbent: 0 once feasible, else the lowest
+     *  residual cost reached — how close an infeasible run got. NaN when unpopulated. */
+    val incumbentViolation: Double = Double.NaN,
     val peakDepth: MaxResult = NO_MAX,
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     val wallMs: Long = 0L,
@@ -133,6 +148,28 @@ data class SolveStats(
             lpSeeded = SumResult(lpSeeded.sum + other.lpSeeded.sum),
             lagrangianPruned = SumResult(lagrangianPruned.sum + other.lagrangianPruned.sum),
             energeticPruned = SumResult(energeticPruned.sum + other.energeticPruned.sum),
+            moves = SumResult(moves.sum + other.moves.sum),
+            stalls = SumResult(stalls.sum + other.stalls.sum),
+            // Earliest time-to-best across workers (the portfolio reports the first to reach its best);
+            // -1 sentinels defer to any real reading.
+            timeToBestMs = when {
+                timeToBestMs < 0L -> other.timeToBestMs
+                other.timeToBestMs < 0L -> timeToBestMs
+                else -> minOf(timeToBestMs, other.timeToBestMs)
+            },
+            // Keep the incumbent fingerprint from whichever worker got closer to feasibility (lower
+            // violation); direction-agnostic so it's sound for both minimise and maximise. NaN defers.
+            incumbentObjective = pickByViolation(
+                incumbentViolation,
+                incumbentObjective,
+                other.incumbentViolation,
+                other.incumbentObjective,
+            ),
+            incumbentViolation = when {
+                incumbentViolation.isNaN() -> other.incumbentViolation
+                other.incumbentViolation.isNaN() -> incumbentViolation
+                else -> minOf(incumbentViolation, other.incumbentViolation)
+            },
             peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
             depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
             wallMs = maxOf(wallMs, other.wallMs),
@@ -144,6 +181,15 @@ data class SolveStats(
     companion object {
         internal val ZERO_COUNT: SumResult = SumResult(sum = 0.0)
         internal val NO_MAX: MaxResult = MaxResult(Double.NEGATIVE_INFINITY)
+
+        /** Of two (violation, objective) pairs, return the objective paired with the lower violation
+         *  (closer to feasible); NaN violation defers to the other side, ties keep the left objective. */
+        private fun pickByViolation(violA: Double, objA: Double, violB: Double, objB: Double): Double = when {
+            violA.isNaN() -> objB
+            violB.isNaN() -> objA
+            violB < violA -> objB
+            else -> objA
+        }
 
         /** Empty stats — the default for backends that don't populate. */
         val EMPTY: SolveStats = SolveStats()
@@ -180,6 +226,15 @@ internal class SolveStatsSink(val backend: String) {
     val energeticPruned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
+
+    // Plain accumulators rather than CountStat: move counts reach the millions, so per-event
+    // CountStat.update would be pure overhead — the LS loop sets these in bulk.
+    private var lsMoves: Long = 0L
+    private var lsRestarts: Long = 0L
+    private var lsStalls: Long = 0L
+    private var lsTimeToBestMs: Long = -1L
+    private var lsIncumbentObjective: Double = Double.NaN
+    private var lsIncumbentViolation: Double = Double.NaN
 
     private var startMark: TimeMark? = null
     private var endElapsedMs: Long? = null
@@ -313,6 +368,25 @@ internal class SolveStatsSink(val backend: String) {
         energeticPruned.update(1.0)
     }
 
+    /** Record the LS engine's move / restart / stall totals in one call at loop exit; cheaper than
+     *  per-event updates when moves run to the millions. */
+    fun recordLsWork(moves: Long, restarts: Long, stalls: Long) {
+        lsMoves = moves
+        lsRestarts = restarts
+        lsStalls = stalls
+    }
+
+    /** Record the LS incumbent fingerprint: its objective (NaN if never feasible), its residual
+     *  violation (0 once feasible), and the wall ms at which it was found (-1 if no incumbent). */
+    fun recordLsIncumbent(objective: Double, violation: Double, foundAtMs: Long) {
+        lsIncumbentObjective = objective
+        lsIncumbentViolation = violation
+        lsTimeToBestMs = foundAtMs
+    }
+
+    /** Elapsed ms since [start] — used by the LS loop to stamp time-to-best as incumbents land. */
+    fun elapsedMs(): Long = startMark?.elapsedNow()?.inWholeMilliseconds ?: 0L
+
     /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
      *  uses the most recent [start] / [stop] window; if [stop] hasn't been called yet, we
      *  read the elapsed time from now. */
@@ -324,7 +398,9 @@ internal class SolveStatsSink(val backend: String) {
             backend = backend,
             nodes = nodes.read(),
             fails = fails.read(),
-            restarts = restarts.read(),
+            // LS folds its restart count in here (it never touches the CountStat path); complete
+            // backends report their own restarts CountStat.
+            restarts = if (lsRestarts > 0L) SumResult(lsRestarts.toDouble()) else restarts.read(),
             propagations = propagations.read(),
             learnedClauses = learnedClauses.read(),
             relearned = relearned.read(),
@@ -343,6 +419,11 @@ internal class SolveStatsSink(val backend: String) {
             lpSeeded = lpSeeded.read(),
             lagrangianPruned = lagrangianPruned.read(),
             energeticPruned = energeticPruned.read(),
+            moves = SumResult(lsMoves.toDouble()),
+            stalls = SumResult(lsStalls.toDouble()),
+            timeToBestMs = lsTimeToBestMs,
+            incumbentObjective = lsIncumbentObjective,
+            incumbentViolation = lsIncumbentViolation,
             peakDepth = peakDepth.read(),
             depthMean = depthMean.read(),
             wallMs = elapsedMs,

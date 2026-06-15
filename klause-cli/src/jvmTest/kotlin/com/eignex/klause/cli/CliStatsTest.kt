@@ -62,4 +62,74 @@ class CliStatsTest {
         assertEquals("4", m["lpEnergeticPruned"])
         assertTrue("lpRootBound" !in m, "no root bound when the LP never solved")
     }
+
+    @Test
+    fun `no ls activity emits nothing`() {
+        assertTrue(lsStatPairs(SolveStats.EMPTY).isEmpty())
+        // A complete backend that never ran LS: nothing in the LS block.
+        assertTrue(lsStatPairs(SolveStats(backend = "backtrack", nodes = SumResult(10.0))).isEmpty())
+    }
+
+    @Test
+    fun `ls backend emits the block even before any move`() {
+        // An LS solve that found feasibility immediately still identifies as the LS engine.
+        val pairs = lsStatPairs(SolveStats(backend = "ls"))
+        assertTrue(pairs.isNotEmpty())
+        assertEquals("0", pairs.toMap()["lsMoves"])
+    }
+
+    @Test
+    fun `every emitted key is ls-prefixed`() {
+        val stats = SolveStats(
+            backend = "ls",
+            moves = SumResult(1000.0),
+            restarts = SumResult(5.0),
+            stalls = SumResult(3.0),
+            timeToBestMs = 500L,
+            incumbentObjective = 12.0,
+            incumbentViolation = 0.0,
+            wallMs = 2000L,
+        )
+        val pairs = lsStatPairs(stats)
+        assertTrue(pairs.isNotEmpty())
+        for ((k, _) in pairs) assertTrue(k.startsWith("ls"), "key not ls-prefixed: $k")
+    }
+
+    @Test
+    fun `derived ls rates and incumbent are correct`() {
+        val stats = SolveStats(
+            backend = "ls",
+            moves = SumResult(1000.0),
+            restarts = SumResult(5.0),
+            stalls = SumResult(3.0),
+            timeToBestMs = 500L,
+            incumbentObjective = 12.0,
+            incumbentViolation = 0.0,
+            wallMs = 2000L,
+        )
+        val m = lsStatPairs(stats).toMap()
+        assertEquals("1000", m["lsMoves"])
+        assertEquals("5", m["lsRestarts"])
+        assertEquals("3", m["lsStalls"])
+        assertEquals("500", m["lsMovesPerSec"]) // 1000 / (2000ms = 2s)
+        assertEquals("0.5", m["lsTimeToBest"]) // 500ms
+        assertEquals("12", m["lsIncumbentObjective"])
+        assertEquals("0", m["lsIncumbentViolation"])
+    }
+
+    @Test
+    fun `infeasible ls run reports residual violation and no objective`() {
+        val stats = SolveStats(backend = "ls", moves = SumResult(800.0), incumbentViolation = 7.0)
+        val m = lsStatPairs(stats).toMap()
+        assertEquals("7", m["lsIncumbentViolation"])
+        assertTrue("lsIncumbentObjective" !in m, "no objective when never feasible")
+        assertTrue("lsTimeToBest" !in m, "no time-to-best when no incumbent")
+    }
+
+    @Test
+    fun `mixed portfolio with ls moves still emits the ls block`() {
+        val stats = SolveStats(backend = "mixed", moves = SumResult(42.0))
+        assertTrue(lsStatPairs(stats).isNotEmpty())
+        assertEquals("42", lsStatPairs(stats).toMap()["lsMoves"])
+    }
 }

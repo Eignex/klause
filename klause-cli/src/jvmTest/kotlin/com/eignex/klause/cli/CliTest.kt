@@ -186,13 +186,21 @@ class CliTest {
             writeText("var 1..9: x;\nsolve maximize x;\n")
             deleteOnExit()
         }
-        val satOut = capture { main(arrayOf("-s", sat.absolutePath)) }
-        assertTrue("%%%mzn-stat: solveTime=" in satOut, satOut)
-        assertTrue("%%%mzn-stat: solutions=1" in satOut, satOut)
-        assertTrue("%%%mzn-stat: nodes=" in satOut, satOut)
-        assertTrue("%%%mzn-stat-end" in satOut, satOut)
+        // Complete engine: the CP/CDCL counter schema (nodes/failures/...).
+        val cpOut = capture { main(arrayOf("-s", "-e", "cp", sat.absolutePath)) }
+        assertTrue("%%%mzn-stat: solveTime=" in cpOut, cpOut)
+        assertTrue("%%%mzn-stat: solutions=1" in cpOut, cpOut)
+        assertTrue("%%%mzn-stat: nodes=" in cpOut, cpOut)
+        assertTrue("%%%mzn-stat-end" in cpOut, cpOut)
         // The stats block must come after the protocol terminator, not between solutions.
-        assertTrue(satOut.indexOf("==========") < satOut.indexOf("%%%mzn-stat:"), satOut)
+        assertTrue(cpOut.indexOf("==========") < cpOut.indexOf("%%%mzn-stat:"), cpOut)
+
+        // Local search: the native LS schema (lsMoves/...), and none of the CP zero counters.
+        val lsOut = capture { main(arrayOf("-s", "-e", "ls", sat.absolutePath)) }
+        assertTrue("%%%mzn-stat: solutions=1" in lsOut, lsOut)
+        assertTrue("%%%mzn-stat: lsMoves=" in lsOut, lsOut)
+        assertTrue("%%%mzn-stat: nodes=" !in lsOut, lsOut)
+        assertTrue("%%%mzn-stat-end" in lsOut, lsOut)
 
         val optOut = capture { main(arrayOf("-s", opt.absolutePath)) }
         assertTrue("%%%mzn-stat: solutions=" in optOut, optOut)
