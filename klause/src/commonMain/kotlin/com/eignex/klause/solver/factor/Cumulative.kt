@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortByIntKey
@@ -136,6 +137,16 @@ class Cumulative(
             out
         }
     }
+
+    /**
+     * Advisor subscription (#623): cumulative propagation (mandatory profile + Θ-tree edge-finding)
+     * reads only each variable's `min`/`max` — start bounds drive the profile/edge-finding, and
+     * duration/resource/capacity vars are consulted only once fixed (`d.min == d.max`). It never
+     * inspects interior holes, so it subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on
+     * every integer variable and skips interior `VALUE_REMOVED` wakes. Presence is carried by Boolean
+     * variables, which keep their separate two-watched-literal wakeup.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     private val n: Int = starts.size
 

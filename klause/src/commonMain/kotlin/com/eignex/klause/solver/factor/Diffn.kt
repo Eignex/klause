@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
@@ -65,6 +66,14 @@ class Diffn(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray)
+
+    /**
+     * Advisor subscription (#623): non-overlap propagation reads only each coordinate/size variable's
+     * `min`/`max` (the "must-overlap on one axis ⇒ separate on the other" reasoning is pure interval
+     * arithmetic). An interior hole moves no bound, so it subscribes to [IntEvent.LB_RAISED] /
+     * [IntEvent.UB_LOWERED] per variable and skips interior `VALUE_REMOVED` wakes.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     /** Whether the search can resize rectangles (var dimensions present). */
     private val varSize: Boolean = widthVars != null || heightVars != null
