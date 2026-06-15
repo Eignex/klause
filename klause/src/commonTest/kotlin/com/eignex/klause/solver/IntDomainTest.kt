@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -285,5 +286,61 @@ class IntDomainTest {
         d = d.excludeValue(3)
         assertEquals(1, d.size)
         assertFails { d.excludeValue(1) }
+    }
+
+    @Test
+    fun `excludeValues empty list is identity`() {
+        val d = IntDomain(1, 5)
+        assertTrue(d.excludeValues(IntArray(0)) === d)
+    }
+
+    @Test
+    fun `excludeValues with no present value is identity`() {
+        val d = IntDomain(1, 5).excludeValue(3)
+        assertTrue(d.excludeValues(intArrayOf(-1, 0, 3, 6, 9)) === d, "all absent → same instance")
+    }
+
+    @Test
+    fun `excludeValues emptying the domain returns null`() {
+        assertEquals(null, IntDomain(2, 4).excludeValues(intArrayOf(2, 3, 4)))
+    }
+
+    @Test
+    fun `excludeValues matches folding excludeValue across reps`() {
+        // Cover contiguous, bitset-span (<= threshold) and wide-holes domains, plus
+        // edge-only, interior-only and mixed exclusion sets — the result must equal
+        // (by membership) folding excludeValue over the same sorted list.
+        val rng = Random(0xE7C1)
+        repeat(400) {
+            val lo = rng.nextInt(-20, 20)
+            val width = rng.nextInt(2, 600) // straddles BITSET_THRESHOLD (256)
+            val hi = lo + width
+            val base = IntDomain(lo, hi)
+            // Pick a sorted, distinct subset of [lo, hi] to exclude.
+            val picked = sortedSetOf<Int>()
+            val k = rng.nextInt(0, width + 2)
+            repeat(k) { picked.add(rng.nextInt(lo, hi + 1)) }
+            val values = picked.toIntArray()
+
+            val folded = run {
+                var d: IntDomain? = base
+                for (v in values) {
+                    val cur = d ?: break
+                    d = if (cur.size == 1 && v in cur) null else cur.excludeValue(v)
+                }
+                d
+            }
+            val bulk = base.excludeValues(values)
+
+            if (folded == null) {
+                assertEquals(null, bulk, "values=${values.toList()} on $base should empty")
+            } else {
+                assertEquals(folded, bulk, "values=${values.toList()} on $base")
+                // equals() is membership-based across reps; also spot-check size + bounds.
+                assertEquals(folded.size, bulk!!.size)
+                assertEquals(folded.min, bulk.min)
+                assertEquals(folded.max, bulk.max)
+            }
+        }
     }
 }

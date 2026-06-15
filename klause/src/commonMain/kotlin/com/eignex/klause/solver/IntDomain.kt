@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -215,6 +216,54 @@ class IntDomain private constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Return a domain with every value in [values] excluded, `this` if none are present
+     * (idempotent), or `null` when excluding them all would empty the domain.
+     *
+     * [values] must be sorted ascending and distinct; entries outside `min..max` or already
+     * absent are ignored. Equivalent to folding [excludeValue] over [values], but merges in a
+     * single `O(domain + values)` pass instead of rebuilding the hole list once per value —
+     * the latter is `O(domain^2)` over a wide sparse domain and was the bake-time wedge in #599.
+     *
+     * The result's representation is chosen from the final span exactly as [excludeValue]'s
+     * transition rule would (bitset when the surviving span fits [BITSET_THRESHOLD], else
+     * holes). Only the value *set* is contractual: [equals] compares by membership, so the rep
+     * choice is immaterial to callers.
+     */
+    fun excludeValues(values: IntArray): IntDomain? {
+        if (values.isEmpty()) return this
+        // Merge the ascending present values against the ascending exclusions, keeping survivors.
+        val survivors = IntArrayList()
+        var j = 0
+        forEach { p ->
+            while (j < values.size && values[j] < p) j++
+            if (j < values.size && values[j] == p) j++ else survivors.add(p)
+        }
+        if (survivors.size == size) return this // nothing present was excluded
+        if (survivors.size == 0) return null // domain emptied
+        val newMin = survivors[0]
+        val newMax = survivors[survivors.size - 1]
+        val span = newMax - newMin + 1
+        if (survivors.size == span) return IntDomain(newMin, newMax) // gap-free → contiguous
+        if (span <= BITSET_THRESHOLD) {
+            val bits = LongArray((span + 63) ushr 6)
+            for (i in 0 until survivors.size) setBit(bits, survivors[i] - newMin)
+            return IntDomain(newMin, newMax, null, bits, newMin)
+        }
+        val newHoles = IntArray(span - survivors.size)
+        var hi = 0
+        var expect = newMin
+        for (i in 0 until survivors.size) {
+            val s = survivors[i]
+            while (expect < s) {
+                newHoles[hi++] = expect
+                expect++
+            }
+            expect = s + 1
+        }
+        return IntDomain(newMin, newMax, newHoles, null, 0)
     }
 
     private fun excludeFromBitset(value: Int, bs: LongArray): IntDomain {
