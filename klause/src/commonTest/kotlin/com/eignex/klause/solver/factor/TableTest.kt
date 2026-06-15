@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -77,12 +78,12 @@ class TableTest {
 
     @Test
     fun `backtrack enumeration equals the in-domain tuple set`() {
-        // Soundness gate for the unchanged-domains fast path: enumerating fires propagate
-        // repeatedly on one PropagationState — fast-path hits on no-op re-fires, misses when a
-        // decision shrinks a column — across push/pop that snapshot/restore the cached domain
-        // refs. An unsound skip (returning satisfied when a value should have been pruned) would
-        // let a forbidden tuple through, so the enumerated set must equal the brute-force set of
-        // allowed rows that lie within the domains.
+        // Soundness gate for the reversible, delta-driven STR2 sweep: enumerating fires propagate
+        // repeatedly on one PropagationState — the delta fast path skips no-op re-fires, a column
+        // shrink re-wakes the sweep — across push/pop that restore the reversible live-set size
+        // (numValid). An unsound skip (returning satisfied when a value should have been pruned)
+        // would let a forbidden tuple through, so the enumerated set must equal the brute-force set
+        // of allowed rows that lie within the domains.
         data class Inst(val arity: Int, val lo: Int, val hi: Int, val tuples: List<List<Int>>)
         val instances = listOf(
             Inst(2, 0, 3, listOf(listOf(0, 1), listOf(2, 3), listOf(1, 1))),
@@ -103,6 +104,42 @@ class TableTest {
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { it.ints.toList() }.toHashSet()
             assertEquals(brute, found, "table instance #$idx: enumerated solutions must equal in-domain tuples")
+        }
+    }
+
+    @Test
+    fun `randomized tables enumerate exactly the in-domain tuple set across deep backtracking`() {
+        // Stresses the reversible STR2 sparse set + delta-driven re-sweep: random tables (varied
+        // arity, value span and row count) enumerated under CDCL, which branches/prunes/backtracks
+        // deeply — the live-set swap-removals must roll back exactly via numValid, and the delta must
+        // re-wake the sweep on every column shrink. The enumerated set must equal the in-domain rows.
+        val rng = Random(0x7AB1E)
+        repeat(80) { trial ->
+            val arity = rng.nextInt(2, 5)
+            val lo = 0
+            val hi = rng.nextInt(1, 4)
+            val numRows = rng.nextInt(1, 9)
+            val rows = ArrayList<List<Int>>(numRows)
+            repeat(numRows) { rows.add(List(arity) { rng.nextInt(lo, hi + 1) }) }
+            val flat = IntArray(rows.size * arity)
+            rows.forEachIndexed { r, t -> for (c in 0 until arity) flat[r * arity + c] = t[c] }
+            // Per-column random subdomain (still within [lo, hi]) to force pruning + cascades.
+            val cdom = Array(arity) {
+                val a = rng.nextInt(lo, hi + 1);
+                val b = rng.nextInt(a, hi + 1);
+                a to b
+            }
+            val brute = rows.filter { t -> t.indices.all { c -> t[c] in cdom[c].first..cdom[c].second } }
+                .map { it.toList() }.toHashSet()
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = arity,
+                intDomains = Array(arity) { IntDomain(cdom[it].first, cdom[it].second) },
+                factors = arrayOf<Factor>(Table(xs = IntArray(arity) { it }, tuples = flat)),
+            )
+            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = (trial + 1).toLong()))
+                .take(100_000).map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "trial #$trial (arity=$arity hi=$hi rows=$numRows): must equal in-domain tuples")
         }
     }
 }
