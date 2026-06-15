@@ -220,10 +220,16 @@ internal fun BacktrackSolver.lpBoundAndFix(
     cancellation: Cancellation,
 ): LpNodeOutcome = try {
     sink.lpClockStart()
-    lpBoundAndFixUnsafe(
-        relaxer, session, bound, sink, warmBasis, params, separators, hints,
-        objectiveVar, objectiveAscending, globalCuts, seedTableau, cancellation,
-    )
+    if (params.lpSparsePrimary) {
+        // Over the dense-tableau cap (#602): take the bound-only sparse pipeline directly, never
+        // allocating the dense tableau the guard protects against.
+        sparseCertifiedPrune(relaxer, session, bound, globalCuts, sink, cancellation)
+    } else {
+        lpBoundAndFixUnsafe(
+            relaxer, session, bound, sink, warmBasis, params, separators, hints,
+            objectiveVar, objectiveAscending, globalCuts, seedTableau, cancellation,
+        )
+    }
 } catch (_: LpOverflowException) {
     // Determinant growth (large cut coefficients especially, #18) can exceed 64 bits. Instead of
     // dropping the bound, recover a sound one via the float revised simplex + exact BigInt

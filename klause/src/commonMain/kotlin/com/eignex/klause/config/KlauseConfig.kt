@@ -26,6 +26,12 @@ const val DEFAULT_FLOAT_SCALE: Long = 1_000_000L
  *  bigger relaxations; the bound stays sound either way, so the ceiling is purely a cost guard. */
 const val DEFAULT_LP_MAX_TABLEAU_CELLS: Long = 1L shl 20
 
+/** Default ceiling for routing an over-dense-cap model to the *sparse* LP pipeline (float revised
+ *  simplex + exact certify) as a bound-only fallback, instead of disabling LP entirely. Larger than
+ *  [DEFAULT_LP_MAX_TABLEAU_CELLS] since the sparse path does not allocate the dense tableau; still
+ *  bounded so a pathologically huge model isn't built. Purely a cost guard (the bound is sound). */
+const val DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS: Long = 1L shl 26
+
 /**
  * Central, process-wide configuration for klause's core (compiler + frontends).
  *
@@ -84,6 +90,11 @@ data class KlauseConfig(
      *  the bound is always sound — so raising it trades node throughput for LP reach on big models.
      *  Env: `KLAUSE_FZN_LP_MAX_TABLEAU_CELLS` / `klause.fzn.lpMaxTableauCells`. */
     val lpMaxTableauCells: Long = DEFAULT_LP_MAX_TABLEAU_CELLS,
+
+    /** Ceiling for routing an over-[lpMaxTableauCells] model to the sparse LP pipeline as a bound-only
+     *  fallback rather than disabling LP (see [DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS]).
+     *  Env: `KLAUSE_FZN_LP_SPARSE_MAX_TABLEAU_CELLS` / `klause.fzn.lpSparseMaxTableauCells`. */
+    val lpSparseMaxTableauCells: Long = DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS,
 
     // Presolve: an emphasis level plus one tri-state override knob per pass (`true` forces the pass
     // on, `false` off, `null` defers to the emphasis). Assembled into a [PresolveConfig] via

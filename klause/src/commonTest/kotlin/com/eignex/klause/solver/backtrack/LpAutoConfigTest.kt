@@ -47,16 +47,25 @@ class LpAutoConfigTest {
 
     @Test
     fun `the configurable tableau cap gates auto bounding`() {
-        // #570: KlauseConfig.lpMaxTableauCells is the env-tunable dense-tableau ceiling. A tiny cap
-        // disables auto LP even on linear structure; a huge cap re-enables it. The bound is sound
-        // either way — this is purely the cost guard.
+        // KlauseConfig.lpMaxTableauCells is the env-tunable dense-tableau ceiling; a huge cap takes
+        // the dense path. Over the dense cap but within the sparse cap (#602) routes to the bound-only
+        // sparse path instead of disabling LP; both caps tiny disables it. The bound is sound in all
+        // cases — purely a cost guard.
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
         val saved = KlauseConfig.current
         try {
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L)
-            assertFalse(LpAutoConfig.recommend(p).lpBounding, "a 1-cell cap must disable auto LP")
             KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
-            assertTrue(LpAutoConfig.recommend(p).lpBounding, "an unbounded cap must enable auto LP")
+            LpAutoConfig.recommend(p).let {
+                assertTrue(it.lpBounding, "an unbounded cap must enable dense auto LP")
+                assertFalse(it.lpSparsePrimary, "under the dense cap, the dense path is used")
+            }
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            LpAutoConfig.recommend(p).let {
+                assertTrue(it.lpBounding, "over the dense cap but within the sparse cap, LP routes to sparse")
+                assertTrue(it.lpSparsePrimary, "a 1-cell dense cap must route to the sparse primary path")
+            }
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = 1L)
+            assertFalse(LpAutoConfig.recommend(p).lpBounding, "both caps tiny must disable auto LP")
         } finally {
             KlauseConfig.current = saved
         }
@@ -240,20 +249,33 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `oversized model declines the lp family but keeps the structure-capped bounds`() {
-        // 2000 unit rows over 2000 vars estimate a dense tableau of ~8M cells — past the auto
-        // guard — so the LP-relaxation flags stay off; the Lagrangian/energetic bounds (own
-        // internal caps) are not size-gated.
+    fun `oversized model routes LP to the sparse bound-only path and keeps structure-capped bounds`() {
+        // 2000 unit rows over 2000 vars estimate a dense tableau of ~8M cells — past the dense cap
+        // but within the sparse cap — so LP routes to the bound-only sparse path (#602): bounding on,
+        // cuts/probe off. The Lagrangian/energetic bounds (own internal caps) are not size-gated.
         val n = 2000
         val factors = ArrayList<Factor>(n + 1)
         repeat(n) { i -> factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, 0)) }
         factors.add(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6))
         val p = Problem(0, n, Array(n) { IntDomain(0, 5) }, factors.toTypedArray())
         val r = LpAutoConfig.recommend(p)
-        assertFalse(r.lpBounding)
+        assertTrue(r.lpSparsePrimary)
+        assertTrue(r.lpBounding)
         assertFalse(r.lpCuts)
         assertFalse(r.lpProbe)
         assertTrue(r.lagrangian)
+
+        // Past the sparse cap too ⇒ the LP family fully declines; the Lagrangian still runs.
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = 1L)
+            val off = LpAutoConfig.recommend(p)
+            assertFalse(off.lpBounding)
+            assertFalse(off.lpSparsePrimary)
+            assertTrue(off.lagrangian)
+        } finally {
+            KlauseConfig.current = saved
+        }
     }
 
     @Test
