@@ -173,6 +173,10 @@ class Problem(
      *  and [nonIntEventWatcherIntOccurrences] aliases [intOccurrences]. */
     val usesIntEventWatchers: Boolean = factors.any { it.initialIntEventWatches != null }
 
+    /** True iff some factor consumes the per-factor dirty-variable delta ([Factor.consumesIntEventDelta]).
+     *  When false the engine allocates no delta accumulators and the dirty-var bookkeeping is skipped. */
+    val usesIntEventDeltaConsumers: Boolean = factors.any { it.consumesIntEventDelta }
+
     /**
      * [intOccurrences] minus, per variable, the factors that subscribe to a typed int-event on
      * *that* variable (see [Factor.initialIntEventWatches]). The propagation engine walks this list

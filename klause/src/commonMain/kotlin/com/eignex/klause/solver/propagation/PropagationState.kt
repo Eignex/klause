@@ -438,6 +438,25 @@ class PropagationState(
         }
 
     /**
+     * Per-factor dirty-variable delta accumulator (#624): for each [com.eignex.klause.solver.Factor]
+     * with [com.eignex.klause.solver.Factor.consumesIntEventDelta], the subscribed variables that
+     * fired since the consumer last drained. [enqueueForIntChange] appends a variable when it wakes
+     * the consumer via the advisor index ([eventDirtyMark] deduplicates), and
+     * [drainIntEventDirtyVars] returns and clears the set on a fire.
+     *
+     * **Drift-tolerant superset.** It is never cleared on backtrack, so after a pop it may list a
+     * variable whose change was undone — harmless, because the consumer diffs its own reversible
+     * baseline and finds no change for a stale variable. It is therefore always a *superset* of
+     * "changed since this consumer last fired": no real change is ever missed (every change to a
+     * subscribed variable wakes the consumer and appends), which is the soundness-critical direction.
+     * `null` per non-consuming factor; both arrays are empty when the problem has no consumer.
+     */
+    private val eventDirtyVars: Array<IntArrayList?> =
+        if (problem.usesIntEventDeltaConsumers) arrayOfNulls(problem.numFactors) else emptyArray()
+    private val eventDirtyMark: Array<IntHashSet?> =
+        if (problem.usesIntEventDeltaConsumers) arrayOfNulls(problem.numFactors) else emptyArray()
+
+    /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
      * current pin was implied. For a Clause that unit-propagated `v`, the antecedents are
      * all the *other* literals in that clause, every one of which was already false at
@@ -774,6 +793,17 @@ class PropagationState(
     }
 
     init {
+        if (problem.usesIntEventDeltaConsumers) {
+            for (fid in 0 until problem.numFactors) {
+                if (problem.factors[fid].consumesIntEventDelta) {
+                    eventDirtyVars[fid] = IntArrayList()
+                    eventDirtyMark[fid] = IntHashSet()
+                }
+            }
+        }
+    }
+
+    init {
         seeded = seedAssumptions(assumptions)
     }
 
@@ -1021,9 +1051,40 @@ class PropagationState(
         while (kind < IntEvent.COUNT) {
             if (mask and (1 shl kind) != 0) {
                 val list = intEventWatchersBySlot[IntEvent.pack(v, kind)]
-                for (i in 0 until list.size) propEnq(list[i])
+                for (i in 0 until list.size) {
+                    val fid = list[i]
+                    propEnq(fid)
+                    accumulateDirtyVar(fid, v)
+                }
             }
             kind++
         }
+    }
+
+    /** Record [v] in [fid]'s dirty-variable delta if [fid] consumes it ([eventDirtyMark] dedups).
+     *  No-op for non-consumers and when no factor in the problem consumes a delta. */
+    private fun accumulateDirtyVar(fid: Int, v: Int) {
+        if (eventDirtyMark.isEmpty()) return
+        val mark = eventDirtyMark[fid] ?: return
+        if (mark.add(v)) eventDirtyVars[fid]!!.add(v)
+    }
+
+    /**
+     * Drain and return the dirty-variable delta accumulated for [factorId] since it last drained —
+     * the subscribed variables that fired, a superset of those actually changed since the consumer's
+     * last fire (see [eventDirtyVars]). A consumer ([com.eignex.klause.solver.Factor.consumesIntEventDelta])
+     * calls this on a fire and recovers the exact removed values by diffing its own reversible
+     * baseline for these variables. Clears the accumulator (keeping it in lockstep with the
+     * consumer's baseline update), so call it exactly when the baseline is advanced. Returns an empty
+     * array for a non-consuming factor.
+     */
+    fun drainIntEventDirtyVars(factorId: Int): IntArray {
+        if (eventDirtyVars.isEmpty()) return EmptyIntArray
+        val list = eventDirtyVars[factorId] ?: return EmptyIntArray
+        if (list.size == 0) return EmptyIntArray
+        val out = list.toIntArray()
+        list.clear()
+        eventDirtyMark[factorId]!!.clear()
+        return out
     }
 }

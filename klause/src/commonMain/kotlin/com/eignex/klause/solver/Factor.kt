@@ -156,6 +156,22 @@ interface Factor {
     val initialIntEventWatches: IntArray? get() = null
 
     /**
+     * Whether this factor consumes the engine-maintained **dirty-variable delta** (#624): the set of
+     * its subscribed variables that changed since it last drained, retrieved on a fire via
+     * [com.eignex.klause.solver.propagation.PropagationState.drainIntEventDirtyVars]. A
+     * domain-sensitive incremental propagator (Régin/GCC/Table/…) sets this `true` so it can scope
+     * its per-fire work to the changed variables instead of scanning all of [intVars].
+     *
+     * **Contract:** a consumer must also subscribe via [initialIntEventWatches] to *every* kind on
+     * *every* variable it depends on — the engine only accumulates a variable into the delta when an
+     * advisor it subscribed to fires, so an under-broad subscription drops a change and is unsound.
+     * The accumulated set is a *superset* of "changed since last fire" (a backtrack leaves stale
+     * entries, harmless because the consumer diffs its own reversible baseline). Default `false`:
+     * the factor gets typed wakeup (if it subscribes) but the engine accumulates no delta for it.
+     */
+    val consumesIntEventDelta: Boolean get() = false
+
+    /**
      * If this factor just returned `false` from [propagate], the clause-form explanation
      * of why — i.e. an array of literals, all currently *false* in [state], whose
      * disjunction is unsatisfied. The propagation-graph conflict analyzer seeds its
