@@ -2,9 +2,9 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevInt
 
@@ -57,6 +57,25 @@ class Table(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
+    /** Advisor subscription (#623): STR2 is hole-aware GAC (tuple feasibility tests membership, the
+     *  prune drops interior values), so subscribe to every kind on every column variable and consume
+     *  the dirty-variable delta (#624) — a fire re-sweeps only when a column actually changed, instead
+     *  of the per-fire O(arity) domain-ref scan. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = xs.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
+
     /** STR2 sparse-set state. [validTuples] holds tuple indices; the prefix `[0, numValid)` is live
      *  (still feasible). [numValid] is a [RevInt] on the engine's reversible trail, so backtrack
      *  restores it in O(1); the sparse-set invariant — removals only swap a dead tuple to the
@@ -65,15 +84,12 @@ class Table(
      *  some order), so [validTuples] needs no copy or undo. This factor therefore no longer
      *  implements `SnapshottablePayload` — the O(numTuples) per-push snapshot is gone.
      *
-     *  [cachedDoms] (unchanged-domains fast path) deliberately drifts across snapshot/restore: after
-     *  a backtrack its stale refs simply fail to match the restored domains, so the fast path misses
-     *  and a full STR2 sweep runs — never a false skip. */
-    private class Str2State(
-        val validTuples: IntArray,
-        numValidInit: Int,
-        state: PropagationState,
-        val cachedDoms: Array<IntDomain?>,
-    ) {
+     *  [started] gates the first full sweep; afterwards a fire that drains an empty dirty-variable
+     *  delta has nothing to re-filter and returns immediately. The flag drifts across push/pop (a
+     *  drained delta plus the reversible [numValid] make a stale `true` harmless — the live set is
+     *  already restored, and any forward narrowing re-wakes via its event). */
+    private class Str2State(val validTuples: IntArray, numValidInit: Int, state: PropagationState) {
+        var started: Boolean = false
         private val numValidCell = RevInt(state, numValidInit)
         var numValid: Int
             get() = numValidCell.value
@@ -176,22 +192,16 @@ class Table(
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val s = (state.refPayload[factorId] as? Str2State) ?: run {
-            val fresh = Str2State(IntArray(numTuples) { it }, numTuples, state, arrayOfNulls(arity))
+            val fresh = Str2State(IntArray(numTuples) { it }, numTuples, state)
             state.refPayload[factorId] = fresh
             fresh
         }
-        // Incremental fast path: if no column's domain ref changed since the last successful
-        // propagate, STR2 already pruned to that fixpoint and would deduce nothing new. (IntDomain
-        // is immutable — a tighten allocates a fresh object — so reference identity per column means
-        // the column's domain is byte-for-byte unchanged.)
-        var changed = false
-        for (col in 0 until arity) {
-            if (s.cachedDoms[col] !== state.intDomains[xs[col]]) {
-                changed = true
-                break
-            }
-        }
-        if (!changed && s.cachedDoms[0] != null) return true
+        // Incremental fast path (#624): a fire that drains an empty dirty-variable delta saw no column
+        // change since the last sweep, so STR2 is still at its fixpoint and would deduce nothing new.
+        // The first fire (not yet started) always sweeps. A prune below re-wakes its column, so the
+        // delta carries the cascade across fires.
+        val dirty = state.drainIntEventDirtyVars(factorId)
+        if (s.started && dirty.isEmpty()) return true
         // Per-column support bitsets: bit (value - lo[col]) is set iff some currently-feasible
         // tuple has that value at the column. Spans are bounded by the column's current
         // domain [min..max] (values outside this band cannot appear because infeasible
@@ -282,8 +292,7 @@ class Table(
                 if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
             }
         }
-        // Record the post-propagate domain refs so the next fire can short-circuit if nothing moved.
-        for (col in 0 until arity) s.cachedDoms[col] = state.intDomains[xs[col]]
+        s.started = true
         return true
     }
 }
