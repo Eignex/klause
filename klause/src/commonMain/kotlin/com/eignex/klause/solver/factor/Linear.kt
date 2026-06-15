@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -62,6 +63,25 @@ class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int
     override fun remapValues(valueMap: (Int) -> Int): Factor? = if (isBinaryValueRelation()) this else null
 
     override val boolVars: IntArray = EmptyIntArray
+
+    /**
+     * Advisor subscription (#623): [propagateLinearBounds] derives everything from the interval
+     * `[c·min, c·max]` of each term — it reads only `min`/`max` and never inspects interior holes
+     * (the `NE` branch excludes a value, but only once the *other* terms are fixed, which it detects
+     * from their bounds; an interior hole cannot change any term's min/max, so it can never enable a
+     * new linear deduction). So the factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED]
+     * on each variable and is not woken by interior `VALUE_REMOVED` carves a co-constraint punches
+     * into its variables — a sound selectivity win across the arithmetic core. Terms are coalesced,
+     * so [vars] is already duplicate-free. A var becoming fixed collapses both bounds, so fixing is
+     * covered without an explicit `FIXED` subscription.
+     */
+    override val initialIntEventWatches: IntArray = IntArray(vars.size * 2).also { out ->
+        var w = 0
+        for (v in vars) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+        }
+    }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !holds(state.longPayload[factorId])
 
