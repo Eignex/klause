@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -106,6 +107,29 @@ class AllDifferent(
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars
+
+    /**
+     * Advisor subscription (#622): on the bounds-consistency path — and *only* there — this factor
+     * reacts purely to the `min`/`max` of its variables ([boundsAllDifferentFilter] never reads
+     * interior holes), so it subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on each
+     * variable and is *not* woken by interior [IntEvent.VALUE_REMOVED] carves a co-constraint may
+     * punch. A var becoming fixed collapses both bounds, so the FIXED case is covered by the bound
+     * kinds without subscribing to [IntEvent.FIXED]. `null` (occurrence-list wakeup, fire on any
+     * change) for the full-GAC / optional / excepted paths, which need every value removal.
+     */
+    override val initialIntEventWatches: IntArray? =
+        if (boundsConsistent && presents.isEmpty() && exceptSet.isEmpty()) {
+            val distinctVars = vars.distinct()
+            val out = IntArray(distinctVars.size * 2)
+            var w = 0
+            for (v in distinctVars) {
+                out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+                out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            }
+            out
+        } else {
+            null
+        }
 
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
