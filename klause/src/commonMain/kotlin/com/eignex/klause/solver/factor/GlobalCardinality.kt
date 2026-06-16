@@ -188,7 +188,6 @@ class GlobalCardinality(
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val before = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
         val sim = s.counts.copyOf()
         var occurrencesInXs = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
@@ -198,36 +197,32 @@ class GlobalCardinality(
             coverIndexByValue[newValue]?.let { sim[it] += occurrencesInXs }
         }
         val after = rawDegree(state, sim, ovVar = intVar, ovVal = newValue)
-        return compressViolation(after, state.violationSoftCap) - compressViolation(before, state.violationSoftCap)
+        // The pre-move degree is the factor's current violation degree, already maintained in
+        // factorDegree — reuse it instead of re-scanning the cover for `before`.
+        return compressViolation(after, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
+        // The pre-move degree is the factor's current violation degree, already maintained in
+        // factorDegree (still pre-move here — the engine reconciles after apply*), so the prior
+        // counts need not be reconstructed and re-scanned.
+        val beforeDeg = state.factorDegree[factorId]
         var occurrencesInXs = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
-        // Pre-update degree: reconstruct the prior counts by inverting this move, and read the
-        // prior value (oldValue) for the count-var / closed overrides.
-        val simInv = s.counts.copyOf()
-        if (occurrencesInXs > 0) {
-            coverIndexByValue[cur]?.let { simInv[it] -= occurrencesInXs }
-            coverIndexByValue[oldValue]?.let { simInv[it] += occurrencesInXs }
-        }
-        val beforeDeg = rawDegree(state, simInv, ovVar = intVar, ovVal = oldValue)
         if (occurrencesInXs > 0) {
             coverIndexByValue[oldValue]?.let { s.counts[it] -= occurrencesInXs }
             coverIndexByValue[cur]?.let { s.counts[it] += occurrencesInXs }
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
-        return compressViolation(afterDeg, state.violationSoftCap) -
-            compressViolation(beforeDeg, state.violationSoftCap)
+        return compressViolation(afterDeg, state.violationSoftCap) - beforeDeg
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val before = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
         val sim = s.counts.copyOf()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
@@ -238,16 +233,17 @@ class GlobalCardinality(
         // Counts term uses the simulated counts; closed term re-evaluates with the flip applied.
         val after = countsDegree(state, sim, ovVar = -1, ovVal = 0) +
             closedDegree(state, ovVar = -1, ovVal = 0, flipVar = boolVar)
-        return compressViolation(after, state.violationSoftCap) - compressViolation(before, state.violationSoftCap)
+        // Pre-move degree is the maintained current violation degree — reuse it for `before`.
+        return compressViolation(after, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        // Flip is already applied to the assignment; reconstruct the pre-flip degree by inverting
-        // the presence of boolVar's positions for the closed term, against the un-mutated counts.
-        val beforeDeg = countsDegree(state, s.counts, ovVar = -1, ovVal = 0) +
-            closedDegree(state, ovVar = -1, ovVal = 0, flipVar = boolVar)
+        // Flip is already applied to the assignment; the pre-flip degree is the maintained current
+        // violation degree (the engine reconciles factorDegree only after apply*), so it need not
+        // be reconstructed from the inverted presence.
+        val beforeDeg = state.factorDegree[factorId]
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val nowP = present(state, i)
@@ -255,8 +251,7 @@ class GlobalCardinality(
             s.counts[coverIdx] += if (nowP) +1 else -1
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
-        return compressViolation(afterDeg, state.violationSoftCap) -
-            compressViolation(beforeDeg, state.violationSoftCap)
+        return compressViolation(afterDeg, state.violationSoftCap) - beforeDeg
     }
 
     /** Vars currently pinned (singleton) to [value], among [scope]. */
