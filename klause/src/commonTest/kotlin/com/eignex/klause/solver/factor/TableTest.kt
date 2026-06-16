@@ -125,8 +125,8 @@ class TableTest {
             rows.forEachIndexed { r, t -> for (c in 0 until arity) flat[r * arity + c] = t[c] }
             // Per-column random subdomain (still within [lo, hi]) to force pruning + cascades.
             val cdom = Array(arity) {
-                val a = rng.nextInt(lo, hi + 1);
-                val b = rng.nextInt(a, hi + 1);
+                val a = rng.nextInt(lo, hi + 1)
+                val b = rng.nextInt(a, hi + 1)
                 a to b
             }
             val brute = rows.filter { t -> t.indices.all { c -> t[c] in cdom[c].first..cdom[c].second } }

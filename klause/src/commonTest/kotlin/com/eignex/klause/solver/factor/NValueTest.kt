@@ -137,7 +137,7 @@ class NValueTest {
                     return
                 }
                 for (v in 1..xsHi) {
-                    acc[p] = v;
+                    acc[p] = v
                     rec(p + 1)
                 }
             }
