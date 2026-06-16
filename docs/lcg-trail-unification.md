@@ -164,3 +164,37 @@ So the order-literal rewrite is not a one-instance fix: it targets the class of 
 order-atom-heavy models (≈ a third of the conflict-bearing sample) that currently discard nearly all
 their learned clauses. `caNotApplicable` is ~0 everywhere, so the loss is non-asserting clauses
 (the same-variable order-atom fans/cycles), not missing conflict reasons.
+
+## Core-rewrite progress: the single-establishment (gating) piece is verified sound
+
+Building toward the order-literal trail rewrite, the **single-establishment** piece — `wakeAtom` does
+not re-stamp an already-determined order atom (it keeps the atom's first establishment, only firing
+watchers on a re-cross) — was implemented and **passes the full enumerate-vs-brute oracle** (all 1686
+tests, plus the multi-seed harness; an added "kept-atom reason must be currently false" assertion never
+trips). Earlier this same gating looked unsound — that was the unfixed `ExcludeOnFix` stub plus the
+buggy #1–#3 scaffolding; on clean `main` (stub fixed, merged via #696) gating is sound on its own.
+
+So the establishment half of "each order atom has exactly one `(level, reason)`" works. It is **not yet
+a win on its own**: with gating, the crossed-hole atoms a snapped bound move sweeps become
+`lvl = -1` (history-derived) and form a same-variable conflict-level fan — e.g.
+`[v≤51429] ∨ [v=51430] ∨ [v≥432952]` — that does not subsume and does not resolve to the bound, so
+liner-sf stays `learned = 0`. Root of the residual: those crossed-hole atoms have **no recoverable
+reason pointing at the cause that excluded them** — `holeHist` records only *pure interior* carves, not
+edge-excluded holes, so `holeReasonFor` returns null and they degrade to conflict-level leaves.
+
+### Remaining piece (now fully specified): ladder-clause BCP for the collateral
+The fix that pays off, sound-by-construction:
+1. Lazily materialize order-ladder consistency clauses between adjacent **materialized** atoms of each
+   int var (`(¬[v≤a] ∨ [v≤b])` for a<b, the GE↔LE complement, the EQ↔bounds links). Huge domains are
+   fine — only materialized thresholds get clauses.
+2. A bound move wakes **only its representative** order atom (the new bound), with the move's real
+   reason; the collateral order atoms it currently sweeps are instead propagated by **BCP over the
+   ladder clauses**, each taking the ladder clause as its (valid, entailed) reason.
+3. Then conflict analysis resolves every collateral atom → ladder clause → representative bound →
+   the move's other-variable reason. The same-variable fan collapses to one literal; non-asserting
+   becomes structurally impossible, and it is sound because the ladder clauses are real axioms (no
+   hand-rolled antecedent, no re-attribution).
+
+Gate: the multi-seed harness (bump seeds locally) + full oracle at every step, and the liner-sf /
+mzn-bench baseline above for the payoff measurement. Build it behind a default-off flag so the current
+(sound) path stays the default until the new path is both sound and a measured win.
