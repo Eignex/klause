@@ -3,6 +3,9 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.movesource.Frontier
+import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
+import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.proposeRepairChains
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -372,71 +375,26 @@ class Cbls(
         for (i in w.indices) w[i] = keep * w[i] + pull
     }
 
+    /** Violated-factor repair source backing [sampleFromViolated]. The duplicated draw loop now
+     *  lives in [ViolatedRepairs] (epic #710); this strategy supplies its `violatedSampleCount`. */
+    private val violatedRepairs = ViolatedRepairs(violatedSampleCount)
+
+    /** Plateau-escape frontier source backing [sampleFrontier] — see [Frontier]. */
+    private val frontier = Frontier(violatedSampleCount, frontierMoveCap)
+
     private fun sampleFromViolated(state: LocalSearchState, sink: MoveSink) {
-        if (state.violated.isEmpty()) return
-        repeat(minOf(violatedSampleCount, state.violated.size)) {
-            val fid = state.violated.random(state.rng)
-            state.factors[fid].proposeRepairMoves(state, fid, sink)
-        }
+        violatedRepairs.generate(MoveGenContext(state), sink)
     }
 
     /** **Frontier moves** for plateau escape: when the search is trapped, the violated-only
      *  repair pool can't get out — every repair of a violated factor breaks a *satisfied
      *  neighbour*, and the moves that would first re-arrange those neighbours are never
-     *  generated (satisfied factors are sampled only at feasibility). This injects bounded
+     *  generated (satisfied factors are sampled only at feasibility). [Frontier] injects bounded
      *  ±1 / bool-flip moves on the variables of factors that *neighbour* a violated factor
      *  (share a variable), giving the search — together with the raised stall noise — moves
      *  to step through the basin wall. Capped at [frontierMoveCap] per call. */
     private fun sampleFrontier(state: LocalSearchState, sink: MoveSink) {
-        if (state.violated.isEmpty()) return
-        val problem = state.problem
-        var budget = frontierMoveCap
-        repeat(minOf(violatedSampleCount, state.violated.size)) {
-            if (budget <= 0) return
-            val fid = state.violated.random(state.rng)
-            val f = state.factors[fid]
-            for (v in f.intVars) {
-                for (nf in problem.intOccurrences[v]) {
-                    if (nf == fid) continue
-                    budget = addNeighbourMoves(state, sink, nf, budget)
-                    if (budget <= 0) return
-                }
-            }
-            for (v in f.boolVars) {
-                for (nf in problem.boolOccurrences[v]) {
-                    if (nf == fid) continue
-                    budget = addNeighbourMoves(state, sink, nf, budget)
-                    if (budget <= 0) return
-                }
-            }
-        }
-    }
-
-    /** Emit ±1 int-steps and bool flips for every variable of factor [nf], spending from and
-     *  returning the remaining [budget]. */
-    private fun addNeighbourMoves(state: LocalSearchState, sink: MoveSink, nf: Int, budget: Int): Int {
-        var b = budget
-        val nfac = state.factors[nf]
-        for (u in nfac.intVars) {
-            if (b <= 0) return b
-            val cur = state.assignment.intValue(u)
-            val d = state.problem.intDomains[u]
-            if (cur < d.max) {
-                sink.addChannelingIntSet(state, u, cur + 1)
-                b--
-            }
-            if (b <= 0) return b
-            if (cur > d.min) {
-                sink.addChannelingIntSet(state, u, cur - 1)
-                b--
-            }
-        }
-        for (u in nfac.boolVars) {
-            if (b <= 0) return b
-            sink.addBoolFlip(u)
-            b--
-        }
-        return b
+        frontier.generate(MoveGenContext(state), sink)
     }
 
     /** Stall-gated int-pair swap proposals (see [stallSwapCap]). Randomized draws: pick a
