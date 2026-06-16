@@ -53,7 +53,7 @@ bench list [<suite>]                 list suites, or the problems in one suite
 
 Both read the per-problem `output/<config>/*.json` `solve` records — no solving, no Gradle.
 
-- **`compare.sh <dirA> <dirB>`** — diff two configs across their shared problems: direction-aware win/tie/loss, the "solves 100% of B's" superset, and the time-to-best aggregate.
+- **`compare.sh [--incomplete] <dirA> <dirB>`** — score two configs across their shared problems by the [MiniZinc Challenge](https://www.minizinc.org/challenge/2026/rules/) pairwise (Borda) rule: per problem, the better solver scores 1, a tie splits by the time fraction `timeUsed(B)/(timeUsed(A)+timeUsed(B))`, and an unsolved instance scores 0. "Better" is the priority chain solved > optimal > quality, direction-aware. `--complete` (default; the FD/free/parallel/open classes) counts proving optimality as better; `--incomplete` (the local-search class) ignores optimality and flat-scores ties 0.5. Reports each config's total Borda score, strict win/loss/tie counts, the "solves 100% of B's" superset, and any `UNSOUND` clash (A beating a proven optimum, or SAT vs proved-UNSAT).
 - **`credit.sh <dir>`** — per-**arm** credit over ONE klause-portfolio config: firsts / bests / soles / improvements per arm + a greedy marginal-contribution ranking, read from each record's `attribution` (klause emits `%%%klause-arm:` lines under `-s` on a `-e mixed/cp/ls` optimize). Produce the data with `bench solve … backend=klause engine=mixed -p8`.
 
 ## Recipes
