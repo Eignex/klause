@@ -2,6 +2,8 @@ package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.schedule.Geometric
+import com.eignex.klause.solver.localsearch.schedule.Schedule
 import kotlin.math.exp
 import kotlin.math.pow
 
@@ -125,18 +127,13 @@ internal class ProbSatWeighted(
  * Simulated-annealing selection: repeatedly sample a candidate and accept the first one whose
  * shaped break score `delta` passes the Metropolis criterion — `delta ≤ 0` (improving, always
  * accepted) or `rng < exp(-delta / T)` (worsening, accepted with temperature-dependent
- * probability). The temperature cools by [coolingRate] on each accepted move, floored at
- * [minTemperature]; high T early favours exploration, low T later favours exploitation. If no
- * candidate passes after one pass, a random candidate is taken. Temperature is per-instance and
- * cools monotonically (not re-heated on restart), matching the original strategy's behaviour.
+ * probability). The temperature trajectory is owned by [schedule] and advanced once per accepted
+ * move; high T early favours exploration, low T later favours exploitation. If no candidate passes
+ * after one pass, a random candidate is taken. The schedule is per-instance; the default
+ * [Geometric] reproduces the long-standing cool-only behaviour, while an adaptive-cooling or
+ * reheating schedule plugs in here unchanged.
  */
-internal class Annealing(
-    val initialTemperature: Double = 1.0,
-    val coolingRate: Double = 0.999,
-    val minTemperature: Double = 0.001,
-) : MoveSelection {
-    private var temperature: Double = initialTemperature
-
+internal class Annealing(private val schedule: Schedule = Geometric()) : MoveSelection {
     override fun pick(state: LocalSearchState, moves: List<Move>): Move {
         repeat(moves.size) {
             val move = moves[state.rng.nextInt(moves.size)]
@@ -144,17 +141,13 @@ internal class Annealing(
             // objective delta tilts the Metropolis criterion so objective-improving moves are
             // accepted unconditionally and mildly-worsening ones get more acceptance mass.
             val delta = state.shapedBreakScore(move)
-            if (delta <= 0.0 || state.rng.nextDouble() < exp(-delta / temperature)) {
-                anneal()
+            if (delta <= 0.0 || state.rng.nextDouble() < exp(-delta / schedule.temperature)) {
+                schedule.step()
                 return move
             }
         }
-        anneal()
+        schedule.step()
         return moves[state.rng.nextInt(moves.size)]
-    }
-
-    private fun anneal() {
-        temperature = (temperature * coolingRate).coerceAtLeast(minTemperature)
     }
 }
 
@@ -265,16 +258,27 @@ object ProbSat {
  * Configuration checking is opt-in.
  */
 object SimulatedAnnealing {
-    /** Run one focused-LS step. */
+    /** Run one focused-LS step under a fixed geometric cooling schedule. */
     operator fun invoke(
         initialTemperature: Double = 1.0,
         coolingRate: Double = 0.999,
         minTemperature: Double = 0.001,
         tabu: TabuFilter = TabuFilter(tenure = 10),
         configurationChecking: Boolean = false,
-    ): FocusedLs = FocusedLs(
-        Annealing(initialTemperature, coolingRate, minTemperature),
+    ): FocusedLs = withSchedule(
+        Geometric(initialTemperature, coolingRate, minTemperature),
         tabu,
         configurationChecking,
     )
+
+    /**
+     * Build an annealing [FocusedLs] over an arbitrary temperature [schedule] — geometric,
+     * adaptive-cooling, or reheating — so the SA arms can run any schedule without a bespoke
+     * selection policy.
+     */
+    fun withSchedule(
+        schedule: Schedule,
+        tabu: TabuFilter = TabuFilter(tenure = 10),
+        configurationChecking: Boolean = false,
+    ): FocusedLs = FocusedLs(Annealing(schedule), tabu, configurationChecking)
 }
