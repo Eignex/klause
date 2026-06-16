@@ -429,10 +429,47 @@ class AllDifferent(
         if (cur > d.min) sink.addChannelingIntSet(state, occupant, cur - 1)
     }
 
+    /** Feasibility-preserving neighbourhood: when the factor is satisfied every present var
+     *  holds a distinct value, so swapping the values of two present vars keeps the multiset
+     *  and therefore distinctness intact. Each swap is offered as a compound the engine scores
+     *  against coupled constraints — within one all-different it is cost-neutral, but on shared
+     *  scopes (Sudoku rows × columns, timetabling) it can relocate a value to clear a clash
+     *  elsewhere without ever breaking this constraint. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (vars.size < 2) return
+        var emitted = 0
+        var attempts = 0
+        val cap = MAX_STRUCTURED_SWAPS
+        while (emitted < cap && attempts < cap * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val ai = state.rng.nextInt(vars.size)
+            val bi = state.rng.nextInt(vars.size)
+            val a = vars[ai]
+            val b = vars[bi]
+            if (a == b) continue
+            if (!present(state, ai) || !present(state, bi)) continue
+            val va = state.assignment.intValue(a)
+            val vb = state.assignment.intValue(b)
+            if (va == vb) continue // nothing to swap (e.g. both excepted and equal).
+            if (vb !in state.problem.intDomains[a]) continue
+            if (va !in state.problem.intDomains[b]) continue
+            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+            emitted++
+        }
+    }
+
     private companion object {
         /** Empty excepted-value set for the shared [reginFilter] (plain alldifferent has none).
          *  [reginFilter] only reads it, so one shared immutable-in-practice instance is safe. */
         val NO_EXCEPT = IntHashSet()
+
+        /** Cap on feasibility-preserving swap pairs offered per [proposeStructuredMoves] call.
+         *  Each compound costs an apply-and-revert in scoring, so keep the fan small. */
+        const val MAX_STRUCTURED_SWAPS: Int = 4
+
+        /** Rejection-sampling attempts allowed per requested swap before giving up (saturated or
+         *  domain-incompatible pairs are skipped). Bounds the loop on tight/heterogeneous domains. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 6
 
         /** Cap on candidate targets per repair call. Each candidate adds one O(arity) break-score
          *  evaluation in WalkSat/probSAT, so don't go wild — the fan only needs to be wide enough
