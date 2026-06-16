@@ -9,17 +9,23 @@ import kotlin.math.abs
  * bound. All values are double-precision; the authoritative bound comes from exact certification of
  * [basis], never from these.
  */
-internal class FloatLpResult(val basis: Basis, val objective: Double, val duals: DoubleArray)
+internal class FloatLpResult(
+    val basis: Basis,
+    val objective: Double,
+    val duals: DoubleArray,
+    /** Per-structural-variable primal value (unshifted, length `n`); the LP point. */
+    val primal: DoubleArray,
+)
 
 /**
  * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
  * sparse LU factorization ([SparseLu], `O(nnz)` memory) and the constraint columns in sparse CSC,
- * instead of the full `m × (n+m)` dense tableau [FloatSimplex] carries or an explicit dense `B⁻¹`.
+ * instead of the full `m × (n+m)` dense tableau the dense float simplex carries or an explicit dense `B⁻¹`.
  * The decision logic — slack cold start, most-violated leaving variable, dual ratio-test entering
- * variable — is identical to [FloatSimplex]; only the linear algebra is revised (FTRAN/BTRAN via the
+ * variable — is identical to the dense float simplex; only the linear algebra is revised (FTRAN/BTRAN via the
  * LU), so it scales to large sparse models without materializing an `m²` structure.
  *
- * Like [FloatSimplex] it is a heuristic that can return null (non-convergence / dual-unbounded /
+ * Like the dense float simplex it is a heuristic that can return null (non-convergence / dual-unbounded /
  * singular basis); its [FloatLpResult.basis] is then certified exactly downstream, so float rounding is never
  * safety-critical.
  *
@@ -217,7 +223,16 @@ internal class RevisedSimplex(
             val c = model.cost[basicVar[i]]
             if (c != 0L) obj += c.toDouble() * beta[i]
         }
-        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, duals(lu))
+        val primal = DoubleArray(n)
+        for (j in 0 until n) {
+            primal[j] = model.loShift[j].toDouble() +
+                if (status[j] == VarStatus.AT_UPPER) model.upper[j].toDouble() else 0.0
+        }
+        for (i in 0 until m) {
+            val v = basicVar[i]
+            if (v < n) primal[v] = model.loShift[v].toDouble() + beta[i]
+        }
+        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, duals(lu), primal)
     }
 
     private fun coldStart() {

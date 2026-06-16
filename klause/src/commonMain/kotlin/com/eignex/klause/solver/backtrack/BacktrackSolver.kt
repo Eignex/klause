@@ -10,19 +10,11 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.lp.AllDifferentSeparator
-import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
-import com.eignex.klause.solver.lp.CircuitSeparator
-import com.eignex.klause.solver.lp.CliqueCutSeparator
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.CumulativeFlowBound
 import com.eignex.klause.solver.lp.Cut
-import com.eignex.klause.solver.lp.CutSeparator
-import com.eignex.klause.solver.lp.DualSimplex
-import com.eignex.klause.solver.lp.GccSeparator
-import com.eignex.klause.solver.lp.KnapsackCoverSeparator
 import com.eignex.klause.solver.lp.KnapsackLagrangianBound
 import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.objective.LinearObjective
@@ -312,8 +304,6 @@ class BacktrackSolver(override val problem: Problem) :
             CpToLpRelaxation(
                 problem,
                 objective,
-                generateCuts = params.lpCuts,
-                circuitArcs = params.lpCircuit,
                 elementHull = params.lpElement,
                 tableHull = params.lpTable,
                 cumulative = params.lpCumulative,
@@ -324,31 +314,16 @@ class BacktrackSolver(override val problem: Problem) :
                 mddHull = params.lpMdd,
                 gccCountHull = params.lpGccCount,
                 objectiveCone = params.lpObjectiveCone,
-                sparseModel = params.lpSparsePrimary,
+                // The sparse revised-simplex pipeline is the only LP path (#705): always build the CSC
+                // model so the dense `m × n` is never allocated.
+                sparseModel = true,
             )
         } else {
             null
         }
-        private val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
-            buildList {
-                if (params.lpCuts) {
-                    add(AllDifferentSeparator())
-                    add(GccSeparator())
-                    add(KnapsackCoverSeparator())
-                    add(CliqueCutSeparator())
-                    val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
-                    add(AssignmentObjectiveCut(coef))
-                }
-                if (params.lpCircuit) add(CircuitSeparator())
-            }
-        } else {
-            emptyList()
-        }
 
-        // Root cut harvesting solves the LP and can be slow on a large relaxation; it is deferred to
-        // [runUntilEvent]'s one-shot `started` block, where the cancellation token is live (it is unset
-        // at field-init time on the pausable portfolio path — the slice arms it before each slice).
-        private var lpGlobalCuts: List<Cut> = emptyList()
+        // No cuts on the sparse-only LP path (#705); the relaxation carries no extra cut rows.
+        private val lpGlobalCuts: List<Cut> = emptyList()
         private val lagBound = if (params.lagrangian) {
             LagrangianBound(problem, objective).takeIf { it.applicable }
         } else {
@@ -384,8 +359,6 @@ class BacktrackSolver(override val problem: Problem) :
         )
         private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
         private val lpBasisByDepth = ArrayList<Basis?>()
-        private var lpHotTableau: DualSimplex? = null
-        private val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
         private var lpBackjump: Learned? = null
 
         private val pruneIf: (PropagationSession) -> Boolean = { session ->
@@ -455,23 +428,20 @@ class BacktrackSolver(override val problem: Problem) :
                     ++lpCheckCounter % params.lpBoundEvery == 0 &&
                     lpAutoOff.shouldRun() -> {
                     val depth = session.decisionLevel
-                    val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
-                        lpBasisByDepth[depth - 1]
-                    } else {
-                        null
-                    }
                     val outcome = lpBoundAndFix(
-                        lpRelaxerL, session, effectiveBound, sink, warm, params, lpSeparators, lpHints,
+                        lpRelaxerL,
+                        session,
+                        effectiveBound,
+                        sink,
                         objectiveVar = singleObj?.varId ?: -1,
                         objectiveAscending = singleObj?.ascending ?: true,
-                        globalCuts = lpGlobalCuts, seedTableau = lpHotTableau,
+                        globalCuts = lpGlobalCuts,
                         cancellation = params.cancellation,
                     )
                     if (outcome.basis != null) {
                         while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                         lpBasisByDepth[depth] = outcome.basis
                     }
-                    if (outcome.tableau != null) lpHotTableau = outcome.tableau
                     val explanation = outcome.explanation
                     if (explanation != null) {
                         val analyzed = session.analyzeConflictClause(explanation) as? Learned
@@ -653,14 +623,7 @@ class BacktrackSolver(override val problem: Problem) :
          */
         private fun initRootLp() {
             val relaxer = lpRelaxer ?: return
-            if (params.lpCutPool && lpSeparators.isNotEmpty()) {
-                lpGlobalCuts =
-                    harvestRootCuts(relaxer, PropagationSession(problem), lpSeparators, params.cancellation)
-            }
-            sink.observeRootLpBound(
-                0,
-                rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation, sparse = params.lpSparsePrimary),
-            )
+            sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation))
         }
 
         /** Advance the search to the next reportable event (a new incumbent, the terminal verdict, or —
@@ -674,12 +637,6 @@ class BacktrackSolver(override val problem: Problem) :
                 sink.start()
                 // Root LP work runs here, not at construction, so the cancellation is live while it solves.
                 initRootLp()
-                // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
-                // prunes and reduced-cost fixing bite from the first node.
-                if (params.lpProbe) {
-                    val seed = lpRoundingProbe(objective, params.cancellation)
-                    if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
-                }
             }
             outer@ while (true) {
                 if (!runActive) {
@@ -737,8 +694,7 @@ class BacktrackSolver(override val problem: Problem) :
                             varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
                             boolTarget, boolTargetSet, rephaseMode, rng,
                         )
-                        val ordered = lpHints?.order(varRef, phased) ?: phased
-                        val node = makeNode(varRef, ordered)
+                        val node = makeNode(varRef, phased)
                         val decsBefore = decisionsLeft
                         val out = advance(
                             node, session, params, pruneIf,

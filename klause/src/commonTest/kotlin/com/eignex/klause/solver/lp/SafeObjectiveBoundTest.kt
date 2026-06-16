@@ -26,20 +26,13 @@ class SafeObjectiveBoundTest {
         var total = 0
         repeat(1200) {
             val model = randomModel(rng.nextInt(3, 10), rng.nextInt(3, 10), rng)
-            val exact = try {
-                DualSimplex(model).solve()
-            } catch (_: LpOverflowException) {
-                return@repeat
-            }
-            if (exact.status != LpStatus.OPTIMAL) return@repeat
+            val opt = exactLpOptimum(model)
+            if (opt.isNaN()) return@repeat
             val rev = RevisedSimplex(model).solve() ?: return@repeat
             total++
             val safe = safeObjectiveLowerBound(model, rev.duals) ?: return@repeat
             finite++
-            assertTrue(
-                safe <= exact.objectiveValue + 1e-6,
-                "UNSOUND safe bound $safe > optimum ${exact.objectiveValue}",
-            )
+            assertTrue(safe <= opt + 1e-6, "UNSOUND safe bound $safe > optimum $opt")
         }
         assertTrue(total > 300, "covered only $total instances")
         // The bound should be usefully tight (finite) on the large majority of instances.

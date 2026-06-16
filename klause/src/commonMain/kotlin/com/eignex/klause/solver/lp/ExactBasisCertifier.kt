@@ -5,7 +5,7 @@ import com.eignex.klause.util.BigRational
 
 /**
  * Exact lower bound on the minimized objective `cᵀz`, certified from a (float-found) [Basis] using
- * exact rationals — the fallback for when the `Long` fraction-free path ([DualSimplex]) overflows,
+ * exact rationals — the fallback for when the `Long` fraction-free path (the dense dual simplex) overflows,
  * which happens precisely on the large-determinant bases of big models.
  *
  * It solves the dual system `M y = c_B` exactly (`M[t][i] = A_full[i][basicVar[t]]`) by fraction-free

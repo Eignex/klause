@@ -49,9 +49,9 @@ class CumulativeTimeIndexedTest {
         val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
         val relaxation = CpToLpRelaxation(problem, obj, cumulativeTimeIndexed = timeIndexed)
             .build(PropagationSession(problem))
-        val sol = DualSimplex(relaxation.model).solve()
+        val sol = solveSparse(relaxation.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
-        return sol.objectiveValue + relaxation.objectiveConstant
+        return sol.objectiveValue
     }
 
     /** Sum-of-starts LP bound (`min Σ startᵢ`) with the time-indexed rows on/off. The time-indexed
@@ -63,9 +63,9 @@ class CumulativeTimeIndexedTest {
         )
         val relaxation = CpToLpRelaxation(problem, obj, cumulativeTimeIndexed = timeIndexed)
             .build(PropagationSession(problem))
-        val sol = DualSimplex(relaxation.model).solve()
+        val sol = solveSparse(relaxation.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
-        return sol.objectiveValue + relaxation.objectiveConstant
+        return sol.objectiveValue
     }
 
     @Test
@@ -102,9 +102,9 @@ class CumulativeTimeIndexedTest {
         val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
         val relaxation = CpToLpRelaxation(problem, obj, cumulative = true, cumulativeTimeIndexed = ti)
             .build(PropagationSession(problem))
-        val sol = DualSimplex(relaxation.model).solve()
+        val sol = solveSparse(relaxation.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
-        return sol.objectiveValue + relaxation.objectiveConstant
+        return sol.objectiveValue
     }
 
     @Test
@@ -186,7 +186,7 @@ class CumulativeTimeIndexedTest {
             }
             if (row.isNotEmpty()) b.addRow(row, Relation.LE, cap.toLong())
         }
-        val sol = DualSimplex(b.build(Sense.MINIMIZE)).solve()
+        val sol = solveSparse(b.build(Sense.MINIMIZE))
         assertEquals(LpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }

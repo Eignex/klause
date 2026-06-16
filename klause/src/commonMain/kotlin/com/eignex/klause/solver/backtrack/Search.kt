@@ -160,9 +160,6 @@ internal fun BacktrackSolver.driveSearch(
     // LP-learned Farkas nogoods (#247) pending registration; drained at each restart while the
     // trail is at root, so their bound atoms are no longer all-false. Null when learning is off.
     lpNogoods: LpNogoodPool? = null,
-    // LP-guided value ordering (#246): when non-null, branch values are ordered toward the
-    // variable's fractional LP value. Populated by the node LP solve via [pruneIf].
-    lpHints: LpHints? = null,
 ): Sequence<SearchOutcome> = sequence {
     if (problem.baked is PropagationResult.Unsat) {
         yield(SearchOutcome.Exhausted(coreOf(problem.baked)))
@@ -418,9 +415,7 @@ internal fun BacktrackSolver.driveSearch(
                     varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
                     boolTarget, boolTargetSet, rephaseMode, rng,
                 )
-                // LP-guided diving reorders toward the LP value; no-op when no hint (#246).
-                val ordered = lpHints?.order(varRef, phased) ?: phased
-                val node = makeNode(varRef, ordered)
+                val node = makeNode(varRef, phased)
                 val decsBefore = decisionsLeft
                 val out = advance(
                     node,
