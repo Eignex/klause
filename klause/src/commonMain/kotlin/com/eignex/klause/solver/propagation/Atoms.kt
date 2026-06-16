@@ -42,10 +42,10 @@ internal fun PropagationState.atomCurrentTruth(atomId: Int): Boolean? = when (at
 
 /**
  * Decision level at which atom [atomId]'s **current** truth was established on the
- * **current** search path — recomputed from the bound-change and hole-carve histories,
- * which are truncated on every undo and re-pushed on every move, so they always
- * reflect the current path. An undetermined atom reports the live decision count
- * (conservative: it can only constrain at the current level).
+ * **current** search path — read from its trail slot ([PropagationState.atomLvl]); for an atom materialized after
+ * its bound already crossed (no slot stamped), reconstructed from the per-side bound levels or the
+ * hole-carve record, both kept current-path-accurate by backtrack. An undetermined atom reports the
+ * live decision count (conservative: it can only constrain at the current level).
  */
 internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     // Trail-resident: a determined order literal carries the level it was established at on
@@ -173,20 +173,19 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
 }
 
 /**
- * Antecedents of atom [atomId], derived on demand: a true bound atom resolves to the
- * recorded reason of the move that first established it (the bound histories); a
- * false bound atom and a bound-excluded eq atom cite the opposing bound atom, which
- * the analyzer unfolds through its own history; a true eq atom cites both endpoint
- * atoms; an interior-hole eq atom resolves to the carve's recorded reason. `null`
- * marks a root/bake fact or an undetermined atom — the analyzer keeps such literals
- * instead of resolving through them.
+ * Antecedents of atom [atomId]: the reason on its trail slot ([PropagationState.atomAnt]) for an atom established on
+ * the current path, else derived on demand. The derived cases: a true bound atom resolves to the
+ * stored reason of the live bound; a false bound atom and a bound-excluded eq atom cite that live
+ * opposing bound's reason ([falseBoundReason], over other variables); a true eq atom cites both
+ * endpoint bounds; an interior-hole eq atom resolves to the carve's recorded reason
+ * ([holeReasonFor]). `null` marks a root/bake fact or an undetermined atom — the analyzer keeps
+ * such literals instead of resolving through them.
  */
 internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
-    // Trail-resident fast path: an atom established on the current path (channeled by a bound
-    // move, or reconstructed at materialization) carries the move's reason on [atomAnt] at its
-    // exact establishment level — return it directly instead of re-deriving from the histories.
-    // The remaining history derivation below covers only the not-yet-stored cases (interior-hole
-    // eq atoms) and undetermined atoms.
+    // Trail-resident fast path: an atom established on the current path (stamped by a bound move,
+    // or reconstructed at materialization) carries its reason on [atomAnt] at its exact
+    // establishment level — return it directly. The derivation below covers only the not-yet-stored
+    // cases (interior-hole eq atoms) and undetermined atoms.
     if (atomLvl[atomId] >= 0) return atomAnt[atomId]
     val v = atomIntVar[atomId]
     val k = atomThreshold[atomId]
