@@ -8,6 +8,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
+import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
@@ -84,6 +86,10 @@ class LocalSearchSolver(
     val perMoveInvariants: Boolean = false,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
+
+    /** Enumerate-all structured-move source for [structuredMoveStep] — the same generator CBLS
+     *  draws from (random-sampled), shared per epic #710. */
+    private val satisfiedStructured: SatisfiedStructured = SatisfiedStructured.all()
 
     /** The restart policy actually driven by the engine: when a [definitionalSweep] is
      *  present, every restart is followed by the sweep + a state recompute, so all restart
@@ -835,12 +841,10 @@ class LocalSearchSolver(
     ): Boolean {
         val sink = state.moveSink
         sink.clear()
-        for (fid in 0 until problem.numFactors) {
-            val f = state.factors[fid]
-            // Only consult factors that are currently satisfied. A violated factor would
-            // propose repair moves (which run before objective descent) so we skip here.
-            if (!f.isViolated(state, fid)) f.proposeStructuredMoves(state, fid, sink)
-        }
+        // Only consult factors that are currently satisfied. A violated factor would propose
+        // repair moves (which run before objective descent) so the enumerate-all source skips
+        // them — the same structured generator CBLS samples (epic #710).
+        satisfiedStructured.generate(MoveGenContext(state), sink)
         val proposed = sink.list
         if (proposed.isEmpty()) return false
         val poll = IntArray(1)

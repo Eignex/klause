@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.movesource.Frontier
 import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
+import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.proposeRepairChains
 import com.eignex.klause.solver.objective.FunctionalObjective
@@ -541,24 +542,18 @@ class Cbls(
     /** Private sink for [buildStallKick] proposals. */
     private val kickSink: MoveSink = MoveSink()
 
+    /** Satisfied-factor structured-move source backing [sampleFromSatisfied] — the random-sampling
+     *  variant of [SatisfiedStructured], which the minimize engine also uses (enumerate-all). */
+    private val satisfiedStructured = SatisfiedStructured.sampled(satisfiedSampleCount)
+
     private fun sampleFromSatisfied(state: LocalSearchState, sink: MoveSink) {
-        if (satisfiedSampleCount == 0) return
         // At infeasibility the structured-move source contributes nothing useful — its
         // moves only matter when the engine is already at cost==0 and looking for
         // objective-improving steps. Sampling here just dilutes the candidate pool while
-        // the search should be focused on closing violations.
+        // the search should be focused on closing violations. The source itself is
+        // Phase.Feasible; this gate is the (still per-strategy) enforcement of it.
         if (state.cost > 0) return
-        val total = state.problem.numFactors
-        if (total == 0) return
-        // Random sampling rather than enumerate-then-filter; the satisfied-vs-violated
-        // index isn't materialised, so a 4-random-probe-of-N approach is cheaper than
-        // walking everything.
-        repeat(satisfiedSampleCount) {
-            val fid = state.rng.nextInt(total)
-            if (!state.violated.contains(fid)) {
-                state.factors[fid].proposeStructuredMoves(state, fid, sink)
-            }
-        }
+        satisfiedStructured.generate(MoveGenContext(state), sink)
     }
 
     /** Seed single-variable moves directly on the objective's nonzero-weight vars. Without
