@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
@@ -258,7 +259,106 @@ class Subcircuit(
         }
     }
 
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood over subcircuits. With the included nodes forming a
+     *  single cycle, three structure-preserving edits keep that invariant: **relocate** an included
+     *  node to a different edge of the cycle, **exclude** an included node (link past it, self-loop
+     *  it), and **include** an excluded node by splicing it into a cycle edge. Each keeps exactly one
+     *  cycle (or empty), perturbing the route / membership without breaking feasibility. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (n < 2) return
+        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]) }
+        val active = BooleanArray(n)
+        var activeCount = 0
+        for (i in 0 until n) {
+            val s = nextOf[i]
+            if (s !in 0 until n) return // out of range — not a feasible subcircuit.
+            if (s != i) {
+                active[i] = true
+                activeCount++
+            }
+        }
+        val predOf = IntArray(n) { -1 }
+        for (i in 0 until n) if (active[i]) predOf[nextOf[i]] = i
+        val activeNodes = IntArray(activeCount)
+        val excludedNodes = IntArray(n - activeCount)
+        var ai = 0
+        var ei = 0
+        for (i in 0 until n) if (active[i]) activeNodes[ai++] = i else excludedNodes[ei++] = i
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
+            attempts++
+            when (state.rng.nextInt(3)) {
+                0 -> { // relocate an included node onto a different cycle edge
+                    if (activeCount < 3) continue
+                    val v = activeNodes[state.rng.nextInt(activeCount)]
+                    val p = predOf[v]
+                    val nv = nextOf[v]
+                    if (p < 0) continue
+                    val a = activeNodes[state.rng.nextInt(activeCount)]
+                    if (a == v || a == p) continue
+                    val b = nextOf[a]
+                    if (b == v) continue
+                    if (nv !in state.problem.intDomains[succ[p]]) continue
+                    if (v !in state.problem.intDomains[succ[a]]) continue
+                    if (b !in state.problem.intDomains[succ[v]]) continue
+                    sink.addCompound(
+                        listOf(Move.IntSet(succ[p], nv), Move.IntSet(succ[a], v), Move.IntSet(succ[v], b)),
+                    )
+                    emitted++
+                }
+
+                1 -> { // exclude an included node (link past it, self-loop it)
+                    if (activeCount < 2) continue
+                    val v = activeNodes[state.rng.nextInt(activeCount)]
+                    val p = predOf[v]
+                    val nv = nextOf[v]
+                    if (p < 0) continue
+                    if (nv !in state.problem.intDomains[succ[p]]) continue
+                    if (v !in state.problem.intDomains[succ[v]]) continue
+                    sink.addCompound(listOf(Move.IntSet(succ[p], nv), Move.IntSet(succ[v], v)))
+                    emitted++
+                }
+
+                else -> { // include an excluded node by splicing it into a cycle edge
+                    if (activeCount < 2 || excludedNodes.isEmpty()) continue
+                    val u = excludedNodes[state.rng.nextInt(excludedNodes.size)]
+                    val a = activeNodes[state.rng.nextInt(activeCount)]
+                    val b = nextOf[a]
+                    if (u !in state.problem.intDomains[succ[a]]) continue
+                    if (b !in state.problem.intDomains[succ[u]]) continue
+                    sink.addCompound(listOf(Move.IntSet(succ[a], u), Move.IntSet(succ[u], b)))
+                    emitted++
+                }
+            }
+        }
+    }
+
+    /** Feasible init: the full Hamiltonian cycle `succ(i) = (i + 1) mod n` (every node included).
+     *  Returns false — leaving the random assignment — if a successor value is out of domain or a
+     *  frozen var pins another. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        if (n < 2) return false
+        for (i in 0 until n) {
+            val target = (i + 1) % n
+            if (target !in state.problem.intDomains[succ[i]]) return false
+            if (state.assumptions.isFrozenInt(succ[i]) && state.assignment.intValue(succ[i]) != target) return false
+        }
+        for (i in 0 until n) {
+            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], (i + 1) % n)
+        }
+        return true
+    }
+
     private companion object {
         const val MAX_TARGETS: Int = 4
+
+        /** Cap on structure-preserving moves offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_MOVE_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested move before giving up. */
+        const val MOVE_ATTEMPT_STRIDE: Int = 8
     }
 }
