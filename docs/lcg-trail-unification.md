@@ -228,3 +228,35 @@ sound, collapsing nogood needs — each order literal needs its **own** establis
 so resolution flows through entailed axioms. That is the genuine multi-session, soundness-critical
 rewrite; no in-place patch over the per-variable store is both sound and collapsing. The harness +
 baseline above are the gate and yardstick for whoever lands it.
+
+## Resolution — the same-variable cycle IS broken in place (sound, oracle-green)
+
+The "irreducible blocker" conclusion above was **wrong about the route, right about the requirement**:
+each order literal does need its own establishment level + reason — but that can be recorded *in
+place*, without folding carve reasons into the snap reason (the unsound step that defeated the prior
+attempt). The fix that lands it (commit on this branch):
+
+1. **Record each eq atom's reason at its first death, in the move's NEAR region** (`recordEqDeath` in
+   `Atoms.kt`). A value killed below the raised min / above the lowered max *requested* bound is ruled
+   out by that requested bound alone, whose reason cites **other variables** (`antNear`): a sound,
+   acyclic per-value reason (`antNear ⟹ v ≥ reqMin ⟹ v ≠ k` for `k < reqMin`). Recorded once
+   (guarded), truncated with the move on backtrack. The earlier attempt recorded a *later* snap's
+   reason for a *pre-existing* hole — which the snap does not actually exclude — and that was the
+   unsoundness. First-death-only sidesteps it: the first time any value dies it is always in some
+   move's near region (or a pure-interior carve, already recorded).
+2. **A crossed hole derives/wakes with its recorded carve reason, not the bound move** (`wakeAtom`
+   + `atomAntecedentsDerived` + `falseBoundReason` consult `holeReasonFor`/`holeHistHas`). The eq
+   atom then resolves to the other variables that excluded it, off the same-var fan.
+3. **Cite the requested-bound atom only for a *decision* move** (`antecedents == null`, in
+   `tightenIntMin/MaxImpl`). A propagation already carries `antecedents` that imply the bound, so the
+   self-citation was redundant *and* the last surviving cycle (the prior-bound LE/GE atom citing the
+   move whose reason lists it).
+
+Result: the EQ/LE same-variable fan collapses; `learned` rises from 0 on the holey-int class
+(black-hole 14→712, crosswords 10→39, bacp's asserting rate 1.4%→3.9% at 15 s) and the full oracle +
+multi-seed adversarial harness stay green. **What it does NOT yet fix:** a *second*, distinct
+non-asserting shape where two propagated **bool** literals sharing one antecedent fail to collapse
+because the 1-UIP pivot scan carries a monotonically-decreasing `boolPinOrder` cursor and never
+revisits a bool an atom-pivot's reason cites below it. A naive rescan-from-top is unsound (it resolves
+atoms the ping-pong guard deliberately keeps as leaves), so that one is a separate, careful follow-up
+in `ConflictAnalyzer.analyzeFromSeed` — it is *not* an order-literal issue.
