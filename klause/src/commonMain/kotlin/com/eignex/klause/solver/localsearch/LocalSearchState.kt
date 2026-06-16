@@ -174,7 +174,16 @@ class LocalSearchState(
     private var degScratch: IntArray? = null
     private var boolConfScratch: BooleanArray? = null
     private var intConfScratch: BooleanArray? = null
-    private val oldViolatedScratch: IntHashSet = IntHashSet()
+
+    // Break-count probe scratch. While [breakProbeActive], [updateViolation] records each factor
+    // whose degree changes during a probe's forward apply, snapshotting its pre-probe violated
+    // status on first touch. The break count is then a scan of only the touched factors: a factor
+    // can flip into violation only if its degree changed, so untouched factors contribute nothing
+    // and the whole [violated] set need never be examined.
+    private var breakProbeActive = false
+    private val probeTouched: BooleanArray = BooleanArray(problem.numFactors)
+    private val probeWasViolated: BooleanArray = BooleanArray(problem.numFactors)
+    private val probeTouchedList: IntArrayList = IntArrayList()
 
     /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
@@ -766,10 +775,6 @@ class LocalSearchState(
         val oldStep = step
         val oldCost = cost
         val oldBestCost = bestCostSeen
-        // Pre-probe violated set for the break count, into a scratch set cleared per probe.
-        val oldViolatedIds = oldViolatedScratch
-        oldViolatedIds.clear()
-        violated.forEach { oldViolatedIds.add(it) }
         // Conf-change snapshots restored after the apply+revert probe; copyInto reused scratch rather
         // than copyOf so the restore path allocates nothing.
         val oldBoolConf = (boolConfScratch ?: BooleanArray(boolConfChange.size)).also { boolConfScratch = it }
@@ -795,10 +800,17 @@ class LocalSearchState(
         // restore below alongside lastTouched.
         val savedTouchCount = IntArray(touchedSlots.size) { touchCount[touchedSlots[it]] }
 
+        probeTouchedList.clear()
+        breakProbeActive = true
         for (p in move.parts) apply(p)
+        breakProbeActive = false
 
         var breakCount = 0
-        violated.forEach { fid -> if (fid !in oldViolatedIds) breakCount++ }
+        for (i in 0 until probeTouchedList.size) {
+            val fid = probeTouchedList[i]
+            if (factorDegree[fid] > 0 && !probeWasViolated[fid]) breakCount++
+            probeTouched[fid] = false
+        }
         val netDelta: Long = cost - oldCost
         var weightedNetDelta = netDelta.toDouble()
         if (degBefore != null) {
@@ -834,6 +846,11 @@ class LocalSearchState(
         val newDegree = factors[factorId].violationDegree(this, factorId)
         val delta = newDegree - factorDegree[factorId]
         if (delta == 0) return
+        if (breakProbeActive && !probeTouched[factorId]) {
+            probeTouched[factorId] = true
+            probeWasViolated[factorId] = factorDegree[factorId] > 0
+            probeTouchedList.add(factorId)
+        }
         factorDegree[factorId] = newDegree
         cost += delta
         if (newDegree > 0) violated.add(factorId) else violated.remove(factorId)
