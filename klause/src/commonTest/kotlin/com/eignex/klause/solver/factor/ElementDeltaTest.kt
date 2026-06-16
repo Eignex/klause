@@ -30,7 +30,14 @@ class ElementDeltaTest {
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val d = state.intDomains[src]
-            return if (d.min == d.max) state.excludeIntValue(dst, d.min) else true
+            // Explain the exclusion: dst != src.min holds *because* src is fixed to that value.
+            // Citing src's singleton bounds keeps the recorded reason complete, so conflict
+            // analysis cannot drop the premise (a null reason silently under-explains).
+            return if (d.min == d.max) {
+                state.excludeIntValue(dst, d.min, state.composeIntVarAtomAntecedents(intArrayOf(src)))
+            } else {
+                true
+            }
         }
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ExcludeOnFix(intMap[src], intMap[dst])
