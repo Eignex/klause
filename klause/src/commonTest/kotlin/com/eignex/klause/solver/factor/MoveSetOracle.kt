@@ -94,7 +94,8 @@ object MoveSetOracle {
 
         repeat(iters) { iter ->
             val state = LocalSearchState(problem, Random(seed + iter))
-            // Search for a feasible start within a small budget; skip the iteration if none.
+            // Search for a feasible start: a few random tries, then the factor's own feasible
+            // seeder (structural globals supply one — it lands a permutation / tuple directly).
             var feasible = false
             for (t in 0 until FEASIBLE_SEARCH_BUDGET) {
                 randomizeAssignment(state, problem, rng)
@@ -103,6 +104,12 @@ object MoveSetOracle {
                     feasible = true
                     break
                 }
+            }
+            if (!feasible) {
+                randomizeAssignment(state, problem, rng)
+                factor.seedFeasible(state, 0)
+                state.recompute()
+                feasible = !factor.isViolated(state, 0)
             }
             if (!feasible) return@repeat
 
