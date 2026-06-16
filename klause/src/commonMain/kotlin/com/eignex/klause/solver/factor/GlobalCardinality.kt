@@ -9,6 +9,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
 /**
  * Global Cardinality Constraint (GCC). Covers the four MiniZinc variants in one factor:
@@ -110,11 +111,10 @@ class GlobalCardinality(
         if (cv != null) xs + cv else xs
     }
 
-    private val coverIndexByValue: HashMap<Int, Int> = run {
-        val m = HashMap<Int, Int>(cover.size * 2)
-        for (i in cover.indices) m[cover[i]] = i
-        m
-    }
+    // Cover value → its index. IntIntMap keeps the per-probe lookup unboxed; indices are ≥ 0 so
+    // -1 is a safe absent sentinel (a value not in the cover).
+    private val coverIndexByValue: IntIntMap =
+        IntIntMap.build(cover, IntArray(cover.size) { it }, absent = -1)
 
     /** Per-cover-index count under the current assignment. */
     private class State(val counts: IntArray)
@@ -124,7 +124,8 @@ class GlobalCardinality(
         for (i in xs.indices) {
             if (!present(state, i)) continue
             val value = state.assignment.intValue(xs[i])
-            val idx = coverIndexByValue[value] ?: continue // out-of-cover; counts unaffected
+            val idx = coverIndexByValue[value]
+            if (idx < 0) continue // out-of-cover; counts unaffected
             counts[idx]++
         }
         state.refPayload[factorId] = State(counts)
@@ -178,7 +179,7 @@ class GlobalCardinality(
             val p = if (controlled) !present(state, i) else present(state, i)
             if (!p) continue
             val v = if (xs[i] == ovVar) ovVal else state.assignment.intValue(xs[i])
-            if (v !in coverIndexByValue) deg++
+            if (!coverIndexByValue.contains(v)) deg++
         }
         return deg
     }
@@ -193,8 +194,10 @@ class GlobalCardinality(
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
             val old = state.assignment.intValue(intVar)
-            coverIndexByValue[old]?.let { sim[it] -= occurrencesInXs }
-            coverIndexByValue[newValue]?.let { sim[it] += occurrencesInXs }
+            val oldIdx = coverIndexByValue[old]
+            if (oldIdx >= 0) sim[oldIdx] -= occurrencesInXs
+            val newIdx = coverIndexByValue[newValue]
+            if (newIdx >= 0) sim[newIdx] += occurrencesInXs
         }
         val after = rawDegree(state, sim, ovVar = intVar, ovVal = newValue)
         // The pre-move degree is the factor's current violation degree, already maintained in
@@ -213,8 +216,10 @@ class GlobalCardinality(
         var occurrencesInXs = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
-            coverIndexByValue[oldValue]?.let { s.counts[it] -= occurrencesInXs }
-            coverIndexByValue[cur]?.let { s.counts[it] += occurrencesInXs }
+            val oldIdx = coverIndexByValue[oldValue]
+            if (oldIdx >= 0) s.counts[oldIdx] -= occurrencesInXs
+            val curIdx = coverIndexByValue[cur]
+            if (curIdx >= 0) s.counts[curIdx] += occurrencesInXs
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
         return compressViolation(afterDeg, state.violationSoftCap) - beforeDeg
@@ -227,7 +232,8 @@ class GlobalCardinality(
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasP = present(state, i)
-            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
+            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])]
+            if (coverIdx < 0) continue
             sim[coverIdx] += if (wasP) -1 else +1
         }
         // Counts term uses the simulated counts; closed term re-evaluates with the flip applied.
@@ -247,7 +253,8 @@ class GlobalCardinality(
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val nowP = present(state, i)
-            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
+            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])]
+            if (coverIdx < 0) continue
             s.counts[coverIdx] += if (nowP) +1 else -1
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
@@ -357,7 +364,6 @@ class GlobalCardinality(
         }
         val n = effectiveXs.size
         val m = cover.size
-        val coverSet = coverIndexByValue.keys
         // Maybe-present xs: presence undecided. They contribute no definite count and take
         // no pruning, but they remain potential takers of any cover value, so every
         // upper-bound argument must include them.
@@ -387,7 +393,7 @@ class GlobalCardinality(
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
                 val toRemove = IntArrayList()
-                d.forEach { if (it !in coverSet) toRemove.add(it) }
+                d.forEach { if (!coverIndexByValue.contains(it)) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(
                             x,
@@ -463,7 +469,7 @@ class GlobalCardinality(
             for (i in 0 until n) {
                 val d = state.intDomains[effectiveXs[i]]
                 var found = false
-                d.forEach { if (!found && it !in coverSet) found = true }
+                d.forEach { if (!found && !coverIndexByValue.contains(it)) found = true }
                 hasOtherVar[i] = found
                 if (found) any = true
             }
@@ -615,7 +621,7 @@ class GlobalCardinality(
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[varNode[i]] != sccId[otherNode]) {
                 val d = state.intDomains[effectiveXs[i]]
                 val toRemove = IntArrayList()
-                d.forEach { if (it !in coverSet) toRemove.add(it) }
+                d.forEach { if (!coverIndexByValue.contains(it)) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(
                             effectiveXs[i],
@@ -909,7 +915,7 @@ class GlobalCardinality(
             for (i in xs.indices) {
                 if (!present(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
-                if (cur in coverIndexByValue) continue
+                if (coverIndexByValue.contains(cur)) continue
                 val d = state.problem.intDomains[xs[i]]
                 for (cv in cover) {
                     if (cv in d && cv != cur) {
