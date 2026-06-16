@@ -1,7 +1,6 @@
-@file:OptIn(ExperimentalForeignApi::class)
-// Drop this suppression and migrate off kotlin.native.concurrent.Worker once Kotlin/Native ships a
-// stable threads replacement (the API is flagged obsolete but has no drop-in successor yet).
-@file:Suppress("DEPRECATION")
+// Opt into the obsolete Workers API and migrate off kotlin.native.concurrent.Worker once Kotlin/Native
+// ships a stable threads replacement (the API is flagged obsolete but has no drop-in successor yet).
+@file:OptIn(ExperimentalForeignApi::class, ObsoleteWorkersApi::class)
 
 package com.eignex.klause.portfolio
 
@@ -10,6 +9,7 @@ import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.posix.usleep
+import kotlin.native.concurrent.ObsoleteWorkersApi
 import kotlin.native.concurrent.TransferMode
 import kotlin.native.concurrent.Worker
 
