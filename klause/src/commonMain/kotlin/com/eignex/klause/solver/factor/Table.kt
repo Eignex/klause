@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
@@ -351,5 +352,103 @@ class Table(
         }
         s.started = true
         return true
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: a *tuple jump*. When some allowed tuple matches
+     *  exactly, moving the columns to any other allowed tuple lands on that tuple — still
+     *  satisfied. Each jump is offered as a compound (single survivor demoted by the sink), so
+     *  the engine can relocate columns to clear a coupled constraint without leaving the table. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (numTuples < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_JUMP_CAP && attempts < STRUCTURED_JUMP_CAP * JUMP_ATTEMPT_STRIDE) {
+            attempts++
+            val row = state.rng.nextInt(numTuples)
+            val parts = buildTupleMove(state, row) ?: continue
+            if (parts.isEmpty()) continue // already on this tuple — no move.
+            sink.addCompound(parts)
+            emitted++
+        }
+    }
+
+    /** Build the set-moves that land [xs] exactly on tuple [row], or null if the row is
+     *  unreachable (a value out of domain, or a variable repeated across columns whose tuple
+     *  entries disagree). Columns already matching are omitted. */
+    private fun buildTupleMove(state: LocalSearchState, row: Int): List<Move>? {
+        val base = row * arity
+        for (col in 0 until arity) {
+            val v = xs[col]
+            val target = tuples[base + col]
+            if (target !in state.problem.intDomains[v]) return null
+            for (prev in 0 until col) {
+                if (xs[prev] == v && tuples[base + prev] != target) return null
+            }
+        }
+        val parts = ArrayList<Move>(arity)
+        for (col in 0 until arity) {
+            val v = xs[col]
+            var dup = false
+            for (prev in 0 until col) {
+                if (xs[prev] == v) {
+                    dup = true
+                    break
+                }
+            }
+            if (dup) continue
+            val target = tuples[base + col]
+            if (state.assignment.intValue(v) != target) parts.add(Move.IntSet(v, target))
+        }
+        return parts
+    }
+
+    /** Feasible init: set [xs] to the first allowed tuple all of whose entries are in domain,
+     *  consistent across any repeated variable, and compatible with frozen assignments. Returns
+     *  false (leaving the random assignment) if no such tuple exists. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        for (row in 0 until numTuples) {
+            val base = row * arity
+            var usable = true
+            for (col in 0 until arity) {
+                val v = xs[col]
+                val target = tuples[base + col]
+                if (target !in state.problem.intDomains[v]) {
+                    usable = false
+                    break
+                }
+                if (state.assumptions.isFrozenInt(v) && state.assignment.intValue(v) != target) {
+                    usable = false
+                    break
+                }
+                var conflict = false
+                for (prev in 0 until col) {
+                    if (xs[prev] == v && tuples[base + prev] != target) {
+                        conflict = true
+                        break
+                    }
+                }
+                if (conflict) {
+                    usable = false
+                    break
+                }
+            }
+            if (!usable) continue
+            for (col in 0 until arity) {
+                val v = xs[col]
+                if (!state.assumptions.isFrozenInt(v)) state.assignment.setInt(v, tuples[base + col])
+            }
+            return true
+        }
+        return false
+    }
+
+    private companion object {
+        /** Cap on tuple-jump compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_JUMP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested jump before giving up. */
+        const val JUMP_ATTEMPT_STRIDE: Int = 4
     }
 }
