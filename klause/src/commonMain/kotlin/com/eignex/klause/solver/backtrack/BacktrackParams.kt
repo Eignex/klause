@@ -338,6 +338,14 @@ data class BacktrackParams(
      */
     val lpNValue: Boolean = false,
     /**
+     * Regular DFA flow hull (#655). When true and [lpBounding] holds, each Regular contributes the
+     * layer-expanded automaton flow model (arc vars + flow-conservation + channel rows) — the exact
+     * convex hull of its accepting strings, so an objective over the sequence gets a tight LP bound.
+     * Sound by construction; off by default; a no-op when no Regular exists or the unfolding exceeds
+     * the arc cap.
+     */
+    val lpRegular: Boolean = false,
+    /**
      * Mdd layered flow hull (#655). When true and [lpBounding] holds, each Mdd contributes the layered
      * flow model (arc vars + flow-conservation + value channel + cost channel) — the exact convex hull
      * of its accepting paths, so an objective over the sequence (or a cost-MDD's cost var) gets a tight

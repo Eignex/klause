@@ -57,6 +57,9 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** NValue one-hot value-hull columns (#435). */
     NVALUE("nvalue", LpTiming.EXHAUSTIVE),
 
+    /** Regular layer-expanded DFA flow-hull columns (#655). */
+    REGULAR("regular", LpTiming.EXHAUSTIVE),
+
     /** Mdd layered flow-hull columns (#655). */
     MDD("mdd", LpTiming.EXHAUSTIVE),
 
