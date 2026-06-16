@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.localsearch.movesource.GreedyInit
 import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
 import com.eignex.klause.solver.localsearch.movesource.PairSwap
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
@@ -91,6 +92,9 @@ class LocalSearchSolver(
     /** Enumerate-all structured-move source for [structuredMoveStep] — the same generator CBLS
      *  draws from (random-sampled), shared per epic #710. */
     private val satisfiedStructured: SatisfiedStructured = SatisfiedStructured.all()
+
+    /** Greedy-repair restart initializer (epic #710); shared by the satisfy and optimize restarts. */
+    private val greedyInit: GreedyInit = GreedyInit()
 
     /** The restart policy actually driven by the engine: when a [definitionalSweep] is
      *  present, every restart is followed by the sweep + a state recompute, so all restart
@@ -759,66 +763,7 @@ class LocalSearchSolver(
      * random start has 1000+ violations; this pass typically drops it by 30–60% before
      * the main loop runs.
      */
-    private fun greedyRepairPass(state: LocalSearchState) {
-        val varCount = problem.numBoolVars + problem.numIntVars
-        if (varCount == 0) return
-        val order = IntArray(varCount) { it }
-        // Fisher-Yates shuffle using the state's RNG so the pass is deterministic for a
-        // given seed.
-        for (i in order.size - 1 downTo 1) {
-            val j = state.rng.nextInt(i + 1)
-            val tmp = order[i]
-            order[i] = order[j]
-            order[j] = tmp
-        }
-        for (v in order) {
-            if (v < problem.numBoolVars) {
-                val boolId = v
-                if (state.assumptions.isFrozenBool(boolId)) continue
-                val baselineCost = state.cost
-                state.apply(Move.BoolFlip(boolId))
-                if (state.cost > baselineCost) state.apply(Move.BoolFlip(boolId))
-            } else {
-                val intId = v - problem.numBoolVars
-                if (state.assumptions.isFrozenInt(intId)) continue
-                val d = problem.intDomains[intId]
-                val cur = state.assignment.intValue(intId)
-                if (d.size <= 1) continue
-                // For tiny domains (≤16 values) sweep all; for larger domains sample up
-                // to 16 candidates to bound the per-pass cost at O(numVars × 16).
-                val maxTries = 16
-                var bestCost = state.cost
-                var bestVal = cur
-                if (d.size <= maxTries) {
-                    for (idx in 0 until d.size) {
-                        val candidate = d.valueAt(idx)
-                        if (candidate == cur) continue
-                        state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) {
-                            bestCost = state.cost
-                            bestVal = candidate
-                        }
-                        state.apply(Move.IntSet(intId, cur))
-                    }
-                } else {
-                    repeat(maxTries) {
-                        val candidate = d.valueAt(state.rng.nextInt(d.size))
-                        if (candidate == cur) return@repeat
-                        state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) {
-                            bestCost = state.cost
-                            bestVal = candidate
-                        }
-                        state.apply(Move.IntSet(intId, cur))
-                    }
-                }
-                if (bestVal != cur) state.apply(Move.IntSet(intId, bestVal))
-            }
-        }
-        // Reset tabu / activity tracking so the main loop doesn't start with every var
-        // freshly blocked by the repair pass's apply-then-revert churn.
-        state.resetStepCounters()
-    }
+    private fun greedyRepairPass(state: LocalSearchState) = greedyInit.run(state)
 
     /**
      * Factor-aware structured descent step. Collects [com.eignex.klause.solver.Factor.proposeStructuredMoves]

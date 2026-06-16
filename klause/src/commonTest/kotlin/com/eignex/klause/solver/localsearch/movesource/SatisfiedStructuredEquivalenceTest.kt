@@ -54,6 +54,16 @@ class SatisfiedStructuredEquivalenceTest {
         }
     }
 
+    /** The implicit-neighbourhood `sampleElectedStructured` shape: consult exactly the elected,
+     *  non-violated factor ids. */
+    private val elected = intArrayOf(0)
+
+    private fun oldElectedStructured(state: LocalSearchState, sink: MoveSink) {
+        for (fid in elected) {
+            if (!state.violated.contains(fid)) state.factors[fid].proposeStructuredMoves(state, fid, sink)
+        }
+    }
+
     @Test
     fun `sampled scope matches the old sampleFromSatisfied`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
@@ -68,6 +78,15 @@ class SatisfiedStructuredEquivalenceTest {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L)) {
             assertSourceMatchesGenerator(::feasibleProblem, seed, SatisfiedStructured.all()) { s, sink ->
                 oldStructuredAll(s, sink)
+            }
+        }
+    }
+
+    @Test
+    fun `elected scope matches the implicit-neighbourhood sampleElectedStructured shape`() {
+        for (seed in longArrayOf(1L, 7L, 42L)) {
+            assertSourceMatchesGenerator(::feasibleProblem, seed, SatisfiedStructured.elected(elected)) { s, sink ->
+                oldElectedStructured(s, sink)
             }
         }
     }
