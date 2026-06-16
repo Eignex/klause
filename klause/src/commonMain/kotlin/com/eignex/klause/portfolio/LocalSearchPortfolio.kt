@@ -69,6 +69,12 @@ internal data class LocalSearchWorkerConfig(
      *  search-excluded and the dismantle chains can't thread (measured: chains solve pc 3/3
      *  without invariants, plateau at cost ≈3 with them). */
     val perMoveInvariants: Boolean = true,
+    /** Per-worker switch for implicit-solving feasible init (see
+     *  [LocalSearchSolver.seedImplicitOnRestart]): seeds elected structural globals feasible on
+     *  every restart so their structure-preserving neighbourhoods are productive from step one.
+     *  Off by default; paired with a [Cbls] whose `implicitStructuredCap > 0` on the
+     *  permutation/assignment-shaped arm. */
+    val seedImplicitOnRestart: Boolean = false,
 ) : WorkerConfig {
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
@@ -92,6 +98,7 @@ internal data class LocalSearchWorkerConfig(
             restartPolicy = restartPolicy,
             definitionalSweep = definitionalSweep,
             perMoveInvariants = definitionalSweep != null && perMoveInvariants,
+            seedImplicitOnRestart = seedImplicitOnRestart,
         ).session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(
@@ -139,6 +146,7 @@ internal data class LocalSearchWorkerConfig(
             label: String,
             restart: RestartPolicy,
             perMoveInvariants: Boolean = true,
+            seedImplicitOnRestart: Boolean = false,
             make: () -> Cbls,
         ) = LocalSearchWorkerConfig(
             label,
@@ -146,6 +154,7 @@ internal data class LocalSearchWorkerConfig(
             restart,
             optimizeStrategy = make(),
             perMoveInvariants = perMoveInvariants,
+            seedImplicitOnRestart = seedImplicitOnRestart,
         )
 
         /**
@@ -259,6 +268,15 @@ internal data class LocalSearchWorkerConfig(
             // Bandit-adaptive probSAT (#8): a UCB1 bandit picks the cb noise schedule per session.
             LsArm.ProbsatBanditFixed ->
                 LocalSearchWorkerConfig(arm.label, ProbSat.bandit(tabu = cblsTabu()), FixedCadenceRestart())
+
+            // Implicit-solving neighbourhoods: seed elected structural globals (all-different /
+            // inverse / table) feasible on every restart and draw their feasibility-preserving
+            // moves during the infeasibility fight, so the search relocates values inside one
+            // global to clear coupled constraints (Sudoku rows × columns, timetabling). The
+            // permutation/assignment-shaped niche.
+            LsArm.CblsImplicitFixed -> cblsWorker(arm.label, FixedCadenceRestart(), seedImplicitOnRestart = true) {
+                Cbls(implicitStructuredCap = 8, tabu = cblsTabu())
+            }
         }
 
         /**
@@ -282,6 +300,10 @@ internal data class LocalSearchWorkerConfig(
             // #9-lite credit pass kept these two (each held a best); the third, the LS move bandit,
             // was a dud and was removed.
             LsArm.CblsIlsBandit, LsArm.ProbsatBanditFixed,
+            // Implicit-solving niche; kept last (like the bandit arms) so the default diverse(N)
+            // prefix is unchanged pending a cross-seed credit pass. Reachable by label and in the
+            // full pool.
+            LsArm.CblsImplicitFixed,
         )
 
         /** Resolve a catalog label to its typed [LsArm] — the single string boundary, for the CLI /
@@ -330,6 +352,7 @@ internal enum class LsArm(val label: String) {
     CblsTenure3Fixed("cbls-tenure3/fixed"),
     CblsIlsBandit("cbls/ils-bandit"),
     ProbsatBanditFixed("probsat-bandit/fixed"),
+    CblsImplicitFixed("cbls-implicit/fixed"),
 }
 
 /**

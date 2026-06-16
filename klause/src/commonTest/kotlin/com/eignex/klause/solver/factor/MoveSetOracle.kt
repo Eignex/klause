@@ -97,13 +97,15 @@ object MoveSetOracle {
             // Search for a feasible start: a few random tries, then the factor's own feasible
             // seeder (structural globals supply one — it lands a permutation / tuple directly).
             var feasible = false
-            for (t in 0 until FEASIBLE_SEARCH_BUDGET) {
+            var tries = 0
+            while (tries < FEASIBLE_SEARCH_BUDGET) {
                 randomizeAssignment(state, problem, rng)
                 state.recompute()
                 if (!factor.isViolated(state, 0)) {
                     feasible = true
                     break
                 }
+                tries++
             }
             if (!feasible) {
                 randomizeAssignment(state, problem, rng)
