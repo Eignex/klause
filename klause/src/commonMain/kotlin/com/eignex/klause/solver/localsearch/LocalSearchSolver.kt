@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
+import com.eignex.klause.solver.localsearch.movesource.PairSwap
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
@@ -919,25 +920,18 @@ class LocalSearchSolver(
         cancellation: Cancellation,
     ): Boolean {
         val baseCost = state.cost
-        val rng = state.rng
         val poll = IntArray(1)
         var tried = 0
-        // Bool-pair swaps: pick a true var and a false var, flip both.
-        val nBool = problem.numBoolVars
-        if (nBool >= 2) {
+        // Bool-pair swaps: pick a true var and a false var, flip both. Candidate construction
+        // (draw + validate) is shared with PairSwap (epic #710); the lazy first-improving loop —
+        // and therefore the RNG draw order and selection — stays exactly as before.
+        if (problem.numBoolVars >= 2) {
             while (tried < budget) {
                 if (pollCancel(poll, cancellation)) return false
                 tried++
-                val a = rng.nextInt(nBool)
-                val b = rng.nextInt(nBool)
-                if (a == b) continue
-                if (state.assumptions.isFrozenBool(a) || state.assumptions.isFrozenBool(b)) continue
-                val va = state.assignment.boolValue(a)
-                val vb = state.assignment.boolValue(b)
-                if (va == vb) continue
+                val swap = PairSwap.drawBoolSwap(state) ?: continue
                 // Score the joint swap without committing: netDelta (apply/revert-backed for
                 // the Compound) for feasibility, objectiveDelta for the improvement test.
-                val swap = Move.Compound(listOf(Move.BoolFlip(a), Move.BoolFlip(b)))
                 if (baseCost + state.netDelta(swap) == 0L) {
                     val od = state.objectiveDelta(objective, swap)
                     if (od != null && od < 0.0) {
@@ -949,22 +943,12 @@ class LocalSearchSolver(
         }
         // Int-pair swaps: pick two int vars with different values whose values fit in the
         // other's domain; swap them.
-        val nInt = problem.numIntVars
-        if (nInt >= 2) {
+        if (problem.numIntVars >= 2) {
             tried = 0
-            val intBudget = budget
-            while (tried < intBudget) {
+            while (tried < budget) {
                 if (pollCancel(poll, cancellation)) return false
                 tried++
-                val a = rng.nextInt(nInt)
-                val b = rng.nextInt(nInt)
-                if (a == b) continue
-                if (state.assumptions.isFrozenInt(a) || state.assumptions.isFrozenInt(b)) continue
-                val va = state.assignment.intValue(a)
-                val vb = state.assignment.intValue(b)
-                if (va == vb) continue
-                if (vb !in problem.intDomains[a] || va !in problem.intDomains[b]) continue
-                val swap = Move.Compound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+                val swap = PairSwap.drawIntSwap(state) ?: continue
                 if (baseCost + state.netDelta(swap) == 0L) {
                     val od = state.objectiveDelta(objective, swap)
                     if (od != null && od < 0.0) {
