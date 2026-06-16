@@ -203,8 +203,6 @@ object LpAutoConfig {
         val baseFits = tableauCells(rows, baseCols) <= maxCells
 
         val cutEligible = allDifferent || globalCardinality
-        val makespanLp = baseFits && makespanPlans > 0
-        val diffnLp = baseFits && diffnPlans > 0
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
@@ -224,10 +222,20 @@ object LpAutoConfig {
             config.resolved(LpTechnique.BOUNDING) &&
             tableauCells(rows, baseCols) <= KlauseConfig.current.lpSparseMaxTableauCells
 
+        // Hull columns and the cumulative/diffn makespan rows attach to whichever bounding path runs.
+        // They were previously gated on `bounding` alone, so the sparse-primary path (every over-cap
+        // model — i.e. the instances rich enough to carry these globals) silently dropped them despite
+        // fitting their own caps. Gating on `lpActive` fixes that; the sparse path budgets hulls
+        // against the (larger) sparse cap, the dense path against the dense cap (#705).
+        val lpActive = bounding || sparsePrimary
+        val makespanLp = lpActive && makespanPlans > 0
+        val diffnLp = lpActive && diffnPlans > 0
+        val hullCap = if (sparsePrimary) KlauseConfig.current.lpSparseMaxTableauCells else maxCells
+
         // Only structurally-present hulls the emphasis permits compete for the budget (a forbidden
         // hull is never built, so it costs nothing). Each estimate sums over its factors and honours
         // that hull's own MAX_* cap, exactly as the builder does.
-        val candidates = if (!bounding) {
+        val candidates = if (!lpActive) {
             emptyList()
         } else {
             buildList {
@@ -243,7 +251,7 @@ object LpAutoConfig {
                 }
             }
         }
-        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, maxCells)
+        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
 
         val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
@@ -264,8 +272,8 @@ object LpAutoConfig {
             lpRegular = base.lpRegular || (LpTechnique.REGULAR in acceptedHulls),
             lpMdd = base.lpMdd || (LpTechnique.MDD in acceptedHulls),
             lpGccCount = base.lpGccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
-            lpCumulative = base.lpCumulative || (bounding && makespanLp),
-            lpDiffn = base.lpDiffn || (bounding && diffnLp && config.resolved(LpTechnique.DIFFN)),
+            lpCumulative = base.lpCumulative || makespanLp,
+            lpDiffn = base.lpDiffn || (diffnLp && config.resolved(LpTechnique.DIFFN)),
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
                 (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
             lpCumulativeFlow = base.lpCumulativeFlow || (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
