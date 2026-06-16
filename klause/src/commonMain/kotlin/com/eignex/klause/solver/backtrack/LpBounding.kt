@@ -326,10 +326,17 @@ internal fun BacktrackSolver.rootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
+    sparse: Boolean = false,
 ): Double = try {
     val relaxation = relaxer.build(PropagationSession(problem), globalCuts)
     if (relaxation.model.n == 0) {
         Double.NaN
+    } else if (sparse) {
+        // The over-cap sparse model has no dense tableau for [DualSimplex]; take the revised simplex +
+        // Neumaier–Shcherbina safe bound — the same sound bound the per-node sparse prune reports.
+        val result = RevisedSimplex(relaxation.model, cancellation).solve()
+        val safe = result?.let { safeObjectiveLowerBound(relaxation.model, it.duals) }
+        if (safe != null) safe + relaxation.objectiveConstant.toDouble() else Double.NaN
     } else {
         lpObjectiveOf(DualSimplex(relaxation.model, cancellation = cancellation).solve(), relaxation)
     }

@@ -187,9 +187,10 @@ internal class DualSimplex(
 
     /** Reset [nMat] to the original `[A | I | b]` and `det = 1`. */
     private fun loadOriginalMatrix() {
+        val a = model.denseRows() // dense path only (DualSimplex never runs on a sparse model)
         for (i in 0 until m) {
             val row = nMat[i]
-            for (j in 0 until model.n) row[j] = model.a[i][j]
+            for (j in 0 until model.n) row[j] = a[i][j]
             for (s in 0 until m) row[model.n + s] = if (s == i) 1L else 0L
             row[rhsCol] = model.rhs[i]
             var mx = 0L
@@ -451,9 +452,11 @@ internal class DualSimplex(
         val changeRow = IntArrayList()
         val changeCol = IntArrayList()
         val changeDelta = LongArrayList()
+        val ma = model.denseRows()
+        val pma = pm.denseRows()
         for (i in 0 until m) {
-            val a = model.a[i]
-            val pa = pm.a[i]
+            val a = ma[i]
+            val pa = pma[i]
             for (j in 0 until model.n) {
                 if (a[j] == pa[j]) continue
                 if (prev.status[j] == VarStatus.BASIC) return false
@@ -540,13 +543,15 @@ internal class DualSimplex(
     private fun seedAppended(prev: DualSimplex): Boolean {
         val pm = prev.model
         val m0 = pm.m
+        val ma = model.denseRows()
+        val pma = pm.denseRows()
         // The structural costs and the old rows (coefficients, rhs, relation) must be identical;
         // bounds are free to differ (they never enter the tableau).
         for (j in 0 until model.n) {
             if (pm.cost[j] != model.cost[j]) return false
         }
         for (i in 0 until m0) {
-            if (!pm.a[i].contentEquals(model.a[i])) return false
+            if (!pma[i].contentEquals(ma[i])) return false
             if (pm.rhs[i] != model.rhs[i]) return false
             if (pm.hasUpper[pm.n + i] != model.hasUpper[model.n + i]) return false
         }
@@ -573,12 +578,12 @@ internal class DualSimplex(
         }
         for (t in m0 until m) {
             val dst = nMat[t]
-            for (j in 0 until model.n) dst[j] = mulExact(d, model.a[t][j])
+            for (j in 0 until model.n) dst[j] = mulExact(d, ma[t][j])
             for (j in model.n until numVars) dst[j] = 0L
             dst[model.n + t] = d
             dst[rhsCol] = mulExact(d, model.rhs[t])
             for (j in 0 until model.n) {
-                val c = model.a[t][j]
+                val c = ma[t][j]
                 if (c == 0L) continue
                 val k = varRow[j]
                 if (k < 0) continue
@@ -682,6 +687,7 @@ internal class DualSimplex(
     ): Cut? {
         val coef = LongArray(model.n) // accumulated coefficient on each structural x'_k
         var c = 0L // accumulated constant on the left side
+        val ma = model.denseRows() // dense path only (cut separation runs on the dense tableau)
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
             val atLower = status[j] == VarStatus.AT_LOWER
@@ -703,7 +709,7 @@ internal class DualSimplex(
                 if (model.hasUpper[r + model.n]) continue // equality slack is fixed at 0 → t_j = 0
                 // ≤-row slack: t_j = rhs_r − Σ_k a_rk·x'_k.
                 for (k in 0 until model.n) {
-                    val ark = model.a[r][k]
+                    val ark = ma[r][k]
                     if (ark != 0L) coef[k] = subExact(coef[k], mulExact(mj, ark))
                 }
                 c = addExact(c, mulExact(mj, model.rhs[r]))

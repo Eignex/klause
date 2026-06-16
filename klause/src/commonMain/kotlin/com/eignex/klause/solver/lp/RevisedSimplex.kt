@@ -45,19 +45,19 @@ internal class RevisedSimplex(
     init {
         colRows = Array(n) { IntArray(0) }
         colVals = Array(n) { DoubleArray(0) }
+        // Read columns through the model's representation-agnostic accessor: a direct CSC slice on a
+        // sparse model (#602), or a dense-column scan otherwise. Two passes (the accessor is inline,
+        // so each is a tight loop) — count nnz, then fill.
         for (j in 0 until n) {
             var nnz = 0
-            for (i in 0 until m) if (model.a[i][j] != 0L) nnz++
+            model.forEachInColumn(j) { _, _ -> nnz++ }
             val rows = IntArray(nnz)
             val vals = DoubleArray(nnz)
             var k = 0
-            for (i in 0 until m) {
-                val v = model.a[i][j]
-                if (v != 0L) {
-                    rows[k] = i
-                    vals[k] = v.toDouble()
-                    k++
-                }
+            model.forEachInColumn(j) { i, v ->
+                rows[k] = i
+                vals[k] = v.toDouble()
+                k++
             }
             colRows[j] = rows
             colVals[j] = vals

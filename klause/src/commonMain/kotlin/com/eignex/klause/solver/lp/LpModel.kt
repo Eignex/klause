@@ -51,8 +51,18 @@ internal class LpModel(
     val n: Int,
     /** Number of constraint rows, equivalently the number of slack variables. */
     val m: Int,
-    /** Dense constraint coefficients over structural variables: `a[i][j]`, row-major, `m × n`. */
-    val a: Array<LongArray>,
+    /**
+     * Dense constraint coefficients over structural variables: `a[i][j]`, row-major, `m × n` — or
+     * `null` when the model was built sparse (over the dense cap, #602), where only the [csc] core is
+     * materialized so the dense `m × n` is never allocated. The dense [DualSimplex] /
+     * [FloatSimplex] read this (and only run on the dense path, where it is non-null — see
+     * [denseRows]); the sparse [RevisedSimplex] / [safeObjectiveLowerBound] / [ExactBasisCertifier]
+     * read columns through [forEachInColumn], which works against either representation.
+     */
+    val a: Array<LongArray>?,
+    /** Sparse CSC of the structural columns when built sparse (over the dense cap, #602), else `null`
+     *  and the dense [a] carries the coefficients. Read uniformly through [forEachInColumn]. */
+    val csc: Csc? = null,
     /** Right-hand side per row, after the lower-bound shift. */
     val rhs: LongArray,
     /** Objective coefficient per variable (length `n + m`); minimization sense, slacks are `0`. */
@@ -92,7 +102,39 @@ internal class LpModel(
 
     /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
+
+    /** The dense coefficient matrix, required by the dense [DualSimplex] / [FloatSimplex]; errors on a
+     *  sparse model (those solvers only run on the dense path, so this never fires there). */
+    fun denseRows(): Array<LongArray> = a ?: error("dense coefficient matrix absent on a sparse LP model")
+
+    /**
+     * Iterate the nonzero structural entries of column [j] as `(row, value)`, rows ascending. Reads
+     * the sparse CSC core when present (the over-cap sparse build) and the dense matrix otherwise, so
+     * the column-oriented sparse readers ([RevisedSimplex], [safeObjectiveLowerBound],
+     * [ExactBasisCertifier]) are representation-agnostic. [j] must be a structural column (`< n`);
+     * slack columns are the implicit unit vectors the callers handle separately.
+     */
+    inline fun forEachInColumn(j: Int, action: (row: Int, value: Long) -> Unit) {
+        val c = csc
+        if (c != null) {
+            for (k in c.colPtr[j] until c.colPtr[j + 1]) action(c.rowIdx[k], c.colVal[k])
+        } else {
+            val dense = a ?: error("LP model has neither a dense matrix nor a CSC core")
+            for (i in 0 until m) {
+                val v = dense[i][j]
+                if (v != 0L) action(i, v)
+            }
+        }
+    }
 }
+
+/**
+ * Compressed-sparse-column store of an [LpModel]'s structural columns: column `j` occupies
+ * `rowIdx[colPtr[j] until colPtr[j + 1]]` with the parallel values in [colVal], row indices ascending.
+ * Slack columns are the implicit unit vectors and are never stored. Built by [LpBuilder.buildSparse]
+ * so the over-cap pipeline never allocates the dense `m × n`.
+ */
+internal class Csc(val colPtr: IntArray, val rowIdx: IntArray, val colVal: LongArray)
 
 /**
  * Builds an [LpModel] from structural variables and constraint rows. Coefficients are sparse
@@ -181,6 +223,13 @@ internal class LpBuilder {
      */
     fun build(sense: Sense): LpModel = buildShared(sense, sharedRows = null)
 
+    /** Build a sparse model: only the CSC core of the structural columns is materialized, so the dense
+     *  `m × n` matrix is never allocated. For the over-cap bound-only sparse pipeline (#602), whose
+     *  solvers ([RevisedSimplex], [safeObjectiveLowerBound], [ExactBasisCertifier]) read columns via
+     *  [LpModel.forEachInColumn]. The result is field-for-field identical to [build] except `a` is null
+     *  and the CSC arrays are populated. */
+    fun buildSparse(sense: Sense): LpModel = buildShared(sense, sharedRows = null, sparse = true)
+
     /**
      * As [build], but reuses pre-densified coefficient rows for the rows that did not change since a
      * prior build (#564). For row `i`, a non-null `sharedRows[i]` is used as the row's dense
@@ -193,12 +242,18 @@ internal class LpBuilder {
      * full [build]; sharing only avoids reallocating and re-zeroing the dense `m × n` matrix, which
      * dominates the per-node relaxation rebuild on sparse models.
      */
-    fun buildShared(sense: Sense, sharedRows: Array<LongArray?>?): LpModel {
+    fun buildShared(sense: Sense, sharedRows: Array<LongArray?>?, sparse: Boolean = false): LpModel {
         val n = lo.size
         val m = rows.size
-        val a = Array(m) { i ->
-            val shared = if (sharedRows != null && i < sharedRows.size) sharedRows[i] else null
-            shared ?: LongArray(n)
+        // Dense path: the m × n matrix (reusing shared bound-invariant rows, #564). Sparse path: leave
+        // `a` null and let the CSC core below carry the coefficients, so the dense matrix is unallocated.
+        val a = if (sparse) {
+            null
+        } else {
+            Array(m) { i ->
+                val shared = if (sharedRows != null && i < sharedRows.size) sharedRows[i] else null
+                shared ?: LongArray(n)
+            }
         }
         val rhs = LongArray(m)
         val loShift = LongArray(n) { lo[it] }
@@ -211,13 +266,16 @@ internal class LpBuilder {
             for (k in row.cols.indices) {
                 val j = row.cols[k]
                 val coeff = if (flip) -row.vals[k] else row.vals[k]
-                if (!reused) a[i][j] = addExact(a[i][j], coeff) // sum repeated columns
+                if (a != null && !reused) a[i][j] = addExact(a[i][j], coeff) // sum repeated columns
                 // Apply the lower-bound shift: substituting x_j = x'_j + lo_j moves the constant
                 // coeff*lo_j across to the right-hand side.
                 b = subExact(b, mulExact(coeff, lo[j]))
             }
             rhs[i] = b
         }
+
+        // The CSC core (sparse path only) — same coefficients, column-major.
+        val csc = if (sparse) buildCsc(n) else null
 
         val numVars = n + m
         val cost = LongArray(numVars)
@@ -241,11 +299,52 @@ internal class LpBuilder {
         }
 
         return LpModel(
-            n = n, m = m, a = a, rhs = rhs, cost = cost,
+            n = n, m = m, a = a, csc = csc,
+            rhs = rhs, cost = cost,
             upper = upper, hasUpper = hasUpper, loShift = loShift,
             objConstant = objConstant, sense = sense, tag = IntArray(n) { tags[it] },
             rowGlobal = BooleanArray(m) { rows[it].global },
             rowPremises = Array(m) { rows[it].premises },
         )
+    }
+
+    /** Build the CSC core over the `n` structural columns from the accumulated [rows]: `>=` rows are
+     *  negated to `<=` (matching the dense normalization), repeated columns within a row are summed,
+     *  and entries land column-major with ascending row indices (rows walked in order). */
+    private fun buildCsc(n: Int): Csc {
+        val colRowBuckets = Array(n) { IntArrayList() }
+        val colValBuckets = Array(n) { LongArrayList() }
+        for ((i, row) in rows.withIndex()) {
+            val flip = row.rel == Relation.GE
+            val summed = HashMap<Int, Long>(row.cols.size)
+            for (k in row.cols.indices) {
+                val j = row.cols[k]
+                val coeff = if (flip) -row.vals[k] else row.vals[k]
+                summed[j] = addExact(summed.getOrElse(j) { 0L }, coeff)
+            }
+            // Ascending column order keeps the CSC deterministic; i ascends ⇒ rows ascend within a column.
+            for (j in summed.keys.sorted()) {
+                val v = summed.getValue(j)
+                if (v != 0L) {
+                    colRowBuckets[j].add(i)
+                    colValBuckets[j].add(v)
+                }
+            }
+        }
+        val colPtr = IntArray(n + 1)
+        for (j in 0 until n) colPtr[j + 1] = colPtr[j] + colRowBuckets[j].size
+        val rowIdx = IntArray(colPtr[n])
+        val colVal = LongArray(colPtr[n])
+        for (j in 0 until n) {
+            val br = colRowBuckets[j]
+            val bv = colValBuckets[j]
+            var w = colPtr[j]
+            for (k in 0 until br.size) {
+                rowIdx[w] = br[k]
+                colVal[w] = bv[k]
+                w++
+            }
+        }
+        return Csc(colPtr, rowIdx, colVal)
     }
 }

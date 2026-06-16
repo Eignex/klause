@@ -33,10 +33,7 @@ internal object ExactBasisCertifier {
         for (j in 0 until model.numVars) {
             if (!nonBasic[j]) continue
             var dot = BigRational.ZERO
-            for (i in 0 until m) {
-                val a = fullEntry(model, i, j)
-                if (a != 0L) dot += y[i] * BigRational.of(a)
-            }
+            forEachFullColumn(model, j) { i, a -> dot += y[i] * BigRational.of(a) }
             val dj = BigRational.of(model.cost[j]) - dot // reduced cost c_j − yᵀA_j
             if (dj.signum() < 0) {
                 if (!model.hasUpper[j]) return null // unbounded below
@@ -56,7 +53,11 @@ internal object ExactBasisCertifier {
         // pure-integer, no per-op gcd, with magnitudes bounded by a single determinant.
         val a = Array(m) { t ->
             val col = basic[t]
-            Array(m + 1) { j -> BigInt.of(if (j < m) fullEntry(model, j, col) else model.cost[col]) }
+            // Column `col` over rows 0 until m (scatter the nonzeros), with the dual rhs c_col at m.
+            val rowArr = Array(m + 1) { BigInt.ZERO }
+            rowArr[m] = BigInt.of(model.cost[col])
+            forEachFullColumn(model, col) { i, v -> rowArr[i] = BigInt.of(v) }
+            rowArr
         }
         var prev = BigInt.ONE
         for (k in 0 until m) {
@@ -92,12 +93,9 @@ internal object ExactBasisCertifier {
         return x
     }
 
-    /** `A_full[row][col]`: structural column → `a[row][col]`, slack column `n+s` → unit `e_s`. */
-    private fun fullEntry(model: LpModel, row: Int, col: Int): Long = if (col < model.n) {
-        model.a[row][col]
-    } else if (col - model.n == row) {
-        1L
-    } else {
-        0L
+    /** Iterate the nonzero rows of full column [col] as `(row, value)`: a structural column through the
+     *  model's CSC/dense accessor, a slack column `n+s` as the unit vector `e_s`. */
+    private inline fun forEachFullColumn(model: LpModel, col: Int, action: (row: Int, value: Long) -> Unit) {
+        if (col < model.n) model.forEachInColumn(col, action) else action(col - model.n, 1L)
     }
 }
