@@ -2,10 +2,12 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -159,5 +161,66 @@ class SymmetricAllDifferent(
             if (!state.tightenIntMax(xs[target], mirror, ant)) return false
         }
         return true
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood on the space of involutions: **pair** two fixed
+     *  points `i`, `j` (`xs(i)=i`, `xs(j)=j` → `xs(i)=j`, `xs(j)=i`) or **unpair** a transposition
+     *  `(i, j)` back to two fixed points. Both keep `xs` a valid self-inverse permutation while
+     *  re-arranging which positions are paired. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val n = xs.size
+        if (n < 2) return
+        val fixed = IntArrayList()
+        for (i in 0 until n) {
+            if (state.assignment.intValue(xs[i]) - indexOffset == i) fixed.add(i)
+        }
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
+            attempts++
+            if (state.rng.nextBoolean() && fixed.size >= 2) {
+                val i = fixed[state.rng.nextInt(fixed.size)]
+                val j = fixed[state.rng.nextInt(fixed.size)]
+                if (i == j || xs[i] == xs[j]) continue
+                val vi = j + indexOffset
+                val vj = i + indexOffset
+                if (vi !in state.problem.intDomains[xs[i]] || vj !in state.problem.intDomains[xs[j]]) continue
+                sink.addCompound(listOf(Move.IntSet(xs[i], vi), Move.IntSet(xs[j], vj)))
+                emitted++
+            } else {
+                val i = state.rng.nextInt(n)
+                val p = state.assignment.intValue(xs[i]) - indexOffset
+                if (p == i || p !in 0 until n || xs[i] == xs[p]) continue
+                val vi = i + indexOffset
+                val vp = p + indexOffset
+                if (vi !in state.problem.intDomains[xs[i]] || vp !in state.problem.intDomains[xs[p]]) continue
+                sink.addCompound(listOf(Move.IntSet(xs[i], vi), Move.IntSet(xs[p], vp)))
+                emitted++
+            }
+        }
+    }
+
+    /** Feasible init: the identity involution (`xs(i) = i`). Returns false (leaving the random
+     *  assignment) if any index is out of its variable's domain or pinned otherwise by a frozen var. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        for (i in xs.indices) {
+            val target = i + indexOffset
+            if (target !in state.problem.intDomains[xs[i]]) return false
+            if (state.assumptions.isFrozenInt(xs[i]) && state.assignment.intValue(xs[i]) != target) return false
+        }
+        for (i in xs.indices) {
+            if (!state.assumptions.isFrozenInt(xs[i])) state.assignment.setInt(xs[i], i + indexOffset)
+        }
+        return true
+    }
+
+    private companion object {
+        /** Cap on pair/unpair compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_MOVE_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested move before giving up. */
+        const val MOVE_ATTEMPT_STRIDE: Int = 6
     }
 }
