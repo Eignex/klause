@@ -269,6 +269,7 @@ class LocalSearchSolver(
         return sequence {
             val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
             state.violationSoftCap = params.violationSoftCap
+            state.normalizeWeightsByClass = params.normalizeWeightsByClass
             installInvariants(state)
             warm?.applyTo(state)
             // Streaming has no notion of "best so far" to anchor an adaptive restart
@@ -385,6 +386,7 @@ class LocalSearchSolver(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         state.violationSoftCap = params.violationSoftCap
+        state.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
         warm?.applyTo(state)
         // Plumb shaping into the state so strategies (e.g. WalkSat) consulting
