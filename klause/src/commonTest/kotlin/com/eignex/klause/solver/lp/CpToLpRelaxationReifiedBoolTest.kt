@@ -27,9 +27,10 @@ class CpToLpRelaxationReifiedBoolTest {
         val r = CpToLpRelaxation(p, null).build(PropagationSession(p))
         val m = r.model
         val x = LongArray(m.n) { col -> (if (bits[r.colVarId[col]]) 1L else 0L) - m.loShift[col] }
+        val a = m.denseRows()
         for (i in 0 until m.m) {
             var s = 0L
-            for (j in 0 until m.n) s += m.a[i][j] * x[j]
+            for (j in 0 until m.n) s += a[i][j] * x[j]
             if (s > m.rhs[i]) return false
         }
         return true

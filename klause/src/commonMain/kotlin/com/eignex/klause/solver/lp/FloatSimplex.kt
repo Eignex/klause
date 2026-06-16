@@ -102,9 +102,10 @@ internal class FloatSimplex(
     }
 
     private fun coldStart() {
+        val a = model.denseRows() // dense path only (FloatSimplex never runs on a sparse model)
         for (i in 0 until m) {
             val rowi = nMat[i]
-            for (j in 0 until model.n) rowi[j] = model.a[i][j].toDouble()
+            for (j in 0 until model.n) rowi[j] = a[i][j].toDouble()
             for (s in 0 until m) rowi[model.n + s] = if (s == i) 1.0 else 0.0
             rowi[rhsCol] = model.rhs[i].toDouble()
             basicVar[i] = model.slackCol(i)

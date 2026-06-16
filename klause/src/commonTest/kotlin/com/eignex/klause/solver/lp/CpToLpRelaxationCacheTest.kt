@@ -93,12 +93,11 @@ class CpToLpRelaxationCacheTest {
     private fun assertModelsEqual(a: LpModel, b: LpModel, seed: Int) {
         assertEquals(a.n, b.n, "n at seed $seed")
         assertEquals(a.m, b.m, "m at seed $seed")
+        val aa = a.denseRows()
+        val ba = b.denseRows()
         for (i in 0 until a.m) {
-            if (!a.a[i].contentEquals(
-                    b.a[i],
-                )
-            ) {
-                fail("row $i coeffs differ at seed $seed: ${a.a[i].toList()} vs ${b.a[i].toList()}")
+            if (!aa[i].contentEquals(ba[i])) {
+                fail("row $i coeffs differ at seed $seed: ${aa[i].toList()} vs ${ba[i].toList()}")
             }
         }
         assertTrue(a.rhs.contentEquals(b.rhs), "rhs at seed $seed: ${a.rhs.toList()} vs ${b.rhs.toList()}")

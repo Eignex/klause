@@ -137,6 +137,11 @@ internal class CpToLpRelaxation(
      * probe is deliberately the minimal linear+Boolean relaxation.
      */
     private val objectiveCone: Boolean = false,
+    /** When true, emit a sparse [LpModel] (CSC core only, no dense `m × n` matrix) — for the over-cap
+     *  bound-only sparse pipeline (#602), whose solvers read columns via [LpModel.forEachInColumn].
+     *  Set from [com.eignex.klause.solver.backtrack.BacktrackParams.lpSparsePrimary]; the dense
+     *  [DualSimplex] path leaves it false. Disables the #564 dense-row cache (moot without a dense `a`). */
+    private val sparseModel: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -748,12 +753,14 @@ internal class CpToLpRelaxation(
             // (re)capture the cache. Sharing is sound because the re-walk above produced the live
             // right-hand sides / global flags for every row — only the bound-invariant coefficient
             // arrays are aliased.
+            // The over-cap sparse pipeline (#602) builds only the CSC core — no dense `m × n` matrix —
+            // so the #564 dense-row cache is moot there and skipped.
             val shared = denseCache?.takeIf {
-                cacheable && cacheVarCount == builder.varCount &&
+                !sparseModel && cacheable && cacheVarCount == builder.varCount &&
                     cacheBaseRows == baseRows
             }
-            val model = builder.buildShared(Sense.MINIMIZE, shared)
-            if (shared == null && cacheable) captureDenseCache(model, baseRows)
+            val model = builder.buildShared(Sense.MINIMIZE, shared, sparse = sparseModel)
+            if (!sparseModel && shared == null && cacheable) captureDenseCache(model, baseRows)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
             return LpRelaxation(
                 model = model,
@@ -775,7 +782,8 @@ internal class CpToLpRelaxation(
                 val r = reifiedRowIdx[idx]
                 if (r < baseRows) reified[r] = true
             }
-            denseCache = Array(baseRows) { i -> if (reified[i]) null else model.a[i] }
+            val a = model.denseRows()
+            denseCache = Array(baseRows) { i -> if (reified[i]) null else a[i] }
             cacheVarCount = builder.varCount
             cacheBaseRows = baseRows
         }

@@ -227,7 +227,9 @@ class TableauSeedTest {
         var attempts = 0
         repeat(100) {
             val inst = randomInstance(rng, n = 10, m = 14)
-            if (!inst.parent.a.indices.all { i -> inst.parent.a[i].contentEquals(inst.child.a[i]) }) return@repeat
+            val pa = inst.parent.denseRows()
+            val ca = inst.child.denseRows()
+            if (!pa.indices.all { i -> pa[i].contentEquals(ca[i]) }) return@repeat
             val parentSimplex = DualSimplex(inst.parent)
             val parent = try {
                 parentSimplex.solve()

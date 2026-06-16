@@ -324,6 +324,7 @@ class BacktrackSolver(override val problem: Problem) :
                 mddHull = params.lpMdd,
                 gccCountHull = params.lpGccCount,
                 objectiveCone = params.lpObjectiveCone,
+                sparseModel = params.lpSparsePrimary,
             )
         } else {
             null
@@ -656,7 +657,10 @@ class BacktrackSolver(override val problem: Problem) :
                 lpGlobalCuts =
                     harvestRootCuts(relaxer, PropagationSession(problem), lpSeparators, params.cancellation)
             }
-            sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation))
+            sink.observeRootLpBound(
+                0,
+                rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation, sparse = params.lpSparsePrimary),
+            )
         }
 
         /** Advance the search to the next reportable event (a new incumbent, the terminal verdict, or —
