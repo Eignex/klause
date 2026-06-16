@@ -7,43 +7,6 @@ import com.eignex.klause.util.LongArrayList
 /** Pivots between consecutive cancellation polls in [DualSimplex.runDualSimplex]. */
 private const val CANCEL_POLL_INTERVAL = 256L
 
-/** Outcome of an LP solve. */
-internal enum class LpStatus {
-    /** An optimal vertex was found; [LpSolution] carries the bound, primal, duals and basis. */
-    OPTIMAL,
-
-    /** The LP has no feasible point. For branch-and-bound this means the subtree is infeasible. */
-    INFEASIBLE,
-
-    /** The objective is unbounded below (minimization). Cannot happen when every variable is bounded. */
-    UNBOUNDED,
-}
-
-/** Where a variable sits. Nonbasic variables are pinned to a finite bound; basic ones float. */
-internal enum class VarStatus {
-    /** Basic: the variable floats; its value is read off the tableau. */
-    BASIC,
-
-    /** Nonbasic, pinned to its lower bound. */
-    AT_LOWER,
-
-    /** Nonbasic, pinned to its upper bound. */
-    AT_UPPER,
-}
-
-/**
- * A basis: the set of basic variable columns plus the bound each nonbasic variable is pinned to.
- * Passed to [DualSimplex.solve] to warm-start re-optimization from a parent node's basis. Because
- * branch-and-bound only tightens bounds, the parent basis stays dual feasible, so
- * the child re-optimizes with a few dual pivots instead of a cold solve.
- */
-internal class Basis(
-    /** The `m` variable columns that are basic. Order is irrelevant; the loader assigns rows. */
-    val basicVars: IntArray,
-    /** Per-variable status (length `numVars`): [VarStatus.BASIC], [VarStatus.AT_LOWER] or `AT_UPPER`. */
-    val status: Array<VarStatus>,
-)
-
 /**
  * An optimal (or infeasible/unbounded) LP solution. All exact quantities are exposed as an
  * integer numerator over the shared determinant [denominator] (> 0): the value is
