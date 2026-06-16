@@ -3,13 +3,13 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.movesource.EjectionChains
 import com.eignex.klause.solver.localsearch.movesource.Frontier
 import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
+import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
+import com.eignex.klause.solver.localsearch.movesource.StallSwaps
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
-import com.eignex.klause.solver.localsearch.proposeRepairChains
-import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -100,8 +100,8 @@ class Cbls(
      *  explicitly on permutation/assignment-shaped problems. */
     val stallSwapCap: Int = 0,
     /** **Ejection chains** (opt-in, `0` = off): cap on stall-gated directed repair-chain
-     *  compounds injected per stalled [pickMove] (see
-     *  [LocalSearchState.proposeRepairChains]). Where [stallSwapCap] hard-codes the one
+     *  compounds injected per stalled [pickMove] (see [EjectionChains]). Where [stallSwapCap]
+     *  hard-codes the one
      *  coordinated shape assignment plateaus need (a same-domain pair swap), chains *derive*
      *  the coordinated move from the break structure: apply a violated factor's repair,
      *  find the factor it newly regressed, append that factor's best eligible repair, and
@@ -398,72 +398,21 @@ class Cbls(
         frontier.generate(MoveGenContext(state), sink)
     }
 
-    /** Stall-gated int-pair swap proposals (see [stallSwapCap]). Randomized draws: pick a
-     *  violated factor, take one of its int vars `u`, and pair it with either another var of
-     *  the same factor or a var of a frontier (variable-sharing) factor. A legal swap needs
-     *  differing values and cross-compatible domains; the [MoveSink] handles frozen-var
-     *  filtering and dedup. Scored like any candidate — a swap that repairs the violated
-     *  factor while preserving its satisfied neighbours scores strictly negative, which is
-     *  exactly the signal the single-set pool can't produce on these plateaus. */
+    /** Plateau-buster swap source backing [sampleStallSwaps] — see [StallSwaps]. */
+    private val stallSwaps = StallSwaps(stallSwapCap)
+
+    /** Ejection-chain source backing [sampleStallChains] — see [EjectionChains]. */
+    private val ejectionChains = EjectionChains(stallChainCap, stallChainDepth)
+
+    /** Objective-direction seed source backing [seedObjectiveMoves] — see [ObjectiveSeed]. */
+    private val objectiveSeed = ObjectiveSeed()
+
     private fun sampleStallSwaps(state: LocalSearchState, sink: MoveSink) {
-        if (stallSwapCap <= 0 || state.violated.isEmpty()) return
-        val rng = state.rng
-        val problem = state.problem
-        var budget = stallSwapCap
-        // Randomized rejection sampling; most draws on bool-only or single-var factors miss,
-        // so allow a few attempts per requested swap before giving up.
-        var attempts = stallSwapCap * ATTEMPTS_PER_SWAP
-        while (budget > 0 && attempts-- > 0) {
-            val fid = state.violated.random(rng)
-            val vars = state.factors[fid].intVars
-            if (vars.isEmpty()) continue
-            val u = vars[rng.nextInt(vars.size)]
-            val w = if (vars.size >= 2 && rng.nextBoolean()) {
-                vars[rng.nextInt(vars.size)]
-            } else {
-                val occ = problem.intOccurrences[u]
-                if (occ.isEmpty()) continue
-                val nvars = state.factors[occ[rng.nextInt(occ.size)]].intVars
-                if (nvars.isEmpty()) continue
-                nvars[rng.nextInt(nvars.size)]
-            }
-            if (w == u) continue
-            // The private swap sink bypasses the state sink's assumption filtering — check
-            // frozen vars explicitly (mirrors the engine's post-feasibility pairSwapStep).
-            if (state.assumptions.isFrozenInt(u) || state.assumptions.isFrozenInt(w)) continue
-            val du = problem.intDomains[u]
-            val dw = problem.intDomains[w]
-            // Same-shaped domains only: swaps target permutation/assignment structure
-            // (course→period style vars sharing one value range). Cross-domain swaps (e.g. a
-            // decision var against a derived load/count var) are semantically meaningless and
-            // measured to thrash the plateau rather than walk it.
-            if (du.min != dw.min || du.max != dw.max) continue
-            val vu = state.assignment.intValue(u)
-            val vw = state.assignment.intValue(w)
-            if (vu == vw) continue
-            if (vw !in du || vu !in dw) continue
-            sink.addCompound(listOf(Move.IntSet(u, vw), Move.IntSet(w, vu)))
-            budget--
-        }
+        stallSwaps.generate(MoveGenContext(state), sink)
     }
 
-    /** Stall-gated ejection-chain proposals (see [stallChainCap]): grow up to the cap of
-     *  directed repair chains from random violated seed factors, each chain entering the
-     *  score-only race as one atomic compound. Construction is delegated to
-     *  [LocalSearchState.proposeRepairChains]; this just spends the per-pick budget. */
     private fun sampleStallChains(state: LocalSearchState, sink: MoveSink) {
-        if (stallChainCap <= 0 || state.violated.isEmpty()) return
-        var budget = stallChainCap
-        repeat(minOf(stallChainCap, state.violated.size)) {
-            if (budget <= 0) return
-            val fid = state.violated.random(state.rng)
-            budget -= state.proposeRepairChains(
-                seedFactor = fid,
-                maxDepth = stallChainDepth,
-                firstMoveCap = CHAIN_FIRST_MOVES,
-                sink = sink,
-            )
-        }
+        ejectionChains.generate(MoveGenContext(state), sink)
     }
 
     /** Build one targeted kick (see [stallKickAfter]): a **random walk** over the
@@ -564,50 +513,7 @@ class Cbls(
      *  proposeRepairMoves to cover that phase. */
     private fun seedObjectiveMoves(state: LocalSearchState, sink: MoveSink) {
         if (state.cost > 0) return
-        val obj = state.objective ?: return
-        when (obj) {
-            is LinearObjective -> {
-                for (v in obj.boolWeights.indices) {
-                    if (obj.boolWeights[v] == 0L) continue
-                    sink.addBoolFlip(v)
-                }
-                for (v in obj.intCoefficients.indices) {
-                    if (obj.intCoefficients[v] == 0L) continue
-                    val cur = state.assignment.intValue(v)
-                    val d = state.problem.intDomains[v]
-                    // Step in the direction the coefficient says reduces the objective.
-                    // Channeling-aware so int-move + indicator updates stay atomic.
-                    if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
-                    if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
-                }
-            }
-
-            is FunctionalObjective -> {
-                // Decomposed objective: its gradient lives in deltaIfApplied, not in per-var
-                // coefficients, so we can't pick a direction a priori. Seed *geometric* steps
-                // (±1, ±2, ±4, …, plus the domain endpoints) on each decision (leaf) variable
-                // and let the move scoring (which folds in the functional objective delta) keep
-                // the best. Pure ±1 descends a wide-domain coordinate objective far too slowly;
-                // geometric steps let the search jump while still refining at unit resolution.
-                for (v in obj.leafVars) {
-                    val cur = state.assignment.intValue(v)
-                    val d = state.problem.intDomains[v]
-                    var step = 1
-                    while (step <= OBJ_SEED_MAX_STEP) {
-                        val up = cur + step
-                        val down = cur - step
-                        if (up <= d.max) sink.addChannelingIntSet(state, v, up)
-                        if (down >= d.min) sink.addChannelingIntSet(state, v, down)
-                        if (up > d.max && down < d.min) break
-                        step = step shl 1
-                    }
-                    if (cur != d.min) sink.addChannelingIntSet(state, v, d.min)
-                    if (cur != d.max) sink.addChannelingIntSet(state, v, d.max)
-                }
-            }
-
-            else -> { /* no per-var direction without inspecting the objective shape */ }
-        }
+        objectiveSeed.generate(MoveGenContext(state), sink)
     }
 
     /**
@@ -719,14 +625,8 @@ class Cbls(
 
     /** Tuning constants and the [vnd] preset factory. */
     companion object {
-        /** Largest geometric step seeded per leaf var during functional-objective descent. */
-        private const val OBJ_SEED_MAX_STEP = 4096
-
-        /** Rejection-sampling attempts allowed per requested stall swap (see [sampleStallSwaps]). */
+        /** Rejection-sampling attempts allowed per kicked variable (see [buildStallKick]). */
         private const val ATTEMPTS_PER_SWAP = 4
-
-        /** First-move branch width per ejection-chain seed factor (see [sampleStallChains]). */
-        private const val CHAIN_FIRST_MOVES = 4
 
         /**
          * Classical Variable-Neighbourhood-Descent as a [Cbls] preset (the unified strategy

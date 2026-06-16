@@ -89,12 +89,13 @@ fun assertSourceMatchesGenerator(
     seed: Long,
     source: MoveSource,
     stalled: Boolean = false,
+    prepare: (LocalSearchState) -> Unit = {},
     reference: (LocalSearchState, MoveSink) -> Unit,
 ) {
     // Reference and source each get their own freshly-seeded state so the RNG sequences align.
-    val refState = freshState(build(), seed)
+    val refState = freshState(build(), seed).also(prepare)
     val expected = captureFromSink(refState) { sink -> reference(refState, sink) }
-    val srcState = freshState(build(), seed)
+    val srcState = freshState(build(), seed).also(prepare)
     val actual = captureFromSink(srcState) { sink -> source.generate(MoveGenContext(srcState, stalled), sink) }
     val detail = actual.diff(expected)
     assertEquals(
