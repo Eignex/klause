@@ -30,6 +30,10 @@ abstract class LinearSumFactor internal constructor(
 
     final override fun residual(sum: Long, softCap: Int): Int = linearResidual(sum, op, bound, softCap)
 
+    // Fused holds+residual in a single signed-gap pass; the hot degree() path (violationDegree and
+    // every deltaIf*/apply* probe) avoids the separate virtual holds()/residual() calls.
+    final override fun degree(sum: Long, softCap: Int): Int = linearDegree(sum, op, bound, softCap)
+
     final override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0L
         for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
