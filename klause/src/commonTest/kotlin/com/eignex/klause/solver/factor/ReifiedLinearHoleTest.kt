@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -8,9 +9,12 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.propagation.AtomKind
+import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * Regression for #121: a forced-false `aux ↔ (x == v)` reification on an interior domain hole
@@ -84,6 +88,61 @@ class ReifiedLinearHoleTest {
         }
         val p = Problem(nVars * perVar, nVars, doms, factors.toTypedArray())
         assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 1L)))
+    }
+
+    /**
+     * Regression for #713: the conflict reason of a single-term `aux ↔ (x == k)` reification whose
+     * target `k` is an interior hole carved *during search* (with `x`'s bounds unchanged from root —
+     * the `eqTargetUnreachable` path with `aux` already true). The reason must cite the hole
+     * (`[x == k]`), so it is satisfied by the feasible assignment `x = k` (where `k` is not a hole).
+     * A bounds-only reason cites nothing and degenerates to the bare unit `¬aux`, which that
+     * assignment violates — forbidding the reification globally and closing the search as a false
+     * UNSAT. Driven directly on a hand-built state so it is independent of search order.
+     */
+    @Test
+    fun `eq reification conflict reason over a search-time hole is sound`() {
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 3)),
+            factors = arrayOf(),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        // aux = true at level 1, then carve 2 out of x at level 2 — a search-time interior
+        // hole with x's bounds still [0, 3]: the eqTargetUnreachable conflict state.
+        state.currentLevel = 1
+        check(state.pinBool(0, true)) { "pin aux failed" }
+        state.currentLevel = 2
+        check(state.excludeIntValue(0, 2, null)) { "carve hole failed" }
+        val reif = ReifiedLinear(
+            auxBoolVar = 0,
+            coeffs = intArrayOf(1),
+            vars = intArrayOf(0),
+            op = LinearOp.EQ,
+            bound = 2,
+        )
+        val reason = reif.conflictReason(state, 0) ?: error("expected a conflict reason")
+        // The feasible witness aux = true, x = 2 must satisfy the reason clause (≥ 1 literal true).
+        val nbv = problem.numBoolVars
+        fun satUnderWitness(lit: Int): Boolean {
+            val v = Lit.variable(lit)
+            val holds = if (v < nbv) {
+                true // aux = true
+            } else {
+                val a = v - nbv
+                when (state.atomKind[a]) {
+                    AtomKind.GE -> 2 >= state.atomThreshold[a]
+                    AtomKind.LE -> 2 <= state.atomThreshold[a]
+                    AtomKind.EQ -> 2 == state.atomThreshold[a]
+                }
+            }
+            return holds == Lit.isPositive(lit)
+        }
+        assertTrue(
+            reason.any { satUnderWitness(it) },
+            "conflict reason must be satisfied by the feasible x=2 assignment, not a bare unit: ${reason.toList()}",
+        )
     }
 
     /** Guard against over-correction: when every candidate value is a hole, the at-least-one

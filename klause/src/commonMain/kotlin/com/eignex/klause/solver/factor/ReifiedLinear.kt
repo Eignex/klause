@@ -105,9 +105,20 @@ class ReifiedLinear private constructor(
      * body is infeasible at root bounds.
      */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        val auxVal = state.boolValues[auxBoolVar]
-            ?: return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
-        return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = Lit.make(auxBoolVar, !auxVal))
+        val extraLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0
+        // A single-term equality body (`c·v == bound`) can be infeasible because its required value
+        // is an *interior hole* of v, with v's bounds unchanged from root (the [eqTargetUnreachable]
+        // path). A bounds-only reason then cites nothing and degenerates to the bare indicator lit —
+        // an unsound unit nogood that forbids the indicator even on assignments where the hole is
+        // absent. Use the hole-aware collector so the carved value's eq-atom joins the reason. Other
+        // failure paths are bound-driven (the sum range is computed from bounds; a hole crossed by a
+        // body tighten is already chained through that bound atom's own reason), so they stay on the
+        // tighter bounds-only collector.
+        return if (op == LinearOp.EQ && vars.size == 1) {
+            collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit)
+        } else {
+            collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = extraLit)
+        }
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
