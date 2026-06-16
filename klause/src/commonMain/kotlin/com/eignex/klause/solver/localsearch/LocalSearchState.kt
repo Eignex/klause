@@ -168,12 +168,10 @@ class LocalSearchState(
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
     val intConfChange: BooleanArray = BooleanArray(problem.numIntVars) { true }
 
-    // Probe scratch reused by [evaluateCompound] across calls so an apply+revert probe allocates
+    // Degree scratch reused by [evaluateCompound] across calls so an apply+revert probe allocates
     // nothing on its array-copy path (the dominant LS allocation source). Lazily created because
     // compound moves are factor-specific; the state is per-worker, so no sharing/locking is needed.
     private var degScratch: IntArray? = null
-    private var boolConfScratch: BooleanArray? = null
-    private var intConfScratch: BooleanArray? = null
 
     // Break-count probe scratch. While [breakProbeActive], [updateViolation] records each factor
     // whose degree changes during a probe's forward apply, snapshotting its pre-probe violated
@@ -184,6 +182,12 @@ class LocalSearchState(
     private val probeTouched: BooleanArray = BooleanArray(problem.numFactors)
     private val probeWasViolated: BooleanArray = BooleanArray(problem.numFactors)
     private val probeTouchedList: IntArrayList = IntArrayList()
+
+    // Set for the whole apply+revert span of a compound probe. While active, [applyBoolFlip] and
+    // [applyIntSet] skip configuration-change maintenance: a probe restores the assignment it
+    // started from, so any conf-change marks it made would have to be reverted anyway. Suppressing
+    // them lets the probe skip both the neighbor-marking scan and snapshotting the conf-change arrays.
+    private var probeActive = false
 
     /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
@@ -629,8 +633,10 @@ class LocalSearchState(
                 }
             }
         }
-        markNeighborConfChange(touchedFactors)
-        boolConfChange[boolVar] = false
+        if (!probeActive) {
+            markNeighborConfChange(touchedFactors)
+            boolConfChange[boolVar] = false
+        }
         step++
         lastTouched[boolVar] = step
         if (touchCount[boolVar] < Int.MAX_VALUE) touchCount[boolVar]++
@@ -678,8 +684,10 @@ class LocalSearchState(
                 }
             }
         }
-        markNeighborConfChange(touchedFactors)
-        intConfChange[intVar] = false
+        if (!probeActive) {
+            markNeighborConfChange(touchedFactors)
+            intConfChange[intVar] = false
+        }
         step++
         val slot = problem.numBoolVars + intVar
         lastTouched[slot] = step
@@ -775,12 +783,6 @@ class LocalSearchState(
         val oldStep = step
         val oldCost = cost
         val oldBestCost = bestCostSeen
-        // Conf-change snapshots restored after the apply+revert probe; copyInto reused scratch rather
-        // than copyOf so the restore path allocates nothing.
-        val oldBoolConf = (boolConfScratch ?: BooleanArray(boolConfChange.size)).also { boolConfScratch = it }
-        boolConfChange.copyInto(oldBoolConf)
-        val oldIntConf = (intConfScratch ?: BooleanArray(intConfChange.size)).also { intConfScratch = it }
-        intConfChange.copyInto(oldIntConf)
         // Degree snapshot for the exact weighted delta. Skipped when no strategy has touched the
         // weights (weights all 1.0 ⇒ weighted == raw netDelta).
         val degBefore = if (factorWeightsAllocated) {
@@ -801,6 +803,7 @@ class LocalSearchState(
         val savedTouchCount = IntArray(touchedSlots.size) { touchCount[touchedSlots[it]] }
 
         probeTouchedList.clear()
+        probeActive = true
         breakProbeActive = true
         for (p in move.parts) apply(p)
         breakProbeActive = false
@@ -823,13 +826,13 @@ class LocalSearchState(
         }
 
         for (i in inverses.indices.reversed()) apply(inverses[i])
+        probeActive = false
 
-        // Restore: step, lastTouched, conf-change arrays, best-cost watermark.
+        // Restore: step, lastTouched, best-cost watermark. Conf-change needs no restore — it was
+        // left untouched for the whole probe (see [probeActive]).
         step = oldStep
         for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
         for (i in touchedSlots.indices) touchCount[touchedSlots[i]] = savedTouchCount[i]
-        oldBoolConf.copyInto(boolConfChange)
-        oldIntConf.copyInto(intConfChange)
         bestCostSeen = oldBestCost
 
         return CompoundEval(breakScore = breakCount, netDelta = netDelta, weightedNetDelta = weightedNetDelta)
