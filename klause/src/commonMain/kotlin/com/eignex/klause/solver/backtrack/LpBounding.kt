@@ -226,7 +226,7 @@ internal fun BacktrackSolver.lpBoundAndFix(
         // Over the dense-tableau cap (#602): take the bound-only sparse pipeline directly, never
         // allocating the dense tableau. Uses the cheap O(nnz) Neumaier–Shcherbina safe bound (not the
         // O(m³) exact certify) so the per-node cost is bounded and the `-t` deadline is honored.
-        sparseSafePrune(relaxer, session, bound, globalCuts, sink, cancellation)
+        sparseSafePrune(relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending)
     } else {
         lpBoundAndFixUnsafe(
             relaxer, session, bound, sink, warmBasis, params, separators, hints,
@@ -248,11 +248,16 @@ internal fun BacktrackSolver.lpBoundAndFix(
 }
 
 /**
- * Cheap sound prune for the over-cap sparse-primary path (#602/#562): float revised simplex for the
- * duals, then the O(nnz) Neumaier–Shcherbina safe bound — no exact BigInt certify, so the per-node
- * cost is bounded and `-t` is honored (the simplex itself polls cancellation). Prunes when the safe
- * bound (+ the relaxation's objective constant) reaches the incumbent; any failure keeps the node.
+ * Cheap sound prune + objective-bound propagation for the over-cap sparse-primary path (#602/#562):
+ * float revised simplex for the duals, then the O(nnz) Neumaier–Shcherbina safe bound — no exact
+ * BigInt certify, so the per-node cost is bounded and `-t` is honored (the simplex itself polls
+ * cancellation). Prunes when the safe bound (+ the relaxation's objective constant) reaches the
+ * incumbent, and — independent of any incumbent — tightens an ascending objective variable up to
+ * `ceil(safe bound)` (#281). That tightening is applied **reason-less** (a sound, level-local leaf
+ * for conflict analysis, exactly as [lpBoundAndFixUnsafe] does when a reason is withheld); the exact
+ * reduced-cost reason on the revised basis is the next slice of #705. Any solver failure keeps the node.
  */
+@Suppress("LongParameterList")
 internal fun BacktrackSolver.sparseSafePrune(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
@@ -260,20 +265,35 @@ internal fun BacktrackSolver.sparseSafePrune(
     globalCuts: List<Cut>,
     sink: SolveStatsSink,
     cancellation: Cancellation,
+    objectiveVar: Int,
+    objectiveAscending: Boolean,
 ): LpNodeOutcome {
-    if (!bound.isFinite()) return LpNodeOutcome(false, null)
+    val canPrune = bound.isFinite()
+    val canPropagate = objectiveVar >= 0 && objectiveAscending
+    if (!canPrune && !canPropagate) return LpNodeOutcome(false, null)
     val relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
     val result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
     val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return LpNodeOutcome(false, null)
     val full = safe + relaxation.objectiveConstant.toDouble()
-    return if (full >= bound) {
+    if (canPrune && full >= bound) {
         sink.observeLpPrune()
-        LpNodeOutcome(true, null)
-    } else {
-        LpNodeOutcome(false, null)
+        return LpNodeOutcome(true, null)
     }
+    // Objective-bound propagation (#281): the integer objective is ≥ ceil(safe bound). The safe bound
+    // only under-estimates, so ceil(full) ≤ the true optimum — a sound lower bound. Reason-less, so an
+    // Unsat tightening prunes this node (a conflict-analysis leaf).
+    if (canPropagate && full.isFinite()) {
+        val lpFloor = ceil(full)
+        if (lpFloor in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble() &&
+            session.implyIntAtLeast(objectiveVar, lpFloor.toInt()) is PropagationResult.Unsat
+        ) {
+            sink.observeLpPrune()
+            return LpNodeOutcome(true, null)
+        }
+    }
+    return LpNodeOutcome(false, null)
 }
 
 /**
