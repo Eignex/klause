@@ -15,6 +15,7 @@ import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
@@ -105,6 +106,10 @@ internal class CpToLpRelaxation(
     /** When true, linearize each NValue with a one-hot value model (per-value "used" indicators) so
      *  the distinct-count target gets an LP bound. Adds O(Σ|domain|) columns, so it is gated. */
     private val nValueHull: Boolean = false,
+    /** When true, linearize each Regular with the layer-expanded DFA flow hull (one arc var per
+     *  reachable `(position, state, symbol)` transition, flow-conservation + channel rows) — the exact
+     *  convex hull of the automaton's accepting strings. Adds O(len·states·alphabet) columns, gated. */
+    private val regularHull: Boolean = false,
     /** When true, linearize each Mdd with the layered flow hull (one arc var per reachable transition
      *  record, flow-conservation + value channel + optional cost channel) — the exact convex hull of
      *  the diagram's accepting paths, so a cost-MDD's cost var gets an exact lower bound. Gated. */
@@ -136,7 +141,8 @@ internal class CpToLpRelaxation(
      * re-walk recomputes anyway.
      */
     private val cacheable: Boolean =
-        !circuitArcs && !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed && !mddHull
+        !circuitArcs && !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed &&
+            !regularHull && !mddHull
 
     /** Shared pre-densified coefficient rows for the bound-invariant base rows (#564). A null entry is
      *  a live-big-M reified base row, re-densified each node. Populated on the first cacheable build;
@@ -244,6 +250,10 @@ internal class CpToLpRelaxation(
         /** Above this total selector count (Σ over `xs` of the declared-domain size) the NValue
          *  one-hot value hull is skipped. */
         const val MAX_NVALUE_CELLS: Int = 1024
+
+        /** Above this many arc columns one Regular DFA flow hull is skipped (the O(len·states·alphabet)
+         *  blow-up). */
+        const val MAX_REGULAR_ARCS: Int = 4096
 
         /** Above this many arc columns one Mdd flow hull is skipped (the transition-record blow-up). */
         const val MAX_MDD_ARCS: Int = 4096
@@ -629,6 +639,9 @@ internal class CpToLpRelaxation(
                 if (nValueHull) {
                     for (factor in problem.factors) if (factor is NValue) buildNValueHull(factor)
                 }
+                if (regularHull) {
+                    for (factor in problem.factors) if (factor is Regular) buildRegularHull(factor)
+                }
                 if (mddHull) {
                     for (factor in problem.factors) if (factor is Mdd) buildMddHull(factor)
                 }
@@ -936,6 +949,114 @@ internal class CpToLpRelaxation(
             cols[m] = intColumn(factor.n)
             vals[m] = -1L
             builder.addRow(cols, vals, rel, 0L)
+        }
+
+        /**
+         * Layer-expanded DFA flow hull of one [Regular] `regular(seq, Q, S, δ, q0, F)` — the exact convex
+         * hull of the automaton's accepting strings. An arc variable `y ∈ [0,1]` per reachable
+         * `(position t, state q, symbol s)` whose transition `δ(q, s)` is live (pinned to 0 when symbol
+         * `s` left the live domain of `seq[t]`); states 1-based, `δ = 0` is the dead/reject sink. Rows:
+         * a source row `Σ y out of (0, q0) = 1`, flow conservation `Σ out(t,q) − Σ in(t,q) = 0` at every
+         * interior `(t, q)`, an acceptance row `Σ y into accepting states at the last layer = 1`, and a
+         * channel `Σ_s s·y_{t,·,s} = seq[t]` per position. The flow polytope is integral, so the LP is
+         * the true convex hull and its optimum a tight bound. Forward reachability from `q0` over the
+         * *declared* domains keeps the layout stable and bounds the arc count ([MAX_REGULAR_ARCS]); above
+         * the cap, or when no accepting path survives the declared domains, the factor is skipped (only
+         * loosens). 1-based symbol values are taken to *be* the `seq` values (per [Regular]).
+         */
+        @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
+        private fun buildRegularHull(factor: Regular) {
+            val seq = factor.seq
+            val len = seq.size
+            val s = factor.alphabetSize
+            val trans = factor.transitions
+            fun delta(state: Int, sym: Int): Int = trans[(state - 1) * s + (sym - 1)] // 1-based; 0 = dead
+            val accepting = HashSet<Int>().apply { for (a in factor.accepting) add(a) }
+
+            // Forward-reachable states per layer over the declared domains; bail if a layer empties.
+            val reach = Array(len + 1) { HashSet<Int>() }
+            reach[0].add(factor.q0)
+            var arcCount = 0L
+            for (t in 0 until len) {
+                val dom = problem.intDomains[seq[t]]
+                for (state in reach[t]) {
+                    dom.forEach { sym ->
+                        if (sym in 1..s) {
+                            val nxt = delta(state, sym)
+                            if (nxt != 0) {
+                                reach[t + 1].add(nxt)
+                                arcCount++
+                            }
+                        }
+                    }
+                }
+                if (reach[t + 1].isEmpty()) return // no accepting path under declared domains — leave to propagation
+            }
+            if (arcCount == 0L || arcCount > MAX_REGULAR_ARCS) return
+
+            val outCols = Array(len) { HashMap<Int, IntArrayList>() }
+            val inCols = Array(len + 1) { HashMap<Int, IntArrayList>() }
+            val chanCols = Array(len) { IntArrayList() }
+            val chanSym = Array(len) { IntArrayList() }
+            val acceptCols = IntArrayList()
+            for (t in 0 until len) {
+                val declared = problem.intDomains[seq[t]]
+                val live = session.intDomain(seq[t])
+                for (state in reach[t]) {
+                    declared.forEach { sym ->
+                        if (sym !in 1..s) return@forEach
+                        val nxt = delta(state, sym)
+                        if (nxt == 0) return@forEach
+                        val col = auxColumn(0L, if (live.contains(sym)) 1L else 0L)
+                        outCols[t].getOrPut(state) { IntArrayList() }.add(col)
+                        inCols[t + 1].getOrPut(nxt) { IntArrayList() }.add(col)
+                        chanCols[t].add(col)
+                        chanSym[t].add(sym)
+                        if (t == len - 1 && nxt in accepting) acceptCols.add(col)
+                    }
+                }
+            }
+            // Source: one unit leaves (0, q0).
+            val src = outCols[0][factor.q0] ?: return
+            if (src.isEmpty()) return
+            builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
+            // Flow conservation at every interior node: Σ out − Σ in = 0.
+            for (t in 1 until len) {
+                for (state in reach[t]) {
+                    val cols = IntArrayList()
+                    val vals = LongArrayList()
+                    outCols[t][state]?.let {
+                        for (k in 0 until it.size) {
+                            cols.add(it[k])
+                            vals.add(1L)
+                        }
+                    }
+                    inCols[t][state]?.let {
+                        for (k in 0 until it.size) {
+                            cols.add(it[k])
+                            vals.add(-1L)
+                        }
+                    }
+                    if (!cols.isEmpty()) builder.addRow(cols.toIntArray(), vals.toLongArray(), Relation.EQ, 0L)
+                }
+            }
+            // Acceptance: one unit enters an accepting state at the last layer.
+            if (acceptCols.isEmpty()) return // no accepting transition reachable — leave to propagation
+            builder.addRow(acceptCols.toIntArray(), LongArray(acceptCols.size) { 1L }, Relation.EQ, 1L)
+            // Channel: Σ_s s·y = seq[t] at each position.
+            for (t in 0 until len) {
+                val k = chanCols[t].size
+                if (k == 0) return
+                val cols = IntArray(k + 1)
+                val vals = LongArray(k + 1)
+                for (i in 0 until k) {
+                    cols[i] = chanCols[t][i]
+                    vals[i] = chanSym[t][i].toLong()
+                }
+                cols[k] = intColumn(seq[t])
+                vals[k] = -1L
+                builder.addRow(cols, vals, Relation.EQ, 0L)
+            }
         }
 
         /**

@@ -14,6 +14,7 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
@@ -105,6 +106,7 @@ object LpAutoConfig {
         var constArrayElement = false
         var table = false
         var nValue = false
+        var regular = false
         var mdd = false
         var rows = 0L
         for (f in problem.factors) {
@@ -162,6 +164,8 @@ object LpAutoConfig {
 
                 is NValue -> nValue = true
 
+                is Regular -> regular = true
+
                 is Mdd -> mdd = true
 
                 else -> Unit
@@ -185,7 +189,7 @@ object LpAutoConfig {
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
-                table || nValue || mdd || makespanPlans > 0
+                table || nValue || regular || mdd || makespanPlans > 0
         // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
         // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
         // #571: an explicit objective-cone request always fits the dense cap (the cone drops the
@@ -212,6 +216,7 @@ object LpAutoConfig {
                 if (constArrayElement && config.resolved(LpTechnique.ELEMENT)) elementEstimate(problem)?.let(::add)
                 if (table && config.resolved(LpTechnique.TABLE)) tableEstimate(problem)?.let(::add)
                 if (nValue && config.resolved(LpTechnique.NVALUE)) nValueEstimate(problem)?.let(::add)
+                if (regular && config.resolved(LpTechnique.REGULAR)) regularEstimate(problem)?.let(::add)
                 if (mdd && config.resolved(LpTechnique.MDD)) mddEstimate(problem)?.let(::add)
                 if (scheduling && config.resolved(LpTechnique.CUMULATIVE_TIME_INDEXED)) {
                     timeIndexedEstimate(problem)?.let(::add)
@@ -236,6 +241,7 @@ object LpAutoConfig {
             lpElement = base.lpElement || (LpTechnique.ELEMENT in acceptedHulls),
             lpTable = base.lpTable || (LpTechnique.TABLE in acceptedHulls),
             lpNValue = base.lpNValue || (LpTechnique.NVALUE in acceptedHulls),
+            lpRegular = base.lpRegular || (LpTechnique.REGULAR in acceptedHulls),
             lpMdd = base.lpMdd || (LpTechnique.MDD in acceptedHulls),
             lpCumulative = base.lpCumulative || (bounding && makespanLp),
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
@@ -357,6 +363,48 @@ object LpAutoConfig {
             rows += cells + 2L * f.xs.size + 1L // y≥z rows + (Σz=1, channel) per var + the count row
         }
         return if (any) HullEstimate(LpTechnique.NVALUE, cols, rows) else null
+    }
+
+    /** [Regular] DFA flow-hull arc columns + flow/channel rows over the under-cap factors, counting
+     *  forward-reachable transitions over the declared domains (mirrors `buildRegularHull`). */
+    private fun regularEstimate(problem: Problem): HullEstimate? {
+        var cols = 0L
+        var rows = 0L
+        var any = false
+        for (f in problem.factors) {
+            if (f !is Regular) continue
+            val len = f.seq.size
+            val s = f.alphabetSize
+            val reach = HashSet<Int>().also { it.add(f.q0) }
+            var arcs = 0L
+            var ok = true
+            for (t in 0 until len) {
+                val dom = problem.intDomains[f.seq[t]]
+                val next = HashSet<Int>()
+                for (state in reach) {
+                    dom.forEach { sym ->
+                        if (sym in 1..s) {
+                            val nx = f.transitions[(state - 1) * s + (sym - 1)]
+                            if (nx != 0) {
+                                next.add(nx)
+                                arcs++
+                            }
+                        }
+                    }
+                }
+                if (next.isEmpty()) {
+                    ok = false
+                    break
+                }
+                reach.clear()
+                reach.addAll(next)
+            }
+            if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_REGULAR_ARCS) continue
+            any = true
+            cols += arcs
+            rows += arcs + len + 2L // conservation (≤ arcs) + channel (len) + source + acceptance
+        }
+        return if (any) HullEstimate(LpTechnique.REGULAR, cols, rows) else null
     }
 
     /** [Mdd] flow-hull arc columns + flow/channel rows over the under-cap factors, counting
