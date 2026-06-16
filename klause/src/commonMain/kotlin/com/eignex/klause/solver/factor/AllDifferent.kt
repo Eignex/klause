@@ -435,6 +435,8 @@ class AllDifferent(
      *  against coupled constraints — within one all-different it is cost-neutral, but on shared
      *  scopes (Sudoku rows × columns, timetabling) it can relocate a value to clear a clash
      *  elsewhere without ever breaking this constraint. */
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (vars.size < 2) return
         var emitted = 0

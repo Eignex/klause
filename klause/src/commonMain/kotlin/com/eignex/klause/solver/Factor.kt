@@ -280,6 +280,20 @@ interface Factor {
     fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
     }
 
+    /**
+     * True iff this factor's [proposeStructuredMoves] generates a *feasibility-preserving*
+     * neighbourhood for a structural global — moves that keep the constraint satisfied while
+     * relocating values within its scope (e.g. an all-different value swap, a circuit tour
+     * re-link). Such factors are candidates for implicit-solving: the engine seeds them
+     * feasible and draws their structure-preserving moves even during infeasibility so they
+     * can clear violations in *coupled* constraints without ever breaking themselves.
+     *
+     * Default `false`. Factors with arithmetic structured moves that only make sense at
+     * feasibility (e.g. `Linear EQ` pair-shifts, `Cardinality` count-preserving swaps) leave
+     * this `false` — they are objective-descent helpers, not implicit-solving neighbourhoods.
+     */
+    val providesImplicitNeighbourhood: Boolean get() = false
+
     /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]
      *  and [LocalSearchState.boolMakeCount] incrementally via [updateBoolBreakMakeForFlip],
      *  skipping the engine's brute-force O(arity²) per-flip subtract-add cycle.

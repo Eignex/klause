@@ -69,6 +69,22 @@ class LocalSearchState(
      *  cast or capability check is needed. */
     val factors: Array<Factor> = problem.factors
 
+    /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals
+     *  whose [Factor.proposeStructuredMoves] preserves their own feasibility (see
+     *  [Factor.providesImplicitNeighbourhood]). The engine draws these factors'
+     *  feasibility-preserving moves even during infeasibility so they can clear violations in
+     *  coupled constraints without ever breaking themselves, and seeds them feasible at search
+     *  start. Built once on first access. */
+    val electedImplicit: IntArray by lazy { electImplicitFactors() }
+
+    private fun electImplicitFactors(): IntArray {
+        val out = IntArrayList()
+        for (id in 0 until problem.numFactors) {
+            if (factors[id].providesImplicitNeighbourhood) out.add(id)
+        }
+        return IntArray(out.size) { out[it] }
+    }
+
     /** Step counter incremented on every accepted move. Strategies use this together with
      *  [lastTouched] to enforce a tabu list. */
     var step: Long = 0L
