@@ -171,8 +171,22 @@ class LocalSearchState(
             if (w == null) {
                 w = initialFactorWeights()
                 _factorWeights = w
+                _baseFactorWeights = w.copyOf()
             }
             return w
+        }
+
+    private var _baseFactorWeights: DoubleArray? = null
+
+    /** The initial seeded per-factor weights ([initialFactorWeights]), snapshotted once when
+     *  [factorWeights] is first allocated and never mutated afterwards. SAPS-style smoothing pulls
+     *  the live weights back toward this baseline rather than a flat constant, so the proactive
+     *  per-class / implied seeding survives the reactive bumping instead of being washed out. */
+    val baseFactorWeights: DoubleArray
+        get() {
+            _baseFactorWeights?.let { return it }
+            factorWeights // forces allocation, which also assigns _baseFactorWeights
+            return _baseFactorWeights ?: error("baseFactorWeights is assigned when factorWeights is allocated")
         }
 
     /** Build the initial per-factor weight vector. Non-implied factors start at 1.0, optionally

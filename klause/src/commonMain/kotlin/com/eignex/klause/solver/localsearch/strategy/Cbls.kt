@@ -26,9 +26,11 @@ import com.eignex.klause.util.IntHashSet
  *     bump weights on currently-violated factors by [stallIncrement] — SAPS-style scale,
  *     amplifying pressure on factors that resist being repaired. Then, with probability
  *     [smoothProb], apply SAPS-style probabilistic *smoothing*: pull every weight a fraction
- *     [smoothFactor] of the way back toward [baseWeight]. Smoothing is a forgetting mechanism
- *     that counteracts the otherwise-monotone weight growth, so factors that are no longer
- *     hard decay back and the gradient doesn't ossify on long plateau-heavy runs. Disabled by
+ *     [smoothFactor] of the way back toward its seeded baseline (the per-factor initial weights
+ *     scaled by [baseWeight]). Smoothing is a forgetting mechanism that counteracts the otherwise-
+ *     monotone weight growth, so factors that are no longer hard decay back and the gradient doesn't
+ *     ossify on long plateau-heavy runs — and, targeting the seed rather than a flat constant, it
+ *     restores the proactive per-class / implied landscape instead of flattening it. Disabled by
  *     default ([smoothProb] = 0.0); the bump-only schedule is the baseline regime.
  *  2. Collect candidate moves:
  *     - From each violated factor (capped at [violatedSampleCount]): `proposeRepairMoves`.
@@ -59,7 +61,9 @@ class Cbls(
      *  [baseWeight] (`w ← (1 - smoothFactor)·w + smoothFactor·baseWeight`). Only consulted
      *  when [smoothProb] > 0. */
     val smoothFactor: Double = 0.8,
-    /** Weight that smoothing pulls toward — the lazily-allocated default of `factorWeights`. */
+    /** Scale on the per-factor smoothing target: smoothing pulls each weight toward
+     *  `baseWeight · `[LocalSearchState.baseFactorWeights]`[f]`. `1.0` (default) targets the seed
+     *  exactly; only consulted when [smoothProb] > 0. */
     val baseWeight: Double = 1.0,
     /** Cap on violated factors sampled per [pickMove] call for candidate generation. */
     val violatedSampleCount: Int = 4,
@@ -361,15 +365,18 @@ class Cbls(
     }
 
     /** SAPS-style probabilistic smoothing (forgetting): pull every factor weight a fraction
-     *  [smoothFactor] of the way back toward [baseWeight]. [bumpViolatedWeights] only ever
-     *  grows weights, so without a counter-pressure the gradient ossifies on long runs;
-     *  smoothing lets weight on factors that are no longer hard decay back. Called with
-     *  probability [smoothProb] right after a stall bump. */
+     *  [smoothFactor] of the way back toward its seeded baseline ([LocalSearchState.baseFactorWeights]
+     *  scaled by [baseWeight]). [bumpViolatedWeights] only ever grows weights, so without a
+     *  counter-pressure the gradient ossifies on long runs; smoothing lets weight on factors that are
+     *  no longer hard decay back. Targeting the per-factor seed rather than a flat constant means the
+     *  decay restores the proactive per-class / implied landscape from
+     *  [LocalSearchState.factorWeights] instead of flattening it. Called with probability [smoothProb]
+     *  right after a stall bump. */
     private fun smoothAllWeights(state: LocalSearchState) {
         val w = state.factorWeights
+        val base = state.baseFactorWeights
         val keep = 1.0 - smoothFactor
-        val pull = smoothFactor * baseWeight
-        for (i in w.indices) w[i] = keep * w[i] + pull
+        for (i in w.indices) w[i] = keep * w[i] + smoothFactor * baseWeight * base[i]
     }
 
     private fun sampleFromViolated(state: LocalSearchState, sink: MoveSink) {
