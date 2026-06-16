@@ -60,10 +60,12 @@ class ReifiedLinear private constructor(
     private fun degreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
         reifiedDegree(aux, holds(sum)) { residual(sum, softCap) }
 
+    // The pre-move degree `degreeFor(sum, aux)` is the factor's current violation degree, already
+    // maintained in factorDegree — reuse it instead of re-running the residual/compression.
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val sum = state.longPayload[factorId]
         val aux = state.assignment.boolValue(auxBoolVar)
-        return degreeFor(sum, !aux, state.violationSoftCap) - degreeFor(sum, aux, state.violationSoftCap)
+        return degreeFor(sum, !aux, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
@@ -71,7 +73,7 @@ class ReifiedLinear private constructor(
         val sum = state.longPayload[factorId]
         val coeff = coeffOf(intVar)
         val newSum = sum + coeff.toLong() * (newValue - state.assignment.intValue(intVar))
-        return degreeFor(newSum, aux, state.violationSoftCap) - degreeFor(sum, aux, state.violationSoftCap)
+        return degreeFor(newSum, aux, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {

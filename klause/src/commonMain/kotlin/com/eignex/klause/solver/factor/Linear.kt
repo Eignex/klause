@@ -93,7 +93,9 @@ class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int
         val old = state.assignment.intValue(intVar)
         val sum = state.longPayload[factorId]
         val newSum = sum + coeff.toLong() * (newValue - old)
-        return degree(newSum, state.violationSoftCap) - degree(sum, state.violationSoftCap)
+        // The pre-move degree `degree(sum)` is the factor's current violation degree, already
+        // maintained in factorDegree — reuse it instead of re-running the residual/compression.
+        return degree(newSum, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
