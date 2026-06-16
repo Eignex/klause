@@ -108,9 +108,12 @@ internal object MiniZincMode : CliMode {
                         objVarId = objVarId,
                         definitionalSweep = program.definitionalSweep,
                         render = render,
-                        // MiniZinc reports the objective inside the rendered solution, so the
-                        // protocol never needs a separate value — keep it null.
-                        objectiveValue = null,
+                        // The MiniZinc protocol carries the objective inside the rendered solution, so
+                        // onSolution ignores this value — but the same sign-corrected objective (the
+                        // canonical linear objective in original units, see the generic builder in
+                        // CliMode) feeds arm attribution and the LS incumbent statistic, which the engine
+                        // produces in its internal minimise frame. Reuse one lambda for all three.
+                        objectiveValue = { s -> linear.evaluateLong(s).let { if (maximize) -it else it } },
                         annotatedBacktrackParams = program.defaultBacktrackParams,
                     )
                 }
