@@ -317,6 +317,7 @@ class BacktrackSolver(override val problem: Problem) :
                 elementHull = params.lpElement,
                 tableHull = params.lpTable,
                 cumulative = params.lpCumulative,
+                diffn = params.lpDiffn,
                 cumulativeTimeIndexed = params.lpCumulativeTimeIndexed,
                 nValueHull = params.lpNValue,
                 regularHull = params.lpRegular,

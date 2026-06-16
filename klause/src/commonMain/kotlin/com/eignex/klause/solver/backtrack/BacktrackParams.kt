@@ -390,6 +390,15 @@ data class BacktrackParams(
      */
     val lpCumulative: Boolean = false,
     /**
+     * Diffn per-axis cumulative makespan bound (#655). When true and [lpBounding] holds, each
+     * constant-size Diffn is projected onto both axes as a cumulative (capacity = the maximum
+     * perpendicular extent) and contributes the same energetic makespan row as [lpCumulative] — a
+     * sound lower bound on a strip-length / extent variable (its `t1 = min-est` case is the area bound
+     * `Σ wᵢ·hᵢ ≤ W·H`). Sound by construction; off by default; a no-op unless an axis extent is a
+     * verifiable upper bound on every task end. See [com.eignex.klause.solver.lp.CumulativeRelaxation].
+     */
+    val lpDiffn: Boolean = false,
+    /**
      * Time-indexed LP reformulation of the scheduling globals (#453). When true and [lpBounding]
      * holds, each Cumulative / Disjunctive over a bounded horizon gets binary `x_{i,t}` start
      * columns with assignment, start-channel and per-time-point resource rows — the resource–time

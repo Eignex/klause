@@ -7,6 +7,7 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
@@ -109,6 +110,7 @@ object LpAutoConfig {
         var regular = false
         var mdd = false
         var gccCount = false
+        var diffn = false
         var rows = 0L
         for (f in problem.factors) {
             when (f) {
@@ -173,6 +175,8 @@ object LpAutoConfig {
 
                 is Mdd -> mdd = true
 
+                is Diffn -> diffn = true
+
                 else -> Unit
             }
         }
@@ -184,6 +188,14 @@ object LpAutoConfig {
         // largest are shed and the base LP still runs.
         val makespanPlans = if (scheduling) CumulativeRelaxation(problem).plans.size else 0
         rows += makespanPlans.toLong()
+        // Diffn contributes the same kind of makespan row, one per derived axis plan (over an existing
+        // column), counted separately so it gates under its own technique rather than lpCumulative.
+        val diffnPlans = if (diffn) {
+            CumulativeRelaxation(problem, includeCumulative = false, includeDiffn = true).plans.size
+        } else {
+            0
+        }
+        rows += diffnPlans.toLong()
         val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
         // Cost guard: the configurable dense-tableau ceiling (env-tunable via KlauseConfig).
         val maxCells = KlauseConfig.current.lpMaxTableauCells
@@ -191,10 +203,11 @@ object LpAutoConfig {
 
         val cutEligible = allDifferent || globalCardinality
         val makespanLp = baseFits && makespanPlans > 0
+        val diffnLp = baseFits && diffnPlans > 0
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
-                table || nValue || regular || mdd || gccCount || makespanPlans > 0
+                table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0
         // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
         // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
         // #571: an explicit objective-cone request always fits the dense cap (the cone drops the
@@ -251,6 +264,7 @@ object LpAutoConfig {
             lpMdd = base.lpMdd || (LpTechnique.MDD in acceptedHulls),
             lpGccCount = base.lpGccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
             lpCumulative = base.lpCumulative || (bounding && makespanLp),
+            lpDiffn = base.lpDiffn || (bounding && diffnLp && config.resolved(LpTechnique.DIFFN)),
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
                 (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
             lpCumulativeFlow = base.lpCumulativeFlow || (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
