@@ -249,16 +249,34 @@ class LexLess(
         val x0 = xs[0]
         val y0 = ys[0]
         if (x0 == y0) return false
-        val xv = if (state.assumptions.isFrozenInt(x0)) state.assignment.intValue(x0) else state.problem.intDomains[x0].min
-        val yv = if (state.assumptions.isFrozenInt(y0)) state.assignment.intValue(y0) else state.problem.intDomains[y0].max
+        val xv = if (state.assumptions.isFrozenInt(
+                x0,
+            )
+        ) {
+            state.assignment.intValue(x0)
+        } else {
+            state.problem.intDomains[x0].min
+        }
+        val yv = if (state.assumptions.isFrozenInt(
+                y0,
+            )
+        ) {
+            state.assignment.intValue(y0)
+        } else {
+            state.problem.intDomains[y0].max
+        }
         if (xv >= yv) return false
         if (!state.assumptions.isFrozenInt(x0)) state.assignment.setInt(x0, xv)
         if (!state.assumptions.isFrozenInt(y0)) state.assignment.setInt(y0, yv)
-        for (i in 1 until xs.size) if (!state.assumptions.isFrozenInt(xs[i])) {
-            state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
+        for (i in 1 until xs.size) {
+            if (!state.assumptions.isFrozenInt(xs[i])) {
+                state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
+            }
         }
-        for (i in 1 until ys.size) if (!state.assumptions.isFrozenInt(ys[i])) {
-            state.assignment.setInt(ys[i], state.problem.intDomains[ys[i]].min)
+        for (i in 1 until ys.size) {
+            if (!state.assumptions.isFrozenInt(ys[i])) {
+                state.assignment.setInt(ys[i], state.problem.intDomains[ys[i]].min)
+            }
         }
         return true
     }
