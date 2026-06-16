@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.localsearch.strategy
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Move
@@ -26,7 +27,7 @@ class ImplicitNeighbourhoodTest {
 
     private fun row(a: Int, b: Int) = AllDifferent(vars = intArrayOf(a, b), domainMin = 0, domainSize = 2)
 
-    /** Rows: (v0,v1),(v2,v3); columns: (v0,v2),(v1,v3). */
+    /** Rows: (v0,v1), (v2,v3); columns: (v0,v2), (v1,v3). */
     private fun latinSquare(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 4,
@@ -118,7 +119,7 @@ class ImplicitNeighbourhoodTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
         )
-        val frozen = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 2))
+        val frozen = Assumptions(ints = mapOf(0 to 2))
         val state = LocalSearchState(problem, Random(5), frozen)
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 0)
