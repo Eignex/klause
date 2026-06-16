@@ -7,6 +7,8 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevInt
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `table_int(xs, tuples)` — the vector of `xs(i)` values must equal one of the rows of
@@ -57,6 +59,30 @@ class Table(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
+    // Var id → its tuple column, for the LS Hamming-distance maintenance. A var occupying exactly
+    // one column maps to it here (the common case, unboxed); vars repeated across columns fall to
+    // [multiColumnsByVar]. Together they cover every var in [xs].
+    private val singleColumnByVar: IntIntMap
+    private val multiColumnsByVar: Map<Int, IntArray>
+
+    init {
+        val occ = HashMap<Int, IntArrayList>()
+        for (c in 0 until arity) occ.getOrPut(xs[c]) { IntArrayList() }.add(c)
+        val singleKeys = IntArrayList()
+        val singleVals = IntArrayList()
+        val multi = HashMap<Int, IntArray>()
+        for ((v, cols) in occ) {
+            if (cols.size == 1) {
+                singleKeys.add(v)
+                singleVals.add(cols[0])
+            } else {
+                multi[v] = cols.toIntArray()
+            }
+        }
+        singleColumnByVar = IntIntMap.build(singleKeys.toIntArray(), singleVals.toIntArray(), absent = -1)
+        multiColumnsByVar = multi
+    }
+
     /** Advisor subscription (#623): STR2 is hole-aware GAC (tuple feasibility tests membership, the
      *  prune drops interior values), so subscribe to every kind on every column variable and consume
      *  the dirty-variable delta (#624) — a fire re-sweeps only when a column actually changed, instead
@@ -96,56 +122,85 @@ class Table(
             set(value) = numValidCell.set(value)
     }
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        for (row in 0 until numTuples) {
-            var match = true
-            for (col in 0 until arity) {
-                if (state.assignment.intValue(xs[col]) != tuples[row * arity + col]) {
-                    match = false
-                    break
-                }
-            }
-            if (match) return false
-        }
-        return true
-    }
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+        (state.refPayload[factorId] as LsState).minDist > 0
 
-    /** Graded violation: the **minimum Hamming distance** from the current `xs` assignment to
-     *  any allowed tuple — i.e. the fewest columns that must change to satisfy the table. `0`
-     *  iff some tuple matches exactly. Gives CBLS a gradient that rewards moves bringing `xs`
-     *  closer to a tuple, instead of the flat all-or-nothing binary cost. */
+    /** Graded violation: the **minimum Hamming distance** from the current `xs` assignment to any
+     *  allowed tuple — the fewest columns that must change to satisfy the table; `0` iff some tuple
+     *  matches exactly. Gives CBLS a gradient toward the nearest tuple instead of a flat binary cost.
+     *
+     *  Maintained incrementally: [LsState.dist] holds each tuple's Hamming distance and
+     *  [LsState.minDist] their minimum, so a query is O(1) and a move is O(numTuples) — the one
+     *  changed column shifts each tuple's distance by at most one — rather than O(numTuples · arity). */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        minHamming(state, intVar = -1, newValue = 0)
+        (state.refPayload[factorId] as LsState).minDist
 
-    /** Min Hamming distance from the assignment (with [intVar] hypothetically set to
-     *  [newValue], or no override when `intVar < 0`) to the nearest tuple. Early-exits a row
-     *  once it exceeds the running best, and returns immediately on an exact match. */
-    private fun minHamming(state: LocalSearchState, intVar: Int, newValue: Int): Int {
-        var best = arity + 1
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        val dist = IntArray(numTuples)
+        var minD = arity
         for (row in 0 until numTuples) {
             val base = row * arity
-            var dist = 0
+            var d = 0
             for (col in 0 until arity) {
-                val v = if (xs[col] == intVar) newValue else state.assignment.intValue(xs[col])
-                if (v != tuples[base + col]) {
-                    dist++
-                    if (dist >= best) break
-                }
+                if (state.assignment.intValue(xs[col]) != tuples[base + col]) d++
             }
-            if (dist < best) {
-                best = dist
-                if (best == 0) return 0
-            }
+            dist[row] = d
+            if (d < minD) minD = d
         }
-        return best
+        state.refPayload[factorId] = LsState(dist, minD)
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int =
-        // The pre-move distance `minHamming(-1, 0)` is the factor's current violation degree, already
-        // maintained in factorDegree — reuse it instead of re-scanning every tuple for `before`.
-        minHamming(state, intVar, newValue) - state.factorDegree[factorId]
+    /** Recompute the minimum tuple distance for [intVar] changing [oldV] → [newV]. Only the
+     *  column(s) [intVar] occupies shift a tuple's distance (by ±1), so each tuple is an O(1)
+     *  update off its stored [LsState.dist]. When [commit], the new per-tuple distances are written
+     *  back (used by [applyIntSet]); otherwise they are only probed (used by [deltaIfIntSet]). */
+    private fun rescanForChange(s: LsState, intVar: Int, oldV: Int, newV: Int, commit: Boolean): Int {
+        var minD = arity
+        val col = singleColumnByVar[intVar]
+        if (col >= 0) {
+            for (row in 0 until numTuples) {
+                val t = tuples[row * arity + col]
+                val d = s.dist[row] + (if (newV != t) 1 else 0) - (if (oldV != t) 1 else 0)
+                if (commit) s.dist[row] = d
+                if (d < minD) minD = d
+            }
+        } else {
+            val cols = multiColumnsByVar.getValue(intVar)
+            for (row in 0 until numTuples) {
+                val base = row * arity
+                var d = s.dist[row]
+                for (c in cols) {
+                    val t = tuples[base + c]
+                    d += (if (newV != t) 1 else 0) - (if (oldV != t) 1 else 0)
+                }
+                if (commit) s.dist[row] = d
+                if (d < minD) minD = d
+            }
+        }
+        return minD
+    }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val s = state.refPayload[factorId] as LsState
+        val old = state.assignment.intValue(intVar)
+        if (old == newValue) return 0
+        return rescanForChange(s, intVar, old, newValue, commit = false) - s.minDist
+    }
+
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        val s = state.refPayload[factorId] as LsState
+        val newVal = state.assignment.intValue(intVar)
+        if (newVal == oldValue) return 0
+        val before = s.minDist
+        val minD = rescanForChange(s, intVar, oldValue, newVal, commit = true)
+        s.minDist = minD
+        return minD - before
+    }
+
+    /** Per-worker LS state: [dist] is each tuple's Hamming distance from the current assignment;
+     *  [minDist] their running minimum (the graded violation). Held in `refPayload`, so it is
+     *  per-[LocalSearchState] and never shared across workers. */
+    private class LsState(val dist: IntArray, var minDist: Int)
 
     /** Repair via per-tuple-support: find the tuple closest (by Hamming distance) to the
      *  current assignment, then propose IntSet moves that bring `xs` toward each matching
