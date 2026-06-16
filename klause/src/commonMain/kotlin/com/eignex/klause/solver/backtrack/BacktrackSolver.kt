@@ -359,6 +359,7 @@ class BacktrackSolver(override val problem: Problem) :
         )
         private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
         private val lpBasisByDepth = ArrayList<Basis?>()
+        private val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
         private var lpBackjump: Learned? = null
 
         private val pruneIf: (PropagationSession) -> Boolean = { session ->
@@ -437,6 +438,7 @@ class BacktrackSolver(override val problem: Problem) :
                         objectiveAscending = singleObj?.ascending ?: true,
                         globalCuts = lpGlobalCuts,
                         cancellation = params.cancellation,
+                        hints = lpHints,
                     )
                     if (outcome.basis != null) {
                         while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
@@ -637,6 +639,12 @@ class BacktrackSolver(override val problem: Problem) :
                 sink.start()
                 // Root LP work runs here, not at construction, so the cancellation is live while it solves.
                 initRootLp()
+                // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
+                // prunes and reduced-cost fixing bite from the first node.
+                if (params.lpProbe && lpRelaxer != null) {
+                    val seed = lpRoundingProbe(objective, params.cancellation)
+                    if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+                }
             }
             outer@ while (true) {
                 if (!runActive) {
@@ -694,7 +702,8 @@ class BacktrackSolver(override val problem: Problem) :
                             varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
                             boolTarget, boolTargetSet, rephaseMode, rng,
                         )
-                        val node = makeNode(varRef, phased)
+                        val ordered = lpHints?.order(varRef, phased) ?: phased
+                        val node = makeNode(varRef, ordered)
                         val decsBefore = decisionsLeft
                         val out = advance(
                             node, session, params, pruneIf,

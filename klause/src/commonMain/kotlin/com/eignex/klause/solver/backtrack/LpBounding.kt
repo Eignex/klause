@@ -16,9 +16,11 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
 import kotlin.math.ceil
+import kotlin.math.round
 
 /**
  * Sound lower bound on a [LinearObjective] given the current partial assignment in
@@ -102,9 +104,10 @@ internal fun BacktrackSolver.lpBoundAndFix(
     objectiveAscending: Boolean,
     globalCuts: List<Cut>,
     cancellation: Cancellation,
+    hints: LpHints? = null,
 ): LpNodeOutcome = try {
     sink.lpClockStart()
-    sparseSafePrune(relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending)
+    sparseSafePrune(relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending, hints)
 } catch (_: LpOverflowException) {
     // A determinant or coefficient overflow in the relaxation build loses the bound; recover a sound
     // one via the exact BigInt basis-certification pipeline. A failure just keeps the node.
@@ -131,6 +134,7 @@ internal fun BacktrackSolver.sparseSafePrune(
     cancellation: Cancellation,
     objectiveVar: Int,
     objectiveAscending: Boolean,
+    hints: LpHints? = null,
 ): LpNodeOutcome {
     val relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
@@ -150,6 +154,9 @@ internal fun BacktrackSolver.sparseSafePrune(
         }
         return LpNodeOutcome(false, null)
     }
+    // LP-guided branching (#287): record the fractional primal so the descent can order branch values
+    // toward the LP point. Purely advisory — it never changes feasibility or the optimum.
+    hints?.record(relaxation, result.primal)
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
     if (!canPrune && !canPropagate) return LpNodeOutcome(false, null) // feasible, nothing more to deduce
@@ -306,4 +313,45 @@ internal fun BacktrackSolver.rootLpRelaxationBound(
     }
 } catch (_: LpOverflowException) {
     Double.NaN
+}
+
+/**
+ * LP-rounding primal heuristic (#287) on the sparse revised-simplex path: solve the root relaxation,
+ * round each variable's fractional LP value to the nearest in-domain integer, and propagate. Returns a
+ * complete assignment when rounding-then-propagation reaches a fixpoint without a wipeout, else null.
+ * Sound by construction — the result is a candidate that the caller re-evaluates against the objective
+ * and only keeps if feasible-and-improving; a bad rounding just yields null or a worse incumbent.
+ */
+internal fun BacktrackSolver.lpRoundingProbe(
+    objective: LinearObjective,
+    cancellation: Cancellation,
+): Sample? {
+    val session = PropagationSession(problem)
+    if (session.isUnsatAtRoot) return null
+    val relaxation = CpToLpRelaxation(problem, objective, sparseModel = true).build(session)
+    if (relaxation.model.n == 0) return null
+    val result = try {
+        RevisedSimplex(relaxation.model, cancellation).solve()
+    } catch (_: LpOverflowException) {
+        return null
+    } ?: return null
+    val primal = result.primal
+    for (v in 0 until problem.numIntVars) {
+        val d = session.intDomain(v)
+        if (d.min == d.max) continue // already fixed by propagation
+        val col = relaxation.intColOf[v]
+        val target = if (col >= 0 && col < primal.size) {
+            round(primal[col]).toInt().coerceIn(d.min, d.max)
+        } else {
+            d.min
+        }
+        if (session.pinInt(v, target) is PropagationResult.Unsat) return null
+    }
+    for (b in 0 until problem.numBoolVars) {
+        if (session.boolValue(b) != null) continue
+        val col = relaxation.boolColOf[b]
+        val target = col >= 0 && col < primal.size && primal[col] >= 0.5
+        if (session.pinBool(b, target) is PropagationResult.Unsat) return null
+    }
+    return snapshotAssignment(session)
 }

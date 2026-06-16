@@ -251,8 +251,10 @@ class LpAutoConfigTest {
     @Test
     fun `oversized model routes LP to the sparse bound-only path and keeps structure-capped bounds`() {
         // 2000 unit rows over 2000 vars estimate a dense tableau of ~8M cells — past the dense cap
-        // but within the sparse cap — so LP routes to the bound-only sparse path (#602): bounding on,
-        // cuts/probe off. The Lagrangian/energetic bounds (own internal caps) are not size-gated.
+        // but within the sparse cap — so LP routes to the bound-only sparse path (#602): bounding on.
+        // The LP-rounding probe rides along (it solves the relaxation through the sparse revised
+        // simplex, so it fires on this path too, #705); cuts are still dense-only. The
+        // Lagrangian/energetic bounds (own internal caps) are not size-gated.
         val n = 2000
         val factors = ArrayList<Factor>(n + 1)
         repeat(n) { i -> factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, 0)) }
@@ -262,7 +264,7 @@ class LpAutoConfigTest {
         assertTrue(r.lpSparsePrimary)
         assertTrue(r.lpBounding)
         assertFalse(r.lpCuts)
-        assertFalse(r.lpProbe)
+        assertTrue(r.lpProbe)
         assertTrue(r.lagrangian)
 
         // Past the sparse cap too ⇒ the LP family fully declines; the Lagrangian still runs.

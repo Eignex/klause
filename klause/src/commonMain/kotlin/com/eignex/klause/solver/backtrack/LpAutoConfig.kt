@@ -264,7 +264,10 @@ object LpAutoConfig {
             lpLearn = base.lpLearn || bounding,
             lpObjectiveBound = base.lpObjectiveBound || bounding,
             lpFixpoint = base.lpFixpoint || bounding,
-            lpProbe = base.lpProbe || bounding,
+            // The LP-rounding probe runs on whichever bounding path is active (#705): it solves the
+            // root relaxation through the sparse revised simplex, so it fires on the over-cap
+            // sparse-primary instances too, not just the dense-capped ones.
+            lpProbe = base.lpProbe || lpActive,
             lpCircuit = base.lpCircuit || (LpTechnique.CIRCUIT in acceptedHulls),
             lpElement = base.lpElement || (LpTechnique.ELEMENT in acceptedHulls),
             lpTable = base.lpTable || (LpTechnique.TABLE in acceptedHulls),
