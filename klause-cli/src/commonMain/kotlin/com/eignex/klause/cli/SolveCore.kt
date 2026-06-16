@@ -284,15 +284,18 @@ internal object SolveCore {
         t0: Long,
     ) {
         var produced = 0L
+        var best: Sample? = null
         when (r) {
             is MinimizeResult.Optimal -> {
                 emit(output, solvable, r.sample)
+                best = r.sample
                 produced = 1L
                 output.onComplete(Verdict.OPTIMAL)
             }
 
             is MinimizeResult.BestFound -> {
                 emit(output, solvable, r.sample)
+                best = r.sample
                 produced = 1L
                 output.onComplete(Verdict.BEST_FOUND)
             }
@@ -302,7 +305,7 @@ internal object SolveCore {
 
             is MinimizeResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
         }
-        stats(common, output, r.stats, nowMillis() - t0, produced)
+        stats(common, output, withModelObjective(r.stats, solvable, best), nowMillis() - t0, produced)
     }
 
     // --- generic per-engine satisfy / optimize ---
@@ -399,15 +402,18 @@ internal object SolveCore {
         var produced = 0
         val t0 = nowMillis()
         var lastStats = SolveStats.EMPTY
+        var bestSample: Sample? = null
         for (step in optimizer.improvements(objective, params)) {
             lastStats = step.stats
             when (step) {
                 is MinimizeResult.WithSample -> {
                     emit(output, solvable, step.sample)
+                    bestSample = step.sample
                     produced++
                     if (step is MinimizeResult.Optimal) {
                         output.onComplete(Verdict.OPTIMAL)
-                        stats(common, output, step.stats, nowMillis() - t0, produced.toLong())
+                        val oriented = withModelObjective(step.stats, solvable, step.sample)
+                        stats(common, output, oriented, nowMillis() - t0, produced.toLong())
                         return
                     }
                 }
@@ -428,7 +434,8 @@ internal object SolveCore {
         // Sequence ended without an Optimal verdict: optimality was NOT proven. Best-found
         // incumbents were already streamed; report BEST_FOUND (or UNKNOWN if nothing feasible).
         output.onComplete(if (produced == 0) Verdict.UNKNOWN else Verdict.BEST_FOUND)
-        stats(common, output, lastStats, nowMillis() - t0, produced.toLong())
+        val oriented = withModelObjective(lastStats, solvable, bestSample)
+        stats(common, output, oriented, nowMillis() - t0, produced.toLong())
     }
 
     private fun <P : SolverParams> runOptimizeViaEnumerate(
@@ -478,6 +485,18 @@ internal object SolveCore {
 
     private fun stats(common: CommonOptions, output: OutputProtocol, s: SolveStats, ms: Long, solutions: Long) {
         if (common.statistics) output.onStatistics(s, ms, solutions)
+    }
+
+    /** Re-express the LS incumbent objective in the model's orientation, reusing the same sign-corrected
+     *  [Solvable.objectiveValue] that renders solutions and arm attribution. The engine records the
+     *  incumbent in its internal "lower is better" frame (maximisation via a negated coefficient); the
+     *  objective lambda reads the canonical objective variable in original units, which also reconciles
+     *  the LS functional gradient view back to the linear objective. No-op for satisfy / infeasible
+     *  runs (no incumbent) and non-MiniZinc modes without an objective lambda. */
+    private fun withModelObjective(s: SolveStats, solvable: Solvable, sample: Sample?): SolveStats {
+        if (sample == null || s.incumbentObjective.isNaN()) return s
+        val objectiveValue = solvable.objectiveValue ?: return s
+        return s.copy(incumbentObjective = objectiveValue(sample).toDouble())
     }
 }
 

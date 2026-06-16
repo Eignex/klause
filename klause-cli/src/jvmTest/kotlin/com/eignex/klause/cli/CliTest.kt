@@ -205,6 +205,13 @@ class CliTest {
         val optOut = capture { main(arrayOf("-s", opt.absolutePath)) }
         assertTrue("%%%mzn-stat: solutions=" in optOut, optOut)
         assertTrue("%%%mzn-stat-end" in optOut, optOut)
+
+        // The LS incumbent objective is reported in the model's orientation, not the engine's internal
+        // minimise frame: a maximize incumbent reads as a positive value, never negated. LS optimize is
+        // incomplete (it never proves the optimum), so the run is bounded by a short deadline.
+        val maxOut = capture { main(arrayOf("-s", "-e", "ls-single", "-t", "100", opt.absolutePath)) }
+        assertTrue("%%%mzn-stat: lsIncumbentObjective=" in maxOut, maxOut)
+        assertTrue("%%%mzn-stat: lsIncumbentObjective=-" !in maxOut, maxOut)
     }
 
     @Test
