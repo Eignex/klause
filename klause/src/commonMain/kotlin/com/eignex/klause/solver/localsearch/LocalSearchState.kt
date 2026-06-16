@@ -16,6 +16,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
+import kotlin.reflect.KClass
 
 /** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
  *  order of magnitude below the 1.0 structural default: a model padded with hundreds of redundant
@@ -149,26 +150,60 @@ class LocalSearchState(
      *  to capture all-1.0 defaults from sessions that ran a weight-blind strategy. */
     private var _factorWeights: DoubleArray? = null
 
+    /** Seed [factorWeights] by per-class population so no constraint kind dominates the landscape by
+     *  count. Set by the engine from [LocalSearchParams.normalizeWeightsByClass] once per solve,
+     *  before the first weight access. */
+    var normalizeWeightsByClass: Boolean = false
+        internal set
+
     /** Per-factor dynamic weights for weighted-violation strategies. Factors the model declared
      *  implied (redundant / symmetry-breaking — [Problem.impliedFactorMask]) start at
      *  [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than 1.0, so the bulk of those rows can't dominate
      *  the initial descent before the structural constraints are met. SAPS-style
      *  bumping still raises an implied factor's weight if it persistently blocks progress, so the
-     *  lower seed biases the early landscape without making the constraint unenforceable. */
+     *  lower seed biases the early landscape without making the constraint unenforceable.
+     *
+     *  When [normalizeWeightsByClass] is set, the remaining (non-implied) factors are additionally
+     *  damped by class population — see [initialFactorWeights]. */
     val factorWeights: DoubleArray
         get() {
             var w = _factorWeights
             if (w == null) {
-                val implied = problem.impliedFactorMask
-                w = if (implied == null) {
-                    DoubleArray(problem.numFactors) { 1.0 }
-                } else {
-                    DoubleArray(problem.numFactors) { if (implied[it]) IMPLIED_FACTOR_INITIAL_WEIGHT else 1.0 }
-                }
+                w = initialFactorWeights()
                 _factorWeights = w
             }
             return w
         }
+
+    /** Build the initial per-factor weight vector. Non-implied factors start at 1.0, optionally
+     *  class-normalised ([normalizeWeightsByClass]): an over-represented factor class — population
+     *  above the mean over non-implied classes — is scaled so its aggregate weight is capped at that
+     *  mean, never amplifying a smaller class above 1.0. Implied factors are pinned to
+     *  [IMPLIED_FACTOR_INITIAL_WEIGHT] regardless, and are excluded from the class tally so a
+     *  structural constraint isn't penalised for merely sharing a type with the implied bulk. */
+    private fun initialFactorWeights(): DoubleArray {
+        val n = problem.numFactors
+        val implied = problem.impliedFactorMask
+        val w = DoubleArray(n) { 1.0 }
+        if (normalizeWeightsByClass) {
+            val counts = HashMap<KClass<*>, Int>()
+            for (i in 0 until n) {
+                if (implied != null && implied[i]) continue
+                val k = problem.factors[i]::class
+                counts[k] = (counts[k] ?: 0) + 1
+            }
+            if (counts.isNotEmpty()) {
+                val meanClassSize = counts.values.sum().toDouble() / counts.size
+                for (i in 0 until n) {
+                    if (implied != null && implied[i]) continue
+                    val c = counts.getValue(problem.factors[i]::class)
+                    if (c > meanClassSize) w[i] = meanClassSize / c
+                }
+            }
+        }
+        if (implied != null) for (i in 0 until n) if (implied[i]) w[i] = IMPLIED_FACTOR_INITIAL_WEIGHT
+        return w
+    }
 
     /** True iff [factorWeights] has been touched (allocated) on this state. Reading is
      *  free; allows callers to probe without forcing the lazy allocation. */
