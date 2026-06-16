@@ -967,7 +967,11 @@ class GlobalCardinality(
             if (!present(state, i)) continue
             if (state.assumptions.isFrozenInt(xs[i])) {
                 val idx = coverIndexByValue[state.assignment.intValue(xs[i])]
-                if (idx >= 0) counts[idx]++ else if (closed) return false
+                if (idx >= 0) {
+                    counts[idx]++
+                } else if (closed) {
+                    return false
+                }
             } else {
                 free.add(i)
             }
