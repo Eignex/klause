@@ -442,10 +442,22 @@ private fun PropagationState.recordEqDeath(v: Int, k: Int, near: Boolean, antNea
  *  in [atomLevelForConflict] (provably equal: a crossing at level L *is* the level the
  *  bound first reached the threshold). Reset to -1 on backtrack of the underlying var. */
 internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
-    if (atomLvl[atomId] != currentLevel || atomRsn[atomId] != currentFactor) {
-        boolPinOrder.add(problem.numBoolVars + atomId)
+    val targetState = if (newT) 1 else 2
+    // Single establishment: stamp the trail slot only when the atom's truth actually flips into
+    // [targetState]. A later bound move that merely re-crosses an atom already at this truth (a
+    // bound still satisfied, a hole still excluded) leaves its FIRST establishment intact — the
+    // level/position/reason where its truth was really decided on the current path. Re-stamping it
+    // at the later move would mis-date the literal (a hole carved at level 3 then swept at level 5
+    // is false since level 3) and append a second, out-of-order trail entry, both of which break
+    // the reverse-assignment-order resolution the unified trail relies on. Watchers still fire so
+    // dependent factors re-examine the re-crossed literal. (#612 trail residency.)
+    if (atomState[atomId] == targetState) {
+        val ww = atomWatchersByLit[(atomId shl 1) or (if (!newT) 0 else 1)] ?: return
+        for (j in 0 until ww.size) dirtyAtomFactors.addLast(ww[j])
+        return
     }
-    atomState[atomId] = if (newT) 1 else 2
+    boolPinOrder.add(problem.numBoolVars + atomId)
+    atomState[atomId] = targetState
     atomLvl[atomId] = currentLevel
     atomRsn[atomId] = currentFactor
     // Record the establishment reason on the trail slot: a true eq atom (the var just became
@@ -484,24 +496,23 @@ private fun PropagationState.clearAtomSlot(atomId: Int) {
     atomAnt[atomId] = null
 }
 
-/** Reset an EQ atom in a widened range. Two cases when the value re-enters the restored domain:
- *  it flips false→undetermined if the value is live again ([clearAtomSlot]); it stays false if the
- *  value is still an interior hole. The still-a-hole slot must NOT be trusted: a bound move that
- *  crossed the value while it sat below the min / above the max overwrites the carve-time slot with
- *  that move's level/reason ([wakeAtom]), and a backtrack that widens the bound back across the value
- *  leaves the slot citing a bound atom undetermined at the restored bound, at a level no longer on
- *  the trail — which conflict analysis cannot ingest. Drop the level/reason back to "derive from
- *  history" (keeping the false truth bit) so [atomLevelForConflict] / [atomAntecedentsDerived]
- *  reconstruct from the canonical, trail-reversible hole-carve record ([holeLevelFor] /
- *  [holeReasonFor]). (GE/LE atoms never sit on holes, so they clear unconditionally in the caller.) */
+/** Reset an EQ atom in a widened range. If its value re-enters the restored domain it flips
+ *  false→undetermined and the slot is cleared ([clearAtomSlot]); if it is still an interior hole the
+ *  slot is **kept** untouched.
+ *
+ *  Keeping it is sound under single establishment ([wakeAtom] never re-stamps a still-determined
+ *  atom): the slot holds the atom's first establishment — its carve / first death, recorded at the
+ *  level its truth was really decided — and that establishment is still in force (the value is still
+ *  excluded, by a move below this one on the trail). The carve's own undo ([resetAtomTrailForCarve],
+ *  or [clearAtomSlot] here when the *killing* move is the one being undone) clears it once we
+ *  backtrack past it; its [PropagationState.boolPinOrder] entry sits below this mark and survives the
+ *  truncation in step. (The former "reset to derive-from-history" was needed only because a sweeping bound move
+ *  used to *overwrite* the carve slot; single establishment removes that overwrite.)
+ *  (GE/LE atoms never sit on holes, so they clear unconditionally in the caller.) */
 private fun PropagationState.clearEqIfFreed(atomId: Int) {
     if (atomTruthOf(atomIntVar[atomId], AtomKind.EQ, atomThreshold[atomId]) == null) {
         clearAtomSlot(atomId)
-    } else {
-        atomLvl[atomId] = -1
-        atomRsn[atomId] = -1
-        atomAnt[atomId] = null
-    }
+    } // still excluded ⇒ keep the first (carve) establishment
 }
 
 /**

@@ -260,3 +260,64 @@ because the 1-UIP pivot scan carries a monotonically-decreasing `boolPinOrder` c
 revisits a bool an atom-pivot's reason cites below it. A naive rescan-from-top is unsound (it resolves
 atoms the ping-pong guard deliberately keeps as leaves), so that one is a separate, careful follow-up
 in `ConflictAnalyzer.analyzeFromSeed` — it is *not* an order-literal issue.
+
+## Follow-up — the residual non-asserting is bounded by the trail representation, not a missing patch
+
+Investigating the residual (after #704) reduced it to one root: the monotonic `boolPinOrder` cursor in
+`analyzeFromSeed`. It has two manifestations, both confirmed by dumping conflicts:
+
+- **Stranded bool** — a bool an atom-pivot's reason cites sits at a trail position the cursor already
+  passed; never revisited, it lingers at the conflict level.
+- **Decision surfaced early** — the cursor returns a level's *decision* atom (assigned first, low
+  position) while propagated atoms it stranded *above* the cursor are still seen; the decision is a leaf,
+  so the loop drains the propagated atoms as leaves → non-asserting (e.g. costas-array: `iv4/LE/6` drained
+  with `clc=5`).
+
+Patching the *analyzer* around a dirty trail proved impossible — each attempt was unsound:
+- **Rescan the pin trail from the top each iteration** (pick the genuinely most-recent seen literal):
+  UNSOUND on a dirty trail — loses solutions on AllDifferent, because an atom's `boolPinOrder` position
+  was its *wake* order, not the level its truth was decided, so "most-recent on the trail" ≠
+  reverse-assignment order for atoms.
+- **Defer a leaf pivot** (resolve a still-resolvable current-level literal before the decision):
+  UNSOUND — same root. Reordering atom resolution off the trail order corrupts the clause.
+
+**Conclusion:** resolving atoms in correct reverse-assignment order — the prerequisite for collapsing
+*both* manifestations — requires each order literal to carry a real, single trail position. That is the
+trail-residency rewrite below; once the trail is clean the rescan is sound and subsumes both the
+stranded-bool and decision-early cases at once.
+
+## The trail-residency rewrite — completed (sound, oracle-green, a measured win)
+
+The blocker was that an order literal could carry *multiple, mis-dated* trail entries: a hole carved at
+level 3 then swept by a bound move at level 5 was re-stamped to level 5, and `clearEqIfFreed` reset
+still-excluded holes to "derive from history" — so an atom's `boolPinOrder` position no longer matched
+the level its truth was decided, and reverse-assignment-order resolution was impossible. Two changes
+give every determined order literal **one consistent trail entry** (position ↔ establishment level):
+
+1. **Single establishment in `wakeAtom`** — stamp the slot (and append to `boolPinOrder`) only when the
+   atom's truth actually *flips*. A later bound move that re-crosses an atom already at that truth leaves
+   its first establishment — the level/position/reason where its truth was really decided — intact.
+2. **`clearEqIfFreed` keeps the slot** for a still-excluded hole on backtrack. Under single establishment
+   the slot holds the carve's establishment, still in force until the carve's own undo fires; its
+   `boolPinOrder` entry sits below the backtrack mark and survives the truncation. (The old "reset to
+   derive-from-history" existed *only* to paper over the re-stamp that single establishment removes.)
+
+With the trail clean, the analyzer resolves atoms exactly like bools: **`analyzeFromSeed` rescans the
+unified pin trail from the top each iteration** for the most-recent seen current-level literal. Because a
+reason now only cites earlier-established (lower-position) literals, the rescan always converges and never
+strands — the monotonic cursor, the separate atom-scan-as-primary, the bool-recovery and the
+leaf-drain-stranding all go away. (A `seenAtomList` fallback remains only for atoms materialised
+mid-analysis, which are never on the trail.)
+
+Soundness gated throughout by the multi-seed adversarial enumerate-vs-brute harness + full `:klause:jvmTest`.
+Measured A/B vs the pre-rewrite engine (`engine=fixed`, 15 s, holey-int):
+
+| instance | before | after |
+|---|---|---|
+| black-hole | UNKNOWN (unsolved), 17270 nodes, 25821 non-asserting | **solved**, 1633 nodes, 293 non-asserting |
+| bacp | obj 67, 4896 nodes, 3856 non-asserting | obj 67, **2190 nodes**, 16 non-asserting |
+| talent-scheduling | cost 122, 17050 nodes | cost 122, 13926 nodes |
+
+Asserting rate on the holey-int sample rose from ~3–15 % to ~68 %; conflict counts collapsed by 10–80×, so
+the per-iteration rescan is a net win (far fewer conflicts to analyse) with no throughput regression. The
+costas-array remainder is now a handful of genuinely multi-decision conflicts, not a structural fan.
