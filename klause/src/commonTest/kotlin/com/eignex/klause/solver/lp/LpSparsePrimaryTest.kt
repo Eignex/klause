@@ -124,7 +124,9 @@ class LpSparsePrimaryTest {
                 val factors = ArrayList<Factor>()
                 for ((c, r) in geCons) factors.add(Linear(c, IntArray(nx) { it }, LinearOp.GE, r))
                 // z >= Σx : Σx − z ≤ 0.
-                factors.add(Linear(IntArray(nx + 1) { if (it < nx) 1 else -1 }, IntArray(nx + 1) { it }, LinearOp.LE, 0))
+                factors.add(
+                    Linear(IntArray(nx + 1) { if (it < nx) 1 else -1 }, IntArray(nx + 1) { it }, LinearOp.LE, 0),
+                )
                 val problem = Problem(0, nx + 1, domains, factors.toTypedArray())
                 val obj = LinearObjective(intCoefficients = LongArray(nx + 1) { if (it == zVar) 1L else 0L })
                 val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 9L))
