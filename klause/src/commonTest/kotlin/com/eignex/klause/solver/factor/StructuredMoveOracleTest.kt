@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
@@ -13,14 +14,18 @@ import kotlin.test.Test
  */
 class StructuredMoveOracleTest {
 
-    private fun oneFactor(factor: com.eignex.klause.solver.Factor, intDomains: Array<IntDomain>) {
+    private fun oneFactor(factor: Factor, intDomains: Array<IntDomain>) {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = intDomains.size,
             intDomains = intDomains,
             factors = listOf(factor),
         )
-        MoveSetOracle.assertStructuredMovesPreserveFeasibility(problem, factor::class.simpleName ?: "factor", iters = 60)
+        MoveSetOracle.assertStructuredMovesPreserveFeasibility(
+            problem,
+            factor::class.simpleName ?: "factor",
+            iters = 60,
+        )
     }
 
     @Test fun `equal-duration disjunctive start-swaps preserve no-overlap`() {
