@@ -108,20 +108,30 @@ be worthwhile, since the failure mode is silent.)
   fixed), but a clean A/B on liner shows **no measured win** — `fixed` stays `learned=0`, and
   `cp-single` is `learned=60, caNonAsserting≈120` either way. liner-sf is dominated by cause (2), which
   this does not touch. Not shipped (sound, but no demonstrated benefit, and it adds hot-path cost).
-- **`wakeAtom` no-re-establishment / gating** (keep a crossed-hole atom's carve-time reason instead of
-  re-stamping it to the sweeping move — the natural fix for cause (2)): **unsound** — loses an
-  `AllDifferent` solution `(3,0,5,2,1,4)`; `AllDifferent` is a real explaining factor, so this is a
-  genuine resolution/level interaction, not a test artifact.
-- **Order-literal subsumption merge** / **defer-leaf 1-UIP**: sound-but-insufficient / crashes
-  respectively (see git history of this branch).
+- **Full ladder** (collateral cite the new-bound representative for *every* move, decisions and
+  propagations — the natural fix for cause (2)): **unsound** — loses an `AllDifferent` solution and a
+  `LinearBoundsEventTest` solution (both real explaining factors, with the test stub already fixed). A
+  propagation that sweeps a pre-existing hole re-attributes that crossed-hole atom to the *sweeping*
+  move's level/reason, which mis-levels 1-UIP.
+- **`wakeAtom` no-re-establishment / gating** (the opposite: keep a crossed-hole atom's *carve-time*
+  reason instead of re-stamping it): also **unsound** — produces a bogus unit clause `[iv0≤0]` and
+  loses an `AllDifferent` solution `(3,0,5,2,1,4)`.
+- **Order-literal subsumption merge** (`finalizeClause`): **sound** but **no win** — liner-sf's
+  surviving conflict-level atoms (`[v=33524]`, `[v=51430]`, `[v≥432952]`) do not subsume each other.
+- **Defer-leaf 1-UIP**: crashes (`UIP atom undetermined`) and loses solutions.
+
+The common root: a crossed-hole order atom is false for **two** valid reasons at **two** levels (the
+carve at `L1`, and "below the new bound" at `L2 > L1`). Conflict analysis needs one consistent
+`(level, reason)`. Keeping `L1` (gating) corrupts one way; attributing `L2` (ladder) corrupts the
+other. No `wakeAtom`/analyzer patch escapes this — it is structural.
 
 ### The remaining principled fix (dedicated, sound-by-construction)
-Cause (2) is the binding one for liner-sf and has no shipped sound fix. The robust route is order-ladder
-consistency as **real entailed clauses** the analyzer resolves through (not hand-rolled antecedents),
-which also subsumes cause (1). The infrastructure exists — clauses already carry atom literals, BCP
-watches them (`atomWatchersByLit`), `pinLit` unit-propagates them with recorded antecedents
-(`propagation/ClauseDb.kt` `addLearnedClause`). The hard part: `wakeAtom` sets an order atom's truth
-from the *domain* before any ladder clause fires, so making the ladder load-bearing means order-atom
-truth flows from BCP over ladder clauses, plus reworking the 1-UIP drain to resolve resolvable literals
-before draining leaves. **Gate any such change on the enumerate-vs-brute oracle under many seeds**
-(the single-seed oracle hid the `ExcludeOnFix` gap for the life of that test).
+Eight distinct patch-level attempts (above) were each rejected by the enumerate-vs-brute oracle or
+showed no win. The only robust route is to make the order literals genuine first-class trail entries:
+**order-ladder consistency as real entailed clauses** the analyzer resolves through, with order-atom
+truth flowing from **BCP over those clauses** (not domain-sweep), so each atom has exactly one
+establishment. The infrastructure exists — clauses already carry atom literals, BCP watches them
+(`atomWatchersByLit`), `pinLit` unit-propagates them with recorded antecedents
+(`propagation/ClauseDb.kt` `addLearnedClause`). This is a large, multi-session rewrite of the most
+false-UNSAT-prone code, **not** a patch. **Gate any such change on the enumerate-vs-brute oracle under
+many seeds** (the single-seed oracle hid the `ExcludeOnFix` gap for the life of that test).
