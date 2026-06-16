@@ -2,6 +2,8 @@ package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.schedule.Geometric
+import com.eignex.klause.solver.localsearch.schedule.Schedule
 import kotlin.math.exp
 import kotlin.random.Random
 
@@ -150,39 +152,31 @@ sealed interface AspirationCriterion {
 
     /**
      * Simulated-annealing-style cooling admission. Admit a tabu move with probability
-     * `exp(-1 / temperature)`; the temperature multiplies by [coolingRate] on every
-     * admitsTabu call and is floored at [minTemperature]. Early in the search T is high
-     * and tabu moves are admitted liberally (effectively no tabu); late in the search T
-     * is low and admission becomes vanishingly rare (behaves like [AllowAllWhenAllTabu]).
+     * `exp(-1 / temperature)`; the [schedule] advances one step on every admitsTabu call. Early in
+     * the search T is high and tabu moves are admitted liberally (effectively no tabu); late in the
+     * search T is low and admission becomes vanishingly rare (behaves like [AllowAllWhenAllTabu]).
      *
-     * Carries mutable temperature state; don't share a single instance across concurrent
-     * solvers.
+     * Carries the schedule's mutable temperature state; don't share a single instance across
+     * concurrent solvers.
      */
-    class Cooling(
-        /** Starting temperature. */
-        val initialTemperature: Double = 1.0,
-        val coolingRate: Double = 0.999,
-        val minTemperature: Double = 1e-3,
-    ) : AspirationCriterion {
-        init {
-            require(initialTemperature > 0) { "initialTemperature must be positive, got $initialTemperature" }
-            require(coolingRate in 0.0..1.0) { "coolingRate must be in [0, 1], got $coolingRate" }
-            require(minTemperature > 0) { "minTemperature must be positive, got $minTemperature" }
-        }
+    class Cooling(private val schedule: Schedule) : AspirationCriterion {
+        /** Fixed geometric cooling — the long-standing default schedule. */
+        constructor(
+            initialTemperature: Double = 1.0,
+            coolingRate: Double = 0.999,
+            minTemperature: Double = 1e-3,
+        ) : this(Geometric(initialTemperature, coolingRate, minTemperature))
 
-        /** Current temperature. */
-        var temperature: Double = initialTemperature
-            private set
+        /** Current temperature (cools on each [admitsTabu] call). */
+        val temperature: Double get() = schedule.temperature
 
         override fun admitsTabu(state: LocalSearchState, move: Move): Boolean {
-            val admit = state.rng.nextDouble() < exp(-1.0 / temperature)
-            temperature = (temperature * coolingRate).coerceAtLeast(minTemperature)
+            val admit = state.rng.nextDouble() < exp(-1.0 / schedule.temperature)
+            schedule.step()
             return admit
         }
 
-        /** Restore [temperature] to [initialTemperature]. */
-        fun reset() {
-            temperature = initialTemperature
-        }
+        /** Restore the schedule to its initial temperature. */
+        fun reset() = schedule.reset()
     }
 }
