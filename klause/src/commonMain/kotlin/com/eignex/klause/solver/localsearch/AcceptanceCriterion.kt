@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
+import com.eignex.klause.solver.localsearch.schedule.Geometric
+import com.eignex.klause.solver.localsearch.schedule.Schedule
 import kotlin.math.exp
 import kotlin.random.Random
 
@@ -40,47 +42,41 @@ sealed interface AcceptanceCriterion {
     }
 
     /**
-     * Metropolis acceptance with a cooling temperature schedule. On every call, the
-     * temperature multiplies by [coolingRate] (floored at [minTemperature]); worsening
-     * candidates are accepted with probability `exp((incumbent - new) / T)`. At high T
-     * almost all moves accept (diversification); as T cools the policy converges to
-     * [Improving]. Holds mutable temperature state, so each `IteratedLocalSearchRestart`
-     * or `Alns` instance should get its own.
+     * Metropolis acceptance under a temperature [schedule] (advanced one step per call): improving
+     * candidates always accepted, worsening candidates accepted with probability
+     * `exp((incumbent - new) / T)` where T is the schedule's current temperature. At high T almost
+     * all moves accept (diversification); as T cools the policy converges to [Improving]. Holds the
+     * schedule's mutable temperature state, so each `IteratedLocalSearchRestart` or `Alns` instance
+     * should get its own.
      *
-     * Defaults follow common LS-SA conventions: starting T = 1.0 (problem-dependent in
-     * production), cooling = 0.999, floor = 1e-3.
+     * The default [Geometric] schedule (start 1.0, cooling 0.999, floor 1e-3) reproduces the
+     * long-standing cool-only behaviour; pass an adaptive-cooling or reheating schedule for a
+     * stronger trajectory.
      */
-    class SimulatedAnnealing(
-        /** Starting temperature. */
-        val initialTemperature: Double = 1.0,
-        val coolingRate: Double = 0.999,
-        val minTemperature: Double = 1e-3,
-    ) : AcceptanceCriterion {
-        init {
-            require(initialTemperature > 0) { "initialTemperature must be positive, got $initialTemperature" }
-            require(coolingRate in 0.0..1.0) { "coolingRate must be in [0, 1], got $coolingRate" }
-            require(minTemperature > 0) { "minTemperature must be positive, got $minTemperature" }
-        }
+    class SimulatedAnnealing(private val schedule: Schedule) : AcceptanceCriterion {
+        /** Fixed geometric cooling — the long-standing default schedule. */
+        constructor(
+            initialTemperature: Double = 1.0,
+            coolingRate: Double = 0.999,
+            minTemperature: Double = 1e-3,
+        ) : this(Geometric(initialTemperature, coolingRate, minTemperature))
 
-        /** Current temperature (cools on each call). */
-        var temperature: Double = initialTemperature
-            private set
+        /** Current temperature (cools on each [accept] call). */
+        val temperature: Double get() = schedule.temperature
 
         override fun accept(newObjective: Double, incumbentObjective: Double, rng: Random): Boolean {
             val accepted = if (newObjective <= incumbentObjective) {
                 true
             } else {
                 val delta = newObjective - incumbentObjective
-                rng.nextDouble() < exp(-delta / temperature)
+                rng.nextDouble() < exp(-delta / schedule.temperature)
             }
-            temperature = (temperature * coolingRate).coerceAtLeast(minTemperature)
+            schedule.step()
             return accepted
         }
 
-        /** Reset the temperature to [initialTemperature]; useful for re-using one instance
+        /** Reset the schedule to its initial temperature; useful for re-using one instance
          *  across consecutive `minimize` calls. */
-        fun reset() {
-            temperature = initialTemperature
-        }
+        fun reset() = schedule.reset()
     }
 }
