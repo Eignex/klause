@@ -96,6 +96,19 @@ class PresolverTest {
     }
 
     @Test
+    fun `auto symmetry breaking defers to a model that already breaks symmetry`() {
+        val auto = PresolveConfig.AUTO
+        val breaks = PresolveContext(modelBreaksSymmetry = true)
+        // Default case: the model's own symmetry_breaking_constraint turns klause's pass off…
+        assertEquals(false, auto.resolved(PresolvePass.BREAK_SYMMETRIES, breaks))
+        // …without disturbing the other auto passes.
+        assertTrue(auto.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, breaks))
+        // Explicit overrides win regardless of the model: +symmetry forces it on, -symmetry off.
+        assertEquals(true, PresolveConfig.parse("default,+symmetry").resolved(PresolvePass.BREAK_SYMMETRIES, breaks))
+        assertEquals(false, PresolveConfig.parse("default,-symmetry").resolved(PresolvePass.BREAK_SYMMETRIES, breaks))
+    }
+
+    @Test
     fun `every pass self-registers and is dispatchable`() {
         // The enum is the registry: ids must be unique and round-trip through fromId, and every
         // problem-stage pass must apply cleanly (no unhandled entry) — a malformed addition fails loudly.
