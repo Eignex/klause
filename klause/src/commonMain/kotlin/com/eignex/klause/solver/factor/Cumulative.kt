@@ -874,7 +874,72 @@ class Cumulative(
         }
     }
 
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: swap the start times of two present tasks with the
+     *  same current duration **and** resource demand. Their energy blocks have identical shape and
+     *  height, so swapping which task occupies which slot leaves the resource profile `usage(t)`
+     *  unchanged at every time point — the overage cost, hence feasibility, is preserved. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (n < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(n)
+            val j = state.rng.nextInt(n)
+            if (i == j || starts[i] == starts[j]) continue
+            if (!present(state, i) || !present(state, j)) continue
+            if (curDur(state, i) != curDur(state, j) || curRes(state, i) != curRes(state, j)) continue
+            val si = state.assignment.intValue(starts[i])
+            val sj = state.assignment.intValue(starts[j])
+            if (si == sj) continue
+            if (sj !in state.problem.intDomains[starts[i]] || si !in state.problem.intDomains[starts[j]]) continue
+            sink.addCompound(listOf(IntSet(starts[i], sj), IntSet(starts[j], si)))
+            emitted++
+        }
+    }
+
+    /** Feasible init: serialise the present tasks in earliest-start order so no two overlap; with
+     *  no overlap the usage at any time is a single task's demand, capacity-feasible as long as
+     *  every demand fits under the capacity. Returns false — leaving the random assignment — when a
+     *  task can't be placed in domain or a single demand exceeds the capacity. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        if (starts.isEmpty()) return false
+        val cap = curCap(state)
+        val order = argsortByIntKey(starts.size) { state.problem.intDomains[starts[it]].min }
+        var prevEnd = Int.MIN_VALUE
+        for (oi in order.indices) {
+            val i = order[oi]
+            if (!present(state, i)) continue
+            if (curRes(state, i) > cap) return false
+            val dur = curDur(state, i)
+            val v = starts[i]
+            if (state.assumptions.isFrozenInt(v)) {
+                val s = state.assignment.intValue(v)
+                if (s < prevEnd) return false
+                prevEnd = s + dur
+            } else {
+                val d = state.problem.intDomains[v]
+                val cand = max(d.min, prevEnd)
+                if (cand > d.max) return false
+                var s = -1
+                d.forEach { if (s < 0 && it >= cand) s = it }
+                if (s < 0) return false
+                state.assignment.setInt(v, s)
+                prevEnd = s + dur
+            }
+        }
+        return true
+    }
+
     private companion object {
         const val MAX_SWAPS: Int = 4
+
+        /** Cap on equal-shape start-swap compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 8
     }
 }

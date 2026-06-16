@@ -34,4 +34,18 @@ class StructuredMoveOracleTest {
             arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 6)),
         )
     }
+
+    @Test fun `equal-footprint diffn position-swaps preserve non-overlap`() {
+        // Two 1x1 rectangles (identical footprint): the position swap fires and must keep them
+        // non-overlapping.
+        oneFactor(
+            Diffn(
+                xs = intArrayOf(0, 1),
+                ys = intArrayOf(2, 3),
+                widths = intArrayOf(1, 1),
+                heights = intArrayOf(1, 1),
+            ),
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+        )
+    }
 }
