@@ -7,6 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `diffn(xs, ys, widths, heights)` — pairwise non-overlapping 2D rectangles. Each rectangle
@@ -82,7 +83,10 @@ class Diffn(
      *  by ≥2 distinct rectangles (a degenerate model). The affected-pair delta only touches
      *  the moved rectangle, which is exact iff the moved var maps to exactly one rectangle;
      *  a shared id forces the O(n²) full-recount fallback to preserve exact semantics. */
-    private val varToRect: Map<Int, Int> = run {
+    // Var id → its rectangle index, or -1 when the id is shared across rectangles (the moved-rect
+    // fast path can't apply). IntIntMap keeps the per-move lookup unboxed; -1 doubles as the
+    // absent sentinel, which the read site already treats the same as a shared id (`r < 0`).
+    private val varToRect: IntIntMap = run {
         val m = HashMap<Int, Int>(n * 2)
         fun record(v: Int, i: Int) {
             val prev = m[v]
@@ -94,7 +98,8 @@ class Diffn(
             widthVars?.let { record(it[i], i) }
             heightVars?.let { record(it[i], i) }
         }
-        m
+        val keys = m.keys.toIntArray()
+        IntIntMap.build(keys, IntArray(keys.size) { m.getValue(keys[it]) }, absent = -1)
     }
 
     /** Number of overlapping pairs that include rectangle [r], under an optional single-var
@@ -204,7 +209,7 @@ class Diffn(
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val r = varToRect[intVar]
-        val after = if (r == null || r < 0) {
+        val after = if (r < 0) {
             countOverlaps(state, intVar, newValue)
         } else {
             val oldPairsR = pairsInvolvingRect(state, r, ov = -1, nv = 0)

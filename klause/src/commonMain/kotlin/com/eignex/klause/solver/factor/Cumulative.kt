@@ -9,6 +9,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.max
 import kotlin.math.min
@@ -150,11 +151,11 @@ class Cumulative(
 
     private val n: Int = starts.size
 
-    private val startPos: Map<Int, Int> = starts.withIndex().associate { (i, v) -> v to i }
-    private val durPos: Map<Int, Int> =
-        if (durationVars.isEmpty()) emptyMap() else durationVars.withIndex().associate { (i, v) -> v to i }
-    private val resPos: Map<Int, Int> =
-        if (resourceVars.isEmpty()) emptyMap() else resourceVars.withIndex().associate { (i, v) -> v to i }
+    // Var id → its position in the corresponding array (-1 when the var is not in that role).
+    // IntIntMap keeps the lookup unboxed and array-backed for the dense var ids these hold.
+    private val startPos: IntIntMap = IntIntMap.build(starts, IntArray(starts.size) { it }, absent = -1)
+    private val durPos: IntIntMap = IntIntMap.build(durationVars, IntArray(durationVars.size) { it }, absent = -1)
+    private val resPos: IntIntMap = IntIntMap.build(resourceVars, IntArray(resourceVars.size) { it }, absent = -1)
 
     private fun curDur(state: LocalSearchState, i: Int): Int =
         if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
@@ -209,7 +210,7 @@ class Cumulative(
 
             else -> {
                 val sp = startPos[intVar]
-                if (sp != null) {
+                if (sp >= 0) {
                     if (!present(state, sp)) {
                         0
                     } else {
@@ -223,7 +224,7 @@ class Cumulative(
                     }
                 } else {
                     val dp = durPos[intVar]
-                    if (dp != null) {
+                    if (dp >= 0) {
                         if (!present(state, dp)) {
                             0
                         } else {
@@ -237,7 +238,7 @@ class Cumulative(
                         }
                     } else {
                         val rp = resPos[intVar]
-                        if (rp != null) {
+                        if (rp >= 0) {
                             if (!present(state, rp)) {
                                 0
                             } else {
@@ -270,7 +271,7 @@ class Cumulative(
 
             else -> {
                 val sp = startPos[intVar]
-                if (sp != null) {
+                if (sp >= 0) {
                     if (!present(state, sp)) return 0
                     val d = curDur(state, sp)
                     val r = curRes(state, sp)
@@ -278,14 +279,15 @@ class Cumulative(
                     applyStartDelta(ls, oldValue, newValue, d, r)
                 } else {
                     val dp = durPos[intVar]
-                    if (dp != null) {
+                    if (dp >= 0) {
                         if (!present(state, dp)) return 0
                         val r = curRes(state, dp)
                         if (r <= 0) return 0
                         val s = state.assignment.intValue(starts[dp])
                         applyDurDelta(ls, s, oldValue, newValue, r)
                     } else {
-                        val rp = resPos[intVar] ?: return 0
+                        val rp = resPos[intVar]
+                        if (rp < 0) return 0
                         if (!present(state, rp)) return 0
                         val d = curDur(state, rp)
                         if (d <= 0) return 0
