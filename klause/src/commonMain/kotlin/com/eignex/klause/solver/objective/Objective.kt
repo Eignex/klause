@@ -17,6 +17,12 @@ import com.eignex.klause.solver.Sample
 interface Objective {
     /** Objective value of [sample]; lower is better. */
     fun evaluate(sample: Sample): Double
+
+    /** Objective value of the live [assignment]; lower is better. Equivalent to
+     *  `evaluate(assignment.snapshot())` but without materialising a [Sample] — the descent loop calls
+     *  this every iteration, so the default's snapshot copy dominates allocation. Hot implementations
+     *  read the assignment's variables directly; the default is the safe fallback. */
+    fun evaluate(assignment: Assignment): Double = evaluate(assignment.snapshot())
 }
 
 /**
@@ -79,6 +85,21 @@ data class LinearObjective(
     }
 
     override fun evaluate(sample: Sample): Double = evaluateLong(sample).toDouble()
+
+    /** Exact integer objective value of the live [assignment]; lower is better. Reads variables in
+     *  place — no [Sample] copy — so the descent loop can score every iteration allocation-free. */
+    fun evaluateLong(assignment: Assignment): Long {
+        var total = constant
+        for (b in 0 until minOf(assignment.numBoolVars, boolWeights.size)) {
+            if (assignment.boolValue(b)) total += boolWeights[b]
+        }
+        for (i in 0 until minOf(assignment.numIntVars, intCoefficients.size)) {
+            total += intCoefficients[i] * assignment.intValue(i)
+        }
+        return total
+    }
+
+    override fun evaluate(assignment: Assignment): Double = evaluateLong(assignment).toDouble()
 
     /**
      * If this objective is a single integer variable — exactly one nonzero coefficient, on
