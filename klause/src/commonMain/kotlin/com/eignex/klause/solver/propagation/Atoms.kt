@@ -22,22 +22,6 @@ internal fun PropagationState.atomKey(intVar: Int, kind: AtomKind, threshold: In
     return (intVar.toLong() shl 34) or (kind.ordinal.toLong() shl 32) or biased
 }
 
-/** Encode a *positive* atom-lit (the atom holds) directly as a [Lit]-style id. */
-internal fun PropagationState.atomLitGe(intVar: Int, threshold: Int): Int = Lit.make(atomVarGe(intVar, threshold), true)
-
-/** Literal for the bound atom `intVar ≤ threshold`. */
-internal fun PropagationState.atomLitLe(intVar: Int, threshold: Int): Int = Lit.make(atomVarLe(intVar, threshold), true)
-
-/** Literal for the value atom `intVar = value`. */
-internal fun PropagationState.atomLitEq(intVar: Int, value: Int): Int = Lit.make(atomVarEq(intVar, value), true)
-
-/** Literal for the value atom `intVar ≠ value`. */
-internal fun PropagationState.atomLitNe(intVar: Int, value: Int): Int = Lit.make(atomVarEq(intVar, value), false)
-
-/** True iff `v` is an atom-id (past the bool var space). Used by the conflict
- *  analyzer to dispatch between bool-trail and atom-table lookups. */
-internal fun PropagationState.isAtomVar(v: Int): Boolean = v >= problem.numBoolVars
-
 /** Translate a virtual atom-var id back to its 0-based atom index. */
 internal fun PropagationState.atomIdOf(v: Int): Int = v - problem.numBoolVars
 
@@ -46,10 +30,10 @@ internal fun PropagationState.atomIdOf(v: Int): Int = v - problem.numBoolVars
 internal fun PropagationState.atomLitWatchIndex(lit: Int): Int =
     (atomIdOf(Lit.variable(lit)) shl 1) or (if (Lit.isPositive(lit)) 0 else 1)
 
-/** Current truth of an atom — derived fresh from `intDomains`, not the
- *  snapshot-at-allocation `atomValue`. Returns `null` when undetermined (the bound
- *  isn't either side-decided yet). Used by [PropagationState.litTrue] / [PropagationState.litFalse] /
- *  [PropagationState.pinLit]. */
+/** Current truth of an atom — read from the stored [PropagationState.atomState] slot (kept in
+ *  sync with `intDomains` by channeling), not re-derived from the domain on every touch. Returns
+ *  `null` when undetermined (the bound isn't either side-decided yet). Used by
+ *  [PropagationState.litTrue] / [PropagationState.litFalse] / [PropagationState.pinLit]. */
 internal fun PropagationState.atomCurrentTruth(atomId: Int): Boolean? = when (atomState[atomId]) {
     1 -> true
     2 -> false
@@ -67,8 +51,7 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     // Trail-resident: a determined order literal carries the level it was established at on
     // its [atomLvl] slot — set when a bound move crossed it ([wakeAtom]) and kept across
     // backtracks (only the flipped range is reset, see [resetAtomTrailFor]); reconstructed from
-    // the per-side [intMinLevel]/[intMaxLevel] slots for an atom materialized at the current
-    // bound. This is the canonical replacement for the old bound-history binary search.
+    // the per-side [intMinLevel]/[intMaxLevel] slots for an atom materialized at the current bound.
     val stored = atomLvl[atomId]
     if (stored >= 0) return stored
     val v = atomIntVar[atomId]
@@ -90,11 +73,11 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
 
 /** Reconstruct the trail level of a freshly-materialized **determined** atom from the per-side
  *  [PropagationState.intMinLevel] / [PropagationState.intMaxLevel] slots, when its threshold is
- *  exactly the current opposing bound (the only case a single slot can answer; provably equal to
- *  [atomLevelForConflict]'s bound-history result). Returns -1 ("not reconstructed") for undetermined
- *  atoms, looser-than-current bounds, and interior-hole eq atoms — those keep -1 and the level read
- *  falls back to the history derivation. A -1 per-side slot means the bound is still at its root, i.e.
- *  level 0. [st]: 0 = undetermined, 1 = true, 2 = false. */
+ *  exactly the current opposing bound (the only case a single slot can answer; the level at which
+ *  that endpoint was set is exactly when the atom's truth was decided). Returns -1 ("not
+ *  reconstructed") for undetermined atoms, looser-than-current bounds, and interior-hole eq atoms —
+ *  those keep -1 and the level read falls back to the hole-carve record. A -1 per-side slot means
+ *  the bound is still at its root, i.e. level 0. [st]: 0 = undetermined, 1 = true, 2 = false. */
 internal fun PropagationState.reconstructCurrentBoundLevel(v: Int, kind: AtomKind, k: Int, st: Int): Int {
     if (st == 0) return -1
     val d = intDomains[v]
@@ -181,7 +164,6 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
     val st = stateOfTruth(atomTruthOf(intVar, kind, threshold))
     atomState.add(st)
     atomLvl.add(reconstructCurrentBoundLevel(intVar, kind, threshold, st))
-    atomRsn.add(-1)
     atomAnt.add(reconstructCurrentBoundReason(intVar, kind, threshold, st))
     atomWatchersByLit.add(null) // positive-literal watcher slot for this atom
     atomWatchersByLit.add(null) // negative-literal watcher slot
@@ -434,13 +416,13 @@ private fun PropagationState.recordEqDeath(v: Int, k: Int, near: Boolean, antNea
     pendingMoveAnt = if (near) antNear else antFar
 }
 
-/** Wake the watchers of [atomId]'s now-false literal after its truth flipped to
- *  [newT]. Truth itself is never stored — it is derived from the domains on read — but
- *  the **level** the atom became determined at is recorded on its trail slot: this move
- *  crossed the atom's threshold, so its truth was established at the move's [PropagationState.currentLevel].
- *  That stored level is the trail-resident replacement for the bound-history binary search
- *  in [atomLevelForConflict] (provably equal: a crossing at level L *is* the level the
- *  bound first reached the threshold). Reset to -1 on backtrack of the underlying var. */
+/** Record [atomId]'s establishment after a bound move flipped its truth to [newT], then wake the
+ *  watchers of the now-false literal. The move crossed the atom's threshold, so its truth was
+ *  established at the move's [PropagationState.currentLevel]: store the truth ([PropagationState.atomState]),
+ *  that level ([PropagationState.atomLvl]) and the move's literal-form reason ([PropagationState.atomAnt]) on
+ *  the atom's trail slot, so [atomLevelForConflict] / [atomAntecedentsDerived] read them directly
+ *  (a crossing at level L *is* the level the bound first reached the threshold). The slot is reset
+ *  on backtrack of the underlying var ([resetAtomTrailFor]). */
 internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
     val targetState = if (newT) 1 else 2
     // Single establishment: stamp the trail slot only when the atom's truth actually flips into
@@ -459,7 +441,6 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
     boolPinOrder.add(problem.numBoolVars + atomId)
     atomState[atomId] = targetState
     atomLvl[atomId] = currentLevel
-    atomRsn[atomId] = currentFactor
     // Record the establishment reason on the trail slot: a true eq atom (the var just became
     // the singleton {k}) rests on BOTH endpoint bounds, so cite them; a crossed hole (false eq)
     // rests on why its value was excluded — its per-value carve reason ([holeReasonFor]), which
@@ -492,7 +473,6 @@ internal fun stateOfTruth(t: Boolean?): Int = when (t) {
 private fun PropagationState.clearAtomSlot(atomId: Int) {
     atomState[atomId] = 0
     atomLvl[atomId] = -1
-    atomRsn[atomId] = -1
     atomAnt[atomId] = null
 }
 

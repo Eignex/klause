@@ -519,15 +519,15 @@ class PropagationState(
     // -------- Per-atom trail slots (LCG: order literals are trail-resident) --------
     //
     // Each materialized order literal carries the same trail metadata a bool var does:
-    // the decision level it was established at, the factor that forced it, and the
-    // literal-form antecedents of that force. Truth is still read from the int-domain
-    // view (the two are kept in sync by channeling), but level / reason / antecedents
-    // are *stored* at the moment the bound crosses the threshold rather than re-derived
-    // from a bound-change history. Parallel to [atomIntVar]; one slot appended per
-    // [allocAtom]. Undone on backtrack alongside the int-domain change that set them.
+    // the decision level it was established at and the literal-form antecedents of the
+    // force. Truth is still read from the int-domain view (the two are kept in sync by
+    // channeling), but level / antecedents are *stored* at the moment the bound crosses
+    // the threshold rather than re-derived from a bound-change history. Parallel to
+    // [atomIntVar]; one slot appended per [allocAtom]. Undone on backtrack alongside the
+    // int-domain change that set them.
     //
     // [atomLvl] = -1 means "not established on the current path" (truth undetermined, or
-    // a root/bake fact). [atomRsn] = -1 means decision / leaf / root fact (no factor).
+    // a root/bake fact).
 
     /** Stored truth of this order literal — the canonical, BCP-cheap replacement for deriving it
      *  from [intDomains] on every clause touch (the #588 profile's dominant cost, `atomTruthOf`).
@@ -540,9 +540,6 @@ class PropagationState(
 
     /** Decision level at which this atom's current truth was established (-1 = none). */
     internal val atomLvl: IntArrayList = IntArrayList()
-
-    /** Factor that forced this atom's current truth (-1 = decision / leaf / root). */
-    internal val atomRsn: IntArrayList = IntArrayList()
 
     /** Literal-form antecedents of this atom's current truth (null = leaf / root). */
     internal val atomAnt: ArrayList<IntArray?> = ArrayList()
@@ -594,31 +591,6 @@ class PropagationState(
      *  of this atom encodes `[intVar ≠ value]`; share the same atom id rather than allocating
      *  a dedicated `Ne` kind. */
     fun atomVarEq(intVar: Int, value: Int): Int = allocAtom(intVar, kind = AtomKind.EQ, threshold = value)
-
-    /**
-     * Allocate a *relaxed* bound atom (`kind` 0 = `[v ≥ threshold]`, 1 = `[v ≤ threshold]`)
-     * for use as a conflict-reason leaf: when the atom is **freshly** allocated and currently
-     * true, pin its level to [level] (the level the bound first reached [threshold], from the
-     * history) and clear its antecedent so the analyzer keeps it as a leaf rather than the
-     * over-attributed current [intLevel]. An already-existing atom is returned untouched (its
-     * level is ≥ the true level — sound, just not improved). Returns the virtual var id.
-     *
-     * Caller guarantees the atom is currently true (the relaxed bound is implied by the
-     * current domain) and [level] is exactly the level it became true — both required for the
-     * learned clause's backjump level to be sound.
-     */
-    internal fun atomBoundLeafIfNew(intVar: Int, kind: AtomKind, threshold: Int, level: Int): Int {
-        val vVar = allocAtom(intVar, kind = kind, threshold = threshold)
-        // Store the caller-supplied establishment level on the atom's trail slot when it has no
-        // fresher channeled level. This is the trail-resident level source for a *looser*-than-
-        // current relaxed bound (the only kind whose level the per-var [intMinLevel]/[intMaxLevel]
-        // slots can't reconstruct), so [atomLevelForConflict] reads it from the slot instead of
-        // a bound-history binary search. A channeled crossing (atomLvl ≥ 0) already holds the
-        // exact level — don't clobber it.
-        val id = atomIdOf(vVar)
-        if (atomLvl[id] < 0) atomLvl[id] = level
-        return vVar
-    }
 
     /** True iff bool [v] is currently assigned (by decision or propagation). Primitive — lets
      *  hot factor loops test assignment without the `Boolean?` box that `boolValues[v]` allocates.
@@ -724,10 +696,12 @@ class PropagationState(
     //           int-var state is recorded so replay restores it exactly even when the same
     //           var is narrowed several times within a level.
     //
-    // Atom-table mutations are *not* logged: [undoTo] re-derives surviving atoms' truth
-    // from the restored int domains (matching the old `restore`), and atoms allocated
-    // after a mark are truncated wholesale. atomLevel / atomAntecedents drift across pops,
-    // exactly as they did under the snapshot scheme (advisory, like watches).
+    // Atom-table slots are *not* logged per-mutation: [undoTo] reconciles them after restoring
+    // each int domain — [resetAtomTrailFor] / [resetAtomTrailForCarve] clear exactly the order
+    // literals whose truth flips back to undetermined over the widened range, leaving every
+    // still-determined atom its trail-resident level / reason (#708). The unified pin trail
+    // [boolPinOrder] is truncated to the mark, so atoms allocated/established after it are dropped
+    // wholesale.
 
     /** Per-variable unassign sink invoked by [undoTo]; see its doc. Null = no subscriber. */
     var unassignListener: ((Int) -> Unit)? = null

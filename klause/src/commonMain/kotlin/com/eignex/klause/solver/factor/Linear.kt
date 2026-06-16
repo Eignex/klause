@@ -348,7 +348,7 @@ internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntAr
                 // currently-true premise, so each is currently false — exactly like the bound
                 // entries above (¬[v ≥ min] / ¬[v ≤ max]). The hole premise is `v ≠ value`, so
                 // the clause literal is the positive eq atom `[v == value]`. Storing the premise
-                // itself (atomLitNe, currently true) would invert the recorded implication for
+                // itself (`v ≠ value`, currently true) would invert the recorded implication for
                 // any consumer that reads the stored polarity directly.
                 val lit = Lit.make(state.atomVarEq(v, value), true)
                 if (seen.add(lit)) out.add(lit)

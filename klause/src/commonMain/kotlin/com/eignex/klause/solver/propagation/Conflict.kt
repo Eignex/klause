@@ -64,7 +64,7 @@ internal fun PropagationState.maxLevelForClause(literals: IntArray): Int {
  *
  *  Atom-lit dispatch: `boolVars` may legitimately contain virtual atom-var ids when the
  *  failing factor is a learned Clause whose literals reference atom-lits (encoded as
- *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those map into `atomLevel`,
+ *  `Lit.make(v, ...)` with `v >= problem.numBoolVars`). Those resolve via [atomLevelForConflict],
  *  not [PropagationState.boolLevel] — mirrors the [maxLevelForVars] dispatch a few lines above. */
 internal fun PropagationState.collectLevelsForVars(boolVars: IntArray, intVars: IntArray): IntArray {
     // Dedup levels in a reused primitive set (no per-conflict HashSet / Int boxing), then
