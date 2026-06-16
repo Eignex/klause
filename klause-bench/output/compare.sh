@@ -1,72 +1,98 @@
 #!/usr/bin/env bash
-# Compare two configs' saved `solve` output across the problems they share.
-# Each config is a directory of per-problem JSON records (see SolveMetric): one <problem>.json per
-# instance, holding solver/settings/budget + the parsed result. Direction-aware (maximize vs
-# minimize per problem).
+# MiniZinc Challenge pairwise (Borda) scoring between two configs' saved `solve` output.
+# Implements the official rules (https://www.minizinc.org/challenge/2026/rules/): for each shared
+# problem, solver A scores points relative to B:
+#   - A not solved                   -> 0      (even when B is also unsolved)
+#   - A solved, B not                -> 1
+#   - both solved, A strictly better -> 1
+#   - both solved, B strictly better -> 0
+#   - both solved, indistinguishable -> complete:  timeUsed(B)/(timeUsed(A)+timeUsed(B)), 0.5 if both 0
+#                                       incomplete: 0.5
+# "strictly better" is the priority chain solved > optimal > quality:
+#   - complete   (FD / free / parallel / open): proving optimality beats not proving; then objective.
+#   - incomplete (local search): optimality is ignored; only objective quality counts.
+# A track's score for a solver is the sum of its pairwise points; this script reports A's and B's
+# totals over the problems they share.
 #
-#   compare.sh <dirA> <dirB>
-#   e.g.  compare.sh output/klause-cp-p8-free-t300s output/choco-p8-free-t300s
+#   compare.sh [--incomplete] <dirA> <dirB>      (default --complete)
 #
-# Verdict per shared problem (A relative to B):
-#   win  = A's objective is better (higher for maximize, lower for minimize), OR equal-value reached
-#          no later (time-to-best tiebreak); for satisfaction, A feasible where B is not.
-#   loss = the reverse.  tie = same value/feasibility, no time edge.
-#   UNSOUND = A strictly beats B's PROVEN optimum (impossible — a bug to investigate).
-# Also reports the "solve 100% of B's" superset (problems B solved that A did not) and the
-# time-to-best aggregate over problems both solvers timed (A/B totals + ratio) — the regression edge
-# when A and B are two runs of the same solver.
+# Each config is a directory of per-problem JSON records (see SolveMetric), direction-aware via the
+# per-record `maximize` flag. Record fields used:
+#   feasible  true = found a solution, false = proved unsatisfiable, null = nothing found
+#   objective the model-oriented objective value (null unless feasible)
+#   proven    optimality (or unsatisfiability) was proved
+#   timeToBestMs / budgetMs    timing
+# timeUsed is approximated as timeToBestMs when solved, else budgetMs — the bench does not separately
+# stamp proof-completion time, so the tie time-fraction uses time-to-best as the proxy.
 set -eu
+MODE=complete
+case "${1:-}" in
+  --incomplete) MODE=incomplete; shift ;;
+  --complete)   MODE=complete;   shift ;;
+esac
 A="${1%/}"; B="${2%/}"
 
 jq -rn \
-  --arg as "$(basename "$A")" --arg bs "$(basename "$B")" \
+  --arg as "$(basename "$A")" --arg bs "$(basename "$B")" --arg mode "$MODE" \
   --slurpfile a <(cat "$A"/*.json) \
-  --slurpfile b <(cat "$B"/*.json) \
-  '
-  ($b | map({key: .problem, value: .}) | from_entries) as $bi
-  | [ $a[] | . as $x | ($bi[.problem]) as $y | select($y != null)
-      | (.maximize) as $max
-      | {
-          name: .problem, kind: .kind, max: $max,
-          ao: .objective, at: .timeToBestMs, ap: .proven, af: .feasible,
-          bo: $y.objective, bt: $y.timeToBestMs, bp: $y.proven, bf: $y.feasible,
-          afl: (.stats.failures), bfl: ($y.stats.failures),
-          and: (.stats.nodes), bnd: ($y.stats.nodes),
-          verdict:
-            (if (.objective != null and $y.objective != null) then
-               (if (.objective == $y.objective) then
-                  (if ((.timeToBestMs // 9e18) <= ($y.timeToBestMs // 9e18)) then "win" else "loss" end)
-                else
-                  ( ((if $max then .objective > $y.objective else .objective < $y.objective end)) as $abetter
-                  | if $abetter then (if $y.proven then "UNSOUND" else "win" end) else "loss" end )
-                end)
-             elif (.objective != null) then "win"
-             elif ($y.objective != null) then "loss"
-             elif (.feasible == true and $y.feasible != true) then "win"
-             elif (.feasible == $y.feasible) then "tie"
-             else "loss" end)
-        } ]
+  --slurpfile b <(cat "$B"/*.json) '
+  ($mode == "complete") as $complete |
+  ($b | map({key: .problem, value: .}) | from_entries) as $bi |
+  # solved: found a solution (feasible true) or proved unsatisfiable (feasible false). null = not solved.
+  def solved($r): ($r.feasible != null);
+  # optimal: a complete answer — proved optimality, proved unsat, or a solved satisfaction instance.
+  def optimal($r): ($r.proven == true) or ($r.feasible == false) or ($r.kind == "satisfy" and solved($r));
+  # timeUsed proxy (ms).
+  def tu($r): (if solved($r) then (($r.timeToBestMs // $r.budgetMs) // 0) else ($r.budgetMs // 0) end);
+  [ $a[] | . as $x | ($bi[.problem]) as $y | select($y != null)
+    | (.maximize) as $max
+    | (if (.objective != null and $y.objective != null) then
+         (if .objective == $y.objective then "eq"
+          elif ($max and .objective > $y.objective) or (($max | not) and .objective < $y.objective) then "A"
+          else "B" end)
+       else "na" end) as $q
+    # cmp: 1 = A strictly better, -1 = B strictly better, 0 = indistinguishable.
+    | (if (solved($x) | not) then (if (solved($y) | not) then 0 else -1 end)
+       elif (solved($y) | not) then 1
+       elif $complete and optimal($x) and (optimal($y) | not) then 1
+       elif $complete and optimal($y) and (optimal($x) | not) then -1
+       elif $q == "A" then 1
+       elif $q == "B" then -1
+       else 0 end) as $cmp
+    | tu($x) as $at | tu($y) as $bt
+    | (if (solved($x) | not) then 0
+       elif $cmp == 1 then 1
+       elif $cmp == -1 then 0
+       elif $complete then (if ($at + $bt) == 0 then 0.5 else ($bt / ($at + $bt)) end)
+       else 0.5 end) as $pa
+    | (if (solved($y) | not) then 0
+       elif $cmp == -1 then 1
+       elif $cmp == 1 then 0
+       elif $complete then (if ($at + $bt) == 0 then 0.5 else ($at / ($at + $bt)) end)
+       else 0.5 end) as $pb
+    # correctness clash: A reports a value beating B'"'"'s proven optimum, or SAT vs proved-UNSAT.
+    | ((($q == "A") and ($y.proven == true)) or (.feasible == true and $y.feasible == false)) as $unsound
+    | {name: .problem, max: $max, cmp: $cmp, pa: $pa, pb: $pb, unsound: $unsound,
+       asolved: solved($x), bsolved: solved($y),
+       av: (if .feasible == false then "UNSAT" else (.objective // .feasible // "-") end),
+       bv: (if $y.feasible == false then "UNSAT" else ($y.objective // $y.feasible // "-") end),
+       aopt: optimal($x), bopt: optimal($y), at: $at, bt: $bt } ]
   | . as $rows
-  | ($rows|length) as $n
-  | ($rows|map(select(.verdict=="win"))|length) as $w
-  | ($rows|map(select(.verdict=="loss"))|length) as $l
-  | ($rows|map(select(.verdict=="tie"))|length) as $t
-  | ($rows|map(select(.verdict=="UNSOUND"))|length) as $u
-  | ($rows|map(select((.bf==true or .bo!=null) and (.af!=true and .ao==null)))|map(.name)) as $missed
-  | ($rows|map(select(.at!=null and .bt!=null))) as $timed
-  | ($timed|map(.at)|add // 0) as $atot
-  | ($timed|map(.bt)|add // 0) as $btot
-  | ($rows|map(select(.afl!=null and .bfl!=null))) as $stated
-  | ($stated|map(.afl|tonumber)|add // 0) as $afl
-  | ($stated|map(.bfl|tonumber)|add // 0) as $bfl
-  | ($stated|map(.and|tonumber)|add // 0) as $anod
-  | ($stated|map(.bnd|tonumber)|add // 0) as $bnod
-  | "=== \($as)  vs  \($bs)   (\($n) shared problems) ===",
-    ($rows[] | "  \(.verdict|ascii_upcase|.[0:4]) [\(.name)]\(if .max then " (max)" else "" end) "
-       + "A=\(.ao // .af)@\(.at // "-")ms  B=\(.bo // .bf)@\(.bt // "-")ms\(if .bp then " (B proved)" else "" end)"),
+  | ($rows | length) as $n
+  | ($rows | map(.pa) | add // 0) as $sa
+  | ($rows | map(.pb) | add // 0) as $sb
+  | ($rows | map(select(.cmp == 1)) | length) as $wa
+  | ($rows | map(select(.cmp == -1)) | length) as $wb
+  | ($rows | map(select(.cmp == 0 and .asolved and .bsolved)) | length) as $ties
+  | ($rows | map(select(.asolved | not)) | length) as $aun
+  | ($rows | map(select(.unsound)) | map(.name)) as $uns
+  | ($rows | map(select(.bsolved and (.asolved | not))) | map(.name)) as $missed
+  | "=== MiniZinc Challenge \($mode) scoring:  \($as)  vs  \($bs)   (\($n) shared) ===",
+    (if ($uns | length) > 0 then "  !! UNSOUND (A beats a proven optimum / SAT-vs-UNSAT): \($uns | join(", "))" else empty end),
+    ($rows[] | "  A\(if .pa >= .pb then "+" else " " end)\((.pa * 100 | round) / 100) [\(.name)]\(if .max then " (max)" else "" end) "
+       + "A=\(.av)\(if .aopt then "!" else "" end)@\(.at)ms  B=\(.bv)\(if .bopt then "!" else "" end)@\(.bt)ms"),
     "",
-    "A wins \($w)/\($n)  (loss \($l), tie \($t), unsound \($u))",
-    "B-solved problems A missed: \($missed|length)\(if ($missed|length)>0 then "  -> " + ($missed|join(", ")) else "" end)",
-    "time-to-best over both-timed (\($timed|length)): A=\($atot)ms B=\($btot)ms\(if $btot>0 then "  (\(($atot/$btot*100|round)/100)×)" else "" end)",
-    (if ($stated|length)>0 then "search effort over both-with-stats (\($stated|length)): A=\($afl) conflicts / \($anod) nodes  B=\($bfl) / \($bnod)" else empty end)
+    "  BORDA SCORE:  \($as) = \((($sa) * 100 | round) / 100)   \($bs) = \((($sb) * 100 | round) / 100)   (of \($n))",
+    "  A strict wins \($wa), strict losses \($wb), ties \($ties), A-unsolved \($aun)",
+    "  B-solved that A did not: \($missed | length)\(if ($missed | length) > 0 then "  -> " + ($missed | join(", ")) else "" end)"
 '
