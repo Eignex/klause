@@ -77,12 +77,54 @@ class LocalSearchState(
      *  start. Built once on first access. */
     val electedImplicit: IntArray by lazy { electImplicitFactors() }
 
+    /** Scope-disjoint subset of [electedImplicit] used for feasible-init seeding: greedily
+     *  chosen largest-scope-first so no two seed factors share an int variable. Disjointness
+     *  guarantees one factor's [Factor.seedFeasible] never overwrites another's seeded vars,
+     *  so the post-seed assignment satisfies every seeded global simultaneously. */
+    val implicitSeedFactors: IntArray by lazy { electImplicitSeedSet() }
+
     private fun electImplicitFactors(): IntArray {
         val out = IntArrayList()
         for (id in 0 until problem.numFactors) {
             if (factors[id].providesImplicitNeighbourhood) out.add(id)
         }
         return IntArray(out.size) { out[it] }
+    }
+
+    private fun electImplicitSeedSet(): IntArray {
+        // Largest scope first so the packing seeds the most variables; ties broken by factor id
+        // for determinism (the RNG never enters election — it must be reproducible across runs).
+        val candidates = electedImplicit.sortedWith(
+            compareByDescending<Int> { factors[it].intVars.size }.thenBy { it },
+        )
+        val owned = BooleanArray(problem.numIntVars)
+        val seeds = IntArrayList()
+        for (id in candidates) {
+            val scope = factors[id].intVars
+            var disjoint = true
+            for (v in scope) {
+                if (owned[v]) {
+                    disjoint = false
+                    break
+                }
+            }
+            if (!disjoint) continue
+            for (v in scope) owned[v] = true
+            seeds.add(id)
+        }
+        return IntArray(seeds.size) { seeds[it] }
+    }
+
+    /** Implicit-solving feasible init: seed every [implicitSeedFactors] global into a satisfying
+     *  configuration (skipping variables frozen by [assumptions]). Caller is responsible for the
+     *  subsequent [recompute] — the engine's restart wrapper runs that once after seeding +
+     *  any definitional sweep. */
+    fun seedImplicitFeasible() {
+        val seeds = implicitSeedFactors
+        for (i in seeds.indices) {
+            val fid = seeds[i]
+            factors[fid].seedFeasible(this, fid)
+        }
     }
 
     /** Step counter incremented on every accepted move. Strategies use this together with

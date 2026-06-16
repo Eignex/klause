@@ -437,6 +437,40 @@ class AllDifferent(
      *  elsewhere without ever breaking this constraint. */
     override val providesImplicitNeighbourhood: Boolean get() = true
 
+    /** Feasible init: assign distinct in-domain values to the present positions. Frozen vars
+     *  keep their value and reserve it; each remaining position takes the smallest unused value
+     *  in its domain (excepted values may repeat, so they are never reserved). Returns true iff
+     *  every required position landed on a distinct (or excepted) value. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val used = IntHashSet(vars.size)
+        // Reserve frozen positions first so free positions avoid their values.
+        for (i in vars.indices) {
+            if (!present(state, i)) continue
+            val v = vars[i]
+            if (!state.assumptions.isFrozenInt(v)) continue
+            val value = state.assignment.intValue(v)
+            if (value !in exceptValues) used.add(value)
+        }
+        var allDistinct = true
+        for (i in vars.indices) {
+            if (!present(state, i)) continue
+            val v = vars[i]
+            if (state.assumptions.isFrozenInt(v)) continue
+            val d = state.problem.intDomains[v]
+            var chosen = Int.MIN_VALUE
+            d.forEach { cand ->
+                if (chosen == Int.MIN_VALUE && (cand in exceptValues || !used.contains(cand))) chosen = cand
+            }
+            if (chosen == Int.MIN_VALUE) {
+                allDistinct = false // domain exhausted — leave whatever the random restart set.
+            } else {
+                state.assignment.setInt(v, chosen)
+                if (chosen !in exceptValues) used.add(chosen)
+            }
+        }
+        return allDistinct
+    }
+
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (vars.size < 2) return
         var emitted = 0

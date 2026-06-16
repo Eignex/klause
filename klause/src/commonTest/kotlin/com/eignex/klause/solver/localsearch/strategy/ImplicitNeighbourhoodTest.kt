@@ -76,11 +76,64 @@ class ImplicitNeighbourhoodTest {
     }
 
     @Test
+    fun `the implicit seed set is scope-disjoint`() {
+        val problem = latinSquare()
+        val state = LocalSearchState(problem, Random(1))
+        val owned = HashSet<Int>()
+        for (fid in state.implicitSeedFactors) {
+            for (v in problem.factors[fid].intVars) {
+                assertTrue(owned.add(v), "seed factors must not share var $v")
+            }
+        }
+        assertTrue(state.implicitSeedFactors.isNotEmpty(), "at least one all-different must be seeded")
+    }
+
+    @Test
+    fun `feasible init seeds every elected global satisfied`() {
+        // A row/column pair on a 3-value domain: a Latin row+column whose disjoint seeds each
+        // become a permutation. With domain {0,1,2} the greedy seeder always succeeds.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
+        )
+        val state = LocalSearchState(problem, Random(5))
+        // Start from an all-equal (maximally violated) assignment.
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+        assertTrue(state.cost > 0L, "fixture must start violated")
+        state.seedImplicitFeasible()
+        state.recompute()
+        assertTrue(state.cost == 0L, "feasible init must leave the seeded all-different satisfied")
+    }
+
+    @Test
+    fun `feasible init leaves frozen vars untouched`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
+        )
+        val frozen = com.eignex.klause.solver.Assumptions(ints = mapOf(0 to 2))
+        val state = LocalSearchState(problem, Random(5), frozen)
+        state.assignment.setInt(0, 2)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+        state.seedImplicitFeasible()
+        assertTrue(state.assignment.intValue(0) == 2, "frozen var must keep its value")
+    }
+
+    @Test
     fun `the CBLS engine drives the coupled square to feasibility`() {
         val problem = latinSquare()
         val state = LocalSearchState(problem, Random(1))
         seed(state)
-        val strategy = Cbls()
+        val strategy = Cbls(implicitStructuredCap = 8)
         var solved = state.cost == 0L
         repeat(2_000) {
             if (solved) return@repeat
