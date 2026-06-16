@@ -198,3 +198,33 @@ The fix that pays off, sound-by-construction:
 Gate: the multi-seed harness (bump seeds locally) + full oracle at every step, and the liner-sf /
 mzn-bench baseline above for the payoff measurement. Build it behind a default-off flag so the current
 (sound) path stays the default until the new path is both sound and a measured win.
+
+## Core-rewrite: the irreducible blocker (traced to the source)
+
+The non-asserting fan was traced all the way down. On a snapped/holey bound move,
+`Mutators.kt`'s `antecedentsAcrossHoles` records the crossed **same-variable** hole atoms `[v=h]`
+(and `appendPriorBound` the prior same-variable bound) into `intMin/MaxAntecedents[v]`. Since
+*every* one of `v`'s order atoms resolves to that per-variable move reason
+([atomAntecedentsDerived]), the reason citing `v`'s own atoms is a same-variable self-cycle 1UIP
+cannot collapse — proven by dumping a conflict: each conflict-level `iv115` atom resolves to a reason
+listing `iv115`'s own atoms.
+
+Both ends were attempted and the wall is real:
+- **Analyzer side** (all oracle-green, but no win on their own, because the cycle is in the reason,
+  not the analyzer): single-establishment gating; `clearEqIfFreed` keeping the carve slot; deriving a
+  looser atom's reason as the bound's move reason; growing the 1UIP frontier to resolve atoms
+  materialised mid-analysis.
+- **Source side** (the real fix — make the snap reason cite the holes' *carve reasons* over other
+  variables instead of `[v=h]`): requires every value-exclusion to record its reason. Extending
+  `pushHoleHist` to all exclusions (interior + edge, single + batch) makes `holeReasonFor` complete,
+  but folding those carve reasons into the snap reason is **unsound** — it loses solutions on
+  AllDifferent (a real explaining factor): a value's carve reason, folded into a *later* snap,
+  over-attributes / mis-levels the learned clause (the per-variable store has no per-value
+  establishment *level*, only the reason).
+
+**Conclusion (evidence-backed):** the per-variable bound-reason representation cannot carry what a
+sound, collapsing nogood needs — each order literal needs its **own** establishment level + reason
+(true first-class trail residency), or the order-ladder consistency must live as **real DB clauses**
+so resolution flows through entailed axioms. That is the genuine multi-session, soundness-critical
+rewrite; no in-place patch over the per-variable store is both sound and collapsing. The harness +
+baseline above are the gate and yardstick for whoever lands it.
