@@ -114,6 +114,11 @@ internal class CpToLpRelaxation(
      *  record, flow-conservation + value channel + optional cost channel) — the exact convex hull of
      *  the diagram's accepting paths, so a cost-MDD's cost var gets an exact lower bound. Gated. */
     private val mddHull: Boolean = false,
+    /** When true, linearize each count-variable [GlobalCardinality] with a one-hot selector model so
+     *  the count variables get an LP bound: per `xs[i]` a one-hot over its declared domain, and per
+     *  cover value `Σ_i z_{i,cover} = counts(k)` — exact, so a count in the objective reads a true
+     *  bound. Adds O(Σ|domain|) columns, so it is gated. */
+    private val gccCountHull: Boolean = false,
     /**
      * #571: build only the **objective cone** — the rows and variables transitively connected to the
      * objective through the linear/Boolean constraints — and **drop every big-M [ReifiedLinear] row**.
@@ -142,7 +147,7 @@ internal class CpToLpRelaxation(
      */
     private val cacheable: Boolean =
         !circuitArcs && !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed &&
-            !regularHull && !mddHull
+            !regularHull && !mddHull && !gccCountHull
 
     /** Shared pre-densified coefficient rows for the bound-invariant base rows (#564). A null entry is
      *  a live-big-M reified base row, re-densified each node. Populated on the first cacheable build;
@@ -257,6 +262,10 @@ internal class CpToLpRelaxation(
 
         /** Above this many arc columns one Mdd flow hull is skipped (the transition-record blow-up). */
         const val MAX_MDD_ARCS: Int = 4096
+
+        /** Above this total selector count (Σ over `xs` of the declared-domain size) the count-variable
+         *  GlobalCardinality one-hot hull is skipped. */
+        const val MAX_GCC_CELLS: Int = 1024
     }
 
     /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
@@ -645,6 +654,9 @@ internal class CpToLpRelaxation(
                 if (mddHull) {
                     for (factor in problem.factors) if (factor is Mdd) buildMddHull(factor)
                 }
+                if (gccCountHull) {
+                    for (factor in problem.factors) if (factor is GlobalCardinality) buildGccCountHull(factor)
+                }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
                 if (cumulativeTimeIndexed) {
                     for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
@@ -949,6 +961,66 @@ internal class CpToLpRelaxation(
             cols[m] = intColumn(factor.n)
             vals[m] = -1L
             builder.addRow(cols, vals, rel, 0L)
+        }
+
+        /**
+         * One-hot selector model for one count-variable [GlobalCardinality] `counts(k) = #{i : xs(i) =
+         * cover(k)}`: a one-hot selector `z_iv ∈ [0,1]` per variable/value over `xs[i]`'s declared
+         * domain with `Σ_v z_iv = 1` and the channel `Σ_v v·z_iv = xs(i)`, and per cover value the
+         * exact count linkage `Σ_i z_{i,cover(k)} = counts(k)`. Each row holds at every integer solution
+         * (set `z_iv = 1` iff `xs(i) = v`), so the relaxation is sound and a count variable in the
+         * objective reads a true LP bound. Gated by [MAX_GCC_CELLS]; the constant-bound form (no count
+         * variable) and the optional-presence form (count over present vars only) are skipped — neither
+         * has a count variable this hull would bound.
+         */
+        private fun buildGccCountHull(factor: GlobalCardinality) {
+            if (factor.presents.isNotEmpty()) return // count is over present vars only — defer
+            val countVars = factor.countVars ?: return // constant-bound form has no count var to bound
+            val xs = factor.xs
+            var cells = 0L
+            for (x in xs) cells += problem.intDomains[x].size.toLong()
+            if (cells == 0L || cells > MAX_GCC_CELLS) return
+            // Selector columns contributing to each cover value's count, accumulated across all xs.
+            val selByCover = HashMap<Int, IntArrayList>()
+            for (v in factor.cover) selByCover[v] = IntArrayList()
+            for (x in xs) {
+                val declared = problem.intDomains[x]
+                val live = session.intDomain(x)
+                val sel = IntArrayList()
+                val selVal = IntArrayList()
+                declared.forEach { v ->
+                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L)
+                    sel.add(z)
+                    selVal.add(v)
+                    selByCover[v]?.add(z) // only cover values carry a count row
+                }
+                val k = sel.size
+                if (k == 0) return // a variable with no declared values — leave it to propagation
+                builder.addRow(sel.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L) // Σ_v z = 1
+                // Σ_v v·z − xs(i) = 0.
+                val cCols = IntArray(k + 1)
+                val cVals = LongArray(k + 1)
+                for (s in 0 until k) {
+                    cCols[s] = sel[s]
+                    cVals[s] = selVal[s].toLong()
+                }
+                cCols[k] = intColumn(x)
+                cVals[k] = -1L
+                builder.addRow(cCols, cVals, Relation.EQ, 0L)
+            }
+            // Σ_i z_{i,cover(k)} − counts(k) = 0 per cover value (a cover value in no domain forces 0).
+            for (k in factor.cover.indices) {
+                val sel = selByCover[factor.cover[k]] ?: continue
+                val cols = IntArray(sel.size + 1)
+                val vals = LongArray(sel.size + 1)
+                for (i in 0 until sel.size) {
+                    cols[i] = sel[i]
+                    vals[i] = 1L
+                }
+                cols[sel.size] = intColumn(countVars[k])
+                vals[sel.size] = -1L
+                builder.addRow(cols, vals, Relation.EQ, 0L)
+            }
         }
 
         /**
