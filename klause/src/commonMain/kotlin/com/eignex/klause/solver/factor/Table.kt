@@ -141,7 +141,9 @@ class Table(
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int =
-        minHamming(state, intVar, newValue) - minHamming(state, -1, 0)
+        // The pre-move distance `minHamming(-1, 0)` is the factor's current violation degree, already
+        // maintained in factorDegree — reuse it instead of re-scanning every tuple for `before`.
+        minHamming(state, intVar, newValue) - state.factorDegree[factorId]
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
