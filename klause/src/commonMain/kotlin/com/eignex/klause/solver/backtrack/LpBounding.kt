@@ -1,10 +1,12 @@
 package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.Cut
 import com.eignex.klause.solver.lp.ExactBasisCertifier
+import com.eignex.klause.solver.lp.LpExplanation
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRelaxation
 import com.eignex.klause.solver.lp.RevisedSimplex
@@ -16,7 +18,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
 import kotlin.math.ceil
@@ -105,9 +106,12 @@ internal fun BacktrackSolver.lpBoundAndFix(
     globalCuts: List<Cut>,
     cancellation: Cancellation,
     hints: LpHints? = null,
+    learn: Boolean = false,
 ): LpNodeOutcome = try {
     sink.lpClockStart()
-    sparseSafePrune(relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending, hints)
+    sparseSafePrune(
+        relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending, hints, learn,
+    )
 } catch (_: LpOverflowException) {
     // A determinant or coefficient overflow in the relaxation build loses the bound; recover a sound
     // one via the exact BigInt basis-certification pipeline. A failure just keeps the node.
@@ -135,6 +139,7 @@ internal fun BacktrackSolver.sparseSafePrune(
     objectiveVar: Int,
     objectiveAscending: Boolean,
     hints: LpHints? = null,
+    learn: Boolean = false,
 ): LpNodeOutcome {
     val relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
@@ -166,25 +171,50 @@ internal fun BacktrackSolver.sparseSafePrune(
         sink.observeLpPrune()
         return LpNodeOutcome(true, null)
     }
-    // Objective-bound propagation (#281): the integer objective is ≥ ceil(safe bound). The safe bound
-    // only under-estimates, so ceil(full) ≤ the true optimum — a sound lower bound. Reason-less, so an
-    // Unsat tightening prunes this node (a conflict-analysis leaf).
+    // The exact basis-certificate backs both the learnable objective-bound reason (#281/#705) and the
+    // reduced-cost fixing. Compute it once when either needs it; a singular/unbounded certify yields
+    // null and both fall back to the cheap reason-less paths, which is sound.
+    val cert = if ((learn && canPropagate) || canPrune) {
+        ExactBasisCertifier.certify(relaxation.model, result.basis)
+    } else {
+        null
+    }
+    // Objective-bound propagation (#281): the integer objective is ≥ ceil(LP lower bound). With
+    // learning, propagate the exact certified bound (tighter than the safe bound) and attach the
+    // reduced-cost reason so an Unsat tightening backjumps; otherwise tighten to ceil(safe bound)
+    // reason-less (a sound conflict-analysis leaf). The safe bound only under-estimates the optimum,
+    // so either floor ≤ the true optimum.
     if (canPropagate && full.isFinite()) {
-        val lpFloor = ceil(full)
-        if (lpFloor in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble() &&
-            session.implyIntAtLeast(objectiveVar, lpFloor.toInt()) is PropagationResult.Unsat
-        ) {
-            sink.observeLpPrune()
-            return LpNodeOutcome(true, null)
+        val exactFloor = if (learn && cert != null) {
+            (cert.objective + BigRational.of(relaxation.objectiveConstant)).ceil().toLongOrNull()
+        } else {
+            null
+        }
+        val lpFloor = exactFloor ?: ceil(full).takeIf { it in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble() }
+            ?.toLong()
+        if (lpFloor != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+            val reason = if (learn && cert != null) {
+                LpExplanation.objectiveBoundReason(relaxation, cert, session)
+            } else {
+                null
+            }
+            val res = if (reason != null) {
+                session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
+            } else {
+                session.implyIntAtLeast(objectiveVar, lpFloor.toInt())
+            }
+            if (res is PropagationResult.Unsat) {
+                sink.observeLpPrune()
+                return LpNodeOutcome(true, null)
+            }
         }
     }
     // Reduced-cost fixing (#21) on the exact certified reduced costs — needs a finite incumbent for
     // the improving gap, so it runs only when pruning is possible.
-    if (canPrune) {
-        val cert = ExactBasisCertifier.certify(relaxation.model, result.basis)
-        if (cert != null && applySparseReducedCostFixing(relaxation, cert, result.basis, session, bound, sink)) {
-            return LpNodeOutcome(true, null)
-        }
+    if (canPrune && cert != null &&
+        applySparseReducedCostFixing(relaxation, cert, result.basis, session, bound, sink)
+    ) {
+        return LpNodeOutcome(true, null)
     }
     return LpNodeOutcome(false, null)
 }
@@ -322,10 +352,7 @@ internal fun BacktrackSolver.rootLpRelaxationBound(
  * Sound by construction — the result is a candidate that the caller re-evaluates against the objective
  * and only keeps if feasible-and-improving; a bad rounding just yields null or a worse incumbent.
  */
-internal fun BacktrackSolver.lpRoundingProbe(
-    objective: LinearObjective,
-    cancellation: Cancellation,
-): Sample? {
+internal fun BacktrackSolver.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
     val session = PropagationSession(problem)
     if (session.isUnsatAtRoot) return null
     val relaxation = CpToLpRelaxation(problem, objective, sparseModel = true).build(session)

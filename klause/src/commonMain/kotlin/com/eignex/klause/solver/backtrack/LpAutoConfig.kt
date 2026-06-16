@@ -261,7 +261,10 @@ object LpAutoConfig {
             lpSparsePrimary = base.lpSparsePrimary || sparsePrimary,
             lpCuts = base.lpCuts || cuts,
             lpCutPool = base.lpCutPool || cuts,
-            lpLearn = base.lpLearn || bounding,
+            // LP learning rides on whichever bounding path runs (#705): the objective-bound reason is
+            // built from the exact basis-certificate the sparse path already computes, so it fires on
+            // the over-cap sparse-primary instances too, not just the dense-capped ones.
+            lpLearn = base.lpLearn || lpActive,
             lpObjectiveBound = base.lpObjectiveBound || bounding,
             lpFixpoint = base.lpFixpoint || bounding,
             // The LP-rounding probe runs on whichever bounding path is active (#705): it solves the

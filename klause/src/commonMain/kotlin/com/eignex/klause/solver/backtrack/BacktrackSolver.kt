@@ -439,6 +439,7 @@ class BacktrackSolver(override val problem: Problem) :
                         globalCuts = lpGlobalCuts,
                         cancellation = params.cancellation,
                         hints = lpHints,
+                        learn = params.lpLearn,
                     )
                     if (outcome.basis != null) {
                         while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)

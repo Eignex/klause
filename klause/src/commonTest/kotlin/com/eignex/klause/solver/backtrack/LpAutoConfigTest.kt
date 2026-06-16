@@ -265,6 +265,7 @@ class LpAutoConfigTest {
         assertTrue(r.lpBounding)
         assertFalse(r.lpCuts)
         assertTrue(r.lpProbe)
+        assertTrue(r.lpLearn)
         assertTrue(r.lagrangian)
 
         // Past the sparse cap too ⇒ the LP family fully declines; the Lagrangian still runs.
