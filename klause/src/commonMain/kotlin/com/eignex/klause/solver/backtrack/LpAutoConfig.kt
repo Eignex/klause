@@ -13,7 +13,9 @@ import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.lp.CpToLpRelaxation
@@ -111,6 +113,16 @@ object LpAutoConfig {
                 }
 
                 is ReifiedLinear -> {
+                    lpEmittable = true
+                    rows += 2
+                }
+
+                is ReifiedPseudoBoolean -> {
+                    lpEmittable = true
+                    rows += 2
+                }
+
+                is ReifiedCardinality -> {
                     lpEmittable = true
                     rows += 2
                 }
