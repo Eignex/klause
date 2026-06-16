@@ -175,7 +175,12 @@ internal object SolveCore {
             EngineParams(common.engineParams),
         )
         val tabu = TabuFilter(tenure = setup.tabuTenure, aspiration = AspirationCriterion.OrImproving)
-        val strategy = Cbls(noiseProbability = setup.noise, tabu = tabu)
+        val strategy = Cbls(
+            noiseProbability = setup.noise,
+            smoothProb = setup.smoothProb,
+            smoothFactor = setup.smoothFactor,
+            tabu = tabu,
+        )
         val solver = LocalSearchSolver(
             solvable.problem,
             strategy = strategy,
@@ -189,9 +194,12 @@ internal object SolveCore {
             cancellation = cancel,
             lsObjective = solvable.lsObjective,
             onEvent = verboseListener(common.verbose),
+            // Match the portfolio: keep an over-populated constraint kind from steering the descent.
+            normalizeWeightsByClass = true,
         )
         cliLogger(common.verbose).v {
-            "engine ls-single: seed=${cblsParams.randomSeed} tabu=${setup.tabuTenure} noise=${setup.noise}"
+            "engine ls-single: seed=${cblsParams.randomSeed} tabu=${setup.tabuTenure} noise=${setup.noise} " +
+                "smooth=${setup.smoothProb}/${setup.smoothFactor}"
         }
         runGeneric(solver, cblsParams, solvable, common, output, complete = false, deadline)
     }

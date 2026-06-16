@@ -59,6 +59,22 @@ class FactorWeightNormalizationTest {
     }
 
     @Test
+    fun `base factor weights snapshot the seed and survive live-weight mutation`() {
+        // The smoothing target must be the seed, not the live (bumped) weights — capture it once and
+        // hold it immutable so decay restores the proactive landscape.
+        val factors = List(8) { linear() } + List(2) { clause() }
+        val implied = BooleanArray(10).also { for (i in 0 until 6) it[i] = true }
+        val state = LocalSearchState(problem(factors, implied), Random(0))
+        val base = state.baseFactorWeights
+        for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, base[i], 1e-9)
+        for (i in 6 until 10) assertEquals(1.0, base[i], 1e-9)
+        // Bumping the live weights leaves the baseline untouched.
+        for (i in state.factorWeights.indices) state.factorWeights[i] += 5.0
+        for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, state.baseFactorWeights[i], 1e-9)
+        for (i in 6 until 10) assertEquals(1.0, state.baseFactorWeights[i], 1e-9)
+    }
+
+    @Test
     fun `implied factors are pinned and excluded from the class tally`() {
         // 8 Linear (first 6 implied) + 2 Clause. The class tally counts only the 2 non-implied
         // Linear and 2 Clause: mean = 2, neither exceeds it, so the structural Linear stay at 1.0

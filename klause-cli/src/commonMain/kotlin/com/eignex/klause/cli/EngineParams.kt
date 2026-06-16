@@ -149,7 +149,14 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
 
 /** Constructor/strategy-level LS knobs for the `ls-single` engine (the rest ride on
  *  [LocalSearchParams]). */
-internal class LsSetup(val tabuTenure: Int, val pairSwapBudget: Int, val lambda: Double, val noise: Double)
+internal class LsSetup(
+    val tabuTenure: Int,
+    val pairSwapBudget: Int,
+    val lambda: Double,
+    val noise: Double,
+    val smoothProb: Double,
+    val smoothFactor: Double,
+)
 
 /** Split `--param` overrides for the naked `ls-single` engine into per-call [LocalSearchParams] and
  *  the constructor/strategy knobs ([LsSetup]). */
@@ -162,8 +169,12 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
         pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
         lambda = p.double("lambda") ?: 1.0,
         noise = p.double("noise") ?: 0.05,
+        // Smoothing on by default: the proactive landscape (per-class / implied seeding) only holds
+        // if the reactive bumping decays back toward it. Mirrors the portfolio's smoothing arms.
+        smoothProb = p.double("smooth-prob") ?: 0.4,
+        smoothFactor = p.double("smooth-factor") ?: 0.8,
     )
-    p.finish("ls", "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, noise")
+    p.finish("ls", "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, noise, smooth-prob, smooth-factor")
     return out to setup
 }
 
