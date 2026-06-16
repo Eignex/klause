@@ -63,6 +63,9 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Mdd layered flow-hull columns (#655). */
     MDD("mdd", LpTiming.EXHAUSTIVE),
 
+    /** Count-variable GlobalCardinality one-hot count-hull columns (#655). */
+    GCC_COUNT("gcc-count", LpTiming.EXHAUSTIVE),
+
     /** Cumulative / Disjunctive time-indexed `x_{i,t}` reformulation over a bounded horizon (#453). */
     CUMULATIVE_TIME_INDEXED("cumulative-time-indexed", LpTiming.EXHAUSTIVE),
     ;

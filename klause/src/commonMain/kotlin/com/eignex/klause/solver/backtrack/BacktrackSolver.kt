@@ -321,6 +321,7 @@ class BacktrackSolver(override val problem: Problem) :
                 nValueHull = params.lpNValue,
                 regularHull = params.lpRegular,
                 mddHull = params.lpMdd,
+                gccCountHull = params.lpGccCount,
                 objectiveCone = params.lpObjectiveCone,
             )
         } else {

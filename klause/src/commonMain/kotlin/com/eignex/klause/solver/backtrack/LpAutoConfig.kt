@@ -108,6 +108,7 @@ object LpAutoConfig {
         var nValue = false
         var regular = false
         var mdd = false
+        var gccCount = false
         var rows = 0L
         for (f in problem.factors) {
             when (f) {
@@ -137,7 +138,11 @@ object LpAutoConfig {
 
                 is AllDifferent -> allDifferent = true
 
-                is GlobalCardinality -> globalCardinality = true
+                is GlobalCardinality -> {
+                    globalCardinality = true
+                    // The count-var hull bounds the count variables; only that form has any to bound.
+                    if (f.countVars != null && f.presents.isEmpty()) gccCount = true
+                }
 
                 is Cumulative -> {
                     cumulative = true
@@ -189,7 +194,7 @@ object LpAutoConfig {
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
-                table || nValue || regular || mdd || makespanPlans > 0
+                table || nValue || regular || mdd || gccCount || makespanPlans > 0
         // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
         // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
         // #571: an explicit objective-cone request always fits the dense cap (the cone drops the
@@ -218,6 +223,7 @@ object LpAutoConfig {
                 if (nValue && config.resolved(LpTechnique.NVALUE)) nValueEstimate(problem)?.let(::add)
                 if (regular && config.resolved(LpTechnique.REGULAR)) regularEstimate(problem)?.let(::add)
                 if (mdd && config.resolved(LpTechnique.MDD)) mddEstimate(problem)?.let(::add)
+                if (gccCount && config.resolved(LpTechnique.GCC_COUNT)) gccCountEstimate(problem)?.let(::add)
                 if (scheduling && config.resolved(LpTechnique.CUMULATIVE_TIME_INDEXED)) {
                     timeIndexedEstimate(problem)?.let(::add)
                 }
@@ -243,6 +249,7 @@ object LpAutoConfig {
             lpNValue = base.lpNValue || (LpTechnique.NVALUE in acceptedHulls),
             lpRegular = base.lpRegular || (LpTechnique.REGULAR in acceptedHulls),
             lpMdd = base.lpMdd || (LpTechnique.MDD in acceptedHulls),
+            lpGccCount = base.lpGccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
             lpCumulative = base.lpCumulative || (bounding && makespanLp),
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
                 (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
@@ -363,6 +370,24 @@ object LpAutoConfig {
             rows += cells + 2L * f.xs.size + 1L // y≥z rows + (Σz=1, channel) per var + the count row
         }
         return if (any) HullEstimate(LpTechnique.NVALUE, cols, rows) else null
+    }
+
+    /** Count-variable [GlobalCardinality] one-hot selector columns + rows (mirrors `buildGccCountHull`):
+     *  one `z` per var×declared-value, a `Σz=1` + channel row per var, and one count row per cover value. */
+    private fun gccCountEstimate(problem: Problem): HullEstimate? {
+        var cols = 0L
+        var rows = 0L
+        var any = false
+        for (f in problem.factors) {
+            if (f !is GlobalCardinality || f.countVars == null || f.presents.isNotEmpty()) continue
+            var cells = 0L
+            for (x in f.xs) cells += problem.intDomains[x].size.toLong()
+            if (cells == 0L || cells > CpToLpRelaxation.MAX_GCC_CELLS) continue
+            any = true
+            cols += cells // one z selector per var×declared-value
+            rows += 2L * f.xs.size + f.cover.size // (Σz=1, channel) per var + one count row per cover value
+        }
+        return if (any) HullEstimate(LpTechnique.GCC_COUNT, cols, rows) else null
     }
 
     /** [Regular] DFA flow-hull arc columns + flow/channel rows over the under-cap factors, counting

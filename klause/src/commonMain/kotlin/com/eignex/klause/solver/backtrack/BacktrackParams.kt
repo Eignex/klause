@@ -354,6 +354,14 @@ data class BacktrackParams(
      */
     val lpMdd: Boolean = false,
     /**
+     * Count-variable GlobalCardinality count hull (#655). When true and [lpBounding] holds, each
+     * count-variable GCC contributes a one-hot selector model (`Σ_v z_iv = 1`, channel
+     * `Σ_v v·z_iv = xs(i)`, and `Σ_i z_{i,cover(k)} = counts(k)` per cover value) so a count variable
+     * in the objective gets an exact LP bound. Sound by construction; off by default; a no-op when no
+     * count-variable GCC exists or the selector count exceeds the cell cap.
+     */
+    val lpGccCount: Boolean = false,
+    /**
      * Objective-cone / precedence-only sub-relaxation (#571). When true and [lpBounding] holds, the
      * per-node LP is built over **only** the variables and rows transitively connected to the
      * objective, with every big-M [com.eignex.klause.solver.factor.ReifiedLinear] disjunctive row
