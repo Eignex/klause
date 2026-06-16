@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -295,6 +296,89 @@ class NValue(
                 if (pick != null) sink.addChannelingIntSet(state, xs[i], pick)
             }
         }
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: relabel one present `xs[i]` from value `v` to value
+     *  `w` in a way that keeps the distinct-value count constant — either `v` survives and `w` is
+     *  already present, or `v` disappears and `w` is freshly introduced (`vDies == wBorn`). The
+     *  count, and hence the relation to `n`, is unchanged; only which value sits at `i` differs. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val s = state.refPayload[factorId] as State
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(xs.size)
+            if (!present(state, i)) continue
+            val v = state.assignment.intValue(xs[i])
+            var occ = 0
+            for (j in xs.indices) if (xs[j] == xs[i] && present(state, j)) occ++
+            val cv = s.counts.getOrDefault(v, 0)
+            val vDies = cv - occ == 0
+            val d = state.problem.intDomains[xs[i]]
+            var pick = -1
+            var seen = 0
+            d.forEach { w ->
+                if (w != v) {
+                    val wBorn = s.counts.getOrDefault(w, 0) == 0
+                    if (vDies == wBorn) {
+                        seen++
+                        if (state.rng.nextInt(seen) == 0) pick = w
+                    }
+                }
+            }
+            if (pick < 0) continue
+            sink.addChannelingIntSet(state, xs[i], pick)
+            emitted++
+        }
+    }
+
+    /** Feasible init: assign each present `xs` to its domain minimum, then set `n` to a value
+     *  consistent with the realised distinct count under [mode]. Returns false — leaving the
+     *  random assignment — when no such `n` is in domain or a frozen var blocks it. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        for (i in xs.indices) {
+            if (!present(state, i)) continue
+            if (state.assumptions.isFrozenInt(xs[i])) continue
+            state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
+        }
+        val seen = IntHashSet()
+        for (i in xs.indices) if (present(state, i)) seen.add(state.assignment.intValue(xs[i]))
+        val distinct = seen.size
+        val nDom = state.problem.intDomains[n]
+        val target = when (mode) {
+            Mode.Eq -> distinct
+            Mode.AtLeast -> largestInDomainAtMost(nDom, distinct) ?: return false
+            Mode.AtMost -> smallestInDomainAtLeast(nDom, distinct) ?: return false
+        }
+        if (state.assumptions.isFrozenInt(n)) return nvDegree(distinct, state.assignment.intValue(n)) == 0
+        if (target !in nDom) return false
+        state.assignment.setInt(n, target)
+        return true
+    }
+
+    private fun largestInDomainAtMost(d: IntDomain, bound: Int): Int? {
+        if (d.min > bound) return null
+        var pick = -1
+        d.forEach { if (it <= bound) pick = it }
+        return if (pick < 0) null else pick
+    }
+
+    private fun smallestInDomainAtLeast(d: IntDomain, bound: Int): Int? {
+        if (d.max < bound) return null
+        var pick = -1
+        d.forEach { if (pick < 0 && it >= bound) pick = it }
+        return if (pick < 0) null else pick
+    }
+
+    private companion object {
+        /** Cap on distinct-preserving relabel moves offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_MOVE_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested move before giving up. */
+        const val MOVE_ATTEMPT_STRIDE: Int = 6
     }
 
     /** Reason on conflict: bounds *and* interior holes of every participating var. The
