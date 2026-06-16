@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 /**
  * Coverage for the **atom-var** paths of [ConflictAnalyzer] — the `levelOf` / `uipLit` /
  * `antecedentsOf` branches that dispatch on `variable >= numBoolVars`. Every case in
- * [ConflictAnalyzerTest] is pure-bool, so these branches (and the atomLevel-drift /
+ * [ConflictAnalyzerTest] is pure-bool, so these branches (and the trail-resident atom-level /
  * conflict-level soundness fixes #76 / #77 that lean on them) had zero direct coverage.
  *
  * The bound-consistent propagators (Linear back-clamp, AllDifferent Hall sets) eagerly
@@ -42,8 +42,8 @@ class AtomConflictAnalyzerTest {
     /**
      * Build a state with one int var per entry of [levels] over `[0, 10]`, each tightened so
      * `v ≥ 5` holds and recorded at the given decision level (the tighten runs with
-     * `currentLevel = levels[v]`, so the bound-change history — which the analyzer now reads
-     * for atom levels, see #76 — places the bound at that level). Allocates the `v ≥ 5` atom
+     * `currentLevel = levels[v]`, so the atom's trail slot — which the analyzer reads for atom
+     * levels, see #76 — stamps the bound at that level). Allocates the `v ≥ 5` atom
      * for each. With `numBoolVars = 0` and allocation in var order, the atom's virtual var id
      * equals its int var index — so atom `i` is var `i` and `Lit.make(i, false)` is `¬(varᵢ ≥ 5)`.
      */
@@ -90,29 +90,28 @@ class AtomConflictAnalyzerTest {
     }
 
     @Test
-    fun `backjump level uses bound history not a drifted atomLevel`() {
-        // #76 regression: ax's bound was genuinely established at level 1 on this path (its
-        // history records level 1). Atom levels are derived from the bound histories on
-        // every read — there is no stored per-atom level left to drift — so the analyzer
-        // necessarily sees ax at its true level 1 regardless of how the search popped.
+    fun `backjump level uses the trail-resident atom level`() {
+        // #76 regression: ax's bound was genuinely established at level 1 on this path, and its
+        // trail slot records level 1. The analyzer reads that stored establishment level, so it
+        // sees ax at its true level 1 regardless of how the search popped to reach the conflict.
         val state = atomGeState(intArrayOf(1, 2)) // ax established @1, ay @2
         state.currentLevel = 2
         val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
 
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
         assertEquals(setOf(0, 1), varsOf(learned.literals))
-        assertEquals(1, learned.backjumpLevel, "backjump must reflect ax's true level 1, not the drifted 5")
-        assertEquals(2, learned.lbd, "two true levels {1, 2}, not {5, 2}")
+        assertEquals(1, learned.backjumpLevel, "backjump must reflect ax's true establishment level 1")
+        assertEquals(2, learned.lbd, "two true levels {1, 2}")
         assertTrue(learned.asserting)
     }
 
     @Test
     fun `factor conflict level comes from the seed reason not the firing-factor attribution`() {
-        // #77 regression: the conflict's literals are ax @1 and ay @2 (their bound histories),
+        // #77 regression: the conflict's literals are ax @1 and ay @2 (their trail-resident levels),
         // so the conflict level is 2 and ay is the lone level-2 UIP → an asserting clause that
         // backjumps to level 1. But state.currentLevel carries the failing factor's attribution
-        // (here a stale-high 5, as maxLevelForClause would read off a drifted atomLevel for an
-        // atom-lit clause). The analyzer must take the conflict level from the seed reason's own
+        // (here a stale-high 5, the coarse maxLevelForVars attribution over all the factor's vars
+        // for an atom-lit clause). The analyzer must take the conflict level from the seed reason's own
         // literals (max = 2), not that attribution: were it to trust currentLevel = 5, no literal
         // sits at level 5, the 1UIP loop finds no pivot, and the clause degenerates to a
         // non-asserting nogood (lost learning) with a mis-targeted backjump.
@@ -290,7 +289,7 @@ class AtomConflictAnalyzerTest {
 
 /** Re-derives the analyzer's private level lookup for assertions, mirroring
  *  [ConflictAnalyzer]'s `levelOf`: bool vars via [PropagationState.boolLevel], atoms via the
- *  bound-history-derived [PropagationState.atomLevelForConflict] (#76). */
+ *  trail-resident [PropagationState.atomLevelForConflict] (#76). */
 internal object ConflictAnalyzerTestAccess {
     fun levelOf(state: PropagationState, v: Int): Int = if (v < state.problem.numBoolVars) {
         state.boolLevel[v]

@@ -288,9 +288,9 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedent
     }
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
-    // An interior carve (no endpoint moved) records the hole history — still the level/reason
-    // source for an eq atom materialized after its value was already carved (bound moves keep
-    // their level/reason on the order literals themselves now, so no bound history is needed).
+    // An interior carve (no endpoint moved) records the hole-carve record — the level/reason source
+    // for an eq atom materialized after its value was already carved. (A bound move instead stamps
+    // the level/reason directly on each crossed order literal's trail slot, see [wakeAtom].)
     if (newDomain.min == d.min && newDomain.max == d.max) pushHoleHist(v, value, currentLevel, antecedents)
     // Reason attribution: which side (min/max) "moved" depends on where the hole
     // landed. Pure interior holes don't shift either endpoint; in that case the

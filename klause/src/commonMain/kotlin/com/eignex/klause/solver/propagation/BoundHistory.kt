@@ -2,12 +2,13 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.util.IntArrayList
 
-// The per-var bound histories (minHist/maxHist) that derived atom levels/reasons at conflict
-// time are GONE: order literals are now trail-resident and carry their establishment
-// level/reason on their own slots (see [PropagationState.atomLvl] / [PropagationState.atomAnt],
-// maintained by [wakeAtom] / [resetAtomTrailFor] / [reconstructCurrentBoundLevel]). The only
-// surviving per-var history is the interior-hole carve record, which still answers the level /
-// reason of an eq atom ruled out by a hole materialized after the carve.
+// The interior-hole carve record: the per-var (value, level, reason) of each interior hole carved
+// out of a variable's domain during search. Bound atoms carry their establishment level/reason on
+// their own trail slots ([PropagationState.atomLvl] / [PropagationState.atomAnt]); this record is the
+// equivalent for an eq atom ruled out by a hole — it answers the level and reason of an eq atom
+// materialized after its value was carved, when no trail slot was stamped at carve time. Pushed by
+// [pushHoleHist], truncated on backtrack alongside the carve, read by [holeReasonFor] /
+// [holeLevelFor] / [holeHistHas].
 
 /** Reason for the interior carve of `k` from `v`'s domain; null = bake-time fact. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Int): IntArray? {
