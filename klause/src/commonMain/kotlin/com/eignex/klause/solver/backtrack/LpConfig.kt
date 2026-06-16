@@ -57,6 +57,9 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** NValue one-hot value-hull columns (#435). */
     NVALUE("nvalue", LpTiming.EXHAUSTIVE),
 
+    /** Mdd layered flow-hull columns (#655). */
+    MDD("mdd", LpTiming.EXHAUSTIVE),
+
     /** Cumulative / Disjunctive time-indexed `x_{i,t}` reformulation over a bounded horizon (#453). */
     CUMULATIVE_TIME_INDEXED("cumulative-time-indexed", LpTiming.EXHAUSTIVE),
     ;

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
@@ -104,6 +105,7 @@ object LpAutoConfig {
         var constArrayElement = false
         var table = false
         var nValue = false
+        var mdd = false
         var rows = 0L
         for (f in problem.factors) {
             when (f) {
@@ -160,6 +162,8 @@ object LpAutoConfig {
 
                 is NValue -> nValue = true
 
+                is Mdd -> mdd = true
+
                 else -> Unit
             }
         }
@@ -181,7 +185,7 @@ object LpAutoConfig {
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
-                table || nValue || makespanPlans > 0
+                table || nValue || mdd || makespanPlans > 0
         // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
         // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
         // #571: an explicit objective-cone request always fits the dense cap (the cone drops the
@@ -208,6 +212,7 @@ object LpAutoConfig {
                 if (constArrayElement && config.resolved(LpTechnique.ELEMENT)) elementEstimate(problem)?.let(::add)
                 if (table && config.resolved(LpTechnique.TABLE)) tableEstimate(problem)?.let(::add)
                 if (nValue && config.resolved(LpTechnique.NVALUE)) nValueEstimate(problem)?.let(::add)
+                if (mdd && config.resolved(LpTechnique.MDD)) mddEstimate(problem)?.let(::add)
                 if (scheduling && config.resolved(LpTechnique.CUMULATIVE_TIME_INDEXED)) {
                     timeIndexedEstimate(problem)?.let(::add)
                 }
@@ -231,6 +236,7 @@ object LpAutoConfig {
             lpElement = base.lpElement || (LpTechnique.ELEMENT in acceptedHulls),
             lpTable = base.lpTable || (LpTechnique.TABLE in acceptedHulls),
             lpNValue = base.lpNValue || (LpTechnique.NVALUE in acceptedHulls),
+            lpMdd = base.lpMdd || (LpTechnique.MDD in acceptedHulls),
             lpCumulative = base.lpCumulative || (bounding && makespanLp),
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
                 (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
@@ -351,6 +357,46 @@ object LpAutoConfig {
             rows += cells + 2L * f.xs.size + 1L // y≥z rows + (Σz=1, channel) per var + the count row
         }
         return if (any) HullEstimate(LpTechnique.NVALUE, cols, rows) else null
+    }
+
+    /** [Mdd] flow-hull arc columns + flow/channel rows over the under-cap factors, counting
+     *  forward-reachable transition records over the declared domains (mirrors `buildMddHull`). */
+    private fun mddEstimate(problem: Problem): HullEstimate? {
+        var cols = 0L
+        var rows = 0L
+        var any = false
+        for (f in problem.factors) {
+            if (f !is Mdd) continue
+            val n = f.seq.size
+            val stride = f.recordStride
+            val reach = HashSet<Int>().also { it.add(f.initial) }
+            var arcs = 0L
+            var ok = true
+            for (layer in 0 until n) {
+                val dom = problem.intDomains[f.seq[layer]]
+                val next = HashSet<Int>()
+                var p = f.layerStarts[layer]
+                val end = f.layerStarts[layer + 1]
+                while (p < end) {
+                    if (f.transitions[p] in reach && f.transitions[p + 1] in dom) {
+                        next.add(f.transitions[p + 2])
+                        arcs++
+                    }
+                    p += stride
+                }
+                if (next.isEmpty()) {
+                    ok = false
+                    break
+                }
+                reach.clear()
+                reach.addAll(next)
+            }
+            if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_MDD_ARCS) continue
+            any = true
+            cols += arcs
+            rows += arcs + n + 3L // conservation (≤ arcs) + value channel (n) + source + acceptance + cost
+        }
+        return if (any) HullEstimate(LpTechnique.MDD, cols, rows) else null
     }
 
     /** Time-indexed `x_{i,t}` columns + resource/assignment/channel rows over the bounded-horizon

@@ -338,6 +338,14 @@ data class BacktrackParams(
      */
     val lpNValue: Boolean = false,
     /**
+     * Mdd layered flow hull (#655). When true and [lpBounding] holds, each Mdd contributes the layered
+     * flow model (arc vars + flow-conservation + value channel + cost channel) — the exact convex hull
+     * of its accepting paths, so an objective over the sequence (or a cost-MDD's cost var) gets a tight
+     * LP bound. Sound by construction; off by default; a no-op when no Mdd exists or the unfolding
+     * exceeds the arc cap.
+     */
+    val lpMdd: Boolean = false,
+    /**
      * Objective-cone / precedence-only sub-relaxation (#571). When true and [lpBounding] holds, the
      * per-node LP is built over **only** the variables and rows transitively connected to the
      * objective, with every big-M [com.eignex.klause.solver.factor.ReifiedLinear] disjunctive row
