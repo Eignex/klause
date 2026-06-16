@@ -270,13 +270,27 @@ internal fun BacktrackSolver.sparseSafePrune(
     objectiveVar: Int,
     objectiveAscending: Boolean,
 ): LpNodeOutcome {
-    val canPrune = bound.isFinite()
-    val canPropagate = objectiveVar >= 0 && objectiveAscending
-    if (!canPrune && !canPropagate) return LpNodeOutcome(false, null)
     val relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
-    val result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
+    // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
+    val simplex = RevisedSimplex(relaxation.model, cancellation)
+    val result = simplex.solve() ?: run {
+        // Infeasibility prune (#705 slice 3): a dual-unbounded termination is only a *candidate*
+        // infeasibility — confirm it with an exact Farkas certificate before pruning (the float ray
+        // alone is not sound). Any other failure (non-convergence / singular) keeps the node.
+        val basis = simplex.infeasibleBasis
+        if (basis != null &&
+            ExactBasisCertifier.certifiesInfeasible(relaxation.model, basis, simplex.infeasibleRow)
+        ) {
+            sink.observeLpInfeasiblePrune()
+            return LpNodeOutcome(true, null)
+        }
+        return LpNodeOutcome(false, null)
+    }
+    val canPrune = bound.isFinite()
+    val canPropagate = objectiveVar >= 0 && objectiveAscending
+    if (!canPrune && !canPropagate) return LpNodeOutcome(false, null) // feasible, nothing more to deduce
     val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return LpNodeOutcome(false, null)
     val full = safe + relaxation.objectiveConstant.toDouble()
     if (canPrune && full >= bound) {

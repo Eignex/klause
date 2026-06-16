@@ -150,6 +150,84 @@ class LpSparsePrimaryTest {
         }
     }
 
+    @Test
+    fun `sparse-primary infeasibility pruning matches brute force`() {
+        // Tight mixed LE/GE/EQ constraints make many instances (and interior nodes) LP-infeasible, so
+        // the exact-Farkas infeasibility prune (#705 slice 3) fires. An unsound prune would cut a
+        // feasible node, surfacing as a feasible instance wrongly reported Infeasible or a wrong optimum.
+        val rng = Random(987654321)
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            var infeasible = 0
+            var feasible = 0
+            repeat(400) { _ ->
+                val n = rng.nextInt(2, 5)
+                val ub = IntArray(n) { rng.nextInt(1, 4) }
+                val cons = ArrayList<Triple<IntArray, LinearOp, Int>>()
+                repeat(rng.nextInt(2, 5)) { _ ->
+                    val op = listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ)[rng.nextInt(3)]
+                    cons.add(Triple(IntArray(n) { rng.nextInt(-2, 3) }, op, rng.nextInt(-3, 6)))
+                }
+                val brute = bruteMinX0(n, ub, cons)
+                val domains = Array(n) { IntDomain(0, ub[it]) }
+                val factors = cons.map { (c, op, r) -> Linear(c, IntArray(n) { it }, op, r) }.toTypedArray<Factor>()
+                val problem = Problem(0, n, domains, factors)
+                val obj = LinearObjective(intCoefficients = LongArray(n) { if (it == 0) 1L else 0L })
+                val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 3L))
+                assertTrue(resolved.lpSparsePrimary, "expected the sparse-primary path under the tiny dense cap")
+
+                when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
+                    is MinimizeResult.Optimal -> {
+                        val o = brute ?: error("solver Optimal but brute infeasible")
+                        assertEquals(o.toDouble(), res.objective, 1e-9, "wrong optimum")
+                        feasible++
+                    }
+
+                    is MinimizeResult.Infeasible -> {
+                        assertTrue(brute == null, "solver Infeasible but brute feasible")
+                        infeasible++
+                    }
+
+                    else -> error("unexpected $res")
+                }
+            }
+            assertTrue(infeasible > 30 && feasible > 30, "want both verdicts exercised: infeasible=$infeasible feasible=$feasible")
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
+    /** Min x0 over feasible assignments (LE/GE/EQ), or null if infeasible — the brute oracle. */
+    private fun bruteMinX0(n: Int, ub: IntArray, cons: List<Triple<IntArray, LinearOp, Int>>): Long? {
+        val x = IntArray(n)
+        var best: Long? = null
+        fun feasible(): Boolean = cons.all { (c, op, r) ->
+            val s = (0 until n).sumOf { c[it] * x[it] }
+            when (op) {
+                LinearOp.LE -> s <= r
+                LinearOp.GE -> s >= r
+                LinearOp.EQ -> s == r
+                else -> true
+            }
+        }
+        fun rec(i: Int) {
+            if (i == n) {
+                if (feasible()) {
+                    val cur = best
+                    if (cur == null || x[0].toLong() < cur) best = x[0].toLong()
+                }
+                return
+            }
+            for (v in 0..ub[i]) {
+                x[i] = v
+                rec(i + 1)
+            }
+        }
+        rec(0)
+        return best
+    }
+
     /** Minimal feasible z = min over GE-feasible x of Σx (z can always equal Σx, ≤ its upper bound). */
     private fun bruteMinLinked(nx: Int, ub: IntArray, geCons: List<Pair<IntArray, Int>>): Long? {
         val x = IntArray(nx)

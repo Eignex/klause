@@ -87,17 +87,54 @@ internal object ExactBasisCertifier {
         return l + BigRational.of(model.objConstant)
     }
 
-    /** Exact solve of `M y = c_B` with `M[t][i] = A_full[i][basicVar[t]]`: fraction-free Bareiss
-     *  forward elimination (integer, no gcd) then rational back-substitution. */
-    private fun solveDual(model: LpModel, basic: IntArray): Array<BigRational>? {
+    /**
+     * Exactly certify that the node LP `{A x = rhs, 0 ≤ x ≤ upper}` is **infeasible**, from a (float)
+     * basis and the leaving row at a dual-unbounded termination ([RevisedSimplex.infeasibleRow]). The
+     * candidate Farkas ray is `ρ = B⁻ᵀ e_r` solved exactly; by Farkas' lemma the LP is infeasible iff
+     * some `ρ` has `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`, which is checked exactly here (both `±ρ`). **Any**
+     * `ρ` passing it proves infeasibility, so a bad/float-misled ray simply fails the check and the
+     * node is kept — the prune is sound regardless of how the ray was found. Returns false on a
+     * singular basis or when neither sign certifies.
+     */
+    fun certifiesInfeasible(model: LpModel, basis: Basis, leavingRow: Int): Boolean {
+        if (leavingRow !in 0 until model.m) return false
+        val rho = solveDualSystem(model, basis.basicVars) { t -> if (t == leavingRow) BigInt.ONE else BigInt.ZERO }
+            ?: return false
+        return farkasCertifies(model, rho) || farkasCertifies(model, Array(rho.size) { BigRational.ZERO - rho[it] })
+    }
+
+    /** Whether [rho] is an exact Farkas infeasibility certificate: `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`. A
+     *  column with `ρ·A_j > 0` but no finite upper bound makes the box max unbounded — this ρ cannot
+     *  certify, so bail (false). */
+    private fun farkasCertifies(model: LpModel, rho: Array<BigRational>): Boolean {
+        var lhs = BigRational.ZERO
+        for (i in 0 until model.m) lhs += rho[i] * BigRational.of(model.rhs[i])
+        var boxMax = BigRational.ZERO
+        for (j in 0 until model.numVars) {
+            var aj = BigRational.ZERO
+            forEachFullColumn(model, j) { i, a -> aj += rho[i] * BigRational.of(a) }
+            if (aj.signum() > 0) {
+                if (!model.hasUpper[j]) return false
+                boxMax += aj * BigRational.of(model.upper[j])
+            }
+        }
+        return lhs > boxMax
+    }
+
+    /** Exact solve of `Bᵀ y = rhs` with `Bᵀ`'s row `t` the basic column `basic[t]`: fraction-free
+     *  Bareiss forward elimination (integer, no gcd) then rational back-substitution. */
+    private fun solveDual(model: LpModel, basic: IntArray): Array<BigRational>? =
+        solveDualSystem(model, basic) { t -> BigInt.of(model.cost[basic[t]]) }
+
+    private fun solveDualSystem(model: LpModel, basic: IntArray, rhs: (Int) -> BigInt): Array<BigRational>? {
         val m = model.m
-        // Augmented [M | c_B] in BigInt; the O(m³) elimination below is fraction-free (Bareiss):
+        // Augmented [Bᵀ | rhs] in BigInt; the O(m³) elimination below is fraction-free (Bareiss):
         // pure-integer, no per-op gcd, with magnitudes bounded by a single determinant.
         val a = Array(m) { t ->
             val col = basic[t]
-            // Column `col` over rows 0 until m (scatter the nonzeros), with the dual rhs c_col at m.
+            // Basic column `col` over rows 0 until m (scatter the nonzeros), with rhs(t) at column m.
             val rowArr = Array(m + 1) { BigInt.ZERO }
-            rowArr[m] = BigInt.of(model.cost[col])
+            rowArr[m] = rhs(t)
             forEachFullColumn(model, col) { i, v -> rowArr[i] = BigInt.of(v) }
             rowArr
         }
