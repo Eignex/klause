@@ -10,6 +10,7 @@ import com.eignex.klause.solver.backtrack.LpAutoConfig
 import com.eignex.klause.solver.backtrack.LpConfig
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.random.Random
@@ -151,6 +152,35 @@ class LpSparsePrimaryTest {
     }
 
     @Test
+    fun `sparse-primary carries the hull columns after the disabling-logic fix`() {
+        val saved = KlauseConfig.current
+        try {
+            // Over the 1-cell dense cap ⇒ routes sparse. The Table convex-hull columns must now be
+            // accepted on the sparse path; previously they were gated on the dense `bounding` flag and
+            // silently dropped on every over-cap model — the bug that made the #655 hulls unreachable.
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            val p = Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 4), IntDomain(0, 5)),
+                arrayOf<Factor>(
+                    // A base linear row so the model exceeds the 1-cell dense cap and routes sparse.
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
+                    Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 5, 2, 2, 4, 0)),
+                ),
+            )
+            val resolved = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 1L))
+            assertTrue(resolved.lpSparsePrimary, "over the dense cap ⇒ sparse path")
+            assertTrue(resolved.lpTable, "the Table hull must be wired onto the sparse path")
+            // And the solve is sound: minimise x0 over the table {(0,5),(2,2),(4,0)} ⇒ 0.
+            val res = BacktrackSolver(p).minimize(LinearObjective(intCoefficients = longArrayOf(1L, 0L)), resolved)
+            assertTrue(res is MinimizeResult.Optimal && res.objective == 0.0, "expected optimum x0=0, got $res")
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
+    @Test
     fun `sparse-primary infeasibility pruning matches brute force`() {
         // Tight mixed LE/GE/EQ constraints make many instances (and interior nodes) LP-infeasible, so
         // the exact-Farkas infeasibility prune (#705 slice 3) fires. An unsound prune would cut a
@@ -192,7 +222,10 @@ class LpSparsePrimaryTest {
                     else -> error("unexpected $res")
                 }
             }
-            assertTrue(infeasible > 30 && feasible > 30, "want both verdicts exercised: infeasible=$infeasible feasible=$feasible")
+            assertTrue(
+                infeasible > 30 && feasible > 30,
+                "want both verdicts exercised: infeasible=$infeasible feasible=$feasible",
+            )
         } finally {
             KlauseConfig.current = saved
         }
