@@ -437,12 +437,24 @@ private fun PropagationState.clearAtomSlot(atomId: Int) {
     atomAnt[atomId] = null
 }
 
-/** Reset an EQ atom in a widened range: it flips false→undetermined ONLY if its value
- *  re-entered the (restored) domain. If the value is still an interior hole it stays false
- *  and keeps its carve-time slot (the carve is undone by its own separate record), so leave
- *  it untouched. (GE/LE atoms never sit on holes, so they clear unconditionally.) */
+/** Reset an EQ atom in a widened range. Two cases when the value re-enters the restored domain:
+ *  it flips false→undetermined if the value is live again ([clearAtomSlot]); it stays false if the
+ *  value is still an interior hole. The still-a-hole slot must NOT be trusted: a bound move that
+ *  crossed the value while it sat below the min / above the max overwrites the carve-time slot with
+ *  that move's level/reason ([wakeAtom]), and a backtrack that widens the bound back across the value
+ *  leaves the slot citing a bound atom undetermined at the restored bound, at a level no longer on
+ *  the trail — which conflict analysis cannot ingest. Drop the level/reason back to "derive from
+ *  history" (keeping the false truth bit) so [atomLevelForConflict] / [atomAntecedentsDerived]
+ *  reconstruct from the canonical, trail-reversible hole-carve record ([holeLevelFor] /
+ *  [holeReasonFor]). (GE/LE atoms never sit on holes, so they clear unconditionally in the caller.) */
 private fun PropagationState.clearEqIfFreed(atomId: Int) {
-    if (atomTruthOf(atomIntVar[atomId], AtomKind.EQ, atomThreshold[atomId]) == null) clearAtomSlot(atomId)
+    if (atomTruthOf(atomIntVar[atomId], AtomKind.EQ, atomThreshold[atomId]) == null) {
+        clearAtomSlot(atomId)
+    } else {
+        atomLvl[atomId] = -1
+        atomRsn[atomId] = -1
+        atomAnt[atomId] = null
+    }
 }
 
 /**
