@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
@@ -337,5 +338,77 @@ class Disjunctive(
             }
         }
         return true
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: swap the start times of two **equal-duration** tasks.
+     *  The pair of occupied intervals `{[s_i, s_i+d), [s_j, s_j+d)}` is exactly preserved (each task
+     *  takes the other's slot), so the no-overlap relation with every other task is untouched — only
+     *  which task sits in which slot changes. Restricted to the non-optional form. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (presents.isNotEmpty() || starts.size < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(starts.size)
+            val j = state.rng.nextInt(starts.size)
+            if (i == j || starts[i] == starts[j]) continue
+            if (durationOf(state, i) != durationOf(state, j)) continue
+            val si = state.assignment.intValue(starts[i])
+            val sj = state.assignment.intValue(starts[j])
+            if (si == sj) continue
+            if (sj !in state.problem.intDomains[starts[i]] || si !in state.problem.intDomains[starts[j]]) continue
+            sink.addCompound(listOf(Move.IntSet(starts[i], sj), Move.IntSet(starts[j], si)))
+            emitted++
+        }
+    }
+
+    /** Feasible init: left-pack the tasks in earliest-start order, each placed at the first
+     *  in-domain time at or after the previous task's end so no two overlap. Returns false —
+     *  leaving the random assignment — for the optional form or when a task can't be placed
+     *  (domain exhausted, or a frozen start overlaps the packing). */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        if (presents.isNotEmpty() || starts.isEmpty()) return false
+        val order = argsortByIntKey(starts.size) { state.problem.intDomains[starts[it]].min }
+        var prevEnd = Int.MIN_VALUE
+        for (oi in order.indices) {
+            val i = order[oi]
+            val v = starts[i]
+            val dur = durationOf(state, i)
+            if (state.assumptions.isFrozenInt(v)) {
+                val s = state.assignment.intValue(v)
+                if (s < prevEnd) return false
+                prevEnd = s + dur
+            } else {
+                val cand = max(state.problem.intDomains[v].min, prevEnd)
+                val s = firstInDomainAtLeast(state, v, cand) ?: return false
+                state.assignment.setInt(v, s)
+                prevEnd = s + dur
+            }
+        }
+        return true
+    }
+
+    /** Current duration of task [i]: the constant, or the duration variable's value. */
+    private fun durationOf(state: LocalSearchState, i: Int): Int =
+        if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
+
+    /** Smallest value in [varId]'s domain that is ≥ [lo], or null if none. */
+    private fun firstInDomainAtLeast(state: LocalSearchState, varId: Int, lo: Int): Int? {
+        val d = state.problem.intDomains[varId]
+        if (lo > d.max) return null
+        var pick = -1
+        d.forEach { if (pick < 0 && it >= lo) pick = it }
+        return if (pick < 0) null else pick
+    }
+
+    private companion object {
+        /** Cap on equal-duration start-swap compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 8
     }
 }
