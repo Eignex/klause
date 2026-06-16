@@ -147,6 +147,64 @@ class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
         }
     }
 
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: relabel one position in a way that cannot create a
+     *  `t`-before-first-`s` violation. Safe targets are (a) the value `s` itself — adding/moving an
+     *  `s` only pulls the first-`s` index earlier, never breaking precedence — and (b) any value
+     *  other than `t`, provided the position isn't currently the guarding `s` (so we never strip the
+     *  `s` that a later `t` depends on). This frees the variable for a coupled constraint while the
+     *  precedence stays satisfied. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (xs.isEmpty()) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(xs.size)
+            val v = state.assignment.intValue(xs[i])
+            val d = state.problem.intDomains[xs[i]]
+            var pick = -1
+            var seen = 0
+            d.forEach { w ->
+                if (w != v && (w == s || (w != t && v != s))) {
+                    seen++
+                    if (state.rng.nextInt(seen) == 0) pick = w
+                }
+            }
+            if (pick < 0) continue
+            sink.addChannelingIntSet(state, xs[i], pick)
+            emitted++
+        }
+    }
+
+    /** Feasible init: a `t`-free assignment (each position takes any in-domain value other than
+     *  `t`), so `t` never occurs and precedence holds trivially. Returns false — leaving the random
+     *  assignment — when a position can only be `t` (frozen to `t`, or singleton `{t}` domain). */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        for (i in xs.indices) {
+            val v = xs[i]
+            if (state.assumptions.isFrozenInt(v)) {
+                if (state.assignment.intValue(v) == t) return false
+                continue
+            }
+            val d = state.problem.intDomains[v]
+            var pick = -1
+            d.forEach { if (pick < 0 && it != t) pick = it }
+            if (pick < 0) return false
+            state.assignment.setInt(v, pick)
+        }
+        return true
+    }
+
+    private companion object {
+        /** Cap on precedence-preserving relabel moves offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_MOVE_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested move before giving up. */
+        const val MOVE_ATTEMPT_STRIDE: Int = 6
+    }
+
     /** Hole-aware conflict reason — the current domains of [xs] (bound shifts + interior holes) the
      *  deduction reasons over; identical helper to the hole-pruning globals (AllDifferent, Table). */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
