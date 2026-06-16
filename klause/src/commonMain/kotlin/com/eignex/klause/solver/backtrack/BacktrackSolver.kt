@@ -207,12 +207,12 @@ class BacktrackSolver(override val problem: Problem) :
      * problem contains. The objective is statically linear, so no objective-shape check is involved —
      * LP enablement is purely a params decision.
      */
-    override fun improvements(objective: LinearObjective, baseParams: BacktrackParams): Sequence<MinimizeResult> =
+    override fun improvements(objective: LinearObjective, params: BacktrackParams): Sequence<MinimizeResult> =
         sequence {
             // The single B&B orchestration ([ResumableMinimize]), driven lazily: one incumbent surfaced
             // per step, then the terminal verdict. lpConfig is resolved inside the search. `pausable = false`
             // makes a fired cancellation a hard terminal stop (no resume) — a one-shot stream's contract.
-            val search = ResumableMinimize(objective, baseParams, pausable = false)
+            val search = ResumableMinimize(objective, params, pausable = false)
             while (true) {
                 when (val event = search.runUntilEvent()) {
                     is StepEvent.Incumbent -> yield(event.result)
