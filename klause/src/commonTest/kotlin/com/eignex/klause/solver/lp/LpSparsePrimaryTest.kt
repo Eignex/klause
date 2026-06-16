@@ -99,6 +99,78 @@ class LpSparsePrimaryTest {
         }
     }
 
+    @Test
+    fun `sparse-primary single-objective propagation preserves the optimum`() {
+        // Minimise a single variable z linked by z >= Σx to the rest, so the LP relaxation bounds z
+        // from below and the sparse path's objective-bound propagation (#705 slice 1) fires. An
+        // unsound (over-tightened) bound would prove a too-high optimum and fail against brute force.
+        val rng = Random(424242)
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            var optimal = 0
+            repeat(120) { _ ->
+                val nx = rng.nextInt(2, 4)
+                val ub = IntArray(nx) { rng.nextInt(2, 5) }
+                val zVar = nx
+                val zUb = ub.sum()
+                val geCons = ArrayList<Pair<IntArray, Int>>()
+                repeat(rng.nextInt(1, 3)) { _ ->
+                    geCons.add(IntArray(nx) { rng.nextInt(0, 4) } to rng.nextInt(0, zUb + 1))
+                }
+                val brute = bruteMinLinked(nx, ub, geCons)
+
+                val domains = Array(nx + 1) { if (it < nx) IntDomain(0, ub[it]) else IntDomain(0, zUb) }
+                val factors = ArrayList<Factor>()
+                for ((c, r) in geCons) factors.add(Linear(c, IntArray(nx) { it }, LinearOp.GE, r))
+                // z >= Σx : Σx − z ≤ 0.
+                factors.add(Linear(IntArray(nx + 1) { if (it < nx) 1 else -1 }, IntArray(nx + 1) { it }, LinearOp.LE, 0))
+                val problem = Problem(0, nx + 1, domains, factors.toTypedArray())
+                val obj = LinearObjective(intCoefficients = LongArray(nx + 1) { if (it == zVar) 1L else 0L })
+                val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 9L))
+                assertTrue(resolved.lpSparsePrimary, "expected the sparse-primary path under the tiny dense cap")
+
+                when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
+                    is MinimizeResult.Optimal -> {
+                        val o = brute ?: error("solver Optimal but brute infeasible")
+                        assertEquals(o.toDouble(), res.objective, 1e-9, "wrong optimum")
+                        optimal++
+                    }
+
+                    is MinimizeResult.Infeasible -> assertTrue(brute == null, "solver Infeasible but brute feasible")
+
+                    else -> error("unexpected $res")
+                }
+            }
+            assertTrue(optimal > 60, "covered only $optimal")
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
+    /** Minimal feasible z = min over GE-feasible x of Σx (z can always equal Σx, ≤ its upper bound). */
+    private fun bruteMinLinked(nx: Int, ub: IntArray, geCons: List<Pair<IntArray, Int>>): Long? {
+        val x = IntArray(nx)
+        var best: Long? = null
+        fun feasible(): Boolean = geCons.all { (c, r) -> (0 until nx).sumOf { c[it] * x[it] } >= r }
+        fun rec(i: Int) {
+            if (i == nx) {
+                if (feasible()) {
+                    val s = (0 until nx).sumOf { x[it].toLong() }
+                    val cur = best
+                    if (cur == null || s < cur) best = s
+                }
+                return
+            }
+            for (v in 0..ub[i]) {
+                x[i] = v
+                rec(i + 1)
+            }
+        }
+        rec(0)
+        return best
+    }
+
     private fun bruteMin(n: Int, ub: IntArray, cost: LongArray, cons: List<Pair<LongArray, Long>>): Long? {
         val x = IntArray(n)
         var best: Long? = null
