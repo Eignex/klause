@@ -158,8 +158,9 @@ class Cbls(
      *  winning only when the structure-preserving relocation clears a clash in a coupled
      *  constraint (e.g. swapping two cells of one all-different to fix the column it shares).
      *  At feasibility [sampleFromSatisfied] already owns the structured pool, so this source
-     *  is gated to `state.cost > 0`. */
-    val implicitStructuredCap: Int = 4,
+     *  is gated to `state.cost > 0`. `0` (default) = off, so default convergence is unchanged;
+     *  enabled by the portfolio on permutation/assignment-shaped models. */
+    val implicitStructuredCap: Int = 0,
 ) : Strategy {
 
     init {

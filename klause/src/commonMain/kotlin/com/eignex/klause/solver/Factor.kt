@@ -294,6 +294,21 @@ interface Factor {
      */
     val providesImplicitNeighbourhood: Boolean get() = false
 
+    /**
+     * Overwrite this factor's variables in [state]'s assignment with a configuration that
+     * satisfies the factor, used by the engine's implicit-solving feasible-init pass on a
+     * scope-disjoint set of elected globals (so seeds never clobber one another). Must leave
+     * variables frozen by [LocalSearchState.assumptions] untouched and may only write the
+     * factor's own [intVars] / [boolVars]. Returns true if it produced a fully satisfying
+     * configuration, false if the factor could not be seeded feasibly (over-constrained or
+     * frozen out) — the engine then falls back to the random assignment for those vars.
+     *
+     * Default: no-op returning false. Structural globals that provide an implicit
+     * neighbourhood ([providesImplicitNeighbourhood]) override this so the search can begin
+     * inside their feasible region.
+     */
+    fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean = false
+
     /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]
      *  and [LocalSearchState.boolMakeCount] incrementally via [updateBoolBreakMakeForFlip],
      *  skipping the engine's brute-force O(arity²) per-flip subtract-add cycle.
