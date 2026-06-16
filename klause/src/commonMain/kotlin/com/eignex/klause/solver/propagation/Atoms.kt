@@ -79,7 +79,10 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     // record. Bound atoms always carry a stored level once determined.
     if (atomKind[atomId] == AtomKind.EQ && !truth) {
         val d = intDomains[v]
-        if (k > d.min && k < d.max) return holeLevelFor(v, k)
+        // Interior hole, or a value carved on this path that a later bound move has since swept
+        // past: its truth was established at the carve, so the carve level is the real level —
+        // not the (possibly later) bound move that snapped over an already-dead value.
+        if ((k > d.min && k < d.max) || holeHistHas(v, k)) return holeLevelFor(v, k)
     }
     val rl = reconstructCurrentBoundLevel(v, atomKind[atomId], k, stateOfTruth(truth))
     return if (rl >= 0) rl else levelToDecisionVar.size
@@ -214,21 +217,28 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
         AtomKind.GE -> if (truth) {
             reconstructCurrentBoundReason(v, AtomKind.GE, k, 1)
         } else {
-            falseBoundReason(v, viaMax = true, complementK = k - 1)
+            falseBoundReason(v, viaMax = true)
         }
 
         AtomKind.LE -> if (truth) {
             reconstructCurrentBoundReason(v, AtomKind.LE, k, 1)
         } else {
-            falseBoundReason(v, viaMax = false, complementK = k + 1)
+            falseBoundReason(v, viaMax = false)
         }
 
         AtomKind.EQ -> if (truth) {
             composeIntVarAtomAntecedents(intArrayOf(v))
         } else {
+            // Prefer the recorded interior-carve reason whenever the value was carved on the
+            // current path — it cites the other variables that forced the exclusion (the original,
+            // tightest reason). Otherwise the value was swept past by a bound move, so the live
+            // opposing endpoint rules it out; [falseBoundReason] cites that endpoint's stored
+            // reason (other variables), keeping resolution off the same-var GE<->LE cycle that
+            // leaves the clause non-asserting (#671).
             when {
-                k < d.min -> falseBoundReason(v, viaMax = false, complementK = k + 1)
-                k > d.max -> falseBoundReason(v, viaMax = true, complementK = k - 1)
+                holeHistHas(v, k) -> holeReasonFor(v, k)
+                k < d.min -> falseBoundReason(v, viaMax = false)
+                k > d.max -> falseBoundReason(v, viaMax = true)
                 else -> holeReasonFor(v, k)
             }
         }
@@ -241,23 +251,22 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
  * `[v ≤ k]`); the analyzer then unfolded that atom through its own reason, which couples a
  * GE atom to the LE atom of the same var and back — the same-level cycle that makes 1UIP
  * keep a resolved literal and the learned clause non-asserting (the 0.37%-asserting-rate
- * pathology this rewrite targets). Instead, when the falsifying bound is exactly the current
- * opposing endpoint (`viaMax`: `d.max == complementK`, i.e. the atom is the complement of the
- * live upper bound; symmetric for the min side), cite the **per-var stored antecedent of that
- * endpoint** — the real reason the bound moved there — so resolution flows straight to the
- * other variables' bounds with no GE↔LE round trip. A `null` stored antecedent means the
- * endpoint is a root/bake fact (no search move set it), which is the correct leaf. For a
- * *looser* false atom (the opposing bound sits strictly past the complement) the endpoint's
- * reason would over-attribute the level, so fall back to the classical complementary citation.
+ * pathology this rewrite targets). Instead always cite the **per-var stored antecedent of the
+ * live opposing endpoint** ([PropagationState.intMaxAntecedents] / [PropagationState.intMinAntecedents]):
+ * the real reason the bound stands where it does — so resolution flows straight to the *other* variables' bounds
+ * with no same-var round trip. This holds for any false atom, not just one adjacent to the
+ * endpoint: `v ≤ d.max` already rules out `v ≥ k` for every `k > d.max` (symmetric for the min
+ * side), and the bound's reason justifies it. A `null` stored antecedent means the endpoint is a
+ * root/bake fact (no search move set it), which is the correct leaf.
+ *
+ * For a value strictly past the endpoint (looser than adjacent) this attributes the endpoint's
+ * (possibly later) establishment level rather than the exact level the value was first ruled out
+ * — sound (a true antecedent cited at its real level), and since the atom resolves against this
+ * reason in the 1UIP loop it never lingers as a mis-levelled leaf. The earlier complementary-atom
+ * citation kept the level tight but reintroduced the fatal cycle; avoiding the cycle wins.
  */
-internal fun PropagationState.falseBoundReason(v: Int, viaMax: Boolean, complementK: Int): IntArray? {
-    val d = intDomains[v]
-    return if (viaMax) {
-        if (d.max == complementK) intMaxAntecedents[v] else intArrayOf(Lit.make(atomVarLe(v, complementK), false))
-    } else {
-        if (d.min == complementK) intMinAntecedents[v] else intArrayOf(Lit.make(atomVarGe(v, complementK), false))
-    }
-}
+internal fun PropagationState.falseBoundReason(v: Int, viaMax: Boolean): IntArray? =
+    if (viaMax) intMaxAntecedents[v] else intMinAntecedents[v]
 
 internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Int): Boolean? {
     val d = intDomains[v]
@@ -301,35 +310,52 @@ internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Int): Boole
  */
 internal fun PropagationState.propagateAtomsForVar(
     v: Int,
-    @Suppress("UNUSED_PARAMETER") antNear: IntArray?,
-    @Suppress("UNUSED_PARAMETER") antFar: IntArray? = antNear,
-    @Suppress("UNUSED_PARAMETER") reqMin: Int = intDomains[v].min,
-    @Suppress("UNUSED_PARAMETER") reqMax: Int = intDomains[v].max,
+    antNear: IntArray?,
+    antFar: IntArray? = antNear,
+    reqMin: Int = intDomains[v].min,
+    reqMax: Int = intDomains[v].max,
     oldMin: Int,
     oldMax: Int,
     carved: Int = NO_CARVE,
 ) {
     // Iterate all materialized atoms so every crossed order literal becomes a chronological
-    // trail fact (see [wakeAtom]), with the move's reason recorded on its slot.
+    // trail fact (see [wakeAtom]), with the move's reason recorded on its slot. A move carries
+    // two reason sets: [antNear] justifies the *requested* bound (a factor reason over other
+    // variables), [antFar] additionally carries the hole-crossing chain when the landed bound
+    // snapped past holes. Each crossed literal takes the weakest set that still implies its
+    // truth, split by its threshold against the requested [reqMin] / [reqMax]: a literal implied
+    // by the requested bound alone gets [antNear]; one that needs the further snap gets [antFar].
+    // Critically the requested-bound atom itself ([v ≥ reqMin] / [v ≤ reqMax]) takes [antNear],
+    // which does NOT list that atom — [antFar] does (via [antecedentsAcrossHoles]), so giving it
+    // [antFar] would be the same-var cycle 1UIP cannot collapse (#671).
     val idx = atomsByIntVar[v] ?: return
-    pendingMoveAnt = antFar
     val d = intDomains[v]
     val newMin = d.min
     val newMax = d.max
     if (newMin > oldMin) {
+        pendingMoveAnt = antFar
         visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
         visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+        visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id ->
+            recordEqDeath(v, atomThreshold[id], near = atomThreshold[id] < reqMin, antNear, antFar)
+            wakeAtom(id, false)
+        }
     }
     if (newMax < oldMax) {
+        pendingMoveAnt = antFar
         visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
         visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+        visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id ->
+            recordEqDeath(v, atomThreshold[id], near = atomThreshold[id] > reqMax, antNear, antFar)
+            wakeAtom(id, false)
+        }
     }
     if (carved != NO_CARVE && carved in (newMin + 1) until newMax) {
+        pendingMoveAnt = antFar
         visitAtomRange(idx.eqKeys, idx.eqIds, carved, carved) { id -> wakeAtom(id, false) }
     }
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
+        pendingMoveAnt = antFar
         visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
     }
 }
@@ -394,6 +420,20 @@ internal inline fun PropagationState.visitAtomRange(
     }
 }
 
+/** Record an eq atom's carve reason at its first death during a bound move (#671). A value killed in
+ *  the move's NEAR region — below the raised min / above the lowered max *requested* bound — is ruled
+ *  out by that requested bound alone, whose reason [antNear] cites other variables: a sound, acyclic
+ *  per-value reason (`antNear ⟹ v ≥ reqMin ⟹ v ≠ k` for `k < reqMin`, symmetric for the max side).
+ *  Recorded once (guarded) so a later bound move that snaps across the now-dead value finds it via
+ *  [holeReasonFor] instead of deriving it from the live opposing bound — i.e. from that later move,
+ *  whose reason lists this very eq-atom, the same-var cycle 1UIP cannot collapse. A FAR-region
+ *  crossing reuses the record from the value's first (near) death. [PropagationState.pendingMoveAnt] is the fallback
+ *  reason [wakeAtom] uses when no record is on file. */
+private fun PropagationState.recordEqDeath(v: Int, k: Int, near: Boolean, antNear: IntArray?, antFar: IntArray?) {
+    if (near && !holeHistHas(v, k)) pushHoleHist(v, k, currentLevel, antNear)
+    pendingMoveAnt = if (near) antNear else antFar
+}
+
 /** Wake the watchers of [atomId]'s now-false literal after its truth flipped to
  *  [newT]. Truth itself is never stored — it is derived from the domains on read — but
  *  the **level** the atom became determined at is recorded on its trail slot: this move
@@ -409,12 +449,19 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
     atomLvl[atomId] = currentLevel
     atomRsn[atomId] = currentFactor
     // Record the establishment reason on the trail slot: a true eq atom (the var just became
-    // the singleton {k}) rests on BOTH endpoint bounds, so cite them; every other crossed
-    // literal rests on the move that crossed it (the channeled [pendingMoveAnt]).
-    atomAnt[atomId] = if (newT && atomKind[atomId] == AtomKind.EQ) {
-        composeIntVarAtomAntecedents(intArrayOf(atomIntVar[atomId]))
-    } else {
-        pendingMoveAnt
+    // the singleton {k}) rests on BOTH endpoint bounds, so cite them; a crossed hole (false eq)
+    // rests on why its value was excluded — its per-value carve reason ([holeReasonFor]), which
+    // cites other variables. The bound move's reason ([PropagationState.pendingMoveAnt]) lists this very eq-atom
+    // when it snapped across the hole ([antecedentsAcrossHoles]); citing it back would form the
+    // same-var cycle 1UIP cannot collapse (#671). Every other crossed literal rests on the move.
+    atomAnt[atomId] = when {
+        newT && atomKind[atomId] == AtomKind.EQ ->
+            composeIntVarAtomAntecedents(intArrayOf(atomIntVar[atomId]))
+
+        !newT && atomKind[atomId] == AtomKind.EQ && holeHistHas(atomIntVar[atomId], atomThreshold[atomId]) ->
+            holeReasonFor(atomIntVar[atomId], atomThreshold[atomId])
+
+        else -> pendingMoveAnt
     }
     // Wake watchers of the now-false literal: index = atomId*2 + (positive?0:1); the false
     // literal's polarity is `!newT`, so its slot is `atomId*2 + (!newT ? 0 : 1)`.

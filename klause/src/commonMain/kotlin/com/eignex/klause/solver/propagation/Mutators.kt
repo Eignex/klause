@@ -174,13 +174,16 @@ internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Int, antecedents: In
     // Preserve interior holes via the sparse-aware constructor path. For contiguous
     // domains this is functionally identical to `IntDomain(lo, d.max)`.
     val newDomain = d.withMinAtLeast(lo)
-    // A landing value inside a hole snaps the min further. The snapped bound rests on
-    // the requested bound plus the crossed holes; without the requested-bound atom in
-    // the chain a decision's contribution vanishes from conflict analysis.
+    // A landing value inside a hole snaps the min further. The snapped bound rests on the requested
+    // bound plus the crossed holes. The requested-bound atom is cited only for a *decision* move
+    // (`antecedents == null`): a decision to set `v ≥ lo` has no factor reason, so its sole
+    // representation in conflict analysis is that atom. A *propagation* supplies `antecedents` that
+    // already imply `v ≥ lo`, so citing the atom too is redundant — and since the atom resolves
+    // back to this very bound it would be a same-var cycle 1UIP cannot collapse (#671).
     val ant = if (newDomain.min > lo) {
         appendPriorBound(
             Lit.make(atomVarGe(v, lo), false),
-            lo > problem.intDomains[v].min,
+            lo > problem.intDomains[v].min && antecedents == null,
             antecedentsAcrossHoles(v, lo until newDomain.min, antecedents),
         )
     } else {
@@ -212,7 +215,7 @@ internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: In
     val ant = if (newDomain.max < hi) {
         appendPriorBound(
             Lit.make(atomVarLe(v, hi), false),
-            hi < problem.intDomains[v].max,
+            hi < problem.intDomains[v].max && antecedents == null,
             antecedentsAcrossHoles(v, (newDomain.max + 1)..hi, antecedents),
         )
     } else {
