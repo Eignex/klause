@@ -168,6 +168,14 @@ class LocalSearchState(
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
     val intConfChange: BooleanArray = BooleanArray(problem.numIntVars) { true }
 
+    // Probe scratch reused by [evaluateCompound] across calls so an apply+revert probe allocates
+    // nothing on its array-copy path (the dominant LS allocation source). Lazily created because
+    // compound moves are factor-specific; the state is per-worker, so no sharing/locking is needed.
+    private var degScratch: IntArray? = null
+    private var boolConfScratch: BooleanArray? = null
+    private var intConfScratch: BooleanArray? = null
+    private val oldViolatedScratch: IntHashSet = IntHashSet()
+
     /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
         assignment.randomize(rng, problem.intDomains)
@@ -758,14 +766,23 @@ class LocalSearchState(
         val oldStep = step
         val oldCost = cost
         val oldBestCost = bestCostSeen
-        val oldViolatedIds = IntHashSet(violated.size)
+        // Pre-probe violated set for the break count, into a scratch set cleared per probe.
+        val oldViolatedIds = oldViolatedScratch
+        oldViolatedIds.clear()
         violated.forEach { oldViolatedIds.add(it) }
-        val oldBoolConf = boolConfChange.copyOf()
-        val oldIntConf = intConfChange.copyOf()
-        // Degree snapshot for the exact weighted delta — same O(n)-copy class as the
-        // conf-change snapshots above. Skipped when no strategy has touched the weights
-        // (weights all 1.0 ⇒ weighted == raw netDelta).
-        val degBefore = if (factorWeightsAllocated) factorDegree.copyOf() else null
+        // Conf-change snapshots restored after the apply+revert probe; copyInto reused scratch rather
+        // than copyOf so the restore path allocates nothing.
+        val oldBoolConf = (boolConfScratch ?: BooleanArray(boolConfChange.size)).also { boolConfScratch = it }
+        boolConfChange.copyInto(oldBoolConf)
+        val oldIntConf = (intConfScratch ?: BooleanArray(intConfChange.size)).also { intConfScratch = it }
+        intConfChange.copyInto(oldIntConf)
+        // Degree snapshot for the exact weighted delta. Skipped when no strategy has touched the
+        // weights (weights all 1.0 ⇒ weighted == raw netDelta).
+        val degBefore = if (factorWeightsAllocated) {
+            (degScratch ?: IntArray(factorDegree.size)).also { degScratch = it }.also { factorDegree.copyInto(it) }
+        } else {
+            null
+        }
         // Capture inverse per part (BoolFlip self-inverts; IntSet needs current value).
         val inverses = ArrayList<Move>(move.parts.size)
         for (p in move.parts) inverses += inverseOf(p)
@@ -781,8 +798,7 @@ class LocalSearchState(
         for (p in move.parts) apply(p)
 
         var breakCount = 0
-        val newViolated = violated.toIntArray()
-        for (fid in newViolated) if (fid !in oldViolatedIds) breakCount++
+        violated.forEach { fid -> if (fid !in oldViolatedIds) breakCount++ }
         val netDelta: Long = cost - oldCost
         var weightedNetDelta = netDelta.toDouble()
         if (degBefore != null) {
@@ -800,8 +816,8 @@ class LocalSearchState(
         step = oldStep
         for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
         for (i in touchedSlots.indices) touchCount[touchedSlots[i]] = savedTouchCount[i]
-        for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
-        for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
+        oldBoolConf.copyInto(boolConfChange)
+        oldIntConf.copyInto(intConfChange)
         bestCostSeen = oldBestCost
 
         return CompoundEval(breakScore = breakCount, netDelta = netDelta, weightedNetDelta = weightedNetDelta)

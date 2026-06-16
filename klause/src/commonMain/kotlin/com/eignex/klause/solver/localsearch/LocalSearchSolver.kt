@@ -455,10 +455,13 @@ class LocalSearchSolver(
                     cancelled = true
                     break
                 }
-                val snap = state.assignment.snapshot()
-                val obj = objective.evaluate(snap)
+                // Score the live assignment without copying it; the full snapshot is taken only when
+                // this point is a strict improvement, so the steady state of the descent allocates
+                // nothing per iteration.
+                val obj = objective.evaluate(state.assignment)
                 if (obj < bestObj) {
                     bestObj = obj
+                    val snap = state.assignment.snapshot()
                     bestSample = snap
                     bestFoundAtMs = sink.elapsedMs()
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
@@ -492,10 +495,11 @@ class LocalSearchSolver(
                         // CBLS may propose moves that break feasibility (e.g. a true→false
                         // flip that opens slack) which we don't want during the gated
                         // descent phase.
+                        val baseObj = objective.evaluate(state.assignment)
+                        // Snapshot only to undo a rejected move; both objective reads are live.
                         val savedSnap = state.assignment.snapshot()
-                        val baseObj = objective.evaluate(savedSnap)
                         state.apply(m)
-                        if (state.cost == 0L && objective.evaluate(state.assignment.snapshot()) < baseObj) {
+                        if (state.cost == 0L && objective.evaluate(state.assignment) < baseObj) {
                             flipsSinceRestart++
                             totalFlips++
                             continue
@@ -515,7 +519,9 @@ class LocalSearchSolver(
                     totalFlips++
                     continue
                 }
-                restarts.onLocalOptimum(state, snap, obj)
+                // A local optimum (all descent steps failed) is infrequent relative to descent steps,
+                // so snapshotting here for the restart policy stays off the per-iteration hot path.
+                restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
                 restarts.restart(state, bestSample)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
                 stallCount++
@@ -692,7 +698,7 @@ class LocalSearchSolver(
         // snapshot/evaluate, and no apply/revert (objectiveDelta reads the live assignment).
         // Every reachable objective is incremental; there is no evaluate fallback.
         val baseCost = state.cost
-        val baselineObj = objective.evaluate(state.assignment.snapshot())
+        val baselineObj = objective.evaluate(state.assignment)
         val poll = IntArray(1)
         var bestShaped = shaping.shape(baseCost, baselineObj)
         var bestMove: Move? = null
