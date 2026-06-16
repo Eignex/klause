@@ -135,3 +135,32 @@ establishment. The infrastructure exists — clauses already carry atom literals
 (`propagation/ClauseDb.kt` `addLearnedClause`). This is a large, multi-session rewrite of the most
 false-UNSAT-prone code, **not** a patch. **Gate any such change on the enumerate-vs-brute oracle under
 many seeds** (the single-seed oracle hid the `ExcludeOnFix` gap for the life of that test).
+
+## Phase-0 baseline measurements (the rewrite's before-state)
+
+Captured on `main` at the order-literal-rewrite branch point, `engine=fixed` unless noted. Gate the
+rewrite against these: `learned` should rise and `caNonAsserting` fall, with no enumerate-vs-brute
+regression under the multi-seed harness.
+
+liner-sf-repositioning (the canonical case), 30s:
+
+| engine | nodes | failures | learned | caNonAsserting | caNotApplicable | feasible |
+|---|---|---|---|---|---|---|
+| `fixed` | 101 | 173 | **0** | **173 (100%)** | 0 | no |
+| `cp-single` | 620 | 167 | 60 | 107 (64%) | 0 | no |
+
+The pathology is **not** liner-specific. A 30-instance mzn-bench sample (`per-family=1 max=30 seed=1`,
+`engine=fixed`, 10s each) shows 15% of all conflicts non-asserting *overall*, but severely
+concentrated — a whole class learns almost nothing while others learn fine:
+
+| non-asserting rate | instances (sample) |
+|---|---|
+| ~100% | carseq, cvrp, costas-array |
+| 97–99% | black-hole, diameterc-mst, amaze, bacp, crosswords |
+| 73–86% | depot-placement, elitserien-handball |
+| 0–7% (healthy) | cargo, carpet-cutting, community-detection, cyclic-rcpsp, cryptanalysis, fast-food, … |
+
+So the order-literal rewrite is not a one-instance fix: it targets the class of holey-int /
+order-atom-heavy models (≈ a third of the conflict-bearing sample) that currently discard nearly all
+their learned clauses. `caNotApplicable` is ~0 everywhere, so the loss is non-asserting clauses
+(the same-variable order-atom fans/cycles), not missing conflict reasons.
