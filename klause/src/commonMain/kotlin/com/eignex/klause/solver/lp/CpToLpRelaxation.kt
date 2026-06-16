@@ -12,6 +12,7 @@ import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Mdd
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
@@ -104,6 +105,10 @@ internal class CpToLpRelaxation(
     /** When true, linearize each NValue with a one-hot value model (per-value "used" indicators) so
      *  the distinct-count target gets an LP bound. Adds O(Σ|domain|) columns, so it is gated. */
     private val nValueHull: Boolean = false,
+    /** When true, linearize each Mdd with the layered flow hull (one arc var per reachable transition
+     *  record, flow-conservation + value channel + optional cost channel) — the exact convex hull of
+     *  the diagram's accepting paths, so a cost-MDD's cost var gets an exact lower bound. Gated. */
+    private val mddHull: Boolean = false,
     /**
      * #571: build only the **objective cone** — the rows and variables transitively connected to the
      * objective through the linear/Boolean constraints — and **drop every big-M [ReifiedLinear] row**.
@@ -131,7 +136,7 @@ internal class CpToLpRelaxation(
      * re-walk recomputes anyway.
      */
     private val cacheable: Boolean =
-        !circuitArcs && !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed
+        !circuitArcs && !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed && !mddHull
 
     /** Shared pre-densified coefficient rows for the bound-invariant base rows (#564). A null entry is
      *  a live-big-M reified base row, re-densified each node. Populated on the first cacheable build;
@@ -239,6 +244,9 @@ internal class CpToLpRelaxation(
         /** Above this total selector count (Σ over `xs` of the declared-domain size) the NValue
          *  one-hot value hull is skipped. */
         const val MAX_NVALUE_CELLS: Int = 1024
+
+        /** Above this many arc columns one Mdd flow hull is skipped (the transition-record blow-up). */
+        const val MAX_MDD_ARCS: Int = 4096
     }
 
     /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
@@ -621,6 +629,9 @@ internal class CpToLpRelaxation(
                 if (nValueHull) {
                     for (factor in problem.factors) if (factor is NValue) buildNValueHull(factor)
                 }
+                if (mddHull) {
+                    for (factor in problem.factors) if (factor is Mdd) buildMddHull(factor)
+                }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
                 if (cumulativeTimeIndexed) {
                     for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
@@ -925,6 +936,128 @@ internal class CpToLpRelaxation(
             cols[m] = intColumn(factor.n)
             vals[m] = -1L
             builder.addRow(cols, vals, rel, 0L)
+        }
+
+        /**
+         * Layered flow hull of one [Mdd] — the exact convex hull of the diagram's accepting paths. An
+         * arc variable `y ∈ [0,1]` per forward-reachable transition record `(src, value, dst[, weight])`
+         * at each layer (pinned to 0 when `value` left the live domain of `seq[layer]`). Rows: a source
+         * row (one unit leaves `(0, initial)`), flow conservation at every interior `(layer, state)`, an
+         * acceptance row (one unit enters an accepting state at the final layer), a value channel
+         * `Σ value·y = seq[layer]` per layer, and — for a cost-MDD (stride 4) — a cost channel
+         * `Σ weight·y = cost`, an **exact lower bound on the cost variable**. The flow polytope is
+         * integral, so the LP optimum is exact. Forward reachability over the declared domains keeps the
+         * layout stable and bounds the arc count ([MAX_MDD_ARCS]); above the cap, or when no accepting
+         * path survives, the factor is skipped (only loosens).
+         */
+        @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
+        private fun buildMddHull(factor: Mdd) {
+            val seq = factor.seq
+            val n = seq.size
+            val stride = factor.recordStride
+            val trans = factor.transitions
+            val starts = factor.layerStarts
+            // Forward-reachable states per layer over the declared domains; bail if a layer empties.
+            val reach = Array(n + 1) { HashSet<Int>() }
+            reach[0].add(factor.initial)
+            var arcCount = 0L
+            for (layer in 0 until n) {
+                val dom = problem.intDomains[seq[layer]]
+                var p = starts[layer]
+                val end = starts[layer + 1]
+                while (p < end) {
+                    if (trans[p] in reach[layer] && trans[p + 1] in dom) {
+                        reach[layer + 1].add(trans[p + 2])
+                        arcCount++
+                    }
+                    p += stride
+                }
+                if (reach[layer + 1].isEmpty()) return // no accepting path under declared domains
+            }
+            if (arcCount == 0L || arcCount > MAX_MDD_ARCS) return
+
+            val outCols = Array(n) { HashMap<Int, IntArrayList>() }
+            val inCols = Array(n + 1) { HashMap<Int, IntArrayList>() }
+            val chanCols = Array(n) { IntArrayList() }
+            val chanVal = Array(n) { IntArrayList() }
+            val accepting = HashSet<Int>().apply { for (a in factor.accepting) add(a) }
+            val acceptCols = IntArrayList()
+            val costArcs = IntArrayList()
+            val costWeight = IntArrayList()
+            for (layer in 0 until n) {
+                val declared = problem.intDomains[seq[layer]]
+                val live = session.intDomain(seq[layer])
+                var p = starts[layer]
+                val end = starts[layer + 1]
+                while (p < end) {
+                    val src = trans[p]
+                    val value = trans[p + 1]
+                    val dst = trans[p + 2]
+                    if (src in reach[layer] && value in declared) {
+                        val col = auxColumn(0L, if (live.contains(value)) 1L else 0L)
+                        outCols[layer].getOrPut(src) { IntArrayList() }.add(col)
+                        inCols[layer + 1].getOrPut(dst) { IntArrayList() }.add(col)
+                        chanCols[layer].add(col)
+                        chanVal[layer].add(value)
+                        if (layer == n - 1 && dst in accepting) acceptCols.add(col)
+                        if (stride == 4) {
+                            costArcs.add(col)
+                            costWeight.add(trans[p + 3])
+                        }
+                    }
+                    p += stride
+                }
+            }
+            val src = outCols[0][factor.initial] ?: return
+            if (src.isEmpty()) return
+            builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
+            for (layer in 1 until n) {
+                for (state in reach[layer]) {
+                    val cols = IntArrayList()
+                    val vals = LongArrayList()
+                    outCols[layer][state]?.let {
+                        for (k in 0 until it.size) {
+                            cols.add(it[k])
+                            vals.add(1L)
+                        }
+                    }
+                    inCols[layer][state]?.let {
+                        for (k in 0 until it.size) {
+                            cols.add(it[k])
+                            vals.add(-1L)
+                        }
+                    }
+                    if (!cols.isEmpty()) builder.addRow(cols.toIntArray(), vals.toLongArray(), Relation.EQ, 0L)
+                }
+            }
+            if (acceptCols.isEmpty()) return
+            builder.addRow(acceptCols.toIntArray(), LongArray(acceptCols.size) { 1L }, Relation.EQ, 1L)
+            for (layer in 0 until n) {
+                val k = chanCols[layer].size
+                if (k == 0) return
+                val cols = IntArray(k + 1)
+                val vals = LongArray(k + 1)
+                for (i in 0 until k) {
+                    cols[i] = chanCols[layer][i]
+                    vals[i] = chanVal[layer][i].toLong()
+                }
+                cols[k] = intColumn(seq[layer])
+                vals[k] = -1L
+                builder.addRow(cols, vals, Relation.EQ, 0L)
+            }
+            // Cost channel: Σ weight·y − cost = 0, an exact lower bound on the cost var.
+            if (factor.cost >= 0 && !costArcs.isEmpty()) {
+                val k = costArcs.size
+                val cols = IntArray(k + 1)
+                val vals = LongArray(k + 1)
+                for (i in 0 until k) {
+                    cols[i] = costArcs[i]
+                    vals[i] = costWeight[i].toLong()
+                }
+                cols[k] = intColumn(factor.cost)
+                vals[k] = -1L
+                builder.addRow(cols, vals, Relation.EQ, 0L)
+            }
         }
 
         /**
