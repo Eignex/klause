@@ -151,6 +151,15 @@ class Cbls(
      *  slightly-worsening move whose spatial reach is small — the classical mechanism for
      *  crossing plateau lakes. `0.0` (default) = strict descent on the scored delta. */
     val skewAlpha: Double = 0.0,
+    /** **Implicit-solving neighbourhoods** (`0` = off): cap on elected structural globals
+     *  (see [LocalSearchState.electedImplicit]) sampled per *infeasible* [pickMove] for their
+     *  feasibility-preserving structured moves. Those moves never break the global itself, so
+     *  they enter the noise-eligible pool and are scored by the weighted-violation gradient —
+     *  winning only when the structure-preserving relocation clears a clash in a coupled
+     *  constraint (e.g. swapping two cells of one all-different to fix the column it shares).
+     *  At feasibility [sampleFromSatisfied] already owns the structured pool, so this source
+     *  is gated to `state.cost > 0`. */
+    val implicitStructuredCap: Int = 4,
 ) : Strategy {
 
     init {
@@ -173,6 +182,7 @@ class Cbls(
         require(maxNeighborhood >= 1) { "maxNeighborhood ≥ 1, got $maxNeighborhood" }
         require(candidatesPerLevel >= 1) { "candidatesPerLevel ≥ 1, got $candidatesPerLevel" }
         require(skewAlpha >= 0.0) { "skewAlpha ≥ 0, got $skewAlpha" }
+        require(implicitStructuredCap >= 0) { "implicitStructuredCap ≥ 0, got $implicitStructuredCap" }
     }
 
     private var lastImprovingStep: Long = -1L
@@ -240,6 +250,7 @@ class Cbls(
         sampleFromViolated(state, sink)
         if (stalled) sampleFrontier(state, sink)
         sampleFromSatisfied(state, sink)
+        if (state.cost > 0L) sampleElectedStructured(state, sink)
         seedObjectiveMoves(state, sink)
 
         // Stall swaps and ejection chains live in a private sink: they compete on *score
@@ -597,6 +608,24 @@ class Cbls(
         // walking everything.
         repeat(satisfiedSampleCount) {
             val fid = state.rng.nextInt(total)
+            if (!state.violated.contains(fid)) {
+                state.factors[fid].proposeStructuredMoves(state, fid, sink)
+            }
+        }
+    }
+
+    /** Implicit-solving source (see [implicitStructuredCap]): during infeasibility, draw
+     *  feasibility-preserving structured moves from elected structural globals that are
+     *  *currently satisfied*. Unlike [sampleFromSatisfied] (which scans random factors and is
+     *  gated off at infeasibility) this iterates only the small elected set, so it stays cheap
+     *  while the search is still closing violations. The moves preserve the elected global, so
+     *  they only improve the score when they help a coupled constraint. */
+    private fun sampleElectedStructured(state: LocalSearchState, sink: MoveSink) {
+        if (implicitStructuredCap == 0) return
+        val elected = state.electedImplicit
+        if (elected.isEmpty()) return
+        repeat(minOf(implicitStructuredCap, elected.size)) {
+            val fid = elected[state.rng.nextInt(elected.size)]
             if (!state.violated.contains(fid)) {
                 state.factors[fid].proposeStructuredMoves(state, fid, sink)
             }
