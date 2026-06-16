@@ -76,7 +76,21 @@ internal class FlatZincCompiler(
 
     fun compile(): FlatZincProgram {
         for (decl in model.varDecls) processDecl(decl)
-        for (c in model.constraints) processConstraint(c)
+        // Factor ids the model marked implied (`redundant_constraint` / `symmetry_breaking_constraint`,
+        // tagged by the klause MZN library): the slice of `factors` each such constraint appends. LS
+        // seeds these a lower violation weight so they don't swamp the landscape; a model symmetry
+        // break also tells presolve to skip its own. Holds factor indices stable because the
+        // only later `factors` mutation (the GaussianXor append below) only grows the tail.
+        val impliedFactorIds = ArrayList<Int>()
+        var hasSymmetryBreaking = false
+        for (c in model.constraints) {
+            val before = factors.size
+            processConstraint(c)
+            val redundant = c.annotations.any { it.name == "klause_redundant" }
+            val symmetry = c.annotations.any { it.name == "klause_symmetry" }
+            if (symmetry) hasSymmetryBreaking = true
+            if (redundant || symmetry) for (i in before until factors.size) impliedFactorIds.add(i)
+        }
         // Joint GF(2) reasoning for multi-xor models: one GaussianXor system on top of the
         // individual Xor factors (which keep their sharper unit-propagation reasons), plus
         // a search recipe that branches the system's rare variables first. On
@@ -98,6 +112,11 @@ internal class FlatZincCompiler(
         // resolved under EMPTY); holes imply bounds.
         val presolve = KlauseConfig.current.presolveConfig()
         val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
+        val impliedFactorMask = if (impliedFactorIds.isEmpty()) {
+            null
+        } else {
+            BooleanArray(factors.size).also { for (i in impliedFactorIds) it[i] = true }
+        }
         val problem = Problem(
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
@@ -109,6 +128,8 @@ internal class FlatZincCompiler(
             probeBudgetPerVar = presolve.probeBudgetPerVar(),
             probeTotalBudget = presolve.probeTotalBudget(),
             cancellation = cancellation,
+            impliedFactorMask = impliedFactorMask,
+            hasSymmetryBreaking = hasSymmetryBreaking,
         )
         return FlatZincProgram(
             problem = problem,

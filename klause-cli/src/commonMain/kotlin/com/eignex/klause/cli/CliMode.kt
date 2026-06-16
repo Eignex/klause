@@ -240,7 +240,8 @@ internal fun Solvable.presolved(
     solutionSetSensitive: Boolean,
     cancellation: Cancellation = Cancellation.Never,
 ): Solvable {
-    val pre = Presolver.run(problem, config, PresolveContext.of(linearObjective, solutionSetSensitive), cancellation)
+    val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
+    val pre = Presolver.run(problem, config, context, cancellation)
     if (pre.problem === problem) return this
     return Solvable(
         problem = pre.problem,

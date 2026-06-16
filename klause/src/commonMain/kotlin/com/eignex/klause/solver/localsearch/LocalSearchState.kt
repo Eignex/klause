@@ -17,6 +17,12 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
 
+/** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
+ *  order of magnitude below the 1.0 structural default: a model padded with hundreds of redundant
+ *  rows then aggregates to roughly the weight of a handful of structural ones, so the early descent
+ *  follows the real feasible region instead of chasing the implied bulk. */
+internal const val IMPLIED_FACTOR_INITIAL_WEIGHT: Double = 0.1
+
 /**
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
  * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard cost.
@@ -143,12 +149,22 @@ class LocalSearchState(
      *  to capture all-1.0 defaults from sessions that ran a weight-blind strategy. */
     private var _factorWeights: DoubleArray? = null
 
-    /** Per-factor dynamic weights for weighted-violation strategies. */
+    /** Per-factor dynamic weights for weighted-violation strategies. Factors the model declared
+     *  implied (redundant / symmetry-breaking — [Problem.impliedFactorMask]) start at
+     *  [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than 1.0, so the bulk of those rows can't dominate
+     *  the initial descent before the structural constraints are met. SAPS-style
+     *  bumping still raises an implied factor's weight if it persistently blocks progress, so the
+     *  lower seed biases the early landscape without making the constraint unenforceable. */
     val factorWeights: DoubleArray
         get() {
             var w = _factorWeights
             if (w == null) {
-                w = DoubleArray(problem.numFactors) { 1.0 }
+                val implied = problem.impliedFactorMask
+                w = if (implied == null) {
+                    DoubleArray(problem.numFactors) { 1.0 }
+                } else {
+                    DoubleArray(problem.numFactors) { if (implied[it]) IMPLIED_FACTOR_INITIAL_WEIGHT else 1.0 }
+                }
                 _factorWeights = w
             }
             return w
