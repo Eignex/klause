@@ -8,9 +8,9 @@ import com.eignex.klause.solver.localsearch.movesource.Frontier
 import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
 import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
+import com.eignex.klause.solver.localsearch.movesource.StallKick
 import com.eignex.klause.solver.localsearch.movesource.StallSwaps
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
-import com.eignex.klause.util.IntHashSet
 
 /**
  * Constraint-Based Local Search strategy. Unlike SAT-family strategies ([ProbSat],
@@ -425,70 +425,16 @@ class Cbls(
      *  parasitic successor chain whose dangling tail is the only violation (the measured
      *  prize-collecting orbit shape). Returns null when nothing eligible. */
     private fun buildStallKick(state: LocalSearchState): Move? {
-        if (state.violated.isEmpty()) return null
-        val problem = state.problem
-        var factor = state.factors[state.violated.random(state.rng)]
-        // Reuse the strategy-private sink so frozen/defined filtering applies; channeling
-        // keeps indicator bools consistent with kicked int values.
         kickSink.clear()
-        kickSink.setAssumptions(state.assumptions)
-        kickSink.setInvariants(state.invariants)
-        var budget = stallKickVars
-        var attempts = stallKickVars * ATTEMPTS_PER_SWAP
-        while (budget > 0 && attempts-- > 0) {
-            // Step 1: a random variable of the current factor.
-            val nInts = factor.intVars.size
-            val nBools = factor.boolVars.size
-            if (nInts + nBools == 0) break
-            val pick = state.rng.nextInt(nInts + nBools)
-            val occ: IntArray
-            if (pick < nInts) {
-                val v = factor.intVars[pick]
-                val d = problem.intDomains[v]
-                val span = (d.max.toLong() - d.min.toLong()).toInt()
-                if (span > 0) {
-                    val nv = d.min + state.rng.nextInt(span + 1)
-                    if (nv != state.assignment.intValue(v)) {
-                        kickSink.addChannelingIntSet(state, v, nv)
-                        budget--
-                    }
-                }
-                occ = problem.intOccurrences[v]
-            } else {
-                val v = factor.boolVars[pick - nInts]
-                kickSink.addBoolFlip(v)
-                budget--
-                occ = problem.boolOccurrences[v]
-            }
-            // Step 2: hop to a random factor sharing that variable and continue the walk.
-            if (occ.isEmpty()) break
-            factor = state.factors[occ[state.rng.nextInt(occ.size)]]
-        }
-        // Flatten everything queued into one atomic perturbation, first-write-wins per slot.
-        val parts = ArrayList<Move>()
-        val seenSlots = IntHashSet()
-        fun addPart(p: Move) {
-            val slot = when (p) {
-                is Move.BoolFlip -> p.varId
-                is Move.IntSet -> state.problem.numBoolVars + p.varId
-                is Move.Compound -> return
-            }
-            if (seenSlots.add(slot)) parts.add(p)
-        }
-        for (m in kickSink.list) {
-            when (m) {
-                is Move.Compound -> for (p in m.parts) addPart(p)
-                else -> addPart(m)
-            }
-        }
-        return when (parts.size) {
-            0 -> null
-            1 -> parts[0]
-            else -> Move.Compound(parts)
-        }
+        stallKick.generate(MoveGenContext(state), kickSink)
+        return kickSink.list.firstOrNull()
     }
 
-    /** Private sink for [buildStallKick] proposals. */
+    /** Targeted-kick source backing [buildStallKick] — see [StallKick]. */
+    private val stallKick = StallKick(stallKickVars)
+
+    /** Read-back sink for [buildStallKick]: [StallKick] emits its one flattened perturbation here
+     *  and the strategy applies it directly (it is the certified-stuck escalation, not scored). */
     private val kickSink: MoveSink = MoveSink()
 
     /** Satisfied-factor structured-move source backing [sampleFromSatisfied] — the random-sampling
@@ -625,9 +571,6 @@ class Cbls(
 
     /** Tuning constants and the [vnd] preset factory. */
     companion object {
-        /** Rejection-sampling attempts allowed per kicked variable (see [buildStallKick]). */
-        private const val ATTEMPTS_PER_SWAP = 4
-
         /**
          * Classical Variable-Neighbourhood-Descent as a [Cbls] preset (the unified strategy
          * subsumes the former standalone `Vnd`): [MoveScoring.Raw] move scoring, a `k`-level
