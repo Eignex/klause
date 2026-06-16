@@ -354,58 +354,82 @@ class Cumulative(
             compressViolation(before.toLong(), state.violationSoftCap)
     }
 
+    /**
+     * Visit every timeline slot whose load changes when an equal-length task footprint moves from
+     * `[oldStart, +d)` to `[newStart, +d)`. The two footprints share the overlap `[overlapLo,
+     * overlapHi)`, whose load is unchanged, so only the symmetric difference is visited: [onRemove]
+     * for slots the task leaves, [onAdd] for slots it enters. Work is `O(|newStart − oldStart|)`,
+     * not `O(d)` — a one-step shift touches two slots regardless of duration. Slots are clamped to
+     * the timeline `[0, size)`. Inline so the per-slot callbacks stay allocation-free.
+     */
+    private inline fun forEachStartShiftSlot(
+        ls: LsState,
+        oldStart: Int,
+        newStart: Int,
+        d: Int,
+        onRemove: (t: Int) -> Unit,
+        onAdd: (t: Int) -> Unit,
+    ) {
+        val size = ls.usage.size
+        val oldFrom = oldStart - ls.tLow
+        val newFrom = newStart - ls.tLow
+        val overlapLo = max(oldFrom, newFrom)
+        val overlapHi = min(oldFrom + d, newFrom + d)
+        if (overlapLo >= overlapHi) {
+            for (t in max(0, oldFrom) until min(size, oldFrom + d)) onRemove(t)
+            for (t in max(0, newFrom) until min(size, newFrom + d)) onAdd(t)
+        } else {
+            for (t in max(0, oldFrom) until min(size, overlapLo)) onRemove(t)
+            for (t in max(0, overlapHi) until min(size, oldFrom + d)) onRemove(t)
+            for (t in max(0, newFrom) until min(size, overlapLo)) onAdd(t)
+            for (t in max(0, overlapHi) until min(size, newFrom + d)) onAdd(t)
+        }
+    }
+
     /** Overage Δ of shifting task from [oldStart,+d) → [newStart,+d). Pure simulation. */
     private fun simulateStartDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int): Int {
         val cap = ls.cap
         val usage = ls.usage
-        val tLow = ls.tLow
-        val size = usage.size
         var delta = 0
-        val oldFrom = oldStart - tLow
-        val oldTo = oldFrom + d
-        val newFrom = newStart - tLow
-        val newTo = newFrom + d
-        for (t in oldFrom until oldTo) {
-            if (t in newFrom until newTo) continue
-            if (t < 0 || t >= size) continue
-            val u = usage[t]
-            delta += max(0, u - r - cap) - max(0, u - cap)
-        }
-        for (t in newFrom until newTo) {
-            if (t in oldFrom until oldTo) continue
-            if (t < 0 || t >= size) continue
-            val u = usage[t]
-            delta += max(0, u + r - cap) - max(0, u - cap)
-        }
+        forEachStartShiftSlot(
+            ls,
+            oldStart,
+            newStart,
+            d,
+            onRemove = { t ->
+                val u = usage[t]
+                delta += max(0, u - r - cap) - max(0, u - cap)
+            },
+            onAdd = { t ->
+                val u = usage[t]
+                delta += max(0, u + r - cap) - max(0, u - cap)
+            },
+        )
         return delta
     }
 
     private fun applyStartDelta(ls: LsState, oldStart: Int, newStart: Int, d: Int, r: Int) {
         val cap = ls.cap
         val usage = ls.usage
-        val tLow = ls.tLow
-        val size = usage.size
         var deltaOv = 0
-        val oldFrom = oldStart - tLow
-        val oldTo = oldFrom + d
-        val newFrom = newStart - tLow
-        val newTo = newFrom + d
-        for (t in oldFrom until oldTo) {
-            if (t in newFrom until newTo) continue
-            if (t < 0 || t >= size) continue
-            val u = usage[t]
-            val nu = u - r
-            usage[t] = nu
-            deltaOv += max(0, nu - cap) - max(0, u - cap)
-        }
-        for (t in newFrom until newTo) {
-            if (t in oldFrom until oldTo) continue
-            if (t < 0 || t >= size) continue
-            val u = usage[t]
-            val nu = u + r
-            usage[t] = nu
-            deltaOv += max(0, nu - cap) - max(0, u - cap)
-        }
+        forEachStartShiftSlot(
+            ls,
+            oldStart,
+            newStart,
+            d,
+            onRemove = { t ->
+                val u = usage[t]
+                val nu = u - r
+                usage[t] = nu
+                deltaOv += max(0, nu - cap) - max(0, u - cap)
+            },
+            onAdd = { t ->
+                val u = usage[t]
+                val nu = u + r
+                usage[t] = nu
+                deltaOv += max(0, nu - cap) - max(0, u - cap)
+            },
+        )
         ls.overage += deltaOv
     }
 
