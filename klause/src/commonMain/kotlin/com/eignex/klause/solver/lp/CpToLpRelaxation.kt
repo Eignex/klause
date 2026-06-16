@@ -17,6 +17,7 @@ import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
@@ -82,8 +83,10 @@ internal class CpToLpRelaxation(
     /** When true, materialize columns for variables of cut-eligible globals (AllDifferent) so a
      *  [CutSeparator] can write cuts over them, even when no other factor references the variable. */
     private val generateCuts: Boolean = false,
-    /** When true, build the arc-indicator relaxation of each Circuit (degree + channelling rows) so
-     *  [CircuitSeparator] can separate subtour-elimination cuts. Adds O(n²) columns, so it is gated. */
+    /** When true, build the arc-indicator relaxation of each Circuit / Subcircuit (degree + channelling
+     *  rows). For Circuit it also feeds [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets
+     *  only the sound permutation relaxation (the Hamiltonian SEC is unsound there). Adds O(n²) columns,
+     *  so it is gated. */
     private val circuitArcs: Boolean = false,
     /** When true, linearize each constant-array Element with a one-hot selector model (its exact
      *  convex hull). Adds O(len) columns, so it is gated; variable arrays are skipped. */
@@ -604,7 +607,10 @@ internal class CpToLpRelaxation(
                     }
                 }
                 if (circuitArcs) {
-                    for (factor in problem.factors) if (factor is Circuit) buildCircuitArcs(factor)
+                    for (factor in problem.factors) {
+                        if (factor is Circuit) buildCircuitArcs(factor)
+                        if (factor is Subcircuit) buildSubcircuitArcs(factor)
+                    }
                 }
                 if (elementHull) {
                     for (factor in problem.factors) if (factor is Element) buildElementHull(factor)
@@ -737,15 +743,32 @@ internal class CpToLpRelaxation(
          * LP tableau would dominate); gating on arc count rather than n lets large sparse graphs
          * through (#431). Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
          */
-        private fun buildCircuitArcs(factor: Circuit) {
-            val succ = factor.succ
+        private fun buildCircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = false, sec = true)
+
+        /**
+         * Arc-indicator relaxation of one [Subcircuit] over `succ[0..n)`. As [buildCircuitArcs] but the
+         * self-loop arc `y_ii` (= "node i is excluded") is a candidate, so the degree + channel rows
+         * describe the **permutation** polytope (each node has exactly one in- and out-arc, fixed points
+         * allowed) — a sound assignment relaxation of the routing cost. **No subtour-elimination model is
+         * registered**: the Hamiltonian SEC `Σ_{i∈S,j∉S} y_ij ≥ 1` is *unsound* for a subcircuit (an
+         * all-excluded subset legitimately has no leaving arc). A subcircuit-correct SEC is a follow-up.
+         */
+        private fun buildSubcircuitArcs(factor: Subcircuit) = buildArcModel(factor.succ, selfLoops = true, sec = false)
+
+        /**
+         * Shared degree + channel arc model for [Circuit] / [Subcircuit]: a column `y_ij ∈ [0,1]` per
+         * candidate arc (pinned to 0 when `j` left the live domain), out-degree `Σ_j y_ij = 1`, in-degree
+         * `Σ_i y_ij = 1`, and channel `Σ_j j·y_ij = succ[i]`. [selfLoops] keeps the `j = i` arc (subcircuit
+         * exclusion). When [sec] is true the arc model is recorded for the subtour separator (circuit only).
+         */
+        private fun buildArcModel(succ: IntArray, selfLoops: Boolean, sec: Boolean) {
             val n = succ.size
             if (n < 2) return
             // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
             // graphs (small per-node successor domains) are not skipped by a blunt node cap.
             var arcCount = 0
             for (i in 0 until n) {
-                problem.intDomains[succ[i]].forEach { j -> if (j != i && j in 0 until n) arcCount++ }
+                problem.intDomains[succ[i]].forEach { j -> if ((selfLoops || j != i) && j in 0 until n) arcCount++ }
             }
             if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
             val tails = IntArrayList()
@@ -759,7 +782,7 @@ internal class CpToLpRelaxation(
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
                 problem.intDomains[succ[i]].forEach { j ->
-                    if (j == i || j < 0 || j >= n) return@forEach
+                    if ((!selfLoops && j == i) || j < 0 || j >= n) return@forEach
                     val present = live.contains(j)
                     val col = auxColumn(0L, if (present) 1L else 0L)
                     outCols.add(col)
@@ -790,7 +813,7 @@ internal class CpToLpRelaxation(
                     builder.addRow(inCols.toIntArray(), LongArray(inCols.size) { 1L }, Relation.EQ, 1L)
                 }
             }
-            circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
+            if (sec) circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
         /**

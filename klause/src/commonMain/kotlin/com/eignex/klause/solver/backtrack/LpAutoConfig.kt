@@ -16,6 +16,7 @@ import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
@@ -151,6 +152,8 @@ object LpAutoConfig {
 
                 is Circuit -> circuit = true
 
+                is Subcircuit -> circuit = true
+
                 is Element -> if (!f.arrIsVars) constArrayElement = true
 
                 is Table -> table = true
@@ -274,18 +277,25 @@ object LpAutoConfig {
         return accepted
     }
 
-    /** Circuit arc-model columns (`Σ` candidate arcs) + degree/channel rows, over the under-cap
-     *  [Circuit] factors (mirrors `CpToLpRelaxation.buildCircuitArcs`). */
+    /** Arc-model columns (`Σ` candidate arcs) + degree/channel rows over the under-cap [Circuit] /
+     *  [Subcircuit] factors (mirrors `CpToLpRelaxation.buildArcModel`; subcircuit keeps self-loop arcs). */
     private fun circuitEstimate(problem: Problem): HullEstimate? {
         var cols = 0L
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            if (f !is Circuit) continue
-            val n = f.succ.size
+            val succ = when (f) {
+                is Circuit -> f.succ
+                is Subcircuit -> f.succ
+                else -> continue
+            }
+            val selfLoops = f is Subcircuit
+            val n = succ.size
             if (n < 2) continue
             var arcs = 0L
-            for (i in 0 until n) problem.intDomains[f.succ[i]].forEach { j -> if (j != i && j in 0 until n) arcs++ }
+            for (i in 0 until n) {
+                problem.intDomains[succ[i]].forEach { j -> if ((selfLoops || j != i) && j in 0 until n) arcs++ }
+            }
             if (arcs == 0L || arcs > CpToLpRelaxation.MAX_CIRCUIT_ARCS) continue
             any = true
             cols += arcs
