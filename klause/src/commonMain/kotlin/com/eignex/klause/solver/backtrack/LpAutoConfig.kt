@@ -25,6 +25,7 @@ import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.CumulativeRelaxation
 import com.eignex.klause.solver.lp.schedulingViews
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -414,13 +415,13 @@ object LpAutoConfig {
             if (f !is Regular) continue
             val len = f.seq.size
             val s = f.alphabetSize
-            val reach = HashSet<Int>().also { it.add(f.q0) }
+            val reach = IntHashSet().also { it.add(f.q0) }
             var arcs = 0L
             var ok = true
             for (t in 0 until len) {
                 val dom = problem.intDomains[f.seq[t]]
-                val next = HashSet<Int>()
-                for (state in reach) {
+                val next = IntHashSet()
+                reach.forEach { state ->
                     dom.forEach { sym ->
                         if (sym in 1..s) {
                             val nx = f.transitions[(state - 1) * s + (sym - 1)]
@@ -436,7 +437,7 @@ object LpAutoConfig {
                     break
                 }
                 reach.clear()
-                reach.addAll(next)
+                next.forEach { reach.add(it) }
             }
             if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_REGULAR_ARCS) continue
             any = true
@@ -456,12 +457,12 @@ object LpAutoConfig {
             if (f !is Mdd) continue
             val n = f.seq.size
             val stride = f.recordStride
-            val reach = HashSet<Int>().also { it.add(f.initial) }
+            val reach = IntHashSet().also { it.add(f.initial) }
             var arcs = 0L
             var ok = true
             for (layer in 0 until n) {
                 val dom = problem.intDomains[f.seq[layer]]
-                val next = HashSet<Int>()
+                val next = IntHashSet()
                 var p = f.layerStarts[layer]
                 val end = f.layerStarts[layer + 1]
                 while (p < end) {
@@ -476,7 +477,7 @@ object LpAutoConfig {
                     break
                 }
                 reach.clear()
-                reach.addAll(next)
+                next.forEach { reach.add(it) }
             }
             if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_MDD_ARCS) continue
             any = true
