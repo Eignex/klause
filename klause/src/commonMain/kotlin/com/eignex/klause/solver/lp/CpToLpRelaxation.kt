@@ -14,7 +14,9 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.NValue
 import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
@@ -482,6 +484,104 @@ internal class CpToLpRelaxation(
             }
         }
 
+        /** The Boolean fan-in of a reified weighted sum folded over its columns: `Σ coeffs·x_col +
+         *  constant`, with the declared `[lMin, lMax]` range of the `Σ coeffs·x_col` part over `x ∈ [0,1]`.
+         *  A negative literal `w·(1 − x)` folds to coefficient `−w` and `+w` into the constant. */
+        private inner class BoolSum(
+            val cols: IntArray,
+            val coeffs: LongArray,
+            val constant: Long,
+            val lMin: Long,
+            val lMax: Long,
+        )
+
+        private fun boolSum(literals: IntArray, weights: IntArray?): BoolSum {
+            val coeffByCol = LinkedHashMap<Int, Long>()
+            var constant = 0L
+            for (k in literals.indices) {
+                val lit = literals[k]
+                val w = (weights?.get(k) ?: 1).toLong()
+                val col = boolColumn(Lit.variable(lit))
+                val c = if (Lit.isPositive(lit)) w else -w
+                if (!Lit.isPositive(lit)) constant = addExact(constant, w)
+                coeffByCol[col] = addExact(coeffByCol.getOrElse(col) { 0L }, c)
+            }
+            val cols = IntArray(coeffByCol.size)
+            val coeffs = LongArray(coeffByCol.size)
+            var lMin = 0L
+            var lMax = 0L
+            var i = 0
+            for ((col, c) in coeffByCol) {
+                cols[i] = col
+                coeffs[i] = c
+                i++
+                if (c >= 0L) lMax = addExact(lMax, c) else lMin = addExact(lMin, c)
+            }
+            return BoolSum(cols, coeffs, constant, lMin, lMax)
+        }
+
+        /** Emit `Σ sum.coeffs·x + auxCoeff·x_aux  rel  rhs`. The big-M rests on the *declared* `[0,1]`
+         *  literal ranges, so the row holds at every solution — globally valid (and cacheable), unlike
+         *  the live-big-M [reifiedRows]; no [LpRowPremises] are needed. */
+        private fun boolReifiedRow(sum: BoolSum, auxCol: Int, auxCoeff: Long, rel: Relation, rhs: Long) {
+            val cols = sum.cols.copyOf(sum.cols.size + 1)
+            val vals = sum.coeffs.copyOf(sum.coeffs.size + 1)
+            cols[sum.cols.size] = auxCol
+            vals[sum.coeffs.size] = auxCoeff
+            builder.addRow(cols, vals, rel, rhs)
+        }
+
+        /**
+         * Indicator rows for `auxBoolVar ↔ (Σ weights·lit ⟨op⟩ bound)` over Boolean literals — the
+         * pseudo-Boolean analogue of [reifiedRows]. The big-M comes from the declared `[0,1]` ranges
+         * (so the rows are global), and for `EQ` only the `aux = 1 ⇒ L = bound` direction is emitted
+         * (its complement is a disjunction with no single LP cut), mirroring [reifiedRows].
+         */
+        private fun reifiedPbRows(rpb: ReifiedPseudoBoolean) {
+            val sum = boolSum(rpb.literals, rpb.weights)
+            val a = boolColumn(rpb.auxBoolVar)
+            val bound = subExact(rpb.bound.toLong(), sum.constant)
+            when (rpb.op) {
+                PbOp.LE -> {
+                    val m1 = maxOf(0L, subExact(sum.lMax, bound)) // aux=1 ⇒ L ≤ bound
+                    boolReifiedRow(sum, a, m1, Relation.LE, addExact(bound, m1))
+                    val m2 = maxOf(0L, subExact(addExact(bound, 1L), sum.lMin)) // aux=0 ⇒ L ≥ bound+1
+                    boolReifiedRow(sum, a, m2, Relation.GE, addExact(bound, 1L))
+                }
+
+                PbOp.GE -> {
+                    val m1 = maxOf(0L, subExact(bound, sum.lMin)) // aux=1 ⇒ L ≥ bound
+                    boolReifiedRow(sum, a, -m1, Relation.GE, subExact(bound, m1))
+                    val m2 = maxOf(0L, subExact(sum.lMax, subExact(bound, 1L))) // aux=0 ⇒ L ≤ bound-1
+                    boolReifiedRow(sum, a, -m2, Relation.LE, subExact(bound, 1L))
+                }
+
+                PbOp.EQ -> {
+                    val mHi = maxOf(0L, subExact(sum.lMax, bound)) // aux=1 ⇒ L ≤ bound
+                    boolReifiedRow(sum, a, mHi, Relation.LE, addExact(bound, mHi))
+                    val mLo = maxOf(0L, subExact(bound, sum.lMin)) // aux=1 ⇒ L ≥ bound
+                    boolReifiedRow(sum, a, -mLo, Relation.GE, subExact(bound, mLo))
+                }
+            }
+        }
+
+        /**
+         * Indicator rows for `auxBoolVar ↔ (min ≤ #true literals ≤ max)`. Only the
+         * `aux = 1 ⇒ (count ≥ min ∧ count ≤ max)` direction yields LP cuts (the `aux = 0` side is the
+         * disjunction `count < min ∨ count > max`, whose hull is the whole interval), so two rows are
+         * emitted, big-M'd from the declared `[0,1]` ranges (globally valid).
+         */
+        private fun reifiedCardRows(rc: ReifiedCardinality) {
+            val sum = boolSum(rc.literals, weights = null)
+            val a = boolColumn(rc.auxBoolVar)
+            val lo = subExact(rc.min.toLong(), sum.constant)
+            val hi = subExact(rc.max.toLong(), sum.constant)
+            val mHi = maxOf(0L, subExact(sum.lMax, hi)) // aux=1 ⇒ count ≤ max
+            boolReifiedRow(sum, a, mHi, Relation.LE, addExact(hi, mHi))
+            val mLo = maxOf(0L, subExact(lo, sum.lMin)) // aux=1 ⇒ count ≥ min
+            boolReifiedRow(sum, a, -mLo, Relation.GE, subExact(lo, mLo))
+        }
+
         fun assemble(extraCuts: List<Cut>): LpRelaxation {
             // Materialize objective-only variables first so the relaxed objective is complete.
             objective?.let { obj ->
@@ -534,6 +634,12 @@ internal class CpToLpRelaxation(
                         reifiedRows(factor)
                         for (r in start until builder.rowCount) reifiedRowIdx.add(r)
                     }
+
+                    // Reified Boolean sums use declared-[0,1] big-M, so their rows are global /
+                    // bound-invariant (cacheable) — not added to reifiedRowIdx.
+                    is ReifiedPseudoBoolean -> reifiedPbRows(factor)
+
+                    is ReifiedCardinality -> reifiedCardRows(factor)
 
                     is Cardinality -> {
                         addBoolRow(factor.literals, null, Relation.GE, factor.min.toLong())
