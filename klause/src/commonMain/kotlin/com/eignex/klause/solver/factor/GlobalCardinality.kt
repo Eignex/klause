@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
@@ -925,5 +926,127 @@ class GlobalCardinality(
                 }
             }
         }
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: swap the values of two present `xs` positions. Every
+     *  cover value's count is unchanged (one position loses it, another gains it), so all bound /
+     *  count-var obligations and the closed check are preserved while the assignment is perturbed —
+     *  which can clear a clash in a coupled constraint sharing one of those variables. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (xs.size < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val ai = state.rng.nextInt(xs.size)
+            val bi = state.rng.nextInt(xs.size)
+            val a = xs[ai]
+            val b = xs[bi]
+            if (a == b) continue
+            if (!present(state, ai) || !present(state, bi)) continue
+            val va = state.assignment.intValue(a)
+            val vb = state.assignment.intValue(b)
+            if (va == vb) continue
+            if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) continue
+            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+            emitted++
+        }
+    }
+
+    /** Feasible init: assign present `xs` to cover values meeting every lower bound without
+     *  exceeding an upper bound (bound form) or any in-domain cover value (count-var form, then
+     *  the count vars are set to the realised counts). Frozen vars keep their value and are
+     *  counted first. Returns false — leaving the random assignment — if no feasible assignment is
+     *  reachable greedily. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val counts = IntArray(cover.size)
+        val free = IntArrayList()
+        for (i in xs.indices) {
+            if (!present(state, i)) continue
+            if (state.assumptions.isFrozenInt(xs[i])) {
+                val idx = coverIndexByValue[state.assignment.intValue(xs[i])]
+                if (idx >= 0) counts[idx]++ else if (closed) return false
+            } else {
+                free.add(i)
+            }
+        }
+        val assigned = BooleanArray(xs.size)
+        if (countVars == null) {
+            val lo = requireNotNull(countLow)
+            val hi = requireNotNull(countHigh)
+            for (k in cover.indices) {
+                while (counts[k] < lo[k]) {
+                    val pos = takeFreeFor(state, free, assigned, cover[k]) ?: return false
+                    state.assignment.setInt(xs[pos], cover[k])
+                    counts[k]++
+                }
+            }
+            for (fi in 0 until free.size) {
+                val pos = free[fi]
+                if (assigned[pos]) continue
+                val pick = pickUnderHigh(state, xs[pos], counts, hi) ?: return false
+                state.assignment.setInt(xs[pos], pick)
+                val idx = coverIndexByValue[pick]
+                if (idx >= 0) counts[idx]++
+            }
+        } else {
+            for (fi in 0 until free.size) {
+                val pos = free[fi]
+                val pick = firstCoverInDomain(state, xs[pos])
+                    ?: if (closed) return false else firstInDomain(state, xs[pos])
+                state.assignment.setInt(xs[pos], pick)
+                val idx = coverIndexByValue[pick]
+                if (idx >= 0) counts[idx]++
+            }
+            for (k in cover.indices) {
+                val cv = countVars[k]
+                if (state.assumptions.isFrozenInt(cv)) {
+                    if (state.assignment.intValue(cv) != counts[k]) return false
+                } else {
+                    if (counts[k] !in state.problem.intDomains[cv]) return false
+                    state.assignment.setInt(cv, counts[k])
+                }
+            }
+        }
+        return true
+    }
+
+    /** First unassigned free position whose domain contains [value]; marks it assigned. */
+    private fun takeFreeFor(state: LocalSearchState, free: IntArrayList, assigned: BooleanArray, value: Int): Int? {
+        for (fi in 0 until free.size) {
+            val pos = free[fi]
+            if (assigned[pos]) continue
+            if (value in state.problem.intDomains[xs[pos]]) {
+                assigned[pos] = true
+                return pos
+            }
+        }
+        return null
+    }
+
+    /** A cover value still under its high whose domain contains it, for filling a free position. */
+    private fun pickUnderHigh(state: LocalSearchState, varId: Int, counts: IntArray, hi: IntArray): Int? {
+        for (k in cover.indices) {
+            if (counts[k] < hi[k] && cover[k] in state.problem.intDomains[varId]) return cover[k]
+        }
+        return if (closed) null else firstInDomain(state, varId)
+    }
+
+    private fun firstCoverInDomain(state: LocalSearchState, varId: Int): Int? {
+        val d = state.problem.intDomains[varId]
+        for (cv in cover) if (cv in d) return cv
+        return null
+    }
+
+    private fun firstInDomain(state: LocalSearchState, varId: Int): Int = state.problem.intDomains[varId].min
+
+    private companion object {
+        /** Cap on `xs` value-swap compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 6
     }
 }
