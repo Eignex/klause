@@ -21,6 +21,48 @@ internal object ExactBasisCertifier {
     /** Exact ceil of the objective lower bound `⌈L(y)⌉`, a valid integer lower bound, or null. */
     fun lowerBoundCeil(model: LpModel, basis: Basis): Long? = lagrangian(model, basis)?.ceil()?.toLongOrNull()
 
+    /**
+     * Certified-exact quantities at a (float-found) optimal [basis], for the sparse path's
+     * reduced-cost fixing / objective-bound reasons (#705): the exact objective lower bound
+     * ([Certificate.objective] — tight at an optimal basis, i.e. the LP optimum), each variable's
+     * reduced cost (`0` for basic columns), and which rows carry nonzero dual weight. Null when the
+     * dual system is singular (bad float basis) or a negative reduced cost meets an infinite upper
+     * bound (unbounded Lagrangian) — the caller then skips fixing, which is sound.
+     */
+    fun certify(model: LpModel, basis: Basis): Certificate? {
+        val m = model.m
+        val basic = basis.basicVars
+        val y = solveDual(model, basic) ?: return null
+        var l = BigRational.ZERO
+        for (i in 0 until m) l += y[i] * BigRational.of(model.rhs[i])
+        val nonBasic = BooleanArray(model.numVars) { true }
+        for (t in 0 until m) nonBasic[basic[t]] = false
+        val reducedCost = Array(model.numVars) { BigRational.ZERO }
+        for (j in 0 until model.numVars) {
+            if (!nonBasic[j]) continue
+            var dot = BigRational.ZERO
+            forEachFullColumn(model, j) { i, a -> dot += y[i] * BigRational.of(a) }
+            val dj = BigRational.of(model.cost[j]) - dot // reduced cost c_j − yᵀA_j
+            reducedCost[j] = dj
+            if (dj.signum() < 0) {
+                if (!model.hasUpper[j]) return null // unbounded below
+                l += dj * BigRational.of(model.upper[j])
+            }
+        }
+        val dualNonzeroRow = BooleanArray(m) { y[it].signum() != 0 }
+        return Certificate(l + BigRational.of(model.objConstant), reducedCost, dualNonzeroRow)
+    }
+
+    /** Exact LP-optimum data certified from an optimal [Basis]: see [certify]. */
+    class Certificate(
+        /** The exact objective lower bound, tight at an optimal basis (= the LP optimum). */
+        val objective: BigRational,
+        /** Per-variable reduced cost `c_j − yᵀA_j`; `0` for basic columns. */
+        val reducedCost: Array<BigRational>,
+        /** Whether row `i` carries nonzero dual weight (for non-global-row premise citation). */
+        val dualNonzeroRow: BooleanArray,
+    )
+
     private fun lagrangian(model: LpModel, basis: Basis): BigRational? {
         val m = model.m
         val basic = basis.basicVars

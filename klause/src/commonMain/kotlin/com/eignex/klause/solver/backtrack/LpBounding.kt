@@ -26,6 +26,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -293,7 +295,88 @@ internal fun BacktrackSolver.sparseSafePrune(
             return LpNodeOutcome(true, null)
         }
     }
+    // Reduced-cost fixing (#21) on the exact certified reduced costs — needs a finite incumbent for
+    // the improving gap, so it runs only when pruning is possible. The exact certify is the per-node
+    // cost the sparse path pays for fixing parity with the dense path (#705 slice 2).
+    if (canPrune) {
+        val cert = ExactBasisCertifier.certify(relaxation.model, result.basis)
+        if (cert != null && applySparseReducedCostFixing(relaxation, cert, result.basis, session, bound, sink)) {
+            return LpNodeOutcome(true, null)
+        }
+    }
     return LpNodeOutcome(false, null)
+}
+
+/**
+ * Reduced-cost fixing (#21) for the sparse path, from the exact [ExactBasisCertifier.Certificate].
+ * Mirrors [applyReducedCostFixing] but over exact rationals, and **reason-less** — a sound
+ * level-local tightening that conflict analysis treats as a leaf (the learnable reduced-cost reason
+ * on the revised basis is a later #705 slice). At the LP optimum a nonbasic column sits at a bound;
+ * moving it Δ integer steps raises the objective by `|reducedCost|·Δ`, and any incumbent-beating
+ * solution has objective `≤ ⌈bound⌉ − 1`, so the column can move at most
+ * `floor((improvingMax − lpOptimum) / |reducedCost|)` steps before it alone overshoots. Returns true
+ * if a reduction empties a domain (the node is then infeasible and pruned).
+ */
+internal fun BacktrackSolver.applySparseReducedCostFixing(
+    relaxation: LpRelaxation,
+    cert: ExactBasisCertifier.Certificate,
+    basis: Basis,
+    session: PropagationSession,
+    bound: Double,
+    sink: SolveStatsSink,
+): Boolean {
+    val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
+    val slack = BigRational.of(improvingMax) - cert.objective // exact gap; ≥ 0 (node not bound-pruned)
+    if (slack.signum() < 0) return false
+    val status = basis.status
+    for (col in relaxation.colVarId.indices) {
+        val st = status[col]
+        if (st == VarStatus.BASIC) continue
+        val varId = relaxation.colVarId[col]
+        if (varId < 0) continue // auxiliary column — no CP variable to fix
+        val isBool = relaxation.colIsBool[col]
+        if (isBool && session.boolValue(varId) != null) continue
+        val liveMin: Long
+        val liveMax: Long
+        if (isBool) {
+            liveMin = 0L
+            liveMax = 1L
+        } else {
+            val d = session.intDomain(varId)
+            liveMin = d.min.toLong()
+            liveMax = d.max.toLong()
+        }
+        if (liveMin == liveMax) continue
+        val span = liveMax - liveMin
+        val dj = cert.reducedCost[col]
+        val res = when (st) {
+            // At lower bound: reducedCost ≥ 0; it can rise at most floor(slack / d) steps.
+            VarStatus.AT_LOWER -> {
+                if (dj.signum() <= 0) continue
+                val dMaxBig = (slack / dj).floor()
+                if (dMaxBig >= BigInt.of(span)) continue
+                val dMax = dMaxBig.toLongOrNull() ?: continue // overflow ⇒ skip (sound)
+                if (isBool) session.implyBool(varId, false) else session.implyIntAtMost(varId, (liveMin + dMax).toInt())
+            }
+
+            // At upper bound: reducedCost ≤ 0; symmetric, tighten the lower bound.
+            VarStatus.AT_UPPER -> {
+                if (dj.signum() >= 0) continue
+                val dMaxBig = (slack / (BigRational.ZERO - dj)).floor()
+                if (dMaxBig >= BigInt.of(span)) continue
+                val dMax = dMaxBig.toLongOrNull() ?: continue
+                if (isBool) session.implyBool(varId, true) else session.implyIntAtLeast(varId, (liveMax - dMax).toInt())
+            }
+
+            VarStatus.BASIC -> continue
+        }
+        if (res is PropagationResult.Unsat) {
+            sink.observeLpPrune()
+            return true
+        }
+        sink.observeLpFix()
+    }
+    return false
 }
 
 /**
