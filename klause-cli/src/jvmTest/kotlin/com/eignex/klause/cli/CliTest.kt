@@ -151,6 +151,24 @@ class CliTest {
     }
 
     @Test
+    fun `ls-single recipe axes select sources scoring and acceptance`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        // Each four-axis recipe builds a SourceDrivenStrategy as the naked ls-single engine (#722).
+        for (recipe in listOf(
+            arrayOf("--param", "sources=violated,argmin", "--param", "acceptance=walksat", "--param", "noise=0.2"),
+            arrayOf("--param", "sources=violated,frontier", "--param", "scoring=raw", "--param", "acceptance=greedy"),
+            arrayOf("--param", "sources=argmin", "--param", "acceptance=probsat", "--param", "cb=2.0"),
+        )) {
+            val out = capture { main(arrayOf("-e", "ls-single", "-t", "5000") + recipe + fzn.absolutePath) }
+            assertTrue("x = " in out, out)
+            assertTrue("----------" in out, out)
+        }
+    }
+
+    @Test
     fun `portfolio engine solves with explicit worker counts`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
