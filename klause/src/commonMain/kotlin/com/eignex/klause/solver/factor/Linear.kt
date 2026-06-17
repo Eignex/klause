@@ -302,9 +302,13 @@ class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int
  * Allocates `atomVarEq` atoms on demand for each cited hole. Returns `null` when nothing is
  * tighter than the original (caller falls back to default antecedents).
  */
-internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntArray): IntArray? {
+internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntArray, extraLit: Int = 0): IntArray? {
     val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
+    if (extraLit != 0) {
+        out.add(extraLit)
+        seen.add(extraLit)
+    }
     // Sweep-prefix tightening: collect *only* antecedents tied to decision levels > 0 when
     // any such exist in scope. A var with `intLevel[v] <= 0` was tightened at root level —
     // its restriction is a global fact that the resolution analyzer would minimize out

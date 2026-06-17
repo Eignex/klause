@@ -246,14 +246,18 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             return finalizeClause(learned, currentLevel)
         }
 
-        var pinIdx = state.boolPinOrder.size - 1
         while (true) {
-            // Pick a current-level pivot: prefer the most-recent bool from the pin trail
-            // (1UIP canonical order); if none, fall back to any atom-var at currentLevel.
+            // Pick the most-recent still-seen current-level literal — reverse-assignment order, the
+            // canonical 1UIP pivot. The unified pin trail is rescanned from the top each iteration
+            // rather than walked by a monotonically-decreasing cursor: under single establishment
+            // ([wakeAtom]) every determined order literal carries exactly one trail entry at the level
+            // its truth was decided, and a reason only cites earlier-established (lower-position)
+            // literals, so the rescan always converges and never strands a literal that entered the
+            // frontier behind a cursor — the residual non-asserting pathology a monotonic cursor left
+            // (#612). Resolved / lower-level literals (`seen` cleared) are skipped.
             var pivot = -1
-            while (pinIdx >= 0) {
-                val v = state.boolPinOrder[pinIdx]
-                pinIdx--
+            for (i in state.boolPinOrder.size - 1 downTo 0) {
+                val v = state.boolPinOrder[i]
                 if (!seen[v]) continue
                 val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
                 if (lvl == currentLevel) {
@@ -262,12 +266,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 }
             }
             if (pivot < 0) {
-                // Look for an atom pivot at currentLevel. Use the bound-history-derived level
-                // (not the drifted [atomLevel]) so a stale level can't hide a genuine
-                // current-level pivot or surface a spurious one. Scan only the seen-atom
-                // frontier, not all `atomCount` atoms — the bound-history level lookup is the
-                // dominant cost on int-only models, so O(frontier) ≪ O(total atoms). Stale
-                // (no-longer-seen) and duplicate entries are skipped by the `seen[v]` recheck.
+                // Fallback for an atom materialised mid-analysis — cited by a derived reason, never
+                // woken, hence absent from the pin trail. Scan the seen-atom frontier by its
+                // bound-history-derived level (not the drifted [atomLevel]). Stale / duplicate entries
+                // are skipped by the `seen[v]` recheck.
                 for (k in 0 until seenAtomList.size) {
                     val v = seenAtomList[k]
                     if (seen[v] && cachedAtomLevel(v - numBoolVars) == currentLevel) {
