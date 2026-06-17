@@ -401,7 +401,7 @@ class IntDomainTest {
         // cross-check every inspection / mutation against a HashSet oracle. Uses bulk excludeValues
         // (O(span)) rather than one-at-a-time folding, so spans can be wide while staying fast.
         val rng = Random(0x5A17)
-        repeat(60) {
+        repeat(60) { _ ->
             val lo = rng.nextInt(0, 1000)
             val width = rng.nextInt(IntDomain.BITSET_THRESHOLD + 1, 20_000)
             val hi = lo + width
