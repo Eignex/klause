@@ -3,10 +3,14 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
-import com.eignex.klause.solver.localsearch.proposeRepairChains
-import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.solver.localsearch.movesource.EjectionChains
+import com.eignex.klause.solver.localsearch.movesource.Frontier
+import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
+import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
+import com.eignex.klause.solver.localsearch.movesource.StallKick
+import com.eignex.klause.solver.localsearch.movesource.StallSwaps
+import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 
 /**
  * Constraint-Based Local Search strategy. Unlike SAT-family strategies ([ProbSat],
@@ -100,8 +104,8 @@ class Cbls(
      *  explicitly on permutation/assignment-shaped problems. */
     val stallSwapCap: Int = 0,
     /** **Ejection chains** (opt-in, `0` = off): cap on stall-gated directed repair-chain
-     *  compounds injected per stalled [pickMove] (see
-     *  [LocalSearchState.proposeRepairChains]). Where [stallSwapCap] hard-codes the one
+     *  compounds injected per stalled [pickMove] (see [EjectionChains]). Where [stallSwapCap]
+     *  hard-codes the one
      *  coordinated shape assignment plateaus need (a same-domain pair swap), chains *derive*
      *  the coordinated move from the break structure: apply a violated factor's repair,
      *  find the factor it newly regressed, append that factor's best eligible repair, and
@@ -391,139 +395,43 @@ class Cbls(
         for (i in w.indices) w[i] = keep * w[i] + smoothFactor * baseWeight * base[i]
     }
 
+    /** Violated-factor repair source backing [sampleFromViolated]. The duplicated draw loop now
+     *  lives in [ViolatedRepairs] (epic #710); this strategy supplies its `violatedSampleCount`. */
+    private val violatedRepairs = ViolatedRepairs(violatedSampleCount)
+
+    /** Plateau-escape frontier source backing [sampleFrontier] — see [Frontier]. */
+    private val frontier = Frontier(violatedSampleCount, frontierMoveCap)
+
     private fun sampleFromViolated(state: LocalSearchState, sink: MoveSink) {
-        if (state.violated.isEmpty()) return
-        repeat(minOf(violatedSampleCount, state.violated.size)) {
-            val fid = state.violated.random(state.rng)
-            state.factors[fid].proposeRepairMoves(state, fid, sink)
-        }
+        violatedRepairs.generate(MoveGenContext(state), sink)
     }
 
     /** **Frontier moves** for plateau escape: when the search is trapped, the violated-only
      *  repair pool can't get out — every repair of a violated factor breaks a *satisfied
      *  neighbour*, and the moves that would first re-arrange those neighbours are never
-     *  generated (satisfied factors are sampled only at feasibility). This injects bounded
+     *  generated (satisfied factors are sampled only at feasibility). [Frontier] injects bounded
      *  ±1 / bool-flip moves on the variables of factors that *neighbour* a violated factor
      *  (share a variable), giving the search — together with the raised stall noise — moves
      *  to step through the basin wall. Capped at [frontierMoveCap] per call. */
     private fun sampleFrontier(state: LocalSearchState, sink: MoveSink) {
-        if (state.violated.isEmpty()) return
-        val problem = state.problem
-        var budget = frontierMoveCap
-        repeat(minOf(violatedSampleCount, state.violated.size)) {
-            if (budget <= 0) return
-            val fid = state.violated.random(state.rng)
-            val f = state.factors[fid]
-            for (v in f.intVars) {
-                for (nf in problem.intOccurrences[v]) {
-                    if (nf == fid) continue
-                    budget = addNeighbourMoves(state, sink, nf, budget)
-                    if (budget <= 0) return
-                }
-            }
-            for (v in f.boolVars) {
-                for (nf in problem.boolOccurrences[v]) {
-                    if (nf == fid) continue
-                    budget = addNeighbourMoves(state, sink, nf, budget)
-                    if (budget <= 0) return
-                }
-            }
-        }
+        frontier.generate(MoveGenContext(state), sink)
     }
 
-    /** Emit ±1 int-steps and bool flips for every variable of factor [nf], spending from and
-     *  returning the remaining [budget]. */
-    private fun addNeighbourMoves(state: LocalSearchState, sink: MoveSink, nf: Int, budget: Int): Int {
-        var b = budget
-        val nfac = state.factors[nf]
-        for (u in nfac.intVars) {
-            if (b <= 0) return b
-            val cur = state.assignment.intValue(u)
-            val d = state.problem.intDomains[u]
-            if (cur < d.max) {
-                sink.addChannelingIntSet(state, u, cur + 1)
-                b--
-            }
-            if (b <= 0) return b
-            if (cur > d.min) {
-                sink.addChannelingIntSet(state, u, cur - 1)
-                b--
-            }
-        }
-        for (u in nfac.boolVars) {
-            if (b <= 0) return b
-            sink.addBoolFlip(u)
-            b--
-        }
-        return b
-    }
+    /** Plateau-buster swap source backing [sampleStallSwaps] — see [StallSwaps]. */
+    private val stallSwaps = StallSwaps(stallSwapCap)
 
-    /** Stall-gated int-pair swap proposals (see [stallSwapCap]). Randomized draws: pick a
-     *  violated factor, take one of its int vars `u`, and pair it with either another var of
-     *  the same factor or a var of a frontier (variable-sharing) factor. A legal swap needs
-     *  differing values and cross-compatible domains; the [MoveSink] handles frozen-var
-     *  filtering and dedup. Scored like any candidate — a swap that repairs the violated
-     *  factor while preserving its satisfied neighbours scores strictly negative, which is
-     *  exactly the signal the single-set pool can't produce on these plateaus. */
+    /** Ejection-chain source backing [sampleStallChains] — see [EjectionChains]. */
+    private val ejectionChains = EjectionChains(stallChainCap, stallChainDepth)
+
+    /** Objective-direction seed source backing [seedObjectiveMoves] — see [ObjectiveSeed]. */
+    private val objectiveSeed = ObjectiveSeed()
+
     private fun sampleStallSwaps(state: LocalSearchState, sink: MoveSink) {
-        if (stallSwapCap <= 0 || state.violated.isEmpty()) return
-        val rng = state.rng
-        val problem = state.problem
-        var budget = stallSwapCap
-        // Randomized rejection sampling; most draws on bool-only or single-var factors miss,
-        // so allow a few attempts per requested swap before giving up.
-        var attempts = stallSwapCap * ATTEMPTS_PER_SWAP
-        while (budget > 0 && attempts-- > 0) {
-            val fid = state.violated.random(rng)
-            val vars = state.factors[fid].intVars
-            if (vars.isEmpty()) continue
-            val u = vars[rng.nextInt(vars.size)]
-            val w = if (vars.size >= 2 && rng.nextBoolean()) {
-                vars[rng.nextInt(vars.size)]
-            } else {
-                val occ = problem.intOccurrences[u]
-                if (occ.isEmpty()) continue
-                val nvars = state.factors[occ[rng.nextInt(occ.size)]].intVars
-                if (nvars.isEmpty()) continue
-                nvars[rng.nextInt(nvars.size)]
-            }
-            if (w == u) continue
-            // The private swap sink bypasses the state sink's assumption filtering — check
-            // frozen vars explicitly (mirrors the engine's post-feasibility pairSwapStep).
-            if (state.assumptions.isFrozenInt(u) || state.assumptions.isFrozenInt(w)) continue
-            val du = problem.intDomains[u]
-            val dw = problem.intDomains[w]
-            // Same-shaped domains only: swaps target permutation/assignment structure
-            // (course→period style vars sharing one value range). Cross-domain swaps (e.g. a
-            // decision var against a derived load/count var) are semantically meaningless and
-            // measured to thrash the plateau rather than walk it.
-            if (du.min != dw.min || du.max != dw.max) continue
-            val vu = state.assignment.intValue(u)
-            val vw = state.assignment.intValue(w)
-            if (vu == vw) continue
-            if (vw !in du || vu !in dw) continue
-            sink.addCompound(listOf(Move.IntSet(u, vw), Move.IntSet(w, vu)))
-            budget--
-        }
+        stallSwaps.generate(MoveGenContext(state), sink)
     }
 
-    /** Stall-gated ejection-chain proposals (see [stallChainCap]): grow up to the cap of
-     *  directed repair chains from random violated seed factors, each chain entering the
-     *  score-only race as one atomic compound. Construction is delegated to
-     *  [LocalSearchState.proposeRepairChains]; this just spends the per-pick budget. */
     private fun sampleStallChains(state: LocalSearchState, sink: MoveSink) {
-        if (stallChainCap <= 0 || state.violated.isEmpty()) return
-        var budget = stallChainCap
-        repeat(minOf(stallChainCap, state.violated.size)) {
-            if (budget <= 0) return
-            val fid = state.violated.random(state.rng)
-            budget -= state.proposeRepairChains(
-                seedFactor = fid,
-                maxDepth = stallChainDepth,
-                firstMoveCap = CHAIN_FIRST_MOVES,
-                sink = sink,
-            )
-        }
+        ejectionChains.generate(MoveGenContext(state), sink)
     }
 
     /** Build one targeted kick (see [stallKickAfter]): a **random walk** over the
@@ -536,91 +444,35 @@ class Cbls(
      *  parasitic successor chain whose dangling tail is the only violation (the measured
      *  prize-collecting orbit shape). Returns null when nothing eligible. */
     private fun buildStallKick(state: LocalSearchState): Move? {
-        if (state.violated.isEmpty()) return null
-        val problem = state.problem
-        var factor = state.factors[state.violated.random(state.rng)]
-        // Reuse the strategy-private sink so frozen/defined filtering applies; channeling
-        // keeps indicator bools consistent with kicked int values.
         kickSink.clear()
-        kickSink.setAssumptions(state.assumptions)
-        kickSink.setInvariants(state.invariants)
-        var budget = stallKickVars
-        var attempts = stallKickVars * ATTEMPTS_PER_SWAP
-        while (budget > 0 && attempts-- > 0) {
-            // Step 1: a random variable of the current factor.
-            val nInts = factor.intVars.size
-            val nBools = factor.boolVars.size
-            if (nInts + nBools == 0) break
-            val pick = state.rng.nextInt(nInts + nBools)
-            val occ: IntArray
-            if (pick < nInts) {
-                val v = factor.intVars[pick]
-                val d = problem.intDomains[v]
-                val span = (d.max.toLong() - d.min.toLong()).toInt()
-                if (span > 0) {
-                    val nv = d.min + state.rng.nextInt(span + 1)
-                    if (nv != state.assignment.intValue(v)) {
-                        kickSink.addChannelingIntSet(state, v, nv)
-                        budget--
-                    }
-                }
-                occ = problem.intOccurrences[v]
-            } else {
-                val v = factor.boolVars[pick - nInts]
-                kickSink.addBoolFlip(v)
-                budget--
-                occ = problem.boolOccurrences[v]
-            }
-            // Step 2: hop to a random factor sharing that variable and continue the walk.
-            if (occ.isEmpty()) break
-            factor = state.factors[occ[state.rng.nextInt(occ.size)]]
-        }
-        // Flatten everything queued into one atomic perturbation, first-write-wins per slot.
-        val parts = ArrayList<Move>()
-        val seenSlots = IntHashSet()
-        fun addPart(p: Move) {
-            val slot = when (p) {
-                is Move.BoolFlip -> p.varId
-                is Move.IntSet -> state.problem.numBoolVars + p.varId
-                is Move.Compound -> return
-            }
-            if (seenSlots.add(slot)) parts.add(p)
-        }
-        for (m in kickSink.list) {
-            when (m) {
-                is Move.Compound -> for (p in m.parts) addPart(p)
-                else -> addPart(m)
-            }
-        }
-        return when (parts.size) {
-            0 -> null
-            1 -> parts[0]
-            else -> Move.Compound(parts)
-        }
+        stallKick.generate(MoveGenContext(state), kickSink)
+        return kickSink.list.firstOrNull()
     }
 
-    /** Private sink for [buildStallKick] proposals. */
+    /** Targeted-kick source backing [buildStallKick] — see [StallKick]. */
+    private val stallKick = StallKick(stallKickVars)
+
+    /** Read-back sink for [buildStallKick]: [StallKick] emits its one flattened perturbation here
+     *  and the strategy applies it directly (it is the certified-stuck escalation, not scored). */
     private val kickSink: MoveSink = MoveSink()
 
+    /** Satisfied-factor structured-move source backing [sampleFromSatisfied] — the random-sampling
+     *  variant of [SatisfiedStructured], which the minimize engine also uses (enumerate-all). */
+    private val satisfiedStructured = SatisfiedStructured.sampled(satisfiedSampleCount)
+
     private fun sampleFromSatisfied(state: LocalSearchState, sink: MoveSink) {
-        if (satisfiedSampleCount == 0) return
         // At infeasibility the structured-move source contributes nothing useful — its
         // moves only matter when the engine is already at cost==0 and looking for
         // objective-improving steps. Sampling here just dilutes the candidate pool while
-        // the search should be focused on closing violations.
+        // the search should be focused on closing violations. The source itself is
+        // Phase.Feasible; this gate is the (still per-strategy) enforcement of it.
         if (state.cost > 0) return
-        val total = state.problem.numFactors
-        if (total == 0) return
-        // Random sampling rather than enumerate-then-filter; the satisfied-vs-violated
-        // index isn't materialised, so a 4-random-probe-of-N approach is cheaper than
-        // walking everything.
-        repeat(satisfiedSampleCount) {
-            val fid = state.rng.nextInt(total)
-            if (!state.violated.contains(fid)) {
-                state.factors[fid].proposeStructuredMoves(state, fid, sink)
-            }
-        }
+        satisfiedStructured.generate(MoveGenContext(state), sink)
     }
+
+    /** Implicit-solving source backing [sampleElectedStructured] — the [SatisfiedStructured.elected]
+     *  variant of the single structured generator (epic #710). */
+    private val electedStructured = SatisfiedStructured.elected(implicitStructuredCap)
 
     /** Implicit-solving source (see [implicitStructuredCap]): during infeasibility, draw
      *  feasibility-preserving structured moves from elected structural globals that are
@@ -630,14 +482,7 @@ class Cbls(
      *  they only improve the score when they help a coupled constraint. */
     private fun sampleElectedStructured(state: LocalSearchState, sink: MoveSink) {
         if (implicitStructuredCap == 0) return
-        val elected = state.electedImplicit
-        if (elected.isEmpty()) return
-        repeat(minOf(implicitStructuredCap, elected.size)) {
-            val fid = elected[state.rng.nextInt(elected.size)]
-            if (!state.violated.contains(fid)) {
-                state.factors[fid].proposeStructuredMoves(state, fid, sink)
-            }
-        }
+        electedStructured.generate(MoveGenContext(state), sink)
     }
 
     /** Seed single-variable moves directly on the objective's nonzero-weight vars. Without
@@ -648,50 +493,7 @@ class Cbls(
      *  proposeRepairMoves to cover that phase. */
     private fun seedObjectiveMoves(state: LocalSearchState, sink: MoveSink) {
         if (state.cost > 0) return
-        val obj = state.objective ?: return
-        when (obj) {
-            is LinearObjective -> {
-                for (v in obj.boolWeights.indices) {
-                    if (obj.boolWeights[v] == 0L) continue
-                    sink.addBoolFlip(v)
-                }
-                for (v in obj.intCoefficients.indices) {
-                    if (obj.intCoefficients[v] == 0L) continue
-                    val cur = state.assignment.intValue(v)
-                    val d = state.problem.intDomains[v]
-                    // Step in the direction the coefficient says reduces the objective.
-                    // Channeling-aware so int-move + indicator updates stay atomic.
-                    if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
-                    if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
-                }
-            }
-
-            is FunctionalObjective -> {
-                // Decomposed objective: its gradient lives in deltaIfApplied, not in per-var
-                // coefficients, so we can't pick a direction a priori. Seed *geometric* steps
-                // (±1, ±2, ±4, …, plus the domain endpoints) on each decision (leaf) variable
-                // and let the move scoring (which folds in the functional objective delta) keep
-                // the best. Pure ±1 descends a wide-domain coordinate objective far too slowly;
-                // geometric steps let the search jump while still refining at unit resolution.
-                for (v in obj.leafVars) {
-                    val cur = state.assignment.intValue(v)
-                    val d = state.problem.intDomains[v]
-                    var step = 1
-                    while (step <= OBJ_SEED_MAX_STEP) {
-                        val up = cur + step
-                        val down = cur - step
-                        if (up <= d.max) sink.addChannelingIntSet(state, v, up)
-                        if (down >= d.min) sink.addChannelingIntSet(state, v, down)
-                        if (up > d.max && down < d.min) break
-                        step = step shl 1
-                    }
-                    if (cur != d.min) sink.addChannelingIntSet(state, v, d.min)
-                    if (cur != d.max) sink.addChannelingIntSet(state, v, d.max)
-                }
-            }
-
-            else -> { /* no per-var direction without inspecting the objective shape */ }
-        }
+        objectiveSeed.generate(MoveGenContext(state), sink)
     }
 
     /**
@@ -803,15 +605,6 @@ class Cbls(
 
     /** Tuning constants and the [vnd] preset factory. */
     companion object {
-        /** Largest geometric step seeded per leaf var during functional-objective descent. */
-        private const val OBJ_SEED_MAX_STEP = 4096
-
-        /** Rejection-sampling attempts allowed per requested stall swap (see [sampleStallSwaps]). */
-        private const val ATTEMPTS_PER_SWAP = 4
-
-        /** First-move branch width per ejection-chain seed factor (see [sampleStallChains]). */
-        private const val CHAIN_FIRST_MOVES = 4
-
         /**
          * Classical Variable-Neighbourhood-Descent as a [Cbls] preset (the unified strategy
          * subsumes the former standalone `Vnd`): [MoveScoring.Raw] move scoring, a `k`-level
