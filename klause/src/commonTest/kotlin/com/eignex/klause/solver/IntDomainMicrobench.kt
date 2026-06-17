@@ -43,7 +43,7 @@ class IntDomainMicrobench {
         println("=== contains() vs declared span (survivors fixed at $survivorCount) ===")
         for (spanShift in intArrayOf(16, 18, 20, 22, 24)) {
             val span = 1 shl spanShift
-            val survivors = IntArray(survivorCount) { rng.nextInt(span) }.toSortedSet().toIntArray()
+            val survivors = IntArray(survivorCount) { rng.nextInt(span) }.distinct().sorted().toIntArray()
             val d = carveDownTo(span, survivors)
             val probes = IntArray(1_000_000) { rng.nextInt(span) }
             var hits = 0
@@ -66,7 +66,7 @@ class IntDomainMicrobench {
             var v = 0
             while (v < span && survivors.size < 200_000) {
                 val runLen = 1 + rng.nextInt(2 * avgRun) // mean ~ avgRun
-                for (k in 0 until runLen) {
+                repeat(runLen) {
                     if (v < span) survivors.add(v)
                     v++
                 }
@@ -88,7 +88,7 @@ class IntDomainMicrobench {
 
         // Wide-sparse: a handful of scattered survivors (the liner-sf shape).
         run {
-            val sv = IntArray(5_000) { rng.nextInt(span) }.toSortedSet().toIntArray()
+            val sv = IntArray(5_000) { rng.nextInt(span) }.distinct().sorted().toIntArray()
             val d = carveDownTo(span, sv)
             val excl = IntArray(1000) { rng.nextInt(span) }.also { it.sort() }
             val tExcl = measureTime { repeat(1000) { d.excludeValues(excl) } }

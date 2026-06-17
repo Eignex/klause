@@ -7,6 +7,7 @@ import com.eignex.klause.solver.intdomain.ContiguousDomain
  *  per-value propagation hot paths; lambdas still convert at the call site via SAM conversion, so
  *  `d.forEach { … }` is unchanged. */
 fun interface IntConsumer {
+    /** Receive one domain [value] from an [IntDomain] iteration. */
     fun accept(value: Int)
 }
 
