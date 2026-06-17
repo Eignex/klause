@@ -36,8 +36,6 @@ class LpAutoConfigTest {
         assertTrue(r.lpBounding)
         // The bounding-stack techniques that need no extra structure ride along.
         assertTrue(r.lpLearn)
-        assertTrue(r.lpObjectiveBound)
-        assertTrue(r.lpFixpoint)
         assertTrue(r.lpProbe)
         assertFalse(r.lpCuts)
         assertFalse(r.lpCutPool)
@@ -46,26 +44,19 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `the configurable tableau cap gates auto bounding`() {
-        // KlauseConfig.lpMaxTableauCells is the env-tunable dense-tableau ceiling; a huge cap takes
-        // the dense path. Over the dense cap but within the sparse cap (#602) routes to the bound-only
-        // sparse path instead of disabling LP; both caps tiny disables it. The bound is sound in all
-        // cases — purely a cost guard.
+    fun `the configurable relaxation-size ceiling gates auto bounding`() {
+        // LP activation gates on the ceiling cap (#705): within it LP is on (even over the base cap,
+        // where only the hull budget shrinks); past it LP is declined. Pure cost guard — sound either way.
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
         val saved = KlauseConfig.current
         try {
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
-            LpAutoConfig.recommend(p).let {
-                assertTrue(it.lpBounding, "an unbounded cap must enable dense auto LP")
-                assertFalse(it.lpSparsePrimary, "under the dense cap, the dense path is used")
-            }
+            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = Long.MAX_VALUE)
+            assertTrue(LpAutoConfig.recommend(p).lpBounding, "a large ceiling must enable auto LP")
+            // Over the base cap but within the ceiling: LP still on.
             KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
-            LpAutoConfig.recommend(p).let {
-                assertTrue(it.lpBounding, "over the dense cap but within the sparse cap, LP routes to sparse")
-                assertTrue(it.lpSparsePrimary, "a 1-cell dense cap must route to the sparse primary path")
-            }
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = 1L)
-            assertFalse(LpAutoConfig.recommend(p).lpBounding, "both caps tiny must disable auto LP")
+            assertTrue(LpAutoConfig.recommend(p).lpBounding, "over the base cap but within the ceiling, LP stays on")
+            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = 1L)
+            assertFalse(LpAutoConfig.recommend(p).lpBounding, "a 1-cell ceiling must disable auto LP")
         } finally {
             KlauseConfig.current = saved
         }
@@ -157,44 +148,56 @@ class LpAutoConfigTest {
     @Test
     fun `size guard sheds an over-budget hull but keeps the base LP`() {
         // NValue over 32 vars × domain 32 = 1024 cells: under its own MAX_NVALUE_CELLS cap (so the
-        // builder would build it), but its ~2048 columns + ~1089 rows blow the dense-tableau budget.
+        // builder would build it), but its ~2048 columns + ~1089 rows blow a 2^20 relaxation budget.
         // The size guard (#484) must shed the hull (lpNValue off) while the base LP still runs.
-        val n = 32
-        val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n) }
-        val big = Problem(0, n + 1, domains, arrayOf<Factor>(NValue(n, IntArray(n) { it })))
-        val rBig = LpAutoConfig.recommend(big)
-        assertFalse(rBig.lpNValue, "the over-budget NValue hull must be shed")
-        assertTrue(rBig.lpBounding, "the base LP still runs; only the hull is shed")
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L shl 20)
+            val n = 32
+            val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n) }
+            val big = Problem(0, n + 1, domains, arrayOf<Factor>(NValue(n, IntArray(n) { it })))
+            val rBig = LpAutoConfig.recommend(big)
+            assertFalse(rBig.lpNValue, "the over-budget NValue hull must be shed")
+            assertTrue(rBig.lpBounding, "the base LP still runs; only the hull is shed")
 
-        // A small NValue (3×3 = 9 cells) fits comfortably and is enabled.
-        val small = Problem(
-            0,
-            4,
-            Array(4) { if (it < 3) IntDomain(0, 2) else IntDomain(0, 3) },
-            arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))),
-        )
-        assertTrue(LpAutoConfig.recommend(small).lpNValue, "a small NValue hull fits and is enabled")
+            // A small NValue (3×3 = 9 cells) fits comfortably and is enabled.
+            val small = Problem(
+                0,
+                4,
+                Array(4) { if (it < 3) IntDomain(0, 2) else IntDomain(0, 3) },
+                arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))),
+            )
+            assertTrue(LpAutoConfig.recommend(small).lpNValue, "a small NValue hull fits and is enabled")
+        } finally {
+            KlauseConfig.current = saved
+        }
     }
 
     @Test
     fun `size guard sheds the larger of two stacked hulls`() {
         // A Table (1024 tuples) and an NValue (1024 cells) both fit on their own, but together they
-        // exceed the budget — the size guard keeps the cheaper one (smallest-first) and sheds the other.
-        val nVars = 32
-        val tableXs = intArrayOf(0, 1)
-        val tuples = IntArray(1024 * 2) { it % 2 } // 1024 two-column tuples
-        val xs = IntArray(nVars) { it + 2 } // NValue over fresh vars 2..33
-        val total = 2 + nVars + 1 // table xs + nvalue xs + nvalue count var
-        val domains = Array(total) { IntDomain(0, 31) }
-        val p = Problem(
-            0,
-            total,
-            domains,
-            arrayOf<Factor>(Table(tableXs, tuples), NValue(total - 1, xs)),
-        )
-        val r = LpAutoConfig.recommend(p)
-        assertFalse(r.lpTable && r.lpNValue, "two stacked hulls cannot both be enabled past the budget")
-        assertTrue(r.lpTable || r.lpNValue, "the cheaper hull is still kept")
+        // exceed a 2^20 budget — the size guard keeps the cheaper one (smallest-first) and sheds the other.
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L shl 20)
+            val nVars = 32
+            val tableXs = intArrayOf(0, 1)
+            val tuples = IntArray(1024 * 2) { it % 2 } // 1024 two-column tuples
+            val xs = IntArray(nVars) { it + 2 } // NValue over fresh vars 2..33
+            val total = 2 + nVars + 1 // table xs + nvalue xs + nvalue count var
+            val domains = Array(total) { IntDomain(0, 31) }
+            val p = Problem(
+                0,
+                total,
+                domains,
+                arrayOf<Factor>(Table(tableXs, tuples), NValue(total - 1, xs)),
+            )
+            val r = LpAutoConfig.recommend(p)
+            assertFalse(r.lpTable && r.lpNValue, "two stacked hulls cannot both be enabled past the budget")
+            assertTrue(r.lpTable || r.lpNValue, "the cheaper hull is still kept")
+        } finally {
+            KlauseConfig.current = saved
+        }
     }
 
     @Test
@@ -249,34 +252,30 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `oversized model routes LP to the sparse bound-only path and keeps structure-capped bounds`() {
-        // 2000 unit rows over 2000 vars estimate a dense tableau of ~8M cells — past the dense cap
-        // but within the sparse cap — so LP routes to the bound-only sparse path (#602): bounding on.
-        // The whole bounding stack rides along over the sparse revised simplex (#705) — the probe, LP
-        // learning, and the structural cut separators all fire on this path. The Lagrangian/energetic
-        // bounds (own internal caps) are not size-gated.
+    fun `large model keeps the full bounding stack within the ceiling`() {
+        // 2000 unit rows over 2000 vars estimate ~8M cells — over the 2^20 base cap but under the 2^26
+        // ceiling (#705) — so LP bounding is on (hulls budget against the ceiling). The whole bounding
+        // stack rides along over the sparse revised simplex: the probe, LP learning, and the structural
+        // cut separators all fire. The Lagrangian/energetic bounds (own internal caps) are not size-gated.
         val n = 2000
         val factors = ArrayList<Factor>(n + 1)
         repeat(n) { i -> factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, 0)) }
         factors.add(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6))
         val p = Problem(0, n, Array(n) { IntDomain(0, 5) }, factors.toTypedArray())
         val r = LpAutoConfig.recommend(p)
-        assertTrue(r.lpSparsePrimary)
         assertTrue(r.lpBounding)
-        // The AllDifferent makes the instance cut-eligible; cuts gate on lpActive (#705), so the
-        // structural separators now fire on the sparse-primary path too.
+        // The AllDifferent makes the instance cut-eligible; cuts gate on lpActive (#705).
         assertTrue(r.lpCuts)
         assertTrue(r.lpProbe)
         assertTrue(r.lpLearn)
         assertTrue(r.lagrangian)
 
-        // Past the sparse cap too ⇒ the LP family fully declines; the Lagrangian still runs.
+        // Past the ceiling ⇒ the LP family fully declines; the Lagrangian still runs.
         val saved = KlauseConfig.current
         try {
             KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = 1L)
             val off = LpAutoConfig.recommend(p)
             assertFalse(off.lpBounding)
-            assertFalse(off.lpSparsePrimary)
             assertTrue(off.lagrangian)
         } finally {
             KlauseConfig.current = saved

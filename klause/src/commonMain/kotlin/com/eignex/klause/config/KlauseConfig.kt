@@ -20,16 +20,17 @@ const val DEFAULT_FLOAT_BUCKETS: Int = 1024
  *  bounds are multiplied by this and rounded to integers. */
 const val DEFAULT_FLOAT_SCALE: Long = 1_000_000L
 
-/** Default ceiling on the estimated dense per-node LP tableau (`rows × (cols + rows + 1)` cells)
- *  above which `LpAutoConfig` declines to auto-enable LP bounding — a memory/throughput bound for
- *  the dense simplex (~8 MB/node at `2^20`). Raise it (env below) once a sparser solve can afford
- *  bigger relaxations; the bound stays sound either way, so the ceiling is purely a cost guard. */
+/** Default **base** relaxation-size cap (`rows × (cols + rows + 1)` cells). The sparse revised simplex
+ *  is the only LP engine (#705); this is a pure per-node cost guard (not a memory bound), and the bound
+ *  stays sound either way. A model whose *base* relaxation fits this cap budgets its gated hulls against
+ *  it; a larger base (still under [DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS]) budgets hulls against that
+ *  ceiling. Raise it (env below) to spend more per node for hull reach on small models. */
 const val DEFAULT_LP_MAX_TABLEAU_CELLS: Long = 1L shl 20
 
-/** Default ceiling for routing an over-dense-cap model to the *sparse* LP pipeline (float revised
- *  simplex + exact certify) as a bound-only fallback, instead of disabling LP entirely. Larger than
- *  [DEFAULT_LP_MAX_TABLEAU_CELLS] since the sparse path does not allocate the dense tableau; still
- *  bounded so a pathologically huge model isn't built. Purely a cost guard (the bound is sound). */
+/** Default **ceiling** relaxation-size cap: the absolute size past which `LpAutoConfig` declines LP
+ *  entirely. Larger than [DEFAULT_LP_MAX_TABLEAU_CELLS] (the sparse engine carries bigger relaxations
+ *  cheaply); also the hull budget for models whose base relaxation is over the base cap but under this
+ *  ceiling. A pure cost guard (the bound is sound). */
 const val DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS: Long = 1L shl 26
 
 /**
@@ -85,14 +86,13 @@ data class KlauseConfig(
      *  bounds are multiplied by this and rounded to integers). Env: `KLAUSE_FLOAT_SCALE`. */
     val floatScale: Long = DEFAULT_FLOAT_SCALE,
 
-    /** Ceiling on the estimated dense per-node LP tableau cell count above which `LpAutoConfig`
-     *  declines to auto-enable LP bounding (see [DEFAULT_LP_MAX_TABLEAU_CELLS]). A pure cost guard —
-     *  the bound is always sound — so raising it trades node throughput for LP reach on big models.
+    /** Base relaxation-size cap (see [DEFAULT_LP_MAX_TABLEAU_CELLS]): a model whose base relaxation
+     *  fits it budgets its gated hulls against it. A pure cost guard — the bound is always sound.
      *  Env: `KLAUSE_FZN_LP_MAX_TABLEAU_CELLS` / `klause.fzn.lpMaxTableauCells`. */
     val lpMaxTableauCells: Long = DEFAULT_LP_MAX_TABLEAU_CELLS,
 
-    /** Ceiling for routing an over-[lpMaxTableauCells] model to the sparse LP pipeline as a bound-only
-     *  fallback rather than disabling LP (see [DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS]).
+    /** Ceiling relaxation-size cap (see [DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS]): the absolute size past
+     *  which LP is declined, and the hull budget for an over-base-cap but in-ceiling model.
      *  Env: `KLAUSE_FZN_LP_SPARSE_MAX_TABLEAU_CELLS` / `klause.fzn.lpSparseMaxTableauCells`. */
     val lpSparseMaxTableauCells: Long = DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS,
 

@@ -39,12 +39,7 @@ class LpSparseBoundTest {
             val factors = cons.map { (c, v, r) -> Linear(c.map { it.toInt() }.toIntArray(), v, LinearOp.LE, r.toInt()) }
             val problem = Problem(0, n, domains, factors.toTypedArray<Factor>())
             val obj = LinearObjective(intCoefficients = cost)
-            val params = BacktrackParams(
-                randomSeed = 5L,
-                lpBounding = true,
-                lpSparseBound = true,
-                lpObjectiveBound = true,
-            )
+            val params = BacktrackParams(randomSeed = 5L, lpBounding = true)
 
             when (val res = BacktrackSolver(problem).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {

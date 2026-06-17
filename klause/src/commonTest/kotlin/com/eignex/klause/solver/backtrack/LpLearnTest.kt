@@ -40,11 +40,7 @@ class LpLearnTest {
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)),
         )
         val session = PropagationSession(problem)
-        val relaxation = CpToLpRelaxation(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            sparseModel = true,
-        )
+        val relaxation = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
             .build(session)
         val result = assertNotNull(RevisedSimplex(relaxation.model).solve())
         val cert = assertNotNull(ExactBasisCertifier.certify(relaxation.model, result.basis))

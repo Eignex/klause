@@ -322,9 +322,6 @@ class BacktrackSolver(override val problem: Problem) :
                 gccCountHull = params.lpGccCount,
                 circuitArcs = params.lpCircuit,
                 objectiveCone = params.lpObjectiveCone,
-                // The sparse revised-simplex pipeline is the only LP path (#705): always build the CSC
-                // model so the dense `m × n` is never allocated.
-                sparseModel = true,
             )
         } else {
             null
@@ -967,9 +964,6 @@ internal const val GOMORY_CUTS_PER_ROUND: Int = 8
 
 /** Separation rounds when harvesting the persistent root cut pool. */
 internal const val CUT_POOL_ROUNDS: Int = 8
-
-/** Maximum LP↔propagation re-solve rounds per node under `lpFixpoint` (#283). */
-internal const val LP_FIXPOINT_ITERS: Int = 4
 
 /** Cap on cascading CDB backjumps within a single search step. Defensive; under
  *  a well-formed analyzer the loop terminates well before this. */
