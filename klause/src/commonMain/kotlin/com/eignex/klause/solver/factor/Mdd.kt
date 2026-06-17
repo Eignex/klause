@@ -256,4 +256,158 @@ class Mdd(
         }
         return inc.propagate(state, factorId)
     }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: at a layer `i`, replace its symbol with another
+     *  in-domain symbol whose transition has the *same* source, destination, and (for a cost-MDD)
+     *  weight. The path through the diagram — and therefore acceptance and the path cost — is
+     *  unchanged, only the surface symbol differs. Only meaningful on an accepted assignment. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val n = seq.size
+        val path = IntArray(n + 1)
+        path[0] = initial
+        for (i in 0 until n) {
+            val nxt = step(path[i], state.assignment.intValue(seq[i]), i)
+            if (nxt < 0) return // not on an accepting path — nothing structure-preserving to offer.
+            path[i + 1] = nxt
+        }
+        if (accepting.none { it == path[n] }) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(n)
+            val cur = state.assignment.intValue(seq[i])
+            val from = path[i]
+            val to = path[i + 1]
+            val curWeight = recordWeight(from, cur, i)
+            val d = state.problem.intDomains[seq[i]]
+            var pick = -1
+            var seen = 0
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                val sym = transitions[p + 1]
+                val sameCost = recordStride < 4 || transitions[p + 3] == curWeight
+                if (transitions[p] == from && transitions[p + 2] == to && sameCost && sym != cur && sym in d) {
+                    seen++
+                    if (state.rng.nextInt(seen) == 0) pick = sym
+                }
+                p += recordStride
+            }
+            if (pick == -1) continue
+            sink.addChannelingIntSet(state, seq[i], pick)
+            emitted++
+        }
+    }
+
+    /** Feasible init: reconstruct an in-domain accepting path through the layered diagram by
+     *  forward reachability (per-layer symbols restricted to the variable's domain, or the pinned
+     *  value for a frozen var). For a cost-MDD the realised path weight is written to the cost var.
+     *  Returns false — leaving the random assignment — when no in-domain accepting path exists or
+     *  the cost var can't take the path weight. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val n = seq.size
+        val fwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
+        if (initial < fwd[0].size) fwd[0][initial] = true
+        for (i in 0 until n) {
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                val from = transitions[p]
+                val sym = transitions[p + 1]
+                val to = transitions[p + 2]
+                if (from < fwd[i].size && fwd[i][from] && symbolAllowed(state, i, sym)) fwd[i + 1][to] = true
+                p += recordStride
+            }
+        }
+        var target = -1
+        for (s in accepting) {
+            if (s < fwd[n].size && fwd[n][s]) {
+                target = s
+                break
+            }
+        }
+        if (target == -1) return false
+        val chosen = IntArray(n)
+        var totalWeight = 0L
+        var t = target
+        for (i in n - 1 downTo 0) {
+            var fs = -1
+            var ff = -1
+            var fw = 0
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                val from = transitions[p]
+                val sym = transitions[p + 1]
+                if (transitions[p + 2] == t && from < fwd[i].size && fwd[i][from] && symbolAllowed(state, i, sym)) {
+                    fs = sym
+                    ff = from
+                    fw = if (recordStride == 4) transitions[p + 3] else 0
+                    break
+                }
+                p += recordStride
+            }
+            if (fs == -1) return false
+            chosen[i] = fs
+            totalWeight += fw
+            t = ff
+        }
+        if (cost >= 0) {
+            if (state.assumptions.isFrozenInt(cost)) {
+                if (state.assignment.intValue(cost).toLong() != totalWeight) return false
+            } else {
+                if (totalWeight > Int.MAX_VALUE || totalWeight.toInt() !in state.problem.intDomains[cost]) return false
+            }
+        }
+        for (i in 0 until n) {
+            if (!state.assumptions.isFrozenInt(seq[i])) state.assignment.setInt(seq[i], chosen[i])
+        }
+        if (cost >= 0 && !state.assumptions.isFrozenInt(cost)) state.assignment.setInt(cost, totalWeight.toInt())
+        return true
+    }
+
+    /** Destination state of the transition from [from] on [symbol] at layer [i], or -1 if none. */
+    private fun step(from: Int, symbol: Int, i: Int): Int {
+        var p = layerStarts[i]
+        val end = layerStarts[i + 1]
+        while (p < end) {
+            if (transitions[p] == from && transitions[p + 1] == symbol) return transitions[p + 2]
+            p += recordStride
+        }
+        return -1
+    }
+
+    /** Weight of the transition from [from] on [symbol] at layer [i] (0 for a plain MDD). */
+    private fun recordWeight(from: Int, symbol: Int, i: Int): Int {
+        if (recordStride < 4) return 0
+        var p = layerStarts[i]
+        val end = layerStarts[i + 1]
+        while (p < end) {
+            if (transitions[p] == from && transitions[p + 1] == symbol) return transitions[p + 3]
+            p += recordStride
+        }
+        return 0
+    }
+
+    /** Symbol [s] is usable at layer [i]: the pinned value for a frozen variable, else any value
+     *  in the variable's domain. */
+    private fun symbolAllowed(state: LocalSearchState, i: Int, s: Int): Boolean {
+        val v = seq[i]
+        return if (state.assumptions.isFrozenInt(v)) {
+            state.assignment.intValue(v) == s
+        } else {
+            s in state.problem.intDomains[v]
+        }
+    }
+
+    private companion object {
+        /** Cap on same-transition symbol substitutions offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_MOVE_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested move before giving up. */
+        const val MOVE_ATTEMPT_STRIDE: Int = 6
+    }
 }

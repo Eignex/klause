@@ -87,6 +87,23 @@ class Problem(
      * every consumer that doesn't pass a deadline bakes to completion exactly as before.
      */
     val cancellation: Cancellation = Cancellation.Never,
+    /**
+     * Per-factor flag marking constraints the model declared as *implied* — MiniZinc's
+     * `redundant_constraint` / `symmetry_breaking_constraint` (surfaced via the klause MZN
+     * library's annotation). Indexed parallel to [factors]; `null` (the common case) means no
+     * factor is implied. Local search seeds these factors a lower initial violation weight so
+     * the bulk of redundant / symmetry rows don't dominate the weighted-violation landscape
+     * before the structural constraints are satisfied; every other consumer ignores it (the
+     * constraints are still posted and propagate normally).
+     */
+    val impliedFactorMask: BooleanArray? = null,
+    /**
+     * True when the model declared at least one `symmetry_breaking_constraint`. Presolve uses
+     * it to skip its own symmetry breaking ([com.eignex.klause.solver.presolve.PresolvePass.BREAK_SYMMETRIES])
+     * by default — stacking klause's automorphism break on top of the model's hand-written one
+     * is redundant and the two can interact.
+     */
+    val hasSymmetryBreaking: Boolean = false,
 ) {
     /**
      * Domain (bounds) of each integer variable, indexed by int var id. A defensive copy of
@@ -103,6 +120,9 @@ class Problem(
     init {
         require(intDomains.size == numIntVars) {
             "intDomains size ${intDomains.size} != numIntVars $numIntVars"
+        }
+        require(impliedFactorMask == null || impliedFactorMask.size == factors.size) {
+            "impliedFactorMask size ${impliedFactorMask?.size} != factors size ${factors.size}"
         }
     }
 
@@ -123,6 +143,8 @@ class Problem(
         probeTotalBudget: Int = Int.MAX_VALUE,
         probeSeed: Long = 0L,
         cancellation: Cancellation = Cancellation.Never,
+        impliedFactorMask: BooleanArray? = null,
+        hasSymmetryBreaking: Boolean = false,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -135,6 +157,8 @@ class Problem(
         probeTotalBudget = probeTotalBudget,
         probeSeed = probeSeed,
         cancellation = cancellation,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
     )
 
     /** Factor ids mentioning each Boolean variable, indexed by bool var id. */

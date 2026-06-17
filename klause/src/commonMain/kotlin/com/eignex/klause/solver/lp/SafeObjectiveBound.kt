@@ -38,16 +38,18 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
             atj = y[j - n]
             colMag = abs(atj)
         } else {
-            val col = j
-            for (i in 0 until m) {
-                val a = model.a[i][col]
-                if (a != 0L) {
-                    val term = y[i] * a.toDouble()
-                    atj += term
-                    colMag += abs(term)
-                    terms++
-                }
+            var acc = 0.0
+            var mag = 0.0
+            var t = terms
+            model.forEachInColumn(j) { i, a ->
+                val term = y[i] * a.toDouble()
+                acc += term
+                mag += abs(term)
+                t++
             }
+            atj = acc
+            colMag = mag
+            terms = t
         }
         val cj = model.cost[j].toDouble()
         val dj = cj - atj

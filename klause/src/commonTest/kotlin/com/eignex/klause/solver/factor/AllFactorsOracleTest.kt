@@ -491,6 +491,7 @@ class AllFactorsOracleTest {
             FactorPropagationOracle.assertSound(problem, name)
         }
         MoveSetOracle.assertRepairsCoverImproving(problem, name, iters = 40, requireImprovement = false)
+        MoveSetOracle.assertStructuredMovesPreserveFeasibility(problem, name, iters = 40)
         DegreeConsistencyOracle.assertConsistent(problem, name, exactProbe = exactProbe, softCap = softCap)
     }
 

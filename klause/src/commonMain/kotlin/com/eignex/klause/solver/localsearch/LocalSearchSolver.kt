@@ -86,6 +86,14 @@ class LocalSearchSolver(
      *  generation entirely — the move space shrinks to true decision variables. Requires
      *  [definitionalSweep]; the restart-time sweep stays active as the full (re)initializer. */
     val perMoveInvariants: Boolean = false,
+    /** Implicit-solving feasible init (opt-in, default off): after each restart's randomization
+     *  the engine seeds elected structural globals (see [LocalSearchState.electedImplicit]) into
+     *  a feasible configuration via [com.eignex.klause.solver.Factor.seedFeasible] — an
+     *  all-different becomes a partial permutation, a circuit a single tour — so the search
+     *  starts inside those constraints' feasible region and their structure-preserving moves
+     *  are productive from the first step. Off by default so existing convergence is unchanged;
+     *  enabled by the portfolio on permutation/assignment-shaped models. */
+    val seedImplicitOnRestart: Boolean = false,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
 
@@ -96,10 +104,11 @@ class LocalSearchSolver(
     /** Greedy-repair restart initializer (epic #710); shared by the satisfy and optimize restarts. */
     private val greedyInit: GreedyInit = GreedyInit()
 
-    /** The restart policy actually driven by the engine: when a [definitionalSweep] is
-     *  present, every restart is followed by the sweep + a state recompute, so all restart
-     *  call sites (satisfy loop, optimize loop, streaming) get swept uniformly. */
-    private val restarts: RestartPolicy = if (definitionalSweep == null) {
+    /** The restart policy actually driven by the engine: when a [definitionalSweep] is present
+     *  or [seedImplicitOnRestart] is set, every restart is followed by implicit feasible-init
+     *  and/or the sweep plus a state recompute, so all restart call sites (satisfy loop,
+     *  optimize loop, streaming) get the same post-randomization treatment. */
+    private val restarts: RestartPolicy = if (definitionalSweep == null && !seedImplicitOnRestart) {
         restartPolicy
     } else {
         object : RestartPolicy {
@@ -111,7 +120,8 @@ class LocalSearchSolver(
 
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 restartPolicy.restart(state, bestSoFar)
-                definitionalSweep.sweep(
+                if (seedImplicitOnRestart) state.seedImplicitFeasible()
+                definitionalSweep?.sweep(
                     state.assignment,
                     problem.intDomains,
                     problem.factors,
@@ -280,6 +290,7 @@ class LocalSearchSolver(
         return sequence {
             val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
             state.violationSoftCap = params.violationSoftCap
+            state.normalizeWeightsByClass = params.normalizeWeightsByClass
             installInvariants(state)
             warm?.applyTo(state)
             // Streaming has no notion of "best so far" to anchor an adaptive restart
@@ -396,6 +407,7 @@ class LocalSearchSolver(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         state.violationSoftCap = params.violationSoftCap
+        state.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
         warm?.applyTo(state)
         // Plumb shaping into the state so strategies (e.g. WalkSat) consulting

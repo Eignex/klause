@@ -24,7 +24,9 @@ import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
@@ -99,6 +101,11 @@ internal class CpToLpRelaxation(
     /** When true, emit the energetic makespan lower-bound row for each Cumulative / Disjunctive whose
      *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
     private val cumulative: Boolean = false,
+    /** When true, project each constant-size Diffn onto both axes as a cumulative and emit the same
+     *  energetic makespan row (#655) — a sound lower bound on a strip-length / extent variable (its
+     *  `t1 = min-est` case is the area bound `Σ wᵢ·hᵢ ≤ W·H`). One row per derived plan; a no-op unless
+     *  an axis extent is provably an upper bound on every task end (so it only fires when it helps). */
+    private val diffn: Boolean = false,
     /** When true, emit the time-indexed `x_{i,t}` relaxation of each Cumulative / Disjunctive over a
      *  bounded horizon (#453): assignment + start channel + per-time resource rows. Adds O(n·H)
      *  columns, so it is hard-gated on the horizon and total cell count. */
@@ -130,10 +137,20 @@ internal class CpToLpRelaxation(
      * probe is deliberately the minimal linear+Boolean relaxation.
      */
     private val objectiveCone: Boolean = false,
+    /** When true, emit a sparse [LpModel] (CSC core only, no dense `m × n` matrix) — for the over-cap
+     *  bound-only sparse pipeline (#602), whose solvers read columns via [LpModel.forEachInColumn].
+     *  Set from [com.eignex.klause.solver.backtrack.BacktrackParams.lpSparsePrimary]; the dense
+     *  [DualSimplex] path leaves it false. Disables the #564 dense-row cache (moot without a dense `a`). */
+    private val sparseModel: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
-        if (cumulative) CumulativeRelaxation(problem).takeIf { it.applicable } else null
+        if (cumulative || diffn) {
+            CumulativeRelaxation(problem, includeCumulative = cumulative, includeDiffn = diffn)
+                .takeIf { it.applicable }
+        } else {
+            null
+        }
 
     /**
      * #564 dense-row cache eligibility. The per-node rebuild is dominated by densifying the `m × n`
@@ -736,12 +753,14 @@ internal class CpToLpRelaxation(
             // (re)capture the cache. Sharing is sound because the re-walk above produced the live
             // right-hand sides / global flags for every row — only the bound-invariant coefficient
             // arrays are aliased.
+            // The over-cap sparse pipeline (#602) builds only the CSC core — no dense `m × n` matrix —
+            // so the #564 dense-row cache is moot there and skipped.
             val shared = denseCache?.takeIf {
-                cacheable && cacheVarCount == builder.varCount &&
+                !sparseModel && cacheable && cacheVarCount == builder.varCount &&
                     cacheBaseRows == baseRows
             }
-            val model = builder.buildShared(Sense.MINIMIZE, shared)
-            if (shared == null && cacheable) captureDenseCache(model, baseRows)
+            val model = builder.buildShared(Sense.MINIMIZE, shared, sparse = sparseModel)
+            if (!sparseModel && shared == null && cacheable) captureDenseCache(model, baseRows)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
             return LpRelaxation(
                 model = model,
@@ -763,7 +782,8 @@ internal class CpToLpRelaxation(
                 val r = reifiedRowIdx[idx]
                 if (r < baseRows) reified[r] = true
             }
-            denseCache = Array(baseRows) { i -> if (reified[i]) null else model.a[i] }
+            val a = model.denseRows()
+            denseCache = Array(baseRows) { i -> if (reified[i]) null else a[i] }
             cacheVarCount = builder.varCount
             cacheBaseRows = baseRows
         }
@@ -917,8 +937,15 @@ internal class CpToLpRelaxation(
             for (x in xs) cells += problem.intDomains[x].size.toLong()
             if (cells == 0L || cells > MAX_NVALUE_CELLS) return
             val yCols = IntArrayList()
-            val yByValue = HashMap<Int, Int>()
-            fun yOf(v: Int): Int = yByValue.getOrPut(v) { auxColumn(0L, 1L).also { yCols.add(it) } }
+            val yByValue = MutableIntIntMap()
+            fun yOf(v: Int): Int {
+                val existing = yByValue.getOrDefault(v, -1) // columns are non-negative, so -1 marks absent
+                if (existing >= 0) return existing
+                val col = auxColumn(0L, 1L)
+                yCols.add(col)
+                yByValue.put(v, col)
+                return col
+            }
             for (x in xs) {
                 val declared = problem.intDomains[x]
                 val live = session.intDomain(x)
@@ -1043,15 +1070,18 @@ internal class CpToLpRelaxation(
             val s = factor.alphabetSize
             val trans = factor.transitions
             fun delta(state: Int, sym: Int): Int = trans[(state - 1) * s + (sym - 1)] // 1-based; 0 = dead
-            val accepting = HashSet<Int>().apply { for (a in factor.accepting) add(a) }
+            val accepting = factor.acceptingSet
+            // States are 1-based ids in `1..numStates`, so the per-layer state→arc-columns maps are
+            // dense arrays indexed straight by the state id rather than boxed `HashMap<Int, _>` (#678).
+            val ns = factor.numStates
 
             // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-            val reach = Array(len + 1) { HashSet<Int>() }
+            val reach = Array(len + 1) { IntHashSet() }
             reach[0].add(factor.q0)
             var arcCount = 0L
             for (t in 0 until len) {
                 val dom = problem.intDomains[seq[t]]
-                for (state in reach[t]) {
+                reach[t].forEach { state ->
                     dom.forEach { sym ->
                         if (sym in 1..s) {
                             val nxt = delta(state, sym)
@@ -1066,22 +1096,22 @@ internal class CpToLpRelaxation(
             }
             if (arcCount == 0L || arcCount > MAX_REGULAR_ARCS) return
 
-            val outCols = Array(len) { HashMap<Int, IntArrayList>() }
-            val inCols = Array(len + 1) { HashMap<Int, IntArrayList>() }
+            val outCols = Array(len) { arrayOfNulls<IntArrayList>(ns + 1) }
+            val inCols = Array(len + 1) { arrayOfNulls<IntArrayList>(ns + 1) }
             val chanCols = Array(len) { IntArrayList() }
             val chanSym = Array(len) { IntArrayList() }
             val acceptCols = IntArrayList()
             for (t in 0 until len) {
                 val declared = problem.intDomains[seq[t]]
                 val live = session.intDomain(seq[t])
-                for (state in reach[t]) {
+                reach[t].forEach { state ->
                     declared.forEach { sym ->
                         if (sym !in 1..s) return@forEach
                         val nxt = delta(state, sym)
                         if (nxt == 0) return@forEach
                         val col = auxColumn(0L, if (live.contains(sym)) 1L else 0L)
-                        outCols[t].getOrPut(state) { IntArrayList() }.add(col)
-                        inCols[t + 1].getOrPut(nxt) { IntArrayList() }.add(col)
+                        (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
+                        (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)
                         chanCols[t].add(col)
                         chanSym[t].add(sym)
                         if (t == len - 1 && nxt in accepting) acceptCols.add(col)
@@ -1094,7 +1124,7 @@ internal class CpToLpRelaxation(
             builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
             // Flow conservation at every interior node: Σ out − Σ in = 0.
             for (t in 1 until len) {
-                for (state in reach[t]) {
+                reach[t].forEach { state ->
                     val cols = IntArrayList()
                     val vals = LongArrayList()
                     outCols[t][state]?.let {
@@ -1151,7 +1181,7 @@ internal class CpToLpRelaxation(
             val trans = factor.transitions
             val starts = factor.layerStarts
             // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-            val reach = Array(n + 1) { HashSet<Int>() }
+            val reach = Array(n + 1) { IntHashSet() }
             reach[0].add(factor.initial)
             var arcCount = 0L
             for (layer in 0 until n) {
@@ -1169,11 +1199,14 @@ internal class CpToLpRelaxation(
             }
             if (arcCount == 0L || arcCount > MAX_MDD_ARCS) return
 
-            val outCols = Array(n) { HashMap<Int, IntArrayList>() }
-            val inCols = Array(n + 1) { HashMap<Int, IntArrayList>() }
+            // States are layer-local dense ids in `[0, numStatesPerLayer(layer))`, so the per-layer
+            // state→arc-columns maps are arrays indexed straight by the state id (#678).
+            val nspl = factor.numStatesPerLayer
+            val outCols = Array(n) { arrayOfNulls<IntArrayList>(nspl[it]) }
+            val inCols = Array(n + 1) { arrayOfNulls<IntArrayList>(nspl[it]) }
             val chanCols = Array(n) { IntArrayList() }
             val chanVal = Array(n) { IntArrayList() }
-            val accepting = HashSet<Int>().apply { for (a in factor.accepting) add(a) }
+            val accepting = IntHashSet(factor.accepting.size).apply { for (a in factor.accepting) add(a) }
             val acceptCols = IntArrayList()
             val costArcs = IntArrayList()
             val costWeight = IntArrayList()
@@ -1188,8 +1221,8 @@ internal class CpToLpRelaxation(
                     val dst = trans[p + 2]
                     if (src in reach[layer] && value in declared) {
                         val col = auxColumn(0L, if (live.contains(value)) 1L else 0L)
-                        outCols[layer].getOrPut(src) { IntArrayList() }.add(col)
-                        inCols[layer + 1].getOrPut(dst) { IntArrayList() }.add(col)
+                        (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
+                        (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)
                         chanCols[layer].add(col)
                         chanVal[layer].add(value)
                         if (layer == n - 1 && dst in accepting) acceptCols.add(col)
@@ -1205,7 +1238,7 @@ internal class CpToLpRelaxation(
             if (src.isEmpty()) return
             builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
             for (layer in 1 until n) {
-                for (state in reach[layer]) {
+                reach[layer].forEach { state ->
                     val cols = IntArrayList()
                     val vals = LongArrayList()
                     outCols[layer][state]?.let {

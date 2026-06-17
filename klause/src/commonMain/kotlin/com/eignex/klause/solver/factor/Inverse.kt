@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
@@ -369,6 +370,12 @@ class Inverse(
          *  bijections, no shared values). [reginFilter] only reads it, so one shared instance is
          *  safe. */
         val NO_EXCEPT = IntHashSet()
+
+        /** Cap on paired-transposition compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 6
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -412,5 +419,65 @@ class Inverse(
                 return
             }
         }
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: a paired transposition. When the channel holds,
+     *  swapping the images of two forward indices `i1`, `i2` (`f[i1]=a`, `f[i2]=b`) and
+     *  re-pointing the matching inverse cells (`g[a]→i2`, `g[b]→i1`) keeps `f` a permutation
+     *  and `g` its exact inverse — the constraint stays satisfied while the permutation is
+     *  perturbed, which can relocate a value to clear a coupled constraint. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val n = f.size
+        if (n < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val i1 = state.rng.nextInt(n)
+            val i2 = state.rng.nextInt(n)
+            if (i1 == i2) continue
+            val a = state.assignment.intValue(f[i1])
+            val b = state.assignment.intValue(f[i2])
+            if (a == b) continue
+            val gIdxA = fValueToGIndex(a)
+            val gIdxB = fValueToGIndex(b)
+            if (gIdxA !in g.indices || gIdxB !in g.indices) continue
+            val newGA = i2 + fOffset
+            val newGB = i1 + fOffset
+            if (b !in state.problem.intDomains[f[i1]]) continue
+            if (a !in state.problem.intDomains[f[i2]]) continue
+            if (newGA !in state.problem.intDomains[g[gIdxA]]) continue
+            if (newGB !in state.problem.intDomains[g[gIdxB]]) continue
+            sink.addCompound(
+                listOf(
+                    Move.IntSet(f[i1], b),
+                    Move.IntSet(f[i2], a),
+                    Move.IntSet(g[gIdxA], newGA),
+                    Move.IntSet(g[gIdxB], newGB),
+                ),
+            )
+            emitted++
+        }
+    }
+
+    /** Feasible init: the identity permutation (`f[i] = i + gOffset`, `g[i] = i + fOffset`).
+     *  Returns false — leaving the random assignment — if any required value is out of domain
+     *  or a frozen var pins a non-identity value, so the seed never violates an assumption. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val n = f.size
+        for (i in 0 until n) {
+            val fv = i + gOffset
+            val gv = i + fOffset
+            if (fv !in state.problem.intDomains[f[i]] || gv !in state.problem.intDomains[g[i]]) return false
+            if (state.assumptions.isFrozenInt(f[i]) && state.assignment.intValue(f[i]) != fv) return false
+            if (state.assumptions.isFrozenInt(g[i]) && state.assignment.intValue(g[i]) != gv) return false
+        }
+        for (i in 0 until n) {
+            if (!state.assumptions.isFrozenInt(f[i])) state.assignment.setInt(f[i], i + gOffset)
+            if (!state.assumptions.isFrozenInt(g[i])) state.assignment.setInt(g[i], i + fOffset)
+        }
+        return true
     }
 }

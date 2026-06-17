@@ -21,6 +21,48 @@ internal object ExactBasisCertifier {
     /** Exact ceil of the objective lower bound `⌈L(y)⌉`, a valid integer lower bound, or null. */
     fun lowerBoundCeil(model: LpModel, basis: Basis): Long? = lagrangian(model, basis)?.ceil()?.toLongOrNull()
 
+    /**
+     * Certified-exact quantities at a (float-found) optimal [basis], for the sparse path's
+     * reduced-cost fixing / objective-bound reasons (#705): the exact objective lower bound
+     * ([Certificate.objective] — tight at an optimal basis, i.e. the LP optimum), each variable's
+     * reduced cost (`0` for basic columns), and which rows carry nonzero dual weight. Null when the
+     * dual system is singular (bad float basis) or a negative reduced cost meets an infinite upper
+     * bound (unbounded Lagrangian) — the caller then skips fixing, which is sound.
+     */
+    fun certify(model: LpModel, basis: Basis): Certificate? {
+        val m = model.m
+        val basic = basis.basicVars
+        val y = solveDual(model, basic) ?: return null
+        var l = BigRational.ZERO
+        for (i in 0 until m) l += y[i] * BigRational.of(model.rhs[i])
+        val nonBasic = BooleanArray(model.numVars) { true }
+        for (t in 0 until m) nonBasic[basic[t]] = false
+        val reducedCost = Array(model.numVars) { BigRational.ZERO }
+        for (j in 0 until model.numVars) {
+            if (!nonBasic[j]) continue
+            var dot = BigRational.ZERO
+            forEachFullColumn(model, j) { i, a -> dot += y[i] * BigRational.of(a) }
+            val dj = BigRational.of(model.cost[j]) - dot // reduced cost c_j − yᵀA_j
+            reducedCost[j] = dj
+            if (dj.signum() < 0) {
+                if (!model.hasUpper[j]) return null // unbounded below
+                l += dj * BigRational.of(model.upper[j])
+            }
+        }
+        val dualNonzeroRow = BooleanArray(m) { y[it].signum() != 0 }
+        return Certificate(l + BigRational.of(model.objConstant), reducedCost, dualNonzeroRow)
+    }
+
+    /** Exact LP-optimum data certified from an optimal [Basis]: see [certify]. */
+    class Certificate(
+        /** The exact objective lower bound, tight at an optimal basis (= the LP optimum). */
+        val objective: BigRational,
+        /** Per-variable reduced cost `c_j − yᵀA_j`; `0` for basic columns. */
+        val reducedCost: Array<BigRational>,
+        /** Whether row `i` carries nonzero dual weight (for non-global-row premise citation). */
+        val dualNonzeroRow: BooleanArray,
+    )
+
     private fun lagrangian(model: LpModel, basis: Basis): BigRational? {
         val m = model.m
         val basic = basis.basicVars
@@ -33,10 +75,7 @@ internal object ExactBasisCertifier {
         for (j in 0 until model.numVars) {
             if (!nonBasic[j]) continue
             var dot = BigRational.ZERO
-            for (i in 0 until m) {
-                val a = fullEntry(model, i, j)
-                if (a != 0L) dot += y[i] * BigRational.of(a)
-            }
+            forEachFullColumn(model, j) { i, a -> dot += y[i] * BigRational.of(a) }
             val dj = BigRational.of(model.cost[j]) - dot // reduced cost c_j − yᵀA_j
             if (dj.signum() < 0) {
                 if (!model.hasUpper[j]) return null // unbounded below
@@ -48,15 +87,56 @@ internal object ExactBasisCertifier {
         return l + BigRational.of(model.objConstant)
     }
 
-    /** Exact solve of `M y = c_B` with `M[t][i] = A_full[i][basicVar[t]]`: fraction-free Bareiss
-     *  forward elimination (integer, no gcd) then rational back-substitution. */
-    private fun solveDual(model: LpModel, basic: IntArray): Array<BigRational>? {
+    /**
+     * Exactly certify that the node LP `{A x = rhs, 0 ≤ x ≤ upper}` is **infeasible**, from a (float)
+     * basis and the leaving row at a dual-unbounded termination ([RevisedSimplex.infeasibleRow]). The
+     * candidate Farkas ray is `ρ = B⁻ᵀ e_r` solved exactly; by Farkas' lemma the LP is infeasible iff
+     * some `ρ` has `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`, which is checked exactly here (both `±ρ`). **Any**
+     * `ρ` passing it proves infeasibility, so a bad/float-misled ray simply fails the check and the
+     * node is kept — the prune is sound regardless of how the ray was found. Returns false on a
+     * singular basis or when neither sign certifies.
+     */
+    fun certifiesInfeasible(model: LpModel, basis: Basis, leavingRow: Int): Boolean {
+        if (leavingRow !in 0 until model.m) return false
+        val rho = solveDualSystem(model, basis.basicVars) { t -> if (t == leavingRow) BigInt.ONE else BigInt.ZERO }
+            ?: return false
+        return farkasCertifies(model, rho) || farkasCertifies(model, Array(rho.size) { BigRational.ZERO - rho[it] })
+    }
+
+    /** Whether [rho] is an exact Farkas infeasibility certificate: `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`. A
+     *  column with `ρ·A_j > 0` but no finite upper bound makes the box max unbounded — this ρ cannot
+     *  certify, so bail (false). */
+    private fun farkasCertifies(model: LpModel, rho: Array<BigRational>): Boolean {
+        var lhs = BigRational.ZERO
+        for (i in 0 until model.m) lhs += rho[i] * BigRational.of(model.rhs[i])
+        var boxMax = BigRational.ZERO
+        for (j in 0 until model.numVars) {
+            var aj = BigRational.ZERO
+            forEachFullColumn(model, j) { i, a -> aj += rho[i] * BigRational.of(a) }
+            if (aj.signum() > 0) {
+                if (!model.hasUpper[j]) return false
+                boxMax += aj * BigRational.of(model.upper[j])
+            }
+        }
+        return lhs > boxMax
+    }
+
+    /** Exact solve of `Bᵀ y = rhs` with `Bᵀ`'s row `t` the basic column `basic[t]`: fraction-free
+     *  Bareiss forward elimination (integer, no gcd) then rational back-substitution. */
+    private fun solveDual(model: LpModel, basic: IntArray): Array<BigRational>? =
+        solveDualSystem(model, basic) { t -> BigInt.of(model.cost[basic[t]]) }
+
+    private fun solveDualSystem(model: LpModel, basic: IntArray, rhs: (Int) -> BigInt): Array<BigRational>? {
         val m = model.m
-        // Augmented [M | c_B] in BigInt; the O(m³) elimination below is fraction-free (Bareiss):
+        // Augmented [Bᵀ | rhs] in BigInt; the O(m³) elimination below is fraction-free (Bareiss):
         // pure-integer, no per-op gcd, with magnitudes bounded by a single determinant.
         val a = Array(m) { t ->
             val col = basic[t]
-            Array(m + 1) { j -> BigInt.of(if (j < m) fullEntry(model, j, col) else model.cost[col]) }
+            // Basic column `col` over rows 0 until m (scatter the nonzeros), with rhs(t) at column m.
+            val rowArr = Array(m + 1) { BigInt.ZERO }
+            rowArr[m] = rhs(t)
+            forEachFullColumn(model, col) { i, v -> rowArr[i] = BigInt.of(v) }
+            rowArr
         }
         var prev = BigInt.ONE
         for (k in 0 until m) {
@@ -92,12 +172,9 @@ internal object ExactBasisCertifier {
         return x
     }
 
-    /** `A_full[row][col]`: structural column → `a[row][col]`, slack column `n+s` → unit `e_s`. */
-    private fun fullEntry(model: LpModel, row: Int, col: Int): Long = if (col < model.n) {
-        model.a[row][col]
-    } else if (col - model.n == row) {
-        1L
-    } else {
-        0L
+    /** Iterate the nonzero rows of full column [col] as `(row, value)`: a structural column through the
+     *  model's CSC/dense accessor, a slack column `n+s` as the unit vector `e_s`. */
+    private inline fun forEachFullColumn(model: LpModel, col: Int, action: (row: Int, value: Long) -> Unit) {
+        if (col < model.n) model.forEachInColumn(col, action) else action(col - model.n, 1L)
     }
 }

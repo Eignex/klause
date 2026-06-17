@@ -30,9 +30,11 @@ import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
  *     bump weights on currently-violated factors by [stallIncrement] — SAPS-style scale,
  *     amplifying pressure on factors that resist being repaired. Then, with probability
  *     [smoothProb], apply SAPS-style probabilistic *smoothing*: pull every weight a fraction
- *     [smoothFactor] of the way back toward [baseWeight]. Smoothing is a forgetting mechanism
- *     that counteracts the otherwise-monotone weight growth, so factors that are no longer
- *     hard decay back and the gradient doesn't ossify on long plateau-heavy runs. Disabled by
+ *     [smoothFactor] of the way back toward its seeded baseline (the per-factor initial weights
+ *     scaled by [baseWeight]). Smoothing is a forgetting mechanism that counteracts the otherwise-
+ *     monotone weight growth, so factors that are no longer hard decay back and the gradient doesn't
+ *     ossify on long plateau-heavy runs — and, targeting the seed rather than a flat constant, it
+ *     restores the proactive per-class / implied landscape instead of flattening it. Disabled by
  *     default ([smoothProb] = 0.0); the bump-only schedule is the baseline regime.
  *  2. Collect candidate moves:
  *     - From each violated factor (capped at [violatedSampleCount]): `proposeRepairMoves`.
@@ -63,7 +65,9 @@ class Cbls(
      *  [baseWeight] (`w ← (1 - smoothFactor)·w + smoothFactor·baseWeight`). Only consulted
      *  when [smoothProb] > 0. */
     val smoothFactor: Double = 0.8,
-    /** Weight that smoothing pulls toward — the lazily-allocated default of `factorWeights`. */
+    /** Scale on the per-factor smoothing target: smoothing pulls each weight toward
+     *  `baseWeight · `[LocalSearchState.baseFactorWeights]`[f]`. `1.0` (default) targets the seed
+     *  exactly; only consulted when [smoothProb] > 0. */
     val baseWeight: Double = 1.0,
     /** Cap on violated factors sampled per [pickMove] call for candidate generation. */
     val violatedSampleCount: Int = 4,
@@ -155,6 +159,16 @@ class Cbls(
      *  slightly-worsening move whose spatial reach is small — the classical mechanism for
      *  crossing plateau lakes. `0.0` (default) = strict descent on the scored delta. */
     val skewAlpha: Double = 0.0,
+    /** **Implicit-solving neighbourhoods** (`0` = off): cap on elected structural globals
+     *  (see [LocalSearchState.electedImplicit]) sampled per *infeasible* [pickMove] for their
+     *  feasibility-preserving structured moves. Those moves never break the global itself, so
+     *  they enter the noise-eligible pool and are scored by the weighted-violation gradient —
+     *  winning only when the structure-preserving relocation clears a clash in a coupled
+     *  constraint (e.g. swapping two cells of one all-different to fix the column it shares).
+     *  At feasibility [sampleFromSatisfied] already owns the structured pool, so this source
+     *  is gated to `state.cost > 0`. `0` (default) = off, so default convergence is unchanged;
+     *  enabled by the portfolio on permutation/assignment-shaped models. */
+    val implicitStructuredCap: Int = 0,
 ) : Strategy {
 
     init {
@@ -177,6 +191,7 @@ class Cbls(
         require(maxNeighborhood >= 1) { "maxNeighborhood ≥ 1, got $maxNeighborhood" }
         require(candidatesPerLevel >= 1) { "candidatesPerLevel ≥ 1, got $candidatesPerLevel" }
         require(skewAlpha >= 0.0) { "skewAlpha ≥ 0, got $skewAlpha" }
+        require(implicitStructuredCap >= 0) { "implicitStructuredCap ≥ 0, got $implicitStructuredCap" }
     }
 
     private var lastImprovingStep: Long = -1L
@@ -244,6 +259,7 @@ class Cbls(
         sampleFromViolated(state, sink)
         if (stalled) sampleFrontier(state, sink)
         sampleFromSatisfied(state, sink)
+        if (state.cost > 0L) sampleElectedStructured(state, sink)
         seedObjectiveMoves(state, sink)
 
         // Stall swaps and ejection chains live in a private sink: they compete on *score
@@ -365,15 +381,18 @@ class Cbls(
     }
 
     /** SAPS-style probabilistic smoothing (forgetting): pull every factor weight a fraction
-     *  [smoothFactor] of the way back toward [baseWeight]. [bumpViolatedWeights] only ever
-     *  grows weights, so without a counter-pressure the gradient ossifies on long runs;
-     *  smoothing lets weight on factors that are no longer hard decay back. Called with
-     *  probability [smoothProb] right after a stall bump. */
+     *  [smoothFactor] of the way back toward its seeded baseline ([LocalSearchState.baseFactorWeights]
+     *  scaled by [baseWeight]). [bumpViolatedWeights] only ever grows weights, so without a
+     *  counter-pressure the gradient ossifies on long runs; smoothing lets weight on factors that are
+     *  no longer hard decay back. Targeting the per-factor seed rather than a flat constant means the
+     *  decay restores the proactive per-class / implied landscape from
+     *  [LocalSearchState.factorWeights] instead of flattening it. Called with probability [smoothProb]
+     *  right after a stall bump. */
     private fun smoothAllWeights(state: LocalSearchState) {
         val w = state.factorWeights
+        val base = state.baseFactorWeights
         val keep = 1.0 - smoothFactor
-        val pull = smoothFactor * baseWeight
-        for (i in w.indices) w[i] = keep * w[i] + pull
+        for (i in w.indices) w[i] = keep * w[i] + smoothFactor * baseWeight * base[i]
     }
 
     /** Violated-factor repair source backing [sampleFromViolated]. The duplicated draw loop now
@@ -449,6 +468,24 @@ class Cbls(
         // Phase.Feasible; this gate is the (still per-strategy) enforcement of it.
         if (state.cost > 0) return
         satisfiedStructured.generate(MoveGenContext(state), sink)
+    }
+
+    /** Implicit-solving source (see [implicitStructuredCap]): during infeasibility, draw
+     *  feasibility-preserving structured moves from elected structural globals that are
+     *  *currently satisfied*. Unlike [sampleFromSatisfied] (which scans random factors and is
+     *  gated off at infeasibility) this iterates only the small elected set, so it stays cheap
+     *  while the search is still closing violations. The moves preserve the elected global, so
+     *  they only improve the score when they help a coupled constraint. */
+    private fun sampleElectedStructured(state: LocalSearchState, sink: MoveSink) {
+        if (implicitStructuredCap == 0) return
+        val elected = state.electedImplicit
+        if (elected.isEmpty()) return
+        repeat(minOf(implicitStructuredCap, elected.size)) {
+            val fid = elected[state.rng.nextInt(elected.size)]
+            if (!state.violated.contains(fid)) {
+                state.factors[fid].proposeStructuredMoves(state, fid, sink)
+            }
+        }
     }
 
     /** Seed single-variable moves directly on the objective's nonzero-weight vars. Without

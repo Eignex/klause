@@ -75,6 +75,62 @@ object MoveSetOracle {
         }
     }
 
+    /**
+     * Feasibility-preservation oracle for [Factor.proposeStructuredMoves]. From feasible
+     * starting assignments (factor satisfied) every proposed structured move must keep the
+     * factor satisfied — that is the contract structured moves rely on (they are offered only
+     * to already-feasible factors and must never break them). A factor that proposes nothing
+     * trivially passes, so this is safe to run over every factor.
+     */
+    fun assertStructuredMovesPreserveFeasibility(
+        problem: Problem,
+        label: String = "factor",
+        iters: Int = 60,
+        seed: Long = 0x5EED_F00DL,
+    ) {
+        require(problem.factors.size == 1) { "MoveSetOracle expects a single-factor Problem" }
+        val factor = problem.factors[0]
+        val rng = Random(seed)
+
+        repeat(iters) { iter ->
+            val state = LocalSearchState(problem, Random(seed + iter))
+            // Search for a feasible start: a few random tries, then the factor's own feasible
+            // seeder (structural globals supply one — it lands a permutation / tuple directly).
+            var feasible = false
+            var tries = 0
+            while (tries < FEASIBLE_SEARCH_BUDGET) {
+                randomizeAssignment(state, problem, rng)
+                state.recompute()
+                if (!factor.isViolated(state, 0)) {
+                    feasible = true
+                    break
+                }
+                tries++
+            }
+            if (!feasible) {
+                randomizeAssignment(state, problem, rng)
+                factor.seedFeasible(state, 0)
+                state.recompute()
+                feasible = !factor.isViolated(state, 0)
+            }
+            if (!feasible) return@repeat
+
+            val sink = MoveSink()
+            factor.proposeStructuredMoves(state, 0, sink)
+            for (move in sink.list) {
+                assertLegal(move, problem, state, factor, label)
+                val delta = applyAndReport(problem, state, factor, move)
+                assertTrue(
+                    delta <= 0,
+                    "$label: structured move $move broke feasibility (delta=$delta) on iter=$iter, " +
+                        "ints=${snapshotInts(state, problem)}",
+                )
+            }
+        }
+    }
+
+    private const val FEASIBLE_SEARCH_BUDGET = 64
+
     private fun assertLegal(move: Move, problem: Problem, state: LocalSearchState, factor: Factor, label: String) {
         when (move) {
             is Move.BoolFlip -> {

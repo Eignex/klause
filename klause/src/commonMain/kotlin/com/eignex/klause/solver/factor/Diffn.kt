@@ -2,11 +2,13 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntIntMap
 
 /**
  * `diffn(xs, ys, widths, heights)` — pairwise non-overlapping 2D rectangles. Each rectangle
@@ -82,7 +84,10 @@ class Diffn(
      *  by ≥2 distinct rectangles (a degenerate model). The affected-pair delta only touches
      *  the moved rectangle, which is exact iff the moved var maps to exactly one rectangle;
      *  a shared id forces the O(n²) full-recount fallback to preserve exact semantics. */
-    private val varToRect: Map<Int, Int> = run {
+    // Var id → its rectangle index, or -1 when the id is shared across rectangles (the moved-rect
+    // fast path can't apply). IntIntMap keeps the per-move lookup unboxed; -1 doubles as the
+    // absent sentinel, which the read site already treats the same as a shared id (`r < 0`).
+    private val varToRect: IntIntMap = run {
         val m = HashMap<Int, Int>(n * 2)
         fun record(v: Int, i: Int) {
             val prev = m[v]
@@ -94,7 +99,8 @@ class Diffn(
             widthVars?.let { record(it[i], i) }
             heightVars?.let { record(it[i], i) }
         }
-        m
+        val keys = m.keys.toIntArray()
+        IntIntMap.build(keys, IntArray(keys.size) { m.getValue(keys[it]) }, absent = -1)
     }
 
     /** Number of overlapping pairs that include rectangle [r], under an optional single-var
@@ -204,7 +210,7 @@ class Diffn(
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val r = varToRect[intVar]
-        val after = if (r == null || r < 0) {
+        val after = if (r < 0) {
             countOverlaps(state, intVar, newValue)
         } else {
             val oldPairsR = pairsInvolvingRect(state, r, ov = -1, nv = 0)
@@ -374,5 +380,81 @@ class Diffn(
                 }
             }
         }
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: swap the positions of two rectangles with identical
+     *  current footprint (same width and height). Each rectangle takes the other's lower-left
+     *  corner, so the set of occupied cells is exactly preserved and no overlap is introduced —
+     *  the placement is perturbed while non-overlap holds. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (n < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(n)
+            val j = state.rng.nextInt(n)
+            if (i == j || xs[i] == ys[i] || xs[j] == ys[j]) continue
+            if (rw(state, i, -1, 0) != rw(state, j, -1, 0)) continue
+            if (rh(state, i, -1, 0) != rh(state, j, -1, 0)) continue
+            val xi = state.assignment.intValue(xs[i])
+            val yi = state.assignment.intValue(ys[i])
+            val xj = state.assignment.intValue(xs[j])
+            val yj = state.assignment.intValue(ys[j])
+            if (xi == xj && yi == yj) continue
+            if (xj !in state.problem.intDomains[xs[i]] || yj !in state.problem.intDomains[ys[i]]) continue
+            if (xi !in state.problem.intDomains[xs[j]] || yi !in state.problem.intDomains[ys[j]]) continue
+            // Emit only the coordinates that actually change — a coinciding x (or y) would make a
+            // no-op IntSet, and the swap on the differing axis alone still preserves non-overlap.
+            val parts = ArrayList<Move>(4)
+            if (xj != xi) parts.add(IntSet(xs[i], xj))
+            if (yj != yi) parts.add(IntSet(ys[i], yj))
+            if (xi != xj) parts.add(IntSet(xs[j], xi))
+            if (yi != yj) parts.add(IntSet(ys[j], yi))
+            sink.addCompound(parts)
+            emitted++
+        }
+    }
+
+    /** Feasible init: lay the rectangles out left-to-right so they are pairwise disjoint on the
+     *  x-axis (hence non-overlapping for any y). Each `xs[i]` takes the first in-domain value at or
+     *  after the previous rectangle's right edge; `ys[i]` takes its domain minimum. Returns false —
+     *  leaving the random assignment — when a rectangle can't be placed in domain. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        if (n == 0) return false
+        var prevRight = Int.MIN_VALUE
+        // Earliest-x order keeps the packing close to domains; recompute width per rectangle.
+        val order = (0 until n).sortedBy { state.problem.intDomains[xs[it]].min }
+        for (i in order) {
+            val xv = xs[i]
+            val w = rw(state, i, -1, 0)
+            if (!state.assumptions.isFrozenInt(xv)) {
+                val d = state.problem.intDomains[xv]
+                val cand = if (prevRight > d.min) prevRight else d.min
+                if (cand > d.max) return false
+                var s = -1
+                d.forEach { if (s < 0 && it >= cand) s = it }
+                if (s < 0) return false
+                state.assignment.setInt(xv, s)
+                prevRight = s + w
+            } else {
+                val s = state.assignment.intValue(xv)
+                if (s < prevRight) return false
+                prevRight = s + w
+            }
+            val yv = ys[i]
+            if (!state.assumptions.isFrozenInt(yv)) state.assignment.setInt(yv, state.problem.intDomains[yv].min)
+        }
+        return true
+    }
+
+    private companion object {
+        /** Cap on equal-footprint position-swap compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 8
     }
 }

@@ -16,7 +16,7 @@ abstract class WeightedSumFactor : Factor {
 
     protected abstract fun residual(sum: Long, softCap: Int): Int
 
-    protected fun degree(sum: Long, softCap: Int): Int = if (holds(sum)) 0 else residual(sum, softCap)
+    protected open fun degree(sum: Long, softCap: Int): Int = if (holds(sum)) 0 else residual(sum, softCap)
 }
 
 /*
@@ -62,9 +62,20 @@ internal fun linearResidual(sum: Long, op: LinearOp, bound: Int, softCap: Int): 
     LinearOp.NE -> 1
 }
 
-/** Graded violation degree: `0` when satisfied, otherwise [linearResidual]. */
-internal fun linearDegree(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int =
-    if (linearHolds(sum, op, bound)) 0 else linearResidual(sum, op, bound, softCap)
+/**
+ * Graded violation degree: `0` when satisfied, otherwise the [compressViolation]-compressed
+ * distance. Computes the signed gap `sum − bound` once and branches on its sign, fusing what would
+ * otherwise be a separate [linearHolds] test followed by a [linearResidual] re-derivation.
+ */
+internal fun linearDegree(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int {
+    val d = sum - bound
+    return when (op) {
+        LinearOp.LE -> if (d <= 0L) 0 else compressViolation(d, softCap)
+        LinearOp.GE -> if (d >= 0L) 0 else compressViolation(-d, softCap)
+        LinearOp.EQ -> if (d == 0L) 0 else compressViolation(if (d < 0L) -d else d, softCap)
+        LinearOp.NE -> if (d != 0L) 0 else 1
+    }
+}
 
 /**
  * Integer value for a single variable (whose other terms sum to [sumWithout], coefficient

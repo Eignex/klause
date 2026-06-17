@@ -3,6 +3,7 @@ package com.eignex.klause.solver.lp
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -54,7 +55,18 @@ import com.eignex.klause.util.IntArrayList
  * Optional tasks (presence literals) and variable durations are skipped — the makespan link is then
  * conditional / not linearly expressible — which only drops their energy from the bound (sound).
  */
-internal class CumulativeRelaxation(private val problem: Problem) {
+internal class CumulativeRelaxation(
+    private val problem: Problem,
+    /** Project [Cumulative] / [Disjunctive] factors into makespan plans (the original behaviour). */
+    private val includeCumulative: Boolean = true,
+    /** Also project each constant-size [Diffn] onto both axes as a cumulative (#655 Tranche C): the
+     *  x-axis is `start = xs, dur = widths, res = heights, cap = the max y-extent`, and symmetrically
+     *  for the y-axis. A non-overlapping packing keeps the per-slice perpendicular demand within the
+     *  bounding-box extent, so the energetic row (whose `t1 = min-est` case is the area bound
+     *  `Σ wᵢ·hᵢ ≤ W·H`) lower-bounds a strip-length / extent variable. Using the *maximum* perpendicular
+     *  extent as capacity only loosens, so it stays sound; off by default. */
+    private val includeDiffn: Boolean = false,
+) {
 
     /**
      * One emit plan: a verified makespan variable [makespanVar] (proven ≥ the end of every task in
@@ -226,6 +238,7 @@ internal class CumulativeRelaxation(private val problem: Problem) {
         for (f in problem.factors) {
             when (f) {
                 is Cumulative -> {
+                    if (!includeCumulative) continue
                     // Variable durations: M ≥ startᵢ + durᵢ is not a 2-var linear link. Optional tasks:
                     // the link is conditional on presence. Both are skipped (drops energy, sound).
                     if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
@@ -239,15 +252,44 @@ internal class CumulativeRelaxation(private val problem: Problem) {
                 }
 
                 is Disjunctive -> {
+                    if (!includeCumulative) continue
                     if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
                     if (f.starts.size > MAX_TASKS) continue
                     out.add(Sched(f.starts, f.durations, IntArray(f.starts.size) { 1 }, cap = 1))
                 }
 
+                is Diffn -> if (includeDiffn) addDiffnScheds(f, out)
+
                 else -> Unit
             }
         }
         return out
+    }
+
+    /** Project a constant-size [Diffn] onto both axes (see [includeDiffn]): the x-axis cumulative has
+     *  capacity the maximum y-extent and vice versa. Variable-size diffn is skipped (a variable width
+     *  is not a constant duration); zero-extent axes contribute no resource room and are dropped. */
+    private fun addDiffnScheds(f: Diffn, out: ArrayList<Sched>) {
+        if (f.widthVars != null || f.heightVars != null) return
+        if (f.xs.size > MAX_TASKS) return
+        val yExtent = perpendicularExtent(f.ys, f.heights)
+        if (yExtent > 0) out.add(Sched(f.xs, f.widths, f.heights, yExtent))
+        val xExtent = perpendicularExtent(f.xs, f.widths)
+        if (xExtent > 0) out.add(Sched(f.ys, f.heights, f.widths, xExtent))
+    }
+
+    /** Maximum extent of the bounding box along an axis: `max(coordᵢ.max + sizeᵢ) − min(coordᵢ.min)`.
+     *  An upper bound on the perpendicular resource room, so using it as the cumulative capacity only
+     *  loosens the energetic bound (sound). */
+    private fun perpendicularExtent(coords: IntArray, sizes: IntArray): Int {
+        var hi = Int.MIN_VALUE
+        var lo = Int.MAX_VALUE
+        for (i in coords.indices) {
+            val d = problem.intDomains[coords[i]]
+            if (d.max + sizes[i] > hi) hi = d.max + sizes[i]
+            if (d.min < lo) lo = d.min
+        }
+        return hi - lo
     }
 
     /**

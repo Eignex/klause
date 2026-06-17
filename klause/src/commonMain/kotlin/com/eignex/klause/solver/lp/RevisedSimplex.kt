@@ -42,22 +42,31 @@ internal class RevisedSimplex(
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
 
+    /** When [solve] returns null because the primal is infeasible (dual unbounded — no entering column
+     *  for the most-violated basic row), the basis and that leaving row at termination, for the exact
+     *  Farkas infeasibility check ([ExactBasisCertifier.certifiesInfeasible]). Null on any other failure
+     *  (non-convergence, singular pivot, budget) — so the caller only prunes on a genuine infeasibility. */
+    var infeasibleBasis: Basis? = null
+        private set
+    var infeasibleRow: Int = -1
+        private set
+
     init {
         colRows = Array(n) { IntArray(0) }
         colVals = Array(n) { DoubleArray(0) }
+        // Read columns through the model's representation-agnostic accessor: a direct CSC slice on a
+        // sparse model (#602), or a dense-column scan otherwise. Two passes (the accessor is inline,
+        // so each is a tight loop) — count nnz, then fill.
         for (j in 0 until n) {
             var nnz = 0
-            for (i in 0 until m) if (model.a[i][j] != 0L) nnz++
+            model.forEachInColumn(j) { _, _ -> nnz++ }
             val rows = IntArray(nnz)
             val vals = DoubleArray(nnz)
             var k = 0
-            for (i in 0 until m) {
-                val v = model.a[i][j]
-                if (v != 0L) {
-                    rows[k] = i
-                    vals[k] = v.toDouble()
-                    k++
-                }
+            model.forEachInColumn(j) { i, v ->
+                rows[k] = i
+                vals[k] = v.toDouble()
+                k++
             }
             colRows[j] = rows
             colVals[j] = vals
@@ -180,7 +189,13 @@ internal class RevisedSimplex(
                     q = j
                 }
             }
-            if (q == -1) return null // dual unbounded ⇒ primal infeasible; let the exact solver judge
+            if (q == -1) {
+                // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
+                // certify infeasibility exactly (the float ray alone is not sound to prune on).
+                infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf())
+                infeasibleRow = r
+                return null
+            }
 
             denseColumn(q, aq)
             val alpha = lu.ftran(aq)

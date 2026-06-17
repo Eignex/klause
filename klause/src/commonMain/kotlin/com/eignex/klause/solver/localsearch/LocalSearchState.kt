@@ -18,6 +18,13 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
+import kotlin.reflect.KClass
+
+/** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
+ *  order of magnitude below the 1.0 structural default: a model padded with hundreds of redundant
+ *  rows then aggregates to roughly the weight of a handful of structural ones, so the early descent
+ *  follows the real feasible region instead of chasing the implied bulk. */
+internal const val IMPLIED_FACTOR_INITIAL_WEIGHT: Double = 0.1
 
 /**
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
@@ -63,6 +70,64 @@ class LocalSearchState(
      *  every [Factor] carries the local-search contract (with sound no-op defaults), so no
      *  cast or capability check is needed. */
     val factors: Array<Factor> = problem.factors
+
+    /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals
+     *  whose [Factor.proposeStructuredMoves] preserves their own feasibility (see
+     *  [Factor.providesImplicitNeighbourhood]). The engine draws these factors'
+     *  feasibility-preserving moves even during infeasibility so they can clear violations in
+     *  coupled constraints without ever breaking themselves, and seeds them feasible at search
+     *  start. Built once on first access. */
+    val electedImplicit: IntArray by lazy { electImplicitFactors() }
+
+    /** Scope-disjoint subset of [electedImplicit] used for feasible-init seeding: greedily
+     *  chosen largest-scope-first so no two seed factors share an int variable. Disjointness
+     *  guarantees one factor's [Factor.seedFeasible] never overwrites another's seeded vars,
+     *  so the post-seed assignment satisfies every seeded global simultaneously. */
+    val implicitSeedFactors: IntArray by lazy { electImplicitSeedSet() }
+
+    private fun electImplicitFactors(): IntArray {
+        val out = IntArrayList()
+        for (id in 0 until problem.numFactors) {
+            if (factors[id].providesImplicitNeighbourhood) out.add(id)
+        }
+        return IntArray(out.size) { out[it] }
+    }
+
+    private fun electImplicitSeedSet(): IntArray {
+        // Largest scope first so the packing seeds the most variables; ties broken by factor id
+        // for determinism (the RNG never enters election — it must be reproducible across runs).
+        val candidates = electedImplicit.sortedWith(
+            compareByDescending<Int> { factors[it].intVars.size }.thenBy { it },
+        )
+        val owned = BooleanArray(problem.numIntVars)
+        val seeds = IntArrayList()
+        for (id in candidates) {
+            val scope = factors[id].intVars
+            var disjoint = true
+            for (v in scope) {
+                if (owned[v]) {
+                    disjoint = false
+                    break
+                }
+            }
+            if (!disjoint) continue
+            for (v in scope) owned[v] = true
+            seeds.add(id)
+        }
+        return IntArray(seeds.size) { seeds[it] }
+    }
+
+    /** Implicit-solving feasible init: seed every [implicitSeedFactors] global into a satisfying
+     *  configuration (skipping variables frozen by [assumptions]). Caller is responsible for the
+     *  subsequent [recompute] — the engine's restart wrapper runs that once after seeding +
+     *  any definitional sweep. */
+    fun seedImplicitFeasible() {
+        val seeds = implicitSeedFactors
+        for (i in seeds.indices) {
+            val fid = seeds[i]
+            factors[fid].seedFeasible(this, fid)
+        }
+    }
 
     /** Step counter incremented on every accepted move. Strategies use this together with
      *  [lastTouched] to enforce a tabu list. */
@@ -145,16 +210,74 @@ class LocalSearchState(
      *  to capture all-1.0 defaults from sessions that ran a weight-blind strategy. */
     private var _factorWeights: DoubleArray? = null
 
-    /** Per-factor dynamic weights for weighted-violation strategies. */
+    /** Seed [factorWeights] by per-class population so no constraint kind dominates the landscape by
+     *  count. Set by the engine from [LocalSearchParams.normalizeWeightsByClass] once per solve,
+     *  before the first weight access. */
+    var normalizeWeightsByClass: Boolean = false
+        internal set
+
+    /** Per-factor dynamic weights for weighted-violation strategies. Factors the model declared
+     *  implied (redundant / symmetry-breaking — [Problem.impliedFactorMask]) start at
+     *  [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than 1.0, so the bulk of those rows can't dominate
+     *  the initial descent before the structural constraints are met. SAPS-style
+     *  bumping still raises an implied factor's weight if it persistently blocks progress, so the
+     *  lower seed biases the early landscape without making the constraint unenforceable.
+     *
+     *  When [normalizeWeightsByClass] is set, the remaining (non-implied) factors are additionally
+     *  damped by class population — see [initialFactorWeights]. */
     val factorWeights: DoubleArray
         get() {
             var w = _factorWeights
             if (w == null) {
-                w = DoubleArray(problem.numFactors) { 1.0 }
+                w = initialFactorWeights()
                 _factorWeights = w
+                _baseFactorWeights = w.copyOf()
             }
             return w
         }
+
+    private var _baseFactorWeights: DoubleArray? = null
+
+    /** The initial seeded per-factor weights ([initialFactorWeights]), snapshotted once when
+     *  [factorWeights] is first allocated and never mutated afterwards. SAPS-style smoothing pulls
+     *  the live weights back toward this baseline rather than a flat constant, so the proactive
+     *  per-class / implied seeding survives the reactive bumping instead of being washed out. */
+    val baseFactorWeights: DoubleArray
+        get() {
+            _baseFactorWeights?.let { return it }
+            factorWeights // forces allocation, which also assigns _baseFactorWeights
+            return _baseFactorWeights ?: error("baseFactorWeights is assigned when factorWeights is allocated")
+        }
+
+    /** Build the initial per-factor weight vector. Non-implied factors start at 1.0, optionally
+     *  class-normalised ([normalizeWeightsByClass]): an over-represented factor class — population
+     *  above the mean over non-implied classes — is scaled so its aggregate weight is capped at that
+     *  mean, never amplifying a smaller class above 1.0. Implied factors are pinned to
+     *  [IMPLIED_FACTOR_INITIAL_WEIGHT] regardless, and are excluded from the class tally so a
+     *  structural constraint isn't penalised for merely sharing a type with the implied bulk. */
+    private fun initialFactorWeights(): DoubleArray {
+        val n = problem.numFactors
+        val implied = problem.impliedFactorMask
+        val w = DoubleArray(n) { 1.0 }
+        if (normalizeWeightsByClass) {
+            val counts = HashMap<KClass<*>, Int>()
+            for (i in 0 until n) {
+                if (implied != null && implied[i]) continue
+                val k = problem.factors[i]::class
+                counts[k] = (counts[k] ?: 0) + 1
+            }
+            if (counts.isNotEmpty()) {
+                val meanClassSize = counts.values.sum().toDouble() / counts.size
+                for (i in 0 until n) {
+                    if (implied != null && implied[i]) continue
+                    val c = counts.getValue(problem.factors[i]::class)
+                    if (c > meanClassSize) w[i] = meanClassSize / c
+                }
+            }
+        }
+        if (implied != null) for (i in 0 until n) if (implied[i]) w[i] = IMPLIED_FACTOR_INITIAL_WEIGHT
+        return w
+    }
 
     /** True iff [factorWeights] has been touched (allocated) on this state. Reading is
      *  free; allows callers to probe without forcing the lazy allocation. */

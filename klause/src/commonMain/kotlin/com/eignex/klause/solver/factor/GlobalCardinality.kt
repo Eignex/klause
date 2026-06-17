@@ -4,11 +4,13 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
 /**
  * Global Cardinality Constraint (GCC). Covers the four MiniZinc variants in one factor:
@@ -110,11 +112,10 @@ class GlobalCardinality(
         if (cv != null) xs + cv else xs
     }
 
-    private val coverIndexByValue: HashMap<Int, Int> = run {
-        val m = HashMap<Int, Int>(cover.size * 2)
-        for (i in cover.indices) m[cover[i]] = i
-        m
-    }
+    // Cover value → its index. IntIntMap keeps the per-probe lookup unboxed; indices are ≥ 0 so
+    // -1 is a safe absent sentinel (a value not in the cover).
+    private val coverIndexByValue: IntIntMap =
+        IntIntMap.build(cover, IntArray(cover.size) { it }, absent = -1)
 
     /** Per-cover-index count under the current assignment. */
     private class State(val counts: IntArray)
@@ -124,7 +125,8 @@ class GlobalCardinality(
         for (i in xs.indices) {
             if (!present(state, i)) continue
             val value = state.assignment.intValue(xs[i])
-            val idx = coverIndexByValue[value] ?: continue // out-of-cover; counts unaffected
+            val idx = coverIndexByValue[value]
+            if (idx < 0) continue // out-of-cover; counts unaffected
             counts[idx]++
         }
         state.refPayload[factorId] = State(counts)
@@ -178,7 +180,7 @@ class GlobalCardinality(
             val p = if (controlled) !present(state, i) else present(state, i)
             if (!p) continue
             val v = if (xs[i] == ovVar) ovVal else state.assignment.intValue(xs[i])
-            if (v !in coverIndexByValue) deg++
+            if (!coverIndexByValue.contains(v)) deg++
         }
         return deg
     }
@@ -188,75 +190,76 @@ class GlobalCardinality(
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as State
-        val before = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
         val sim = s.counts.copyOf()
         var occurrencesInXs = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
             val old = state.assignment.intValue(intVar)
-            coverIndexByValue[old]?.let { sim[it] -= occurrencesInXs }
-            coverIndexByValue[newValue]?.let { sim[it] += occurrencesInXs }
+            val oldIdx = coverIndexByValue[old]
+            if (oldIdx >= 0) sim[oldIdx] -= occurrencesInXs
+            val newIdx = coverIndexByValue[newValue]
+            if (newIdx >= 0) sim[newIdx] += occurrencesInXs
         }
         val after = rawDegree(state, sim, ovVar = intVar, ovVal = newValue)
-        return compressViolation(after, state.violationSoftCap) - compressViolation(before, state.violationSoftCap)
+        // The pre-move degree is the factor's current violation degree, already maintained in
+        // factorDegree — reuse it instead of re-scanning the cover for `before`.
+        return compressViolation(after, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as State
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
+        // The pre-move degree is the factor's current violation degree, already maintained in
+        // factorDegree (still pre-move here — the engine reconciles after apply*), so the prior
+        // counts need not be reconstructed and re-scanned.
+        val beforeDeg = state.factorDegree[factorId]
         var occurrencesInXs = 0
         for (i in xs.indices) if (xs[i] == intVar && present(state, i)) occurrencesInXs++
-        // Pre-update degree: reconstruct the prior counts by inverting this move, and read the
-        // prior value (oldValue) for the count-var / closed overrides.
-        val simInv = s.counts.copyOf()
         if (occurrencesInXs > 0) {
-            coverIndexByValue[cur]?.let { simInv[it] -= occurrencesInXs }
-            coverIndexByValue[oldValue]?.let { simInv[it] += occurrencesInXs }
-        }
-        val beforeDeg = rawDegree(state, simInv, ovVar = intVar, ovVal = oldValue)
-        if (occurrencesInXs > 0) {
-            coverIndexByValue[oldValue]?.let { s.counts[it] -= occurrencesInXs }
-            coverIndexByValue[cur]?.let { s.counts[it] += occurrencesInXs }
+            val oldIdx = coverIndexByValue[oldValue]
+            if (oldIdx >= 0) s.counts[oldIdx] -= occurrencesInXs
+            val curIdx = coverIndexByValue[cur]
+            if (curIdx >= 0) s.counts[curIdx] += occurrencesInXs
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
-        return compressViolation(afterDeg, state.violationSoftCap) -
-            compressViolation(beforeDeg, state.violationSoftCap)
+        return compressViolation(afterDeg, state.violationSoftCap) - beforeDeg
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        val before = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
         val sim = s.counts.copyOf()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasP = present(state, i)
-            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
+            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])]
+            if (coverIdx < 0) continue
             sim[coverIdx] += if (wasP) -1 else +1
         }
         // Counts term uses the simulated counts; closed term re-evaluates with the flip applied.
         val after = countsDegree(state, sim, ovVar = -1, ovVal = 0) +
             closedDegree(state, ovVar = -1, ovVal = 0, flipVar = boolVar)
-        return compressViolation(after, state.violationSoftCap) - compressViolation(before, state.violationSoftCap)
+        // Pre-move degree is the maintained current violation degree — reuse it for `before`.
+        return compressViolation(after, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as State
-        // Flip is already applied to the assignment; reconstruct the pre-flip degree by inverting
-        // the presence of boolVar's positions for the closed term, against the un-mutated counts.
-        val beforeDeg = countsDegree(state, s.counts, ovVar = -1, ovVal = 0) +
-            closedDegree(state, ovVar = -1, ovVal = 0, flipVar = boolVar)
+        // Flip is already applied to the assignment; the pre-flip degree is the maintained current
+        // violation degree (the engine reconciles factorDegree only after apply*), so it need not
+        // be reconstructed from the inverted presence.
+        val beforeDeg = state.factorDegree[factorId]
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val nowP = present(state, i)
-            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])] ?: continue
+            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])]
+            if (coverIdx < 0) continue
             s.counts[coverIdx] += if (nowP) +1 else -1
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0)
-        return compressViolation(afterDeg, state.violationSoftCap) -
-            compressViolation(beforeDeg, state.violationSoftCap)
+        return compressViolation(afterDeg, state.violationSoftCap) - beforeDeg
     }
 
     /** Vars currently pinned (singleton) to [value], among [scope]. */
@@ -362,7 +365,6 @@ class GlobalCardinality(
         }
         val n = effectiveXs.size
         val m = cover.size
-        val coverSet = coverIndexByValue.keys
         // Maybe-present xs: presence undecided. They contribute no definite count and take
         // no pruning, but they remain potential takers of any cover value, so every
         // upper-bound argument must include them.
@@ -392,7 +394,7 @@ class GlobalCardinality(
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
                 val toRemove = IntArrayList()
-                d.forEach { if (it !in coverSet) toRemove.add(it) }
+                d.forEach { if (!coverIndexByValue.contains(it)) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(
                             x,
@@ -468,7 +470,7 @@ class GlobalCardinality(
             for (i in 0 until n) {
                 val d = state.intDomains[effectiveXs[i]]
                 var found = false
-                d.forEach { if (!found && it !in coverSet) found = true }
+                d.forEach { if (!found && !coverIndexByValue.contains(it)) found = true }
                 hasOtherVar[i] = found
                 if (found) any = true
             }
@@ -620,7 +622,7 @@ class GlobalCardinality(
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[varNode[i]] != sccId[otherNode]) {
                 val d = state.intDomains[effectiveXs[i]]
                 val toRemove = IntArrayList()
-                d.forEach { if (it !in coverSet) toRemove.add(it) }
+                d.forEach { if (!coverIndexByValue.contains(it)) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(
                             effectiveXs[i],
@@ -914,7 +916,7 @@ class GlobalCardinality(
             for (i in xs.indices) {
                 if (!present(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
-                if (cur in coverIndexByValue) continue
+                if (coverIndexByValue.contains(cur)) continue
                 val d = state.problem.intDomains[xs[i]]
                 for (cv in cover) {
                     if (cv in d && cv != cur) {
@@ -924,5 +926,131 @@ class GlobalCardinality(
                 }
             }
         }
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: swap the values of two present `xs` positions. Every
+     *  cover value's count is unchanged (one position loses it, another gains it), so all bound /
+     *  count-var obligations and the closed check are preserved while the assignment is perturbed —
+     *  which can clear a clash in a coupled constraint sharing one of those variables. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (xs.size < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val ai = state.rng.nextInt(xs.size)
+            val bi = state.rng.nextInt(xs.size)
+            val a = xs[ai]
+            val b = xs[bi]
+            if (a == b) continue
+            if (!present(state, ai) || !present(state, bi)) continue
+            val va = state.assignment.intValue(a)
+            val vb = state.assignment.intValue(b)
+            if (va == vb) continue
+            if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) continue
+            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+            emitted++
+        }
+    }
+
+    /** Feasible init: assign present `xs` to cover values meeting every lower bound without
+     *  exceeding an upper bound (bound form) or any in-domain cover value (count-var form, then
+     *  the count vars are set to the realised counts). Frozen vars keep their value and are
+     *  counted first. Returns false — leaving the random assignment — if no feasible assignment is
+     *  reachable greedily. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val counts = IntArray(cover.size)
+        val free = IntArrayList()
+        for (i in xs.indices) {
+            if (!present(state, i)) continue
+            if (state.assumptions.isFrozenInt(xs[i])) {
+                val idx = coverIndexByValue[state.assignment.intValue(xs[i])]
+                if (idx >= 0) {
+                    counts[idx]++
+                } else if (closed) {
+                    return false
+                }
+            } else {
+                free.add(i)
+            }
+        }
+        val assigned = BooleanArray(xs.size)
+        if (countVars == null) {
+            val lo = requireNotNull(countLow)
+            val hi = requireNotNull(countHigh)
+            for (k in cover.indices) {
+                while (counts[k] < lo[k]) {
+                    val pos = takeFreeFor(state, free, assigned, cover[k]) ?: return false
+                    state.assignment.setInt(xs[pos], cover[k])
+                    counts[k]++
+                }
+            }
+            for (fi in 0 until free.size) {
+                val pos = free[fi]
+                if (assigned[pos]) continue
+                val pick = pickUnderHigh(state, xs[pos], counts, hi) ?: return false
+                state.assignment.setInt(xs[pos], pick)
+                val idx = coverIndexByValue[pick]
+                if (idx >= 0) counts[idx]++
+            }
+        } else {
+            for (fi in 0 until free.size) {
+                val pos = free[fi]
+                val pick = firstCoverInDomain(state, xs[pos])
+                    ?: if (closed) return false else firstInDomain(state, xs[pos])
+                state.assignment.setInt(xs[pos], pick)
+                val idx = coverIndexByValue[pick]
+                if (idx >= 0) counts[idx]++
+            }
+            for (k in cover.indices) {
+                val cv = countVars[k]
+                if (state.assumptions.isFrozenInt(cv)) {
+                    if (state.assignment.intValue(cv) != counts[k]) return false
+                } else {
+                    if (counts[k] !in state.problem.intDomains[cv]) return false
+                    state.assignment.setInt(cv, counts[k])
+                }
+            }
+        }
+        return true
+    }
+
+    /** First unassigned free position whose domain contains [value]; marks it assigned. */
+    private fun takeFreeFor(state: LocalSearchState, free: IntArrayList, assigned: BooleanArray, value: Int): Int? {
+        for (fi in 0 until free.size) {
+            val pos = free[fi]
+            if (assigned[pos]) continue
+            if (value in state.problem.intDomains[xs[pos]]) {
+                assigned[pos] = true
+                return pos
+            }
+        }
+        return null
+    }
+
+    /** A cover value still under its high whose domain contains it, for filling a free position. */
+    private fun pickUnderHigh(state: LocalSearchState, varId: Int, counts: IntArray, hi: IntArray): Int? {
+        for (k in cover.indices) {
+            if (counts[k] < hi[k] && cover[k] in state.problem.intDomains[varId]) return cover[k]
+        }
+        return if (closed) null else firstInDomain(state, varId)
+    }
+
+    private fun firstCoverInDomain(state: LocalSearchState, varId: Int): Int? {
+        val d = state.problem.intDomains[varId]
+        for (cv in cover) if (cv in d) return cv
+        return null
+    }
+
+    private fun firstInDomain(state: LocalSearchState, varId: Int): Int = state.problem.intDomains[varId].min
+
+    private companion object {
+        /** Cap on `xs` value-swap compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 6
     }
 }

@@ -28,6 +28,11 @@ class PresolveContext(
     val objectiveIntCoeffs: Map<Int, Long> = emptyMap(),
     /** Minimize-sense Boolean objective weights (var → nonzero weight), used by Boolean dual fixing. */
     val objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
+    /** The model already breaks symmetry itself (a `symmetry_breaking_constraint`, surfaced via
+     *  [Problem.hasSymmetryBreaking]). Turns off [PresolvePass.BREAK_SYMMETRIES] in the default
+     *  [PresolveConfig.resolved] decision: stacking klause's automorphism break on the model's
+     *  hand-written one is redundant and the two can interact. An explicit override still forces it on. */
+    val modelBreaksSymmetry: Boolean = false,
 ) {
     /** Factories for the common contexts. */
     companion object {
@@ -35,8 +40,17 @@ class PresolveContext(
         val EMPTY = PresolveContext()
 
         /** Protect every variable an objective reads — the nonzero-coefficient indices. */
-        fun of(objective: LinearObjective?, solutionSetSensitive: Boolean = false): PresolveContext {
-            if (objective == null) return PresolveContext(solutionSetSensitive = solutionSetSensitive)
+        fun of(
+            objective: LinearObjective?,
+            solutionSetSensitive: Boolean = false,
+            modelBreaksSymmetry: Boolean = false,
+        ): PresolveContext {
+            if (objective == null) {
+                return PresolveContext(
+                    solutionSetSensitive = solutionSetSensitive,
+                    modelBreaksSymmetry = modelBreaksSymmetry,
+                )
+            }
             val ints = HashSet<Int>()
             val intCoeffs = HashMap<Int, Long>()
             for (i in objective.intCoefficients.indices) {
@@ -55,7 +69,7 @@ class PresolveContext(
                     boolCoeffs[b] = w
                 }
             }
-            return PresolveContext(ints, bools, solutionSetSensitive, intCoeffs, boolCoeffs)
+            return PresolveContext(ints, bools, solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry)
         }
     }
 }
@@ -338,10 +352,12 @@ class PresolveConfig(
     fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = overrides[pass] ?: auto(pass, context)
 
     /** Emphasis rule: an auto-eligible pass whose tier the level enables, unless it would drop
-     *  solutions on a solution-set-sensitive query. */
+     *  solutions on a solution-set-sensitive query, or it is symmetry breaking the model already
+     *  does itself. */
     private fun auto(pass: PresolvePass, context: PresolveContext): Boolean = pass.autoEligible &&
         pass.timing in emphasis.timings &&
-        (pass.preservesSolutionSet || !context.solutionSetSensitive)
+        (pass.preservesSolutionSet || !context.solutionSetSensitive) &&
+        !(pass == PresolvePass.BREAK_SYMMETRIES && context.modelBreaksSymmetry)
 
     /** The [PresolvePass.Stage.PROBLEM] passes that run under [context], in enum (priority) order. */
     fun problemPasses(context: PresolveContext): List<PresolvePass> =

@@ -7,6 +7,7 @@ import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.Diffn
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
@@ -24,6 +25,7 @@ import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.CumulativeRelaxation
 import com.eignex.klause.solver.lp.schedulingViews
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -109,6 +111,7 @@ object LpAutoConfig {
         var regular = false
         var mdd = false
         var gccCount = false
+        var diffn = false
         var rows = 0L
         for (f in problem.factors) {
             when (f) {
@@ -173,6 +176,8 @@ object LpAutoConfig {
 
                 is Mdd -> mdd = true
 
+                is Diffn -> diffn = true
+
                 else -> Unit
             }
         }
@@ -184,17 +189,24 @@ object LpAutoConfig {
         // largest are shed and the base LP still runs.
         val makespanPlans = if (scheduling) CumulativeRelaxation(problem).plans.size else 0
         rows += makespanPlans.toLong()
+        // Diffn contributes the same kind of makespan row, one per derived axis plan (over an existing
+        // column), counted separately so it gates under its own technique rather than lpCumulative.
+        val diffnPlans = if (diffn) {
+            CumulativeRelaxation(problem, includeCumulative = false, includeDiffn = true).plans.size
+        } else {
+            0
+        }
+        rows += diffnPlans.toLong()
         val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
         // Cost guard: the configurable dense-tableau ceiling (env-tunable via KlauseConfig).
         val maxCells = KlauseConfig.current.lpMaxTableauCells
         val baseFits = tableauCells(rows, baseCols) <= maxCells
 
         val cutEligible = allDifferent || globalCardinality
-        val makespanLp = baseFits && makespanPlans > 0
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
-                table || nValue || regular || mdd || gccCount || makespanPlans > 0
+                table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0
         // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
         // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
         // #571: an explicit objective-cone request always fits the dense cap (the cone drops the
@@ -210,10 +222,20 @@ object LpAutoConfig {
             config.resolved(LpTechnique.BOUNDING) &&
             tableauCells(rows, baseCols) <= KlauseConfig.current.lpSparseMaxTableauCells
 
+        // Hull columns and the cumulative/diffn makespan rows attach to whichever bounding path runs.
+        // They were previously gated on `bounding` alone, so the sparse-primary path (every over-cap
+        // model — i.e. the instances rich enough to carry these globals) silently dropped them despite
+        // fitting their own caps. Gating on `lpActive` fixes that; the sparse path budgets hulls
+        // against the (larger) sparse cap, the dense path against the dense cap (#705).
+        val lpActive = bounding || sparsePrimary
+        val makespanLp = lpActive && makespanPlans > 0
+        val diffnLp = lpActive && diffnPlans > 0
+        val hullCap = if (sparsePrimary) KlauseConfig.current.lpSparseMaxTableauCells else maxCells
+
         // Only structurally-present hulls the emphasis permits compete for the budget (a forbidden
         // hull is never built, so it costs nothing). Each estimate sums over its factors and honours
         // that hull's own MAX_* cap, exactly as the builder does.
-        val candidates = if (!bounding) {
+        val candidates = if (!lpActive) {
             emptyList()
         } else {
             buildList {
@@ -229,7 +251,7 @@ object LpAutoConfig {
                 }
             }
         }
-        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, maxCells)
+        val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
 
         val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
@@ -250,7 +272,8 @@ object LpAutoConfig {
             lpRegular = base.lpRegular || (LpTechnique.REGULAR in acceptedHulls),
             lpMdd = base.lpMdd || (LpTechnique.MDD in acceptedHulls),
             lpGccCount = base.lpGccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
-            lpCumulative = base.lpCumulative || (bounding && makespanLp),
+            lpCumulative = base.lpCumulative || makespanLp,
+            lpDiffn = base.lpDiffn || (diffnLp && config.resolved(LpTechnique.DIFFN)),
             lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
                 (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
             lpCumulativeFlow = base.lpCumulativeFlow || (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
@@ -400,13 +423,13 @@ object LpAutoConfig {
             if (f !is Regular) continue
             val len = f.seq.size
             val s = f.alphabetSize
-            val reach = HashSet<Int>().also { it.add(f.q0) }
+            val reach = IntHashSet().also { it.add(f.q0) }
             var arcs = 0L
             var ok = true
             for (t in 0 until len) {
                 val dom = problem.intDomains[f.seq[t]]
-                val next = HashSet<Int>()
-                for (state in reach) {
+                val next = IntHashSet()
+                reach.forEach { state ->
                     dom.forEach { sym ->
                         if (sym in 1..s) {
                             val nx = f.transitions[(state - 1) * s + (sym - 1)]
@@ -422,7 +445,7 @@ object LpAutoConfig {
                     break
                 }
                 reach.clear()
-                reach.addAll(next)
+                next.forEach { reach.add(it) }
             }
             if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_REGULAR_ARCS) continue
             any = true
@@ -442,12 +465,12 @@ object LpAutoConfig {
             if (f !is Mdd) continue
             val n = f.seq.size
             val stride = f.recordStride
-            val reach = HashSet<Int>().also { it.add(f.initial) }
+            val reach = IntHashSet().also { it.add(f.initial) }
             var arcs = 0L
             var ok = true
             for (layer in 0 until n) {
                 val dom = problem.intDomains[f.seq[layer]]
-                val next = HashSet<Int>()
+                val next = IntHashSet()
                 var p = f.layerStarts[layer]
                 val end = f.layerStarts[layer + 1]
                 while (p < end) {
@@ -462,7 +485,7 @@ object LpAutoConfig {
                     break
                 }
                 reach.clear()
-                reach.addAll(next)
+                next.forEach { reach.add(it) }
             }
             if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_MDD_ARCS) continue
             any = true

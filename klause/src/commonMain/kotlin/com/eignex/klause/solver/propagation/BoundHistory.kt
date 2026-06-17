@@ -16,6 +16,17 @@ internal fun PropagationState.holeReasonFor(v: Int, k: Int): IntArray? {
     return null
 }
 
+/** True iff `k` is on `v`'s interior-carve record. Since the record is truncated on every undo,
+ *  a hit means `k` is excluded *and* was carved as a pure-interior hole on the current
+ *  path — so [holeReasonFor] / [holeLevelFor] hold its real (other-variable) reason and carve
+ *  level. Lets the conflict derivation prefer that over the same-var complementary-bound citation
+ *  that otherwise cycles for a value far from the live bound (#671). */
+internal fun PropagationState.holeHistHas(v: Int, k: Int): Boolean {
+    val vals = holeHistVal[v] ?: return false
+    for (i in 0 until vals.size) if (vals[i] == k) return true
+    return false
+}
+
 internal fun PropagationState.pushHoleHist(v: Int, value: Int, level: Int, ant: IntArray?) {
     val vals = holeHistVal[v] ?: IntArrayList(initialCapacity = 4).also { holeHistVal[v] = it }
     val lvls = holeHistLvl[v] ?: IntArrayList(initialCapacity = 4).also { holeHistLvl[v] = it }

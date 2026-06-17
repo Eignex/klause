@@ -326,8 +326,66 @@ class Circuit(
         }
     }
 
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: an **or-opt** relocation of one node. With `succ` a
+     *  single Hamiltonian cycle, remove node `v` from between its predecessor `p` and successor
+     *  `nv` (link `p → nv`) and splice it into another edge `a → b` (link `a → v → b`). The result
+     *  is again one cycle over all nodes — the tour is perturbed without ever leaving feasibility,
+     *  which can re-route an edge to satisfy a coupled constraint. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (n < 3) return
+        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]) }
+        val predOf = IntArray(n) { -1 }
+        for (i in 0 until n) {
+            val s = nextOf[i]
+            if (s in 0 until n) predOf[s] = i else return // not a permutation — not a feasible tour.
+        }
+        var emitted = 0
+        var attempts = 0
+        while (emitted < MAX_SWAP_CANDIDATES && attempts < MAX_SWAP_CANDIDATES * STRUCTURED_ATTEMPT_STRIDE) {
+            attempts++
+            val v = state.rng.nextInt(n)
+            val p = predOf[v]
+            val nv = nextOf[v]
+            if (p < 0) continue
+            val a = state.rng.nextInt(n)
+            if (a == v || a == p) continue
+            val b = nextOf[a]
+            if (b == v) continue
+            if (nv !in state.problem.intDomains[succ[p]]) continue
+            if (v !in state.problem.intDomains[succ[a]]) continue
+            if (b !in state.problem.intDomains[succ[v]]) continue
+            sink.addCompound(
+                listOf(
+                    Move.IntSet(succ[p], nv),
+                    Move.IntSet(succ[a], v),
+                    Move.IntSet(succ[v], b),
+                ),
+            )
+            emitted++
+        }
+    }
+
+    /** Feasible init: the canonical cycle `succ(i) = (i + 1) mod n`. Returns false — leaving the
+     *  random assignment — if a successor value is out of domain or a frozen var pins another. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        for (i in 0 until n) {
+            val target = (i + 1) % n
+            if (target !in state.problem.intDomains[succ[i]]) return false
+            if (state.assumptions.isFrozenInt(succ[i]) && state.assignment.intValue(succ[i]) != target) return false
+        }
+        for (i in 0 until n) {
+            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], (i + 1) % n)
+        }
+        return true
+    }
+
     private companion object {
         const val MAX_TARGETS: Int = 4
         const val MAX_SWAP_CANDIDATES: Int = 4
+
+        /** Rejection-sampling attempts per requested or-opt move before giving up. */
+        const val STRUCTURED_ATTEMPT_STRIDE: Int = 6
     }
 }
