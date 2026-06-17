@@ -49,7 +49,7 @@ class CumulativeTimeIndexedTest {
         val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
         val relaxation = CpToLpRelaxation(problem, obj, cumulativeTimeIndexed = timeIndexed)
             .build(PropagationSession(problem))
-        val sol = solveSparse(relaxation.model)
+        val sol = solveLp(relaxation.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
@@ -63,7 +63,7 @@ class CumulativeTimeIndexedTest {
         )
         val relaxation = CpToLpRelaxation(problem, obj, cumulativeTimeIndexed = timeIndexed)
             .build(PropagationSession(problem))
-        val sol = solveSparse(relaxation.model)
+        val sol = solveLp(relaxation.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
@@ -102,7 +102,7 @@ class CumulativeTimeIndexedTest {
         val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
         val relaxation = CpToLpRelaxation(problem, obj, cumulative = true, cumulativeTimeIndexed = ti)
             .build(PropagationSession(problem))
-        val sol = solveSparse(relaxation.model)
+        val sol = solveLp(relaxation.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
@@ -186,7 +186,7 @@ class CumulativeTimeIndexedTest {
             }
             if (row.isNotEmpty()) b.addRow(row, Relation.LE, cap.toLong())
         }
-        val sol = solveSparse(b.build(Sense.MINIMIZE))
+        val sol = solveLp(b.build(Sense.MINIMIZE))
         assertEquals(LpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }

@@ -6,8 +6,8 @@ import com.eignex.klause.util.IntArrayList
 
 /**
  * Exact lower bound on the minimized objective `cᵀz`, certified from a (float-found) [Basis] using
- * exact rationals — the fallback for when the `Long` fraction-free path (the dense dual simplex) overflows,
- * which happens precisely on the large-determinant bases of big models.
+ * exact rationals — the authoritative bound behind the float [RevisedSimplex] solve, immune to the
+ * floating-point error that the cheap [safeObjectiveLowerBound] worst-cases against.
  *
  * It solves the dual system `M y = c_B` exactly (`M[t][i] = A_full[i][basicVar[t]]`) by fraction-free
  * Bareiss elimination (the O(m³) work, pure-integer / no gcd) plus a cheap rational back-substitution.
@@ -23,7 +23,7 @@ internal object ExactBasisCertifier {
     fun lowerBoundCeil(model: LpModel, basis: Basis): Long? = lagrangian(model, basis)?.ceil()?.toLongOrNull()
 
     /**
-     * Certified-exact quantities at a (float-found) optimal [basis], for the sparse path's
+     * Certified-exact quantities at a (float-found) optimal [basis], for the LP's
      * reduced-cost fixing / objective-bound reasons (#705): the exact objective lower bound
      * ([Certificate.objective] — tight at an optimal basis, i.e. the LP optimum), each variable's
      * reduced cost (`0` for basic columns), and which rows carry nonzero dual weight. Null when the
@@ -331,7 +331,7 @@ internal object ExactBasisCertifier {
     }
 
     /** Iterate the nonzero rows of full column [col] as `(row, value)`: a structural column through the
-     *  model's CSC/dense accessor, a slack column `n+s` as the unit vector `e_s`. */
+     *  model's CSC accessor, a slack column `n+s` as the unit vector `e_s`. */
     private inline fun forEachFullColumn(model: LpModel, col: Int, action: (row: Int, value: Long) -> Unit) {
         if (col < model.n) model.forEachInColumn(col, action) else action(col - model.n, 1L)
     }

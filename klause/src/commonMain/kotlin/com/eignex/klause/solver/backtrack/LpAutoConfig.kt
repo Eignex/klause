@@ -60,7 +60,7 @@ import com.eignex.klause.util.IntHashSet
  * The LP-relaxation flags are additionally gated by a **size guard** (the sparse revised simplex is the
  * only LP engine, #705; these are per-node solve-cost bounds, not tuning judgements). LP is declined
  * once the estimated relaxation size (`rows × (cols + rows + 1)`) exceeds the ceiling
- * [KlauseConfig.lpSparseMaxTableauCells]. The gated hulls (circuit / element / table / nvalue /
+ * [KlauseConfig.lpCeilingTableauCells]. The gated hulls (circuit / element / table / nvalue /
  * time-indexed) then compete for a hull budget — the base cap [KlauseConfig.lpMaxTableauCells] when the
  * base relaxation fits it, else the ceiling — accepted smallest-first, so a stack of hulls is shed
  * rather than allowed to defeat the guard (#484). The Lagrangian and energetic bounds have their own
@@ -201,7 +201,7 @@ object LpAutoConfig {
         // not a literal allocation. The base cap bounds the hull budget of a small base relaxation; the
         // ceiling is the absolute size past which LP is declined.
         val baseCap = KlauseConfig.current.lpMaxTableauCells
-        val ceilingCap = KlauseConfig.current.lpSparseMaxTableauCells
+        val ceilingCap = KlauseConfig.current.lpCeilingTableauCells
         val cells = tableauCells(rows, baseCols)
 
         val cutEligible = allDifferent || globalCardinality
@@ -245,9 +245,8 @@ object LpAutoConfig {
         }
         val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
 
-        // Cuts run on whichever bounding path is active (#705): the structural separators read the LP
-        // point through the sparse revised simplex, so they fire on over-cap sparse-primary instances
-        // too — not just the dense-capped ones (the #13 gating fix). Cut-eligible structure required.
+        // Cuts run whenever LP bounding is active (#705): the structural separators read the LP point
+        // through the revised simplex. Cut-eligible structure required.
         val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(

@@ -40,8 +40,8 @@ internal actual fun installCliConfig(): KlauseConfig {
             ?: base.floatScale,
         lpMaxTableauCells = cliProp("klause.fzn.lpMaxTableauCells")?.trim()?.toLongOrNull()
             ?: base.lpMaxTableauCells,
-        lpSparseMaxTableauCells = cliProp("klause.fzn.lpSparseMaxTableauCells")?.trim()?.toLongOrNull()
-            ?: base.lpSparseMaxTableauCells,
+        lpCeilingTableauCells = cliProp("klause.fzn.lpCeilingTableauCells")?.trim()?.toLongOrNull()
+            ?: base.lpCeilingTableauCells,
     )
     KlauseConfig.current = config
     return config

@@ -11,12 +11,12 @@ import kotlin.math.abs
  * term before its box minimum is taken, and the final sum is reduced by its own rounding error. The
  * result can therefore only *under*-estimate the true bound — never over-estimate it — so pruning on
  * `result ≥ incumbent` is sound. The lower-bound-shift constant `c·lo` ([LpModel.objConstant]) is
- * re-added (as the dense dual simplex does) so the bound is on the true objective at branched nodes, not the
- * shifted one. Returns null when the relaxation is unbounded below (a strictly negative reduced cost
- * on a variable with no finite upper bound) or when [y] is non-finite.
+ * re-added so the bound is on the true objective at branched nodes, not the shifted one. Returns null
+ * when the relaxation is unbounded below (a strictly negative reduced cost on a variable with no
+ * finite upper bound) or when [y] is non-finite.
  *
- * This is the cheap pruning bound; the dense dual simplex / exact certification give the tight authoritative
- * one. A loose result here only costs a missed prune, never correctness.
+ * This is the cheap pruning bound; the exact [ExactBasisCertifier] gives the tight authoritative one.
+ * A loose result here only costs a missed prune, never correctness.
  */
 internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
     val m = model.m

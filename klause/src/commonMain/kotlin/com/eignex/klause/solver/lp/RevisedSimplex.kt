@@ -26,12 +26,12 @@ internal class FloatLpResult(
 /**
  * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
  * sparse LU factorization ([SparseLu], `O(nnz)` memory) and the constraint columns in sparse CSC,
- * instead of the full `m × (n+m)` dense tableau the dense float simplex carries or an explicit dense `B⁻¹`.
+ * instead of a full `m × (n+m)` dense tableau or an explicit dense `B⁻¹`.
  * The decision logic — slack cold start, most-violated leaving variable, dual ratio-test entering
- * variable — is identical to the dense float simplex; only the linear algebra is revised (FTRAN/BTRAN via the
- * LU), so it scales to large sparse models without materializing an `m²` structure.
+ * variable — is the textbook bounded-variable dual simplex; only the linear algebra is revised
+ * (FTRAN/BTRAN via the LU), so it scales to large sparse models without materializing an `m²` structure.
  *
- * Like the dense float simplex it is a heuristic that can return null (non-convergence / dual-unbounded /
+ * It is a heuristic that can return null (non-convergence / dual-unbounded /
  * singular basis); its [FloatLpResult.basis] is then certified exactly downstream, so float rounding is never
  * safety-critical.
  *
@@ -69,8 +69,7 @@ internal class RevisedSimplex(
     init {
         colRows = Array(n) { IntArray(0) }
         colVals = Array(n) { DoubleArray(0) }
-        // Read columns through the model's representation-agnostic accessor: a direct CSC slice on a
-        // sparse model (#602), or a dense-column scan otherwise. Two passes (the accessor is inline,
+        // Read columns through the model's CSC accessor. Two passes (the accessor is inline,
         // so each is a tight loop) — count nnz, then fill.
         for (j in 0 until n) {
             var nnz = 0
@@ -245,7 +244,7 @@ internal class RevisedSimplex(
 
     private fun optimal(beta: DoubleArray, lu: SparseLu): FloatLpResult {
         // Re-add the lower-bound shift the model folded out (c·lo), so [FloatLpResult.objective] is the
-        // objective in original coordinates — matching the exact certify and the dense dual simplex.
+        // objective in original coordinates — matching the exact certify.
         var obj = model.objConstant.toDouble()
         for (j in 0 until numVars) {
             val c = model.cost[j]

@@ -1,10 +1,11 @@
 package com.eignex.klause.solver.lp
 
 /*
- * Exact Long arithmetic for the fraction-free (Bareiss-style) simplex tableau. The tableau shares
- * one integer scale (the basis determinant), so every entry stays a Long and each pivot divides
- * exactly by the previous one. Long is deliberate, not a BigInteger fallback: 64-bit integers keep
- * the inner loops fast. Overflow is detected, never wrapped.
+ * Overflow-checked exact Long arithmetic for LP relaxation construction (coefficient/right-hand-side
+ * assembly) and the integer bound computations. Long is deliberate, not a BigInteger fallback: 64-bit
+ * integers keep the inner loops fast, and overflow is detected and raised as [LpOverflowException]
+ * rather than silently wrapped (a wrapped coefficient would make the LP bound unsound). The exact
+ * BigInt path lives in [ExactBasisCertifier], used only where basis determinants can grow.
  */
 
 /** `a` + `b`, or throw [LpOverflowException] on 64-bit overflow. */
@@ -32,19 +33,6 @@ internal fun mulExact(a: Long, b: Long): Long {
         throw LpOverflowException("mulExact overflow: $a * $b")
     }
     return r
-}
-
-/**
- * The Bareiss combine-and-divide step `(p*x - y*z) / d`, computed so the intermediate
- * products are themselves overflow-checked. The division is exact by the fraction-free
- * invariant — a nonzero remainder means the invariant was violated (a bug), so we assert it.
- */
-internal fun bareissStep(p: Long, x: Long, y: Long, z: Long, d: Long): Long {
-    val numerator = subExact(mulExact(p, x), mulExact(y, z))
-    check(numerator % d == 0L) {
-        "fraction-free invariant broken: ($p*$x - $y*$z) not divisible by $d"
-    }
-    return numerator / d
 }
 
 /** Greatest common divisor of |`a`| and |`b`|; `gcd(0, 0) == 0`. Used for row scaling/normalization. */
