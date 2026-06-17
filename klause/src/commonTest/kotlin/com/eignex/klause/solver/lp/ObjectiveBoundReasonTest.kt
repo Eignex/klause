@@ -1,17 +1,17 @@
 package com.eignex.klause.solver.lp
 
-import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * #281: the objective lower-bound reason must be sound. For an OPTIMAL LP with optimum `L`, the
- * nonbasic columns seated at a bound with a nonzero reduced cost are the load-bearing support: given
- * the constraints and those seated bounds alone, every point has objective ≥ L — independent of the
- * other variables' bounds. This mirrors the Farkas harness ([FarkasExplanationTest]) for the bounding
- * case: the implied clause `(objective ≥ ⌈L⌉) ∨ ⋁ ¬(seated bound of a support column)` must exclude no
- * constraint-feasible integer point over the whole declared box, even though the node tightened bounds.
+ * #281/#705: the objective lower-bound reason must be sound on the sparse path. For an OPTIMAL LP with
+ * exact optimum `L` ([ExactBasisCertifier.Certificate.objective]), the columns with a nonzero exact
+ * reduced cost are the load-bearing support; given the constraints and those seated bounds alone, every
+ * point has objective ≥ L — independent of the other variables' bounds. The seated side follows the
+ * reduced cost's sign (`d > 0` ⇒ lower bound, `d < 0` ⇒ upper), exactly as [LpExplanation.premiseLit]
+ * cites it. The implied clause `(objective ≥ ⌈L⌉) ∨ ⋁ ¬(seated bound of a support column)` must exclude
+ * no constraint-feasible integer point over the whole declared box, even though the node tightened bounds.
  */
 class ObjectiveBoundReasonTest {
 
@@ -45,17 +45,15 @@ class ObjectiveBoundReasonTest {
                 b.addRow((0 until n).associateWith { coeffs[it] }.filterValues { it != 0L }, rel, rhs)
             }
             val model = b.build(Sense.MINIMIZE)
-            val sol = DualSimplex(model).solve()
-            if (sol.status != LpStatus.OPTIMAL) return@repeat
+            val sol = RevisedSimplex(model).solve() ?: return@repeat
+            val cert = ExactBasisCertifier.certify(model, sol.basis) ?: return@repeat
             optimalInstances++
 
-            // Support: structural columns nonbasic with a nonzero reduced cost — the seated bounds the
+            // Support: structural columns with a nonzero exact reduced cost — the seated bounds the
             // reason cites. (Columns 0 until n are the structural vars; slacks are >= n.)
-            val support = (0 until n).filter { c ->
-                sol.basis.status[c] != VarStatus.BASIC && sol.reducedCostNumerator[c] != 0L
-            }
+            val support = (0 until n).filter { c -> cert.reducedCost[c].signum() != 0 }
             if (support.isNotEmpty()) withSupport++
-            val bound = ceil(sol.objectiveValue - 1e-9).toLong()
+            val bound = cert.objective.ceil().toLongOrNull() ?: return@repeat
 
             val point = IntArray(n)
             fun rec(idx: Int) {
@@ -70,11 +68,11 @@ class ObjectiveBoundReasonTest {
                         }
                         if (!ok) return
                     }
-                    // Does the point honour every support column's seated bound? If so, the reason
-                    // clause requires objective >= bound, so the point's objective must meet it.
+                    // Does the point honour every support column's seated bound (side = reduced-cost
+                    // sign)? If so, the reason clause requires objective >= bound, so the point must meet it.
                     var seated = true
                     for (col in support) {
-                        val ok = if (sol.basis.status[col] == VarStatus.AT_UPPER) {
+                        val ok = if (cert.reducedCost[col].signum() < 0) {
                             point[col] <= model.loShift[col] + model.upper[col]
                         } else {
                             point[col] >= model.loShift[col]

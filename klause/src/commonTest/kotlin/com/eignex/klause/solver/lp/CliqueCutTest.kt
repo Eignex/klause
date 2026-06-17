@@ -41,8 +41,8 @@ class CliqueCutTest {
             p,
             LinearObjective(boolWeights = longArrayOf(-1, -1, -1, -1)),
         ).build(PropagationSession(p))
-        val sol = DualSimplex(r.model).solve()
-        val cuts = CliqueCutSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
+        val cuts = CliqueCutSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
 
         assertTrue(cuts.isNotEmpty(), "a violated clique should be separated")
         val cut = cuts.first { it.rel == Relation.LE }
@@ -74,9 +74,8 @@ class CliqueCutTest {
             val p = Problem(n, 0, emptyArray(), factors.toTypedArray())
             val obj = LinearObjective(boolWeights = LongArray(n) { -1L })
             val r = CpToLpRelaxation(p, obj).build(PropagationSession(p))
-            val sol = DualSimplex(r.model).solve()
-            if (sol.status != LpStatus.OPTIMAL) return@repeat
-            val cuts = CliqueCutSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+            val sol = RevisedSimplex(r.model).solve() ?: return@repeat
+            val cuts = CliqueCutSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
             if (cuts.isEmpty()) return@repeat
             separated++
             for (cut in cuts) {

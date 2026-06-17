@@ -8,6 +8,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.localsearch.movesource.GreedyInit
+import com.eignex.klause.solver.localsearch.movesource.PairSwap
+import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
@@ -82,13 +85,29 @@ class LocalSearchSolver(
      *  generation entirely — the move space shrinks to true decision variables. Requires
      *  [definitionalSweep]; the restart-time sweep stays active as the full (re)initializer. */
     val perMoveInvariants: Boolean = false,
+    /** Implicit-solving feasible init (opt-in, default off): after each restart's randomization
+     *  the engine seeds elected structural globals (see [LocalSearchState.electedImplicit]) into
+     *  a feasible configuration via [com.eignex.klause.solver.Factor.seedFeasible] — an
+     *  all-different becomes a partial permutation, a circuit a single tour — so the search
+     *  starts inside those constraints' feasible region and their structure-preserving moves
+     *  are productive from the first step. Off by default so existing convergence is unchanged;
+     *  enabled by the portfolio on permutation/assignment-shaped models. */
+    val seedImplicitOnRestart: Boolean = false,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
 
-    /** The restart policy actually driven by the engine: when a [definitionalSweep] is
-     *  present, every restart is followed by the sweep + a state recompute, so all restart
-     *  call sites (satisfy loop, optimize loop, streaming) get swept uniformly. */
-    private val restarts: RestartPolicy = if (definitionalSweep == null) {
+    /** Enumerate-all structured-move source for [structuredMoveStep] — the same generator CBLS
+     *  draws from (random-sampled), shared per epic #710. */
+    private val satisfiedStructured: SatisfiedStructured = SatisfiedStructured.all()
+
+    /** Greedy-repair restart initializer (epic #710); shared by the satisfy and optimize restarts. */
+    private val greedyInit: GreedyInit = GreedyInit()
+
+    /** The restart policy actually driven by the engine: when a [definitionalSweep] is present
+     *  or [seedImplicitOnRestart] is set, every restart is followed by implicit feasible-init
+     *  and/or the sweep plus a state recompute, so all restart call sites (satisfy loop,
+     *  optimize loop, streaming) get the same post-randomization treatment. */
+    private val restarts: RestartPolicy = if (definitionalSweep == null && !seedImplicitOnRestart) {
         restartPolicy
     } else {
         object : RestartPolicy {
@@ -100,7 +119,8 @@ class LocalSearchSolver(
 
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 restartPolicy.restart(state, bestSoFar)
-                definitionalSweep.sweep(
+                if (seedImplicitOnRestart) state.seedImplicitFeasible()
+                definitionalSweep?.sweep(
                     state.assignment,
                     problem.intDomains,
                     problem.factors,
@@ -269,6 +289,7 @@ class LocalSearchSolver(
         return sequence {
             val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
             state.violationSoftCap = params.violationSoftCap
+            state.normalizeWeightsByClass = params.normalizeWeightsByClass
             installInvariants(state)
             warm?.applyTo(state)
             // Streaming has no notion of "best so far" to anchor an adaptive restart
@@ -385,6 +406,7 @@ class LocalSearchSolver(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
         state.violationSoftCap = params.violationSoftCap
+        state.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
         warm?.applyTo(state)
         // Plumb shaping into the state so strategies (e.g. WalkSat) consulting
@@ -752,66 +774,7 @@ class LocalSearchSolver(
      * random start has 1000+ violations; this pass typically drops it by 30–60% before
      * the main loop runs.
      */
-    private fun greedyRepairPass(state: LocalSearchState) {
-        val varCount = problem.numBoolVars + problem.numIntVars
-        if (varCount == 0) return
-        val order = IntArray(varCount) { it }
-        // Fisher-Yates shuffle using the state's RNG so the pass is deterministic for a
-        // given seed.
-        for (i in order.size - 1 downTo 1) {
-            val j = state.rng.nextInt(i + 1)
-            val tmp = order[i]
-            order[i] = order[j]
-            order[j] = tmp
-        }
-        for (v in order) {
-            if (v < problem.numBoolVars) {
-                val boolId = v
-                if (state.assumptions.isFrozenBool(boolId)) continue
-                val baselineCost = state.cost
-                state.apply(Move.BoolFlip(boolId))
-                if (state.cost > baselineCost) state.apply(Move.BoolFlip(boolId))
-            } else {
-                val intId = v - problem.numBoolVars
-                if (state.assumptions.isFrozenInt(intId)) continue
-                val d = problem.intDomains[intId]
-                val cur = state.assignment.intValue(intId)
-                if (d.size <= 1) continue
-                // For tiny domains (≤16 values) sweep all; for larger domains sample up
-                // to 16 candidates to bound the per-pass cost at O(numVars × 16).
-                val maxTries = 16
-                var bestCost = state.cost
-                var bestVal = cur
-                if (d.size <= maxTries) {
-                    for (idx in 0 until d.size) {
-                        val candidate = d.valueAt(idx)
-                        if (candidate == cur) continue
-                        state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) {
-                            bestCost = state.cost
-                            bestVal = candidate
-                        }
-                        state.apply(Move.IntSet(intId, cur))
-                    }
-                } else {
-                    repeat(maxTries) {
-                        val candidate = d.valueAt(state.rng.nextInt(d.size))
-                        if (candidate == cur) return@repeat
-                        state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) {
-                            bestCost = state.cost
-                            bestVal = candidate
-                        }
-                        state.apply(Move.IntSet(intId, cur))
-                    }
-                }
-                if (bestVal != cur) state.apply(Move.IntSet(intId, bestVal))
-            }
-        }
-        // Reset tabu / activity tracking so the main loop doesn't start with every var
-        // freshly blocked by the repair pass's apply-then-revert churn.
-        state.resetStepCounters()
-    }
+    private fun greedyRepairPass(state: LocalSearchState) = greedyInit.run(state)
 
     /**
      * Factor-aware structured descent step. Collects [com.eignex.klause.solver.Factor.proposeStructuredMoves]
@@ -835,12 +798,10 @@ class LocalSearchSolver(
     ): Boolean {
         val sink = state.moveSink
         sink.clear()
-        for (fid in 0 until problem.numFactors) {
-            val f = state.factors[fid]
-            // Only consult factors that are currently satisfied. A violated factor would
-            // propose repair moves (which run before objective descent) so we skip here.
-            if (!f.isViolated(state, fid)) f.proposeStructuredMoves(state, fid, sink)
-        }
+        // Only consult factors that are currently satisfied. A violated factor would propose
+        // repair moves (which run before objective descent) so the enumerate-all source skips
+        // them — the same structured generator CBLS samples (epic #710).
+        satisfiedStructured.generate(state, sink)
         val proposed = sink.list
         if (proposed.isEmpty()) return false
         val poll = IntArray(1)
@@ -915,25 +876,18 @@ class LocalSearchSolver(
         cancellation: Cancellation,
     ): Boolean {
         val baseCost = state.cost
-        val rng = state.rng
         val poll = IntArray(1)
         var tried = 0
-        // Bool-pair swaps: pick a true var and a false var, flip both.
-        val nBool = problem.numBoolVars
-        if (nBool >= 2) {
+        // Bool-pair swaps: pick a true var and a false var, flip both. Candidate construction
+        // (draw + validate) is shared with PairSwap (epic #710); the lazy first-improving loop —
+        // and therefore the RNG draw order and selection — stays exactly as before.
+        if (problem.numBoolVars >= 2) {
             while (tried < budget) {
                 if (pollCancel(poll, cancellation)) return false
                 tried++
-                val a = rng.nextInt(nBool)
-                val b = rng.nextInt(nBool)
-                if (a == b) continue
-                if (state.assumptions.isFrozenBool(a) || state.assumptions.isFrozenBool(b)) continue
-                val va = state.assignment.boolValue(a)
-                val vb = state.assignment.boolValue(b)
-                if (va == vb) continue
+                val swap = PairSwap.drawBoolSwap(state) ?: continue
                 // Score the joint swap without committing: netDelta (apply/revert-backed for
                 // the Compound) for feasibility, objectiveDelta for the improvement test.
-                val swap = Move.Compound(listOf(Move.BoolFlip(a), Move.BoolFlip(b)))
                 if (baseCost + state.netDelta(swap) == 0L) {
                     val od = state.objectiveDelta(objective, swap)
                     if (od != null && od < 0.0) {
@@ -945,22 +899,12 @@ class LocalSearchSolver(
         }
         // Int-pair swaps: pick two int vars with different values whose values fit in the
         // other's domain; swap them.
-        val nInt = problem.numIntVars
-        if (nInt >= 2) {
+        if (problem.numIntVars >= 2) {
             tried = 0
-            val intBudget = budget
-            while (tried < intBudget) {
+            while (tried < budget) {
                 if (pollCancel(poll, cancellation)) return false
                 tried++
-                val a = rng.nextInt(nInt)
-                val b = rng.nextInt(nInt)
-                if (a == b) continue
-                if (state.assumptions.isFrozenInt(a) || state.assumptions.isFrozenInt(b)) continue
-                val va = state.assignment.intValue(a)
-                val vb = state.assignment.intValue(b)
-                if (va == vb) continue
-                if (vb !in problem.intDomains[a] || va !in problem.intDomains[b]) continue
-                val swap = Move.Compound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+                val swap = PairSwap.drawIntSwap(state) ?: continue
                 if (baseCost + state.netDelta(swap) == 0L) {
                     val od = state.objectiveDelta(objective, swap)
                     if (od != null && od < 0.0) {

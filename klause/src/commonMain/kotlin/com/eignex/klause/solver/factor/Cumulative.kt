@@ -9,6 +9,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.max
 import kotlin.math.min
@@ -150,11 +151,11 @@ class Cumulative(
 
     private val n: Int = starts.size
 
-    private val startPos: Map<Int, Int> = starts.withIndex().associate { (i, v) -> v to i }
-    private val durPos: Map<Int, Int> =
-        if (durationVars.isEmpty()) emptyMap() else durationVars.withIndex().associate { (i, v) -> v to i }
-    private val resPos: Map<Int, Int> =
-        if (resourceVars.isEmpty()) emptyMap() else resourceVars.withIndex().associate { (i, v) -> v to i }
+    // Var id → its position in the corresponding array (-1 when the var is not in that role).
+    // IntIntMap keeps the lookup unboxed and array-backed for the dense var ids these hold.
+    private val startPos: IntIntMap = IntIntMap.build(starts, IntArray(starts.size) { it }, absent = -1)
+    private val durPos: IntIntMap = IntIntMap.build(durationVars, IntArray(durationVars.size) { it }, absent = -1)
+    private val resPos: IntIntMap = IntIntMap.build(resourceVars, IntArray(resourceVars.size) { it }, absent = -1)
 
     private fun curDur(state: LocalSearchState, i: Int): Int =
         if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
@@ -209,7 +210,7 @@ class Cumulative(
 
             else -> {
                 val sp = startPos[intVar]
-                if (sp != null) {
+                if (sp >= 0) {
                     if (!present(state, sp)) {
                         0
                     } else {
@@ -223,7 +224,7 @@ class Cumulative(
                     }
                 } else {
                     val dp = durPos[intVar]
-                    if (dp != null) {
+                    if (dp >= 0) {
                         if (!present(state, dp)) {
                             0
                         } else {
@@ -237,7 +238,7 @@ class Cumulative(
                         }
                     } else {
                         val rp = resPos[intVar]
-                        if (rp != null) {
+                        if (rp >= 0) {
                             if (!present(state, rp)) {
                                 0
                             } else {
@@ -270,7 +271,7 @@ class Cumulative(
 
             else -> {
                 val sp = startPos[intVar]
-                if (sp != null) {
+                if (sp >= 0) {
                     if (!present(state, sp)) return 0
                     val d = curDur(state, sp)
                     val r = curRes(state, sp)
@@ -278,14 +279,15 @@ class Cumulative(
                     applyStartDelta(ls, oldValue, newValue, d, r)
                 } else {
                     val dp = durPos[intVar]
-                    if (dp != null) {
+                    if (dp >= 0) {
                         if (!present(state, dp)) return 0
                         val r = curRes(state, dp)
                         if (r <= 0) return 0
                         val s = state.assignment.intValue(starts[dp])
                         applyDurDelta(ls, s, oldValue, newValue, r)
                     } else {
-                        val rp = resPos[intVar] ?: return 0
+                        val rp = resPos[intVar]
+                        if (rp < 0) return 0
                         if (!present(state, rp)) return 0
                         val d = curDur(state, rp)
                         if (d <= 0) return 0
@@ -872,7 +874,72 @@ class Cumulative(
         }
     }
 
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: swap the start times of two present tasks with the
+     *  same current duration **and** resource demand. Their energy blocks have identical shape and
+     *  height, so swapping which task occupies which slot leaves the resource profile `usage(t)`
+     *  unchanged at every time point — the overage cost, hence feasibility, is preserved. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (n < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(n)
+            val j = state.rng.nextInt(n)
+            if (i == j || starts[i] == starts[j]) continue
+            if (!present(state, i) || !present(state, j)) continue
+            if (curDur(state, i) != curDur(state, j) || curRes(state, i) != curRes(state, j)) continue
+            val si = state.assignment.intValue(starts[i])
+            val sj = state.assignment.intValue(starts[j])
+            if (si == sj) continue
+            if (sj !in state.problem.intDomains[starts[i]] || si !in state.problem.intDomains[starts[j]]) continue
+            sink.addCompound(listOf(IntSet(starts[i], sj), IntSet(starts[j], si)))
+            emitted++
+        }
+    }
+
+    /** Feasible init: serialise the present tasks in earliest-start order so no two overlap; with
+     *  no overlap the usage at any time is a single task's demand, capacity-feasible as long as
+     *  every demand fits under the capacity. Returns false — leaving the random assignment — when a
+     *  task can't be placed in domain or a single demand exceeds the capacity. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        if (starts.isEmpty()) return false
+        val cap = curCap(state)
+        val order = argsortByIntKey(starts.size) { state.problem.intDomains[starts[it]].min }
+        var prevEnd = Int.MIN_VALUE
+        for (oi in order.indices) {
+            val i = order[oi]
+            if (!present(state, i)) continue
+            if (curRes(state, i) > cap) return false
+            val dur = curDur(state, i)
+            val v = starts[i]
+            if (state.assumptions.isFrozenInt(v)) {
+                val s = state.assignment.intValue(v)
+                if (s < prevEnd) return false
+                prevEnd = s + dur
+            } else {
+                val d = state.problem.intDomains[v]
+                val cand = max(d.min, prevEnd)
+                if (cand > d.max) return false
+                var s = -1
+                d.forEach { if (s < 0 && it >= cand) s = it }
+                if (s < 0) return false
+                state.assignment.setInt(v, s)
+                prevEnd = s + dur
+            }
+        }
+        return true
+    }
+
     private companion object {
         const val MAX_SWAPS: Int = 4
+
+        /** Cap on equal-shape start-swap compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 8
     }
 }

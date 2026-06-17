@@ -174,13 +174,16 @@ internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Int, antecedents: In
     // Preserve interior holes via the sparse-aware constructor path. For contiguous
     // domains this is functionally identical to `IntDomain(lo, d.max)`.
     val newDomain = d.withMinAtLeast(lo)
-    // A landing value inside a hole snaps the min further. The snapped bound rests on
-    // the requested bound plus the crossed holes; without the requested-bound atom in
-    // the chain a decision's contribution vanishes from conflict analysis.
+    // A landing value inside a hole snaps the min further. The snapped bound rests on the requested
+    // bound plus the crossed holes. The requested-bound atom is cited only for a *decision* move
+    // (`antecedents == null`): a decision to set `v ≥ lo` has no factor reason, so its sole
+    // representation in conflict analysis is that atom. A *propagation* supplies `antecedents` that
+    // already imply `v ≥ lo`, so citing the atom too is redundant — and since the atom resolves
+    // back to this very bound it would be a same-var cycle 1UIP cannot collapse (#671).
     val ant = if (newDomain.min > lo) {
         appendPriorBound(
             Lit.make(atomVarGe(v, lo), false),
-            lo > problem.intDomains[v].min,
+            lo > problem.intDomains[v].min && antecedents == null,
             antecedentsAcrossHoles(v, lo until newDomain.min, antecedents),
         )
     } else {
@@ -212,7 +215,7 @@ internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: In
     val ant = if (newDomain.max < hi) {
         appendPriorBound(
             Lit.make(atomVarLe(v, hi), false),
-            hi < problem.intDomains[v].max,
+            hi < problem.intDomains[v].max && antecedents == null,
             antecedentsAcrossHoles(v, (newDomain.max + 1)..hi, antecedents),
         )
     } else {
@@ -285,9 +288,9 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedent
     }
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
-    // An interior carve (no endpoint moved) records the hole history — still the level/reason
-    // source for an eq atom materialized after its value was already carved (bound moves keep
-    // their level/reason on the order literals themselves now, so no bound history is needed).
+    // An interior carve (no endpoint moved) records the hole-carve record — the level/reason source
+    // for an eq atom materialized after its value was already carved. (A bound move instead stamps
+    // the level/reason directly on each crossed order literal's trail slot, see [wakeAtom].)
     if (newDomain.min == d.min && newDomain.max == d.max) pushHoleHist(v, value, currentLevel, antecedents)
     // Reason attribution: which side (min/max) "moved" depends on where the hole
     // landed. Pure interior holes don't shift either endpoint; in that case the

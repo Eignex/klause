@@ -1,31 +1,44 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.util.BigRational
 import kotlin.random.Random
 import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * #247: the LP infeasibility (Farkas) certificate and the bound-atom nogood derived from it must be
- * sound — the clause may never exclude a point that satisfies the original constraints. The dual ray
- * uses only the certificate columns' seated bounds, so the clause `⋁ ¬(seated bound)` has to be
- * implied by the constraints alone, even though the node tightened bounds beyond the declared box.
+ * #247/#705: the exact Farkas infeasibility ray ([ExactBasisCertifier.farkasRay]) and the bound-atom
+ * nogood derived from it must be sound — the clause may never exclude a point satisfying the original
+ * constraints. The ray's column support uses only the seated box bounds, so `⋁ ¬(seated bound)` has to
+ * be implied by the constraints alone, even though the node tightened bounds beyond the declared box.
  */
 class FarkasExplanationTest {
 
     private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)
 
+    /** Exact `ρ·A_col` for structural column [col] under ray [ray]. */
+    private fun rayDotColumn(model: LpModel, ray: Array<BigRational>, col: Int): BigRational {
+        var aj = BigRational.ZERO
+        model.forEachInColumn(col) { i, a -> aj += ray[i] * BigRational.of(a) }
+        return aj
+    }
+
     @Test
-    fun `certificate proves a tiny infeasible lp`() {
+    fun `ray proves a tiny infeasible lp`() {
         // x in [2,5], constraint x <= 1: infeasible. The lower bound x>=2 is the reason.
         val b = LpBuilder()
         val x = b.addVar(2, 5, cost = 0)
         b.addRow(mapOf(x to 1L), Relation.LE, 1)
-        val sol = DualSimplex(b.build(Sense.MINIMIZE)).solve()
-        assertEquals(LpStatus.INFEASIBLE, sol.status)
-        assertTrue(sol.certCols.isNotEmpty(), "expected a non-empty infeasibility certificate")
-        // The seated lower bound of x participates.
-        assertTrue(x in sol.certCols)
+        val model = b.build(Sense.MINIMIZE)
+        val simplex = RevisedSimplex(model)
+        val result = simplex.solve()
+        assertTrue(result == null, "the LP is infeasible, so solve() must return null")
+        val ray = assertNotNull(
+            ExactBasisCertifier.farkasRay(model, assertNotNull(simplex.infeasibleBasis), simplex.infeasibleRow),
+            "expected a Farkas infeasibility ray",
+        )
+        // x's seated lower bound participates: ρ·A_x < 0 ⇒ the lower side is load-bearing.
+        assertTrue(rayDotColumn(model, ray, x).signum() < 0, "x's lower bound must participate in the ray")
     }
 
     @Test
@@ -55,15 +68,16 @@ class FarkasExplanationTest {
                 b.addRow((0 until n).associateWith { coeffs[it] }.filterValues { it != 0L }, rel, rhs)
             }
             val model = b.build(Sense.MINIMIZE)
-            val sol = DualSimplex(model).solve()
-            if (sol.status != LpStatus.INFEASIBLE) return@repeat
+            val simplex = RevisedSimplex(model)
+            if (simplex.solve() != null) return@repeat // feasible
+            val basis = simplex.infeasibleBasis ?: return@repeat
+            val ray = ExactBasisCertifier.farkasRay(model, basis, simplex.infeasibleRow) ?: return@repeat
             infeasibleInstances++
-            if (sol.certCols.isEmpty()) return@repeat
+            // Seated side per structural column: ρ·A_j > 0 ⇒ upper, < 0 ⇒ lower, 0 ⇒ not in the box.
+            val seatUpper = IntArray(n) { col -> rayDotColumn(model, ray, col).signum() }
+            if (seatUpper.all { s -> s == 0 }) return@repeat
             withCert++
 
-            // Reconstruct the clause's certificate box: each certificate column is pinned to the side
-            // of its seated bound; a point lies "in the box" when it satisfies all of them — exactly
-            // when it violates the clause. Validity ⇒ no constraint-feasible integer point is in it.
             val point = IntArray(n)
             fun rec(idx: Int) {
                 if (idx == n) {
@@ -79,9 +93,10 @@ class FarkasExplanationTest {
                     }
                     // Constraint-feasible point: it must escape the certificate box (satisfy the clause).
                     var inBox = true
-                    for (c in sol.certCols.indices) {
-                        val col = sol.certCols[c]
-                        val seatedBound = if (sol.certBoundIsUpper[c]) {
+                    for (col in 0 until n) {
+                        val sign = seatUpper[col]
+                        if (sign == 0) continue
+                        val seatedBound = if (sign > 0) {
                             point[col] <= model.loShift[col] + model.upper[col]
                         } else {
                             point[col] >= model.loShift[col]

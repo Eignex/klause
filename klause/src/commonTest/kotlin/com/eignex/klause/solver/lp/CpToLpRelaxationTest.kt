@@ -23,9 +23,9 @@ class CpToLpRelaxationTest {
     private val eps = 1e-9
 
     /** Solve the relaxation of [problem] under [objective] and return (solution, relaxation). */
-    private fun solve(problem: Problem, objective: LinearObjective?): Pair<LpSolution, LpRelaxation> {
+    private fun solve(problem: Problem, objective: LinearObjective?): Pair<SparseSolution, LpRelaxation> {
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
-        return DualSimplex(relaxation.model).solve() to relaxation
+        return solveSparse(relaxation.model) to relaxation
     }
 
     /** LP column standing for integer variable [v], or -1. */
@@ -49,7 +49,7 @@ class CpToLpRelaxationTest {
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 0L)))
 
         assertEquals(LpStatus.OPTIMAL, sol.status)
-        assertEquals(2.0, sol.objectiveValue + r.objectiveConstant, eps)
+        assertEquals(2.0, sol.objectiveValue, eps)
         assertEquals(2.0, sol.primal(intCol(r, 0)), eps)
     }
 
@@ -60,7 +60,7 @@ class CpToLpRelaxationTest {
 
         assertEquals(LpStatus.OPTIMAL, sol.status)
         assertEquals(100L, r.objectiveConstant)
-        // LP objective (cost·x) is 0 at x0 = 0; the true bound is that plus the constant.
+        // LP objective (cost·x) is 0 at x0 = 0; the true bound is that plus the carried constant.
         assertEquals(0.0, sol.objectiveValue, eps)
         assertEquals(100.0, sol.objectiveValue + r.objectiveConstant, eps)
     }

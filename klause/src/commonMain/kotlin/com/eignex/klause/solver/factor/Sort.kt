@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
@@ -170,5 +171,52 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
             if (!state.tightenIntMax(x, yHi, antYs)) return false
         }
         return true
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: swap the values of two `xs` positions. The input
+     *  multiset is unchanged, so `sorted(xs)` — and therefore the satisfied `ys` — is untouched;
+     *  the constraint stays satisfied while the unsorted input is permuted. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (xs.size < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val a = xs[state.rng.nextInt(xs.size)]
+            val b = xs[state.rng.nextInt(xs.size)]
+            if (a == b) continue
+            val va = state.assignment.intValue(a)
+            val vb = state.assignment.intValue(b)
+            if (va == vb) continue
+            if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) continue
+            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+            emitted++
+        }
+    }
+
+    /** Feasible init: set `ys` to the sorted current `xs` values. Returns false (leaving the
+     *  random assignment) if a sorted value is out of an `ys` domain or pinned otherwise by a
+     *  frozen var. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val sortedXs = IntArray(xs.size) { state.assignment.intValue(xs[it]) }.also { it.sort() }
+        for (i in ys.indices) {
+            val target = sortedXs[i]
+            if (target !in state.problem.intDomains[ys[i]]) return false
+            if (state.assumptions.isFrozenInt(ys[i]) && state.assignment.intValue(ys[i]) != target) return false
+        }
+        for (i in ys.indices) {
+            if (!state.assumptions.isFrozenInt(ys[i])) state.assignment.setInt(ys[i], sortedXs[i])
+        }
+        return true
+    }
+
+    private companion object {
+        /** Cap on `xs` value-swap compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 6
     }
 }

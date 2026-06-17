@@ -9,17 +9,25 @@ import kotlin.math.abs
  * bound. All values are double-precision; the authoritative bound comes from exact certification of
  * [basis], never from these.
  */
-internal class FloatLpResult(val basis: Basis, val objective: Double, val duals: DoubleArray)
+internal class FloatLpResult(
+    val basis: Basis,
+    val objective: Double,
+    val duals: DoubleArray,
+    /** Per-structural-variable primal value (unshifted, length `n`); the LP point. */
+    val primal: DoubleArray,
+    /** Dual-simplex pivots taken to reach this optimum (0 when the warm/cold start was already optimal). */
+    val pivots: Int = 0,
+)
 
 /**
  * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
  * sparse LU factorization ([SparseLu], `O(nnz)` memory) and the constraint columns in sparse CSC,
- * instead of the full `m × (n+m)` dense tableau [FloatSimplex] carries or an explicit dense `B⁻¹`.
+ * instead of the full `m × (n+m)` dense tableau the dense float simplex carries or an explicit dense `B⁻¹`.
  * The decision logic — slack cold start, most-violated leaving variable, dual ratio-test entering
- * variable — is identical to [FloatSimplex]; only the linear algebra is revised (FTRAN/BTRAN via the
+ * variable — is identical to the dense float simplex; only the linear algebra is revised (FTRAN/BTRAN via the
  * LU), so it scales to large sparse models without materializing an `m²` structure.
  *
- * Like [FloatSimplex] it is a heuristic that can return null (non-convergence / dual-unbounded /
+ * Like the dense float simplex it is a heuristic that can return null (non-convergence / dual-unbounded /
  * singular basis); its [FloatLpResult.basis] is then certified exactly downstream, so float rounding is never
  * safety-critical.
  *
@@ -41,23 +49,33 @@ internal class RevisedSimplex(
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
+    private var pivots = 0
+
+    /** When [solve] returns null because the primal is infeasible (dual unbounded — no entering column
+     *  for the most-violated basic row), the basis and that leaving row at termination, for the exact
+     *  Farkas infeasibility check ([ExactBasisCertifier.certifiesInfeasible]). Null on any other failure
+     *  (non-convergence, singular pivot, budget) — so the caller only prunes on a genuine infeasibility. */
+    var infeasibleBasis: Basis? = null
+        private set
+    var infeasibleRow: Int = -1
+        private set
 
     init {
         colRows = Array(n) { IntArray(0) }
         colVals = Array(n) { DoubleArray(0) }
+        // Read columns through the model's representation-agnostic accessor: a direct CSC slice on a
+        // sparse model (#602), or a dense-column scan otherwise. Two passes (the accessor is inline,
+        // so each is a tight loop) — count nnz, then fill.
         for (j in 0 until n) {
             var nnz = 0
-            for (i in 0 until m) if (model.a[i][j] != 0L) nnz++
+            model.forEachInColumn(j) { _, _ -> nnz++ }
             val rows = IntArray(nnz)
             val vals = DoubleArray(nnz)
             var k = 0
-            for (i in 0 until m) {
-                val v = model.a[i][j]
-                if (v != 0L) {
-                    rows[k] = i
-                    vals[k] = v.toDouble()
-                    k++
-                }
+            model.forEachInColumn(j) { i, v ->
+                rows[k] = i
+                vals[k] = v.toDouble()
+                k++
             }
             colRows[j] = rows
             colVals[j] = vals
@@ -105,8 +123,16 @@ internal class RevisedSimplex(
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
     private fun duals(lu: SparseLu): DoubleArray = lu.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
 
-    fun solve(): FloatLpResult? {
-        coldStart()
+    /**
+     * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
+     * model structure (cross-node basis reuse, #705). Tightening a child's variable bounds leaves the
+     * parent basis dual-feasible (reduced costs are bound-independent), so the dual simplex resumes from
+     * near the optimum in a few pivots. The warm basis only changes the search path, never the result:
+     * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
+     * sound regardless of how the basis was obtained.
+     */
+    fun solve(warm: Basis? = null): FloatLpResult? {
+        if (warm == null || !tryWarmStart(warm)) coldStart()
         val maxIter = 50 * (m + numVars) + 200
         val rhsAdj = DoubleArray(m)
         val unit = DoubleArray(m)
@@ -180,7 +206,13 @@ internal class RevisedSimplex(
                     q = j
                 }
             }
-            if (q == -1) return null // dual unbounded ⇒ primal infeasible; let the exact solver judge
+            if (q == -1) {
+                // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
+                // certify infeasibility exactly (the float ray alone is not sound to prune on).
+                infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf())
+                infeasibleRow = r
+                return null
+            }
 
             denseColumn(q, aq)
             val alpha = lu.ftran(aq)
@@ -188,12 +220,15 @@ internal class RevisedSimplex(
             status[basicVar[r]] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
             basicVar[r] = q
             status[q] = VarStatus.BASIC
+            pivots++
         }
         return null // budget exhausted
     }
 
     private fun optimal(beta: DoubleArray, lu: SparseLu): FloatLpResult {
-        var obj = 0.0
+        // Re-add the lower-bound shift the model folded out (c·lo), so [FloatLpResult.objective] is the
+        // objective in original coordinates — matching the exact certify and the dense dual simplex.
+        var obj = model.objConstant.toDouble()
         for (j in 0 until numVars) {
             val c = model.cost[j]
             if (c != 0L && status[j] == VarStatus.AT_UPPER) obj += c.toDouble() * model.upper[j].toDouble()
@@ -202,7 +237,40 @@ internal class RevisedSimplex(
             val c = model.cost[basicVar[i]]
             if (c != 0L) obj += c.toDouble() * beta[i]
         }
-        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, duals(lu))
+        val primal = DoubleArray(n)
+        for (j in 0 until n) {
+            primal[j] = model.loShift[j].toDouble() +
+                if (status[j] == VarStatus.AT_UPPER) model.upper[j].toDouble() else 0.0
+        }
+        for (i in 0 until m) {
+            val v = basicVar[i]
+            if (v < n) primal[v] = model.loShift[v].toDouble() + beta[i]
+        }
+        val basis = Basis(basicVar.copyOf(), status.copyOf())
+        optimalBasis = basis
+        return FloatLpResult(basis, obj, duals(lu), primal, pivots)
+    }
+
+    /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
+    private var optimalBasis: Basis? = null
+
+    /** Exact Gomory integrality cuts from the last optimal basis (#22), up to [maxCuts]; empty if the
+     *  last solve was not optimal. Exact (rational) tableau rows, so the cuts are rigorously valid. */
+    fun gomoryCuts(maxCuts: Int): List<Cut> =
+        optimalBasis?.let { ExactBasisCertifier.tableauCuts(model, it, maxCuts, mir = false) }.orEmpty()
+
+    /** Exact Gomory mixed-integer (MIR) cuts from the last optimal basis (#22), up to [maxCuts]. */
+    fun mirCuts(maxCuts: Int): List<Cut> =
+        optimalBasis?.let { ExactBasisCertifier.tableauCuts(model, it, maxCuts, mir = true) }.orEmpty()
+
+    /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch, an
+     *  out-of-range column, or a singular factorization. */
+    private fun tryWarmStart(warm: Basis): Boolean {
+        if (warm.basicVars.size != m || warm.status.size != numVars) return false
+        for (t in 0 until m) if (warm.basicVars[t] !in 0 until numVars) return false
+        warm.basicVars.copyInto(basicVar)
+        warm.status.copyInto(status)
+        return factorizeBasis() != null
     }
 
     private fun coldStart() {

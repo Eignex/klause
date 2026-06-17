@@ -11,11 +11,11 @@ import kotlin.math.abs
  * term before its box minimum is taken, and the final sum is reduced by its own rounding error. The
  * result can therefore only *under*-estimate the true bound — never over-estimate it — so pruning on
  * `result ≥ incumbent` is sound. The lower-bound-shift constant `c·lo` ([LpModel.objConstant]) is
- * re-added (as [DualSimplex] does) so the bound is on the true objective at branched nodes, not the
+ * re-added (as the dense dual simplex does) so the bound is on the true objective at branched nodes, not the
  * shifted one. Returns null when the relaxation is unbounded below (a strictly negative reduced cost
  * on a variable with no finite upper bound) or when [y] is non-finite.
  *
- * This is the cheap pruning bound; [DualSimplex] / exact certification give the tight authoritative
+ * This is the cheap pruning bound; the dense dual simplex / exact certification give the tight authoritative
  * one. A loose result here only costs a missed prune, never correctness.
  */
 internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
@@ -38,16 +38,18 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
             atj = y[j - n]
             colMag = abs(atj)
         } else {
-            val col = j
-            for (i in 0 until m) {
-                val a = model.a[i][col]
-                if (a != 0L) {
-                    val term = y[i] * a.toDouble()
-                    atj += term
-                    colMag += abs(term)
-                    terms++
-                }
+            var acc = 0.0
+            var mag = 0.0
+            var t = terms
+            model.forEachInColumn(j) { i, a ->
+                val term = y[i] * a.toDouble()
+                acc += term
+                mag += abs(term)
+                t++
             }
+            atj = acc
+            colMag = mag
+            terms = t
         }
         val cj = model.cost[j].toDouble()
         val dj = cj - atj

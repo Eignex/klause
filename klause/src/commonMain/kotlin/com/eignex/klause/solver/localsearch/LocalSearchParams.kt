@@ -87,6 +87,17 @@ data class LocalSearchParams(
      * [com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP]; shared by every factor in the solve.
      */
     val violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP,
+    /**
+     * Seed the weighted-violation strategies' initial [LocalSearchState.factorWeights] so no single
+     * constraint *kind* dominates the landscape by sheer population. Every factor otherwise starts at
+     * 1.0, so a model padded with thousands of one constraint type steers the whole initial descent
+     * toward that type before the structural constraints are met. When set, an over-represented
+     * factor class (count above the mean class size) is damped so its aggregate initial weight is
+     * capped at that mean — purely monotone (it only lowers weights), so a rare constraint can never
+     * be amplified into a tyrant. Weight-blind strategies (WalkSat / ProbSat / SA) never read the
+     * weights, so this is a no-op for them. Off in raw params; the portfolio turns it on.
+     */
+    val normalizeWeightsByClass: Boolean = false,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

@@ -2,18 +2,30 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.util.IntArrayList
 
-// The per-var bound histories (minHist/maxHist) that derived atom levels/reasons at conflict
-// time are GONE: order literals are now trail-resident and carry their establishment
-// level/reason on their own slots (see [PropagationState.atomLvl] / [PropagationState.atomAnt],
-// maintained by [wakeAtom] / [resetAtomTrailFor] / [reconstructCurrentBoundLevel]). The only
-// surviving per-var history is the interior-hole carve record, which still answers the level /
-// reason of an eq atom ruled out by a hole materialized after the carve.
+// The interior-hole carve record: the per-var (value, level, reason) of each interior hole carved
+// out of a variable's domain during search. Bound atoms carry their establishment level/reason on
+// their own trail slots ([PropagationState.atomLvl] / [PropagationState.atomAnt]); this record is the
+// equivalent for an eq atom ruled out by a hole — it answers the level and reason of an eq atom
+// materialized after its value was carved, when no trail slot was stamped at carve time. Pushed by
+// [pushHoleHist], truncated on backtrack alongside the carve, read by [holeReasonFor] /
+// [holeLevelFor] / [holeHistHas].
 
 /** Reason for the interior carve of `k` from `v`'s domain; null = bake-time fact. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Int): IntArray? {
     val vals = holeHistVal[v] ?: return null
     for (i in 0 until vals.size) if (vals[i] == k) return requireNotNull(holeHistAnt[v])[i]
     return null
+}
+
+/** True iff `k` is on `v`'s interior-carve record. Since the record is truncated on every undo,
+ *  a hit means `k` is excluded *and* was carved as a pure-interior hole on the current
+ *  path — so [holeReasonFor] / [holeLevelFor] hold its real (other-variable) reason and carve
+ *  level. Lets the conflict derivation prefer that over the same-var complementary-bound citation
+ *  that otherwise cycles for a value far from the live bound (#671). */
+internal fun PropagationState.holeHistHas(v: Int, k: Int): Boolean {
+    val vals = holeHistVal[v] ?: return false
+    for (i in 0 until vals.size) if (vals[i] == k) return true
+    return false
 }
 
 internal fun PropagationState.pushHoleHist(v: Int, value: Int, level: Int, ant: IntArray?) {

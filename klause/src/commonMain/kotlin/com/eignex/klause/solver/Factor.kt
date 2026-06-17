@@ -280,6 +280,35 @@ interface Factor {
     fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
     }
 
+    /**
+     * True iff this factor's [proposeStructuredMoves] generates a *feasibility-preserving*
+     * neighbourhood for a structural global — moves that keep the constraint satisfied while
+     * relocating values within its scope (e.g. an all-different value swap, a circuit tour
+     * re-link). Such factors are candidates for implicit-solving: the engine seeds them
+     * feasible and draws their structure-preserving moves even during infeasibility so they
+     * can clear violations in *coupled* constraints without ever breaking themselves.
+     *
+     * Default `false`. Factors with arithmetic structured moves that only make sense at
+     * feasibility (e.g. `Linear EQ` pair-shifts, `Cardinality` count-preserving swaps) leave
+     * this `false` — they are objective-descent helpers, not implicit-solving neighbourhoods.
+     */
+    val providesImplicitNeighbourhood: Boolean get() = false
+
+    /**
+     * Overwrite this factor's variables in [state]'s assignment with a configuration that
+     * satisfies the factor, used by the engine's implicit-solving feasible-init pass on a
+     * scope-disjoint set of elected globals (so seeds never clobber one another). Must leave
+     * variables frozen by [LocalSearchState.assumptions] untouched and may only write the
+     * factor's own [intVars] / [boolVars]. Returns true if it produced a fully satisfying
+     * configuration, false if the factor could not be seeded feasibly (over-constrained or
+     * frozen out) — the engine then falls back to the random assignment for those vars.
+     *
+     * Default: no-op returning false. Structural globals that provide an implicit
+     * neighbourhood ([providesImplicitNeighbourhood]) override this so the search can begin
+     * inside their feasible region.
+     */
+    fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean = false
+
     /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]
      *  and [LocalSearchState.boolMakeCount] incrementally via [updateBoolBreakMakeForFlip],
      *  skipping the engine's brute-force O(arity²) per-flip subtract-add cycle.

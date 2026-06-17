@@ -196,3 +196,22 @@ predicate disjunctive(array[int] of var int: starts, array[int] of int: duration
 predicate disjunctive_strict(array[int] of var int: starts, array[int] of int: durations);
 % Var-arg cumulative / disjunctive[_strict] live in their own override files
 % (fzn_cumulative.mzn etc.) so MiniZinc shadows the std decomposing definitions.
+
+%-----------------------------------------------------------------------------%
+% Implied-constraint markers.
+%
+% MiniZinc's stdlib lowers `redundant_constraint(c)` / `symmetry_breaking_constraint(c)`
+% to a bare `c`, erasing the marker before it reaches FlatZinc. Klause wants to keep
+% the constraint (dropping it is unsound for symmetry over the objective, and we don't
+% want a separate ls/cp flatten) but knowing a constraint is *implied* lets the
+% local-search engine seed its violation weight lower so the bulk of redundant /
+% symmetry rows can't swamp the landscape before the structural constraints are met,
+% and lets presolve skip its own symmetry breaking when the model already breaks it.
+%
+% The typechecker rewrites the public predicates to these `mzn_*` builtins (declared
+% body-less in stdlib_internal.mzn); redefining them here to keep `b` and attach a
+% klause annotation makes the marker ride through to the constraint in the FZN.
+annotation klause_redundant;
+annotation klause_symmetry;
+predicate mzn_redundant_constraint(var bool: b) = b :: klause_redundant;
+predicate mzn_symmetry_breaking_constraint(var bool: b) = b :: klause_symmetry;

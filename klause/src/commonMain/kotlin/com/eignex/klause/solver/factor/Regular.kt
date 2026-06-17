@@ -227,4 +227,111 @@ class Regular(
         }
         return inc.propagate(state, factorId)
     }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: at a position `i`, replace its symbol with another
+     *  in-domain symbol that drives the *same* state transition `qᵢ → qᵢ₊₁`. The run's state path
+     *  is unchanged, so the accepted word stays accepted; only the surface symbol differs, which can
+     *  free a coupled constraint sharing that variable. Only meaningful on an accepted string. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val n = seq.size
+        val path = IntArray(n + 1)
+        path[0] = q0
+        for (i in 0 until n) {
+            path[i + 1] = delta(path[i], state.assignment.intValue(seq[i]))
+            if (path[i + 1] == 0) return // not on an accepting run — nothing structure-preserving to offer.
+        }
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
+            attempts++
+            val i = state.rng.nextInt(n)
+            val cur = state.assignment.intValue(seq[i])
+            val q = path[i]
+            val nq = path[i + 1]
+            val d = state.problem.intDomains[seq[i]]
+            var pick = -1
+            var seen = 0
+            for (s in 1..alphabetSize) {
+                if (s == cur || s !in d || delta(q, s) != nq) continue
+                seen++
+                if (state.rng.nextInt(seen) == 0) pick = s
+            }
+            if (pick == -1) continue
+            sink.addChannelingIntSet(state, seq[i], pick)
+            emitted++
+        }
+    }
+
+    /** Feasible init: reconstruct an in-domain accepting word by forward reachability over the DFA
+     *  (per-position symbol set restricted to the variable's domain, and to the pinned value for a
+     *  frozen var), then walk an accepting state back to recover one witness word. Returns false —
+     *  leaving the random assignment — when no in-domain accepting word of this length exists. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val n = seq.size
+        val fwd = Array(n + 1) { BooleanArray(numStates + 1) }
+        fwd[0][q0] = true
+        for (i in 0 until n) {
+            for (q in 1..numStates) {
+                if (!fwd[i][q]) continue
+                for (s in 1..alphabetSize) {
+                    if (!symbolAllowed(state, i, s)) continue
+                    val nq = delta(q, s)
+                    if (nq != 0) fwd[i + 1][nq] = true
+                }
+            }
+        }
+        var target = -1
+        for (q in accepting) {
+            if (q in 1..numStates && fwd[n][q]) {
+                target = q
+                break
+            }
+        }
+        if (target == -1) return false
+        val chosen = IntArray(n)
+        var t = target
+        for (i in n - 1 downTo 0) {
+            var fq = -1
+            var fs = -1
+            outer@ for (q in 1..numStates) {
+                if (!fwd[i][q]) continue
+                for (s in 1..alphabetSize) {
+                    if (!symbolAllowed(state, i, s)) continue
+                    if (delta(q, s) == t) {
+                        fq = q
+                        fs = s
+                        break@outer
+                    }
+                }
+            }
+            if (fq == -1) return false
+            chosen[i] = fs
+            t = fq
+        }
+        for (i in 0 until n) {
+            if (!state.assumptions.isFrozenInt(seq[i])) state.assignment.setInt(seq[i], chosen[i])
+        }
+        return true
+    }
+
+    /** Symbol [s] is usable at position [i]: the pinned value for a frozen variable, else any value
+     *  in the variable's domain. */
+    private fun symbolAllowed(state: LocalSearchState, i: Int, s: Int): Boolean {
+        val v = seq[i]
+        return if (state.assumptions.isFrozenInt(v)) {
+            state.assignment.intValue(v) == s
+        } else {
+            s in state.problem.intDomains[v]
+        }
+    }
+
+    private companion object {
+        /** Cap on same-transition symbol substitutions offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_MOVE_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested move before giving up. */
+        const val MOVE_ATTEMPT_STRIDE: Int = 6
+    }
 }

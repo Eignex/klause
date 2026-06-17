@@ -18,6 +18,7 @@ import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.FeasibilityJump
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
@@ -69,6 +70,12 @@ internal data class LocalSearchWorkerConfig(
      *  search-excluded and the dismantle chains can't thread (measured: chains solve pc 3/3
      *  without invariants, plateau at cost ≈3 with them). */
     val perMoveInvariants: Boolean = true,
+    /** Per-worker switch for implicit-solving feasible init (see
+     *  [LocalSearchSolver.seedImplicitOnRestart]): seeds elected structural globals feasible on
+     *  every restart so their structure-preserving neighbourhoods are productive from step one.
+     *  Off by default; paired with a [Cbls] whose `implicitStructuredCap > 0` on the
+     *  permutation/assignment-shaped arm. */
+    val seedImplicitOnRestart: Boolean = false,
 ) : WorkerConfig {
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
@@ -92,6 +99,7 @@ internal data class LocalSearchWorkerConfig(
             restartPolicy = restartPolicy,
             definitionalSweep = definitionalSweep,
             perMoveInvariants = definitionalSweep != null && perMoveInvariants,
+            seedImplicitOnRestart = seedImplicitOnRestart,
         ).session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(
@@ -100,6 +108,9 @@ internal data class LocalSearchWorkerConfig(
             // The per-move gradient view of the objective, when the model provides one.
             lsObjective = lsObjective,
             onEvent = onEvent?.let { sink -> { e -> sink(workerLabel, e) } },
+            // Keep a single over-populated constraint kind from steering the initial descent; a
+            // no-op for the pool's weight-blind arms.
+            normalizeWeightsByClass = true,
         )
         return PortfolioWorker.of(
             workerLabel,
@@ -136,6 +147,7 @@ internal data class LocalSearchWorkerConfig(
             label: String,
             restart: RestartPolicy,
             perMoveInvariants: Boolean = true,
+            seedImplicitOnRestart: Boolean = false,
             make: () -> Cbls,
         ) = LocalSearchWorkerConfig(
             label,
@@ -143,6 +155,7 @@ internal data class LocalSearchWorkerConfig(
             restart,
             optimizeStrategy = make(),
             perMoveInvariants = perMoveInvariants,
+            seedImplicitOnRestart = seedImplicitOnRestart,
         )
 
         /**
@@ -256,6 +269,22 @@ internal data class LocalSearchWorkerConfig(
             // Bandit-adaptive probSAT (#8): a UCB1 bandit picks the cb noise schedule per session.
             LsArm.ProbsatBanditFixed ->
                 LocalSearchWorkerConfig(arm.label, ProbSat.bandit(tabu = cblsTabu()), FixedCadenceRestart())
+
+            // Implicit-solving neighbourhoods: seed elected structural globals (all-different /
+            // inverse / table) feasible on every restart and draw their feasibility-preserving
+            // moves during the infeasibility fight, so the search relocates values inside one
+            // global to clear coupled constraints (Sudoku rows × columns, timetabling). The
+            // permutation/assignment-shaped niche.
+            LsArm.CblsImplicitFixed -> cblsWorker(arm.label, FixedCadenceRestart(), seedImplicitOnRestart = true) {
+                Cbls(implicitStructuredCap = 8, tabu = cblsTabu())
+            }
+
+            // Feasibility-Jump arm (#698): a weighted-violation argmin-jump strategy, orthogonal to
+            // the step-based CBLS/WalkSAT/SA arms. Registered like the SAT-family arms — it drives
+            // the feasibility fight and returns null at feasibility, so the engine's built-in
+            // objective descent owns the optimize phase (no optimizeStrategy).
+            LsArm.FeasibilityJumpFixed ->
+                LocalSearchWorkerConfig(arm.label, FeasibilityJump(), FixedCadenceRestart())
         }
 
         /**
@@ -279,6 +308,13 @@ internal data class LocalSearchWorkerConfig(
             // #9-lite credit pass kept these two (each held a best); the third, the LS move bandit,
             // was a dud and was removed.
             LsArm.CblsIlsBandit, LsArm.ProbsatBanditFixed,
+            // Implicit-solving niche; kept last (like the bandit arms) so the default diverse(N)
+            // prefix is unchanged pending a cross-seed credit pass. Reachable by label and in the
+            // full pool.
+            LsArm.CblsImplicitFixed,
+            // Feasibility-Jump arm (#698); kept last for the same reason — reachable by label and in
+            // the full pool, awaiting its cross-seed credit pass before entering the default prefix.
+            LsArm.FeasibilityJumpFixed,
         )
 
         /** Resolve a catalog label to its typed [LsArm] — the single string boundary, for the CLI /
@@ -327,6 +363,8 @@ internal enum class LsArm(val label: String) {
     CblsTenure3Fixed("cbls-tenure3/fixed"),
     CblsIlsBandit("cbls/ils-bandit"),
     ProbsatBanditFixed("probsat-bandit/fixed"),
+    CblsImplicitFixed("cbls-implicit/fixed"),
+    FeasibilityJumpFixed("fjump/fixed"),
 }
 
 /**

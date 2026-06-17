@@ -2,7 +2,6 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.lp.LpRelaxation
-import com.eignex.klause.solver.lp.LpSolution
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
@@ -19,12 +18,13 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) {
     private val intVal = DoubleArray(numIntVars) { Double.NaN }
     private val boolVal = DoubleArray(numBoolVars) { Double.NaN }
 
-    /** Record an LP solution's fractional primal, keyed by the relaxation's column→variable map. */
-    fun record(relaxation: LpRelaxation, solution: LpSolution) {
+    /** Record an LP solution's fractional primal (per structural column, `RevisedSimplex.FloatLpResult.primal`),
+     *  keyed by the relaxation's column→variable map. */
+    fun record(relaxation: LpRelaxation, primal: DoubleArray) {
         for (col in relaxation.colVarId.indices) {
             val v = relaxation.colVarId[col]
-            if (v < 0) continue // auxiliary column (e.g. circuit arc) — no CP variable to hint
-            val value = solution.primal(col)
+            if (v < 0 || col >= primal.size) continue // auxiliary column (e.g. circuit arc) — no CP variable to hint
+            val value = primal[col]
             if (relaxation.colIsBool[col]) boolVal[v] = value else intVal[v] = value
         }
     }

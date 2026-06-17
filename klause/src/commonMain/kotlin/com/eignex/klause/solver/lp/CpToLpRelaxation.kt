@@ -24,7 +24,9 @@ import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
@@ -82,14 +84,6 @@ internal class LpRelaxation(
 internal class CpToLpRelaxation(
     private val problem: Problem,
     private val objective: LinearObjective?,
-    /** When true, materialize columns for variables of cut-eligible globals (AllDifferent) so a
-     *  [CutSeparator] can write cuts over them, even when no other factor references the variable. */
-    private val generateCuts: Boolean = false,
-    /** When true, build the arc-indicator relaxation of each Circuit / Subcircuit (degree + channelling
-     *  rows). For Circuit it also feeds [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets
-     *  only the sound permutation relaxation (the Hamiltonian SEC is unsound there). Adds O(n²) columns,
-     *  so it is gated. */
-    private val circuitArcs: Boolean = false,
     /** When true, linearize each constant-array Element with a one-hot selector model (its exact
      *  convex hull). Adds O(len) columns, so it is gated; variable arrays are skipped. */
     private val elementHull: Boolean = false,
@@ -99,6 +93,11 @@ internal class CpToLpRelaxation(
     /** When true, emit the energetic makespan lower-bound row for each Cumulative / Disjunctive whose
      *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
     private val cumulative: Boolean = false,
+    /** When true, project each constant-size Diffn onto both axes as a cumulative and emit the same
+     *  energetic makespan row (#655) — a sound lower bound on a strip-length / extent variable (its
+     *  `t1 = min-est` case is the area bound `Σ wᵢ·hᵢ ≤ W·H`). One row per derived plan; a no-op unless
+     *  an axis extent is provably an upper bound on every task end (so it only fires when it helps). */
+    private val diffn: Boolean = false,
     /** When true, emit the time-indexed `x_{i,t}` relaxation of each Cumulative / Disjunctive over a
      *  bounded horizon (#453): assignment + start channel + per-time resource rows. Adds O(n·H)
      *  columns, so it is hard-gated on the horizon and total cell count. */
@@ -130,10 +129,25 @@ internal class CpToLpRelaxation(
      * probe is deliberately the minimal linear+Boolean relaxation.
      */
     private val objectiveCone: Boolean = false,
+    /** When true, build the arc-indicator relaxation of each [Circuit] / [Subcircuit] (degree +
+     *  channelling rows over one `y_ij ∈ [0,1]` column per candidate arc). For Circuit it also records
+     *  a [CircuitArcModel] feeding [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets the
+     *  hull only (its cutset structure differs, #431). Adds O(arcs) columns, so it is gated. */
+    private val circuitArcs: Boolean = false,
+    /** When true, emit a sparse [LpModel] (CSC core only, no dense `m × n` matrix) — for the over-cap
+     *  bound-only sparse pipeline (#602), whose solvers read columns via [LpModel.forEachInColumn].
+     *  Set from [com.eignex.klause.solver.backtrack.BacktrackParams.lpSparsePrimary]; the dense
+     *  the dense dual simplex path leaves it false. Disables the #564 dense-row cache (moot without a dense `a`). */
+    private val sparseModel: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
-        if (cumulative) CumulativeRelaxation(problem).takeIf { it.applicable } else null
+        if (cumulative || diffn) {
+            CumulativeRelaxation(problem, includeCumulative = cumulative, includeDiffn = diffn)
+                .takeIf { it.applicable }
+        } else {
+            null
+        }
 
     /**
      * #564 dense-row cache eligibility. The per-node rebuild is dominated by densifying the `m × n`
@@ -283,11 +297,13 @@ internal class CpToLpRelaxation(
         private val boolCol = IntArray(problem.numBoolVars) { -1 }
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
-        private val circuitModels = ArrayList<CircuitArcModel>()
 
         /** Base-row indices emitted by live-big-M reified rows (#564); their coefficients vary per
          *  node, so they are never shared from the dense cache. */
         private val reifiedRowIdx = IntArrayList()
+
+        /** Arc-indicator models recorded by [buildCircuitArcs] for the subtour-elimination separator. */
+        private val circuitModels = ArrayList<CircuitArcModel>()
 
         /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc. */
         private fun auxColumn(lo: Long, hi: Long): Int {
@@ -295,6 +311,88 @@ internal class CpToLpRelaxation(
             colVarId.add(-1)
             colIsBool.add(0)
             return c
+        }
+
+        /**
+         * Arc-indicator relaxation of one [Circuit] over `succ[0..n)`: a column `y_ij ∈ [0,1]` per
+         * candidate arc (`j` in the declared domain of `succ[i]`, `j ≠ i` — circuit forbids self
+         * loops), pinned to 0 when `j` left the live domain. Rows: out-degree `Σ_j y_ij = 1`,
+         * in-degree `Σ_i y_ij = 1`, and channelling `Σ_j j·y_ij = succ[i]` tying arcs to the integer
+         * column. Integer solutions are then permutations; [CircuitSeparator] removes the subtours.
+         * The column *layout* uses the declared domain so it is identical across nodes (warm-start
+         * safe). A circuit whose candidate-arc count exceeds [MAX_CIRCUIT_ARCS] is skipped (the LP
+         * column count would dominate); gating on arc count rather than n lets large sparse graphs
+         * through (#431). Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
+         */
+        private fun buildCircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = false, sec = true)
+
+        /**
+         * Arc-indicator relaxation of one [Subcircuit] over `succ[0..n)`. As [buildCircuitArcs] but the
+         * self-loop arc `y_ii` (= "node i is excluded") is a candidate, so the degree + channel rows
+         * describe the **permutation** polytope (each node has exactly one in- and out-arc, fixed points
+         * allowed). **No subtour-elimination model is registered**: the Hamiltonian SEC is *unsound* for
+         * a subcircuit (an all-excluded subset legitimately has no leaving arc).
+         */
+        private fun buildSubcircuitArcs(factor: Subcircuit) = buildArcModel(factor.succ, selfLoops = true, sec = false)
+
+        /**
+         * Shared degree + channel arc model for [Circuit] / [Subcircuit]: a `y_ij ∈ [0,1]` column per
+         * candidate arc (pinned to 0 when `j` left the live domain), with out-degree / in-degree
+         * `= 1` rows and the channel `Σ_j j·y_ij = succ[i]`. Records a [CircuitArcModel] when [sec].
+         */
+        private fun buildArcModel(succ: IntArray, selfLoops: Boolean, sec: Boolean) {
+            val n = succ.size
+            if (n < 2) return
+            // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
+            // graphs (small per-node successor domains) are not skipped by a blunt node cap.
+            var arcCount = 0
+            for (i in 0 until n) {
+                problem.intDomains[succ[i]].forEach { j -> if ((selfLoops || j != i) && j in 0 until n) arcCount++ }
+            }
+            if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
+            val tails = IntArrayList()
+            val heads = IntArrayList()
+            val cols = IntArrayList()
+            val inColsByHead = Array(n) { IntArrayList() }
+            // Out-degree and channelling rows, building the (sparse) arc columns on the way.
+            for (i in 0 until n) {
+                val live = session.intDomain(succ[i])
+                val outCols = IntArrayList()
+                val chanCols = IntArrayList()
+                val chanCoef = IntArrayList()
+                problem.intDomains[succ[i]].forEach { j ->
+                    if ((!selfLoops && j == i) || j < 0 || j >= n) return@forEach
+                    val present = live.contains(j)
+                    val col = auxColumn(0L, if (present) 1L else 0L)
+                    outCols.add(col)
+                    chanCols.add(col)
+                    chanCoef.add(j)
+                    tails.add(i)
+                    heads.add(j)
+                    cols.add(col)
+                    inColsByHead[j].add(col)
+                }
+                if (outCols.isEmpty()) return // degenerate: no candidate successor — leave to propagation
+                builder.addRow(outCols.toIntArray(), LongArray(outCols.size) { 1L }, Relation.EQ, 1L)
+                // Σ_j j·y_ij − succ[i] = 0.
+                val cCols = IntArray(chanCols.size + 1)
+                val cVals = LongArray(chanCols.size + 1)
+                for (k in 0 until chanCols.size) {
+                    cCols[k] = chanCols[k]
+                    cVals[k] = chanCoef[k].toLong()
+                }
+                cCols[chanCols.size] = intColumn(succ[i])
+                cVals[chanCols.size] = -1L
+                builder.addRow(cCols, cVals, Relation.EQ, 0L)
+            }
+            // In-degree rows: Σ_i y_ij = 1 for each node j that is some arc's head.
+            for (j in 0 until n) {
+                val inCols = inColsByHead[j]
+                if (!inCols.isEmpty()) {
+                    builder.addRow(inCols.toIntArray(), LongArray(inCols.size) { 1L }, Relation.EQ, 1L)
+                }
+            }
+            if (sec) circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
         /** Column for integer variable `i`, created on first use with its live domain bounds. */
@@ -393,7 +491,7 @@ internal class CpToLpRelaxation(
          * row records the live bounds its M rests on as [LpRowPremises] — the lMax-side rows cite
          * each variable's M-relevant live bound (`≤ max` for positive coefficients, `≥ min` for
          * negative; mirrored for lMin-side rows) — so a certificate that leans on the row can cite
-         * those atoms instead of being withheld (see [LpExplanation]).
+         * those atoms instead of being withheld (see the LP explanation).
          */
         private fun reifiedRows(rl: ReifiedLinear) {
             var lMin = 0L
@@ -621,24 +719,6 @@ internal class CpToLpRelaxation(
             // Cone mode is the minimal linear+Boolean objective-cone probe: the column-heavy hull /
             // circuit / cut / cumulative features are all forced off (see [objectiveCone]).
             if (!objectiveCone) {
-                // Cut generation needs columns for the globals' variables even when nothing else
-                // references them, so a separator has something to write the cut over.
-                if (generateCuts) {
-                    // The all-different family (AllDifferent, SymmetricAllDifferent, both Inverse sides)
-                    // feeds the Hall-sum and assignment cuts; closed GlobalCardinality feeds the GCC cut.
-                    for (group in allDifferentGroups(problem)) for (v in group) intColumn(v)
-                    for (factor in problem.factors) {
-                        if (factor is GlobalCardinality && factor.closed && factor.presents.isEmpty()) {
-                            for (v in factor.xs) intColumn(v)
-                        }
-                    }
-                }
-                if (circuitArcs) {
-                    for (factor in problem.factors) {
-                        if (factor is Circuit) buildCircuitArcs(factor)
-                        if (factor is Subcircuit) buildSubcircuitArcs(factor)
-                    }
-                }
                 if (elementHull) {
                     for (factor in problem.factors) if (factor is Element) buildElementHull(factor)
                 }
@@ -656,6 +736,12 @@ internal class CpToLpRelaxation(
                 }
                 if (gccCountHull) {
                     for (factor in problem.factors) if (factor is GlobalCardinality) buildGccCountHull(factor)
+                }
+                if (circuitArcs) {
+                    for (factor in problem.factors) {
+                        if (factor is Circuit) buildCircuitArcs(factor)
+                        if (factor is Subcircuit) buildSubcircuitArcs(factor)
+                    }
                 }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
                 if (cumulativeTimeIndexed) {
@@ -736,12 +822,14 @@ internal class CpToLpRelaxation(
             // (re)capture the cache. Sharing is sound because the re-walk above produced the live
             // right-hand sides / global flags for every row — only the bound-invariant coefficient
             // arrays are aliased.
+            // The over-cap sparse pipeline (#602) builds only the CSC core — no dense `m × n` matrix —
+            // so the #564 dense-row cache is moot there and skipped.
             val shared = denseCache?.takeIf {
-                cacheable && cacheVarCount == builder.varCount &&
+                !sparseModel && cacheable && cacheVarCount == builder.varCount &&
                     cacheBaseRows == baseRows
             }
-            val model = builder.buildShared(Sense.MINIMIZE, shared)
-            if (shared == null && cacheable) captureDenseCache(model, baseRows)
+            val model = builder.buildShared(Sense.MINIMIZE, shared, sparse = sparseModel)
+            if (!sparseModel && shared == null && cacheable) captureDenseCache(model, baseRows)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
             return LpRelaxation(
                 model = model,
@@ -763,93 +851,10 @@ internal class CpToLpRelaxation(
                 val r = reifiedRowIdx[idx]
                 if (r < baseRows) reified[r] = true
             }
-            denseCache = Array(baseRows) { i -> if (reified[i]) null else model.a[i] }
+            val a = model.denseRows()
+            denseCache = Array(baseRows) { i -> if (reified[i]) null else a[i] }
             cacheVarCount = builder.varCount
             cacheBaseRows = baseRows
-        }
-
-        /**
-         * Arc-indicator relaxation of one [Circuit] over `succ[0..n)`: a column `y_ij ∈ [0,1]` per
-         * candidate arc (`j` in the declared domain of `succ[i]`, `j ≠ i` — circuit forbids self
-         * loops), pinned to 0 when `j` left the live domain. Rows: out-degree `Σ_j y_ij = 1`,
-         * in-degree `Σ_i y_ij = 1`, and channelling `Σ_j j·y_ij = succ[i]` tying arcs to the integer
-         * column. Integer solutions are then permutations; [CircuitSeparator] removes the subtours.
-         * The column *layout* uses the declared domain so it is identical across nodes (warm-start
-         * safe). A circuit whose candidate-arc count exceeds [MAX_CIRCUIT_ARCS] is skipped (the dense
-         * LP tableau would dominate); gating on arc count rather than n lets large sparse graphs
-         * through (#431). Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
-         */
-        private fun buildCircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = false, sec = true)
-
-        /**
-         * Arc-indicator relaxation of one [Subcircuit] over `succ[0..n)`. As [buildCircuitArcs] but the
-         * self-loop arc `y_ii` (= "node i is excluded") is a candidate, so the degree + channel rows
-         * describe the **permutation** polytope (each node has exactly one in- and out-arc, fixed points
-         * allowed) — a sound assignment relaxation of the routing cost. **No subtour-elimination model is
-         * registered**: the Hamiltonian SEC `Σ_{i∈S,j∉S} y_ij ≥ 1` is *unsound* for a subcircuit (an
-         * all-excluded subset legitimately has no leaving arc). A subcircuit-correct SEC is a follow-up.
-         */
-        private fun buildSubcircuitArcs(factor: Subcircuit) = buildArcModel(factor.succ, selfLoops = true, sec = false)
-
-        /**
-         * Shared degree + channel arc model for [Circuit] / [Subcircuit]: a column `y_ij ∈ [0,1]` per
-         * candidate arc (pinned to 0 when `j` left the live domain), out-degree `Σ_j y_ij = 1`, in-degree
-         * `Σ_i y_ij = 1`, and channel `Σ_j j·y_ij = succ[i]`. [selfLoops] keeps the `j = i` arc (subcircuit
-         * exclusion). When [sec] is true the arc model is recorded for the subtour separator (circuit only).
-         */
-        private fun buildArcModel(succ: IntArray, selfLoops: Boolean, sec: Boolean) {
-            val n = succ.size
-            if (n < 2) return
-            // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
-            // graphs (small per-node successor domains) are not skipped by a blunt node cap.
-            var arcCount = 0
-            for (i in 0 until n) {
-                problem.intDomains[succ[i]].forEach { j -> if ((selfLoops || j != i) && j in 0 until n) arcCount++ }
-            }
-            if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
-            val tails = IntArrayList()
-            val heads = IntArrayList()
-            val cols = IntArrayList()
-            val inColsByHead = Array(n) { IntArrayList() }
-            // Out-degree and channelling rows, building the (sparse) arc columns on the way.
-            for (i in 0 until n) {
-                val live = session.intDomain(succ[i])
-                val outCols = IntArrayList()
-                val chanCols = IntArrayList()
-                val chanCoef = IntArrayList()
-                problem.intDomains[succ[i]].forEach { j ->
-                    if ((!selfLoops && j == i) || j < 0 || j >= n) return@forEach
-                    val present = live.contains(j)
-                    val col = auxColumn(0L, if (present) 1L else 0L)
-                    outCols.add(col)
-                    chanCols.add(col)
-                    chanCoef.add(j)
-                    tails.add(i)
-                    heads.add(j)
-                    cols.add(col)
-                    inColsByHead[j].add(col)
-                }
-                if (outCols.isEmpty()) return // degenerate: no candidate successor — leave to propagation
-                builder.addRow(outCols.toIntArray(), LongArray(outCols.size) { 1L }, Relation.EQ, 1L)
-                // Σ_j j·y_ij − succ[i] = 0.
-                val cCols = IntArray(chanCols.size + 1)
-                val cVals = LongArray(chanCols.size + 1)
-                for (k in 0 until chanCols.size) {
-                    cCols[k] = chanCols[k]
-                    cVals[k] = chanCoef[k].toLong()
-                }
-                cCols[chanCols.size] = intColumn(succ[i])
-                cVals[chanCols.size] = -1L
-                builder.addRow(cCols, cVals, Relation.EQ, 0L)
-            }
-            // In-degree rows: Σ_i y_ij = 1 for each node j that is some arc's head.
-            for (j in 0 until n) {
-                val inCols = inColsByHead[j]
-                if (!inCols.isEmpty()) {
-                    builder.addRow(inCols.toIntArray(), LongArray(inCols.size) { 1L }, Relation.EQ, 1L)
-                }
-            }
-            if (sec) circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
         /**
@@ -917,8 +922,15 @@ internal class CpToLpRelaxation(
             for (x in xs) cells += problem.intDomains[x].size.toLong()
             if (cells == 0L || cells > MAX_NVALUE_CELLS) return
             val yCols = IntArrayList()
-            val yByValue = HashMap<Int, Int>()
-            fun yOf(v: Int): Int = yByValue.getOrPut(v) { auxColumn(0L, 1L).also { yCols.add(it) } }
+            val yByValue = MutableIntIntMap()
+            fun yOf(v: Int): Int {
+                val existing = yByValue.getOrDefault(v, -1) // columns are non-negative, so -1 marks absent
+                if (existing >= 0) return existing
+                val col = auxColumn(0L, 1L)
+                yCols.add(col)
+                yByValue.put(v, col)
+                return col
+            }
             for (x in xs) {
                 val declared = problem.intDomains[x]
                 val live = session.intDomain(x)
@@ -1043,15 +1055,18 @@ internal class CpToLpRelaxation(
             val s = factor.alphabetSize
             val trans = factor.transitions
             fun delta(state: Int, sym: Int): Int = trans[(state - 1) * s + (sym - 1)] // 1-based; 0 = dead
-            val accepting = HashSet<Int>().apply { for (a in factor.accepting) add(a) }
+            val accepting = factor.acceptingSet
+            // States are 1-based ids in `1..numStates`, so the per-layer state→arc-columns maps are
+            // dense arrays indexed straight by the state id rather than boxed `HashMap<Int, _>` (#678).
+            val ns = factor.numStates
 
             // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-            val reach = Array(len + 1) { HashSet<Int>() }
+            val reach = Array(len + 1) { IntHashSet() }
             reach[0].add(factor.q0)
             var arcCount = 0L
             for (t in 0 until len) {
                 val dom = problem.intDomains[seq[t]]
-                for (state in reach[t]) {
+                reach[t].forEach { state ->
                     dom.forEach { sym ->
                         if (sym in 1..s) {
                             val nxt = delta(state, sym)
@@ -1066,22 +1081,22 @@ internal class CpToLpRelaxation(
             }
             if (arcCount == 0L || arcCount > MAX_REGULAR_ARCS) return
 
-            val outCols = Array(len) { HashMap<Int, IntArrayList>() }
-            val inCols = Array(len + 1) { HashMap<Int, IntArrayList>() }
+            val outCols = Array(len) { arrayOfNulls<IntArrayList>(ns + 1) }
+            val inCols = Array(len + 1) { arrayOfNulls<IntArrayList>(ns + 1) }
             val chanCols = Array(len) { IntArrayList() }
             val chanSym = Array(len) { IntArrayList() }
             val acceptCols = IntArrayList()
             for (t in 0 until len) {
                 val declared = problem.intDomains[seq[t]]
                 val live = session.intDomain(seq[t])
-                for (state in reach[t]) {
+                reach[t].forEach { state ->
                     declared.forEach { sym ->
                         if (sym !in 1..s) return@forEach
                         val nxt = delta(state, sym)
                         if (nxt == 0) return@forEach
                         val col = auxColumn(0L, if (live.contains(sym)) 1L else 0L)
-                        outCols[t].getOrPut(state) { IntArrayList() }.add(col)
-                        inCols[t + 1].getOrPut(nxt) { IntArrayList() }.add(col)
+                        (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
+                        (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)
                         chanCols[t].add(col)
                         chanSym[t].add(sym)
                         if (t == len - 1 && nxt in accepting) acceptCols.add(col)
@@ -1094,7 +1109,7 @@ internal class CpToLpRelaxation(
             builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
             // Flow conservation at every interior node: Σ out − Σ in = 0.
             for (t in 1 until len) {
-                for (state in reach[t]) {
+                reach[t].forEach { state ->
                     val cols = IntArrayList()
                     val vals = LongArrayList()
                     outCols[t][state]?.let {
@@ -1151,7 +1166,7 @@ internal class CpToLpRelaxation(
             val trans = factor.transitions
             val starts = factor.layerStarts
             // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-            val reach = Array(n + 1) { HashSet<Int>() }
+            val reach = Array(n + 1) { IntHashSet() }
             reach[0].add(factor.initial)
             var arcCount = 0L
             for (layer in 0 until n) {
@@ -1169,11 +1184,14 @@ internal class CpToLpRelaxation(
             }
             if (arcCount == 0L || arcCount > MAX_MDD_ARCS) return
 
-            val outCols = Array(n) { HashMap<Int, IntArrayList>() }
-            val inCols = Array(n + 1) { HashMap<Int, IntArrayList>() }
+            // States are layer-local dense ids in `[0, numStatesPerLayer(layer))`, so the per-layer
+            // state→arc-columns maps are arrays indexed straight by the state id (#678).
+            val nspl = factor.numStatesPerLayer
+            val outCols = Array(n) { arrayOfNulls<IntArrayList>(nspl[it]) }
+            val inCols = Array(n + 1) { arrayOfNulls<IntArrayList>(nspl[it]) }
             val chanCols = Array(n) { IntArrayList() }
             val chanVal = Array(n) { IntArrayList() }
-            val accepting = HashSet<Int>().apply { for (a in factor.accepting) add(a) }
+            val accepting = IntHashSet(factor.accepting.size).apply { for (a in factor.accepting) add(a) }
             val acceptCols = IntArrayList()
             val costArcs = IntArrayList()
             val costWeight = IntArrayList()
@@ -1188,8 +1206,8 @@ internal class CpToLpRelaxation(
                     val dst = trans[p + 2]
                     if (src in reach[layer] && value in declared) {
                         val col = auxColumn(0L, if (live.contains(value)) 1L else 0L)
-                        outCols[layer].getOrPut(src) { IntArrayList() }.add(col)
-                        inCols[layer + 1].getOrPut(dst) { IntArrayList() }.add(col)
+                        (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
+                        (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)
                         chanCols[layer].add(col)
                         chanVal[layer].add(value)
                         if (layer == n - 1 && dst in accepting) acceptCols.add(col)
@@ -1205,7 +1223,7 @@ internal class CpToLpRelaxation(
             if (src.isEmpty()) return
             builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
             for (layer in 1 until n) {
-                for (state in reach[layer]) {
+                reach[layer].forEach { state ->
                     val cols = IntArrayList()
                     val vals = LongArrayList()
                     outCols[layer][state]?.let {

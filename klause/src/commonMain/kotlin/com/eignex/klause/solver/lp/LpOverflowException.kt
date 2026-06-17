@@ -8,7 +8,7 @@ package com.eignex.klause.solver.lp
  * rather than silently producing a wrong bound — an unsound LP bound would make
  * branch-and-bound return wrong answers, so failing loud is the safe default.
  *
- * Also raised by [DualSimplex.runDualSimplex]'s iteration backstop: both mean "the exact LP core
+ * Also raised by the dual simplex's iteration backstop: both mean "the exact LP core
  * could not produce a result," and every caller handles them identically — drop the LP bound and
  * keep the node, which only loses pruning and never soundness.
  */

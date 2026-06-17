@@ -7,6 +7,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on equal-length int
@@ -190,6 +191,102 @@ class LexLess(
             }
             if (added) return
         }
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: once the comparison is strictly decided at the first
+     *  differing index `k` (`xs[k] < ys[k]`), every position *after* `k` is irrelevant to the
+     *  relation. Relabel such a free variable to any other in-domain value — the lex order is
+     *  untouched, and the variable is free for a coupled constraint. Variables that also appear in
+     *  the deciding prefix `[0, k]` are excluded (changing them could move `k`). */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val len = minOf(xs.size, ys.size)
+        var k = -1
+        for (i in 0 until len) {
+            if (state.assignment.intValue(xs[i]) != state.assignment.intValue(ys[i])) {
+                k = i
+                break
+            }
+        }
+        if (k < 0) return // all-equal prefix: no strictly-decided suffix to free.
+        val prefix = IntHashSet()
+        for (i in 0..k) {
+            prefix.add(xs[i])
+            prefix.add(ys[i])
+        }
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
+            attempts++
+            val arr = if (state.rng.nextBoolean()) xs else ys
+            if (k + 1 >= arr.size) continue
+            val vId = arr[k + 1 + state.rng.nextInt(arr.size - (k + 1))]
+            if (prefix.contains(vId)) continue
+            val cur = state.assignment.intValue(vId)
+            val d = state.problem.intDomains[vId]
+            var pick = -1
+            var seen = 0
+            d.forEach { w ->
+                if (w != cur) {
+                    seen++
+                    if (state.rng.nextInt(seen) == 0) pick = w
+                }
+            }
+            if (pick < 0) continue
+            sink.addChannelingIntSet(state, vId, pick)
+            emitted++
+        }
+    }
+
+    /** Feasible init: decide the order strictly at position 0 by lowering `xs[0]` and raising
+     *  `ys[0]`, then leave every later position at its domain minimum (free once position 0
+     *  decides). Returns false — leaving the random assignment — when position 0 can't be made
+     *  `xs[0] < ys[0]` (empty compared range, shared variable, or frozen vars that fix `≥`). */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val len = minOf(xs.size, ys.size)
+        if (len == 0) return false
+        val x0 = xs[0]
+        val y0 = ys[0]
+        if (x0 == y0) return false
+        val xv = if (state.assumptions.isFrozenInt(
+                x0,
+            )
+        ) {
+            state.assignment.intValue(x0)
+        } else {
+            state.problem.intDomains[x0].min
+        }
+        val yv = if (state.assumptions.isFrozenInt(
+                y0,
+            )
+        ) {
+            state.assignment.intValue(y0)
+        } else {
+            state.problem.intDomains[y0].max
+        }
+        if (xv >= yv) return false
+        if (!state.assumptions.isFrozenInt(x0)) state.assignment.setInt(x0, xv)
+        if (!state.assumptions.isFrozenInt(y0)) state.assignment.setInt(y0, yv)
+        for (i in 1 until xs.size) {
+            if (!state.assumptions.isFrozenInt(xs[i])) {
+                state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
+            }
+        }
+        for (i in 1 until ys.size) {
+            if (!state.assumptions.isFrozenInt(ys[i])) {
+                state.assignment.setInt(ys[i], state.problem.intDomains[ys[i]].min)
+            }
+        }
+        return true
+    }
+
+    private companion object {
+        /** Cap on free-suffix relabel moves offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_MOVE_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested move before giving up. */
+        const val MOVE_ATTEMPT_STRIDE: Int = 6
     }
 
     /** Compute `xs lex≤(or <) ys` against current assignment. */

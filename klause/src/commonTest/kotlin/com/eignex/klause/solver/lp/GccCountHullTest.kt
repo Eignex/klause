@@ -39,12 +39,12 @@ class GccCountHullTest {
         )
         val maximizeTotalCount = LinearObjective(intCoefficients = longArrayOf(0, 0, -1, -1))
         val session = PropagationSession(p)
-        val bare = DualSimplex(
+        val bare = solveSparse(
             CpToLpRelaxation(p, maximizeTotalCount, gccCountHull = false).build(session).model,
-        ).solve()
-        val hull = DualSimplex(
+        )
+        val hull = solveSparse(
             CpToLpRelaxation(p, maximizeTotalCount, gccCountHull = true).build(session).model,
-        ).solve()
+        )
         assertEquals(LpStatus.OPTIMAL, hull.status)
         assertEquals(-2.0, hull.objectiveValue, eps, "the two vars contribute exactly 2 to the cover counts")
         assertTrue(hull.objectiveValue > bare.objectiveValue + eps, "the hull beats the per-count domain bound")
@@ -107,14 +107,14 @@ class GccCountHullTest {
             rec(0)
 
             val r = CpToLpRelaxation(p, obj, gccCountHull = true).build(PropagationSession(p))
-            val sol = DualSimplex(r.model).solve()
+            val sol = solveSparse(r.model)
             checked++
             assertEquals(LpStatus.OPTIMAL, sol.status, "feasible assignment exists but LP not optimal")
             assertEquals(
                 brute!!.toDouble(),
-                sol.objectiveValue + r.objectiveConstant,
+                sol.objectiveValue,
                 eps,
-                "GCC count hull optimum ${sol.objectiveValue + r.objectiveConstant} != brute $brute",
+                "GCC count hull optimum ${sol.objectiveValue} != brute $brute",
             )
         }
         assertTrue(checked > 100, "only $checked instances checked")

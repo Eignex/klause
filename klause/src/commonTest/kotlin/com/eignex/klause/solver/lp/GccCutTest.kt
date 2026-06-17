@@ -22,10 +22,10 @@ class GccCutTest {
         val n = factor.xs.size
         val p = Problem(0, n, Array(n) { IntDomain(0, hi) }, arrayOf<Factor>(factor))
         val session = PropagationSession(p)
-        val r = CpToLpRelaxation(p, LinearObjective(intCoefficients = LongArray(n) { coef }), generateCuts = true)
+        val r = CpToLpRelaxation(p, LinearObjective(intCoefficients = LongArray(n) { coef }))
             .build(session)
-        val sol = DualSimplex(r.model).solve()
-        return GccSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
+        return GccSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
     }
 
     private fun lower(factor: GlobalCardinality, hi: Int) = cuts(factor, hi, 1L).single { it.rel == Relation.GE }.rhs

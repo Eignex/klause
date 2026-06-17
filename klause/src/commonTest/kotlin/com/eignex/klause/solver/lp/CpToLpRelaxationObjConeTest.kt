@@ -71,12 +71,12 @@ class CpToLpRelaxationObjConeTest {
         assertEquals(3, cone.model.m, "cone keeps exactly the three Linear rows")
         assertTrue(cone.colIsBool.none { it }, "cone has no Boolean columns (the ordering bools are dropped)")
 
-        val coneSol = DualSimplex(cone.model).solve()
-        val fullSol = DualSimplex(full.model).solve()
+        val coneSol = solveSparse(cone.model)
+        val fullSol = solveSparse(full.model)
         assertEquals(LpStatus.OPTIMAL, coneSol.status)
         assertEquals(LpStatus.OPTIMAL, fullSol.status)
-        val coneBound = coneSol.objectiveValue + cone.objectiveConstant
-        val fullBound = fullSol.objectiveValue + full.objectiveConstant
+        val coneBound = coneSol.objectiveValue
+        val fullBound = fullSol.objectiveValue
         // Critical path: s0=0 → s1≥3 → s2≥7 → M≥12.
         assertEquals(12.0, coneBound, eps, "cone bound is the critical-path length")
         // A relaxation can only loosen: the cone bound never exceeds the full bound (≤ the optimum).
