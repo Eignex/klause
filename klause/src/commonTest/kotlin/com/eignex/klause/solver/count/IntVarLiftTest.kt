@@ -1,16 +1,20 @@
 package com.eignex.klause.solver.count
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.Linear
+import com.eignex.klause.solver.factor.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Counting and sampling lifted over integer variables (bit-blasted, hashed over their bits). */
+/** Counting and sampling lifted over integer variables (channelled to bits, hashed over them). */
 class IntVarLiftTest {
 
     private fun intVars(count: Int, lo: Int, hi: Int) = Problem(
@@ -94,4 +98,29 @@ class IntVarLiftTest {
     }
 
     private fun intKey(s: Sample): List<Int> = s.ints.toList()
+
+    @Test
+    fun `exact count over a constrained integer problem matches brute force`() {
+        // x0 + x1 <= 4 over 0..4 each: a real constraint so the channel must propagate, not just
+        // pass values through. Ground truth = brute-force solve over the 25 value combinations.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4)),
+        )
+        val solver = BacktrackSolver(p)
+        var bruteForce = 0
+        for (a in 0..4) {
+            for (b in 0..4) {
+                val r = solver.solve(BacktrackParams(assumptions = Assumptions(ints = mapOf(0 to a, 1 to b))))
+                if (r is SolveResult.Sat) bruteForce++
+            }
+        }
+        assertEquals(15, bruteForce, "sanity: combinations with x0 + x1 <= 4")
+
+        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 11L))
+        assertTrue(r.exact, "15 combinations is below the hashing threshold")
+        assertEquals(bruteForce.toLong(), r.estimate)
+    }
 }

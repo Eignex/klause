@@ -1,6 +1,5 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.implies
@@ -133,18 +132,6 @@ class CompileTest {
             val rate = compiled.decode(schema.rate, s)
             assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
             assertTrue(rate <= 1.0 + 1e-9 && rate >= 0.0 - 1e-9, "rate=$rate out of [0,1]")
-        }
-    }
-
-    @Test
-    fun `bit blast round trips cnf header`() {
-        val schema = TinyCampaign()
-        val compiled = schema.compile()
-        val text = BitBlaster.compile(compiled.problem).toDimacs()
-        val firstLine = text.lineSequence().first()
-        assertTrue(firstLine.startsWith("p cnf "))
-        text.lineSequence().drop(1).filter { it.isNotBlank() }.forEach { line ->
-            assertTrue(line.trimEnd().endsWith("0"))
         }
     }
 }

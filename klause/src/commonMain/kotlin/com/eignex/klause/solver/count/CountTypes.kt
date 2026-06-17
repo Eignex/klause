@@ -8,9 +8,9 @@ package com.eignex.klause.solver.count
  * enumeration tractable. The result is correct within a multiplicative `(1 ± epsilon)` factor with
  * probability at least `1 - delta`.
  *
- * The projection can include integer variables ([intSamplingSet]): those are bit-blasted and the
- * hashes range over their bits, so counting is over distinct integer *values* (× the Boolean
- * projection).
+ * The projection can include integer variables ([intSamplingSet]): those are channelled to Boolean
+ * bits (see [IntBitChannel]) and the hashes range over their bits, so counting is over distinct
+ * integer *values* (× the Boolean projection).
  */
 data class ApproxCountConfig(
     /** Multiplicative tolerance `ε`. Smaller ε → tighter bound → more enumeration work. */
@@ -24,8 +24,8 @@ data class ApproxCountConfig(
      */
     val samplingSet: IntArray? = null,
     /**
-     * Integer variable ids to count over (their distinct values). Bit-blasted via `BitBlaster`;
-     * hashes range over the bits. `null` together with a `null` [samplingSet] means "all int vars";
+     * Integer variable ids to count over (their distinct values). Channelled to Boolean bits via
+     * [IntBitChannel]; hashes range over the bits. `null` together with a `null` [samplingSet] means "all int vars";
      * `null` with a non-`null` [samplingSet] means "no int vars".
      */
     val intSamplingSet: IntArray? = null,
@@ -154,7 +154,7 @@ data class SamplingConfig(
      */
     val samplingSet: IntArray? = null,
     /**
-     * Integer variable ids to sample over (their values), bit-blasted and hashed over their bits.
+     * Integer variable ids to sample over (their values), channelled to bits and hashed over them.
      * Defaulting matches [ApproxCountConfig.intSamplingSet]. Only consulted by [SampleQuality.ACCURATE].
      */
     val intSamplingSet: IntArray? = null,

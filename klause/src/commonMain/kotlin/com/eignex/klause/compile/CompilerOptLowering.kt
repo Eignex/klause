@@ -39,10 +39,6 @@ import com.eignex.klause.solver.IntDomain
  *    reified form needs both directions — true *and* false — so we'd have to invent the
  *    false-side machinery from scratch per factor. Decomposition gives both directions for
  *    free via the existing reified primitives.
- *  - Bit-blasting only handles a small set of factor kinds (Clause, Cardinality, Linear,
- *    PseudoBoolean, ReifiedLinear, ReifiedCardinality, ReifiedPseudoBoolean, Xor, Product,
- *    AllDifferent). Decompositions land entirely inside that set, so BitBlaster sees the
- *    reified form for free.
  *
  * Tradeoff: at non-top-level we trade stronger propagation (the native factor) for a
  * sound decomposition. Top-level uses keep the native factor through [CompilerAssertions].
@@ -196,8 +192,7 @@ internal fun Lowering.reifyCumulativeOpt(expr: CumulativeExprOpt): Int =
  * successor array must be a permutation with no self-loops, and a single visit order
  * exists such that following `succ` from node 0 traverses every node before returning
  * to 0. Cost: `O(n)` extra constraints + `n - 1` aux position vars + the AllDifferent
- * over `succ` and over positions. All produced factors are BitBlaster-supported (Linear,
- * Reified*, AllDifferent, Clause).
+ * over `succ` and over positions.
  */
 internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
     val n = expr.succ.size

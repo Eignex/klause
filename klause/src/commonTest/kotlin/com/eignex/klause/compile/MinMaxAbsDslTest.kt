@@ -1,9 +1,7 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.abs
-import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.le
 import com.eignex.klause.schema.max
@@ -76,17 +74,5 @@ class MinMaxAbsDslTest {
             val xv = compiled.decode(schema.x, s)
             assertTrue(kabs(xv) <= 2, "|$xv|>2")
         }
-    }
-
-    @Test
-    fun `min bit blasting satisfiability agrees with solver`() {
-        class S : VariableSchema() {
-            val x by intVar(min = 0, max = 3)
-            val y by intVar(min = 0, max = 3)
-            val pin by constraint { min(x, y) eq 2 }
-        }
-        val compiled = S().compile()
-        val cnf = BitBlaster.compile(compiled.problem)
-        assertTrue(cnf.clauses.isNotEmpty())
     }
 }

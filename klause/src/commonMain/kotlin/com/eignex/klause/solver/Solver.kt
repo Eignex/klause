@@ -135,7 +135,8 @@ interface Solver<P : SolverParams> {
     /**
      * Approximate model count over [config]'s sampling set (all variables by default): a
      * probabilistic interval within a multiplicative `(1 ± ε)` factor at confidence `1 - δ`.
-     * Backend-agnostic — XOR hashes are bit-blasted to CNF and counted via ApproxMC (see [Count]).
+     * Backend-agnostic — XOR hashes are counted natively via ApproxMC; an integer projection is
+     * channelled to Boolean bits the hashes range over (see [Count]).
      */
     fun approximateCount(config: ApproxCountConfig = ApproxCountConfig()): Count = ApproxMC.run(problem, config)
 
@@ -171,7 +172,7 @@ interface Solver<P : SolverParams> {
     /**
      * Quality-tiered sampling. [SampleQuality.CHEAP] (the default and the production path)
      * delegates to this backend's [samples]; [SampleQuality.ACCURATE] runs near-uniform UniGen2
-     * XOR-hashing over the bit-blasted problem (an accuracy-validation tool). Returns a lazy,
+     * XOR-hashing over the projection's bits (an accuracy-validation tool). Returns a lazy,
      * unbounded sequence — use `.take(n)`.
      */
     fun samples(config: SamplingConfig, params: P): Sequence<Sample> = when (config.quality) {

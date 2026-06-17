@@ -1,10 +1,8 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.div
 import com.eignex.klause.schema.eq
-import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.rem
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
@@ -60,18 +58,6 @@ class IntDivModDslTest {
             val dv = compiled.decode(schema.d, s)
             assertTrue(nv % dv == 1, "n=$nv d=$dv n%d=${nv % dv}, expected 1")
         }
-    }
-
-    @Test
-    fun `div mod bit blasts cleanly`() {
-        class S : VariableSchema() {
-            val n by intVar(min = 0, max = 7)
-            val d by intVar(min = 1, max = 3)
-            val cap by constraint { (n / d) ge 1 }
-        }
-        val compiled = S().compile()
-        val cnf = BitBlaster.compile(compiled.problem)
-        assertTrue(cnf.clauses.isNotEmpty())
     }
 
     /** Truncated toward zero: -7 div 2 = -3 (remainder -1), matching Kotlin's `/`. */
