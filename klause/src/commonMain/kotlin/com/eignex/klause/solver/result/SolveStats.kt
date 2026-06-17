@@ -71,6 +71,10 @@ data class SolveStats(
     val lpFixed: SumResult = ZERO_COUNT,
     /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
     val lpPivots: SumResult = ZERO_COUNT,
+    /** Max sparse-LU fill ratio `(nnz L+U)/nnz B` over all factorizations (#27); >1 = fill-in growth. */
+    val lpLuMaxFill: MaxResult = NO_MAX,
+    /** Max sparse-LU density `(nnz L+U)/m²`; approaching 1.0 means the LU filled in to effectively dense. */
+    val lpLuMaxDensity: MaxResult = NO_MAX,
     /** LP cuts added by separators (#22). */
     val lpCuts: SumResult = ZERO_COUNT,
     /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate (#280). */
@@ -143,6 +147,8 @@ data class SolveStats(
             lpMs = lpMs + other.lpMs,
             lpFixed = SumResult(lpFixed.sum + other.lpFixed.sum),
             lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
+            lpLuMaxFill = MaxResult(maxOf(lpLuMaxFill.max, other.lpLuMaxFill.max)),
+            lpLuMaxDensity = MaxResult(maxOf(lpLuMaxDensity.max, other.lpLuMaxDensity.max)),
             lpCuts = SumResult(lpCuts.sum + other.lpCuts.sum),
             lpBackjumps = SumResult(lpBackjumps.sum + other.lpBackjumps.sum),
             lpSeeded = SumResult(lpSeeded.sum + other.lpSeeded.sum),
@@ -219,6 +225,8 @@ internal class SolveStatsSink(val backend: String) {
     val lpInfeasible: CountStat = CountStat()
     val lpFixed: CountStat = CountStat()
     val lpPivots: CountStat = CountStat()
+    val lpLuMaxFill: MaxStat = MaxStat()
+    val lpLuMaxDensity: MaxStat = MaxStat()
     val lpCuts: CountStat = CountStat()
     val lpBackjumps: CountStat = CountStat()
     val lpSeeded: CountStat = CountStat()
@@ -343,6 +351,12 @@ internal class SolveStatsSink(val backend: String) {
         repeat(count) { lpPivots.update(1.0) }
     }
 
+    /** Record one node LP solve's sparse-LU fill ratio and density (#27 sparsity audit). */
+    fun observeLpLuFill(fill: Double, density: Double) {
+        if (fill > 0.0) lpLuMaxFill.update(fill)
+        if (density > 0.0) lpLuMaxDensity.update(density)
+    }
+
     /** Record [count] cuts added by separators (#22). */
     fun observeLpCuts(count: Int) {
         repeat(count) { lpCuts.update(1.0) }
@@ -414,6 +428,8 @@ internal class SolveStatsSink(val backend: String) {
             lpMs = lpMs,
             lpFixed = lpFixed.read(),
             lpPivots = lpPivots.read(),
+            lpLuMaxFill = lpLuMaxFill.read(),
+            lpLuMaxDensity = lpLuMaxDensity.read(),
             lpCuts = lpCuts.read(),
             lpBackjumps = lpBackjumps.read(),
             lpSeeded = lpSeeded.read(),
