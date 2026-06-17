@@ -82,7 +82,7 @@ class SourceDrivenStrategyTest {
         // must come from the greedy score path — proving score-only moves bypass the dice.
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(StallSwaps(cap = 16))),
-            noiseProbability = 1.0,
+            acceptance = AcceptanceRule.WalkSatNoise(1.0),
         )
         val problem = Problem(
             numBoolVars = 0,
