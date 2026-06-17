@@ -15,6 +15,8 @@ internal class FloatLpResult(
     val duals: DoubleArray,
     /** Per-structural-variable primal value (unshifted, length `n`); the LP point. */
     val primal: DoubleArray,
+    /** Dual-simplex pivots taken to reach this optimum (0 when the warm/cold start was already optimal). */
+    val pivots: Int = 0,
 )
 
 /**
@@ -47,6 +49,7 @@ internal class RevisedSimplex(
 
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
+    private var pivots = 0
 
     /** When [solve] returns null because the primal is infeasible (dual unbounded — no entering column
      *  for the most-violated basic row), the basis and that leaving row at termination, for the exact
@@ -120,8 +123,16 @@ internal class RevisedSimplex(
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
     private fun duals(lu: SparseLu): DoubleArray = lu.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
 
-    fun solve(): FloatLpResult? {
-        coldStart()
+    /**
+     * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
+     * model structure (cross-node basis reuse, #705). Tightening a child's variable bounds leaves the
+     * parent basis dual-feasible (reduced costs are bound-independent), so the dual simplex resumes from
+     * near the optimum in a few pivots. The warm basis only changes the search path, never the result:
+     * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
+     * sound regardless of how the basis was obtained.
+     */
+    fun solve(warm: Basis? = null): FloatLpResult? {
+        if (warm == null || !tryWarmStart(warm)) coldStart()
         val maxIter = 50 * (m + numVars) + 200
         val rhsAdj = DoubleArray(m)
         val unit = DoubleArray(m)
@@ -209,6 +220,7 @@ internal class RevisedSimplex(
             status[basicVar[r]] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
             basicVar[r] = q
             status[q] = VarStatus.BASIC
+            pivots++
         }
         return null // budget exhausted
     }
@@ -232,7 +244,17 @@ internal class RevisedSimplex(
             val v = basicVar[i]
             if (v < n) primal[v] = model.loShift[v].toDouble() + beta[i]
         }
-        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, duals(lu), primal)
+        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, duals(lu), primal, pivots)
+    }
+
+    /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch, an
+     *  out-of-range column, or a singular factorization. */
+    private fun tryWarmStart(warm: Basis): Boolean {
+        if (warm.basicVars.size != m || warm.status.size != numVars) return false
+        for (t in 0 until m) if (warm.basicVars[t] !in 0 until numVars) return false
+        warm.basicVars.copyInto(basicVar)
+        warm.status.copyInto(status)
+        return factorizeBasis() != null
     }
 
     private fun coldStart() {

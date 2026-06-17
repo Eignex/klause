@@ -429,6 +429,13 @@ class BacktrackSolver(override val problem: Problem) :
                     ++lpCheckCounter % params.lpBoundEvery == 0 &&
                     lpAutoOff.shouldRun() -> {
                     val depth = session.decisionLevel
+                    // Warm-start this node's LP from the parent depth's optimal basis (#705): tightening
+                    // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
+                    val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
+                        lpBasisByDepth[depth - 1]
+                    } else {
+                        null
+                    }
                     val outcome = lpBoundAndFix(
                         lpRelaxerL,
                         session,
@@ -440,6 +447,7 @@ class BacktrackSolver(override val problem: Problem) :
                         cancellation = params.cancellation,
                         hints = lpHints,
                         learn = params.lpLearn,
+                        warm = warm,
                     )
                     if (outcome.basis != null) {
                         while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)

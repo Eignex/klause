@@ -108,10 +108,11 @@ internal fun BacktrackSolver.lpBoundAndFix(
     cancellation: Cancellation,
     hints: LpHints? = null,
     learn: Boolean = false,
+    warm: Basis? = null,
 ): LpNodeOutcome = try {
     sink.lpClockStart()
     sparseSafePrune(
-        relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending, hints, learn,
+        relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending, hints, learn, warm,
     )
 } catch (_: LpOverflowException) {
     // A determinant or coefficient overflow in the relaxation build loses the bound; recover a sound
@@ -141,13 +142,14 @@ internal fun BacktrackSolver.sparseSafePrune(
     objectiveAscending: Boolean,
     hints: LpHints? = null,
     learn: Boolean = false,
+    warm: Basis? = null,
 ): LpNodeOutcome {
     val relaxation = relaxer.build(session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
     val simplex = RevisedSimplex(relaxation.model, cancellation)
-    val result = simplex.solve() ?: run {
+    val result = simplex.solve(warm) ?: run {
         // Infeasibility prune (#705): a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
         // Any other failure (non-convergence / singular) keeps the node.
@@ -166,13 +168,18 @@ internal fun BacktrackSolver.sparseSafePrune(
         }
         return LpNodeOutcome(false, null)
     }
+    sink.observeLpPivots(result.pivots)
     // LP-guided branching (#287): record the fractional primal so the descent can order branch values
     // toward the LP point. Purely advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal)
+    // The optimal basis is cached by the caller and reused to warm-start this node's children (#705).
+    val optimalBasis = result.basis
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
-    if (!canPrune && !canPropagate) return LpNodeOutcome(false, null) // feasible, nothing more to deduce
-    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return LpNodeOutcome(false, null)
+    if (!canPrune && !canPropagate) {
+        return LpNodeOutcome(false, optimalBasis) // feasible, nothing more to deduce
+    }
+    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return LpNodeOutcome(false, optimalBasis)
     val full = safe + relaxation.objectiveConstant.toDouble()
     if (canPrune && full >= bound) {
         sink.observeLpPrune()
@@ -225,7 +232,7 @@ internal fun BacktrackSolver.sparseSafePrune(
     ) {
         return LpNodeOutcome(true, null)
     }
-    return LpNodeOutcome(false, null)
+    return LpNodeOutcome(false, optimalBasis)
 }
 
 /**
