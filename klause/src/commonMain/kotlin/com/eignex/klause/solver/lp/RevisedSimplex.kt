@@ -60,15 +60,6 @@ internal class RevisedSimplex(
     var infeasibleRow: Int = -1
         private set
 
-    /** When [solve] returns null because the primal is infeasible (dual unbounded — no entering column
-     *  for the most-violated basic row), the basis and that leaving row at termination, for the exact
-     *  Farkas infeasibility check ([ExactBasisCertifier.certifiesInfeasible]). Null on any other failure
-     *  (non-convergence, singular pivot, budget) — so the caller only prunes on a genuine infeasibility. */
-    var infeasibleBasis: Basis? = null
-        private set
-    var infeasibleRow: Int = -1
-        private set
-
     init {
         colRows = Array(n) { IntArray(0) }
         colVals = Array(n) { DoubleArray(0) }
