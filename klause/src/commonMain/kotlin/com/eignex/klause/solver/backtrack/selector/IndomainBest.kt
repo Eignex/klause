@@ -34,7 +34,7 @@ internal class IndomainBest(private val objective: LinearObjective) : ValueSelec
             }
             val d = session.intDomain(varRef.varId)
             if (c >= 0L) {
-                sequence { d.forEach { yield(it) } }
+                sequence { for (i in 0 until d.size) yield(d.valueAt(i)) }
             } else {
                 sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }
             }

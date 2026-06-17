@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -148,7 +149,7 @@ class IntDomainTest {
 
     @Test
     fun `narrow span interior exclude switches to bitset rep`() {
-        // Span 50 is well under BITSET_THRESHOLD=256.
+        // Span 50 is well under IntDomain.BITSET_THRESHOLD.
         val d = IntDomain(1, 50).excludeValue(25)
         assertEquals(1, d.min)
         assertEquals(50, d.max)
@@ -159,15 +160,63 @@ class IntDomainTest {
     }
 
     @Test
-    fun `wide span interior exclude stays in holes rep`() {
-        // Span 1000 > BITSET_THRESHOLD.
-        val d = IntDomain(0, 999).excludeValue(500)
+    fun `wide span interior exclude uses interval-run rep`() {
+        // Span 10001 > IntDomain.BITSET_THRESHOLD: a carved wide domain stores survivor runs, not the
+        // full carved span. Behaviour is identical to any other rep.
+        val d = IntDomain(0, 10_000).excludeValue(5_000)
         assertEquals(0, d.min)
-        assertEquals(999, d.max)
-        assertEquals(999, d.size)
-        assertFalse(500 in d)
-        assertTrue(499 in d)
-        assertTrue(501 in d)
+        assertEquals(10_000, d.max)
+        assertEquals(10_000, d.size)
+        assertFalse(5_000 in d)
+        assertTrue(4_999 in d)
+        assertTrue(5_001 in d)
+    }
+
+    @Test
+    fun `wide span carved down to a sparse survivor set`() {
+        // The #723 shape: a very wide domain whose surviving values are few and scattered.
+        // excludeValues keeps only the survivors; membership/iteration are span-independent.
+        val survivors = intArrayOf(3, 7, 1_000_000, 19_999_998, 20_000_000)
+        val toExclude = IntArrayList()
+        // Exclude everything except the survivors across [0, 20_000_000].
+        var next = 0
+        for (s in survivors) {
+            for (v in next until s) toExclude.add(v)
+            next = s + 1
+        }
+        val d = IntDomain(0, 20_000_000).excludeValues(toExclude.toIntArray())!!
+        assertEquals(3, d.min)
+        assertEquals(20_000_000, d.max)
+        assertEquals(survivors.size, d.size)
+        for (s in survivors) assertTrue(s in d, "survivor $s present")
+        assertFalse(8 in d)
+        assertFalse(999_999 in d)
+        val seen = mutableListOf<Int>()
+        d.forEach { seen.add(it) }
+        assertEquals(survivors.toList(), seen)
+        for ((i, s) in survivors.withIndex()) assertEquals(s, d.valueAt(i))
+        // Bound stepping must skip the wide gaps.
+        assertEquals(1_000_000, d.withMinAtLeast(8).min)
+        assertEquals(7, d.withMaxAtMost(999_999).max)
+    }
+
+    @Test
+    fun `interval-run rep stacks excludes and includes`() {
+        // Build a wide sparse domain, carve more, then put a value back (the undo path).
+        var d = IntDomain(0, 100_000).excludeValue(50_000).excludeValue(25_000).excludeValue(75_000)
+        assertEquals(99_998, d.size) // 100001 values minus 3 carves
+        assertFalse(50_000 in d)
+        assertFalse(25_000 in d)
+        d = d.includeInteriorValue(50_000)
+        assertTrue(50_000 in d)
+        assertFalse(25_000 in d)
+        assertEquals(99_999, d.size)
+        // Interior carve adjacent to a hole, then bridge it back.
+        d = d.excludeValue(25_001)
+        assertFalse(25_001 in d)
+        d = d.includeInteriorValue(25_001)
+        assertTrue(25_001 in d)
+        assertFalse(25_000 in d)
     }
 
     @Test
@@ -307,13 +356,15 @@ class IntDomainTest {
 
     @Test
     fun `excludeValues matches folding excludeValue across reps`() {
-        // Cover contiguous, bitset-span (<= threshold) and wide-holes domains, plus
-        // edge-only, interior-only and mixed exclusion sets — the result must equal
-        // (by membership) folding excludeValue over the same sorted list.
+        // Cover contiguous and bitset-span (<= threshold) domains, plus edge-only, interior-only
+        // and mixed exclusion sets — the result must equal (by membership) folding excludeValue
+        // over the same sorted list. (Wide interval-run domains are covered by the property test
+        // below, which uses bulk excludeValues; folding one value at a time is O(width^2) and too
+        // slow to drive to the wide-span regime here.)
         val rng = Random(0xE7C1)
         repeat(400) {
             val lo = rng.nextInt(-20, 20)
-            val width = rng.nextInt(2, 600) // straddles BITSET_THRESHOLD (256)
+            val width = rng.nextInt(2, 600)
             val hi = lo + width
             val base = IntDomain(lo, hi)
             // Pick a sorted, distinct subset of [lo, hi] to exclude.
@@ -340,6 +391,63 @@ class IntDomainTest {
                 assertEquals(folded.size, bulk!!.size)
                 assertEquals(folded.min, bulk.min)
                 assertEquals(folded.max, bulk.max)
+            }
+        }
+    }
+
+    @Test
+    fun `wide reps agree with a brute-force set across operations`() {
+        // Drive the interval-run and survivor-list reps (spans well past IntDomain.BITSET_THRESHOLD) and
+        // cross-check every inspection / mutation against a HashSet oracle. Uses bulk excludeValues
+        // (O(span)) rather than one-at-a-time folding, so spans can be wide while staying fast.
+        val rng = Random(0x5A17)
+        repeat(60) {
+            val lo = rng.nextInt(0, 1000)
+            val width = rng.nextInt(IntDomain.BITSET_THRESHOLD + 1, 20_000)
+            val hi = lo + width
+            val present = (lo..hi).toMutableSet()
+            // Carve out a random fraction: a low fraction makes few holes (interval rep), a high
+            // fraction makes a sparse / comb survivor set (survivor rep).
+            val carveFraction = rng.nextDouble()
+            val toExclude = (lo..hi).filter { rng.nextDouble() < carveFraction }.sorted()
+            for (v in toExclude) present.remove(v)
+            if (present.isEmpty()) return@repeat
+
+            val d = IntDomain(lo, hi).excludeValues(toExclude.toIntArray())
+                ?: error("non-empty present set must not yield null")
+            assertEquals(present.size, d.size, "size")
+            assertEquals(present.min(), d.min, "min")
+            assertEquals(present.max(), d.max, "max")
+
+            // Membership over the whole span.
+            for (v in (lo - 2)..(hi + 2)) assertEquals(v in present, v in d, "contains($v)")
+
+            // Ordered iteration + valueAt.
+            val ordered = present.sorted()
+            val seen = mutableListOf<Int>()
+            d.forEach { seen.add(it) }
+            assertEquals(ordered, seen, "forEach order")
+            for (i in ordered.indices) assertEquals(ordered[i], d.valueAt(i), "valueAt($i)")
+
+            // forEachHole = the complement strictly inside the bounds.
+            val holes = mutableListOf<Int>()
+            d.forEachHole { holes.add(it) }
+            assertEquals((d.min + 1 until d.max).filter { it !in present }, holes, "forEachHole")
+
+            // Bound tightening to a random interior target.
+            val tMin = rng.nextInt(lo, hi + 1)
+            val expectMin = present.filter { it >= tMin }
+            if (expectMin.isNotEmpty()) {
+                val e = d.withMinAtLeast(tMin)
+                assertEquals(expectMin.min(), e.min, "withMinAtLeast($tMin).min")
+                assertEquals(expectMin.size, e.size, "withMinAtLeast($tMin).size")
+            }
+            val tMax = rng.nextInt(lo, hi + 1)
+            val expectMax = present.filter { it <= tMax }
+            if (expectMax.isNotEmpty()) {
+                val e = d.withMaxAtMost(tMax)
+                assertEquals(expectMax.max(), e.max, "withMaxAtMost($tMax).max")
+                assertEquals(expectMax.size, e.size, "withMaxAtMost($tMax).size")
             }
         }
     }

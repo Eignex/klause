@@ -20,7 +20,12 @@ object IndomainSplit : ValueSelector {
             // The midpoint may sit in a hole; the bound split doesn't care, but the
             // trailing ascending walk keeps the sequence complete for any consumer that
             // enumerates past the first value.
-            sequenceOf(mid) + sequence { d.forEach { if (it != mid) yield(it) } }
+            sequenceOf(mid) + sequence {
+                for (i in 0 until d.size) {
+                    val v = d.valueAt(i)
+                    if (v != mid) yield(v)
+                }
+            }
         }
     }
 }
