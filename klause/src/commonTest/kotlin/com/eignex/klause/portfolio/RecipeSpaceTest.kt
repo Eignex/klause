@@ -38,7 +38,7 @@ class RecipeSpaceTest {
     }
 
     @Test
-    fun `sample is a deterministic distinct subset, clamped to the space`() {
+    fun `sample is a deterministic distinct subset clamped to the space`() {
         val space = RecipeSpace()
         val a = space.sample(20, Random(7)).map { it.label }
         val b = space.sample(20, Random(7)).map { it.label }
