@@ -1,0 +1,43 @@
+# klause working notes
+
+Kotlin Multiplatform constraint solver.
+
+## Pre-PR gate
+
+Run `./gradlew check lintDocs`.
+
+- check runs tests and some light checks.
+- lintDocs runs detekt and dokka linting.
+- For new/edited files add `--rerun-tasks`, detekt caches per source-set and skips them otherwise.
+
+## Tests
+
+- Test names within backticks, `x should y` style, plain ascii.
+- Class almost always named after the file under test (`<FileUnderTest>Test`).
+- One observable behavior per test; assert behavior, not implementation. Follow arrange → act → assert.
+- Mirror existing tests' framework, layout, and assertion style.
+- Reuse existing fixtures/helpers; don't add new ones unless asked.
+- Use the parameterized form for variants of the same behavior; separate tests for semantically different ones.
+- Keep comments minimal and let the test name carry the intent.
+- No JVM test over 300ms.
+
+## Bench
+
+Read `klause-bench/README.md` before benchmarking. In short:
+
+- Rebuild the CLI binary first with `:klause-cli:installJvmDist`, since bench runs it as a subprocess. `installDist` is
+  a no-op that serves a stale binary, so suspect it when a bench run contradicts a passing test.
+- `./gradlew :klause-bench:bench --args="solve backend=... suite=..."` runs solvers as subprocesses emitting MiniZinc
+  output files.
+- Analyze the output files separately with scripts; A/B by varying CLI params across runs.
+
+## Style
+
+- Prefer clear naming and types over comments. Comments explain *why* (soundness, perf, lifecycle) and never
+  restate the code. Never narrate changes, avoid "now/no longer/previously", and don't cite issues. Keep `TODO`/`FIXME`.
+- KDoc on public API only. Use functional notation for math (`succ(i)`, not `succ[i]`); use `[Symbol]` for links.
+- Single-line conventional commits, no scope, no body/trailers:
+  `feat: `, `fix: `, `chore: `, `refactor: `, `docs: `, `test: `.
+- PR body: follow `.github/pull_request_template.md`, with `Closes #NN` on its own line at the top.
+- Issues: follow `.github/issue_template.md`. Keep them short, a few plain sentences,
+  and link code/PRs instead of pasting.
