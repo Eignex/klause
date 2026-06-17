@@ -18,6 +18,7 @@ import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.FeasibilityJump
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
@@ -277,6 +278,13 @@ internal data class LocalSearchWorkerConfig(
             LsArm.CblsImplicitFixed -> cblsWorker(arm.label, FixedCadenceRestart(), seedImplicitOnRestart = true) {
                 Cbls(implicitStructuredCap = 8, tabu = cblsTabu())
             }
+
+            // Feasibility-Jump arm (#698): a weighted-violation argmin-jump strategy, orthogonal to
+            // the step-based CBLS/WalkSAT/SA arms. Registered like the SAT-family arms — it drives
+            // the feasibility fight and returns null at feasibility, so the engine's built-in
+            // objective descent owns the optimize phase (no optimizeStrategy).
+            LsArm.FeasibilityJumpFixed ->
+                LocalSearchWorkerConfig(arm.label, FeasibilityJump(), FixedCadenceRestart())
         }
 
         /**
@@ -304,6 +312,9 @@ internal data class LocalSearchWorkerConfig(
             // prefix is unchanged pending a cross-seed credit pass. Reachable by label and in the
             // full pool.
             LsArm.CblsImplicitFixed,
+            // Feasibility-Jump arm (#698); kept last for the same reason — reachable by label and in
+            // the full pool, awaiting its cross-seed credit pass before entering the default prefix.
+            LsArm.FeasibilityJumpFixed,
         )
 
         /** Resolve a catalog label to its typed [LsArm] — the single string boundary, for the CLI /
@@ -353,6 +364,7 @@ internal enum class LsArm(val label: String) {
     CblsIlsBandit("cbls/ils-bandit"),
     ProbsatBanditFixed("probsat-bandit/fixed"),
     CblsImplicitFixed("cbls-implicit/fixed"),
+    FeasibilityJumpFixed("fjump/fixed"),
 }
 
 /**
