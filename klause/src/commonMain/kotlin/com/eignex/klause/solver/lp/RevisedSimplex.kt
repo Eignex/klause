@@ -244,8 +244,22 @@ internal class RevisedSimplex(
             val v = basicVar[i]
             if (v < n) primal[v] = model.loShift[v].toDouble() + beta[i]
         }
-        return FloatLpResult(Basis(basicVar.copyOf(), status.copyOf()), obj, duals(lu), primal, pivots)
+        val basis = Basis(basicVar.copyOf(), status.copyOf())
+        optimalBasis = basis
+        return FloatLpResult(basis, obj, duals(lu), primal, pivots)
     }
+
+    /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
+    private var optimalBasis: Basis? = null
+
+    /** Exact Gomory integrality cuts from the last optimal basis (#22), up to [maxCuts]; empty if the
+     *  last solve was not optimal. Exact (rational) tableau rows, so the cuts are rigorously valid. */
+    fun gomoryCuts(maxCuts: Int): List<Cut> =
+        optimalBasis?.let { ExactBasisCertifier.tableauCuts(model, it, maxCuts, mir = false) }.orEmpty()
+
+    /** Exact Gomory mixed-integer (MIR) cuts from the last optimal basis (#22), up to [maxCuts]. */
+    fun mirCuts(maxCuts: Int): List<Cut> =
+        optimalBasis?.let { ExactBasisCertifier.tableauCuts(model, it, maxCuts, mir = true) }.orEmpty()
 
     /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch, an
      *  out-of-range column, or a singular factorization. */

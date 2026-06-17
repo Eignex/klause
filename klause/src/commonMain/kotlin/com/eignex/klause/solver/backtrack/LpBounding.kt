@@ -431,29 +431,42 @@ internal fun BacktrackSolver.rootLpRelaxationBound(
  * harvested cut is valid at *every* solution of the problem, so it is forced [Cut.global] = true and
  * stays sound when applied at any node. Determinant overflow keeps whatever cuts stayed within 64 bits.
  */
+@Suppress("LongParameterList")
 internal fun BacktrackSolver.harvestRootCuts(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     separators: List<CutSeparator>,
+    gomory: Boolean,
+    mir: Boolean,
     cancellation: Cancellation = Cancellation.Never,
 ): List<Cut> {
-    if (separators.isEmpty() || session.isUnsatAtRoot) return emptyList()
+    if (session.isUnsatAtRoot) return emptyList()
+    if (separators.isEmpty() && !gomory && !mir) return emptyList()
     val pool = HashSet<String>()
     val cuts = ArrayList<Cut>()
     try {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return emptyList()
-        var result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return emptyList()
+        var simplex = RevisedSimplex(relaxation.model, cancellation)
+        var result = simplex.solve() ?: return emptyList()
         var round = 0
         while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
             val ctx = CutContext(problem, relaxation, result.primal, session)
-            val fresh = separators.flatMap { it.separate(ctx) }
-                .filter { pool.add(it.key()) }
+            // Structural separators read the LP point and factor structure (not the constraint rows), so a
+            // cut they separate over the undecided root is valid at every solution — force it global.
+            val structural = separators.flatMap { it.separate(ctx) }
                 .map { if (it.global) it else Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true) }
+            // Gomory/MIR combine rows; tableauCuts already marks one global iff its row weights avoid every
+            // non-global (big-M) row. Only the genuinely-global ones may join the tree-wide pool.
+            val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+            val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
+            val fresh = (structural + (gomoryCuts + mirCuts).filter { it.global })
+                .filter { pool.add(it.key()) }
             if (fresh.isEmpty()) break
             cuts.addAll(fresh)
             relaxation = relaxer.build(session, cuts)
-            result = RevisedSimplex(relaxation.model, cancellation).solve() ?: break
+            simplex = RevisedSimplex(relaxation.model, cancellation)
+            result = simplex.solve() ?: break
         }
     } catch (_: LpOverflowException) {
         return cuts // keep whatever stayed within 64-bit determinants — still globally valid

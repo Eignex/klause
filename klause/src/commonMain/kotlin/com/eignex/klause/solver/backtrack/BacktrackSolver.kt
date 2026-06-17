@@ -656,9 +656,17 @@ class BacktrackSolver(override val problem: Problem) :
          */
         private fun initRootLp() {
             val relaxer = lpRelaxer ?: return
-            if (lpSeparators.isNotEmpty()) {
-                lpGlobalCuts =
-                    harvestRootCuts(relaxer, PropagationSession(problem), lpSeparators, params.cancellation)
+            val gomory = params.lpCuts && params.lpGomory
+            val mir = params.lpCuts && params.lpMir
+            if (lpSeparators.isNotEmpty() || gomory || mir) {
+                lpGlobalCuts = harvestRootCuts(
+                    relaxer,
+                    PropagationSession(problem),
+                    lpSeparators,
+                    gomory,
+                    mir,
+                    params.cancellation,
+                )
                 sink.observeLpCuts(lpGlobalCuts.size)
             }
             sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation))
