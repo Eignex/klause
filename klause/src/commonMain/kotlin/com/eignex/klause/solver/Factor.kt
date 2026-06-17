@@ -1,10 +1,8 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.propagation.allDecisionsAreBool
 
 /** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
  *  the two var spaces (purely-Boolean ones leave [Factor.intVars] empty; purely-integer
@@ -179,15 +177,15 @@ interface Factor {
      * generation). Returns `null` for factors that can't produce a clause-form reason;
      * the analyzer falls back to chronological backtrack in that case.
      *
-     * Bool-pinning factors (Clause, Cardinality, PseudoBoolean, ReifiedCardinality,
-     * ReifiedPseudoBoolean, Xor) override this with a sharp factor-specific clause.
-     * The default implementation handles int-domain factors (Linear, AllDifferent,
-     * GlobalCardinality, Element, Cumulative, etc.) by returning a sound but coarse
-     * "negate the current bool partial assignment" clause via
-     * [defaultBoolPinsConflictReason] — suppressed when int decisions are on the
-     * trail (full LCG int-bound literals would be needed for that case).
+     * Every factor must declare its own explanation: bool-pinning factors (Clause,
+     * Cardinality, PseudoBoolean, Xor, …) return a sharp factor-specific clause, and
+     * int-domain factors (Linear, AllDifferent, GlobalCardinality, Element, Cumulative,
+     * …) cite the order-literal atoms ([Lit] bounds/holes) that pinned the dead-end. A
+     * factor with no sharp reason returns `null` and accepts chronological backtrack
+     * rather than a coarse over-approximation, which would suppress learning under int
+     * decisions and risks unsoundness if the dead-end is not implied by bool pins alone.
      */
-    fun conflictReason(state: PropagationState, factorId: Int): IntArray? = defaultBoolPinsConflictReason(state)
+    fun conflictReason(state: PropagationState, factorId: Int): IntArray?
 
     // ---------------------------------------------------------------------------------------
     // Local-search contract. Every method below defaults to a sound no-op (always-satisfied,
@@ -342,35 +340,4 @@ interface Factor {
      *  [maintainsIntBreakMakeIncrementallyForIntSet] is true. Net adjustment must equal
      *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
     fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {}
-}
-
-/**
- * Sound but coarse clause-form nogood used as the default [Factor.conflictReason] for
- * int-domain factors: the disjunction of every currently-pinned bool literal's
- * false-form. Says "the current bool partial assignment forced this dead-end". Returns
- * `null` (forcing analyzer fallback to chronological backtrack) when:
- *   - no bool vars are currently pinned, or
- *   - any int decision is on the trail — including it as antecedent would be unsound
- *     since the int decision is part of the cause but not captured in the clause.
- *
- * The analyzer's minimization step (self-subsuming resolution) typically shrinks this
- * coarse seed substantially: implied pins resolve against their antecedents and only
- * the actual UIP plus relevant decisions remain. So the practical learned clause is
- * usually much shorter than [Factor.conflictReason]'s return value.
- */
-internal fun defaultBoolPinsConflictReason(state: PropagationState): IntArray? {
-    if (!state.allDecisionsAreBool()) return null
-    val numBool = state.problem.numBoolVars
-    var count = 0
-    for (i in 0 until numBool) {
-        if (state.boolValues[i] != null) count++
-    }
-    if (count == 0) return null
-    val out = IntArray(count)
-    var w = 0
-    for (i in 0 until numBool) {
-        val b = state.boolValues[i] ?: continue
-        out[w++] = Lit.make(i, !b)
-    }
-    return out
 }

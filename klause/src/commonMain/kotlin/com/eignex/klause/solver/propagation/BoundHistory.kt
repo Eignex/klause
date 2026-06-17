@@ -46,15 +46,3 @@ internal fun PropagationState.holeLevelFor(v: Int, k: Int): Int {
     for (i in 0 until vals.size) if (vals[i] == k) return lvls[i]
     return 0
 }
-
-/** True iff every decision on the trail so far is a bool decision (no int pin
- *  decisions). Lets conflict-reason fallbacks emit a sound "negate the current
- *  bool partial assignment" nogood without needing int-bound literals — the clause
- *  is sound exactly when no int decision is partly responsible for the conflict. */
-internal fun PropagationState.allDecisionsAreBool(): Boolean {
-    val numBool = problem.numBoolVars
-    for (lvl in 0 until levelToDecisionVar.size) {
-        if (levelToDecisionVar[lvl] >= numBool) return false
-    }
-    return true
-}

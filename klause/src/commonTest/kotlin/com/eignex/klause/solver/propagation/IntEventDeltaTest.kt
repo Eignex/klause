@@ -59,6 +59,8 @@ class IntEventDeltaTest {
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
             DeltaAllDifferent(IntArray(intVars.size) { intMap[intVars[it]] })
+
+        override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
     }
 
     /** Carves [src]'s fixed value out of [dst] when [src] is fixed — punches interior holes that
@@ -73,6 +75,8 @@ class IntEventDeltaTest {
         }
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ExcludeOnFix(intMap[src], intMap[dst])
+
+        override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
