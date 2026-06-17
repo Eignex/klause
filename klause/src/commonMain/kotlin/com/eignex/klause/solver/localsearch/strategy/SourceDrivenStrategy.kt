@@ -22,9 +22,9 @@ import com.eignex.klause.solver.localsearch.movesource.Pool
  *
  * Because a source is consumed entirely by configuration, *any* source becomes available to *any*
  * strategy with no new generation code: a focused arm is `{ViolatedRepairs}`, a structured-descent
- * arm adds `{SatisfiedStructured, ObjectiveSeed}`, and so on. Scoring stays first-class via
- * [scoring] (the CBLS weighted gradient vs the raw violation delta), so the driver does not blur
- * the distinct strategy behaviours — it removes only the duplicated *generation*.
+ * arm adds `{SatisfiedStructured, ObjectiveSeed}`, and so on. [scoring] (the scoring axis) and
+ * [acceptance] (the acceptance axis) stay first-class, so the driver does not blur the distinct
+ * strategy behaviours — it removes only the duplicated *generation*.
  *
  * This driver is the behaviour-neutral substrate the bespoke strategies migrate onto incrementally;
  * it is not itself a drop-in replacement for [Cbls]'s tuned stall/weight/ladder schedule.
@@ -34,16 +34,11 @@ class SourceDrivenStrategy(
     val sources: List<ConfiguredSource>,
     /** Basis for scoring candidates — the CBLS weighted gradient or the raw violation delta. */
     val scoring: MoveScoring = MoveScoring.Weighted,
-    /** Probability of taking a uniformly-random move from the noise-eligible pool instead of the
-     *  best-scored move. `0.0` (default) = pure greedy descent. */
-    val noiseProbability: Double = 0.0,
+    /** How a scored candidate is selected — greedy, WalkSAT noise, probSAT roulette, or skewed-VNS. */
+    val acceptance: AcceptanceRule = AcceptanceRule.Greedy,
     /** Tabu filter applied to the combined candidate pool before selection. */
     val tabu: TabuFilter = TabuFilter.Disabled,
 ) : Strategy {
-
-    init {
-        require(noiseProbability in 0.0..1.0) { "noiseProbability ∈ [0, 1], got $noiseProbability" }
-    }
 
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
@@ -61,34 +56,12 @@ class SourceDrivenStrategy(
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             cs.source.generate(state, sink)
         }
+        // The noise/score pool split is preserved across the tabu filter; the acceptance rule
+        // applies it (stochastic rules draw from the noise pool only, deterministic ones range over
+        // both) and returns null when both pools are empty.
         val noiseMoves = tabu.filter(state, noiseSink.list)
         val scoreMoves = tabu.filter(state, scoreSink.list)
-        if (noiseMoves.isEmpty() && scoreMoves.isEmpty()) return null
-
-        // Noise draw: only the noise-eligible pool is eligible — coordinated score-only moves are
-        // never taken by dice.
-        if (noiseMoves.isNotEmpty() && state.rng.nextDouble() < noiseProbability) {
-            return noiseMoves[state.rng.nextInt(noiseMoves.size)]
-        }
-
-        // Greedy: minimum scored move across both pools (reservoir tie-break for uniformity).
-        var best: Move? = null
-        var bestScore = Double.POSITIVE_INFINITY
-        var tieCount = 0
-        for (pool in arrayOf(noiseMoves, scoreMoves)) {
-            for (m in pool) {
-                val s = score(state, m)
-                if (s < bestScore) {
-                    best = m
-                    bestScore = s
-                    tieCount = 1
-                } else if (s == bestScore) {
-                    tieCount++
-                    if (state.rng.nextInt(tieCount) == 0) best = m
-                }
-            }
-        }
-        return best
+        return acceptance.choose(state.rng, noiseMoves, scoreMoves) { score(state, it) }
     }
 
     /** Scored delta: the [scoring]-basis violation change, plus the objective change once feasible
