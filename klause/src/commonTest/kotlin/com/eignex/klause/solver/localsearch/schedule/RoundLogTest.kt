@@ -58,6 +58,25 @@ class RoundLogTest {
     }
 
     @Test
+    fun `incumbent cost is the latest observed and step is carried through`() {
+        val acc = RoundAccumulator()
+        acc.observeCost(10.0)
+        acc.observeCost(3.0)
+        acc.observeCost(7.0)
+        val log = acc.snapshot(temperature = 1.0, step = 42L)
+        assertEquals(3.0, log.bestCost, 1e-9)
+        assertEquals(7.0, log.incumbentCost, 1e-9)
+        assertEquals(42L, log.step)
+    }
+
+    @Test
+    fun `incumbent cost falls back to best when no cost was observed`() {
+        val log = RoundAccumulator().snapshot(temperature = 1.0)
+        assertEquals(0.0, log.incumbentCost, 1e-9)
+        assertEquals(0L, log.step)
+    }
+
+    @Test
     fun `best cost tracks the minimum observed`() {
         val acc = RoundAccumulator()
         acc.observeCost(10.0)

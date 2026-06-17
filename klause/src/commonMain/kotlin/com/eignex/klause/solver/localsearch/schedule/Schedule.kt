@@ -15,8 +15,11 @@ package com.eignex.klause.solver.localsearch.schedule
  *
  * Implementations: [Geometric] (fixed cooling rate — the classic schedule), [AdaptiveCooling] (rate
  * tracks the observed acceptance ratio), and the [Reheating] decorator.
+ *
+ * A schedule is an [AdaptivePolicy]: it `observe`s the shared per-round feedback channel and
+ * `reset`s like every other adaptive policy, adding the temperature-specific `step`/`reheat` hooks.
  */
-interface Schedule {
+interface Schedule : AdaptivePolicy {
     /** Current temperature; always strictly positive. */
     val temperature: Double
 
@@ -25,12 +28,6 @@ interface Schedule {
 
     /** Multiply the current temperature by [factor] (≥ 1), capped at the schedule's ceiling. */
     fun reheat(factor: Double)
-
-    /** Feed end-of-round statistics; adaptive schedules retune, static ones ignore it. */
-    fun observe(round: RoundLog)
-
-    /** Reset to the initial temperature. */
-    fun reset()
 }
 
 /**
