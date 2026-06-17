@@ -470,6 +470,10 @@ class Cbls(
         satisfiedStructured.generate(MoveGenContext(state), sink)
     }
 
+    /** Implicit-solving source backing [sampleElectedStructured] — the [SatisfiedStructured.elected]
+     *  variant of the single structured generator (epic #710). */
+    private val electedStructured = SatisfiedStructured.elected(implicitStructuredCap)
+
     /** Implicit-solving source (see [implicitStructuredCap]): during infeasibility, draw
      *  feasibility-preserving structured moves from elected structural globals that are
      *  *currently satisfied*. Unlike [sampleFromSatisfied] (which scans random factors and is
@@ -478,14 +482,7 @@ class Cbls(
      *  they only improve the score when they help a coupled constraint. */
     private fun sampleElectedStructured(state: LocalSearchState, sink: MoveSink) {
         if (implicitStructuredCap == 0) return
-        val elected = state.electedImplicit
-        if (elected.isEmpty()) return
-        repeat(minOf(implicitStructuredCap, elected.size)) {
-            val fid = elected[state.rng.nextInt(elected.size)]
-            if (!state.violated.contains(fid)) {
-                state.factors[fid].proposeStructuredMoves(state, fid, sink)
-            }
-        }
+        electedStructured.generate(MoveGenContext(state), sink)
     }
 
     /** Seed single-variable moves directly on the objective's nonzero-weight vars. Without
