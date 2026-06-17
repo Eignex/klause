@@ -38,6 +38,8 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpFixed" to "${stats.lpFixed.sum.toLong()}"
     out += "lpCuts" to "${stats.lpCuts.sum.toLong()}"
     out += "lpPivots" to "${stats.lpPivots.sum.toLong()}"
+    if (stats.lpLuMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lpLuMaxFill.max)
+    if (stats.lpLuMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lpLuMaxDensity.max)
     out += "lpBackjumps" to "${stats.lpBackjumps.sum.toLong()}"
     out += "lpLagrangianPruned" to "${lagrangian.toLong()}"
     out += "lpEnergeticPruned" to "${energetic.toLong()}"

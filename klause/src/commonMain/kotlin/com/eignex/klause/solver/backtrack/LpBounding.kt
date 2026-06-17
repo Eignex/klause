@@ -171,6 +171,7 @@ internal fun BacktrackSolver.sparseSafePrune(
         return LpNodeOutcome(false, null)
     }
     sink.observeLpPivots(result.pivots)
+    sink.observeLpLuFill(result.luMaxFill, result.luMaxDensity)
     // LP-guided branching (#287): record the fractional primal so the descent can order branch values
     // toward the LP point. Purely advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal)

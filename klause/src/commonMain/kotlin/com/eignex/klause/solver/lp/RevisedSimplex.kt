@@ -17,6 +17,10 @@ internal class FloatLpResult(
     val primal: DoubleArray,
     /** Dual-simplex pivots taken to reach this optimum (0 when the warm/cold start was already optimal). */
     val pivots: Int = 0,
+    /** Max LU fill ratio `(nnz L+U)/nnz B` over this solve's factorizations (#27 sparsity audit). */
+    val luMaxFill: Double = 0.0,
+    /** Max LU density `(nnz L+U)/m²` — approaching 1.0 means the sparse LU filled in to dense. */
+    val luMaxDensity: Double = 0.0,
 )
 
 /**
@@ -50,6 +54,8 @@ internal class RevisedSimplex(
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
     private var pivots = 0
+    private var maxLuFill = 0.0 // max (nnz(L)+nnz(U)) / nnz(B) over this solve's factorizations (#27)
+    private var maxLuDensity = 0.0 // max (nnz(L)+nnz(U)) / m² — 1.0 means the LU is effectively dense
 
     /** When [solve] returns null because the primal is infeasible (dual unbounded — no entering column
      *  for the most-violated basic row), the basis and that leaving row at termination, for the exact
@@ -107,17 +113,29 @@ internal class RevisedSimplex(
     /** Sparse LU of the current basis `B` (`B[i][t] = A_full[i][basicVar[t]]`); null if singular. */
     private fun factorizeBasis(): SparseLu? {
         val rows = Array(m) { HashMap<Int, Double>() }
+        var nnzB = 0
         for (t in 0 until m) {
             val col = basicVar[t]
             if (col >= n) {
                 rows[col - n][t] = 1.0
+                nnzB++
             } else {
                 val rs = colRows[col]
                 val vs = colVals[col]
                 for (k in rs.indices) rows[rs[k]][t] = vs[k]
+                nnzB += rs.size
             }
         }
-        return SparseLu.factorize(rows, m)
+        val lu = SparseLu.factorize(rows, m) ?: return null
+        // Track LU fill (#27): how much the factorization grows the basis (fill ratio) and how dense
+        // it becomes (nnz / m²). If density approaches 1 on real bases, the "sparse" LU is dense.
+        if (m > 0 && nnzB > 0) {
+            val fill = lu.nnz.toDouble() / nnzB
+            if (fill > maxLuFill) maxLuFill = fill
+            val density = lu.nnz.toDouble() / (m.toDouble() * m.toDouble())
+            if (density > maxLuDensity) maxLuDensity = density
+        }
+        return lu
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
@@ -248,7 +266,7 @@ internal class RevisedSimplex(
         }
         val basis = Basis(basicVar.copyOf(), status.copyOf())
         optimalBasis = basis
-        return FloatLpResult(basis, obj, duals(lu), primal, pivots)
+        return FloatLpResult(basis, obj, duals(lu), primal, pivots, maxLuFill, maxLuDensity)
     }
 
     /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
