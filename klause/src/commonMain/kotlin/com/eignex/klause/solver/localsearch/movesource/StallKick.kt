@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch.movesource
 
 import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntHashSet
 
@@ -31,8 +32,7 @@ class StallKick(
 
     private val scratch: MoveSink = MoveSink()
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         val problem = state.problem
         var factor = state.factors[state.violated.random(state.rng)]

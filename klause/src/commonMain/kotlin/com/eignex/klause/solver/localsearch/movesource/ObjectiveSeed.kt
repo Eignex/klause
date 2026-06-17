@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.localsearch.movesource
 
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -25,8 +26,7 @@ class ObjectiveSeed : MoveSource {
     override val phase: Phase = Phase.Feasible
     override val pool: Pool = Pool.NoiseEligible
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         when (val obj = state.objective ?: return) {
             is LinearObjective -> {
                 for (v in obj.boolWeights.indices) {

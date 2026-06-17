@@ -5,7 +5,6 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.movesource.EjectionChains
 import com.eignex.klause.solver.localsearch.movesource.Frontier
-import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
 import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.movesource.StallKick
@@ -403,7 +402,7 @@ class Cbls(
     private val frontier = Frontier(violatedSampleCount, frontierMoveCap)
 
     private fun sampleFromViolated(state: LocalSearchState, sink: MoveSink) {
-        violatedRepairs.generate(MoveGenContext(state), sink)
+        violatedRepairs.generate(state, sink)
     }
 
     /** **Frontier moves** for plateau escape: when the search is trapped, the violated-only
@@ -414,7 +413,7 @@ class Cbls(
      *  (share a variable), giving the search — together with the raised stall noise — moves
      *  to step through the basin wall. Capped at [frontierMoveCap] per call. */
     private fun sampleFrontier(state: LocalSearchState, sink: MoveSink) {
-        frontier.generate(MoveGenContext(state), sink)
+        frontier.generate(state, sink)
     }
 
     /** Plateau-buster swap source backing [sampleStallSwaps] — see [StallSwaps]. */
@@ -427,11 +426,11 @@ class Cbls(
     private val objectiveSeed = ObjectiveSeed()
 
     private fun sampleStallSwaps(state: LocalSearchState, sink: MoveSink) {
-        stallSwaps.generate(MoveGenContext(state), sink)
+        stallSwaps.generate(state, sink)
     }
 
     private fun sampleStallChains(state: LocalSearchState, sink: MoveSink) {
-        ejectionChains.generate(MoveGenContext(state), sink)
+        ejectionChains.generate(state, sink)
     }
 
     /** Build one targeted kick (see [stallKickAfter]): a **random walk** over the
@@ -445,7 +444,7 @@ class Cbls(
      *  prize-collecting orbit shape). Returns null when nothing eligible. */
     private fun buildStallKick(state: LocalSearchState): Move? {
         kickSink.clear()
-        stallKick.generate(MoveGenContext(state), kickSink)
+        stallKick.generate(state, kickSink)
         return kickSink.list.firstOrNull()
     }
 
@@ -467,7 +466,7 @@ class Cbls(
         // the search should be focused on closing violations. The source itself is
         // Phase.Feasible; this gate is the (still per-strategy) enforcement of it.
         if (state.cost > 0) return
-        satisfiedStructured.generate(MoveGenContext(state), sink)
+        satisfiedStructured.generate(state, sink)
     }
 
     /** Implicit-solving source backing [sampleElectedStructured] — the [SatisfiedStructured.elected]
@@ -482,7 +481,7 @@ class Cbls(
      *  they only improve the score when they help a coupled constraint. */
     private fun sampleElectedStructured(state: LocalSearchState, sink: MoveSink) {
         if (implicitStructuredCap == 0) return
-        electedStructured.generate(MoveGenContext(state), sink)
+        electedStructured.generate(state, sink)
     }
 
     /** Seed single-variable moves directly on the objective's nonzero-weight vars. Without
@@ -493,7 +492,7 @@ class Cbls(
      *  proposeRepairMoves to cover that phase. */
     private fun seedObjectiveMoves(state: LocalSearchState, sink: MoveSink) {
         if (state.cost > 0) return
-        objectiveSeed.generate(MoveGenContext(state), sink)
+        objectiveSeed.generate(state, sink)
     }
 
     /**

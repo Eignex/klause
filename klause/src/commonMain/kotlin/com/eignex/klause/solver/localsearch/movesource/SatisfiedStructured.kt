@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.localsearch.movesource
 
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
@@ -51,8 +52,7 @@ class SatisfiedStructured private constructor(
     override val phase: Phase = Phase.Feasible
     override val pool: Pool = Pool.NoiseEligible
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         val total = state.problem.numFactors
         if (total == 0) return
         when (scope) {

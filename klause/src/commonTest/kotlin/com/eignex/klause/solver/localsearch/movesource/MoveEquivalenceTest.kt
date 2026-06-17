@@ -54,8 +54,7 @@ class MoveEquivalenceTest {
         override val id = MoveSourceId("test:violated-repairs")
         override val phase = Phase.Infeasible
         override val pool = Pool.NoiseEligible
-        override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-            val state = ctx.state
+        override fun generate(state: LocalSearchState, sink: MoveSink) {
             if (state.violated.isEmpty()) return
             val fid = state.violated.random(state.rng)
             state.factors[fid].proposeRepairMoves(state, fid, sink)
@@ -68,8 +67,7 @@ class MoveEquivalenceTest {
         override val id = MoveSourceId("test:double-draw")
         override val phase = Phase.Infeasible
         override val pool = Pool.NoiseEligible
-        override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-            val state = ctx.state
+        override fun generate(state: LocalSearchState, sink: MoveSink) {
             if (state.violated.isEmpty()) return
             repeat(2) {
                 val fid = state.violated.random(state.rng)

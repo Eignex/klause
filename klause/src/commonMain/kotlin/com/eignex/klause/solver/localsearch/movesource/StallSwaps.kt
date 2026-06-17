@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch.movesource
 
 import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
@@ -25,8 +26,7 @@ class StallSwaps(
     override val phase: Phase = Phase.Infeasible
     override val pool: Pool = Pool.ScoreOnly
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (cap <= 0 || state.violated.isEmpty()) return
         val rng = state.rng
         val problem = state.problem

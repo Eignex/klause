@@ -32,8 +32,7 @@ class PairSwap(
     override val phase: Phase = Phase.Feasible
     override val pool: Pool = Pool.ScoreOnly
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         repeat(cap) {
             val swap = drawBoolSwap(state) ?: return@repeat
             sink.addCompound(swap.parts)

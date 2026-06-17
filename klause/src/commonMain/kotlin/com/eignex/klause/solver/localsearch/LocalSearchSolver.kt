@@ -9,7 +9,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.localsearch.movesource.GreedyInit
-import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
 import com.eignex.klause.solver.localsearch.movesource.PairSwap
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
@@ -802,7 +801,7 @@ class LocalSearchSolver(
         // Only consult factors that are currently satisfied. A violated factor would propose
         // repair moves (which run before objective descent) so the enumerate-all source skips
         // them — the same structured generator CBLS samples (epic #710).
-        satisfiedStructured.generate(MoveGenContext(state), sink)
+        satisfiedStructured.generate(state, sink)
         val proposed = sink.list
         if (proposed.isEmpty()) return false
         val poll = IntArray(1)

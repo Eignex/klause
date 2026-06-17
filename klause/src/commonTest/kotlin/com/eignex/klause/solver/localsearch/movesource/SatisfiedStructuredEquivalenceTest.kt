@@ -119,7 +119,7 @@ class SatisfiedStructuredEquivalenceTest {
     fun `elected scope yields structured moves from the satisfied AllDifferent`() {
         val state = freshState(electedProblem(), 7L).also(::seedPermutation)
         val captured = captureFromSink(state) { sink ->
-            SatisfiedStructured.elected(sampleCount).generate(MoveGenContext(state), sink)
+            SatisfiedStructured.elected(sampleCount).generate(state, sink)
         }
         assertFalse(captured.isEmpty, "a satisfied elected AllDifferent must propose structured swaps")
     }
@@ -129,7 +129,7 @@ class SatisfiedStructuredEquivalenceTest {
         val state = freshState(feasibleProblem(), 7L)
         val captured = captureFromSink(
             state,
-        ) { sink -> SatisfiedStructured.all().generate(MoveGenContext(state), sink) }
+        ) { sink -> SatisfiedStructured.all().generate(state, sink) }
         assertFalse(captured.isEmpty, "satisfied EQ factors must propose structured pair-shifts")
     }
 }
