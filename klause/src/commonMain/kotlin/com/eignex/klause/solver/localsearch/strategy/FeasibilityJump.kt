@@ -3,6 +3,7 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.movesource.ArgminJump
+import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 
 /**
  * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024; epic #698). An LS arm whose
@@ -55,6 +56,9 @@ class FeasibilityJump(
 
     private val argmin = ArgminJump(candidateVars, maxValueTries)
 
+    /** The bump + geometric-decay weight maintenance, shared with Cbls via the schedule axis. */
+    private val weightSchedule = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay)
+
     private var lastImprovingStep: Long = -1L
     private var lastSeenStep: Long = -1L
     private var lastCost: Long = Long.MAX_VALUE
@@ -78,7 +82,12 @@ class FeasibilityJump(
                 lastCost = state.cost
                 lastDropStep = state.step
             } else if (state.step - lastImprovingStep >= weightBumpAfter) {
-                decayAndBumpWeights(state)
+                weightSchedule.bumpAndRelax(
+                    state.factorWeights,
+                    state.baseFactorWeights,
+                    state.violated.toIntArray(),
+                    state.rng,
+                )
                 lastImprovingStep = state.step
             }
             lastSeenStep = state.step
@@ -115,18 +124,6 @@ class FeasibilityJump(
             }
         }
         return best
-    }
-
-    /** Fade every weight's excess over its seeded baseline, then escalate the currently-violated
-     *  factors — the adaptive-weight schedule that lets the argmin landscape escape local minima. */
-    private fun decayAndBumpWeights(state: LocalSearchState) {
-        val w = state.factorWeights
-        if (weightDecay < 1.0) {
-            val base = state.baseFactorWeights
-            for (i in w.indices) w[i] = base[i] + (w[i] - base[i]) * weightDecay
-        }
-        val violatedSnapshot = state.violated.toIntArray()
-        for (fid in violatedSnapshot) w[fid] += weightIncrement
     }
 
     /** One diversification kick: jump a random variable of a random violated factor to a random
