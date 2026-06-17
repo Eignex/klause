@@ -72,9 +72,13 @@ internal class Cut(
 internal class CutContext(
     val problem: Problem,
     val relaxation: LpRelaxation,
-    val solution: LpSolution,
+    /** Per-structural-column LP primal value (`RevisedSimplex.FloatLpResult.primal`); the point to separate. */
+    val primal: DoubleArray,
     val session: PropagationSession,
-)
+) {
+    /** The LP primal value of structural column [col] (0 outside the primal vector, e.g. an unmapped column). */
+    fun primalOf(col: Int): Double = if (col in primal.indices) primal[col] else 0.0
+}
 
 /**
  * Separates violated cuts from a fractional LP solution. Implementations inspect the LP point
@@ -141,7 +145,7 @@ internal class AllDifferentSeparator : CutSeparator {
             // when those are still the declared intervals (always at the root).
             val global = liveIntervalsAreDeclared(ctx, vars)
             var lpSum = 0.0
-            for (c in cols) lpSum += ctx.solution.primal(c)
+            for (c in cols) lpSum += ctx.primalOf(c)
             val ones = LongArray(cols.size) { 1L }
             if (lpSum < minSum - tol) cuts.add(Cut(cols.copyOf(), ones, Relation.GE, minSum, global))
             if (lpSum > maxSum + tol) {
@@ -231,7 +235,7 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
                 val col = ctx.relaxation.intColOf[v]
                 cols.add(col)
                 coeffs.add(c)
-                lpLhs += c.toDouble() * ctx.solution.primal(col)
+                lpLhs += c.toDouble() * ctx.primalOf(col)
             }
             if (lpLhs < assignmentMin - tol) {
                 // The assignment enumerated the live value sets hole-aware, so globality needs full
@@ -326,7 +330,7 @@ internal class GccSeparator : CutSeparator {
                 countVars != null && liveIntervalsAreDeclared(ctx, countVars)
             }
             var lpSum = 0.0
-            for (c in cols) lpSum += ctx.solution.primal(c)
+            for (c in cols) lpSum += ctx.primalOf(c)
             if (lpSum < bounds[0] - tol) {
                 cuts.add(
                     Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.GE, bounds[0], global),
@@ -449,7 +453,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
                     break
                 }
                 cols[i] = col
-                xstar[i] = ctx.solution.primal(col)
+                xstar[i] = ctx.primalOf(col)
             }
             if (!ok) continue
             // Greedy cover: highest fractional value first, until the weight sum exceeds the bound.
@@ -667,7 +671,7 @@ internal class CliqueCutSeparator : CutSeparator {
         // Variables with a Boolean column, ordered by descending fractional value — the extension order.
         val ranked = adj.keys
             .filter { ctx.relaxation.boolColOf[it] >= 0 }
-            .sortedByDescending { ctx.solution.primal(ctx.relaxation.boolColOf[it]) }
+            .sortedByDescending { ctx.primalOf(ctx.relaxation.boolColOf[it]) }
 
         val cuts = ArrayList<Cut>()
         val emitted = HashSet<String>()
@@ -685,7 +689,7 @@ internal class CliqueCutSeparator : CutSeparator {
             }
             val cols = IntArray(clique.size) { ctx.relaxation.boolColOf[clique[it]] }
             var lhs = 0.0
-            for (c in cols) lhs += ctx.solution.primal(c)
+            for (c in cols) lhs += ctx.primalOf(c)
             if (lhs <= 1.0 + tol) continue
             val key = cols.sorted().joinToString(",")
             if (!emitted.add(key)) continue

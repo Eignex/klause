@@ -32,8 +32,7 @@ class CircuitCutTest {
         return p to LinearObjective(intCoefficients = longArrayOf(3L, 4L, 1L, 2L))
     }
 
-    private fun relaxer(p: Problem, obj: LinearObjective) =
-        CpToLpRelaxation(p, obj, generateCuts = false, circuitArcs = true)
+    private fun relaxer(p: Problem, obj: LinearObjective) = CpToLpRelaxation(p, obj, circuitArcs = true)
 
     private fun intCol(r: LpRelaxation, v: Int): Int {
         for (c in r.colVarId.indices) if (!r.colIsBool[c] && r.colVarId[c] == v) return c
@@ -45,20 +44,19 @@ class CircuitCutTest {
         val (p, obj) = circuitProblem()
         val session = PropagationSession(p)
         val r = relaxer(p, obj).build(session)
-        val sol = DualSimplex(r.model).solve()
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
-        assertEquals(10.0, sol.objectiveValue, eps) // the subtour assignment cost
-        assertEquals(1.0, sol.primal(intCol(r, 0)), eps)
-        assertEquals(0.0, sol.primal(intCol(r, 1)), eps)
-        assertEquals(3.0, sol.primal(intCol(r, 2)), eps)
-        assertEquals(2.0, sol.primal(intCol(r, 3)), eps)
+        assertEquals(10.0, sol.objective, eps) // the subtour assignment cost
+        assertEquals(1.0, sol.primalAt(intCol(r, 0)), eps)
+        assertEquals(0.0, sol.primalAt(intCol(r, 1)), eps)
+        assertEquals(3.0, sol.primalAt(intCol(r, 2)), eps)
+        assertEquals(2.0, sol.primalAt(intCol(r, 3)), eps)
 
-        val cuts = CircuitSeparator().separate(CutContext(p, r, sol, session))
+        val cuts = CircuitSeparator().separate(CutContext(p, r, sol.primal, session))
         assertTrue(cuts.isNotEmpty(), "a subtour LP point must yield a cut")
         assertTrue(cuts.all { it.rel == Relation.GE && it.rhs == 1L })
         // The first cut is violated at the current point: its arcs carry no flow out of the subtour.
-        val lhs = cuts.first().cols.sumOf { sol.primal(it) }
+        val lhs = cuts.first().cols.sumOf { sol.primalAt(it) }
         assertTrue(lhs < 1.0 - eps, "cut LHS $lhs should be < 1 at the subtour point")
     }
 
@@ -67,9 +65,9 @@ class CircuitCutTest {
         val (p, obj) = circuitProblem()
         val session = PropagationSession(p)
         val r = relaxer(p, obj).build(session)
-        val sol = DualSimplex(r.model).solve()
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
         val model = r.circuitArcs.single()
-        val cut = CircuitSeparator().separate(CutContext(p, r, sol, session)).first { it.rel == Relation.GE }
+        val cut = CircuitSeparator().separate(CutContext(p, r, sol.primal, session)).first { it.rel == Relation.GE }
 
         // Map each arc column back to its (i, j) from the sparse arc lists.
         val arcOf = HashMap<Int, Pair<Int, Int>>()
@@ -89,13 +87,12 @@ class CircuitCutTest {
         val session = PropagationSession(p)
         val relaxer = relaxer(p, obj)
         val r = relaxer.build(session)
-        val sol = DualSimplex(r.model).solve()
-        val cuts = CircuitSeparator().separate(CutContext(p, r, sol, session))
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
+        val cuts = CircuitSeparator().separate(CutContext(p, r, sol.primal, session))
 
         val r2 = relaxer.build(session, cuts)
-        val sol2 = DualSimplex(r2.model).solve()
-        assertEquals(LpStatus.OPTIMAL, sol2.status)
-        assertTrue(sol2.objectiveValue > 10.0 + eps, "subtour-eliminated bound ${sol2.objectiveValue} should exceed 10")
+        val sol2 = requireNotNull(RevisedSimplex(r2.model).solve())
+        assertTrue(sol2.objective > 10.0 + eps, "subtour-eliminated bound ${sol2.objective} should exceed 10")
     }
 
     @Test
@@ -114,9 +111,8 @@ class CircuitCutTest {
         val session = PropagationSession(p)
         val r = relaxer(p, obj).build(session)
         val model = r.circuitArcs.single()
-        val sol = DualSimplex(r.model).solve()
-        assertEquals(LpStatus.OPTIMAL, sol.status)
-        val cut = CircuitSeparator().separate(CutContext(p, r, sol, session)).first { it.rel == Relation.GE }
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
+        val cut = CircuitSeparator().separate(CutContext(p, r, sol.primal, session)).first { it.rel == Relation.GE }
         val arcOf = HashMap<Int, Pair<Int, Int>>()
         for (k in model.cols.indices) arcOf[model.cols[k]] = model.tails[k] to model.heads[k]
         val cutArcs = cut.cols.map { arcOf.getValue(it) }
@@ -138,7 +134,7 @@ class CircuitCutTest {
                 intDomains = Array(n) { IntDomain(0, n - 1) },
                 factors = arrayOf<Factor>(Circuit(IntArray(n) { it })),
             )
-            return CpToLpRelaxation(p, null, generateCuts = false, circuitArcs = true).build(PropagationSession(p))
+            return CpToLpRelaxation(p, null, circuitArcs = true).build(PropagationSession(p))
         }
         val built = fullCircuit(30).circuitArcs.single()
         assertEquals(30, built.n)
@@ -178,3 +174,5 @@ class CircuitCutTest {
         return steps == succ.size
     }
 }
+
+private fun FloatLpResult.primalAt(c: Int): Double = primal[c]

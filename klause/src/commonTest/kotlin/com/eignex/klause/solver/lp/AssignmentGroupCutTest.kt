@@ -18,9 +18,9 @@ import kotlin.test.assertTrue
  */
 class AssignmentGroupCutTest {
 
-    private fun relax(p: Problem, obj: LinearObjective): Pair<LpRelaxation, LpSolution> {
-        val relaxation = CpToLpRelaxation(p, obj, generateCuts = true).build(PropagationSession(p))
-        return relaxation to DualSimplex(relaxation.model).solve()
+    private fun relax(p: Problem, obj: LinearObjective): Pair<LpRelaxation, FloatLpResult> {
+        val relaxation = CpToLpRelaxation(p, obj).build(PropagationSession(p))
+        return relaxation to requireNotNull(RevisedSimplex(relaxation.model).solve())
     }
 
     @Test
@@ -35,7 +35,7 @@ class AssignmentGroupCutTest {
         )
         val (r, sol) = relax(p, LinearObjective(intCoefficients = LongArray(3) { 1L }))
 
-        val geCut = AllDifferentSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+        val geCut = AllDifferentSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
             .first { it.rel == Relation.GE }
         assertEquals(3L, geCut.rhs)
         assertEquals(3, geCut.cols.size)
@@ -64,7 +64,7 @@ class AssignmentGroupCutTest {
         )
         val (r, sol) = relax(p, LinearObjective(intCoefficients = LongArray(6) { 1L }))
 
-        val geCuts = AllDifferentSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+        val geCuts = AllDifferentSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
             .filter { it.rel == Relation.GE }
         assertEquals(2, geCuts.size, "one Hall cut per inverse side")
         assertTrue(geCuts.all { it.rhs == 3L && it.cols.size == 3 })
@@ -83,7 +83,7 @@ class AssignmentGroupCutTest {
         val coef = longArrayOf(3L, 1L, 2L, 0L, 0L, 0L)
         val (r, sol) = relax(p, LinearObjective(intCoefficients = coef))
 
-        val cut = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol, PropagationSession(p)))
+        val cut = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol.primal, PropagationSession(p)))
             .first { it.rel == Relation.GE }
         assertEquals(4L, cut.rhs)
         assertEquals(3, cut.cols.size) // only the nonzero-cost f columns

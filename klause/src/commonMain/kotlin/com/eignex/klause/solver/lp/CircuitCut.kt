@@ -58,7 +58,7 @@ internal class CircuitSeparator : CutSeparator {
         // Residual graph over the fractional support: a forward edge (capacity y) and a zero-capacity
         // reverse per arc with y > TOL, in paired adjacency (the reverse of edge e is e xor 1).
         var support = 0
-        for (k in model.cols.indices) if (ctx.solution.primal(model.cols[k]) > TOL) support++
+        for (k in model.cols.indices) if (ctx.primalOf(model.cols[k]) > TOL) support++
         if (support == 0) return
         val eTo = IntArray(2 * support)
         val eNext = IntArray(2 * support)
@@ -66,7 +66,7 @@ internal class CircuitSeparator : CutSeparator {
         val eHead = IntArray(n) { -1 }
         var ec = 0
         for (k in model.cols.indices) {
-            val y = ctx.solution.primal(model.cols[k])
+            val y = ctx.primalOf(model.cols[k])
             if (y <= TOL) continue
             val u = model.tails[k]
             val v = model.heads[k]

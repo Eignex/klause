@@ -54,8 +54,8 @@ internal class LpModel(
     /**
      * Dense constraint coefficients over structural variables: `a[i][j]`, row-major, `m × n` — or
      * `null` when the model was built sparse (over the dense cap, #602), where only the [csc] core is
-     * materialized so the dense `m × n` is never allocated. The dense [DualSimplex] /
-     * [FloatSimplex] read this (and only run on the dense path, where it is non-null — see
+     * materialized so the dense `m × n` is never allocated. The dense the dense dual simplex /
+     * the dense float simplex read this (and only run on the dense path, where it is non-null — see
      * [denseRows]); the sparse [RevisedSimplex] / [safeObjectiveLowerBound] / [ExactBasisCertifier]
      * read columns through [forEachInColumn], which works against either representation.
      */
@@ -103,7 +103,7 @@ internal class LpModel(
     /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
 
-    /** The dense coefficient matrix, required by the dense [DualSimplex] / [FloatSimplex]; errors on a
+    /** The dense coefficient matrix, required by the dense dual simplex / the dense float simplex; errors on a
      *  sparse model (those solvers only run on the dense path, so this never fires there). */
     fun denseRows(): Array<LongArray> = a ?: error("dense coefficient matrix absent on a sparse LP model")
 

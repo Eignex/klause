@@ -12,7 +12,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** #22: cut generation wired into branch-and-bound (AllDifferent Hall-set cuts). */
+/** #22/#705: structural cut generation (AllDifferent Hall-set cuts) wired into branch-and-bound over
+ *  the sparse LP path — cuts are harvested as a global pool at the root and applied at every node. */
 class LpCutTest {
 
     // AllDifferent over n vars in [0, hi], minimize the sum. Optimum is 0+1+...+(n-1).

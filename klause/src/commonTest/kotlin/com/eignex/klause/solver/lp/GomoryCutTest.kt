@@ -16,10 +16,9 @@ class GomoryCutTest {
         val b = LpBuilder()
         val x = b.addVar(0, 5, cost = 1)
         b.addRow(mapOf(x to 2L), Relation.LE, 3)
-        val simplex = DualSimplex(b.build(Sense.MAXIMIZE))
-        val sol = simplex.solve()
-        assertEquals(LpStatus.OPTIMAL, sol.status)
-        assertEquals(1.5, sol.primal(x), 1e-9)
+        val simplex = RevisedSimplex(b.build(Sense.MAXIMIZE))
+        val sol = requireNotNull(simplex.solve())
+        assertEquals(1.5, sol.primal[x], 1e-9)
 
         val cuts = simplex.gomoryCuts(8)
         assertTrue(cuts.isNotEmpty(), "expected a Gomory cut for the fractional optimum")
@@ -56,9 +55,8 @@ class GomoryCutTest {
                 rows.add(Row(coeffs, rel, rhs))
                 b.addRow((0 until n).associateWith { coeffs[it] }.filterValues { it != 0L }, rel, rhs)
             }
-            val simplex = DualSimplex(b.build(Sense.MINIMIZE))
-            val sol = simplex.solve()
-            if (sol.status != LpStatus.OPTIMAL) return@repeat
+            val simplex = RevisedSimplex(b.build(Sense.MINIMIZE))
+            simplex.solve() ?: return@repeat
             val cuts = simplex.gomoryCuts(8)
             if (cuts.isEmpty()) return@repeat
             instances++

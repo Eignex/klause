@@ -29,9 +29,9 @@ class TableHullTest {
         ),
     )
 
-    private fun solve(p: Problem, obj: LinearObjective): Pair<LpSolution, LpRelaxation> {
+    private fun solve(p: Problem, obj: LinearObjective): Pair<SparseSolution, LpRelaxation> {
         val r = CpToLpRelaxation(p, obj, tableHull = true).build(PropagationSession(p))
-        return DualSimplex(r.model).solve() to r
+        return solveSparse(r.model) to r
     }
 
     private fun intCol(r: LpRelaxation, v: Int): Int {

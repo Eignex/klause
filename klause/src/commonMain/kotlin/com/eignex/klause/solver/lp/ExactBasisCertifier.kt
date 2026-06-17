@@ -2,10 +2,11 @@ package com.eignex.klause.solver.lp
 
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
+import com.eignex.klause.util.IntArrayList
 
 /**
  * Exact lower bound on the minimized objective `cᵀz`, certified from a (float-found) [Basis] using
- * exact rationals — the fallback for when the `Long` fraction-free path ([DualSimplex]) overflows,
+ * exact rationals — the fallback for when the `Long` fraction-free path (the dense dual simplex) overflows,
  * which happens precisely on the large-determinant bases of big models.
  *
  * It solves the dual system `M y = c_B` exactly (`M[t][i] = A_full[i][basicVar[t]]`) by fraction-free
@@ -96,11 +97,22 @@ internal object ExactBasisCertifier {
      * node is kept — the prune is sound regardless of how the ray was found. Returns false on a
      * singular basis or when neither sign certifies.
      */
-    fun certifiesInfeasible(model: LpModel, basis: Basis, leavingRow: Int): Boolean {
-        if (leavingRow !in 0 until model.m) return false
+    fun certifiesInfeasible(model: LpModel, basis: Basis, leavingRow: Int): Boolean =
+        farkasRay(model, basis, leavingRow) != null
+
+    /**
+     * The exact Farkas ray `ρ` (either sign of `B⁻ᵀ e_r`) that proves the node LP infeasible, or null
+     * when neither sign certifies / the basis is singular. The returned `ρ` satisfies
+     * `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`, so its column/row support is a sufficient infeasibility reason
+     * ([LpExplanation.infeasibilityClause] turns it into a bound-atom nogood).
+     */
+    fun farkasRay(model: LpModel, basis: Basis, leavingRow: Int): Array<BigRational>? {
+        if (leavingRow !in 0 until model.m) return null
         val rho = solveDualSystem(model, basis.basicVars) { t -> if (t == leavingRow) BigInt.ONE else BigInt.ZERO }
-            ?: return false
-        return farkasCertifies(model, rho) || farkasCertifies(model, Array(rho.size) { BigRational.ZERO - rho[it] })
+            ?: return null
+        if (farkasCertifies(model, rho)) return rho
+        val neg = Array(rho.size) { BigRational.ZERO - rho[it] }
+        return if (farkasCertifies(model, neg)) neg else null
     }
 
     /** Whether [rho] is an exact Farkas infeasibility certificate: `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`. A
@@ -119,6 +131,152 @@ internal object ExactBasisCertifier {
             }
         }
         return lhs > boxMax
+    }
+
+    /**
+     * Exact Gomory ([mir]=false) / mixed-integer-rounding ([mir]=true) cuts from the optimal [basis],
+     * up to [maxCuts]. For each basic row whose basic variable is a structural (integer) column, the
+     * exact tableau row `ā_ij = (B⁻ᵀe_i)·A_j` and basic value `b̄_i = (B⁻ᵀe_i)·rhsAdj` are computed in
+     * rationals (no float rounding), so the fractional-row derivation is exact and the cut is rigorously
+     * valid. The cut is built in shifted z-space, unshifted to the structural x-space, scaled to integer
+     * `Long` coefficients, gcd-reduced and Chvátal-rounded; a cut whose integer form overflows `Long` is
+     * dropped (a missed cut is sound). Tableau-derived, so [Cut.global] stays false — learning withholds.
+     */
+    fun tableauCuts(model: LpModel, basis: Basis, maxCuts: Int, mir: Boolean): List<Cut> {
+        val m = model.m
+        val n = model.n
+        val basic = basis.basicVars
+        val status = basis.status
+        // rhsAdj = rhs − Σ_{nonbasic at upper} A_j·u_j, exactly as the revised simplex forms β's rhs.
+        val rhsAdj = Array(m) { BigRational.of(model.rhs[it]) }
+        for (j in 0 until model.numVars) {
+            if (status[j] == VarStatus.AT_UPPER) {
+                forEachFullColumn(model, j) { i, a -> rhsAdj[i] -= BigRational.of(a) * BigRational.of(model.upper[j]) }
+            }
+        }
+        // Row-major view of the structural matrix, for back-substituting a ≤-row slack to its columns.
+        val rowCols = Array(m) { IntArrayList() }
+        val rowVals = Array(m) { ArrayList<Long>() }
+        for (k in 0 until n) {
+            model.forEachInColumn(k) { i, v ->
+                rowCols[i].add(k)
+                rowVals[i].add(v)
+            }
+        }
+        val cuts = ArrayList<Cut>()
+        val one = BigRational.of(1L)
+        for (i in 0 until m) {
+            if (cuts.size >= maxCuts) break
+            if (basic[i] >= n) continue // cut on fractional structural variables only
+            val rho = solveDualSystem(model, basic) { t -> if (t == i) BigInt.ONE else BigInt.ZERO } ?: continue
+            var bbar = BigRational.ZERO
+            for (r in 0 until m) bbar += rho[r] * rhsAdj[r]
+            val f0 = bbar - BigRational.of(bbar.floor())
+            if (f0.signum() == 0) continue // integral basic value: no cut
+            // The cut combines rows with weights ρ; it is globally valid iff ρ is zero on every
+            // non-global row (a big-M reified row would otherwise make it only conditionally valid).
+            var global = true
+            for (r in 0 until m) {
+                if (!model.rowGlobal[r] && rho[r].signum() != 0) {
+                    global = false
+                    break
+                }
+            }
+            val cut = buildTableauCut(model, status, rho, rowCols, rowVals, f0, mir, one, global) ?: continue
+            cuts.add(cut)
+        }
+        return cuts
+    }
+
+    @Suppress("LongParameterList", "CyclomaticComplexMethod", "NestedBlockDepth")
+    private fun buildTableauCut(
+        model: LpModel,
+        status: Array<VarStatus>,
+        rho: Array<BigRational>,
+        rowCols: Array<IntArrayList>,
+        rowVals: Array<ArrayList<Long>>,
+        f0: BigRational,
+        mir: Boolean,
+        one: BigRational,
+        global: Boolean,
+    ): Cut? {
+        val n = model.n
+        val coef = Array(n) { BigRational.ZERO } // coefficient on each shifted structural column z_k
+        var constant = BigRational.ZERO // constant moved to the left side
+        for (j in 0 until model.numVars) {
+            if (status[j] == VarStatus.BASIC) continue
+            var aij = BigRational.ZERO
+            forEachFullColumn(model, j) { i, a -> aij += rho[i] * BigRational.of(a) }
+            val atLower = status[j] == VarStatus.AT_LOWER
+            val aClassic = if (atLower) aij else BigRational.ZERO - aij // x_v + Σ a_j t_j = b̄, t_j ≥ 0
+            val fj = aClassic - BigRational.of(aClassic.floor())
+            if (fj.signum() == 0) continue
+            // Gomory multiplier f_j; MIR rounds it down past f0: φ(a_j) = f0·(1−f_j)/(1−f0).
+            val mj = if (!mir || fj <= f0) fj else f0 * (one - fj) / (one - f0)
+            if (mj.signum() == 0) continue
+            if (j < n) {
+                if (atLower) {
+                    coef[j] += mj // t_j = z_j
+                } else {
+                    coef[j] -= mj // t_j = u_j − z_j
+                    constant += mj * BigRational.of(model.upper[j])
+                }
+            } else {
+                if (model.hasUpper[j]) continue // equality-row slack fixed at 0 ⇒ t_j = 0
+                val r = j - n // ≤-row slack: t_j = rhs_r − Σ_k A_rk·z_k
+                val cols = rowCols[r]
+                val vals = rowVals[r]
+                for (idx in 0 until cols.size) coef[cols[idx]] -= mj * BigRational.of(vals[idx])
+                constant += mj * BigRational.of(model.rhs[r])
+            }
+        }
+        // Σ coef_k·z_k ≥ f0 − constant, then unshift z_k = x_k − loShift_k.
+        var rhs = f0 - constant
+        for (k in 0 until n) if (coef[k].signum() != 0) rhs += coef[k] * BigRational.of(model.loShift[k])
+        return integerCut(model, coef, rhs, global)
+    }
+
+    /** Scale a rational cut `Σ coef_k·x_k ≥ rhs` to integer `Long` coefficients (common-denominator
+     *  clear, gcd-reduce, ceil the rhs — valid since the reduced left side is integral), or null if it
+     *  has no term or overflows `Long`. */
+    private fun integerCut(model: LpModel, coef: Array<BigRational>, rhs: BigRational, global: Boolean): Cut? {
+        val n = model.n
+        var denLcm = BigInt.ONE
+        for (k in 0 until n) if (coef[k].signum() != 0) denLcm = lcm(denLcm, coef[k].den)
+        denLcm = lcm(denLcm, rhs.den)
+        val intCoef = Array(n) { BigInt.ZERO }
+        var g = BigInt.ZERO
+        var count = 0
+        for (k in 0 until n) {
+            if (coef[k].signum() == 0) continue
+            val c = coef[k].num * denLcm.divExact(coef[k].den)
+            intCoef[k] = c
+            g = g.gcd(c)
+            count++
+        }
+        if (count == 0) return null
+        if (g.signum() == 0) g = BigInt.ONE
+        val rhsInt = rhs.num * denLcm.divExact(rhs.den)
+        val cols = IntArray(count)
+        val vals = LongArray(count)
+        var idx = 0
+        for (k in 0 until n) {
+            if (intCoef[k].signum() == 0) continue
+            val v = intCoef[k].divExact(g).toLongOrNull() ?: return null // overflow ⇒ drop (sound)
+            cols[idx] = k
+            vals[idx] = v
+            idx++
+        }
+        // ceil(rhsInt / g) for g > 0: the reduced left side is integral, so rounding up stays valid.
+        val q = rhsInt.div(g)
+        val ceilRhs = if (rhsInt.rem(g).signum() != 0 && rhsInt.signum() > 0) q + BigInt.ONE else q
+        val rhsLong = ceilRhs.toLongOrNull() ?: return null
+        return Cut(cols, vals, Relation.GE, rhsLong, global)
+    }
+
+    private fun lcm(a: BigInt, b: BigInt): BigInt {
+        if (a.signum() == 0 || b.signum() == 0) return BigInt.ZERO
+        return a.divExact(a.gcd(b)) * b
     }
 
     /** Exact solve of `Bᵀ y = rhs` with `Bᵀ`'s row `t` the basic column `basic[t]`: fraction-free

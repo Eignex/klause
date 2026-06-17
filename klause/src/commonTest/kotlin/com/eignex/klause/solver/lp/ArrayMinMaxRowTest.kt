@@ -18,9 +18,9 @@ class ArrayMinMaxRowTest {
 
     private val eps = 1e-9
 
-    private fun solve(problem: Problem, objective: LinearObjective?): Pair<LpSolution, LpRelaxation> {
+    private fun solve(problem: Problem, objective: LinearObjective?): Pair<SparseSolution, LpRelaxation> {
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
-        return DualSimplex(relaxation.model).solve() to relaxation
+        return solveSparse(relaxation.model) to relaxation
     }
 
     private fun intCol(r: LpRelaxation, v: Int): Int {

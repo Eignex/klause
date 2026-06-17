@@ -1,17 +1,17 @@
 package com.eignex.klause.solver.lp
 
-import kotlin.math.ceil
+import com.eignex.klause.util.BigRational
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * #282: the reason for a reduced-cost domain fixing must be sound. Fixing a nonbasic column `col`
- * (reduced cost `d`) to its tightened bound is justified by `objective ≥ L + d·(x_col − seated_col)` —
- * which holds given the OTHER support columns' seated bounds (the reduced-cost decomposition) — plus
- * the incumbent `objective ≤ M`. So the reason for `x_col ≤ b` (at lower) is the support bounds
- * excluding `col` together with `objective ≤ M`; this harness checks that clause excludes no
- * constraint-feasible integer point with `objective ≤ M`, over the whole declared box.
+ * #282/#705: the reason for a reduced-cost domain fixing must be sound on the sparse path. Fixing a
+ * nonbasic column `col` (exact reduced cost `d` from [ExactBasisCertifier.Certificate]) to its
+ * tightened bound is justified by `objective ≥ L + d·(x_col − seated_col)` — which holds given the
+ * OTHER support columns' seated bounds — plus the incumbent `objective ≤ M`. So the reason for
+ * `x_col ≤ b` (at lower) is the support bounds excluding `col` together with `objective ≤ M`; this
+ * harness checks that clause excludes no constraint-feasible integer point with `objective ≤ M`.
  */
 class ReducedCostReasonTest {
 
@@ -43,33 +43,29 @@ class ReducedCostReasonTest {
                 b.addRow((0 until n).associateWith { coeffs[it] }.filterValues { it != 0L }, rel, rhs)
             }
             val model = b.build(Sense.MINIMIZE)
-            val sol = DualSimplex(model).solve()
-            if (sol.status != LpStatus.OPTIMAL) return@repeat
-            val den = sol.denominator
+            val sol = RevisedSimplex(model).solve() ?: return@repeat
+            val cert = ExactBasisCertifier.certify(model, sol.basis) ?: return@repeat
             // Incumbent target: an integer bound on the objective at or above ⌈L⌉ (some slack).
-            val m = ceil(sol.objectiveValue - 1e-9).toLong() + rng.nextInt(0, 3)
-            val objTrueNum = sol.objectiveNumerator
-            val slack = m * den - objTrueNum
-            if (slack < 0L) return@repeat
+            val m = (cert.objective.ceil().toLongOrNull() ?: return@repeat) + rng.nextInt(0, 3)
+            val slack = BigRational.of(m) - cert.objective
+            if (slack.signum() < 0) return@repeat
 
-            // Support: nonbasic structural columns with a nonzero reduced cost.
-            val support = (0 until n).filter { c ->
-                sol.basis.status[c] != VarStatus.BASIC && sol.reducedCostNumerator[c] != 0L
-            }
+            // Support: nonbasic structural columns with a nonzero exact reduced cost.
+            val support = (0 until n).filter { c -> cert.reducedCost[c].signum() != 0 }
             for (col in support) {
-                val dNum = sol.reducedCostNumerator[col]
+                val dj = cert.reducedCost[col]
                 val seatLo = model.loShift[col]
                 val seatHi = model.loShift[col] + model.upper[col]
                 val atLower = sol.basis.status[col] == VarStatus.AT_LOWER
-                // Mirror applyReducedCostFixing's step bound; only the side dual feasibility allows.
+                // Mirror applySparseReducedCostFixing's step bound; only the side dual feasibility allows.
                 val fixUpper: Long
                 val fixLower: Long
-                if (atLower && dNum > 0L) {
-                    val dMax = slack / dNum
+                if (atLower && dj.signum() > 0) {
+                    val dMax = (slack / dj).floor().toLongOrNull() ?: continue
                     fixUpper = seatLo + dMax
                     fixLower = Long.MIN_VALUE
-                } else if (!atLower && dNum < 0L) {
-                    val dMax = slack / -dNum
+                } else if (!atLower && dj.signum() < 0) {
+                    val dMax = (slack / (BigRational.ZERO - dj)).floor().toLongOrNull() ?: continue
                     fixLower = seatHi - dMax
                     fixUpper = Long.MAX_VALUE
                 } else {

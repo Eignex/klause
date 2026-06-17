@@ -253,7 +253,10 @@ object LpAutoConfig {
         }
         val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
 
-        val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
+        // Cuts run on whichever bounding path is active (#705): the structural separators read the LP
+        // point through the sparse revised simplex, so they fire on over-cap sparse-primary instances
+        // too — not just the dense-capped ones (the #13 gating fix). Cut-eligible structure required.
+        val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
             lpBounding = base.lpBounding || bounding || sparsePrimary,
@@ -261,10 +264,16 @@ object LpAutoConfig {
             lpSparsePrimary = base.lpSparsePrimary || sparsePrimary,
             lpCuts = base.lpCuts || cuts,
             lpCutPool = base.lpCutPool || cuts,
-            lpLearn = base.lpLearn || bounding,
+            // LP learning rides on whichever bounding path runs (#705): the objective-bound reason is
+            // built from the exact basis-certificate the sparse path already computes, so it fires on
+            // the over-cap sparse-primary instances too, not just the dense-capped ones.
+            lpLearn = base.lpLearn || lpActive,
             lpObjectiveBound = base.lpObjectiveBound || bounding,
             lpFixpoint = base.lpFixpoint || bounding,
-            lpProbe = base.lpProbe || bounding,
+            // The LP-rounding probe runs on whichever bounding path is active (#705): it solves the
+            // root relaxation through the sparse revised simplex, so it fires on the over-cap
+            // sparse-primary instances too, not just the dense-capped ones.
+            lpProbe = base.lpProbe || lpActive,
             lpCircuit = base.lpCircuit || (LpTechnique.CIRCUIT in acceptedHulls),
             lpElement = base.lpElement || (LpTechnique.ELEMENT in acceptedHulls),
             lpTable = base.lpTable || (LpTechnique.TABLE in acceptedHulls),

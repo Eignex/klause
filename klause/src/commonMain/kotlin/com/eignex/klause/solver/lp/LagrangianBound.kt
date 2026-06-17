@@ -121,6 +121,11 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
         var total = 0
         for (f in problem.factors) {
             if (f !is AllDifferent || f.vars.size !in 2..MAX_VARS) continue
+            // Only a *true* all-distinct admits the weighted-assignment bound: the excepted values of an
+            // `alldifferent_except` may repeat (so "fewer distinct values than variables" is not
+            // infeasible, and the assignment lower bound over-counts), and a conditional/optional
+            // AllDifferent (`presents`) need not hold at all. Treating either as hard is unsound (#714).
+            if (f.exceptSet.isNotEmpty() || f.presents.isNotEmpty()) continue
             if (total + f.vars.size > MAX_TOTAL_VARS) continue
             if (f.vars.any { it in used }) continue // keep blocks disjoint so the subproblems decouple
             chosen.add(f.vars.copyOf())
@@ -198,9 +203,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
                 for (r in 0 until multiplierCount) num = subExact(num, mulExact(p[r], linkRhs[r]))
                 num = addExact(num, mulExact(Q, rest))
                 if (num > bestNum) bestNum = num
-                if (ceilDivLocal(num, Q) >= incumbentCeil(incumbent)) {
-                    return Result(true, num, Q, p)
-                }
+                if (ceilDivLocal(num, Q) >= incumbentCeil(incumbent)) return Result(true, num, Q, p)
                 if (!incumbent.isFinite() || multiplierCount == 0) return@repeat
                 if (!subgradientStep(eval.values, p, num, incumbent, prevDir)) return@repeat
             }

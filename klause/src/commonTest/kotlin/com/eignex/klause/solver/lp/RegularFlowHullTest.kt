@@ -44,10 +44,10 @@ class RegularFlowHullTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1)) // minimize Σ seq
         val r = CpToLpRelaxation(p, obj, regularHull = true).build(PropagationSession(p))
-        val sol = DualSimplex(r.model).solve()
+        val sol = solveSparse(r.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
         // Cheapest accepted string is 1,1,1 (zero 2s, even), Σ = 3.
-        assertEquals(3.0, sol.objectiveValue + r.objectiveConstant, eps)
+        assertEquals(3.0, sol.objectiveValue, eps)
     }
 
     @Test
@@ -93,16 +93,16 @@ class RegularFlowHullTest {
             rec(0)
 
             val r = CpToLpRelaxation(p, obj, regularHull = true).build(PropagationSession(p))
-            val sol = DualSimplex(r.model).solve()
+            val sol = solveSparse(r.model)
             val opt = brute ?: return@repeat // no accepting string: the hull is skipped (a relaxation may loosen)
             checked++
             assertEquals(LpStatus.OPTIMAL, sol.status, "accepted string exists but LP not optimal")
             // Integral flow polytope ⇒ the LP optimum equals the true optimum over accepted strings.
             assertEquals(
                 opt.toDouble(),
-                sol.objectiveValue + r.objectiveConstant,
+                sol.objectiveValue,
                 eps,
-                "flow hull optimum ${sol.objectiveValue + r.objectiveConstant} != brute $opt",
+                "flow hull optimum ${sol.objectiveValue} != brute $opt",
             )
         }
         assertTrue(checked > 100, "only $checked feasible instances checked")

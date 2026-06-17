@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 /** #23↔#22: the objective-weighted AllDifferent (assignment) cut. */
 class AssignmentObjectiveCutTest {
 
-    private fun setup(coef: LongArray, hi: Int): Triple<Problem, LpRelaxation, LpSolution> {
+    private fun setup(coef: LongArray, hi: Int): Triple<Problem, LpRelaxation, FloatLpResult> {
         val n = coef.size
         val p = Problem(
             0,
@@ -25,9 +25,8 @@ class AssignmentObjectiveCutTest {
         val relaxation = CpToLpRelaxation(
             p,
             LinearObjective(intCoefficients = coef),
-            generateCuts = true,
         ).build(session)
-        return Triple(p, relaxation, DualSimplex(relaxation.model).solve())
+        return Triple(p, relaxation, requireNotNull(RevisedSimplex(relaxation.model).solve()))
     }
 
     @Test
@@ -35,7 +34,7 @@ class AssignmentObjectiveCutTest {
         // min 1·x0 + 2·x1 + 3·x2 over AllDifferent[0,4]: assign 2→x0, 1→x1, 0→x2 = 2+2+0 = 4.
         val coef = longArrayOf(1, 2, 3)
         val (p, r, sol) = setup(coef, 4)
-        val cuts = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol, PropagationSession(p)))
+        val cuts = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol.primal, PropagationSession(p)))
         assertEquals(1, cuts.size)
         assertEquals(Relation.GE, cuts[0].rel)
         assertEquals(4L, cuts[0].rhs)
@@ -45,7 +44,7 @@ class AssignmentObjectiveCutTest {
     fun `cut excludes no distinct assignment`() {
         val coef = longArrayOf(2, -1, 3) // mixed signs
         val (p, r, sol) = setup(coef, 4)
-        val cut = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol, PropagationSession(p)))
+        val cut = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol.primal, PropagationSession(p)))
             .firstOrNull() ?: return // if not violated, nothing to check
         // Exhaustively: every distinct (a,b,c) in [0,4] satisfies Σ coef·x ≥ rhs.
         for (a in 0..4) {
@@ -65,7 +64,7 @@ class AssignmentObjectiveCutTest {
         // bounds 1·x0+2·x1+9·x2, whose minimum places 0 on the heaviest weight.
         val coef = longArrayOf(1, 2, 9)
         val (p, r, sol) = setup(coef, 4)
-        val cuts = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol, PropagationSession(p)))
+        val cuts = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol.primal, PropagationSession(p)))
         // min: x2=0 (×9), x1=1 (×2), x0=2 (×1) = 0 + 2 + 2 = 4.
         assertEquals(4L, cuts.single().rhs)
     }

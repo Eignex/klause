@@ -251,8 +251,10 @@ class LpAutoConfigTest {
     @Test
     fun `oversized model routes LP to the sparse bound-only path and keeps structure-capped bounds`() {
         // 2000 unit rows over 2000 vars estimate a dense tableau of ~8M cells — past the dense cap
-        // but within the sparse cap — so LP routes to the bound-only sparse path (#602): bounding on,
-        // cuts/probe off. The Lagrangian/energetic bounds (own internal caps) are not size-gated.
+        // but within the sparse cap — so LP routes to the bound-only sparse path (#602): bounding on.
+        // The whole bounding stack rides along over the sparse revised simplex (#705) — the probe, LP
+        // learning, and the structural cut separators all fire on this path. The Lagrangian/energetic
+        // bounds (own internal caps) are not size-gated.
         val n = 2000
         val factors = ArrayList<Factor>(n + 1)
         repeat(n) { i -> factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, 0)) }
@@ -261,8 +263,11 @@ class LpAutoConfigTest {
         val r = LpAutoConfig.recommend(p)
         assertTrue(r.lpSparsePrimary)
         assertTrue(r.lpBounding)
-        assertFalse(r.lpCuts)
-        assertFalse(r.lpProbe)
+        // The AllDifferent makes the instance cut-eligible; cuts gate on lpActive (#705), so the
+        // structural separators now fire on the sparse-primary path too.
+        assertTrue(r.lpCuts)
+        assertTrue(r.lpProbe)
+        assertTrue(r.lpLearn)
         assertTrue(r.lagrangian)
 
         // Past the sparse cap too ⇒ the LP family fully declines; the Lagrangian still runs.
@@ -280,8 +285,8 @@ class LpAutoConfigTest {
 
     @Test
     fun `lpConfig resolves at minimize and engages the lp machinery`() {
-        // Triangle covering: optimum 3. With an LP emphasis the node LPs must actually run (pivots
-        // observed); a null lpConfig leaves the LP family off.
+        // Triangle covering: optimum 3. With an LP emphasis the node LPs must actually run (sparse
+        // solves observed); a null lpConfig leaves the LP family off.
         val p = problem(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
             Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
@@ -291,21 +296,20 @@ class LpAutoConfigTest {
         val auto = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
         assertTrue(auto is MinimizeResult.Optimal)
         assertEquals(3.0, auto.objectiveValue)
-        assertTrue(auto.stats.lpPivots.sum > 0.0, "an LP emphasis must engage the node LP")
-        assertTrue(auto.stats.lpSeeded.sum > 0.0, "descendant node LPs must reuse the hot tableau")
+        assertTrue(auto.stats.lpSolves.sum > 0.0, "an LP emphasis must engage the node LP")
 
         val plain = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
         assertTrue(plain is MinimizeResult.Optimal)
         assertEquals(3.0, plain.objectiveValue)
-        assertEquals(0.0, plain.stats.lpPivots.sum, "a null lpConfig leaves the LP family off")
+        assertEquals(0.0, plain.stats.lpSolves.sum, "a null lpConfig leaves the LP family off")
 
-        // The CONSERVATIVE emphasis (FAST tier only) keeps the per-node simplex off — no pivots.
+        // The CONSERVATIVE emphasis (FAST tier only) keeps the per-node simplex off — no solves.
         val conservative = BacktrackSolver(p).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpConfig = LpConfig(LpEmphasis.CONSERVATIVE)),
         )
         assertTrue(conservative is MinimizeResult.Optimal && conservative.objectiveValue == 3.0)
-        assertEquals(0.0, conservative.stats.lpPivots.sum, "CONSERVATIVE runs no per-node simplex")
+        assertEquals(0.0, conservative.stats.lpSolves.sum, "CONSERVATIVE runs no per-node simplex")
     }
 
     @Test

@@ -29,9 +29,9 @@ class DiffnRelaxationTest {
     private fun stripLengthBound(p: Problem, lVar: Int, diffn: Boolean): Double {
         val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == lVar) 1L else 0L })
         val r = CpToLpRelaxation(p, obj, diffn = diffn).build(PropagationSession(p))
-        val sol = DualSimplex(r.model).solve()
+        val sol = solveSparse(r.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
-        return sol.objectiveValue + r.objectiveConstant
+        return sol.objectiveValue
     }
 
     @Test

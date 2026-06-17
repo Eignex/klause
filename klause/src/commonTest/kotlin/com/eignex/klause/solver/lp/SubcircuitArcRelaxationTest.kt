@@ -13,6 +13,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -44,7 +45,7 @@ class SubcircuitArcRelaxationTest {
         assertTrue(r.model.n > 4, "expected arc columns, model has ${r.model.n} columns")
         // No subtour model is registered for a subcircuit (the Hamiltonian SEC would be unsound).
         assertTrue(r.circuitArcs.isEmpty(), "subcircuit must not register a subtour-elimination arc model")
-        assertEquals(LpStatus.OPTIMAL, DualSimplex(r.model).solve().status, "the permutation relaxation is feasible")
+        assertNotNull(RevisedSimplex(r.model).solve(), "the permutation relaxation is feasible")
     }
 
     @Test

@@ -32,8 +32,8 @@ class KnapsackCoverCutTest {
             factors = arrayOf<Factor>(PseudoBoolean(intArrayOf(3, 3, 2), posLits(3), PbOp.LE, 4)),
         )
         val r = CpToLpRelaxation(p, LinearObjective(boolWeights = longArrayOf(-1, -1, 0))).build(PropagationSession(p))
-        val sol = DualSimplex(r.model).solve()
-        val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
+        val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
 
         assertTrue(cuts.isNotEmpty(), "a violated cover should be separated")
         val cut = cuts.first()
@@ -54,8 +54,8 @@ class KnapsackCoverCutTest {
             factors = arrayOf<Factor>(PseudoBoolean(intArrayOf(3, 3, 3), posLits(3), PbOp.LE, 4)),
         )
         val r = CpToLpRelaxation(p, LinearObjective(boolWeights = longArrayOf(-1, -1, -1))).build(PropagationSession(p))
-        val sol = DualSimplex(r.model).solve()
-        val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+        val sol = requireNotNull(RevisedSimplex(r.model).solve())
+        val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
         assertTrue(cuts.isNotEmpty(), "the extended cover should separate the all-4/9 point")
         val cut = cuts.first()
         assertEquals(setOf(0, 1, 2), coverVarsOf(r, cut), "all three items are in the extended cover")
@@ -78,9 +78,8 @@ class KnapsackCoverCutTest {
             )
             val obj = LinearObjective(boolWeights = LongArray(n) { -rng.nextInt(0, 4).toLong() })
             val r = CpToLpRelaxation(p, obj).build(PropagationSession(p))
-            val sol = DualSimplex(r.model).solve()
-            if (sol.status != LpStatus.OPTIMAL) return@repeat
-            val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+            val sol = RevisedSimplex(r.model).solve() ?: return@repeat
+            val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
             if (cuts.isEmpty()) return@repeat
             separated++
             for (cut in cuts) {
@@ -129,9 +128,8 @@ class KnapsackCoverCutTest {
             val p = Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = factors)
             val obj = LinearObjective(boolWeights = LongArray(n) { -rng.nextInt(0, 4).toLong() })
             val r = CpToLpRelaxation(p, obj).build(PropagationSession(p))
-            val sol = DualSimplex(r.model).solve()
-            if (sol.status != LpStatus.OPTIMAL) return@repeat
-            val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol, PropagationSession(p)))
+            val sol = RevisedSimplex(r.model).solve() ?: return@repeat
+            val cuts = KnapsackCoverSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
             if (cuts.isEmpty()) return@repeat
             gubSeen++
             for (cut in cuts) {
