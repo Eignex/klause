@@ -13,7 +13,7 @@ import kotlin.random.Random
  * set. An *accuracy-validation* tool: it produces (almost) uniform draws to measure how biased the
  * cheap sampling path is. Far more expensive than the cheap path.
  *
- * XOR hashes are bit-blasted to CNF (see [cellCount]). Strategy: estimate the projected model
+ * XOR hashes range over the projection's bits (see [cellCount]). Strategy: estimate the projected model
  * count `C` once (via [ApproxMC]); if `C` already fits a target cell band, enumerate all models and
  * pick uniformly (exactly uniform). Otherwise draw `m ≈ log2(C / pivot)` hashes, enumerate the
  * resulting cell, and — when its size lands in the `[loThresh, hiThresh]` band — pick a member

@@ -1,6 +1,5 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.implies
@@ -9,7 +8,6 @@ import com.eignex.klause.schema.minus
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
 import com.eignex.klause.schema.unaryMinus
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
@@ -126,22 +124,6 @@ class ArithmeticDslTest {
     }
 
     @Test
-    fun `bit blaster accepts arithmetic problem`() {
-        class S : VariableSchema() {
-            val flag by boolVar()
-            val x by intVar(min = 0, max = 5)
-            val y by intVar(min = 0, max = 5)
-            val capSum by constraint { flag implies (x + y le 4) }
-        }
-        val compiled = S().compile()
-        val cnf = BitBlaster.compile(compiled.problem)
-
-        assertTrue(cnf.clauses.isNotEmpty())
-
-        cnf.decodeInt(compiled.intVarIdByName.getValue("x"), BooleanArray(cnf.numVars))
-    }
-
-    @Test
     fun `negative unary and inequality match`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 5)
@@ -156,22 +138,5 @@ class ArithmeticDslTest {
             val xv = compiled.decode(schema.x, s)
             assertTrue(xv >= 1, "Expected x≥1, got $xv")
         }
-    }
-
-    @Test
-    fun `symmetry helper lit forwards through cnf`() {
-        class S : VariableSchema() {
-            val flag by boolVar()
-            val x by intVar(min = 0, max = 3)
-            val cond by constraint { flag implies (x le 1) }
-        }
-        val compiled = S().compile()
-        val cnf = BitBlaster.compile(compiled.problem)
-        assertEquals(1, compiled.intVarIdByName.size)
-
-        val flagCnfVar = cnf.boolVarToCnfVar[compiled.boolVarIdByName.getValue("flag")]
-        assertTrue(flagCnfVar in 0 until cnf.numVars)
-
-        Lit.make(flagCnfVar, true)
     }
 }

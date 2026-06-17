@@ -78,8 +78,8 @@ internal class RecipeSpace(
             for (sc in scorings) {
                 for (a in acceptances) {
                     for (r in restarts) {
-            add(Recipe(s, sc, a, r))
-        }
+                        add(Recipe(s, sc, a, r))
+                    }
                 }
             }
         }

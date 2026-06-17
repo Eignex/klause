@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.dimacs
 
-import com.eignex.klause.cnf.CnfProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -9,30 +8,15 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.math.abs
 
 /**
- * DIMACS CNF parser and writer. [parse] reads a `.cnf` file into a [Problem] of all-Boolean
- * variables and one [Clause] factor per clause. [write] serialises a bit-blasted [CnfProblem]
- * back out. Comment lines starting with `c` or `%` are accepted on read; multi-line clauses
- * with a trailing `0` terminator round-trip cleanly.
+ * DIMACS CNF parser. [parse] reads a `.cnf` file into a [Problem] of all-Boolean variables and one
+ * [Clause] factor per clause. Comment lines starting with `c` or `%` are accepted; multi-line
+ * clauses with a trailing `0` terminator parse cleanly.
  */
 object Dimacs {
 
     /** Hard-clause weight sentinel used when a `.wcnf` header omits `top`: a weight at or above
      *  this is treated as a hard clause (the conventional very-large-weight encoding). */
     private const val HARD_WEIGHT_SENTINEL: Long = Long.MAX_VALUE
-
-    /** DIMACS CNF serialization. Empty clauses (compile-time false) are emitted as `0`. */
-    fun write(cnf: CnfProblem): String {
-        val sb = StringBuilder()
-        sb.append("p cnf ").append(cnf.numVars).append(' ').append(cnf.clauses.size).append('\n')
-        for (clause in cnf.clauses) {
-            for (lit in clause) {
-                val v = Lit.variable(lit) + 1
-                sb.append(if (Lit.isPositive(lit)) v else -v).append(' ')
-            }
-            sb.append("0\n")
-        }
-        return sb.toString()
-    }
 
     /** Parse DIMACS CNF/WCNF [text] into a [Problem]. */
     fun parse(text: String): Problem {

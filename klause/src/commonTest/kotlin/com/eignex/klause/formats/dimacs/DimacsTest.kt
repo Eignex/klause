@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.dimacs
 
-import com.eignex.klause.cnf.CnfProblem
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.Clause
 import kotlin.test.Test
@@ -43,32 +42,6 @@ class DimacsTest {
         val problem = Dimacs.parse(text)
         assertEquals(2, problem.numBoolVars)
         assertEquals(2, problem.factors.size)
-    }
-
-    @Test
-    fun `round trips through cnf problem`() {
-        val cnf = CnfProblem(
-            numVars = 4,
-            clauses = listOf(
-                intArrayOf(Lit.make(0, true), Lit.make(1, false)),
-                intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, false)),
-            ),
-            boolVarToCnfVar = intArrayOf(),
-            intVarBits = arrayOf(),
-            intVarMin = intArrayOf(),
-        )
-        val text = cnf.toDimacs()
-        val problem = Dimacs.parse(text)
-        assertEquals(4, problem.numBoolVars)
-        assertEquals(2, problem.factors.size)
-        val parsedClauses = problem.factors.map { (it as Clause).literals.toList() }
-        assertEquals(
-            listOf(
-                listOf(Lit.make(0, true), Lit.make(1, false)),
-                listOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, false)),
-            ),
-            parsedClauses,
-        )
     }
 
     @Test

@@ -1,7 +1,5 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.cnf.BitBlaster
-import com.eignex.klause.compile.CompiledProblem
 import com.eignex.klause.compile.compile
 import com.eignex.klause.model.MultipleSpec
 import com.eignex.klause.model.SetSpec
@@ -247,61 +245,5 @@ class SetEqLiteralTest {
         val samples = solver.enumerate(BacktrackParams()).take(5).toList()
         assertEquals(1, samples.size)
         assertEquals(setOf(1, 2), compiled.decode(schema.s, samples[0]))
-    }
-}
-
-/**
- * Every set constraint must bit-blast cleanly — the decompositions land in BitBlaster-
- * supported factor kinds (Clause, Linear, ReifiedLinear), so this is a smoke gate on the
- * compiler-level lowering.
- */
-class SetBitBlastTest {
-    private class MembershipSchema : VariableSchema() {
-        val s by setVar(0..2)
-        val x by intVar(0, 2)
-        val c by constraint { x inSet s }
-    }
-    private class SubsetSchema : VariableSchema() {
-        val a by setVar(0..2)
-        val b by setVar(0..2)
-        val c by constraint { a subsetOf b }
-    }
-    private class DisjointSchema : VariableSchema() {
-        val a by setVar(0..2)
-        val b by setVar(0..2)
-        val c by constraint { a disjointFrom b }
-    }
-    private class UnionSchema : VariableSchema() {
-        val a by setVar(0..2)
-        val b by setVar(0..2)
-        val u by setVar(0..2)
-        val c by constraint { (a union b) eq u }
-    }
-    private class CardSchema : VariableSchema() {
-        val s by setVar(0..3)
-        val c by constraint { card(s) eq 2 }
-    }
-    private class ReifiedSchema : VariableSchema() {
-        val s by setVar(0..2)
-        val x by intVar(0, 2)
-        val flag by boolVar()
-        val r by constraint { flag iff (x inSet s) }
-    }
-
-    @Test fun `inSet bit-blasts`() = assertBitBlasts(MembershipSchema().compile())
-
-    @Test fun `subsetOf bit-blasts`() = assertBitBlasts(SubsetSchema().compile())
-
-    @Test fun `disjointFrom bit-blasts`() = assertBitBlasts(DisjointSchema().compile())
-
-    @Test fun `union bit-blasts`() = assertBitBlasts(UnionSchema().compile())
-
-    @Test fun `card bit-blasts`() = assertBitBlasts(CardSchema().compile())
-
-    @Test fun `reified inSet bit-blasts`() = assertBitBlasts(ReifiedSchema().compile())
-
-    private fun assertBitBlasts(compiled: CompiledProblem) {
-        val cnf = BitBlaster.compile(compiled.problem)
-        assertTrue(cnf.clauses.isNotEmpty(), "bit-blasted CNF should be non-empty")
     }
 }

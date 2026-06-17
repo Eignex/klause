@@ -1,6 +1,5 @@
 package com.eignex.klause.compile
 
-import com.eignex.klause.cnf.BitBlaster
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.le
@@ -45,17 +44,5 @@ class IntMulDslTest {
             val yv = compiled.decode(schema.y, s)
             assertTrue(xv * yv == 6, "x=$xv y=$yv x*y=${xv * yv}")
         }
-    }
-
-    @Test
-    fun `multiplication bit blasts cleanly`() {
-        class S : VariableSchema() {
-            val x by intVar(min = 0, max = 3)
-            val y by intVar(min = 0, max = 3)
-            val cap by constraint { (x * y) le 4 }
-        }
-        val compiled = S().compile()
-        val cnf = BitBlaster.compile(compiled.problem)
-        assertTrue(cnf.clauses.isNotEmpty())
     }
 }

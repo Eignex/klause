@@ -192,40 +192,23 @@ Compilation and solving knobs (opt-var pinning, default bounds for unbounded
 integers) are consolidated in `KlauseConfig` — set `KlauseConfig.current` once
 at startup, or pass a config straight to `schema.compile(config)`.
 
-## Bit-blasting
+## Model counting and sampling
 
-```kotlin
-val cnf = BitBlaster.compile(compiled.problem)
-val text = cnf.toDimacs()
-```
+Counting and sampling run natively over the compiled problem — no translation
+to CNF. `count` returns an interval `[lower, upper]`: an anytime exact counter
+walks the projection and tightens the bounds until they meet, falling back to
+ApproxMC when the exact count is too large to finish. `approximateCount` runs
+ApproxMC directly for a `(1 ± ε)` estimate at confidence `1 − δ`, and `samples`
+with `ACCURATE` quality draws near-uniformly via UniGen2.
 
-The bit-blaster covers every factor type that can appear in a compiled
-problem. Integers are encoded as binary offsets from their domain minimum;
-the core primitives (clauses, cardinality, linear and pseudo-Boolean
-constraints, xor, product, and their reified forms) and all the globals —
-allDifferent and its variants, circuit/subcircuit, cumulative/disjunctive,
-diffn, count, nValue, among, gcc, sequence, element, table, regular,
-inverse, sort, lex, binPacking, knapsack, network flow, geost, and the
-set-algebra factors — lower directly to CNF. Repeated subexpressions are
-hash-consed so shared gates are emitted once. Propagation-only natives
-(argSort, path, tree, mdd) are already paired with primitive decompositions
-during compilation, so they reach CNF through those.
+Both add random XOR (parity) constraints, propagated jointly by Gauss-Jordan
+elimination, which is what keeps a hashed cell tractable to enumerate. A
+projection that includes integer variables channels them to Boolean bits (a
+binary encoding kept native, so every original constraint keeps its own
+propagator) and the hashes range over those bits, so counting is over distinct
+integer values.
 
-The CNF is for feeding into SAT-ecosystem tools, not a primary solving path.
-Use cases:
-
-- Approximate model counting through ApproxMC or GANAK. SAT-based XOR-hashing
-  gives counts with provable error bounds. Klause's own enumeration is exact
-  but slower on large problems.
-- Uniform sampling through UniGen. Adds random XOR constraints over the CNF
-  to draw samples close to uniformly, which local search cannot do.
-- Weighted sampling over a subset of variables through WAPS or KUS. Compiles
-  the relevant slice to a d-DNNF circuit and draws weighted samples from it.
-- External CDCL SAT solvers (Kissat, CaDiCaL, CryptoMiniSAT) for hard problems
-  where clause learning beats the native backtrack. The adapter modules call
-  the bundled binaries.
-- Optimization through MaxSAT or PB solvers (RC2, OLL) on WCNF input, when the
-  native minimize gives weak bounds.
-- Independent infeasibility checks. External solvers emit DRAT proofs of UNSAT
-  that can be verified separately.
+DIMACS CNF and WCNF instances can be parsed into a problem (`Dimacs.parse`,
+`Dimacs.parseWcnf`) to run external SAT/MaxSAT benchmarks through the native
+engine.
 
