@@ -82,7 +82,7 @@ Solver-control flags are common to **every** mode:
   - `ls-single` — single naked local search; takes the ls strategy `--param`s (`tabu-tenure`,
     `pair-swap-budget`, `lambda`, `noise`, `max-flips`). With `sources=` it instead builds a
     composable recipe over the LS axes — `sources` (e.g. `violated,argmin`), `scoring`
-    (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew`) — for A/B-testing each axis.
+    (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew|sa`) — for A/B-testing each axis.
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):
@@ -91,7 +91,7 @@ Solver-control flags are common to **every** mode:
     (`random|min|max|middle`)
   - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
     `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
-    (`greedy|walksat|probsat|skew`), `cb`, `skew-alpha`
+    (`greedy|walksat|probsat|skew|sa`), `cb`, `skew-alpha`, `cooling-rate`, `initial-temp`, `min-temp`
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`
 
 MiniZinc-mode-only flags:

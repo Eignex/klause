@@ -25,6 +25,7 @@ import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.strategy.AcceptanceRule
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 
@@ -39,7 +40,7 @@ import com.eignex.klause.solver.localsearch.strategy.MoveScoring
  *    `var-selector` (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind])
  *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
  *    `smooth-factor`; recipe axes `sources` (e.g. `violated,argmin`), `scoring` (`weighted|raw`),
- *    `acceptance` (`greedy|walksat|probsat|skew`) + `cb`/`skew-alpha`
+ *    `acceptance` (`greedy|walksat|probsat|skew|sa`) + `cb`/`skew-alpha`/`cooling-rate`
  *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
  */
 internal class EngineParams(pairs: List<String>) {
@@ -183,6 +184,9 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
     val noise = p.double("noise") ?: 0.05
     val cb = p.double("cb") ?: 2.06
     val skewAlpha = p.double("skew-alpha") ?: 0.0
+    val initTemp = p.double("initial-temp") ?: 1.0
+    val coolRate = p.double("cooling-rate") ?: 0.999
+    val minTemp = p.double("min-temp") ?: 1e-3
     val setup = LsSetup(
         tabuTenure = p.int("tabu-tenure") ?: 10,
         pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
@@ -200,16 +204,24 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
         },
         acceptance = when (val a = p.string("acceptance")?.lowercase()) {
             null, "greedy" -> AcceptanceRule.Greedy
+
             "walksat" -> AcceptanceRule.WalkSatNoise(noise)
+
             "probsat" -> AcceptanceRule.ProbSat(cb)
+
             "skew" -> AcceptanceRule.Skew(skewAlpha)
-            else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew, got `$a`")
+
+            "sa" -> AcceptanceRule.Metropolis(
+                Geometric(initialTemperature = initTemp, coolingRate = coolRate, minTemperature = minTemp),
+            )
+
+            else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew|sa, got `$a`")
         },
     )
     p.finish(
         "ls",
         "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, noise, smooth-prob, smooth-factor, " +
-            "sources, scoring, acceptance, cb, skew-alpha",
+            "sources, scoring, acceptance, cb, skew-alpha, initial-temp, cooling-rate, min-temp",
     )
     return out to setup
 }
