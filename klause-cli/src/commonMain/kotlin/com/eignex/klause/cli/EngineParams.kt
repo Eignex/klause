@@ -25,6 +25,8 @@ import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.strategy.AcceptanceRule
+import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 
 /**
  * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
@@ -35,7 +37,9 @@ import com.eignex.klause.solver.localsearch.LocalSearchParams
  * Keys per engine:
  *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
  *    `var-selector` (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind])
- *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
+ *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
+ *    `smooth-factor`; recipe axes `sources` (e.g. `violated,argmin`), `scoring` (`weighted|raw`),
+ *    `acceptance` (`greedy|walksat|probsat|skew`) + `cb`/`skew-alpha`
  *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
  */
 internal class EngineParams(pairs: List<String>) {
@@ -60,6 +64,9 @@ internal class EngineParams(pairs: List<String>) {
     fun double(key: String): Double? = map.remove(key)?.let {
         it.toDoubleOrNull() ?: fail("engine param `$key` expects a number, got `$it`")
     }
+
+    /** Raw string value for [key] (consumed), or null when absent. */
+    fun string(key: String): String? = map.remove(key)
 
     fun bool(key: String): Boolean? = map.remove(key)?.let {
         when (it.lowercase()) {
@@ -148,7 +155,8 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
 }
 
 /** Constructor/strategy-level LS knobs for the `ls-single` engine (the rest ride on
- *  [LocalSearchParams]). */
+ *  [LocalSearchParams]). When [sourcesSpec] is non-null the engine builds a recipe
+ *  [SourceDrivenStrategy] over the four axes; otherwise it uses the default [Cbls]. */
 internal class LsSetup(
     val tabuTenure: Int,
     val pairSwapBudget: Int,
@@ -156,25 +164,53 @@ internal class LsSetup(
     val noise: Double,
     val smoothProb: Double,
     val smoothFactor: Double,
+    /** `sources=` recipe spec, or null for the default CBLS engine. */
+    val sourcesSpec: String?,
+    /** Scoring axis. */
+    val scoring: MoveScoring,
+    /** Acceptance axis (built from `acceptance=` + its numeric knobs). */
+    val acceptance: AcceptanceRule,
 )
 
 /** Split `--param` overrides for the naked `ls-single` engine into per-call [LocalSearchParams] and
- *  the constructor/strategy knobs ([LsSetup]). */
+ *  the constructor/strategy knobs ([LsSetup]). The recipe axes — `sources`, `scoring`, `acceptance`
+ *  (+ `cb`/`skew-alpha`) — let each LS axis be A/B-tested as a naked engine (#722); omitting
+ *  `sources` keeps the default CBLS path byte-identical. */
 internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<LocalSearchParams, LsSetup> {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
     p.long("max-flips")?.let { out = out.copy(maxFlips = it) }
+    val noise = p.double("noise") ?: 0.05
+    val cb = p.double("cb") ?: 2.06
+    val skewAlpha = p.double("skew-alpha") ?: 0.0
     val setup = LsSetup(
         tabuTenure = p.int("tabu-tenure") ?: 10,
         pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
         lambda = p.double("lambda") ?: 1.0,
-        noise = p.double("noise") ?: 0.05,
+        noise = noise,
         // Smoothing on by default: the proactive landscape (per-class / implied seeding) only holds
         // if the reactive bumping decays back toward it. Mirrors the portfolio's smoothing arms.
         smoothProb = p.double("smooth-prob") ?: 0.4,
         smoothFactor = p.double("smooth-factor") ?: 0.8,
+        sourcesSpec = p.string("sources"),
+        scoring = when (val s = p.string("scoring")?.lowercase()) {
+            null, "weighted" -> MoveScoring.Weighted
+            "raw" -> MoveScoring.Raw
+            else -> usageError("ls-single: scoring expects weighted|raw, got `$s`")
+        },
+        acceptance = when (val a = p.string("acceptance")?.lowercase()) {
+            null, "greedy" -> AcceptanceRule.Greedy
+            "walksat" -> AcceptanceRule.WalkSatNoise(noise)
+            "probsat" -> AcceptanceRule.ProbSat(cb)
+            "skew" -> AcceptanceRule.Skew(skewAlpha)
+            else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew, got `$a`")
+        },
     )
-    p.finish("ls", "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, noise, smooth-prob, smooth-factor")
+    p.finish(
+        "ls",
+        "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, noise, smooth-prob, smooth-factor, " +
+            "sources, scoring, acceptance, cb, skew-alpha",
+    )
     return out to setup
 }
 

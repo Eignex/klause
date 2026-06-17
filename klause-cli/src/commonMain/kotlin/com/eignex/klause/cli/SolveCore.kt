@@ -20,8 +20,11 @@ import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
@@ -175,12 +178,20 @@ internal object SolveCore {
             EngineParams(common.engineParams),
         )
         val tabu = TabuFilter(tenure = setup.tabuTenure, aspiration = AspirationCriterion.OrImproving)
-        val strategy = Cbls(
-            noiseProbability = setup.noise,
-            smoothProb = setup.smoothProb,
-            smoothFactor = setup.smoothFactor,
-            tabu = tabu,
-        )
+        // Recipe engine when `sources=` is given (A/B-test the four axes as a naked engine, #722);
+        // otherwise the default tuned CBLS — byte-identical to before.
+        val strategy: Strategy = if (setup.sourcesSpec != null) {
+            val sources = MoveSourceCatalog.parse(setup.sourcesSpec)
+            if (sources.isEmpty()) usageError("ls-single: sources=`${setup.sourcesSpec}` selected no sources")
+            SourceDrivenStrategy(sources, scoring = setup.scoring, acceptance = setup.acceptance, tabu = tabu)
+        } else {
+            Cbls(
+                noiseProbability = setup.noise,
+                smoothProb = setup.smoothProb,
+                smoothFactor = setup.smoothFactor,
+                tabu = tabu,
+            )
+        }
         val solver = LocalSearchSolver(
             solvable.problem,
             strategy = strategy,
@@ -198,8 +209,13 @@ internal object SolveCore {
             normalizeWeightsByClass = true,
         )
         cliLogger(common.verbose).v {
-            "engine ls-single: seed=${cblsParams.randomSeed} tabu=${setup.tabuTenure} noise=${setup.noise} " +
-                "smooth=${setup.smoothProb}/${setup.smoothFactor}"
+            if (setup.sourcesSpec != null) {
+                "engine ls-single: seed=${cblsParams.randomSeed} recipe sources=${setup.sourcesSpec} " +
+                    "scoring=${setup.scoring} acceptance=${setup.acceptance} tabu=${setup.tabuTenure}"
+            } else {
+                "engine ls-single: seed=${cblsParams.randomSeed} tabu=${setup.tabuTenure} noise=${setup.noise} " +
+                    "smooth=${setup.smoothProb}/${setup.smoothFactor}"
+            }
         }
         runGeneric(solver, cblsParams, solvable, common, output, complete = false, deadline)
     }

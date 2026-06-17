@@ -80,14 +80,18 @@ Solver-control flags are common to **every** mode:
   - `cp-single` — single naked free backtrack; the **only** engine that accepts `var-selector`/
     `val-selector` `--param`s (single-solver heuristic experiments).
   - `ls-single` — single naked local search; takes the ls strategy `--param`s (`tabu-tenure`,
-    `pair-swap-budget`, `lambda`, `noise`, `max-flips`).
+    `pair-swap-budget`, `lambda`, `noise`, `max-flips`). With `sources=` it instead builds a
+    composable recipe over the LS axes — `sources` (e.g. `violated,argmin`), `scoring`
+    (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew`) — for A/B-testing each axis.
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):
   - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
     `var-selector` (`vsids|random|smallest-domain|input-order`), `val-selector`
     (`random|min|max|middle`)
-  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
+  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
+    `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
+    (`greedy|walksat|probsat|skew`), `cb`, `skew-alpha`
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`
 
 MiniZinc-mode-only flags:
