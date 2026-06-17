@@ -20,6 +20,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.ceil
 import kotlin.math.round
 
@@ -212,7 +213,9 @@ internal fun BacktrackSolver.sparseSafePrune(
     // Reduced-cost fixing (#21) on the exact certified reduced costs — needs a finite incumbent for
     // the improving gap, so it runs only when pruning is possible.
     if (canPrune && cert != null &&
-        applySparseReducedCostFixing(relaxation, cert, result.basis, session, bound, sink)
+        applySparseReducedCostFixing(
+            relaxation, cert, result.basis, session, bound, sink, objectiveVar, objectiveAscending, learn,
+        )
     ) {
         return LpNodeOutcome(true, null)
     }
@@ -220,13 +223,16 @@ internal fun BacktrackSolver.sparseSafePrune(
 }
 
 /**
- * Reduced-cost fixing (#21) from the exact [ExactBasisCertifier.Certificate], over exact rationals
- * and **reason-less** (a sound level-local tightening that conflict analysis treats as a leaf). At
- * the LP optimum a nonbasic column sits at a bound; moving it Δ integer steps raises the objective by
- * `|reducedCost|·Δ`, and any incumbent-beating solution has objective `≤ ⌈bound⌉ − 1`, so the column
- * can move at most `floor((improvingMax − lpOptimum) / |reducedCost|)` steps before it alone
- * overshoots. Returns true if a reduction empties a domain (the node is then infeasible and pruned).
+ * Reduced-cost fixing (#21/#282) from the exact [ExactBasisCertifier.Certificate], over exact
+ * rationals. At the LP optimum a nonbasic column sits at a bound; moving it Δ integer steps raises the
+ * objective by `|reducedCost|·Δ`, and any incumbent-beating solution has objective `≤ ⌈bound⌉ − 1`, so
+ * the column can move at most `floor((improvingMax − lpOptimum) / |reducedCost|)` steps before it alone
+ * overshoots. With [learn] each integer fixing carries the LP dual-decomposition reason (the other
+ * support columns' seated bounds + the incumbent bound + any dual-weighted non-global row's premises);
+ * when the reason is inexpressible the fixing falls back to a reason-less level-local tightening (a
+ * conflict-analysis leaf). Returns true if a reduction empties a domain (the node is then pruned).
  */
+@Suppress("LongParameterList", "CyclomaticComplexMethod")
 internal fun BacktrackSolver.applySparseReducedCostFixing(
     relaxation: LpRelaxation,
     cert: ExactBasisCertifier.Certificate,
@@ -234,11 +240,59 @@ internal fun BacktrackSolver.applySparseReducedCostFixing(
     session: PropagationSession,
     bound: Double,
     sink: SolveStatsSink,
+    objectiveVar: Int = -1,
+    objectiveAscending: Boolean = true,
+    learn: Boolean = false,
 ): Boolean {
     val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
     val slack = BigRational.of(improvingMax) - cert.objective // exact gap; ≥ 0 (node not bound-pruned)
     if (slack.signum() < 0) return false
     val status = basis.status
+    // Learnable reason support (#282), mirroring the dense path: a fixing of column `col` is justified
+    // by the OTHER support columns' seated bounds (premise side = reduced-cost sign) + the incumbent
+    // bound `objVar ≤ improvingMax` + the validity premises of any dual-weighted non-global row.
+    // Expressible only with a single-var ascending objective whose live upper bound already meets the
+    // incumbent atom, all dual-weighted non-global rows premise-backed, and no support on an aux column.
+    var canLearn = learn && objectiveVar >= 0 && objectiveAscending &&
+        improvingMax in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
+        session.intDomain(objectiveVar).max.toLong() <= improvingMax
+    val supportCols = IntArrayList()
+    val supportLits = IntArrayList()
+    if (canLearn) {
+        val seen = HashSet<Int>()
+        val premLits = IntArrayList()
+        if (LpExplanation.addDualRowPremiseLits(premLits, seen, relaxation, cert, session)) {
+            for (k in 0 until premLits.size) {
+                supportCols.add(-1) // row premise: part of every fixing's reason, never excluded
+                supportLits.add(premLits[k])
+            }
+            for (c in relaxation.colVarId.indices) {
+                if (status[c] == VarStatus.BASIC) continue
+                val sign = cert.reducedCost[c].signum()
+                if (sign == 0) continue
+                val lit = LpExplanation.premiseLit(relaxation, session, c, lowerSide = sign > 0)
+                if (lit == LpExplanation.PREMISE_AUX) {
+                    canLearn = false
+                    break
+                }
+                if (lit == LpExplanation.PREMISE_NONE || !seen.add(lit)) continue
+                supportCols.add(c)
+                supportLits.add(lit)
+            }
+        } else {
+            canLearn = false
+        }
+    }
+    val incumbentLit = if (canLearn) session.boundLeLit(objectiveVar, improvingMax.toInt(), positive = false) else 0
+
+    // Reason for fixing `col`: every support column's seated-bound negation except col's own, plus the
+    // incumbent objective bound. (col's own bound is the variable moving, not a premise.)
+    fun reasonFor(col: Int): IntArray {
+        val out = IntArrayList(supportCols.size + 1)
+        for (k in 0 until supportCols.size) if (supportCols[k] != col) out.add(supportLits[k])
+        out.add(incumbentLit)
+        return out.toIntArray()
+    }
     for (col in relaxation.colVarId.indices) {
         val st = status[col]
         if (st == VarStatus.BASIC) continue
@@ -266,7 +320,12 @@ internal fun BacktrackSolver.applySparseReducedCostFixing(
                 val dMaxBig = (slack / dj).floor()
                 if (dMaxBig >= BigInt.of(span)) continue
                 val dMax = dMaxBig.toLongOrNull() ?: continue // overflow ⇒ skip (sound)
-                if (isBool) session.implyBool(varId, false) else session.implyIntAtMost(varId, (liveMin + dMax).toInt())
+                val hi = (liveMin + dMax).toInt()
+                when {
+                    isBool -> session.implyBool(varId, false)
+                    canLearn -> session.implyIntAtMostWithReason(varId, hi, reasonFor(col))
+                    else -> session.implyIntAtMost(varId, hi)
+                }
             }
 
             // At upper bound: reducedCost ≤ 0; symmetric, tighten the lower bound.
@@ -275,7 +334,12 @@ internal fun BacktrackSolver.applySparseReducedCostFixing(
                 val dMaxBig = (slack / (BigRational.ZERO - dj)).floor()
                 if (dMaxBig >= BigInt.of(span)) continue
                 val dMax = dMaxBig.toLongOrNull() ?: continue
-                if (isBool) session.implyBool(varId, true) else session.implyIntAtLeast(varId, (liveMax - dMax).toInt())
+                val lo = (liveMax - dMax).toInt()
+                when {
+                    isBool -> session.implyBool(varId, true)
+                    canLearn -> session.implyIntAtLeastWithReason(varId, lo, reasonFor(col))
+                    else -> session.implyIntAtLeast(varId, lo)
+                }
             }
 
             VarStatus.BASIC -> continue
