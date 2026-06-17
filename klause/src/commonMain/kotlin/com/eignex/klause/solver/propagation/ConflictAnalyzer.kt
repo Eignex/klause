@@ -251,26 +251,41 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             return finalizeClause(learned, currentLevel)
         }
 
+        // Pin-trail cursor for the 1UIP pivot scan. The pivot is always the most-recent still-seen
+        // current-level literal (reverse-assignment order); under single establishment (#708) a
+        // reason cites only earlier-established (lower-position) literals, so resolving the pivot at
+        // position `p` marks new frontier literals strictly below `p` and the next pivot is at or
+        // below `p`. The cursor therefore descends monotonically across the analysis (O(trail) total)
+        // instead of re-scanning the whole trail every iteration (O(trail) per resolution). The only
+        // literal that can become seen *above* the cursor is one cited by a mid-analysis-materialised
+        // atom (the off-trail fallback below): it has no pin position, so its derived antecedents may
+        // touch the trail anywhere. After any fallback pivot we re-arm a single full rescan so that
+        // "becomes-seen-behind" case is caught exactly — the residual non-asserting pathology the old
+        // monotonic cursor left, now confined to the (rare) off-trail case (#612 follow-up).
+        var pinCursor = state.boolPinOrder.size - 1
+        var rescanFromTop = true
         while (true) {
-            // Pick the most-recent still-seen current-level literal — reverse-assignment order, the
-            // canonical 1UIP pivot. The unified pin trail is rescanned from the top each iteration
-            // rather than walked by a monotonically-decreasing cursor: under single establishment
-            // ([wakeAtom]) every determined order literal carries exactly one trail entry at the level
-            // its truth was decided, and a reason only cites earlier-established (lower-position)
-            // literals, so the rescan always converges and never strands a literal that entered the
-            // frontier behind a cursor — the residual non-asserting pathology a monotonic cursor left
-            // (#612). Resolved / lower-level literals (`seen` cleared) are skipped.
+            // Resolved / lower-level literals (`seen` cleared) are skipped. `scanFrom` is the trail
+            // top on a re-armed rescan, else the descending cursor.
             var pivot = -1
-            for (i in state.boolPinOrder.size - 1 downTo 0) {
+            var pivotPos = -1
+            val scanFrom = if (rescanFromTop) state.boolPinOrder.size - 1 else pinCursor
+            for (i in scanFrom downTo 0) {
                 val v = state.boolPinOrder[i]
                 if (!seen[v]) continue
                 val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
                 if (lvl == currentLevel) {
                     pivot = v
+                    pivotPos = i
                     break
                 }
             }
-            if (pivot < 0) {
+            if (pivot >= 0) {
+                // Trail pivot: its antecedents land strictly below `pivotPos`, so the next pivot is
+                // at or below it — descend the cursor and keep scanning from there.
+                pinCursor = pivotPos - 1
+                rescanFromTop = false
+            } else {
                 // Fallback for an atom materialised mid-analysis — cited by a derived reason, never
                 // woken, hence absent from the pin trail. Scan the seen-atom frontier by its
                 // [atomLevelForConflict]-derived level. Stale / duplicate entries are skipped by the
@@ -283,6 +298,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     }
                 }
                 if (pivot < 0) break
+                // Off-trail pivot: its derived antecedents may cite trail literals above the cursor,
+                // so re-arm the full rescan for the next iteration.
+                rescanFromTop = true
             }
             seen[pivot] = false
             resolved[pivot] = true
