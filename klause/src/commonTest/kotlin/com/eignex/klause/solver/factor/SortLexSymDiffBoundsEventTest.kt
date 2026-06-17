@@ -37,6 +37,8 @@ class SortLexSymDiffBoundsEventTest {
         }
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ExcludeOnFix(intMap[src], intMap[dst])
+
+        override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =

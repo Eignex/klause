@@ -13,10 +13,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * #651: [Disjunctive] now overrides [Factor.conflictReason] with the bound-atom nogood of every
- * read int var (starts + fixed duration vars), mirroring its [Cumulative] backing instead of the
- * coarse [com.eignex.klause.solver.defaultBoolPinsConflictReason] that collapses to chronological
- * backtrack once an int decision is on the trail. The shave/precedence/edge-finding tightenings
+ * #651: [Disjunctive] overrides [Factor.conflictReason] with the bound-atom nogood of every
+ * read int var (starts + fixed duration vars), mirroring its [Cumulative] backing rather than a
+ * coarse bool-pins clause that would collapse to chronological backtrack once an int decision is
+ * on the trail. The shave/precedence/edge-finding tightenings
  * are also unified to cite `intVars` (the time-table min-tighten previously passed `null`, severing
  * the resolution chain). Tests: (1) the reason is a sound non-empty witness — every literal false
  * at conflict time; (2) full enumeration under CDCL learning still matches brute force, so the new

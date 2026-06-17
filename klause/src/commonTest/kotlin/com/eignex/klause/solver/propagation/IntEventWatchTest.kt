@@ -38,6 +38,8 @@ class IntEventWatchTest {
         }
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = StrictLessThan(intMap[x], intMap[y])
+
+        override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
     }
 
     /** `x ≠ y`, propagating only on assignment: when one side is fixed, carve its value from the
@@ -58,6 +60,8 @@ class IntEventWatchTest {
         }
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Disequal(intMap[x], intMap[y])
+
+        override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
@@ -136,6 +140,8 @@ class IntEventWatchTest {
         }
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = WakeCounter(intMap[v], kind)
+
+        override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
     }
 
     @Test

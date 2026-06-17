@@ -57,6 +57,8 @@ class OrderLiteralSoundnessHarnessTest {
         }
 
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = NotEqualOnFix(intMap[a], intMap[b])
+
+        override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
     }
 
     /** Recursive brute-force solution set: every full assignment over [domains] satisfying [ok]. */
