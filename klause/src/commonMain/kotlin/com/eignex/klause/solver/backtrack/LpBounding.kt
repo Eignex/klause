@@ -152,11 +152,17 @@ internal fun BacktrackSolver.sparseSafePrune(
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
         // Any other failure (non-convergence / singular) keeps the node.
         val basis = simplex.infeasibleBasis
-        if (basis != null &&
-            ExactBasisCertifier.certifiesInfeasible(relaxation.model, basis, simplex.infeasibleRow)
-        ) {
+        val ray = if (basis != null) {
+            ExactBasisCertifier.farkasRay(relaxation.model, basis, simplex.infeasibleRow)
+        } else {
+            null
+        }
+        if (ray != null) {
             sink.observeLpInfeasiblePrune()
-            return LpNodeOutcome(true, null)
+            // With learning, the Farkas ray becomes a bound-atom nogood (#247) for a 1UIP backjump;
+            // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
+            val clause = if (learn) LpExplanation.infeasibilityClause(relaxation, ray, session) else null
+            return LpNodeOutcome(true, null, clause)
         }
         return LpNodeOutcome(false, null)
     }

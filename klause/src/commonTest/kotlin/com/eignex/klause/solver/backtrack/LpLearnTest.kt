@@ -7,8 +7,12 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.ExactBasisCertifier
+import com.eignex.klause.solver.lp.LpBuilder
 import com.eignex.klause.solver.lp.LpExplanation
+import com.eignex.klause.solver.lp.LpRelaxation
+import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex
+import com.eignex.klause.solver.lp.Sense
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.MinimizeResult
@@ -53,6 +57,33 @@ class LpLearnTest {
             session.boundGeLit(0, lo.toInt(), positive = false) in reason.toList(),
             "reason ${reason.toList()} must cite the negated lower-bound premise of x (lo=$lo)",
         )
+    }
+
+    @Test
+    fun `infeasible node lp yields a bound-atom nogood from the farkas ray`() {
+        // x in [2,5] with x <= 1: the LP is infeasible and the load-bearing reason is x's lower bound,
+        // so the Farkas ray names x and the clause is the single literal ¬(x >= 2).
+        val b = LpBuilder()
+        val x = b.addVar(2, 5, cost = 0)
+        b.addRow(mapOf(x to 1L), Relation.LE, 1)
+        val model = b.build(Sense.MINIMIZE)
+        val simplex = RevisedSimplex(model)
+        assertTrue(simplex.solve() == null, "the LP is infeasible, so solve() must return null")
+        val ray = assertNotNull(
+            ExactBasisCertifier.farkasRay(model, assertNotNull(simplex.infeasibleBasis), simplex.infeasibleRow),
+        )
+        val relaxation = LpRelaxation(
+            model = model,
+            colVarId = intArrayOf(x),
+            colIsBool = booleanArrayOf(false),
+            objectiveConstant = 0L,
+            intColOf = intArrayOf(x),
+            boolColOf = IntArray(0),
+        )
+        // A clean session (no conflicting constraint) so the premise atom resolves; x stays in [2,5].
+        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(2, 5)), arrayOf<Factor>()))
+        val clause = LpExplanation.infeasibilityClause(relaxation, ray, session)
+        assertEquals(listOf(session.boundGeLit(x, 2, positive = false)), clause?.toList())
     }
 
     @Test

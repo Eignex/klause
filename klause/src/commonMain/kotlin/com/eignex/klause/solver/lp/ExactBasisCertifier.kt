@@ -96,11 +96,22 @@ internal object ExactBasisCertifier {
      * node is kept — the prune is sound regardless of how the ray was found. Returns false on a
      * singular basis or when neither sign certifies.
      */
-    fun certifiesInfeasible(model: LpModel, basis: Basis, leavingRow: Int): Boolean {
-        if (leavingRow !in 0 until model.m) return false
+    fun certifiesInfeasible(model: LpModel, basis: Basis, leavingRow: Int): Boolean =
+        farkasRay(model, basis, leavingRow) != null
+
+    /**
+     * The exact Farkas ray `ρ` (either sign of `B⁻ᵀ e_r`) that proves the node LP infeasible, or null
+     * when neither sign certifies / the basis is singular. The returned `ρ` satisfies
+     * `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`, so its column/row support is a sufficient infeasibility reason
+     * ([LpExplanation.infeasibilityClause] turns it into a bound-atom nogood).
+     */
+    fun farkasRay(model: LpModel, basis: Basis, leavingRow: Int): Array<BigRational>? {
+        if (leavingRow !in 0 until model.m) return null
         val rho = solveDualSystem(model, basis.basicVars) { t -> if (t == leavingRow) BigInt.ONE else BigInt.ZERO }
-            ?: return false
-        return farkasCertifies(model, rho) || farkasCertifies(model, Array(rho.size) { BigRational.ZERO - rho[it] })
+            ?: return null
+        if (farkasCertifies(model, rho)) return rho
+        val neg = Array(rho.size) { BigRational.ZERO - rho[it] }
+        return if (farkasCertifies(model, neg)) neg else null
     }
 
     /** Whether [rho] is an exact Farkas infeasibility certificate: `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`. A

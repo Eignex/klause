@@ -2,6 +2,7 @@ package com.eignex.klause.solver.lp
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.propagation.PropagationSession
+import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -100,6 +101,41 @@ internal object LpExplanation {
             }
         }
         return lits.toIntArray()
+    }
+
+    /**
+     * Nogood literals for an infeasibility [ray] (an exact Farkas certificate, [ExactBasisCertifier.farkasRay]),
+     * or null when the certificate touches an auxiliary column, leans on a non-global row with no
+     * recorded premises, or is constraint-only (no column premise — nothing to learn). The ray makes
+     * `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`: each structural column with `ρ·A_j > 0` is seated at its upper
+     * bound, each with `ρ·A_j < 0` at its lower bound, and those seated bounds — plus the recorded
+     * premises of any ray-weighted non-global row — are jointly inconsistent with the (globally valid)
+     * rows, so the clause `⋁ ¬(premise)` is implied by the problem alone. Every literal is false at the
+     * dead node; the engine registers the clause where one can become unassigned (1UIP backjump / restart).
+     */
+    fun infeasibilityClause(
+        relaxation: LpRelaxation,
+        ray: Array<BigRational>,
+        session: PropagationSession,
+    ): IntArray? {
+        val model = relaxation.model
+        val lits = IntArrayList()
+        val seen = HashSet<Int>()
+        val rows = (0 until model.m).filter { ray[it].signum() != 0 }.toIntArray()
+        if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
+        for (col in relaxation.colVarId.indices) {
+            var aj = BigRational.ZERO
+            model.forEachInColumn(col) { i, a -> aj += ray[i] * BigRational.of(a) }
+            val sign = aj.signum()
+            if (sign == 0) continue
+            // ρ·A_j > 0 ⇒ the column's upper bound is load-bearing (upper side); < 0 ⇒ lower side.
+            when (val lit = premiseLit(relaxation, session, col, lowerSide = sign < 0)) {
+                PREMISE_AUX -> return null
+                PREMISE_NONE -> Unit
+                else -> if (seen.add(lit)) lits.add(lit)
+            }
+        }
+        return if (lits.isEmpty()) null else lits.toIntArray()
     }
 
     /**
