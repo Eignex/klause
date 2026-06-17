@@ -12,7 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /** #23: deflected (conjugate) subgradient stabilization of the Lagrangian dual ascent. */
-class BundleSubgradientTest {
+class LagrangianBoundSubgradientTest {
 
     // min Σ x_i over AllDifferent(3) in [0,5] with the binding linking constraint 2·x0 + x1 + x2 >= 10.
     // True optimum: x0=5, x1=0, x2=1 -> 6. The base bound (no dualization) is only 0+1+2 = 3, so the

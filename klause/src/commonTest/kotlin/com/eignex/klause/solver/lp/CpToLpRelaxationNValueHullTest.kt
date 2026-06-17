@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * captures as a strictly tighter LP bound. It is sound — 1.5 stays below the true integer minimum of
  * 2 distinct values, so no solution is excluded.
  */
-class NValueHullTest {
+class CpToLpRelaxationNValueHullTest {
     private val eps = 1e-7
 
     private fun triangle(mode: NValue.Mode) = Problem(

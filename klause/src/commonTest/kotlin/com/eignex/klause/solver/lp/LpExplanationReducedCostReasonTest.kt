@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * `x_col ≤ b` (at lower) is the support bounds excluding `col` together with `objective ≤ M`; this
  * harness checks that clause excludes no constraint-feasible integer point with `objective ≤ M`.
  */
-class ReducedCostReasonTest {
+class LpExplanationReducedCostReasonTest {
 
     private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)
 

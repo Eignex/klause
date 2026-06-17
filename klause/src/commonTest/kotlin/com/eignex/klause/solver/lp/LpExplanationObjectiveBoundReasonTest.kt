@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * cites it. The implied clause `(objective ≥ ⌈L⌉) ∨ ⋁ ¬(seated bound of a support column)` must exclude
  * no constraint-feasible integer point over the whole declared box, even though the node tightened bounds.
  */
-class ObjectiveBoundReasonTest {
+class LpExplanationObjectiveBoundReasonTest {
 
     private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)
 

@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * automaton's accepting strings — checked against brute force. (Equality ⇒ both sound — never below
  * the true optimum — and tight.)
  */
-class RegularFlowHullTest {
+class CpToLpRelaxationRegularFlowHullTest {
 
     private val eps = 1e-9
 

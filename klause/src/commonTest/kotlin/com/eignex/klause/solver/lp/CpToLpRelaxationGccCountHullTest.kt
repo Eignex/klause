@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * objective over the `xs` and count variables equals the true integer optimum — checked against
  * brute force — and a count in the objective gets an exact bound the bare propagator domain misses.
  */
-class GccCountHullTest {
+class CpToLpRelaxationGccCountHullTest {
 
     private val eps = 1e-9
 

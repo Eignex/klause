@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.lp
+package com.eignex.klause.solver.integration
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.Factor

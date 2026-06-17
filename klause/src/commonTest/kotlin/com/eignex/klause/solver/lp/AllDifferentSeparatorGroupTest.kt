@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  * all-different group, not just plain `AllDifferent` — covering `SymmetricAllDifferent` (a
  * self-inverse permutation) and each injective side of `Inverse`.
  */
-class AssignmentGroupCutTest {
+class AllDifferentSeparatorGroupTest {
 
     private fun relax(p: Problem, obj: LinearObjective): Pair<LpRelaxation, FloatLpResult> {
         val relaxation = CpToLpRelaxation(p, obj).build(PropagationSession(p))

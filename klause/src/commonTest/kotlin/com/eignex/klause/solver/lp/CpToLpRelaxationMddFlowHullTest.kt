@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * of a linear objective over the sequence (or the cost-MDD's cost var) equals the true optimum over
  * the diagram's accepting paths — checked against brute force.
  */
-class MddFlowHullTest {
+class CpToLpRelaxationMddFlowHullTest {
 
     private val eps = 1e-9
 

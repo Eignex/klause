@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  * optimum, and (unlike Circuit) it registers no subtour-elimination model, since the Hamiltonian SEC
  * is unsound for a subcircuit.
  */
-class SubcircuitArcRelaxationTest {
+class CpToLpRelaxationSubcircuitArcTest {
 
     private fun problem(): Problem = Problem(
         numBoolVars = 0,
