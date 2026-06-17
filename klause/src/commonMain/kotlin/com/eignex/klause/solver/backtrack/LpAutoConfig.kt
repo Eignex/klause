@@ -253,7 +253,10 @@ object LpAutoConfig {
         }
         val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
 
-        val cuts = bounding && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
+        // Cuts run on whichever bounding path is active (#705): the structural separators read the LP
+        // point through the sparse revised simplex, so they fire on over-cap sparse-primary instances
+        // too — not just the dense-capped ones (the #13 gating fix). Cut-eligible structure required.
+        val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
             lpBounding = base.lpBounding || bounding || sparsePrimary,

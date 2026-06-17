@@ -5,6 +5,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.Cut
+import com.eignex.klause.solver.lp.CutContext
+import com.eignex.klause.solver.lp.CutSeparator
 import com.eignex.klause.solver.lp.ExactBasisCertifier
 import com.eignex.klause.solver.lp.LpExplanation
 import com.eignex.klause.solver.lp.LpOverflowException
@@ -420,6 +422,43 @@ internal fun BacktrackSolver.rootLpRelaxationBound(
     }
 } catch (_: LpOverflowException) {
     Double.NaN
+}
+
+/**
+ * Harvest a persistent pool of **global** cuts from the root relaxation (#22/#705) on the sparse
+ * revised-simplex path. Each round solves the (cut-augmented) root LP, separates violated cuts from the
+ * LP point, and keeps the fresh ones; because the separation reads the undecided root domains, every
+ * harvested cut is valid at *every* solution of the problem, so it is forced [Cut.global] = true and
+ * stays sound when applied at any node. Determinant overflow keeps whatever cuts stayed within 64 bits.
+ */
+internal fun BacktrackSolver.harvestRootCuts(
+    relaxer: CpToLpRelaxation,
+    session: PropagationSession,
+    separators: List<CutSeparator>,
+    cancellation: Cancellation = Cancellation.Never,
+): List<Cut> {
+    if (separators.isEmpty() || session.isUnsatAtRoot) return emptyList()
+    val pool = HashSet<String>()
+    val cuts = ArrayList<Cut>()
+    try {
+        var relaxation = relaxer.build(session)
+        if (relaxation.model.n == 0) return emptyList()
+        var result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return emptyList()
+        var round = 0
+        while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
+            val ctx = CutContext(problem, relaxation, result.primal, session)
+            val fresh = separators.flatMap { it.separate(ctx) }
+                .filter { pool.add(it.key()) }
+                .map { if (it.global) it else Cut(it.cols, it.coeffs, it.rel, it.rhs, global = true) }
+            if (fresh.isEmpty()) break
+            cuts.addAll(fresh)
+            relaxation = relaxer.build(session, cuts)
+            result = RevisedSimplex(relaxation.model, cancellation).solve() ?: break
+        }
+    } catch (_: LpOverflowException) {
+        return cuts // keep whatever stayed within 64-bit determinants — still globally valid
+    }
+    return cuts
 }
 
 /**

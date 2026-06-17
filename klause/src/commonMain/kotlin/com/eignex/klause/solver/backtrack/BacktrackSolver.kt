@@ -10,11 +10,17 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.lp.AllDifferentSeparator
+import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
+import com.eignex.klause.solver.lp.CliqueCutSeparator
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.CumulativeFlowBound
 import com.eignex.klause.solver.lp.Cut
+import com.eignex.klause.solver.lp.CutSeparator
+import com.eignex.klause.solver.lp.GccSeparator
+import com.eignex.klause.solver.lp.KnapsackCoverSeparator
 import com.eignex.klause.solver.lp.KnapsackLagrangianBound
 import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.objective.LinearObjective
@@ -322,8 +328,24 @@ class BacktrackSolver(override val problem: Problem) :
             null
         }
 
-        // No cuts on the sparse-only LP path (#705); the relaxation carries no extra cut rows.
-        private val lpGlobalCuts: List<Cut> = emptyList()
+        // Structure-based cut separators (#22/#705) run on the sparse LP point; circuit cuts are deferred
+        // until the arc model is rebuilt on the sparse relaxation.
+        private val lpSeparators: List<CutSeparator> = if (params.lpCuts) {
+            buildList {
+                add(AllDifferentSeparator())
+                add(GccSeparator())
+                add(KnapsackCoverSeparator())
+                add(CliqueCutSeparator())
+                val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
+                add(AssignmentObjectiveCut(coef))
+            }
+        } else {
+            emptyList()
+        }
+
+        // Persistent pool of global cuts harvested from the root relaxation (#22); filled in
+        // [initRootLp] where the cancellation token is live. Global, so sound at every node.
+        private var lpGlobalCuts: List<Cut> = emptyList()
         private val lagBound = if (params.lagrangian) {
             LagrangianBound(problem, objective).takeIf { it.applicable }
         } else {
@@ -634,6 +656,11 @@ class BacktrackSolver(override val problem: Problem) :
          */
         private fun initRootLp() {
             val relaxer = lpRelaxer ?: return
+            if (lpSeparators.isNotEmpty()) {
+                lpGlobalCuts =
+                    harvestRootCuts(relaxer, PropagationSession(problem), lpSeparators, params.cancellation)
+                sink.observeLpCuts(lpGlobalCuts.size)
+            }
             sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation))
         }
 
