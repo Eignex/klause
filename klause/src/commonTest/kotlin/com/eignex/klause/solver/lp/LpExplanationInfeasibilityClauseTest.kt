@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
  * constraints. The ray's column support uses only the seated box bounds, so `⋁ ¬(seated bound)` has to
  * be implied by the constraints alone, even though the node tightened bounds beyond the declared box.
  */
-class FarkasExplanationTest {
+class LpExplanationInfeasibilityClauseTest {
 
     private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)
 

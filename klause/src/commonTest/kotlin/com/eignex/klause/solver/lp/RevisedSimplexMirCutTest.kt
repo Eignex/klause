@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Gomory mixed-integer (MIR) cuts from the dual-simplex tableau. */
-class MirCutTest {
+class RevisedSimplexMirCutTest {
 
     private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)
 

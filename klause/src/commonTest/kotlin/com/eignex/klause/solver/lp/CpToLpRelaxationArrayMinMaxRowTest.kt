@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
  * envelope of its operands, so the rows bound an objective that minimises a maximum (makespan)
  * or maximises a minimum — exactly where the bare per-variable domains say nothing.
  */
-class ArrayMinMaxRowTest {
+class CpToLpRelaxationArrayMinMaxRowTest {
 
     private val eps = 1e-9
 

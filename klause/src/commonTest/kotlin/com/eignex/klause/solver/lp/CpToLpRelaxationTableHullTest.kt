@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * columns equals the best allowed tuple for any linear objective, and shrinking a variable's domain
  * removes the tuples it kills.
  */
-class TableHullTest {
+class CpToLpRelaxationTableHullTest {
 
     private val eps = 1e-7
 

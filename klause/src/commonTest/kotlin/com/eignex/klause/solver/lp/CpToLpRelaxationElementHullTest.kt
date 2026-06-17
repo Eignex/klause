@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
  * convex hull, so the LP bound on `result` equals the true min/max selectable entry, and the index
  * channel ties `idx` to the selected position.
  */
-class ElementHullTest {
+class CpToLpRelaxationElementHullTest {
 
     private val eps = 1e-7
 

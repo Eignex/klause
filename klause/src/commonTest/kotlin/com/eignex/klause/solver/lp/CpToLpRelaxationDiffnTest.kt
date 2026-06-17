@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * case is the area bound `Σ wᵢ·hᵢ ≤ W·H`. The row is a sound relaxation, so the LP bound never exceeds
  * the true minimum extent — checked against brute force.
  */
-class DiffnRelaxationTest {
+class CpToLpRelaxationDiffnTest {
 
     private val eps = 1e-6
 
