@@ -16,6 +16,10 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LubyRestart
 import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
+import com.eignex.klause.solver.localsearch.schedule.Geometric
+import com.eignex.klause.solver.localsearch.schedule.LoopSchedule
+import com.eignex.klause.solver.localsearch.schedule.Reheating
+import com.eignex.klause.solver.localsearch.schedule.Segment
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.FeasibilityJump
@@ -285,6 +289,32 @@ internal data class LocalSearchWorkerConfig(
             // objective descent owns the optimize phase (no optimizeStrategy).
             LsArm.FeasibilityJumpFixed ->
                 LocalSearchWorkerConfig(arm.label, FeasibilityJump(), FixedCadenceRestart())
+
+            // SA with periodic reheating (#699): the schedule re-diversifies a cooled-and-stuck run
+            // without discarding the incumbent. Restart epoch (100k) spans several reheat periods
+            // (20k) so the reheats actually fire before a restart resets the schedule. Step-driven —
+            // no per-round feedback needed.
+            LsArm.SaReheatFixed -> LocalSearchWorkerConfig(
+                arm.label,
+                SimulatedAnnealing.withSchedule(Reheating(Geometric(), period = 20_000, reheatFactor = 4.0)),
+                FixedCadenceRestart(maxFlipsBeforeRestart = 100_000),
+            )
+
+            // SA with an explore→exploit phased schedule (#699): a hot, fast-cooling exploratory leg
+            // then a cool, slow-cooling exploitative leg, looped. Distinct landscape coverage from the
+            // single fixed-rate geometric arms. Step-driven.
+            LsArm.SaPhasedFixed -> LocalSearchWorkerConfig(
+                arm.label,
+                SimulatedAnnealing.withSchedule(
+                    LoopSchedule(
+                        listOf(
+                            Segment(Geometric(initialTemperature = 2.0, coolingRate = 0.99), steps = 10_000),
+                            Segment(Geometric(initialTemperature = 0.3, coolingRate = 0.9995), steps = 40_000),
+                        ),
+                    ),
+                ),
+                FixedCadenceRestart(maxFlipsBeforeRestart = 100_000),
+            )
         }
 
         /**
@@ -315,6 +345,9 @@ internal data class LocalSearchWorkerConfig(
             // Feasibility-Jump arm (#698); kept last for the same reason — reachable by label and in
             // the full pool, awaiting its cross-seed credit pass before entering the default prefix.
             LsArm.FeasibilityJumpFixed,
+            // Schedule-diversity SA arms (#699): reheating + explore→exploit phased cooling. Kept last
+            // pending their cross-seed credit pass; reachable by label and in the full pool.
+            LsArm.SaReheatFixed, LsArm.SaPhasedFixed,
         )
 
         /** Resolve a catalog label to its typed [LsArm] — the single string boundary, for the CLI /
@@ -365,6 +398,8 @@ internal enum class LsArm(val label: String) {
     ProbsatBanditFixed("probsat-bandit/fixed"),
     CblsImplicitFixed("cbls-implicit/fixed"),
     FeasibilityJumpFixed("fjump/fixed"),
+    SaReheatFixed("sa-reheat/fixed"),
+    SaPhasedFixed("sa-phased/fixed"),
 }
 
 /**
