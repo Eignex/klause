@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.localsearch.strategy
 
+import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
+import com.eignex.klause.solver.localsearch.schedule.RoundLog
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
@@ -8,10 +10,12 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 /** Adaptive noise/cb schedule the focused-LS move selections consume: [level] in [0, 1] scales
- *  diversification (higher = more random), and [observe] is fed each step's cost so the schedule
- *  may adapt. [NoiseController] is the hand-tuned bump-on-stall implementation;
- *  [BanditNoiseController] learns which schedule profile to run (#8). */
-internal interface NoiseSchedule {
+ *  diversification (higher = more random). It is an [AdaptivePolicy] over the shared per-round
+ *  feedback channel — `observe(RoundLog)` keys off the round's incumbent cost — and additionally
+ *  exposes a per-step `observe(cost)` for the focused-LS strategies that retune every flip.
+ *  [NoiseController] is the hand-tuned bump-on-stall implementation; [BanditNoiseController] learns
+ *  which schedule profile to run (#8). */
+internal interface NoiseSchedule : AdaptivePolicy {
     val level: Double
     fun observe(cost: Long)
 }
@@ -63,18 +67,24 @@ internal class NoiseController(
         private set
 
     private val ewma: EwmaMeanStat? = ewmaAlpha?.let { EwmaMeanStat(alpha = it) }
-    private var bestCostSeen: Long = Long.MAX_VALUE
+    private var bestCostSeen: Double = Double.POSITIVE_INFINITY
     private var stallCount: Int = 0
 
-    /** Observe the current cost; mutates [level] if the trajectory warrants. */
-    override fun observe(cost: Long) {
+    /** Per-step hook for the focused-LS strategies: observe the current cost; mutates [level] if
+     *  the trajectory warrants. */
+    override fun observe(cost: Long) = observeCost(cost.toDouble())
+
+    /** Shared-channel hook: retune off the round's incumbent cost. */
+    override fun observe(round: RoundLog) = observeCost(round.incumbentCost)
+
+    private fun observeCost(cost: Double) {
         val improving = if (ewma != null) {
             // EWMA-trend mode: update the smoother and check whether the latest cost
             // lies strictly below the smoothed average. Smoothing rejects single-step
             // jitter that the best-cost mode would treat as a non-improvement and start
             // bumping noise for.
-            ewma.update(cost.toDouble(), timestampNanos = 0L, weight = 1.0)
-            cost.toDouble() < ewma.read(0L).mean
+            ewma.update(cost, timestampNanos = 0L, weight = 1.0)
+            cost < ewma.read(0L).mean
         } else {
             // Best-cost mode: ratchet against the all-time low.
             val better = cost < bestCostSeen
@@ -94,8 +104,8 @@ internal class NoiseController(
     }
 
     /** Reset trajectory tracking — call on restart. [level] is preserved. */
-    fun reset() {
-        bestCostSeen = Long.MAX_VALUE
+    override fun reset() {
+        bestCostSeen = Double.POSITIVE_INFINITY
         stallCount = 0
         ewma?.reset()
     }
@@ -166,6 +176,18 @@ internal class BanditNoiseController(
             sinceSwitch = 0
             windowStartCost = cost
         }
+    }
+
+    /** Shared-channel hook: drive the active profile off the round's incumbent cost. */
+    override fun observe(round: RoundLog) = observe(round.incumbentCost.toLong())
+
+    /** Reset every profile's trajectory and the active window; the bandit keeps its learned arm
+     *  values, which are session-level rather than per-restart. */
+    override fun reset() {
+        profiles.forEach { it.reset() }
+        sinceSwitch = 0
+        windowStartCost = Long.MAX_VALUE
+        current = bandit.choose()
     }
 
     companion object {
