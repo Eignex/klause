@@ -14,12 +14,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** End-to-end: the sparse float + exact-certify bound fallback (#567) must never corrupt the
- *  optimum, including with large coefficients that overflow the exact `Long` dual simplex. */
-class LpSparseBoundTest {
+/** End-to-end: the float + exact-certify LP bound (#567) must never corrupt the optimum, including
+ *  with large coefficients that stress the exact `BigInt` basis certification. */
+class LpExactBoundTest {
 
     @Test
-    fun `minimize with the sparse bound fallback preserves the optimum`() {
+    fun `minimize with the LP bound preserves the optimum on large coefficients`() {
         val rng = Random(20260618)
         var optimal = 0
         repeat(120) { _ ->

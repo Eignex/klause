@@ -39,10 +39,10 @@ class GccCountHullTest {
         )
         val maximizeTotalCount = LinearObjective(intCoefficients = longArrayOf(0, 0, -1, -1))
         val session = PropagationSession(p)
-        val bare = solveSparse(
+        val bare = solveLp(
             CpToLpRelaxation(p, maximizeTotalCount, gccCountHull = false).build(session).model,
         )
-        val hull = solveSparse(
+        val hull = solveLp(
             CpToLpRelaxation(p, maximizeTotalCount, gccCountHull = true).build(session).model,
         )
         assertEquals(LpStatus.OPTIMAL, hull.status)
@@ -107,7 +107,7 @@ class GccCountHullTest {
             rec(0)
 
             val r = CpToLpRelaxation(p, obj, gccCountHull = true).build(PropagationSession(p))
-            val sol = solveSparse(r.model)
+            val sol = solveLp(r.model)
             checked++
             assertEquals(LpStatus.OPTIMAL, sol.status, "feasible assignment exists but LP not optimal")
             assertEquals(

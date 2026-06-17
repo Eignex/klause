@@ -36,12 +36,12 @@ class LpLargeRelaxationTest {
         val saved = KlauseConfig.current
         try {
             // Over the base cap but within the ceiling ⇒ LP still on (the hull budget shrinks, not LP).
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
             val r = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
             assertTrue(r.lpBounding, "lpBounding should be on within the ceiling")
 
             // Ceiling = 1 cell ⇒ nothing fits ⇒ LP off.
-            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = 1L)
+            KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
             val off = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
             assertFalse(off.lpBounding)
         } finally {

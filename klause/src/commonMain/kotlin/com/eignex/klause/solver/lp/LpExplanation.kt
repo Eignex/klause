@@ -6,9 +6,9 @@ import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Turns LP certificates into learned-clause material over absolute variable-bound atoms (#705: over
- * the sparse revised-simplex path's exact [ExactBasisCertifier.Certificate], which carries the same
- * reduced-cost signs and dual-weight rows the dense dual simplex exposed). Both artifacts share one
+ * Turns LP certificates into learned-clause material over absolute variable-bound atoms (#705: from
+ * the revised simplex's exact [ExactBasisCertifier.Certificate], which carries the reduced-cost signs
+ * and dual-weight rows the reasons lean on). Both artifacts share one
  * shape: a set of *premises* — column bounds the certificate leans on — whose negations form clause
  * literals, with the constraint rows kept implicit. Keeping the rows implicit is what makes the
  * clauses small, and it is sound exactly when every row the certificate leans on holds at every

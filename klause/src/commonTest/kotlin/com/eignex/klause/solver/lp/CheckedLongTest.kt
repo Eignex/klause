@@ -35,18 +35,6 @@ class CheckedLongTest {
     }
 
     @Test
-    fun `bareiss step divides exactly`() {
-        // (p*x - y*z)/d with an exact quotient.
-        assertEquals(((5L * 7L) - (3L * 4L)) / 1L, bareissStep(5L, 7L, 3L, 4L, 1L))
-        assertEquals(((6L * 8L) - (2L * 6L)) / 6L, bareissStep(6L, 8L, 2L, 6L, 6L))
-    }
-
-    @Test
-    fun `bareiss step rejects inexact division`() {
-        assertFailsWith<IllegalStateException> { bareissStep(5L, 7L, 0L, 0L, 4L) } // 35/4 not integer
-    }
-
-    @Test
     fun `gcd basics`() {
         assertEquals(6L, gcdLong(12L, 18L))
         assertEquals(7L, gcdLong(7L, 0L))

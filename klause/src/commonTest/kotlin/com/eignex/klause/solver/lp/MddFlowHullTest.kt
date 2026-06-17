@@ -48,7 +48,7 @@ class MddFlowHullTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)) // minimize the cost var
         val r = CpToLpRelaxation(p, obj, mddHull = true).build(PropagationSession(p))
-        val sol = solveSparse(r.model)
+        val sol = solveLp(r.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
         assertEquals(2.0, sol.objectiveValue, eps, "minimum accepted-path cost is 2")
     }
@@ -121,7 +121,7 @@ class MddFlowHullTest {
             rec(0)
 
             val r = CpToLpRelaxation(p, obj, mddHull = true).build(PropagationSession(p))
-            val sol = solveSparse(r.model)
+            val sol = solveLp(r.model)
             val opt = brute ?: return@repeat // no accepting string: the hull soundly adds no rows
             checked++
             assertEquals(LpStatus.OPTIMAL, sol.status, "accepted string exists but LP not optimal")

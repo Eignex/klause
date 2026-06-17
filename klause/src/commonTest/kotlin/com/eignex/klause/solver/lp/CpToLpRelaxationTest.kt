@@ -23,9 +23,9 @@ class CpToLpRelaxationTest {
     private val eps = 1e-9
 
     /** Solve the relaxation of [problem] under [objective] and return (solution, relaxation). */
-    private fun solve(problem: Problem, objective: LinearObjective?): Pair<SparseSolution, LpRelaxation> {
+    private fun solve(problem: Problem, objective: LinearObjective?): Pair<LpSolution, LpRelaxation> {
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
-        return solveSparse(relaxation.model) to relaxation
+        return solveLp(relaxation.model) to relaxation
     }
 
     /** LP column standing for integer variable [v], or -1. */

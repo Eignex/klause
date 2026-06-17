@@ -125,7 +125,7 @@ internal fun BacktrackSolver.lpBoundAndFix(
 }
 
 /**
- * Cheap sound prune + objective-bound propagation for the sparse LP path (#602/#705): float revised
+ * Cheap sound prune + objective-bound propagation for the LP path (#705): float revised
  * simplex for the duals, then the O(nnz) Neumaier–Shcherbina safe bound — no exact certify on the
  * common path, so the per-node cost is bounded and `-t` is honored. Prunes when the relaxation is
  * infeasible (exact Farkas certificate) or the safe bound reaches the incumbent, tightens an
@@ -264,7 +264,7 @@ internal fun BacktrackSolver.applySparseReducedCostFixing(
     val slack = BigRational.of(improvingMax) - cert.objective // exact gap; ≥ 0 (node not bound-pruned)
     if (slack.signum() < 0) return false
     val status = basis.status
-    // Learnable reason support (#282), mirroring the dense path: a fixing of column `col` is justified
+    // Learnable reason support (#282): a fixing of column `col` is justified
     // by the OTHER support columns' seated bounds (premise side = reduced-cost sign) + the incumbent
     // bound `objVar ≤ improvingMax` + the validity premises of any dual-weighted non-global row.
     // Expressible only with a single-var ascending objective whose live upper bound already meets the

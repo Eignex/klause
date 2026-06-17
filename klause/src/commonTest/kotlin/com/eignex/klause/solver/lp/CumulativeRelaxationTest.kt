@@ -58,7 +58,7 @@ class CumulativeRelaxationTest {
     private fun makespanBound(problem: Problem, makespanVar: Int, cumulative: Boolean): Double {
         val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
         val relaxation = CpToLpRelaxation(problem, obj, cumulative = cumulative).build(PropagationSession(problem))
-        val sol = solveSparse(relaxation.model)
+        val sol = solveLp(relaxation.model)
         assertEquals(LpStatus.OPTIMAL, sol.status)
         return sol.objectiveValue
     }

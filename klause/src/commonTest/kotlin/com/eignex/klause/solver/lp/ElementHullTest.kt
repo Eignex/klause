@@ -18,9 +18,9 @@ class ElementHullTest {
 
     private val eps = 1e-7
 
-    private fun solve(p: Problem, obj: LinearObjective): Pair<SparseSolution, LpRelaxation> {
+    private fun solve(p: Problem, obj: LinearObjective): Pair<LpSolution, LpRelaxation> {
         val r = CpToLpRelaxation(p, obj, elementHull = true).build(PropagationSession(p))
-        return solveSparse(r.model) to r
+        return solveLp(r.model) to r
     }
 
     private fun intCol(r: LpRelaxation, v: Int): Int {

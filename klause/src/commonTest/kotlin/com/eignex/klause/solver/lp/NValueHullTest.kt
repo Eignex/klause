@@ -35,9 +35,9 @@ class NValueHullTest {
         val p = triangle(NValue.Mode.Eq)
         val session = PropagationSession(p)
         // Without the hull the LP only sees the propagator-tightened n domain (≥ 1 here).
-        val bare = solveSparse(CpToLpRelaxation(p, minimizeN, nValueHull = false).build(session).model)
+        val bare = solveLp(CpToLpRelaxation(p, minimizeN, nValueHull = false).build(session).model)
         // With the hull the fractional value cover proves n ≥ 1.5 — strictly tighter, and sound.
-        val hull = solveSparse(CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session).model)
+        val hull = solveLp(CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session).model)
         assertEquals(LpStatus.OPTIMAL, hull.status)
         assertEquals(1.5, hull.objectiveValue, eps)
         assertTrue(hull.objectiveValue > bare.objectiveValue + eps, "the hull beats the greedy disjoint bound")
@@ -48,7 +48,7 @@ class NValueHullTest {
         // AtMost means n ≥ distinct; the fractional cover gives n ≥ 1.5.
         val p = triangle(NValue.Mode.AtMost)
         val session = PropagationSession(p)
-        val hull = solveSparse(CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session).model)
+        val hull = solveLp(CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session).model)
         assertEquals(LpStatus.OPTIMAL, hull.status)
         assertEquals(1.5, hull.objectiveValue, eps)
     }

@@ -50,12 +50,12 @@ class LpAutoConfigTest {
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
         val saved = KlauseConfig.current
         try {
-            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = Long.MAX_VALUE)
+            KlauseConfig.current = saved.copy(lpCeilingTableauCells = Long.MAX_VALUE)
             assertTrue(LpAutoConfig.recommend(p).lpBounding, "a large ceiling must enable auto LP")
             // Over the base cap but within the ceiling: LP still on.
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
             assertTrue(LpAutoConfig.recommend(p).lpBounding, "over the base cap but within the ceiling, LP stays on")
-            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = 1L)
+            KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
             assertFalse(LpAutoConfig.recommend(p).lpBounding, "a 1-cell ceiling must disable auto LP")
         } finally {
             KlauseConfig.current = saved
@@ -273,7 +273,7 @@ class LpAutoConfigTest {
         // Past the ceiling ⇒ the LP family fully declines; the Lagrangian still runs.
         val saved = KlauseConfig.current
         try {
-            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = 1L)
+            KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
             val off = LpAutoConfig.recommend(p)
             assertFalse(off.lpBounding)
             assertTrue(off.lagrangian)

@@ -23,7 +23,7 @@ const val DEFAULT_FLOAT_SCALE: Long = 1_000_000L
 /** Default **base** relaxation-size cap (`rows × (cols + rows + 1)` cells). The sparse revised simplex
  *  is the only LP engine (#705); this is a pure per-node cost guard (not a memory bound), and the bound
  *  stays sound either way. A model whose *base* relaxation fits this cap budgets its gated hulls against
- *  it; a larger base (still under [DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS]) budgets hulls against that
+ *  it; a larger base (still under [DEFAULT_LP_CEILING_TABLEAU_CELLS]) budgets hulls against that
  *  ceiling. Raise it (env below) to spend more per node for hull reach on small models. */
 const val DEFAULT_LP_MAX_TABLEAU_CELLS: Long = 1L shl 20
 
@@ -31,7 +31,7 @@ const val DEFAULT_LP_MAX_TABLEAU_CELLS: Long = 1L shl 20
  *  entirely. Larger than [DEFAULT_LP_MAX_TABLEAU_CELLS] (the sparse engine carries bigger relaxations
  *  cheaply); also the hull budget for models whose base relaxation is over the base cap but under this
  *  ceiling. A pure cost guard (the bound is sound). */
-const val DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS: Long = 1L shl 26
+const val DEFAULT_LP_CEILING_TABLEAU_CELLS: Long = 1L shl 26
 
 /**
  * Central, process-wide configuration for klause's core (compiler + frontends).
@@ -91,10 +91,10 @@ data class KlauseConfig(
      *  Env: `KLAUSE_FZN_LP_MAX_TABLEAU_CELLS` / `klause.fzn.lpMaxTableauCells`. */
     val lpMaxTableauCells: Long = DEFAULT_LP_MAX_TABLEAU_CELLS,
 
-    /** Ceiling relaxation-size cap (see [DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS]): the absolute size past
+    /** Ceiling relaxation-size cap (see [DEFAULT_LP_CEILING_TABLEAU_CELLS]): the absolute size past
      *  which LP is declined, and the hull budget for an over-base-cap but in-ceiling model.
-     *  Env: `KLAUSE_FZN_LP_SPARSE_MAX_TABLEAU_CELLS` / `klause.fzn.lpSparseMaxTableauCells`. */
-    val lpSparseMaxTableauCells: Long = DEFAULT_LP_SPARSE_MAX_TABLEAU_CELLS,
+     *  Env: `KLAUSE_FZN_LP_CEILING_TABLEAU_CELLS` / `klause.fzn.lpCeilingTableauCells`. */
+    val lpCeilingTableauCells: Long = DEFAULT_LP_CEILING_TABLEAU_CELLS,
 
     // Presolve: an emphasis level plus one tri-state override knob per pass (`true` forces the pass
     // on, `false` off, `null` defers to the emphasis). Assembled into a [PresolveConfig] via

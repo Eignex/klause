@@ -21,10 +21,10 @@ internal class LpRowPremises(val vars: IntArray, val isUpper: BooleanArray, val 
 internal enum class Sense { MINIMIZE, MAXIMIZE }
 
 /**
- * A bounded-variable LP in the normalized form the integer-preserving dual simplex
- * consumes. All input coefficients, bounds and right-hand sides are integers — this is the
- * "integer based" core: it exploits that every klause datum is integral rather than carrying
- * a general-purpose floating LP.
+ * A bounded-variable LP in the normalized form the revised simplex consumes. All input coefficients,
+ * bounds and right-hand sides are integers — this is the "integer based" core: it exploits that every
+ * klause datum is integral (the float [RevisedSimplex] solves, the exact [ExactBasisCertifier]
+ * certifies) rather than carrying a general-purpose floating LP.
  *
  * Build instances with [LpBuilder], which performs three normalizations so the engine sees a
  * uniform shape:
@@ -255,7 +255,7 @@ internal class LpBuilder {
     }
 
     /** Build the CSC core over the `n` structural columns from the accumulated [rows]: `>=` rows are
-     *  negated to `<=` (matching the dense normalization), repeated columns within a row are summed,
+     *  negated to `<=` (the row normalization), repeated columns within a row are summed,
      *  and entries land column-major with ascending row indices (rows walked in order). */
     private fun buildCsc(n: Int): Csc {
         val colRowBuckets = Array(n) { IntArrayList() }
