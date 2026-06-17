@@ -9,7 +9,6 @@ import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -852,7 +851,7 @@ class LocalSearchState(
     fun proposeMovesFromRandomViolated(): List<Move>? {
         if (violated.isEmpty()) return null
         moveSink.clear()
-        ViolatedRepairs.SINGLE.generate(MoveGenContext(this), moveSink)
+        ViolatedRepairs.SINGLE.generate(this, moveSink)
         val raw = moveSink.list
         return if (raw.isEmpty()) null else raw
     }

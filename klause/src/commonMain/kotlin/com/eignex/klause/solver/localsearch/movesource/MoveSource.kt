@@ -3,7 +3,6 @@ package com.eignex.klause.solver.localsearch.movesource
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.jvm.JvmInline
-import kotlin.random.Random
 
 /**
  * A named, parameterised generator of candidate moves — the single place a given candidate
@@ -15,12 +14,12 @@ import kotlin.random.Random
  *
  * Contract:
  *  - **Pure with respect to search state.** A source reads the assignment, domains, violated
- *    set, and factor degree through [MoveGenContext]; it does not mutate the state. Its only
- *    output is the moves it pushes into the supplied [MoveSink].
+ *    set, and factor degree from the supplied [LocalSearchState]; it does not mutate the state.
+ *    Its only output is the moves it pushes into the supplied [MoveSink].
  *  - **Allocation-free on the hot path.** A source fills the caller-owned sink and reuses any
  *    private scratch it needs; a fill–clear cycle must touch no per-move objects (the sink's
  *    lane backing already guarantees this for primitives).
- *  - **Deterministic.** All randomness is drawn from [MoveGenContext.rng]; a source never reads
+ *  - **Deterministic.** All randomness is drawn from [LocalSearchState.rng]; a source never reads
  *    a strategy-local RNG. Same state + same RNG draw sequence ⇒ same emitted multiset, which is
  *    what the move-set equivalence harness asserts when an old generator is replaced.
  *
@@ -43,8 +42,8 @@ interface MoveSource {
      *  split a property of the source applies the rule uniformly in the driver. */
     val pool: Pool
 
-    /** Push candidate moves for the current state into [sink]. */
-    fun generate(ctx: MoveGenContext, sink: MoveSink)
+    /** Push candidate moves for the current [state] into [sink]. */
+    fun generate(state: LocalSearchState, sink: MoveSink)
 }
 
 /** Feasibility phase in which a [MoveSource] is meaningful. */
@@ -85,23 +84,6 @@ value class MoveSourceId(
     val label: String,
 ) {
     override fun toString(): String = label
-}
-
-/**
- * The read-only view a [MoveSource] generates against: the search [state] (assignment, domains,
- * violated set, factors, objective) plus the [stalled] flag the plateau-escape sources consult.
- * Bundling these means a source needs no strategy back-reference and draws all randomness from
- * one place ([rng]), which is what makes the equivalence harness's "same draws ⇒ same multiset"
- * guarantee hold.
- */
-class MoveGenContext(
-    val state: LocalSearchState,
-    /** Whether the search is currently stalled (no strict cost drop for the strategy's stall
-     *  window). Plateau-escape sources (frontier, swaps, chains, kicks) only emit when stalled. */
-    val stalled: Boolean = false,
-) {
-    /** The threaded RNG. Every source draws here so runs are reproducible. */
-    val rng: Random get() = state.rng
 }
 
 /**

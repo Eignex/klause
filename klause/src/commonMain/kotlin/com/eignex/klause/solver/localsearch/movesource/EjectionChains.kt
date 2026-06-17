@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.localsearch.movesource
 
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.proposeRepairChains
 
@@ -26,8 +27,7 @@ class EjectionChains(
     override val phase: Phase = Phase.Infeasible
     override val pool: Pool = Pool.ScoreOnly
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (cap <= 0 || state.violated.isEmpty()) return
         var budget = cap
         repeat(minOf(cap, state.violated.size)) {

@@ -131,7 +131,7 @@ class StallAndObjectiveEquivalenceTest {
     @Test
     fun `ObjectiveSeed yields both step directions on an interior assignment`() {
         val state = freshState(objectiveProblem(), 7L).also { it.objective = objective }
-        val captured = captureFromSink(state) { sink -> ObjectiveSeed().generate(MoveGenContext(state), sink) }
+        val captured = captureFromSink(state) { sink -> ObjectiveSeed().generate(state, sink) }
         assertFalse(captured.isEmpty, "a nonzero-coefficient interior objective must seed moves")
     }
 

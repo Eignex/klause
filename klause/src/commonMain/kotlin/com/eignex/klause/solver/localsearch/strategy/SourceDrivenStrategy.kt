@@ -4,7 +4,6 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
-import com.eignex.klause.solver.localsearch.movesource.MoveGenContext
 import com.eignex.klause.solver.localsearch.movesource.Pool
 
 /**
@@ -56,12 +55,11 @@ class SourceDrivenStrategy(
         scoreSink.setAssumptions(state.assumptions)
         noiseSink.setInvariants(state.invariants)
         scoreSink.setInvariants(state.invariants)
-        val ctx = MoveGenContext(state)
         for (cs in sources) {
             if (!cs.enabled) continue
             if (!cs.source.phase.appliesAt(state.cost)) continue
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
-            cs.source.generate(ctx, sink)
+            cs.source.generate(state, sink)
         }
         val noiseMoves = tabu.filter(state, noiseSink.list)
         val scoreMoves = tabu.filter(state, scoreSink.list)

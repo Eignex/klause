@@ -81,14 +81,12 @@ fun captureFromSink(state: LocalSearchState, fill: (MoveSink) -> Unit): MoveMult
 /**
  * Assert that running [source] over a fresh state equals running [reference] (the old generator)
  * over a separate, identically-seeded fresh state. [build] reconstructs the problem for each side
- * so neither run observes the other's RNG advance or sink mutations. [stalled] is the stall flag
- * fed to the [MoveGenContext] (some sources only emit when stalled).
+ * so neither run observes the other's RNG advance or sink mutations.
  */
 fun assertSourceMatchesGenerator(
     build: () -> Problem,
     seed: Long,
     source: MoveSource,
-    stalled: Boolean = false,
     prepare: (LocalSearchState) -> Unit = {},
     reference: (LocalSearchState, MoveSink) -> Unit,
 ) {
@@ -96,11 +94,11 @@ fun assertSourceMatchesGenerator(
     val refState = freshState(build(), seed).also(prepare)
     val expected = captureFromSink(refState) { sink -> reference(refState, sink) }
     val srcState = freshState(build(), seed).also(prepare)
-    val actual = captureFromSink(srcState) { sink -> source.generate(MoveGenContext(srcState, stalled), sink) }
+    val actual = captureFromSink(srcState) { sink -> source.generate(srcState, sink) }
     val detail = actual.diff(expected)
     assertEquals(
         expected,
         actual,
-        "MoveSource '${source.id}' diverged from its generator (seed=$seed, stalled=$stalled): $detail",
+        "MoveSource '${source.id}' diverged from its generator (seed=$seed): $detail",
     )
 }

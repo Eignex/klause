@@ -85,7 +85,7 @@ class PairSwapEquivalenceTest {
     @Test
     fun `PairSwap yields swap candidates on the mixed fixture`() {
         val state = freshState(mixedProblem(), 7L).also(::prepare)
-        val captured = captureFromSink(state) { sink -> PairSwap(cap).generate(MoveGenContext(state), sink) }
+        val captured = captureFromSink(state) { sink -> PairSwap(cap).generate(state, sink) }
         assertFalse(captured.isEmpty, "mixed bool/int assignment with distinct values must yield swaps")
     }
 }

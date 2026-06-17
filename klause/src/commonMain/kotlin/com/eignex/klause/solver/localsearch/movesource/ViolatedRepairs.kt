@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.localsearch.movesource
 
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
@@ -25,8 +26,7 @@ class ViolatedRepairs(
     override val phase: Phase = Phase.Infeasible
     override val pool: Pool = Pool.NoiseEligible
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         repeat(minOf(sampleCount, state.violated.size)) {
             val fid = state.violated.random(state.rng)

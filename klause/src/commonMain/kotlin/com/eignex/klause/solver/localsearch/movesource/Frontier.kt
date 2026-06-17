@@ -30,8 +30,7 @@ class Frontier(
     override val phase: Phase = Phase.Infeasible
     override val pool: Pool = Pool.NoiseEligible
 
-    override fun generate(ctx: MoveGenContext, sink: MoveSink) {
-        val state = ctx.state
+    override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         val problem = state.problem
         var budget = moveCap
