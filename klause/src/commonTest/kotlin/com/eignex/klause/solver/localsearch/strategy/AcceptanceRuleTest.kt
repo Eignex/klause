@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.localsearch.schedule.Geometric
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,12 +67,32 @@ class AcceptanceRuleTest {
     }
 
     @Test
+    fun `metropolis stays in the noise pool and falls back to greedy on the score pool`() {
+        val r = rng()
+        repeat(50) {
+            val m = AcceptanceRule.Metropolis(Geometric()).choose(r, listOf(a, b), listOf(swap), score)
+            assertTrue(m == a || m == b, "Metropolis must accept from the noise pool, not the score-only $m")
+        }
+        // Empty noise pool → the score-only moves are selected greedily (never accepted stochastically).
+        assertEquals(swap, AcceptanceRule.Metropolis(Geometric()).choose(rng(), emptyList(), listOf(swap, flip), score))
+    }
+
+    @Test
+    fun `metropolis cools its schedule each call`() {
+        val schedule = Geometric(initialTemperature = 1.0, coolingRate = 0.9)
+        val t0 = schedule.temperature
+        AcceptanceRule.Metropolis(schedule).choose(rng(), listOf(b), emptyList(), score)
+        assertTrue(schedule.temperature < t0, "Metropolis must step (cool) the schedule once per call")
+    }
+
+    @Test
     fun `all rules return null on empty pools`() {
         for (rule in listOf(
             AcceptanceRule.Greedy,
             AcceptanceRule.WalkSatNoise(0.5),
             AcceptanceRule.ProbSat(),
             AcceptanceRule.Skew(0.3),
+            AcceptanceRule.Metropolis(Geometric()),
         )) {
             assertNull(rule.choose(rng(), emptyList(), emptyList(), score), "$rule must be null on empty")
         }

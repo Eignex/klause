@@ -161,6 +161,7 @@ class CliTest {
             arrayOf("--param", "sources=violated,argmin", "--param", "acceptance=walksat", "--param", "noise=0.2"),
             arrayOf("--param", "sources=violated,frontier", "--param", "scoring=raw", "--param", "acceptance=greedy"),
             arrayOf("--param", "sources=argmin", "--param", "acceptance=probsat", "--param", "cb=2.0"),
+            arrayOf("--param", "sources=violated", "--param", "acceptance=sa", "--param", "cooling-rate=0.99"),
         )) {
             val out = capture { main(arrayOf("-e", "ls-single", "-t", "5000") + recipe + fzn.absolutePath) }
             assertTrue("x = " in out, out)

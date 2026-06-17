@@ -1,6 +1,9 @@
 package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.localsearch.schedule.Geometric
+import com.eignex.klause.solver.localsearch.schedule.Schedule
+import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.random.Random
 
@@ -102,6 +105,31 @@ sealed interface AcceptanceRule {
 
         override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double) =
             bestBy(rng, noisePool, scorePool) { score(it) + alpha * moveSize(it) }
+    }
+
+    /**
+     * Simulated-annealing / Metropolis acceptance: sample the noise pool and take the first
+     * candidate whose scored delta passes the Metropolis test — `delta <= 0` (always accept) or
+     * `rng < exp(-delta / T)` at the [schedule]'s current temperature — cooling one [Schedule.step]
+     * per call. This is the one rule that consumes the *schedule* axis (epic #721) — it bridges
+     * acceptance × schedule. Falls back to the deterministic best over the score-only pool when the
+     * noise pool is empty (score-only moves are never accepted stochastically). [schedule] is
+     * stateful: one per strategy instance, never shared across concurrent searches.
+     */
+    data class Metropolis(val schedule: Schedule = Geometric()) : AcceptanceRule {
+        override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double): Move? {
+            if (noisePool.isEmpty()) return bestBy(rng, emptyList(), scorePool, score)
+            repeat(noisePool.size) {
+                val m = noisePool[rng.nextInt(noisePool.size)]
+                val delta = score(m)
+                if (delta <= 0.0 || rng.nextDouble() < exp(-delta / schedule.temperature)) {
+                    schedule.step()
+                    return m
+                }
+            }
+            schedule.step()
+            return noisePool[rng.nextInt(noisePool.size)]
+        }
     }
 
     /** Shared selection helpers. */
