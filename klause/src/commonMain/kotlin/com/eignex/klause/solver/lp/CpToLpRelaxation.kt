@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.ArrayMinMax
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.Circuit
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.GlobalCardinality
@@ -18,6 +19,7 @@ import com.eignex.klause.solver.factor.Regular
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedLinear
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.Subcircuit
 import com.eignex.klause.solver.factor.Table
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
@@ -47,6 +49,8 @@ internal class LpRelaxation(
     val intColOf: IntArray,
     /** Boolean variable id → its LP column, or -1 if none. */
     val boolColOf: IntArray,
+    /** Arc-indicator models of any Circuit factors, for the subtour-elimination separator. */
+    val circuitArcs: List<CircuitArcModel> = emptyList(),
 )
 
 /**
@@ -125,6 +129,11 @@ internal class CpToLpRelaxation(
      * probe is deliberately the minimal linear+Boolean relaxation.
      */
     private val objectiveCone: Boolean = false,
+    /** When true, build the arc-indicator relaxation of each [Circuit] / [Subcircuit] (degree +
+     *  channelling rows over one `y_ij ∈ [0,1]` column per candidate arc). For Circuit it also records
+     *  a [CircuitArcModel] feeding [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets the
+     *  hull only (its cutset structure differs, #431). Adds O(arcs) columns, so it is gated. */
+    private val circuitArcs: Boolean = false,
     /** When true, emit a sparse [LpModel] (CSC core only, no dense `m × n` matrix) — for the over-cap
      *  bound-only sparse pipeline (#602), whose solvers read columns via [LpModel.forEachInColumn].
      *  Set from [com.eignex.klause.solver.backtrack.BacktrackParams.lpSparsePrimary]; the dense
@@ -151,7 +160,7 @@ internal class CpToLpRelaxation(
      * re-walk recomputes anyway.
      */
     private val cacheable: Boolean =
-        !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed &&
+        !circuitArcs && !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed &&
             !regularHull && !mddHull && !gccCountHull
 
     /** Shared pre-densified coefficient rows for the bound-invariant base rows (#564). A null entry is
@@ -293,12 +302,97 @@ internal class CpToLpRelaxation(
          *  node, so they are never shared from the dense cache. */
         private val reifiedRowIdx = IntArrayList()
 
+        /** Arc-indicator models recorded by [buildCircuitArcs] for the subtour-elimination separator. */
+        private val circuitModels = ArrayList<CircuitArcModel>()
+
         /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc. */
         private fun auxColumn(lo: Long, hi: Long): Int {
             val c = builder.addVar(lo, hi, cost = 0L, tag = -1)
             colVarId.add(-1)
             colIsBool.add(0)
             return c
+        }
+
+        /**
+         * Arc-indicator relaxation of one [Circuit] over `succ[0..n)`: a column `y_ij ∈ [0,1]` per
+         * candidate arc (`j` in the declared domain of `succ[i]`, `j ≠ i` — circuit forbids self
+         * loops), pinned to 0 when `j` left the live domain. Rows: out-degree `Σ_j y_ij = 1`,
+         * in-degree `Σ_i y_ij = 1`, and channelling `Σ_j j·y_ij = succ[i]` tying arcs to the integer
+         * column. Integer solutions are then permutations; [CircuitSeparator] removes the subtours.
+         * The column *layout* uses the declared domain so it is identical across nodes (warm-start
+         * safe). A circuit whose candidate-arc count exceeds [MAX_CIRCUIT_ARCS] is skipped (the LP
+         * column count would dominate); gating on arc count rather than n lets large sparse graphs
+         * through (#431). Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
+         */
+        private fun buildCircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = false, sec = true)
+
+        /**
+         * Arc-indicator relaxation of one [Subcircuit] over `succ[0..n)`. As [buildCircuitArcs] but the
+         * self-loop arc `y_ii` (= "node i is excluded") is a candidate, so the degree + channel rows
+         * describe the **permutation** polytope (each node has exactly one in- and out-arc, fixed points
+         * allowed). **No subtour-elimination model is registered**: the Hamiltonian SEC is *unsound* for
+         * a subcircuit (an all-excluded subset legitimately has no leaving arc).
+         */
+        private fun buildSubcircuitArcs(factor: Subcircuit) = buildArcModel(factor.succ, selfLoops = true, sec = false)
+
+        /**
+         * Shared degree + channel arc model for [Circuit] / [Subcircuit]: a `y_ij ∈ [0,1]` column per
+         * candidate arc (pinned to 0 when `j` left the live domain), with out-degree / in-degree
+         * `= 1` rows and the channel `Σ_j j·y_ij = succ[i]`. Records a [CircuitArcModel] when [sec].
+         */
+        private fun buildArcModel(succ: IntArray, selfLoops: Boolean, sec: Boolean) {
+            val n = succ.size
+            if (n < 2) return
+            // Gate on the candidate-arc total — the LP column count — not on n, so large sparse
+            // graphs (small per-node successor domains) are not skipped by a blunt node cap.
+            var arcCount = 0
+            for (i in 0 until n) {
+                problem.intDomains[succ[i]].forEach { j -> if ((selfLoops || j != i) && j in 0 until n) arcCount++ }
+            }
+            if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
+            val tails = IntArrayList()
+            val heads = IntArrayList()
+            val cols = IntArrayList()
+            val inColsByHead = Array(n) { IntArrayList() }
+            // Out-degree and channelling rows, building the (sparse) arc columns on the way.
+            for (i in 0 until n) {
+                val live = session.intDomain(succ[i])
+                val outCols = IntArrayList()
+                val chanCols = IntArrayList()
+                val chanCoef = IntArrayList()
+                problem.intDomains[succ[i]].forEach { j ->
+                    if ((!selfLoops && j == i) || j < 0 || j >= n) return@forEach
+                    val present = live.contains(j)
+                    val col = auxColumn(0L, if (present) 1L else 0L)
+                    outCols.add(col)
+                    chanCols.add(col)
+                    chanCoef.add(j)
+                    tails.add(i)
+                    heads.add(j)
+                    cols.add(col)
+                    inColsByHead[j].add(col)
+                }
+                if (outCols.isEmpty()) return // degenerate: no candidate successor — leave to propagation
+                builder.addRow(outCols.toIntArray(), LongArray(outCols.size) { 1L }, Relation.EQ, 1L)
+                // Σ_j j·y_ij − succ[i] = 0.
+                val cCols = IntArray(chanCols.size + 1)
+                val cVals = LongArray(chanCols.size + 1)
+                for (k in 0 until chanCols.size) {
+                    cCols[k] = chanCols[k]
+                    cVals[k] = chanCoef[k].toLong()
+                }
+                cCols[chanCols.size] = intColumn(succ[i])
+                cVals[chanCols.size] = -1L
+                builder.addRow(cCols, cVals, Relation.EQ, 0L)
+            }
+            // In-degree rows: Σ_i y_ij = 1 for each node j that is some arc's head.
+            for (j in 0 until n) {
+                val inCols = inColsByHead[j]
+                if (!inCols.isEmpty()) {
+                    builder.addRow(inCols.toIntArray(), LongArray(inCols.size) { 1L }, Relation.EQ, 1L)
+                }
+            }
+            if (sec) circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
         /** Column for integer variable `i`, created on first use with its live domain bounds. */
@@ -643,6 +737,12 @@ internal class CpToLpRelaxation(
                 if (gccCountHull) {
                     for (factor in problem.factors) if (factor is GlobalCardinality) buildGccCountHull(factor)
                 }
+                if (circuitArcs) {
+                    for (factor in problem.factors) {
+                        if (factor is Circuit) buildCircuitArcs(factor)
+                        if (factor is Subcircuit) buildSubcircuitArcs(factor)
+                    }
+                }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
                 if (cumulativeTimeIndexed) {
                     for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
@@ -738,6 +838,7 @@ internal class CpToLpRelaxation(
                 objectiveConstant = objective?.constant ?: 0L,
                 intColOf = intCol.copyOf(),
                 boolColOf = boolCol.copyOf(),
+                circuitArcs = circuitModels,
             )
         }
 

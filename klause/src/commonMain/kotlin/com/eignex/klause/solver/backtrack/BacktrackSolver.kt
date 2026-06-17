@@ -13,6 +13,7 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.lp.AllDifferentSeparator
 import com.eignex.klause.solver.lp.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.Basis
+import com.eignex.klause.solver.lp.CircuitSeparator
 import com.eignex.klause.solver.lp.CliqueCutSeparator
 import com.eignex.klause.solver.lp.CpToLpRelaxation
 import com.eignex.klause.solver.lp.CumulativeEnergeticBound
@@ -319,6 +320,7 @@ class BacktrackSolver(override val problem: Problem) :
                 regularHull = params.lpRegular,
                 mddHull = params.lpMdd,
                 gccCountHull = params.lpGccCount,
+                circuitArcs = params.lpCircuit,
                 objectiveCone = params.lpObjectiveCone,
                 // The sparse revised-simplex pipeline is the only LP path (#705): always build the CSC
                 // model so the dense `m × n` is never allocated.
@@ -330,14 +332,17 @@ class BacktrackSolver(override val problem: Problem) :
 
         // Structure-based cut separators (#22/#705) run on the sparse LP point; circuit cuts are deferred
         // until the arc model is rebuilt on the sparse relaxation.
-        private val lpSeparators: List<CutSeparator> = if (params.lpCuts) {
+        private val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
             buildList {
-                add(AllDifferentSeparator())
-                add(GccSeparator())
-                add(KnapsackCoverSeparator())
-                add(CliqueCutSeparator())
-                val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
-                add(AssignmentObjectiveCut(coef))
+                if (params.lpCuts) {
+                    add(AllDifferentSeparator())
+                    add(GccSeparator())
+                    add(KnapsackCoverSeparator())
+                    add(CliqueCutSeparator())
+                    val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
+                    add(AssignmentObjectiveCut(coef))
+                }
+                if (params.lpCircuit) add(CircuitSeparator())
             }
         } else {
             emptyList()

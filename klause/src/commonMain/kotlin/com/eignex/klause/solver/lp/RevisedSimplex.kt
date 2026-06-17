@@ -226,7 +226,9 @@ internal class RevisedSimplex(
     }
 
     private fun optimal(beta: DoubleArray, lu: SparseLu): FloatLpResult {
-        var obj = 0.0
+        // Re-add the lower-bound shift the model folded out (c·lo), so [FloatLpResult.objective] is the
+        // objective in original coordinates — matching the exact certify and the dense dual simplex.
+        var obj = model.objConstant.toDouble()
         for (j in 0 until numVars) {
             val c = model.cost[j]
             if (c != 0L && status[j] == VarStatus.AT_UPPER) obj += c.toDouble() * model.upper[j].toDouble()
