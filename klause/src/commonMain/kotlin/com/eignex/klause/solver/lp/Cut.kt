@@ -72,7 +72,7 @@ internal class Cut(
 internal class CutContext(
     val problem: Problem,
     val relaxation: LpRelaxation,
-    /** Per-structural-column LP primal value ([RevisedSimplex.FloatLpResult.primal]); the point to separate. */
+    /** Per-structural-column LP primal value (`RevisedSimplex.FloatLpResult.primal`); the point to separate. */
     val primal: DoubleArray,
     val session: PropagationSession,
 ) {

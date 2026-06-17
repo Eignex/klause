@@ -18,7 +18,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) {
     private val intVal = DoubleArray(numIntVars) { Double.NaN }
     private val boolVal = DoubleArray(numBoolVars) { Double.NaN }
 
-    /** Record an LP solution's fractional primal (per structural column, [RevisedSimplex.FloatLpResult.primal]),
+    /** Record an LP solution's fractional primal (per structural column, `RevisedSimplex.FloatLpResult.primal`),
      *  keyed by the relaxation's column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray) {
         for (col in relaxation.colVarId.indices) {
