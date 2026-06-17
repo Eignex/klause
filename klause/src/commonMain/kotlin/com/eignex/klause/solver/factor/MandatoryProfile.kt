@@ -33,6 +33,13 @@ internal class MandatoryProfile {
     var segCount = 0
         private set
 
+    /** When the most recent [build] returned `false`, the start time of the overloaded
+     *  segment — the time point whose summed compulsory parts exceed the capacity. Lets the
+     *  caller reconstruct a pointwise conflict reason citing exactly the tasks covering it.
+     *  Undefined when [build] returned `true`. */
+    var overloadTime = 0
+        private set
+
     /** Record a task's compulsory part `[lst, ect)` with resource demand [resource];
      *  a no-op when the part is empty (`lst >= ect`). */
     fun addTask(lst: Int, ect: Int, resource: Int) {
@@ -69,7 +76,10 @@ internal class MandatoryProfile {
             level += ev[1]
             cursor = t
             if (idx == events.size - 1 || events[idx + 1][0] != t) {
-                if (level > cap) return false
+                if (level > cap) {
+                    overloadTime = t
+                    return false
+                }
             }
         }
         return true
