@@ -134,11 +134,6 @@ internal class CpToLpRelaxation(
      *  a [CircuitArcModel] feeding [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets the
      *  hull only (its cutset structure differs, #431). Adds O(arcs) columns, so it is gated. */
     private val circuitArcs: Boolean = false,
-    /** When true, emit a sparse [LpModel] (CSC core only, no dense `m × n` matrix) — for the over-cap
-     *  bound-only sparse pipeline (#602), whose solvers read columns via [LpModel.forEachInColumn].
-     *  Set from [com.eignex.klause.solver.backtrack.BacktrackParams.lpSparsePrimary]; the dense
-     *  the dense dual simplex path leaves it false. Disables the #564 dense-row cache (moot without a dense `a`). */
-    private val sparseModel: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -148,27 +143,6 @@ internal class CpToLpRelaxation(
         } else {
             null
         }
-
-    /**
-     * #564 dense-row cache eligibility. The per-node rebuild is dominated by densifying the `m × n`
-     * coefficient matrix, not by the factor walk; for the base relaxation every row's coefficients
-     * are bound-invariant except the live-big-M reified rows, so the dense rows can be shared across
-     * nodes. The gated hull / circuit / time-indexed features build auxiliary columns whose layout or
-     * count would have to be re-derived to share safely, so the cache is disabled when any is on and
-     * those builds take the (unchanged) full densify. Cumulative *is* cacheable: its row coefficients
-     * are constant (capacity on the makespan column) and only the right-hand side varies, which the
-     * re-walk recomputes anyway.
-     */
-    private val cacheable: Boolean =
-        !circuitArcs && !elementHull && !tableHull && !nValueHull && !cumulativeTimeIndexed &&
-            !regularHull && !mddHull && !gccCountHull
-
-    /** Shared pre-densified coefficient rows for the bound-invariant base rows (#564). A null entry is
-     *  a live-big-M reified base row, re-densified each node. Populated on the first cacheable build;
-     *  [cacheVarCount] / [cacheBaseRows] guard against a layout change (then it is rebuilt). */
-    private var denseCache: Array<LongArray?>? = null
-    private var cacheVarCount: Int = -1
-    private var cacheBaseRows: Int = -1
 
     /**
      * #571 objective-cone membership, structural (depends only on [Problem.factors] and the
@@ -297,10 +271,6 @@ internal class CpToLpRelaxation(
         private val boolCol = IntArray(problem.numBoolVars) { -1 }
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
-
-        /** Base-row indices emitted by live-big-M reified rows (#564); their coefficients vary per
-         *  node, so they are never shared from the dense cache. */
-        private val reifiedRowIdx = IntArrayList()
 
         /** Arc-indicator models recorded by [buildCircuitArcs] for the subtour-elimination separator. */
         private val circuitModels = ArrayList<CircuitArcModel>()
@@ -757,14 +727,8 @@ internal class CpToLpRelaxation(
                 when (factor) {
                     is Linear -> linearRow(factor.op, factor.vars, factor.coeffs, factor.bound.toLong())
 
-                    is ReifiedLinear -> {
-                        val start = builder.rowCount
-                        reifiedRows(factor)
-                        for (r in start until builder.rowCount) reifiedRowIdx.add(r)
-                    }
+                    is ReifiedLinear -> reifiedRows(factor)
 
-                    // Reified Boolean sums use declared-[0,1] big-M, so their rows are global /
-                    // bound-invariant (cacheable) — not added to reifiedRowIdx.
                     is ReifiedPseudoBoolean -> reifiedPbRows(factor)
 
                     is ReifiedCardinality -> reifiedCardRows(factor)
@@ -806,10 +770,6 @@ internal class CpToLpRelaxation(
                 }
             }
 
-            // The base relaxation is complete; cuts append after it (and are never cached, since they
-            // are per-node and locally separated).
-            val baseRows = builder.rowCount
-
             // Separator-produced cuts, over already-created columns. A cut referencing an absent
             // column is dropped (defensive — separators should only emit over existing columns).
             for (cut in extraCuts) {
@@ -818,18 +778,7 @@ internal class CpToLpRelaxation(
                 }
             }
 
-            // #564: reuse the cached dense base rows when the layout matches; else densify fully and
-            // (re)capture the cache. Sharing is sound because the re-walk above produced the live
-            // right-hand sides / global flags for every row — only the bound-invariant coefficient
-            // arrays are aliased.
-            // The over-cap sparse pipeline (#602) builds only the CSC core — no dense `m × n` matrix —
-            // so the #564 dense-row cache is moot there and skipped.
-            val shared = denseCache?.takeIf {
-                !sparseModel && cacheable && cacheVarCount == builder.varCount &&
-                    cacheBaseRows == baseRows
-            }
-            val model = builder.buildShared(Sense.MINIMIZE, shared, sparse = sparseModel)
-            if (!sparseModel && shared == null && cacheable) captureDenseCache(model, baseRows)
+            val model = builder.build(Sense.MINIMIZE)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
             return LpRelaxation(
                 model = model,
@@ -840,21 +789,6 @@ internal class CpToLpRelaxation(
                 boolColOf = boolCol.copyOf(),
                 circuitArcs = circuitModels,
             )
-        }
-
-        /** Capture the freshly densified base rows for reuse across nodes (#564). Reified base rows
-         *  are left null (their big-M coefficients vary); every other base row's array is aliased —
-         *  it is bound-invariant and the simplex treats [LpModel.a] as read-only. */
-        private fun captureDenseCache(model: LpModel, baseRows: Int) {
-            val reified = BooleanArray(baseRows)
-            for (idx in 0 until reifiedRowIdx.size) {
-                val r = reifiedRowIdx[idx]
-                if (r < baseRows) reified[r] = true
-            }
-            val a = model.denseRows()
-            denseCache = Array(baseRows) { i -> if (reified[i]) null else a[i] }
-            cacheVarCount = builder.varCount
-            cacheBaseRows = baseRows
         }
 
         /**

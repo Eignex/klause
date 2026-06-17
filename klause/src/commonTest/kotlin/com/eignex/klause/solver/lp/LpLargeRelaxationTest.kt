@@ -19,9 +19,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** #602: models over the dense-tableau cap route to the bound-only sparse pipeline instead of
- *  disabling LP — auto-config picks it, and search stays sound. */
-class LpSparsePrimaryTest {
+/** #602/#705: LP bounding activates whenever the model fits the single relaxation-size cap, and the
+ *  sparse revised-simplex path (the only LP engine) stays sound across minimize / single-objective
+ *  propagation / Farkas infeasibility / hull carrying. */
+class LpLargeRelaxationTest {
 
     private fun linearProblem(n: Int): Problem {
         val domains = Array(n) { IntDomain(0, 4) }
@@ -30,21 +31,18 @@ class LpSparsePrimaryTest {
     }
 
     @Test
-    fun `over-cap auto-config routes to the sparse primary path`() {
+    fun `the relaxation-size ceiling gates lp activation`() {
         val p = linearProblem(4)
         val saved = KlauseConfig.current
         try {
-            // Dense cap = 1 cell ⇒ nothing fits dense; sparse cap large ⇒ route to sparse.
+            // Over the base cap but within the ceiling ⇒ LP still on (the hull budget shrinks, not LP).
             KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
             val r = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
-            assertTrue(r.lpBounding, "lpBounding should be on via the sparse route")
-            assertTrue(r.lpSparsePrimary, "lpSparsePrimary should be set when over the dense cap")
-            assertFalse(r.lpCuts, "sparse-primary path is bound-only — no cuts")
+            assertTrue(r.lpBounding, "lpBounding should be on within the ceiling")
 
-            // Both caps tiny ⇒ neither dense nor sparse ⇒ LP off.
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = 1L)
+            // Ceiling = 1 cell ⇒ nothing fits ⇒ LP off.
+            KlauseConfig.current = saved.copy(lpSparseMaxTableauCells = 1L)
             val off = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
-            assertFalse(off.lpSparsePrimary)
             assertFalse(off.lpBounding)
         } finally {
             KlauseConfig.current = saved
@@ -52,12 +50,12 @@ class LpSparsePrimaryTest {
     }
 
     @Test
-    fun `sparse-primary minimize preserves the optimum`() {
+    fun `large-relaxation minimize preserves the optimum`() {
         val rng = Random(20260619)
         val saved = KlauseConfig.current
         try {
-            // Force every relaxation over the dense cap so the sparse-primary path is always taken.
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            // A large cap so the LP bounding path is always taken.
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
             var optimal = 0
             repeat(80) { _ ->
                 val n = rng.nextInt(3, 6)
@@ -80,7 +78,7 @@ class LpSparsePrimaryTest {
                 val problem = Problem(0, n, domains, factors.toTypedArray<Factor>())
                 val obj = LinearObjective(intCoefficients = cost)
                 val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 5L))
-                assertTrue(resolved.lpSparsePrimary, "expected the sparse-primary path under the tiny dense cap")
+                assertTrue(resolved.lpBounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {
@@ -101,14 +99,14 @@ class LpSparsePrimaryTest {
     }
 
     @Test
-    fun `sparse-primary single-objective propagation preserves the optimum`() {
+    fun `large-relaxation single-objective propagation preserves the optimum`() {
         // Minimise a single variable z linked by z >= Σx to the rest, so the LP relaxation bounds z
-        // from below and the sparse path's objective-bound propagation (#705 slice 1) fires. An
+        // from below and the LP objective-bound propagation (#705 slice 1) fires. An
         // unsound (over-tightened) bound would prove a too-high optimum and fail against brute force.
         val rng = Random(424242)
         val saved = KlauseConfig.current
         try {
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
             var optimal = 0
             repeat(120) { _ ->
                 val nx = rng.nextInt(2, 4)
@@ -131,7 +129,7 @@ class LpSparsePrimaryTest {
                 val problem = Problem(0, nx + 1, domains, factors.toTypedArray())
                 val obj = LinearObjective(intCoefficients = LongArray(nx + 1) { if (it == zVar) 1L else 0L })
                 val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 9L))
-                assertTrue(resolved.lpSparsePrimary, "expected the sparse-primary path under the tiny dense cap")
+                assertTrue(resolved.lpBounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {
@@ -152,26 +150,25 @@ class LpSparsePrimaryTest {
     }
 
     @Test
-    fun `sparse-primary carries the hull columns after the disabling-logic fix`() {
+    fun `lp carries the hull columns`() {
         val saved = KlauseConfig.current
         try {
-            // Over the 1-cell dense cap ⇒ routes sparse. The Table convex-hull columns must now be
-            // accepted on the sparse path; previously they were gated on the dense `bounding` flag and
-            // silently dropped on every over-cap model — the bug that made the #655 hulls unreachable.
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            // The Table convex-hull columns are accepted onto the LP bounding path and budgeted against
+            // the relaxation-size cap (#655).
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
             val p = Problem(
                 0,
                 2,
                 arrayOf(IntDomain(0, 4), IntDomain(0, 5)),
                 arrayOf<Factor>(
-                    // A base linear row so the model exceeds the 1-cell dense cap and routes sparse.
+                    // A base linear row alongside the Table global.
                     Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
                     Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 5, 2, 2, 4, 0)),
                 ),
             )
             val resolved = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 1L))
-            assertTrue(resolved.lpSparsePrimary, "over the dense cap ⇒ sparse path")
-            assertTrue(resolved.lpTable, "the Table hull must be wired onto the sparse path")
+            assertTrue(resolved.lpBounding, "LP bounding must activate")
+            assertTrue(resolved.lpTable, "the Table hull must be wired onto the LP path")
             // And the solve is sound: minimise x0 over the table {(0,5),(2,2),(4,0)} ⇒ 0.
             val res = BacktrackSolver(p).minimize(LinearObjective(intCoefficients = longArrayOf(1L, 0L)), resolved)
             assertTrue(res is MinimizeResult.Optimal && res.objective == 0.0, "expected optimum x0=0, got $res")
@@ -181,14 +178,14 @@ class LpSparsePrimaryTest {
     }
 
     @Test
-    fun `sparse-primary infeasibility pruning matches brute force`() {
+    fun `large-relaxation infeasibility pruning matches brute force`() {
         // Tight mixed LE/GE/EQ constraints make many instances (and interior nodes) LP-infeasible, so
         // the exact-Farkas infeasibility prune (#705 slice 3) fires. An unsound prune would cut a
         // feasible node, surfacing as a feasible instance wrongly reported Infeasible or a wrong optimum.
         val rng = Random(987654321)
         val saved = KlauseConfig.current
         try {
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpSparseMaxTableauCells = Long.MAX_VALUE)
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
             var infeasible = 0
             var feasible = 0
             repeat(400) { _ ->
@@ -205,7 +202,7 @@ class LpSparsePrimaryTest {
                 val problem = Problem(0, n, domains, factors)
                 val obj = LinearObjective(intCoefficients = LongArray(n) { if (it == 0) 1L else 0L })
                 val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 3L))
-                assertTrue(resolved.lpSparsePrimary, "expected the sparse-primary path under the tiny dense cap")
+                assertTrue(resolved.lpBounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {

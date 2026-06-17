@@ -485,7 +485,7 @@ internal fun BacktrackSolver.harvestRootCuts(
 internal fun BacktrackSolver.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
     val session = PropagationSession(problem)
     if (session.isUnsatAtRoot) return null
-    val relaxation = CpToLpRelaxation(problem, objective, sparseModel = true).build(session)
+    val relaxation = CpToLpRelaxation(problem, objective).build(session)
     if (relaxation.model.n == 0) return null
     val result = try {
         RevisedSimplex(relaxation.model, cancellation).solve()

@@ -182,21 +182,6 @@ data class BacktrackParams(
      */
     val lpBounding: Boolean = false,
     /**
-     * Sparse-LU fallback for [lpBounding]: when the exact `Long` fraction-free dual simplex overflows
-     * 64 bits on a node (which previously lost the bound entirely), recover a sound objective lower
-     * bound via the float revised simplex + exact BigInt basis-certification pipeline and prune on it.
-     * Sound (the certified bound can only under-estimate); off by default, auto-enabled with [lpBounding].
-     */
-    val lpSparseBound: Boolean = false,
-    /**
-     * Use the sparse pipeline as the *primary* (bound-only) LP path, skipping the dense Bareiss
-     * tableau entirely. Auto-enabled by [LpAutoConfig] for models that exceed the dense-tableau cap
-     * ([com.eignex.klause.config.KlauseConfig.lpMaxTableauCells]) but fit the sparse cap — the class
-     * the guard otherwise disables LP on (big-M-heavy / bool-dominated COP). Bound-only: no cuts,
-     * reduced-cost fixing, or Farkas (those need the exact dense tableau).
-     */
-    val lpSparsePrimary: Boolean = false,
-    /**
      * Frequency policy for [lpBounding]: solve the LP at one in every [lpBoundEvery] pruning checks
      * rather than at every node, since the LP solve dominates a node's cost. `1` solves at every
      * checked node; larger values trade pruning power for throughput. Must be positive.
@@ -217,14 +202,6 @@ data class BacktrackParams(
      * Enabled by default when [lpBounding] is on.
      */
     val lpWarmStart: Boolean = true,
-    /**
-     * Float fast-path (#18): when a node has no parent basis to warm-start from, solve the LP first
-     * in double precision and hand the resulting basis to the exact solver to certify. The bound
-     * stays exact (the exact solver re-optimizes from the float basis); this only trades a cheap
-     * float solve for fewer exact pivots, a win on larger LPs. Off by default — on the small dense
-     * per-node LPs the float solve does not pay for itself.
-     */
-    val lpFloatWarmStart: Boolean = false,
     /**
      * LP-guided value ordering (#246): when the per-node LP has solved (requires [lpBounding]), order
      * each branch variable's candidate values by closeness to its fractional LP value
@@ -297,17 +274,6 @@ data class BacktrackParams(
      */
     val lpMir: Boolean = true,
     /**
-     * Warm-start the dual-simplex re-solves within a node — each cut round resumes from the previous
-     * round's optimal basis extended with the new cut rows' slacks (the textbook dual-simplex cut
-     * loop), and each [lpFixpoint] re-solve resumes from the last optimal basis over the same rows —
-     * instead of cold-starting from the all-slack basis. Adding valid cut rows with their slacks
-     * basic keeps the prior basis dual-feasible, so the re-solve converges in a handful of pivots; a
-     * basis that fails to load (a singular extension, or determinant overflow during the reload)
-     * falls back to a cold start. The optimum is identical either way — this only changes the pivot
-     * path. On by default.
-     */
-    val lpWarmCuts: Boolean = true,
-    /**
      * Genuine subtour-elimination cuts for Circuit globals (#22). When true and [lpBounding] holds,
      * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
      * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
@@ -366,10 +332,10 @@ data class BacktrackParams(
      * per-node LP is built over **only** the variables and rows transitively connected to the
      * objective, with every big-M [com.eignex.klause.solver.factor.ReifiedLinear] disjunctive row
      * dropped — for scheduling, the critical-path / longest-path bound (precedence + objective). The
-     * point is that this subset has no disjunctive ordering bools, so it always fits the dense-tableau
+     * point is that this subset has no disjunctive ordering bools, so it always fits the relaxation-size
      * cap where the full relaxation does not; it is a cheaper, looser, always-sound bound (any subset
      * of constraints is a relaxation). Forces the hull / circuit / cut / cumulative LP features off.
-     * Off by default; meant for the dense path (leave [lpSparsePrimary] false when this is set).
+     * Off by default.
      */
     val lpObjectiveCone: Boolean = false,
     /**
@@ -470,25 +436,6 @@ data class BacktrackParams(
      * clause and is withheld — the prune itself still happens. Off by default.
      */
     val lpLearn: Boolean = false,
-    /**
-     * Propagate the LP objective lower bound onto a single-variable objective (#281). When true and
-     * [lpBounding] holds, a feasible node LP tightens the objective variable's bound to the rounded LP
-     * optimum, with the reduced-cost dual certificate recorded as the reason so the bound is learnable
-     * and propagates through the objective-defining constraint to its component variables. When no
-     * sound bound-atom reason exists (the certificate leans on a node-local row or an auxiliary
-     * column), the bound is still applied as a reason-less, level-local tightening. Off by
-     * default; a no-op unless the objective is a single integer variable being minimised.
-     */
-    val lpObjectiveBound: Boolean = false,
-    /**
-     * Drive the node LP and propagation to a joint fixpoint (#283). When true (and [lpBounding]),
-     * after the LP's domain deductions (objective bound #281, reduced-cost fixing #21/#282) tighten
-     * domains and propagate, the LP is re-solved and the deductions re-applied, repeating while a
-     * round keeps tightening (capped). This lets a fixing that improves the bound enable further
-     * fixings in the same node, instead of waiting for a deeper node. Off by default; a no-op when
-     * the deductions never tighten anything. Cut separation is not repeated (it runs once per node).
-     */
-    val lpFixpoint: Boolean = false,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

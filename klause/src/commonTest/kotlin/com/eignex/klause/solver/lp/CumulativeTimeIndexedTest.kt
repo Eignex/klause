@@ -252,8 +252,6 @@ class CumulativeTimeIndexedTest {
                 randomSeed = 7L,
                 lpBounding = true,
                 lpLearn = true,
-                lpObjectiveBound = true,
-                lpFixpoint = true,
                 lpCumulative = true,
                 lpCumulativeTimeIndexed = true,
                 lpCumulativeFlow = true,

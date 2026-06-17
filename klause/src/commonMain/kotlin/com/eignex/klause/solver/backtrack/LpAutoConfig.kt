@@ -36,10 +36,9 @@ import com.eignex.klause.util.IntHashSet
  *  - **[BacktrackParams.lpBounding]** — there is genuine integer-linear structure ([Linear] /
  *    [ReifiedLinear]) the relaxation can exploit, or a global whose relaxation/cuts need the LP
  *    ([AllDifferent], [GlobalCardinality], [Circuit], constant-array [Element], [Table]). With it
- *    come the bounding-stack techniques that need no extra structure: the per-node objective
- *    propagation ([BacktrackParams.lpObjectiveBound]), Farkas learning ([BacktrackParams.lpLearn]),
- *    the LP↔propagation fixpoint ([BacktrackParams.lpFixpoint]) and the LP-rounding incumbent
- *    probe ([BacktrackParams.lpProbe]).
+ *    come the bounding-stack techniques that need no extra structure: per-node objective propagation,
+ *    Farkas learning ([BacktrackParams.lpLearn]) and the LP-rounding incumbent probe
+ *    ([BacktrackParams.lpProbe]).
  *  - **[BacktrackParams.lpCuts]** — an [AllDifferent] (Hall / assignment cuts),
  *    [GlobalCardinality] (occurrence sum cuts), or [PseudoBoolean] (knapsack cover cuts) is
  *    present; the persistent root pool ([BacktrackParams.lpCutPool]) rides along.
@@ -58,16 +57,15 @@ import com.eignex.klause.util.IntHashSet
  *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
  *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
  *
- * The LP-relaxation flags are additionally gated by a **size guard**: the dual simplex keeps a
- * dense `m × (n + m + 1)` Long tableau per node, so the auto path declines models whose estimated
- * tableau exceeds [KlauseConfig.lpMaxTableauCells] (a memory/feasibility bound, not a tuning
- * judgement — the engine is purpose-built for small dense per-node LPs; raise the cap via its env
- * once a sparser solve can afford bigger relaxations). The estimate folds in each enabled
- * gated hull's columns/rows (circuit / element / table / nvalue / time-indexed) and accepts them
- * smallest-first under the budget, so a stack of hulls is shed rather than allowed to defeat the
- * guard (#484). The Lagrangian and energetic bounds have their own internal caps and are not
- * size-gated here. An explicit caller flag bypasses the guard: every flag is OR-ed onto `base`, so
- * an explicit setting is never turned *off*.
+ * The LP-relaxation flags are additionally gated by a **size guard** (the sparse revised simplex is the
+ * only LP engine, #705; these are per-node solve-cost bounds, not tuning judgements). LP is declined
+ * once the estimated relaxation size (`rows × (cols + rows + 1)`) exceeds the ceiling
+ * [KlauseConfig.lpSparseMaxTableauCells]. The gated hulls (circuit / element / table / nvalue /
+ * time-indexed) then compete for a hull budget — the base cap [KlauseConfig.lpMaxTableauCells] when the
+ * base relaxation fits it, else the ceiling — accepted smallest-first, so a stack of hulls is shed
+ * rather than allowed to defeat the guard (#484). The Lagrangian and energetic bounds have their own
+ * internal caps and are not size-gated here. An explicit caller flag bypasses the guard: every flag is
+ * OR-ed onto `base`, so an explicit setting is never turned *off*.
  *
  * Called by `BacktrackSolver` under [BacktrackParams.lpConfig] (via [resolve]); also callable
  * directly for ahead-of-time configuration (the bench's auto mode).
@@ -198,39 +196,33 @@ object LpAutoConfig {
         }
         rows += diffnPlans.toLong()
         val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
-        // Cost guard: the configurable dense-tableau ceiling (env-tunable via KlauseConfig).
-        val maxCells = KlauseConfig.current.lpMaxTableauCells
-        val baseFits = tableauCells(rows, baseCols) <= maxCells
+        // Two per-node cost-guard tiers (the sparse revised simplex is the only LP engine, #705; both are
+        // pure cost guards on solve time, the bound is sound either way). `tableauCells` is a size proxy,
+        // not a literal allocation. The base cap bounds the hull budget of a small base relaxation; the
+        // ceiling is the absolute size past which LP is declined.
+        val baseCap = KlauseConfig.current.lpMaxTableauCells
+        val ceilingCap = KlauseConfig.current.lpSparseMaxTableauCells
+        val cells = tableauCells(rows, baseCols)
 
         val cutEligible = allDifferent || globalCardinality
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
                 table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0
-        // The simplex (MEDIUM) underlies every relaxation row, so the EXHAUSTIVE hulls additionally
-        // require it — guaranteed by the tier nesting (EXHAUSTIVE ⊇ MEDIUM).
-        // #571: an explicit objective-cone request always fits the dense cap (the cone drops the
-        // disjunctive big-M rows and every variable disconnected from the objective), so it bounds on
-        // the dense path even when the *full* model is over the cap — and it must not be diverted to
-        // the sparse-primary pipeline (which would build the full relaxation instead).
+        // #571: an explicit objective-cone request drops the disjunctive big-M rows and every variable
+        // disconnected from the objective, so it always fits the cap even when the full model is over it.
         val coneRequested = base.lpObjectiveCone
-        val boundingApplicable = (baseFits || coneRequested) && structApplicable
-        val bounding = boundingApplicable && config.resolved(LpTechnique.BOUNDING)
-        // Over the dense cap but within the sparse cap: route to the bound-only sparse pipeline (#602)
-        // instead of disabling LP. The sparse path skips the dense tableau the guard protects against.
-        val sparsePrimary = !coneRequested && !baseFits && structApplicable &&
-            config.resolved(LpTechnique.BOUNDING) &&
-            tableauCells(rows, baseCols) <= KlauseConfig.current.lpSparseMaxTableauCells
+        val baseFits = coneRequested || cells <= baseCap
+        // LP runs whenever the model is structurally amenable, the emphasis permits it, and the base
+        // relaxation fits the ceiling (a cone request always fits).
+        val lpActive = structApplicable && config.resolved(LpTechnique.BOUNDING) &&
+            (coneRequested || cells <= ceilingCap)
 
-        // Hull columns and the cumulative/diffn makespan rows attach to whichever bounding path runs.
-        // They were previously gated on `bounding` alone, so the sparse-primary path (every over-cap
-        // model — i.e. the instances rich enough to carry these globals) silently dropped them despite
-        // fitting their own caps. Gating on `lpActive` fixes that; the sparse path budgets hulls
-        // against the (larger) sparse cap, the dense path against the dense cap (#705).
-        val lpActive = bounding || sparsePrimary
+        // A small base relaxation budgets its hulls against the base cap; a larger (but in-ceiling) base
+        // budgets against the ceiling, since its per-node LP is already that size.
         val makespanLp = lpActive && makespanPlans > 0
         val diffnLp = lpActive && diffnPlans > 0
-        val hullCap = if (sparsePrimary) KlauseConfig.current.lpSparseMaxTableauCells else maxCells
+        val hullCap = if (baseFits) baseCap else ceilingCap
 
         // Only structurally-present hulls the emphasis permits compete for the budget (a forbidden
         // hull is never built, so it costs nothing). Each estimate sums over its factors and honours
@@ -259,20 +251,13 @@ object LpAutoConfig {
         val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
-            lpBounding = base.lpBounding || bounding || sparsePrimary,
-            lpSparseBound = base.lpSparseBound || bounding || sparsePrimary,
-            lpSparsePrimary = base.lpSparsePrimary || sparsePrimary,
+            lpBounding = base.lpBounding || lpActive,
             lpCuts = base.lpCuts || cuts,
             lpCutPool = base.lpCutPool || cuts,
-            // LP learning rides on whichever bounding path runs (#705): the objective-bound reason is
-            // built from the exact basis-certificate the sparse path already computes, so it fires on
-            // the over-cap sparse-primary instances too, not just the dense-capped ones.
+            // LP learning rides on the bounding path: the objective-bound reason is built from the
+            // exact basis-certificate the sparse solve already computes.
             lpLearn = base.lpLearn || lpActive,
-            lpObjectiveBound = base.lpObjectiveBound || bounding,
-            lpFixpoint = base.lpFixpoint || bounding,
-            // The LP-rounding probe runs on whichever bounding path is active (#705): it solves the
-            // root relaxation through the sparse revised simplex, so it fires on the over-cap
-            // sparse-primary instances too, not just the dense-capped ones.
+            // The LP-rounding probe solves the root relaxation through the sparse revised simplex.
             lpProbe = base.lpProbe || lpActive,
             lpCircuit = base.lpCircuit || (LpTechnique.CIRCUIT in acceptedHulls),
             lpElement = base.lpElement || (LpTechnique.ELEMENT in acceptedHulls),
@@ -299,16 +284,16 @@ object LpAutoConfig {
         )
     }
 
-    /** Dense-tableau cell count `m × (n + m + 1)` for `rows = m` constraint rows and `cols = n`
+    /** Relaxation-size proxy `m × (n + m + 1)` for `rows = m` constraint rows and `cols = n`
      *  structural columns (plus the `m` slacks and the rhs column). */
     private fun tableauCells(rows: Long, cols: Long): Long = rows * (cols + rows + 1L)
 
     /** A gated hull's estimated added columns and rows, summed over its factors of one kind. */
     private class HullEstimate(val key: LpTechnique, val cols: Long, val rows: Long)
 
-    /** Accept hulls smallest-first while the combined `base + accepted` tableau stays under
-     *  [maxCells] (the configurable [KlauseConfig.lpMaxTableauCells]); the rest are shed (their flag
-     *  stays off), so a stack of hulls can't push the per-node LP past the budget (#484). */
+    /** Accept hulls smallest-first while the combined `base + accepted` size stays under [maxCells]
+     *  (the configurable [KlauseConfig.lpMaxTableauCells]); the rest are shed (their flag stays off),
+     *  so a stack of hulls can't push the per-node LP past the budget (#484). */
     private fun acceptUnderBudget(
         baseRows: Long,
         baseCols: Long,
