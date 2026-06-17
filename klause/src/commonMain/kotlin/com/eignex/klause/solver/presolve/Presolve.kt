@@ -1725,7 +1725,12 @@ object Presolve {
     }
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
-    private fun domainKey(d: IntDomain): String = "${d.min}:${d.max}:${d.holes?.joinToString("-").orEmpty()}"
+    private fun domainKey(d: IntDomain): String {
+        val sb = StringBuilder()
+        sb.append(d.min).append(':').append(d.max).append(':')
+        d.forEachHole { sb.append(it).append('-') }
+        return sb.toString()
+    }
 
     private fun interchangeableIntGroups(problem: Problem, objectiveVars: Set<Int>): List<IntArray> {
         val n = problem.numIntVars

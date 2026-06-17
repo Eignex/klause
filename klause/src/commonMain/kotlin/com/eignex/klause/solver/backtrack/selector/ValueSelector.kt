@@ -112,7 +112,12 @@ internal fun probeAndOrder(
                 for (c in candidates) add(c)
             }
             val ordered = scored.asSequence().map { it.first }
-            return ordered + sequence { d.forEach { if (it !in probed) yield(it) } }
+            return ordered + sequence {
+                for (i in 0 until d.size) {
+                    val v = d.valueAt(i)
+                    if (v !in probed) yield(v)
+                }
+            }
         }
     }
     return scored.asSequence().map { it.first }
@@ -134,7 +139,8 @@ internal fun logRemainingDomainProduct(session: PropagationSession): Double {
 
 /** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
  *  the engine can early-exit before enumerating the full domain on a backtrack. */
-internal fun domainValuesAscending(d: IntDomain): Sequence<Int> = sequence { d.forEach { yield(it) } }
+internal fun domainValuesAscending(d: IntDomain): Sequence<Int> =
+    sequence { for (i in 0 until d.size) yield(d.valueAt(i)) }
 
 /** Descending sequence; same skip-holes semantics. */
 internal fun domainValuesDescending(d: IntDomain): Sequence<Int> = sequence {
