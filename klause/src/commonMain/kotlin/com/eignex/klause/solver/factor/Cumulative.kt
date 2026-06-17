@@ -151,6 +151,13 @@ class Cumulative(
 
     private val n: Int = starts.size
 
+    /** The sharp pointwise time-tabling explanation ([pointwiseOverloadReason]) covers every task as
+     *  mandatory. Variable durations / resources / capacity are handled by additionally citing their
+     *  (fixed-at-propagation) bounds, but separate presence literals are not, so optional tasks fall
+     *  back to the sound constraint-wide reason. RCPSP / mspsp-style instances (mandatory tasks, the
+     *  multi-skill "presence" carried by a 0/1 resource var rather than a presence literal) are sharp. */
+    private val sharpReasonEligible: Boolean = presents.isEmpty()
+
     // Var id → its position in the corresponding array (-1 when the var is not in that role).
     // IntIntMap keeps the lookup unboxed and array-backed for the dense var ids these hold.
     private val startPos: IntIntMap = IntIntMap.build(starts, IntArray(starts.size) { it }, absent = -1)
@@ -580,15 +587,175 @@ class Cumulative(
      * with planning horizons in the tens of thousands.
      */
 
-    /** Conflict reason: bound atoms of every int var the propagator reads. The sweep is
-     *  bound-only over the *starts* (it tightens start mins/maxes, never excludes interior
-     *  start values), but [propagate] also snapshots and requires the fixed durations,
-     *  resources, and capacity — an overload/edge-finding failure can be driven by those
-     *  fixed values, so the reason must cite them too or the learned nogood is unsound and
-     *  can prune feasible space on backtrack. [intVars] is starts plus any
-     *  duration / resource / capacity vars. */
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+    /**
+     * Conflict reason. The constraint-wide fallback ([collectLinearTightenAntecedents] over every
+     * read int var) is sound but cites *every* task's current bounds, so the learned nogood matches
+     * only the exact dead-end state and the search relearns one clause per failure without pruning
+     * (#729). When an overloaded mandatory-profile point can be reconstructed, the sharp pointwise
+     * reason ([pointwiseOverloadReason]) cites only the tasks whose compulsory part covers that one time
+     * point, and only the generalised window bounds (`start ≤ t`, `start ≥ t − d + 1`) that keep them
+     * there — a Schutt-style minimal time-tabling explanation that generalises across the search.
+     *
+     * The overloaded point is recomputed here rather than stashed at the failure site: the domains
+     * are unchanged between [propagate] returning `false` and this call, and any currently-overloaded
+     * profile point is a valid nogood regardless of which check (per-task / edge-finding / profile)
+     * actually fired. When no profile point is over capacity — a pure energy (edge-finding) overload,
+     * or a no-feasible-placement domain wipeout — the fallback reason is returned.
+     */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        val fallback = collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        if (!sharpReasonEligible) return fallback
+        // Effective durations / resources / capacity at conflict time. Any var-arg is fixed here:
+        // the snapshot in [propagate] defers (returns true) on an unfixed arg, so a `false` return —
+        // the precondition for this call — only happens once they are all singletons.
+        val eff = effectiveSnapshot(state) ?: return fallback
+        val profile = MandatoryProfile()
+        for (i in 0 until n) {
+            val d = eff.dur[i]
+            val r = eff.res[i]
+            if (d == 0 || r == 0) continue
+            val dom = state.intDomains[starts[i]]
+            profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
+        }
+        if (profile.build(eff.cap)) return fallback
+        return pointwiseOverloadReason(state, profile.overloadTime, eff, blamed = -1, blamedStart = 0) ?: fallback
+    }
+
+    /** Effective (fixed) durations / resources / capacity, or `null` if any var-arg is still open. */
+    private class Eff(val dur: IntArray, val res: IntArray, val cap: Int)
+
+    private fun effectiveSnapshot(state: PropagationState): Eff? {
+        val dur = IntArray(n)
+        val res = IntArray(n)
+        for (i in 0 until n) {
+            if (durationVars.isEmpty()) {
+                dur[i] = durations[i]
+            } else {
+                val d = state.intDomains[durationVars[i]]
+                if (d.min != d.max) return null
+                dur[i] = d.min
+            }
+            if (resourceVars.isEmpty()) {
+                res[i] = resources[i]
+            } else {
+                val d = state.intDomains[resourceVars[i]]
+                if (d.min != d.max) return null
+                res[i] = d.min
+            }
+        }
+        val cap = if (capacityVar < 0) {
+            capacity
+        } else {
+            val d = state.intDomains[capacityVar]
+            if (d.min != d.max) return null
+            d.min
+        }
+        return Eff(dur, res, cap)
+    }
+
+    /**
+     * Pointwise time-tabling explanation for an overload at time [t]: the literals that force every
+     * task whose compulsory part covers [t] to keep covering it, plus — when [eff] reads var-arg
+     * durations / resources / capacity — the bounds that fix the energy. Each premise is cited in
+     * implication-clause form (the negation of a currently-true bound), and only when non-trivial
+     * (tighter than the original domain — a global fact is dropped, the analyzer minimises it out):
+     *   - `¬[start_k ≤ t]` and `¬[start_k ≥ t − d_k + 1]` keep `k`'s compulsory part over `t`;
+     *   - `¬[d_k ≥ eff_d_k]` / `¬[r_k ≥ eff_r_k]` pin the (over-)estimated duration / demand so the
+     *     covered energy can't shrink below what overloaded; `¬[cap ≤ eff_cap]` pins the capacity.
+     * Any model satisfying these premises has each cited task covering [t] with demand ≥ its snapshot,
+     * summing past the (≤-snapshot) capacity — so the clause is a true nogood, independent of the
+     * model. [blamed] ≥ 0 names a task whose own compulsory part is discounted by `overloadsAt` in a
+     * shave: it is dropped from the covering loop (its placement is the *conclusion*), but its own
+     * energy bounds and prior start bound [blamedStart] are still cited, since they drive the overload.
+     * Returns `null` when nothing non-trivial is cited (caller falls back to the constraint-wide reason).
+     */
+    private fun pointwiseOverloadReason(
+        state: PropagationState,
+        t: Int,
+        eff: Eff,
+        blamed: Int,
+        blamedStart: Int,
+    ): IntArray? {
+        val out = IntArrayList()
+        if (blamedStart != 0) out.add(blamedStart)
+        if (blamed >= 0) citeEnergyBounds(out, state, blamed, eff)
+        for (k in 0 until n) {
+            if (k == blamed) continue
+            val d = eff.dur[k]
+            val r = eff.res[k]
+            if (d <= 0 || r <= 0) continue
+            val dom = state.intDomains[starts[k]]
+            // Compulsory part [lst, ect) = [dom.max, dom.min + d); covers t iff lst ≤ t < ect.
+            if (dom.max > t || t >= dom.min + d) continue
+            val orig = state.problem.intDomains[starts[k]]
+            if (t < orig.max) out.add(Lit.make(state.atomVarLe(starts[k], t), false))
+            val geThreshold = t - d + 1
+            if (geThreshold > orig.min) out.add(Lit.make(state.atomVarGe(starts[k], geThreshold), false))
+            citeEnergyBounds(out, state, k, eff)
+        }
+        if (capacityVar >= 0) {
+            val orig = state.problem.intDomains[capacityVar]
+            if (eff.cap < orig.max) out.add(Lit.make(state.atomVarLe(capacityVar, eff.cap), false))
+        }
+        if (out.size == 0) return null
+        return out.toIntArray()
+    }
+
+    /** Cite task [k]'s duration / resource var lower bounds (`¬[d_k ≥ eff]` / `¬[r_k ≥ eff]`) when
+     *  variable and tighter than the original domain — a smaller value would only shrink the overload,
+     *  so pinning the lower bound is what the deduction rests on. No-op on the constant fast path. */
+    private fun citeEnergyBounds(out: IntArrayList, state: PropagationState, k: Int, eff: Eff) {
+        if (durationVars.isNotEmpty()) {
+            val dv = durationVars[k]
+            if (eff.dur[k] > state.problem.intDomains[dv].min) out.add(Lit.make(state.atomVarGe(dv, eff.dur[k]), false))
+        }
+        if (resourceVars.isNotEmpty()) {
+            val rv = resourceVars[k]
+            if (eff.res[k] > state.problem.intDomains[rv].min) out.add(Lit.make(state.atomVarGe(rv, eff.res[k]), false))
+        }
+    }
+
+    /**
+     * Sharp reason for raising `start_i`'s lower bound from [oldMin] to [newMin] by time-tabling.
+     * The first feasible start [newMin] differs from the infeasible [newMin] − 1 only by uncovering
+     * `t* = newMin − 1`, so that single point is the blocker: any start in `[t* − d + 1, t*] =
+     * [newMin − d, newMin − 1]` makes `i` cover `t*` and overload it. With `i` already at or above
+     * `[newMin − d]` (`newMin − oldMin ≤ d`), forbidding that window pushes the bound to [newMin].
+     * Cites the profile at `t*` (blaming `i`, whose own part `overloadsAt` discounts) plus `i`'s own
+     * `start_i ≥ oldMin` premise when non-trivial. Returns `null` (caller falls back) when the push
+     * spans more than the duration, where a single point no longer covers the whole forbidden range.
+     */
+    private fun minTightenReason(
+        state: PropagationState,
+        i: Int,
+        d: Int,
+        oldMin: Int,
+        newMin: Int,
+        eff: Eff,
+    ): IntArray? {
+        if (newMin - oldMin > d) return null
+        val orig = state.problem.intDomains[starts[i]]
+        val extra = if (oldMin > orig.min) Lit.make(state.atomVarGe(starts[i], oldMin), false) else 0
+        return pointwiseOverloadReason(state, newMin - 1, eff, blamed = i, blamedStart = extra)
+    }
+
+    /** Mirror of [minTightenReason] for lowering `start_i`'s upper bound from [oldMax] to [newMax].
+     *  The blocking point is `t* = newMax + d` (the point [newMax] + 1's placement uncovers); any
+     *  start in `[newMax + 1, newMax + d]` makes `i` cover it. Cites `i`'s `start_i ≤ oldMax` premise
+     *  when non-trivial. Returns `null` for pushes wider than the duration. */
+    private fun maxTightenReason(
+        state: PropagationState,
+        i: Int,
+        d: Int,
+        oldMax: Int,
+        newMax: Int,
+        eff: Eff,
+    ): IntArray? {
+        if (oldMax - newMax > d) return null
+        val orig = state.problem.intDomains[starts[i]]
+        val extra = if (oldMax < orig.max) Lit.make(state.atomVarLe(starts[i], oldMax), false) else 0
+        return pointwiseOverloadReason(state, newMax + d, eff, blamed = i, blamedStart = extra)
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
@@ -640,6 +807,7 @@ class Cumulative(
             profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
         }
         if (!profile.build(effCap)) return false
+        val eff = if (sharpReasonEligible) Eff(effDur, effRes, effCap) else null
         for (i in 0 until n) {
             if (!definitelyPresent(i, state)) continue
             val d = effDur[i]
@@ -648,10 +816,12 @@ class Cumulative(
             val v = starts[i]
             val dom = state.intDomains[v]
             if (dom.min == dom.max) continue
-            val lstI = dom.max
-            val ectI = dom.min + d
+            val oldMin = dom.min
+            val oldMax = dom.max
+            val lstI = oldMax
+            val ectI = oldMin + d
             val ownsMandatory = lstI < ectI
-            var newMin = dom.min
+            var newMin = oldMin
             while (newMin <= state.intDomains[v].max) {
                 if (profile.overloadsAt(newMin, newMin + d, r, effCap, ownsMandatory, lstI, ectI)) {
                     newMin++
@@ -660,10 +830,15 @@ class Cumulative(
                 }
             }
             if (newMin > state.intDomains[v].max) return false
-            // Cite all read int vars (starts + fixed durations/resources/capacity), not just
-            // starts — the shave can be driven by those fixed values (see [conflictReason]).
-            val ant = state.composeIntVarAtomAntecedents(intVars)
-            if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
+            if (newMin != oldMin) {
+                // Sharp single-point pointwise reason when eligible; the constraint-wide fallback
+                // (all read int vars — the shave can be driven by the fixed durations / resources /
+                // capacity, not just start bounds) for optional tasks or wide pushes. See
+                // [minTightenReason].
+                val ant = (if (eff != null) minTightenReason(state, i, d, oldMin, newMin, eff) else null)
+                    ?: state.composeIntVarAtomAntecedents(intVars)
+                if (!state.tightenIntMin(v, newMin, ant)) return false
+            }
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
                 if (profile.overloadsAt(newMax, newMax + d, r, effCap, ownsMandatory, lstI, ectI)) {
@@ -673,7 +848,11 @@ class Cumulative(
                 }
             }
             if (newMax < state.intDomains[v].min) return false
-            if (newMax != state.intDomains[v].max && !state.tightenIntMax(v, newMax, ant)) return false
+            if (newMax != oldMax) {
+                val ant = (if (eff != null) maxTightenReason(state, i, d, oldMax, newMax, eff) else null)
+                    ?: state.composeIntVarAtomAntecedents(intVars)
+                if (!state.tightenIntMax(v, newMax, ant)) return false
+            }
         }
         return true
     }
