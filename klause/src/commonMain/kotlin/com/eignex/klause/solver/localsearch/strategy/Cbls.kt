@@ -347,14 +347,17 @@ class Cbls(
      *  search isn't pulled away from constraint satisfaction by a competing gradient —
      *  pure weighted-violation delta wins. At feasibility the objective is the only
      *  signal that distinguishes the equally-cost-0 candidates, so it fully drives. */
-    private fun score(state: LocalSearchState, move: Move): Double {
-        val violationDelta = when (scoring) {
-            MoveScoring.Weighted -> state.weightedNetDelta(move)
-            MoveScoring.Raw -> state.netDelta(move).toDouble()
-        }
-        val objDelta = if (state.cost == 0L) state.shapedObjectiveDelta(move) else 0.0
-        return violationDelta + objDelta
+    private fun score(state: LocalSearchState, move: Move): Double = when (scoring) {
+        // Shaped break already folds the objective; the other bases gate it behind feasibility.
+        MoveScoring.Break -> state.shapedBreakScore(move)
+
+        MoveScoring.Weighted -> state.weightedNetDelta(move) + feasibleObjectiveDelta(state, move)
+
+        MoveScoring.Raw -> state.netDelta(move).toDouble() + feasibleObjectiveDelta(state, move)
     }
+
+    private fun feasibleObjectiveDelta(state: LocalSearchState, move: Move): Double =
+        if (state.cost == 0L) state.shapedObjectiveDelta(move) else 0.0
 
     /** Move "size" for skewed-VNS acceptance: 1 for primitives, part-count for compounds. */
     private fun moveSize(move: Move): Int = when (move) {

@@ -17,4 +17,10 @@ enum class MoveScoring {
 
     /** Plain, unweighted violation-count delta — the classical VND / WalkSAT signal. */
     Raw,
+
+    /** Shaped break score (`breakScore + shapingλ·objectiveΔ`, via [LocalSearchState.shapedBreakScore])
+     *  — the focused WalkSAT/probSAT signal: the count of currently-satisfied factors a move would
+     *  break, not the net delta. Already folds the shaped objective, so the driver adds no further
+     *  objective term for this basis. */
+    Break,
 }
