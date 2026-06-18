@@ -10,6 +10,7 @@ import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.movesource.StallKick
 import com.eignex.klause.solver.localsearch.movesource.StallSwaps
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 
 /**
  * The Constraint-Based Local Search orchestration as the [SourceDrivenStrategy]'s **stall-schedule
@@ -81,35 +82,50 @@ class CblsSchedule(
         require(implicitStructuredCap >= 0) { "implicitStructuredCap ≥ 0, got $implicitStructuredCap" }
     }
 
-    private var lastImprovingStep: Long = -1L
+    /** The CBLS SAPS-style bump + probabilistic smoothing, unified with FeasibilityJump's decay
+     *  family ([WeightSchedule]); bit-for-bit equal to the former inline maintenance for the
+     *  production smoothing rates. */
+    private val weightSchedule = WeightSchedule.cbls(
+        stallSteps = stallSteps,
+        stallIncrement = stallIncrement,
+        smoothProb = smoothProb,
+        smoothFactor = smoothFactor,
+        baseWeight = baseWeight,
+    )
+
     private var lastSeenStep: Long = -1L
     private var lastCost: Long = Long.MAX_VALUE
 
-    /** Step of the last strict cost decrease — unlike [lastImprovingStep] this is *not* reset
-     *  by a weight bump, so it measures a true "no progress" stall window for plateau escape. */
+    /** Step of the last strict cost decrease — unlike the weight schedule's own stall (reset by a
+     *  bump) this is *not* reset by a bump, so it measures a true "no progress" window for escape. */
     private var lastDropStep: Long = 0L
 
     /** Pick the next move under the CBLS stall schedule, scored on the `scoring` basis and
      *  tabu-filtered by `tabu`; `null` when no candidate is available (the engine restarts). */
     internal fun pickMove(state: LocalSearchState, scoring: MoveScoring, tabu: TabuFilter): Move? {
-        // Stall detection: when [state.cost] hasn't strictly decreased for [stallSteps] applied
-        // moves, bump weights. Reads the engine-maintained step counter so we don't need our own
-        // apply-tracking — `state.step` advances on every committed move regardless of strategy.
+        // Adaptive weights: the unified schedule bumps violated factors on a [stallSteps] stall and
+        // probabilistically smooths back toward the seeded baseline. Reads the engine-maintained step
+        // counter so we don't need our own apply-tracking — `state.step` advances on every committed
+        // move regardless of strategy.
+        weightSchedule.maintain(
+            state.step,
+            state.cost,
+            state.factorWeights,
+            state.baseFactorWeights,
+            state.violated.toIntArray(),
+            state.rng,
+        )
+        // Separate stall-window tracker for plateau escape: it resets only on a strict cost drop (and
+        // a restart's rewound step), so it measures a true no-progress window, distinct from the
+        // weight schedule's own bump-resetting stall.
         if (state.step < lastSeenStep) {
-            // step rewound → a restart happened; reset the stall trackers to this epoch.
-            lastImprovingStep = state.step
             lastDropStep = state.step
             lastCost = state.cost
-        }
-        if (state.step != lastSeenStep) {
+            lastSeenStep = state.step
+        } else if (state.step != lastSeenStep) {
             if (state.cost < lastCost) {
-                lastImprovingStep = state.step
                 lastCost = state.cost
                 lastDropStep = state.step
-            } else if (state.step - lastImprovingStep >= stallSteps) {
-                bumpViolatedWeights(state, stallIncrement)
-                if (smoothProb > 0.0 && state.rng.nextDouble() < smoothProb) smoothAllWeights(state)
-                lastImprovingStep = state.step
             }
             lastSeenStep = state.step
         }
@@ -237,31 +253,6 @@ class CblsSchedule(
 
     private fun feasibleObjectiveDelta(state: LocalSearchState, move: Move): Double =
         if (state.cost == 0L) state.shapedObjectiveDelta(move) else 0.0
-
-    /** Bump weights on every currently-violated factor by [increment]. SAPS-style scale rather than
-     *  DDFW-style transfer — we don't redistribute from satisfied neighbors, we just inject pressure.
-     *  This is the local-minimum signal: "these constraints have resisted being fixed, prioritize
-     *  them". */
-    private fun bumpViolatedWeights(state: LocalSearchState, increment: Double) {
-        val w = state.factorWeights
-        val violatedSnapshot = state.violated.toIntArray()
-        for (fid in violatedSnapshot) w[fid] += increment
-    }
-
-    /** SAPS-style probabilistic smoothing (forgetting): pull every factor weight a fraction
-     *  [smoothFactor] of the way back toward its seeded baseline ([LocalSearchState.baseFactorWeights]
-     *  scaled by [baseWeight]). [bumpViolatedWeights] only ever grows weights, so without a
-     *  counter-pressure the gradient ossifies on long runs; smoothing lets weight on factors that are
-     *  no longer hard decay back. Targeting the per-factor seed rather than a flat constant means the
-     *  decay restores the proactive per-class / implied landscape from
-     *  [LocalSearchState.factorWeights] instead of flattening it. Called with probability [smoothProb]
-     *  right after a stall bump. */
-    private fun smoothAllWeights(state: LocalSearchState) {
-        val w = state.factorWeights
-        val base = state.baseFactorWeights
-        val keep = 1.0 - smoothFactor
-        for (i in w.indices) w[i] = keep * w[i] + smoothFactor * baseWeight * base[i]
-    }
 
     /** Violated-factor repair source backing [sampleFromViolated]. The duplicated draw loop lives in
      *  [ViolatedRepairs] (epic #710); this schedule supplies its `violatedSampleCount`. */
