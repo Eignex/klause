@@ -2,36 +2,31 @@ package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.Schedule
-import kotlin.math.exp
 import kotlin.math.pow
 
 /**
  * Focused local search: the WalkSAT/probSAT family. Each step picks a uniformly-random
  * *violated* factor, asks it for repair-move suggestions, and selects among them — the
  * "focusing" heuristic that distinguishes this family from the global, gradient-scoring
- * [Cbls]. What differs between the classic algorithms is purely the **selection rule**, so
- * it is factored out into a [MoveSelection] policy:
+ * [Cbls].
  *
- *  - [NoiseGreedy] — WalkSAT (Selman 1994): with probability `noise` take a random candidate,
- *    else the minimum-break candidate.
- *  - [ProbSatWeighted] — probSAT (Balint & Schöning 2012): roulette-sample candidates by
- *    `(eps + break)^(-cb)`, a smooth bias toward low-break moves.
- *  - [Annealing] — simulated annealing: accept a sampled candidate by the Metropolis
- *    criterion under a cooling temperature, drifting through worse regions early on.
+ * The **fixed-parameter** members of the family are now expressed as [SourceDrivenStrategy]
+ * recipes (#721) — `{`[ViolatedRepairs]`(1)} × `[MoveScoring.Break]` × acceptance` — built by the
+ * [WalkSat] / [ProbSat] / [SimulatedAnnealing] factories: WalkSAT is [AcceptanceRule.WalkSatNoise],
+ * probSAT is [AcceptanceRule.ProbSat], simulated annealing is [AcceptanceRule.Metropolis].
  *
- * Two orthogonal refinements apply to either policy:
- *  - **Adaptive parameter** — wrap the policy's scalar (`noise` / `cb`) in a [NoiseController]
- *    so it climbs on stalls and relaxes on improvement (Hoos 2002). See [WalkSat.adaptive] /
- *    [ProbSat.adaptive].
- *  - **Configuration checking** ([configurationChecking], CCASat): restrict candidates to
- *    variables whose configuration changed since their last flip, breaking short flip-unflip
- *    cycles without a globally-disruptive tabu tenure. Falls back to the full set when every
- *    candidate is CC-blocked.
- *
- * The recognizable algorithm names survive as factory objects ([WalkSat], [ProbSat]); only
- * the strategy *type* is unified here.
+ * This class survives only for the **adaptive-parameter** variants ([WalkSat.adaptive],
+ * [ProbSat.adaptive], [ProbSat.bandit]), whose scalar (`noise` / `cb`) is steered per step by a
+ * [NoiseController] that observes the running cost — feedback the acceptance axis does not yet
+ * consume (it lands once the engine drives a per-step/round schedule observe; see #721 follow-ups).
+ * What differs between these variants is purely the **selection rule**, factored into a
+ * [MoveSelection] policy ([NoiseGreedy], [ProbSatWeighted]). Configuration checking
+ * ([configurationChecking], CCASat) restricts candidates to variables whose configuration changed
+ * since their last flip, falling back to the full set when every candidate is CC-blocked.
  */
 class FocusedLs internal constructor(
     internal val selection: MoveSelection = NoiseGreedy(),
@@ -123,46 +118,31 @@ internal class ProbSatWeighted(
     }
 }
 
-/**
- * Simulated-annealing selection: repeatedly sample a candidate and accept the first one whose
- * shaped break score `delta` passes the Metropolis criterion — `delta ≤ 0` (improving, always
- * accepted) or `rng < exp(-delta / T)` (worsening, accepted with temperature-dependent
- * probability). The temperature trajectory is owned by [schedule] and advanced once per accepted
- * move; high T early favours exploration, low T later favours exploitation. If no candidate passes
- * after one pass, a random candidate is taken. The schedule is per-instance; the default
- * [Geometric] reproduces the long-standing cool-only behaviour, while an adaptive-cooling or
- * reheating schedule plugs in here unchanged.
- */
-internal class Annealing(private val schedule: Schedule = Geometric()) : MoveSelection {
-    override fun pick(state: LocalSearchState, moves: List<Move>): Move {
-        repeat(moves.size) {
-            val move = moves[state.rng.nextInt(moves.size)]
-            // Shaped break: under no shaping this is breakScore; under Linear shaping the
-            // objective delta tilts the Metropolis criterion so objective-improving moves are
-            // accepted unconditionally and mildly-worsening ones get more acceptance mass.
-            val delta = state.shapedBreakScore(move)
-            if (delta <= 0.0 || state.rng.nextDouble() < exp(-delta / schedule.temperature)) {
-                schedule.step()
-                return move
-            }
-        }
-        schedule.step()
-        return moves[state.rng.nextInt(moves.size)]
-    }
-}
+/** The focused source set shared by every recipe-form member of the family: a single uniformly-random
+ *  violated factor's repair suggestions ([ViolatedRepairs] with `sampleCount = 1`), the WalkSAT/probSAT
+ *  opener. */
+private fun focusedSources() = listOf(ConfiguredSource(ViolatedRepairs.SINGLE))
 
 /**
- * WalkSAT factory (Selman 1994). `WalkSat(...)` builds a fixed-noise [FocusedLs];
- * [adaptive] builds the Hoos-2002 adaptive-noise variant. Configuration checking is opt-in
- * on both.
+ * WalkSAT factory (Selman 1994). `WalkSat(...)` builds the fixed-noise variant as a
+ * [SourceDrivenStrategy] recipe (`{`[ViolatedRepairs]`(1)} × `[MoveScoring.Break]` ×
+ * `[AcceptanceRule.WalkSatNoise]`)`; [adaptive] builds the Hoos-2002 adaptive-noise variant, which
+ * stays a [FocusedLs] until the acceptance axis can consume a per-step noise schedule. Configuration
+ * checking is opt-in on both.
  */
 object WalkSat {
-    /** Run one focused-LS step. */
+    /** Fixed-noise WalkSAT recipe. */
     operator fun invoke(
         noise: Double = 0.5,
         tabu: TabuFilter = TabuFilter(tenure = 10),
         configurationChecking: Boolean = false,
-    ): FocusedLs = FocusedLs(NoiseGreedy(noise), tabu, configurationChecking)
+    ): SourceDrivenStrategy = SourceDrivenStrategy(
+        sources = focusedSources(),
+        scoring = MoveScoring.Break,
+        acceptance = AcceptanceRule.WalkSatNoise(noise),
+        tabu = tabu,
+        configurationChecking = configurationChecking,
+    )
 
     /**
      * Adaptive-noise WalkSAT: noise starts at [baselineNoise] and is steered in
@@ -194,18 +174,26 @@ object WalkSat {
 }
 
 /**
- * probSAT factory (Balint & Schöning 2012). `ProbSat(...)` builds a fixed-`cb` [FocusedLs];
- * [adaptive] builds the variant whose `cb` relaxes on stalls. Configuration checking is opt-in
- * on both (probSAT + CC is a strong combo on structured instances).
+ * probSAT factory (Balint & Schöning 2012). `ProbSat(...)` builds the fixed-`cb` variant as a
+ * [SourceDrivenStrategy] recipe (`{`[ViolatedRepairs]`(1)} × `[MoveScoring.Break]` ×
+ * `[AcceptanceRule.ProbSat]`)`; [adaptive] / [bandit] build the variants whose `cb` is steered per
+ * step, which stay a [FocusedLs] until the acceptance axis can consume a per-step noise schedule.
+ * Configuration checking is opt-in on all (probSAT + CC is a strong combo on structured instances).
  */
 object ProbSat {
-    /** Run one focused-LS step. */
+    /** Fixed-`cb` probSAT recipe. */
     operator fun invoke(
         cb: Double = 2.06,
         eps: Double = 1.0,
         tabu: TabuFilter = TabuFilter(tenure = 10),
         configurationChecking: Boolean = false,
-    ): FocusedLs = FocusedLs(ProbSatWeighted(cb, eps), tabu, configurationChecking)
+    ): SourceDrivenStrategy = SourceDrivenStrategy(
+        sources = focusedSources(),
+        scoring = MoveScoring.Break,
+        acceptance = AcceptanceRule.ProbSat(cb, eps),
+        tabu = tabu,
+        configurationChecking = configurationChecking,
+    )
 
     /**
      * Adaptive-`cb` probSAT: the break-exponent starts at [baselineCb] and is steered down
@@ -253,32 +241,37 @@ object ProbSat {
 }
 
 /**
- * Simulated-annealing factory. `SimulatedAnnealing(...)` builds a [FocusedLs] with the
- * [Annealing] selection policy — Metropolis acceptance under a cooling temperature.
- * Configuration checking is opt-in.
+ * Simulated-annealing factory, now a [SourceDrivenStrategy] recipe (`{`[ViolatedRepairs]`(1)} ×
+ * `[MoveScoring.Break]` × `[AcceptanceRule.Metropolis]`)` — Metropolis acceptance under a cooling
+ * temperature. Configuration checking is opt-in.
  */
 object SimulatedAnnealing {
-    /** Run one focused-LS step under a fixed geometric cooling schedule. */
+    /** SA recipe under a fixed geometric cooling schedule. */
     operator fun invoke(
         initialTemperature: Double = 1.0,
         coolingRate: Double = 0.999,
         minTemperature: Double = 0.001,
         tabu: TabuFilter = TabuFilter(tenure = 10),
         configurationChecking: Boolean = false,
-    ): FocusedLs = withSchedule(
+    ): SourceDrivenStrategy = withSchedule(
         Geometric(initialTemperature, coolingRate, minTemperature),
         tabu,
         configurationChecking,
     )
 
     /**
-     * Build an annealing [FocusedLs] over an arbitrary temperature [schedule] — geometric,
-     * adaptive-cooling, or reheating — so the SA arms can run any schedule without a bespoke
-     * selection policy.
+     * Build an SA recipe over an arbitrary temperature [schedule] — geometric, adaptive-cooling, or
+     * reheating — so the SA arms can run any schedule through the shared [AcceptanceRule.Metropolis].
      */
     fun withSchedule(
         schedule: Schedule,
         tabu: TabuFilter = TabuFilter(tenure = 10),
         configurationChecking: Boolean = false,
-    ): FocusedLs = FocusedLs(Annealing(schedule), tabu, configurationChecking)
+    ): SourceDrivenStrategy = SourceDrivenStrategy(
+        sources = focusedSources(),
+        scoring = MoveScoring.Break,
+        acceptance = AcceptanceRule.Metropolis(schedule),
+        tabu = tabu,
+        configurationChecking = configurationChecking,
+    )
 }

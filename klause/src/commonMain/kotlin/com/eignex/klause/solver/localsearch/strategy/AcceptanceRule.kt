@@ -73,6 +73,7 @@ sealed interface AcceptanceRule {
 
         override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double): Move? {
             if (noisePool.isEmpty()) return bestBy(rng, emptyList(), scorePool, score)
+            if (noisePool.size == 1) return noisePool[0] // a lone candidate is taken unconditionally, no draw
             val scores = DoubleArray(noisePool.size) { score(noisePool[it]) }
             var minScore = scores[0]
             for (i in 1 until scores.size) if (scores[i] < minScore) minScore = scores[i]

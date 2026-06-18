@@ -3,133 +3,100 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.movesource.ArgminJump
+import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 
 /**
- * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024; epic #698). An LS arm whose
- * move model is fundamentally different from the WalkSAT/CBLS step families: every step **jumps a
- * variable directly to its weighted-violation argmin** ([ArgminJump]) rather than stepping by a
- * flip or ±1, and it escapes local minima by **adaptive per-constraint weights** rather than a
- * stochastic walk. Aggressive toward feasibility and orthogonal to the existing arms, so it is most
- * valuable raced alongside them in the parallel portfolio.
+ * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024; epic #698), re-expressed as a
+ * [SourceDrivenStrategy] recipe (#721). FJ is exactly the driver's four axes pinned to the
+ * jump-and-reweight regime:
  *
- * Per [pickMove]:
- *  1. **Adaptive weights.** When `state.cost` has not strictly dropped for [weightBumpAfter] applied
- *     moves, fade the excess of every weight over its seeded baseline by [weightDecay] (old
- *     escalations forget) and bump every currently-violated factor's weight by [weightIncrement]
- *     (resistant constraints get heavier). This reshapes the argmin landscape so the next jumps
- *     target the constraints that have been blocking progress — the FJ analogue of a restart.
- *  2. **Jump.** Collect the argmin jumps of [candidateVars] hot-spot variables and greedily take the
- *     one with the most-negative weighted-violation delta ([LocalSearchState.weightedNetDelta]).
- *  3. **Perturbation.** After [perturbAfter] applied moves with no strict cost drop — long enough
- *     that the weight bumps alone have not escaped — return a single random hot-spot jump (a
- *     diversification kick) and restart the no-progress clock.
+ *  - **sources** = `{`[ArgminJump]`}` — every step jumps a hot-spot variable directly to its
+ *    weighted-violation argmin, rather than stepping by a flip or ±1.
+ *  - **scoring** = [MoveScoring.Weighted] — the greedy descent is on the weighted-violation delta.
+ *  - **acceptance** = [AcceptanceRule.Greedy] — take the most-negative weighted delta, no noise draw;
+ *    FJ escapes minima by reweighting, not by a stochastic walk.
+ *  - **weight schedule** = [WeightSchedule.feasibilityJump] — when cost stalls, fade old escalations
+ *    by [weightDecay] and bump every violated factor by [weightIncrement], reshaping the argmin
+ *    landscape toward the constraints that have been blocking progress (the FJ analogue of a restart).
+ *  - **perturbation** = [StallPerturbation] — after [perturbAfter] applied moves with no strict cost
+ *    drop (long enough that the weight bumps alone have not escaped) inject one random hot-spot jump.
  *
- * `null` is returned only when there is nothing to repair (`cost == 0`) or no eligible variable,
- * letting the engine restart. The arm learns and prunes nothing, so it carries no soundness
- * obligation; the `deltaIf*` probes it relies on are guarded by the existing delta-consistency oracle.
+ * Aggressive toward feasibility and orthogonal to the WalkSAT/CBLS/SA step families, so it is most
+ * valuable raced alongside them in the parallel portfolio. The arm learns and prunes nothing, so it
+ * carries no soundness obligation.
  */
-class FeasibilityJump(
+@Suppress("FunctionNaming") // factory mirroring the historical strategy constructor it replaced
+fun FeasibilityJump(
     /** Hot-spot variables jumped per pick (passed to [ArgminJump]). */
-    val candidateVars: Int = 8,
+    candidateVars: Int = 8,
     /** Cap on domain values evaluated per wide-domain int variable. */
-    val maxValueTries: Int = ArgminJump.DEFAULT_MAX_VALUE_TRIES,
+    maxValueTries: Int = ArgminJump.DEFAULT_MAX_VALUE_TRIES,
     /** Applied moves without a strict cost drop before weights are bumped. */
-    val weightBumpAfter: Int = 1,
+    weightBumpAfter: Int = 1,
     /** Per-bump increment added to each currently-violated factor's weight. */
-    val weightIncrement: Double = 1.0,
+    weightIncrement: Double = 1.0,
     /** Multiplicative fade applied to each weight's excess over its seeded baseline on every bump
      *  (`w ← base + (w − base)·weightDecay`); `1.0` disables fading (monotone escalation). */
-    val weightDecay: Double = 0.999,
+    weightDecay: Double = 0.999,
     /** Applied moves without a strict cost drop before a perturbation kick fires; should exceed
      *  [weightBumpAfter] so weight escalation gets its chance first. `0` disables perturbation. */
-    val perturbAfter: Int = 200,
-) : Strategy {
+    perturbAfter: Int = 200,
+): SourceDrivenStrategy {
+    require(candidateVars >= 1) { "candidateVars >= 1, got $candidateVars" }
+    require(perturbAfter >= 0) { "perturbAfter >= 0, got $perturbAfter" }
+    return SourceDrivenStrategy(
+        sources = listOf(ConfiguredSource(ArgminJump(candidateVars, maxValueTries))),
+        scoring = MoveScoring.Weighted,
+        acceptance = AcceptanceRule.Greedy,
+        weightSchedule = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay),
+        perturbation = if (perturbAfter > 0) StallPerturbation(perturbAfter) else null,
+    )
+}
 
+/**
+ * The Feasibility-Jump diversification kick as a driver [perturbation hook][SourceDrivenStrategy.perturbation]
+ * (#721): after [perturbAfter] applied moves with no strict cost drop — long enough that weight
+ * escalation has had its chance — return one random hot-spot jump and restart the no-progress window.
+ *
+ * Stateful (one per search): it tracks the stall window off the engine-maintained `state.step`,
+ * re-anchoring on a restart (rewound step) and on every strict cost drop. Returns `null` when the
+ * window has not elapsed or no variable is eligible, leaving the driver to its normal pick.
+ */
+class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> Move? {
     init {
-        require(candidateVars >= 1) { "candidateVars >= 1, got $candidateVars" }
-        require(weightBumpAfter >= 1) { "weightBumpAfter >= 1, got $weightBumpAfter" }
-        require(weightIncrement > 0.0) { "weightIncrement > 0, got $weightIncrement" }
-        require(weightDecay in 0.0..1.0) { "weightDecay ∈ [0, 1], got $weightDecay" }
-        require(perturbAfter >= 0) { "perturbAfter >= 0, got $perturbAfter" }
+        require(perturbAfter >= 1) { "perturbAfter >= 1, got $perturbAfter" }
     }
 
-    private val argmin = ArgminJump(candidateVars, maxValueTries)
-
-    /** The bump + geometric-decay weight maintenance, shared with Cbls via the schedule axis. */
-    private val weightSchedule = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay)
-
-    private var lastImprovingStep: Long = -1L
     private var lastSeenStep: Long = -1L
+    private var lastDropStep: Long = 0L
     private var lastCost: Long = Long.MAX_VALUE
 
-    /** Step of the last strict cost decrease — drives the perturbation window (not reset by a bump). */
-    private var lastDropStep: Long = 0L
-
-    override fun pickMove(state: LocalSearchState): Move? {
-        if (state.violated.isEmpty()) return null
-
-        // Stall tracking off the engine-maintained step counter (mirrors Cbls): bump weights when
-        // cost has not strictly dropped for [weightBumpAfter] applied moves.
+    override fun invoke(state: LocalSearchState): Move? {
+        // Stall tracking off the engine step counter: the window resets on a restart and on every
+        // strict cost decrease, mirroring the schedule axis's own stall detection.
         if (state.step < lastSeenStep) {
-            lastImprovingStep = state.step
             lastDropStep = state.step
             lastCost = state.cost
-        }
-        if (state.step != lastSeenStep) {
+            lastSeenStep = state.step
+        } else if (state.step != lastSeenStep) {
             if (state.cost < lastCost) {
-                lastImprovingStep = state.step
                 lastCost = state.cost
                 lastDropStep = state.step
-            } else if (state.step - lastImprovingStep >= weightBumpAfter) {
-                weightSchedule.bumpAndRelax(
-                    state.factorWeights,
-                    state.baseFactorWeights,
-                    state.violated.toIntArray(),
-                    state.rng,
-                )
-                lastImprovingStep = state.step
             }
             lastSeenStep = state.step
         }
-
-        // Perturbation: weight escalation has had a long window and still no progress.
-        if (perturbAfter > 0 && state.step - lastDropStep >= perturbAfter) {
-            val kick = perturbation(state)
-            if (kick != null) {
-                lastDropStep = state.step // fresh window after the kick
-                return kick
-            }
-        }
-
-        val sink = state.moveSink
-        sink.clear()
-        argmin.generate(state, sink)
-        val moves = sink.list
-        if (moves.isEmpty()) return null
-
-        // Greedy: the most-negative weighted-violation delta (reservoir tie-break for uniformity).
-        var best = moves[0]
-        var bestScore = state.weightedNetDelta(best)
-        var tieCount = 1
-        for (i in 1 until moves.size) {
-            val s = state.weightedNetDelta(moves[i])
-            if (s < bestScore) {
-                best = moves[i]
-                bestScore = s
-                tieCount = 1
-            } else if (s == bestScore) {
-                tieCount++
-                if (state.rng.nextInt(tieCount) == 0) best = moves[i]
-            }
-        }
-        return best
+        if (state.step - lastDropStep < perturbAfter) return null
+        val kick = randomHotSpotJump(state) ?: return null
+        lastDropStep = state.step // fresh window after the kick
+        return kick
     }
 
     /** One diversification kick: jump a random variable of a random violated factor to a random
      *  value (channeling-aware for int vars), or flip it. Skips frozen variables; returns null when
      *  none is eligible. */
-    private fun perturbation(state: LocalSearchState): Move? {
+    private fun randomHotSpotJump(state: LocalSearchState): Move? {
+        if (state.violated.isEmpty()) return null
         val f = state.factors[state.violated.random(state.rng)]
         val nInt = f.intVars.size
         val nBool = f.boolVars.size
