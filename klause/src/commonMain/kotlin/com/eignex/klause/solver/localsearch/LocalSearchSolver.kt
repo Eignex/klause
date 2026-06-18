@@ -11,6 +11,8 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.localsearch.movesource.GreedyInit
 import com.eignex.klause.solver.localsearch.movesource.PairSwap
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
+import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
+import com.eignex.klause.solver.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
@@ -312,6 +314,9 @@ class LocalSearchSolver(
             var moves = 0L
             var restartCount = 0L
             var everFeasible = false
+            // Per-round feedback for adaptive schedules / restart (#721); null unless one wants it.
+            // Use the unwrapped restart policy so an adaptive one is detected past a sweep wrapper.
+            val roundFeedback = RoundFeedback.of(strategy, restartPolicy)
 
             try {
                 while (flipsSinceYield < maxFlips) {
@@ -352,13 +357,16 @@ class LocalSearchSolver(
                         restarts.restart(state, bestSoFar = bestSnap)
                         restartCount++
                         flipsSinceRestart = 0
+                        roundFeedback?.endRound()
                         continue
                     }
+                    val costBefore = state.cost
                     val move = strategy.pickMove(state)
                     if (move == null) {
                         restarts.restart(state, bestSoFar = bestSnap)
                         restartCount++
                         flipsSinceRestart = 0
+                        roundFeedback?.endRound()
                         continue
                     }
                     state.apply(move)
@@ -369,6 +377,7 @@ class LocalSearchSolver(
                     }
                     flipsSinceRestart++
                     flipsSinceYield++
+                    roundFeedback?.record(costBefore, state.cost, moves)
                 }
             } finally {
                 // Sync learned weights back into warm state when the loop exits naturally
@@ -459,6 +468,13 @@ class LocalSearchSolver(
         // strategies that bail at feasibility (DDFW/ProbSat).
         val descentStrategy = optimizeStrategy
         val unified = (descentStrategy as? SourceDrivenStrategy)?.drivesObjectiveDescent == true
+        // Per-round feedback for adaptive schedules (#721): the feasibility-fight strategy is the one
+        // whose moves form the rounds (the unified descent strategy when one drives both phases, else
+        // the satisfy strategy). The helper is null (no overhead) unless it asks for feedback.
+        val satisfyStrategy: Strategy = if (unified) descentStrategy else strategy
+        // Feed round stats to the unwrapped restart policy so an adaptive one is detected and updated
+        // even when a definitional-sweep wrapper stands in for shouldRestart/restart.
+        val roundFeedback = RoundFeedback.of(satisfyStrategy, restartPolicy)
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
@@ -559,12 +575,14 @@ class LocalSearchSolver(
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
+                roundFeedback?.endRound()
                 continue
             }
             // Pre-feasibility: drive through the unified strategy when one is configured,
             // else use the satisfy-mode strategy. CBLS (when unified) scores by
             // weightedNetDelta only at cost>0, which gives it equivalent feasibility-fight
             // behavior to ProbSat plus better multi-flip handling.
+            val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
                 restarts.restart(state, bestSample ?: bestCostSnap)
@@ -572,6 +590,7 @@ class LocalSearchSolver(
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
+                roundFeedback?.endRound() // a restart ends the round; don't span it
                 continue
             }
             state.apply(move)
@@ -581,6 +600,7 @@ class LocalSearchSolver(
             }
             flipsSinceRestart++
             totalFlips++
+            roundFeedback?.record(costBefore, state.cost, totalFlips)
         }
         warm?.captureFrom(state)
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
@@ -918,8 +938,57 @@ class LocalSearchSolver(
         return false
     }
 
+    /**
+     * Accumulates per-step move statistics into rounds and flushes each completed round to a
+     * strategy's adaptive policies (#721). Created only for a strategy that
+     * [Strategy.wantsRoundFeedback], so the common non-adaptive strategies allocate nothing and the
+     * loops carry no overhead. A restart ends the current round ([endRound]) so a round never spans
+     * one.
+     */
+    private class RoundFeedback(private val strategy: Strategy?, private val restartObserver: AdaptivePolicy?) {
+        private val acc = RoundAccumulator()
+        private var sinceRound = 0
+
+        /** Record one applied move (a non-worsening move is the round's acceptance signal) and flush
+         *  the round to the strategy's schedules and an adaptive restart policy when
+         *  [ROUND_FEEDBACK_STEPS] moves have accumulated. */
+        fun record(costBefore: Long, costAfter: Long, step: Long) {
+            acc.record((costAfter - costBefore).toDouble(), costAfter <= costBefore)
+            acc.observeCost(costAfter.toDouble())
+            if (++sinceRound >= ROUND_FEEDBACK_STEPS) {
+                strategy?.observeRound(acc, step)
+                // The restart policy is temperature-agnostic; it keys off the round's cost trend.
+                restartObserver?.observe(acc.snapshot(temperature = 1.0, step = step))
+                acc.clear()
+                sinceRound = 0
+            }
+        }
+
+        /** Drop the partial round (a restart ended it before it completed). */
+        fun endRound() {
+            acc.clear()
+            sinceRound = 0
+        }
+
+        companion object {
+            /** A feedback accumulator driving [strategy]'s schedules and/or an adaptive [restart]
+             *  policy, or `null` when neither wants per-round feedback (no accumulation overhead). */
+            fun of(strategy: Strategy, restart: RestartPolicy): RoundFeedback? {
+                val s = strategy.takeIf { it.wantsRoundFeedback }
+                val r = restart as? AdaptivePolicy
+                return if (s != null || r != null) RoundFeedback(s, r) else null
+            }
+        }
+    }
+
     private companion object {
         /** Polling interval for cooperative cancellation; see Cancellation.kt. */
         const val CANCEL_CHECK_INTERVAL: Int = 1024
+
+        /** Feasibility-fight moves per round of adaptive-schedule feedback (#721). A round is the
+         *  batch over which an adaptive [com.eignex.klause.solver.localsearch.schedule.Schedule]
+         *  retunes; sized so the acceptance-ratio estimate is stable yet the schedule still reacts
+         *  many times over a search. */
+        const val ROUND_FEEDBACK_STEPS: Int = 1024
     }
 }

@@ -8,10 +8,13 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
+import com.eignex.klause.solver.localsearch.schedule.RoundLog
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -126,5 +129,71 @@ class RestartPolicyTest {
         val solver = LocalSearchSolver(problem, restartPolicy = LubyRestart(unit = 50))
         val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 9L)).assignment
         assertNotNull(sample)
+    }
+
+    private fun round(bestCost: Double): RoundLog =
+        RoundLog(proposed = 1, accepted = 1, costMean = 0.0, costVariance = 0.0, bestCost = bestCost, temperature = 1.0)
+
+    @Test
+    fun `stagnation restart fires after patience rounds without improvement`() {
+        val p = StagnationRestart(patience = 3, maxFlipsBeforeRestart = 1_000_000)
+        p.observe(round(5.0)) // first round establishes the watermark
+        p.observe(round(5.0)) // no improvement: 1
+        p.observe(round(5.0)) // no improvement: 2
+        assertFalse(p.shouldRestart(0), "must not restart before patience elapses")
+        p.observe(round(5.0)) // no improvement: 3 → trigger
+        assertTrue(p.shouldRestart(0), "patience consecutive flat rounds must trigger a restart")
+    }
+
+    @Test
+    fun `stagnation restart resets its counter on a strict improvement`() {
+        val p = StagnationRestart(patience = 3, maxFlipsBeforeRestart = 1_000_000)
+        p.observe(round(5.0))
+        p.observe(round(5.0)) // flat: 1
+        p.observe(round(4.0)) // improvement resets the counter
+        p.observe(round(4.0)) // flat: 1
+        p.observe(round(4.0)) // flat: 2
+        assertFalse(p.shouldRestart(0), "an improvement must reset the no-progress counter")
+    }
+
+    @Test
+    fun `stagnation restart honours the hard flip ceiling and clears on restart`() {
+        val p = StagnationRestart(patience = 100, maxFlipsBeforeRestart = 500)
+        assertFalse(p.shouldRestart(499))
+        assertTrue(p.shouldRestart(500), "the ceiling must force a restart even without stagnation")
+        repeat(101) { p.observe(round(5.0)) } // 1 watermark round + 100 flat rounds (patience)
+        assertTrue(p.shouldRestart(0), "stagnation must trigger after patience flat rounds")
+        val state = LocalSearchState(Problem(1, 0, emptyArray(), emptyList()), Random(0))
+        p.restart(state, bestSoFar = null)
+        assertFalse(p.shouldRestart(0), "restart must clear the pending trigger")
+    }
+
+    @Test
+    fun `engine drives per-round feedback to an adaptive restart policy`() {
+        // A restart policy that is also an AdaptivePolicy must be fed RoundLogs by the engine (#721),
+        // exactly like an adaptive schedule — proven by a spy whose observe count is non-zero after a
+        // run that spans several rounds on the UNSAT helper.
+        val spy = object : RestartPolicy, AdaptivePolicy {
+            var observed = 0
+            override fun shouldRestart(stepsSinceLastRestart: Int) = stepsSinceLastRestart >= 1_000_000
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
+            override fun observe(round: RoundLog) {
+                observed++
+            }
+            override fun reset() = Unit
+        }
+        val problem = Problem(
+            numBoolVars = 6,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Cardinality.exactlyOne(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            ),
+        )
+        LocalSearchSolver(problem, restartPolicy = spy)
+            .solve(LocalSearchParams(maxFlips = 6_000L, randomSeed = 4L))
+        assertTrue(spy.observed > 0, "the engine must feed RoundLogs to an adaptive restart policy")
     }
 }

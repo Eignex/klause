@@ -6,8 +6,11 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.localsearch.schedule.AdaptiveCooling
 import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.Strategy
+import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -169,6 +172,23 @@ class LocalSearchSessionTest {
         assertTrue(
             smoothedPeak < bumpOnlyPeak,
             "smoothing should bound growth: smoothed=$smoothedPeak vs bump-only=$bumpOnlyPeak",
+        )
+    }
+
+    @Test
+    fun `engine drives per-round feedback to an adaptive cooling schedule`() {
+        // AdaptiveCooling retunes its rate only when the engine calls observe at round boundaries
+        // (#721); on the UNSAT helper the satisfy loop runs well past several rounds, so its rate
+        // must move off the initial value — proving the loop drives the per-round feedback channel.
+        val cooling = AdaptiveCooling(initialRate = 0.999)
+        // Tabu disabled so the tiny problem never starves the pick into a restart, which would reset
+        // the round before it completes — the production SA arms restart on a far coarser cadence.
+        val strategy = SimulatedAnnealing.withSchedule(cooling, tabu = TabuFilter.Disabled)
+        val solver = LocalSearchSolver(weightLearningProblem(), strategy = strategy)
+        LocalSearchSession(solver).sample(LocalSearchParams(maxFlips = 6_000L, randomSeed = 4L))
+        assertTrue(
+            cooling.coolingRate != 0.999,
+            "the engine must drive schedule.observe each round; rate stayed at ${cooling.coolingRate}",
         )
     }
 
