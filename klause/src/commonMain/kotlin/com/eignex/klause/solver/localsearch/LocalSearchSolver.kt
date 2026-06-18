@@ -14,6 +14,7 @@ import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
+import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.objective.LinearObjective
@@ -457,7 +458,7 @@ class LocalSearchSolver(
         // split (strategy for satisfy, optimizeStrategy for descent) for non-unified
         // strategies that bail at feasibility (DDFW/ProbSat).
         val descentStrategy = optimizeStrategy
-        val unified = descentStrategy is Cbls
+        val unified = (descentStrategy as? SourceDrivenStrategy)?.drivesObjectiveDescent == true
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {

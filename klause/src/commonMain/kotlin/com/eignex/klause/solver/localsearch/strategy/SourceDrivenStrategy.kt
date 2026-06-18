@@ -48,12 +48,27 @@ class SourceDrivenStrategy(
     /** Optional perturbation: consulted once per pick before generation; a non-null result is taken
      *  immediately as a diversification kick. The closure owns its own trigger/stall state. */
     val perturbation: ((LocalSearchState) -> Move?)? = null,
+    /** Optional CBLS stall-schedule mode (#721): when set, the driver hands the pick to a stateful
+     *  weighted-violation orchestration (stall-gated source enabling, stall-aware noise, tabu/
+     *  starvation fallbacks, targeted kick) that the flat collect→score→accept loop below cannot
+     *  express. `null` (default) is the flat recipe mode — the [sources]/[acceptance] path. The two
+     *  modes are exclusive; the [Cbls] factory builds the stall mode. */
+    internal val cblsSchedule: CblsSchedule? = null,
 ) : Strategy {
+
+    /** Whether this strategy drives objective descent at feasibility (the CBLS stall-schedule mode
+     *  scores satisfied/objective candidates at `cost == 0`), rather than bailing for the engine's
+     *  built-in descent. The unified-minimize path keys off this. */
+    internal val drivesObjectiveDescent: Boolean get() = cblsSchedule != null
 
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
 
     override fun pickMove(state: LocalSearchState): Move? {
+        // CBLS stall-schedule mode owns the whole pick (its own weight/noise/kick schedule); the flat
+        // recipe path below is bypassed entirely.
+        cblsSchedule?.let { return it.pickMove(state, scoring, tabu) }
+
         // Stall-driven weight maintenance first, so the bumped gradient scores this pick's candidates.
         weightSchedule?.maintain(
             state.step,
