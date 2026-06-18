@@ -78,11 +78,13 @@ class SourceDrivenStrategy(
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             cs.source.generate(state, sink)
         }
-        // The noise/score pool split is preserved across the tabu + CC filters; the acceptance rule
+        // The noise/score pool split is preserved across the CC + tabu filters; the acceptance rule
         // applies it (stochastic rules draw from the noise pool only, deterministic ones range over
-        // both) and returns null when both pools are empty.
-        val noiseMoves = ccFilter(state, tabu.filter(state, noiseSink.list))
-        val scoreMoves = ccFilter(state, tabu.filter(state, scoreSink.list))
+        // both) and returns null when both pools are empty. CC precedes tabu (matching the focused
+        // WalkSAT/probSAT order): the configuration filter is the primary focus, tabu the cycle-breaker
+        // layered on what survives it.
+        val noiseMoves = tabu.filter(state, ccFilter(state, noiseSink.list))
+        val scoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
         return acceptance.choose(state.rng, noiseMoves, scoreMoves) { score(state, it) }
     }
 

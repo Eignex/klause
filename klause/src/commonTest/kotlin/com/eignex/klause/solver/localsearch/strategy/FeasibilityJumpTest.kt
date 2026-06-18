@@ -12,9 +12,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Behaviour tests for the Feasibility-Jump arm [FeasibilityJump] (#698): a weighted-violation
- * argmin-jump strategy must reach feasibility on a solvable instance, make progress (driven by the
- * adaptive weights) on a coupled one, and be deterministic for a fixed seed.
+ * Behaviour tests for the Feasibility-Jump arm (#698), now a [SourceDrivenStrategy] recipe (#721): a
+ * weighted-violation argmin-jump strategy must reach feasibility on a solvable instance, make
+ * progress (driven by the adaptive weights) on a coupled one, and be deterministic for a fixed seed.
  */
 class FeasibilityJumpTest {
 
@@ -39,7 +39,7 @@ class FeasibilityJumpTest {
         ),
     )
 
-    private fun drive(strategy: FeasibilityJump, state: LocalSearchState, maxSteps: Int): Int {
+    private fun drive(strategy: Strategy, state: LocalSearchState, maxSteps: Int): Int {
         state.recompute()
         var steps = 0
         while (steps < maxSteps && state.cost > 0L) {
