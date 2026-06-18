@@ -165,6 +165,11 @@ internal object ExactBasisCertifier {
         }
         val cuts = ArrayList<Cut>()
         val one = BigRational.of(1L)
+        // Sparse accumulator reused across every cut in this call: `coef[k]` holds the (rational)
+        // coefficient on shifted structural column `k` while a cut is built, `null` = untouched; only
+        // the touched columns are visited and reset, so a sparse cut never scans all `n` columns.
+        val coef = arrayOfNulls<BigRational>(n)
+        val touched = IntArrayList()
         for (i in 0 until m) {
             if (cuts.size >= maxCuts) break
             if (basic[i] >= n) continue // cut on fractional structural variables only
@@ -182,8 +187,8 @@ internal object ExactBasisCertifier {
                     break
                 }
             }
-            val cut = buildTableauCut(model, status, rho, rowCols, rowVals, f0, mir, one, global) ?: continue
-            cuts.add(cut)
+            val cut = buildTableauCut(model, status, rho, rowCols, rowVals, f0, mir, one, global, coef, touched)
+            if (cut != null) cuts.add(cut)
         }
         return cuts
     }
@@ -199,9 +204,21 @@ internal object ExactBasisCertifier {
         mir: Boolean,
         one: BigRational,
         global: Boolean,
+        coef: Array<BigRational?>, // shared sparse accumulator over shifted structural columns (n-wide)
+        touched: IntArrayList, // the columns this cut wrote into `coef`, for O(touched) read + reset
     ): Cut? {
         val n = model.n
-        val coef = Array(n) { BigRational.ZERO } // coefficient on each shifted structural column z_k
+
+        // Accumulate `value` onto shifted structural column `k`, recording the first touch.
+        fun add(k: Int, value: BigRational) {
+            val cur = coef[k]
+            if (cur == null) {
+                coef[k] = value
+                touched.add(k)
+            } else {
+                coef[k] = cur + value
+            }
+        }
         var constant = BigRational.ZERO // constant moved to the left side
         for (j in 0 until model.numVars) {
             if (status[j] == VarStatus.BASIC) continue
@@ -216,9 +233,9 @@ internal object ExactBasisCertifier {
             if (mj.signum() == 0) continue
             if (j < n) {
                 if (atLower) {
-                    coef[j] += mj // t_j = z_j
+                    add(j, mj) // t_j = z_j
                 } else {
-                    coef[j] -= mj // t_j = u_j − z_j
+                    add(j, BigRational.ZERO - mj) // t_j = u_j − z_j
                     constant += mj * BigRational.of(model.upper[j])
                 }
             } else {
@@ -226,32 +243,44 @@ internal object ExactBasisCertifier {
                 val r = j - n // ≤-row slack: t_j = rhs_r − Σ_k A_rk·z_k
                 val cols = rowCols[r]
                 val vals = rowVals[r]
-                for (idx in 0 until cols.size) coef[cols[idx]] -= mj * BigRational.of(vals[idx])
+                for (idx in 0 until cols.size) add(cols[idx], BigRational.ZERO - mj * BigRational.of(vals[idx]))
                 constant += mj * BigRational.of(model.rhs[r])
             }
         }
-        // Σ coef_k·z_k ≥ f0 − constant, then unshift z_k = x_k − loShift_k.
+        // Σ coef_k·z_k ≥ f0 − constant, then unshift z_k = x_k − loShift_k. Touched columns ascending
+        // so the emitted cut is column-ordered and deterministic.
+        val ks = touched.toIntArray()
+        ks.sort()
         var rhs = f0 - constant
-        for (k in 0 until n) if (coef[k].signum() != 0) rhs += coef[k] * BigRational.of(model.loShift[k])
-        return integerCut(model, coef, rhs, global)
+        for (k in ks) {
+            val c = coef[k] ?: continue
+            if (c.signum() != 0) rhs += c * BigRational.of(model.loShift[k])
+        }
+        val cut = integerCut(coef, ks, rhs, global)
+        for (idx in 0 until touched.size) coef[touched[idx]] = null // reset for the next cut
+        touched.clear()
+        return cut
     }
 
-    /** Scale a rational cut `Σ coef_k·x_k ≥ rhs` to integer `Long` coefficients (common-denominator
-     *  clear, gcd-reduce, ceil the rhs — valid since the reduced left side is integral), or null if it
-     *  has no term or overflows `Long`. */
-    private fun integerCut(model: LpModel, coef: Array<BigRational>, rhs: BigRational, global: Boolean): Cut? {
-        val n = model.n
+    /** Scale a rational cut `Σ coef_k·x_k ≥ rhs` (over the touched columns [ks], ascending) to integer
+     *  `Long` coefficients (common-denominator clear, gcd-reduce, ceil the rhs — valid since the reduced
+     *  left side is integral), or null if it has no term or overflows `Long`. */
+    private fun integerCut(coef: Array<BigRational?>, ks: IntArray, rhs: BigRational, global: Boolean): Cut? {
         var denLcm = BigInt.ONE
-        for (k in 0 until n) if (coef[k].signum() != 0) denLcm = lcm(denLcm, coef[k].den)
+        for (k in ks) {
+            val c = coef[k] ?: continue
+            if (c.signum() != 0) denLcm = lcm(denLcm, c.den)
+        }
         denLcm = lcm(denLcm, rhs.den)
-        val intCoef = Array(n) { BigInt.ZERO }
+        val intCoef = arrayOfNulls<BigInt>(ks.size) // parallel to ks
         var g = BigInt.ZERO
         var count = 0
-        for (k in 0 until n) {
-            if (coef[k].signum() == 0) continue
-            val c = coef[k].num * denLcm.divExact(coef[k].den)
-            intCoef[k] = c
-            g = g.gcd(c)
+        for (idx in ks.indices) {
+            val c = coef[ks[idx]] ?: continue
+            if (c.signum() == 0) continue
+            val ci = c.num * denLcm.divExact(c.den)
+            intCoef[idx] = ci
+            g = g.gcd(ci)
             count++
         }
         if (count == 0) return null
@@ -259,13 +288,13 @@ internal object ExactBasisCertifier {
         val rhsInt = rhs.num * denLcm.divExact(rhs.den)
         val cols = IntArray(count)
         val vals = LongArray(count)
-        var idx = 0
-        for (k in 0 until n) {
-            if (intCoef[k].signum() == 0) continue
-            val v = intCoef[k].divExact(g).toLongOrNull() ?: return null // overflow ⇒ drop (sound)
-            cols[idx] = k
-            vals[idx] = v
-            idx++
+        var oi = 0
+        for (idx in ks.indices) {
+            val ci = intCoef[idx] ?: continue
+            val v = ci.divExact(g).toLongOrNull() ?: return null // overflow ⇒ drop (sound)
+            cols[oi] = ks[idx]
+            vals[oi] = v
+            oi++
         }
         // ceil(rhsInt / g) for g > 0: the reduced left side is integral, so rounding up stays valid.
         val q = rhsInt.div(g)
