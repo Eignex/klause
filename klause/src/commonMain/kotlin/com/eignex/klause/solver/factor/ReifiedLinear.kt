@@ -105,7 +105,9 @@ class ReifiedLinear private constructor(
      * body is infeasible at root bounds.
      */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        val extraLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0
+        val auxValue = state.boolValues[auxBoolVar]
+        val extraLit = auxValue?.let { Lit.make(auxBoolVar, !it) } ?: 0
+        val includeExtraLit = auxValue != null
         // A single-term equality body (`c·v == bound`) can be infeasible because its required value
         // is an *interior hole* of v, with v's bounds unchanged from root (the [eqTargetUnreachable]
         // path). A bounds-only reason then cites nothing and degenerates to the bare indicator lit —
@@ -115,9 +117,15 @@ class ReifiedLinear private constructor(
         // body tighten is already chained through that bound atom's own reason), so they stay on the
         // tighter bounds-only collector.
         return if (op == LinearOp.EQ && vars.size == 1) {
-            collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit)
+            collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit, includeExtraLit = includeExtraLit)
         } else {
-            collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = extraLit)
+            collectLinearTightenAntecedents(
+                state,
+                vars,
+                excludeIdx = -1,
+                extraLit = extraLit,
+                includeExtraLit = includeExtraLit,
+            )
         }
     }
 
@@ -166,7 +174,7 @@ class ReifiedLinear private constructor(
         // conflict must trace back through it.
         val auxAntecedent = Lit.make(auxBoolVar, !aux)
         return if (aux) {
-            propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = auxAntecedent)
+            propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = auxAntecedent, includeExtraLit = true)
         } else {
             when (op) {
                 LinearOp.LE -> propagateLinearBounds(
@@ -176,6 +184,7 @@ class ReifiedLinear private constructor(
                     LinearOp.GE,
                     bnd + 1,
                     extraLit = auxAntecedent,
+                    includeExtraLit = true,
                 )
 
                 LinearOp.GE -> propagateLinearBounds(
@@ -185,11 +194,28 @@ class ReifiedLinear private constructor(
                     LinearOp.LE,
                     bnd - 1,
                     extraLit = auxAntecedent,
+                    includeExtraLit = true,
                 )
 
-                LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, extraLit = auxAntecedent)
+                LinearOp.EQ -> propagateLinearBounds(
+                    state,
+                    coeffs,
+                    vars,
+                    LinearOp.NE,
+                    bnd,
+                    extraLit = auxAntecedent,
+                    includeExtraLit = true,
+                )
 
-                LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, extraLit = auxAntecedent)
+                LinearOp.NE -> propagateLinearBounds(
+                    state,
+                    coeffs,
+                    vars,
+                    LinearOp.EQ,
+                    bnd,
+                    extraLit = auxAntecedent,
+                    includeExtraLit = true,
+                )
             }
         }
     }

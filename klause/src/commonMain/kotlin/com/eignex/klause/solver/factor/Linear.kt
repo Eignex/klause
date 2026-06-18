@@ -302,10 +302,15 @@ class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int
  * Allocates `atomVarEq` atoms on demand for each cited hole. Returns `null` when nothing is
  * tighter than the original (caller falls back to default antecedents).
  */
-internal fun collectHoleAndBoundAntecedents(state: PropagationState, vars: IntArray, extraLit: Int = 0): IntArray? {
+internal fun collectHoleAndBoundAntecedents(
+    state: PropagationState,
+    vars: IntArray,
+    extraLit: Int = 0,
+    includeExtraLit: Boolean = false,
+): IntArray? {
     val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
-    if (extraLit != 0) {
+    if (includeExtraLit) {
         out.add(extraLit)
         seen.add(extraLit)
     }
@@ -381,11 +386,12 @@ internal fun collectLinearDirAntecedents(
     vars: IntArray,
     excludeIdx: Int,
     extraLit: Int,
+    includeExtraLit: Boolean = false,
     useLo: Boolean,
 ): IntArray? {
     val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
-    if (extraLit != 0) {
+    if (includeExtraLit) {
         out.add(extraLit)
         seen.add(extraLit)
     }
@@ -428,10 +434,11 @@ internal fun collectLinearTightenAntecedents(
     vars: IntArray,
     excludeIdx: Int,
     extraLit: Int,
+    includeExtraLit: Boolean = false,
 ): IntArray? {
     val seen = IntHashSet(vars.size * 2) // pre-sized to the literal count to avoid rehash-grow during fill
     val out = IntArrayList()
-    if (extraLit != 0) {
+    if (includeExtraLit) {
         out.add(extraLit)
         seen.add(extraLit)
     }
@@ -499,9 +506,10 @@ internal fun collectLinearStartBoundAntecedents(
     rHi: LongArray,
     useLo: Boolean,
     extraLit: Int,
+    includeExtraLit: Boolean = false,
 ): IntArray? {
     val out = IntArrayList()
-    if (extraLit != 0) out.add(extraLit)
+    if (includeExtraLit) out.add(extraLit)
     for (j in vars.indices) {
         val c = coeffs[j]
         if (c == 0) continue
@@ -536,6 +544,7 @@ internal fun propagateLinearBounds(
     op: LinearOp,
     bound: Long,
     extraLit: Int = 0,
+    includeExtraLit: Boolean = false,
 ): Boolean {
     val n = vars.size
     // Wide constraints reuse a shared start-of-call reason that reads a snapshot of every term's
@@ -586,7 +595,7 @@ internal fun propagateLinearBounds(
             if (rhs % c != 0L) continue
             val forbidden = rhs / c
             if (forbidden < Int.MIN_VALUE || forbidden > Int.MAX_VALUE) continue
-            val ant = collectLinearTightenAntecedents(state, vars, i, extraLit)
+            val ant = collectLinearTightenAntecedents(state, vars, i, extraLit, includeExtraLit = includeExtraLit)
             if (!state.excludeIntValue(v, forbidden.toInt(), ant)) return false
         }
         return true
@@ -600,17 +609,55 @@ internal fun propagateLinearBounds(
     var hiBase: IntArray? = null
     var hiBaseBuilt = false
     fun loReason(i: Int): IntArray? {
-        if (!wide) return collectLinearDirAntecedents(state, coeffs, vars, i, extraLit, useLo = true)
+        if (!wide) {
+            return collectLinearDirAntecedents(
+                state,
+                coeffs,
+                vars,
+                i,
+                extraLit,
+                includeExtraLit = includeExtraLit,
+                useLo = true,
+            )
+        }
         if (!loBaseBuilt) {
-            loBase = collectLinearStartBoundAntecedents(state, coeffs, vars, rLo, rHi, useLo = true, extraLit)
+            loBase = collectLinearStartBoundAntecedents(
+                state,
+                coeffs,
+                vars,
+                rLo,
+                rHi,
+                useLo = true,
+                extraLit = extraLit,
+                includeExtraLit = includeExtraLit,
+            )
             loBaseBuilt = true
         }
         return loBase
     }
     fun hiReason(i: Int): IntArray? {
-        if (!wide) return collectLinearDirAntecedents(state, coeffs, vars, i, extraLit, useLo = false)
+        if (!wide) {
+            return collectLinearDirAntecedents(
+                state,
+                coeffs,
+                vars,
+                i,
+                extraLit,
+                includeExtraLit = includeExtraLit,
+                useLo = false,
+            )
+        }
         if (!hiBaseBuilt) {
-            hiBase = collectLinearStartBoundAntecedents(state, coeffs, vars, rLo, rHi, useLo = false, extraLit)
+            hiBase = collectLinearStartBoundAntecedents(
+                state,
+                coeffs,
+                vars,
+                rLo,
+                rHi,
+                useLo = false,
+                extraLit = extraLit,
+                includeExtraLit = includeExtraLit,
+            )
             hiBaseBuilt = true
         }
         return hiBase
