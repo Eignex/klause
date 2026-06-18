@@ -52,7 +52,7 @@ class CblsStallSwapTest {
      *  compounds, not the full stalled drive — they pass [compoundCap] to stop early once
      *  enough have surfaced (the negative default-cap test must ride out every step). */
     private fun drive(
-        strategy: Cbls,
+        strategy: Strategy,
         state: LocalSearchState,
         steps: Int,
         compoundCap: Int = Int.MAX_VALUE,

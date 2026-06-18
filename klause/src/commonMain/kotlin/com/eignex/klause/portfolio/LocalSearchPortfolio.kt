@@ -26,6 +26,7 @@ import com.eignex.klause.solver.localsearch.strategy.FeasibilityJump
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
+import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.localsearch.strategy.Strategy
 import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.localsearch.strategy.WalkSat
@@ -152,7 +153,7 @@ internal data class LocalSearchWorkerConfig(
             restart: RestartPolicy,
             perMoveInvariants: Boolean = true,
             seedImplicitOnRestart: Boolean = false,
-            make: () -> Cbls,
+            make: () -> SourceDrivenStrategy,
         ) = LocalSearchWorkerConfig(
             label,
             make(),
