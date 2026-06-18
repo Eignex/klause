@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.Pool
+import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 
 /**
  * The shared local-search driver (epic #710): a [Strategy] expressed purely as *policy over move
@@ -32,18 +33,39 @@ import com.eignex.klause.solver.localsearch.movesource.Pool
 class SourceDrivenStrategy(
     /** The sources this strategy draws from, with their per-source caps and enable gates. */
     val sources: List<ConfiguredSource>,
-    /** Basis for scoring candidates — the CBLS weighted gradient or the raw violation delta. */
+    /** Basis for scoring candidates — weighted/raw net-delta or the shaped break score. */
     val scoring: MoveScoring = MoveScoring.Weighted,
-    /** How a scored candidate is selected — greedy, WalkSAT noise, probSAT roulette, or skewed-VNS. */
+    /** How a scored candidate is selected — greedy, WalkSAT noise, probSAT roulette, skewed-VNS, or SA. */
     val acceptance: AcceptanceRule = AcceptanceRule.Greedy,
     /** Tabu filter applied to the combined candidate pool before selection. */
     val tabu: TabuFilter = TabuFilter.Disabled,
+    /** Optional violation-weight schedule (the CBLS/FJ stall-bump+decay family). Maintained off
+     *  `(state.step, state.cost)` each pick; `null` (default) leaves the weights untouched. */
+    val weightSchedule: WeightSchedule? = null,
+    /** Configuration checking (CCASat): restrict candidates to variables whose configuration changed
+     *  since their last flip, falling back to the full pool when all are CC-blocked. */
+    val configurationChecking: Boolean = false,
+    /** Optional perturbation: consulted once per pick before generation; a non-null result is taken
+     *  immediately as a diversification kick. The closure owns its own trigger/stall state. */
+    val perturbation: ((LocalSearchState) -> Move?)? = null,
 ) : Strategy {
 
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
 
     override fun pickMove(state: LocalSearchState): Move? {
+        // Stall-driven weight maintenance first, so the bumped gradient scores this pick's candidates.
+        weightSchedule?.maintain(
+            state.step,
+            state.cost,
+            state.factorWeights,
+            state.baseFactorWeights,
+            state.violated.toIntArray(),
+            state.rng,
+        )
+        // Perturbation escalation: a triggered kick pre-empts the normal pick.
+        perturbation?.invoke(state)?.let { return it }
+
         noiseSink.clear()
         scoreSink.clear()
         noiseSink.setAssumptions(state.assumptions)
@@ -56,23 +78,38 @@ class SourceDrivenStrategy(
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             cs.source.generate(state, sink)
         }
-        // The noise/score pool split is preserved across the tabu filter; the acceptance rule
+        // The noise/score pool split is preserved across the tabu + CC filters; the acceptance rule
         // applies it (stochastic rules draw from the noise pool only, deterministic ones range over
         // both) and returns null when both pools are empty.
-        val noiseMoves = tabu.filter(state, noiseSink.list)
-        val scoreMoves = tabu.filter(state, scoreSink.list)
+        val noiseMoves = ccFilter(state, tabu.filter(state, noiseSink.list))
+        val scoreMoves = ccFilter(state, tabu.filter(state, scoreSink.list))
         return acceptance.choose(state.rng, noiseMoves, scoreMoves) { score(state, it) }
     }
 
-    /** Scored delta: the [scoring]-basis violation change, plus the objective change once feasible
-     *  (the objective is gated behind `cost == 0` so the infeasibility fight isn't pulled off the
-     *  constraint gradient). Mirrors [Cbls]'s feasibility-first scoring. */
-    private fun score(state: LocalSearchState, move: Move): Double {
-        val violationDelta = when (scoring) {
-            MoveScoring.Weighted -> state.weightedNetDelta(move)
-            MoveScoring.Raw -> state.netDelta(move).toDouble()
-        }
-        val objDelta = if (state.cost == 0L) state.shapedObjectiveDelta(move) else 0.0
-        return violationDelta + objDelta
+    /** Restrict [moves] to configuration-changed candidates when [configurationChecking] is on,
+     *  falling back to the unfiltered pool when every candidate is CC-blocked. */
+    private fun ccFilter(state: LocalSearchState, moves: List<Move>): List<Move> {
+        if (!configurationChecking || moves.isEmpty()) return moves
+        val cc = moves.filter { confChanged(state, it) }
+        return cc.ifEmpty { moves }
     }
+
+    /** A move is configuration-changed iff every variable it touches has moved since its last flip. */
+    private fun confChanged(state: LocalSearchState, move: Move): Boolean = when (move) {
+        is Move.BoolFlip -> state.boolConfChange[move.varId]
+        is Move.IntSet -> state.intConfChange[move.varId]
+        is Move.Compound -> move.parts.all { confChanged(state, it) }
+    }
+
+    /** Scored value on the [scoring] basis. Weighted/raw net-delta add the objective change once
+     *  feasible (gated behind `cost == 0` so the infeasibility fight keeps the constraint gradient);
+     *  the break basis already folds the shaped objective. Mirrors [Cbls]'s feasibility-first scoring. */
+    private fun score(state: LocalSearchState, move: Move): Double = when (scoring) {
+        MoveScoring.Break -> state.shapedBreakScore(move)
+        MoveScoring.Weighted -> state.weightedNetDelta(move) + feasibleObjectiveDelta(state, move)
+        MoveScoring.Raw -> state.netDelta(move).toDouble() + feasibleObjectiveDelta(state, move)
+    }
+
+    private fun feasibleObjectiveDelta(state: LocalSearchState, move: Move): Double =
+        if (state.cost == 0L) state.shapedObjectiveDelta(move) else 0.0
 }

@@ -200,7 +200,8 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
         scoring = when (val s = p.string("scoring")?.lowercase()) {
             null, "weighted" -> MoveScoring.Weighted
             "raw" -> MoveScoring.Raw
-            else -> usageError("ls-single: scoring expects weighted|raw, got `$s`")
+            "break" -> MoveScoring.Break
+            else -> usageError("ls-single: scoring expects weighted|raw|break, got `$s`")
         },
         acceptance = when (val a = p.string("acceptance")?.lowercase()) {
             null, "greedy" -> AcceptanceRule.Greedy
