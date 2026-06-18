@@ -152,4 +152,44 @@ class ReifiedLinearConflictReasonTest {
             assertEquals(brute, enumerate(problem, seed), "seed=$seed: unreachable EQ target forces aux false")
         }
     }
+
+    @Test
+    fun `enumerate should cover all projected models for int-bit channels with reified eq`() {
+        // x in [0,3], bits c0/c1 in {0,1}, booleans b0/b1 with
+        // b0 <-> (c0 == 1), b1 <-> (c1 == 1), and x - c0 - 2*c1 == 0.
+        val nv = 3
+        for (seed in 1L..5L) {
+            var nextBool = 0
+            var nextInt = nv
+            val doms = ArrayList<IntDomain>().apply { repeat(nv) { add(IntDomain(0, 3)) } }
+            val factors = ArrayList<Factor>()
+            repeat(nv) { x ->
+                val c0 = nextInt++
+                val c1 = nextInt++
+                doms.add(IntDomain(0, 1))
+                doms.add(IntDomain(0, 1))
+                val b0 = nextBool++
+                val b1 = nextBool++
+                factors.add(ReifiedLinear(b0, intArrayOf(1), intArrayOf(c0), LinearOp.EQ, 1))
+                factors.add(ReifiedLinear(b1, intArrayOf(1), intArrayOf(c1), LinearOp.EQ, 1))
+                factors.add(Linear(intArrayOf(1, -1, -2), intArrayOf(x, c0, c1), LinearOp.EQ, 0))
+            }
+            val problem = Problem(
+                numBoolVars = nextBool,
+                numIntVars = nextInt,
+                intDomains = doms.toTypedArray(),
+                factors = factors.toTypedArray(),
+            )
+            val projected = BacktrackSolver(problem).enumerate(
+                BacktrackParams(
+                    maxDecisions = 50_000_000L,
+                    randomSeed = seed,
+                    variableSelector = Vsids(),
+                ),
+            ).map { sample -> (0 until nv).map { sample.ints[it] } }.toHashSet()
+            val expected = HashSet<List<Int>>()
+            for (x0 in 0..3) for (x1 in 0..3) for (x2 in 0..3) expected.add(listOf(x0, x1, x2))
+            assertEquals(expected, projected, "seed=$seed: enumerate must cover all 64 projected models")
+        }
+    }
 }
