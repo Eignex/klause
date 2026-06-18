@@ -2,6 +2,8 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
+import com.eignex.klause.solver.localsearch.schedule.RoundLog
 
 /**
  * Pluggable restart logic for [LocalSearchSolver]. Decouples *when* to restart
@@ -126,6 +128,62 @@ class AdaptivePerturbationRestart(val maxFlipsBeforeRestart: Int = 10_000, val p
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         if (bestSoFar == null) state.restart() else anchorAndPerturb(state, bestSoFar, perturbationStrength)
+    }
+}
+
+/**
+ * Stagnation-driven restart on the shared per-round feedback channel ([AdaptivePolicy], #721): rather
+ * than a fixed flip cadence, restart after [patience] consecutive rounds ([RoundLog]) with no strict
+ * improvement in the best cost seen. A [maxFlipsBeforeRestart] ceiling still forces a restart if a
+ * round never completes (e.g. the search keeps restarting for another reason), so the policy can't
+ * wedge. Anchors to `bestSoFar` with a [perturbationStrength] perturbation when one exists, else a
+ * full random restart.
+ *
+ * The engine feeds rounds only when this policy is installed, so the common fixed-cadence arms carry
+ * no accumulation overhead. Adoption by a portfolio arm is bench-gated.
+ */
+class StagnationRestart(
+    /** Consecutive no-improvement rounds before a restart fires. */
+    val patience: Int = 8,
+    /** Hard flip ceiling that forces a restart even if no round has completed. */
+    val maxFlipsBeforeRestart: Int = 100_000,
+    /** Variables perturbed when anchoring to `bestSoFar` (see [anchorAndPerturb]). */
+    val perturbationStrength: Int = 5,
+) : RestartPolicy,
+    AdaptivePolicy {
+    init {
+        require(patience >= 1) { "patience ≥ 1, got $patience" }
+        require(maxFlipsBeforeRestart >= 1) { "maxFlipsBeforeRestart ≥ 1, got $maxFlipsBeforeRestart" }
+        require(perturbationStrength >= 0) { "perturbationStrength ≥ 0, got $perturbationStrength" }
+    }
+
+    private var bestCost: Double = Double.POSITIVE_INFINITY
+    private var roundsSinceImprovement: Int = 0
+    private var pendingRestart: Boolean = false
+
+    override fun observe(round: RoundLog) {
+        if (round.bestCost < bestCost) {
+            bestCost = round.bestCost
+            roundsSinceImprovement = 0
+        } else if (++roundsSinceImprovement >= patience) {
+            pendingRestart = true
+        }
+    }
+
+    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
+        pendingRestart || stepsSinceLastRestart >= maxFlipsBeforeRestart
+
+    override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+        pendingRestart = false
+        roundsSinceImprovement = 0
+        bestCost = Double.POSITIVE_INFINITY
+        if (bestSoFar == null) state.restart() else anchorAndPerturb(state, bestSoFar, perturbationStrength)
+    }
+
+    override fun reset() {
+        pendingRestart = false
+        roundsSinceImprovement = 0
+        bestCost = Double.POSITIVE_INFINITY
     }
 }
 

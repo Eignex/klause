@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.Pool
+import com.eignex.klause.solver.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 
 /**
@@ -60,6 +61,15 @@ class SourceDrivenStrategy(
      *  scores satisfied/objective candidates at `cost == 0`), rather than bailing for the engine's
      *  built-in descent. The unified-minimize path keys off this. */
     internal val drivesObjectiveDescent: Boolean get() = cblsSchedule != null
+
+    /** Round feedback drives the temperature schedule of a Metropolis (simulated-annealing)
+     *  acceptance rule; other rules ignore it, so accumulation is gated off for them. */
+    override val wantsRoundFeedback: Boolean get() = acceptance is AcceptanceRule.Metropolis
+
+    override fun observeRound(acc: RoundAccumulator, step: Long) {
+        val schedule = (acceptance as? AcceptanceRule.Metropolis)?.schedule ?: return
+        schedule.observe(acc.snapshot(schedule.temperature, step))
+    }
 
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
