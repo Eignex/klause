@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.recipe
+package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -6,7 +6,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

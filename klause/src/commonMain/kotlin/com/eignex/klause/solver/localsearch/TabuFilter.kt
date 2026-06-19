@@ -1,7 +1,6 @@
-package com.eignex.klause.solver.localsearch.driver
+package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.Schedule
 import kotlin.math.exp

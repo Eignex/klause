@@ -6,11 +6,10 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
-import com.eignex.klause.solver.localsearch.driver.TabuFilter
-import com.eignex.klause.solver.localsearch.recipe.Cbls
-import com.eignex.klause.solver.localsearch.recipe.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.schedule.AdaptiveCooling
+import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
+import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals

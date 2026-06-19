@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.recipe
+package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema

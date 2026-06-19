@@ -7,7 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.recipe.ProbSat
+import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

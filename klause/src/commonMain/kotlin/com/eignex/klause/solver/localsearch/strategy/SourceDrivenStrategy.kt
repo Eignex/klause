@@ -1,8 +1,9 @@
-package com.eignex.klause.solver.localsearch.driver
+package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.TabuFilter
 import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.Pool
@@ -33,7 +34,7 @@ import com.eignex.klause.solver.localsearch.scoring.MoveScoring
  * behaviour is its four axes — the driver removes only the duplicated *generation*.
  *
  * Every local-search arm — CBLS, Feasibility-Jump, the WalkSAT/probSAT/SA family — is a named recipe
- * over this driver (see the `recipe` package).
+ * over this driver (the factory functions alongside it in this package).
  */
 class SourceDrivenStrategy(
     /** The sources this strategy draws from, with their per-source caps and enable gates. */

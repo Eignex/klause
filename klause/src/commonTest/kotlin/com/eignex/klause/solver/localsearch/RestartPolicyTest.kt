@@ -8,12 +8,12 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.solver.localsearch.schedule.RoundLog
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test

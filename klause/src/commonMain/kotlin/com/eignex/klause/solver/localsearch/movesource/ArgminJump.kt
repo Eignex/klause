@@ -22,7 +22,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
  *
  * The jump is scored against the *adaptive* per-constraint weights in
  * [LocalSearchState.factorWeights] — the same vector the DDFW/SAPS arms and the
- * [com.eignex.klause.solver.localsearch.recipe.FeasibilityJump] strategy bump and decay. Reading
+ * [com.eignex.klause.solver.localsearch.strategy.FeasibilityJump] strategy bump and decay. Reading
  * it forces the lazy allocation, which is intended: FJ is a weighted-violation method.
  *
  * [Phase.Any] / [Pool.NoiseEligible]: the jump is a single-variable move usable in either phase and
