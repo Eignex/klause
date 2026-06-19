@@ -244,17 +244,13 @@ class BacktrackSolver(override val problem: Problem) :
         // ways this one engine is driven.
         private val pausable: Boolean = true,
     ) : ResumableSearch {
-        // #429: the LP emphasis selector resolves the LP-relaxation family against the problem's
-        // structure; a null [BacktrackParams.lpConfig] uses the explicit per-technique flags verbatim.
-        // The slice cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed
-        // in runSlice.
-        private val resolvedParams0 = params0.lpConfig
-            ?.let { LpAutoConfig.resolve(problem, it, params0) } ?: params0
-
+        // #429: the LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
+        // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
+        // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
         // The caller's own token (drives the non-pausable one-shot path); superseded by the slice in
         // pausable mode.
-        private val baseCancellation: Cancellation = resolvedParams0.cancellation
-        private val params: BacktrackParams = resolvedParams0
+        private val baseCancellation: Cancellation = params0.cancellation
+        private val params: BacktrackParams = params0
             .copy(cancellation = Cancellation { sliceCancelled() }, minHammingDistance = 0, recentWindow = 0)
 
         // --- Slice control (no coroutine): a re-armable deadline + the current global token. ---
@@ -470,8 +466,8 @@ class BacktrackSolver(override val problem: Problem) :
          */
         private fun initRootLp() {
             val relaxer = lpEngine.lpRelaxer ?: return
-            val gomory = params.lpPlan.cuts && params.lpPlan.gomory
-            val mir = params.lpPlan.cuts && params.lpPlan.mir
+            val gomory = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.gomory
+            val mir = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.mir
             if (lpEngine.lpSeparators.isNotEmpty() || gomory || mir) {
                 lpEngine.lpGlobalCuts = lpEngine.harvestRootCuts(
                     relaxer,
@@ -502,7 +498,7 @@ class BacktrackSolver(override val problem: Problem) :
                 initRootLp()
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
-                if (params.lpPlan.probe && lpEngine.lpRelaxer != null) {
+                if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
                     val seed = lpEngine.lpRoundingProbe(objective, params.cancellation)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }
