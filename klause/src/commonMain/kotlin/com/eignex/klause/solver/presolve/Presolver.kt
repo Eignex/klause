@@ -151,6 +151,11 @@ enum class PresolvePass(
             PassResult(Presolve.strengthenCoefficients(problem))
     },
 
+    /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
+    DERIVE_XOR_UNITS("xor-units", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.deriveXorUnits(problem))
+    },
+
     /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated
      *  variable is left unconstrained in the presolved problem (its value is rebuilt from its partner
      *  on the way back), so a complete enumerator would branch over its domain and over-count each
