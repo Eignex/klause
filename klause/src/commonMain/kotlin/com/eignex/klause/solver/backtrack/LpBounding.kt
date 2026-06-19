@@ -32,7 +32,7 @@ import kotlin.math.round
  * weight (or 0) that makes their contribution smallest; unpinned int vars take the
  * domain endpoint matching the coefficient's sign.
  */
-internal fun BacktrackSolver.linearLowerBound(obj: LinearObjective, session: PropagationSession): Long = try {
+internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: PropagationSession): Long = try {
     var total = obj.constant
     val sp = session.problem
     val nb = minOf(sp.numBoolVars, obj.boolWeights.size)
@@ -99,7 +99,7 @@ internal class LpNogoodPool(private val cap: Int = 4096) {
  * variables. Determinant overflow during the relaxation build keeps the node soundly.
  */
 @Suppress("LongParameterList")
-internal fun BacktrackSolver.lpBoundAndFix(
+internal fun LpEngine.lpBoundAndFix(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     bound: Double,
@@ -133,7 +133,7 @@ internal fun BacktrackSolver.lpBoundAndFix(
  * leaf), and fixes reduced-cost-dominated variables off their bounds. Any solver failure keeps the node.
  */
 @Suppress("LongParameterList")
-internal fun BacktrackSolver.sparseSafePrune(
+internal fun LpEngine.sparseSafePrune(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     bound: Double,
@@ -249,7 +249,7 @@ internal fun BacktrackSolver.sparseSafePrune(
  * conflict-analysis leaf). Returns true if a reduction empties a domain (the node is then pruned).
  */
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
-internal fun BacktrackSolver.applySparseReducedCostFixing(
+internal fun LpEngine.applySparseReducedCostFixing(
     relaxation: LpRelaxation,
     cert: ExactBasisCertifier.Certificate,
     basis: Basis,
@@ -374,7 +374,7 @@ internal fun BacktrackSolver.applySparseReducedCostFixing(
  * when the cheap safe-bound path overflowed during the relaxation build. Prunes when the certified
  * bound (plus the relaxation's objective constant) reaches the incumbent. Any failure keeps the node.
  */
-internal fun BacktrackSolver.sparseCertifiedPrune(
+internal fun LpEngine.sparseCertifiedPrune(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     bound: Double,
@@ -408,7 +408,7 @@ internal fun BacktrackSolver.sparseCertifiedPrune(
  * Shcherbina safe bound, the same sound bound the per-node prune reports. Solved once before search,
  * so the value is a sound *global* lower bound on the objective — the integrality-gap baseline for `-s`.
  */
-internal fun BacktrackSolver.rootLpRelaxationBound(
+internal fun LpEngine.rootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
@@ -433,7 +433,7 @@ internal fun BacktrackSolver.rootLpRelaxationBound(
  * stays sound when applied at any node. Determinant overflow keeps whatever cuts stayed within 64 bits.
  */
 @Suppress("LongParameterList")
-internal fun BacktrackSolver.harvestRootCuts(
+internal fun LpEngine.harvestRootCuts(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     separators: List<CutSeparator>,
@@ -482,7 +482,7 @@ internal fun BacktrackSolver.harvestRootCuts(
  * Sound by construction — the result is a candidate that the caller re-evaluates against the objective
  * and only keeps if feasible-and-improving; a bad rounding just yields null or a worse incumbent.
  */
-internal fun BacktrackSolver.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
+internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
     val session = PropagationSession(problem)
     if (session.isUnsatAtRoot) return null
     val relaxation = CpToLpRelaxation(problem, objective).build(session)

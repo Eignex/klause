@@ -49,7 +49,7 @@ interface IncrementalObjective : Objective {
  * coefficients** — the native objective. Every FlatZinc integer `solve minimize`, the
  * SAT/pseudo-Boolean/XCSP/LIA front-ends, and the `minimizeInt` family build this. Integer
  * coefficients let branch-and-bound compute the lower bound and apply the optimality cutoff
- * in exact [Long] arithmetic ([evaluateLong], `BacktrackSolver.linearLowerBound`), so no
+ * in exact [Long] arithmetic ([evaluateLong], `LpEngine.linearLowerBound`), so no
  * floating point enters the pruning decision.
  *
  * - [boolWeights] indexes by the original-problem bool var id; size must equal
