@@ -3,6 +3,10 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.backtrack.lp.LpAutoConfig
+import com.eignex.klause.solver.backtrack.lp.LpConfig
+import com.eignex.klause.solver.backtrack.lp.LpEmphasis
+import com.eignex.klause.solver.backtrack.lp.LpPlan
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
 import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
 import com.eignex.klause.solver.backtrack.selector.IndomainMin

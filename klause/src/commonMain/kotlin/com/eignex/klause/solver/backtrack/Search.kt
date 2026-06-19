@@ -2,6 +2,7 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.backtrack.lp.LpNogoodPool
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Clause

@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.lp
 
+import com.eignex.klause.solver.lp.cut.Cut
+import com.eignex.klause.solver.lp.relaxation.LpExplanation
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList

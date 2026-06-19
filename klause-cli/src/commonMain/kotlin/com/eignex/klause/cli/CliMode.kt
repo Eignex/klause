@@ -4,7 +4,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.LpEmphasis
+import com.eignex.klause.solver.backtrack.lp.LpEmphasis
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective

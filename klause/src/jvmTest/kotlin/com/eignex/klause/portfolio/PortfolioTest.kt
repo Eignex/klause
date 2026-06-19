@@ -7,9 +7,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.LpConfig
-import com.eignex.klause.solver.backtrack.LpEmphasis
-import com.eignex.klause.solver.backtrack.LpTechnique
+import com.eignex.klause.solver.backtrack.lp.LpConfig
+import com.eignex.klause.solver.backtrack.lp.LpEmphasis
+import com.eignex.klause.solver.backtrack.lp.LpTechnique
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
 import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
 import com.eignex.klause.solver.backtrack.selector.InputOrder
