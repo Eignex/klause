@@ -912,8 +912,13 @@ class Cumulative(
         tree.setLeafOrder(leafPos)
         val capL = effCap.toLong()
         // Cite all read int vars — edge-finding deductions depend on the fixed durations /
-        // resources / capacity, not just the start bounds (see [conflictReason]).
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        // resources / capacity, not just the start bounds (see [conflictReason]). Built lazily
+        // on the first actual tightening: the detection test fails on most fires, so the common
+        // pass tightens nothing and never pays for this constraint-wide reason. The first tighten
+        // computes it before any domain in this pass has moved, so it equals the pre-pass reason;
+        // later tightens reuse it (their cited bounds are looser-or-equal, hence still valid).
+        var ant: IntArray? = null
+        var antBuilt = false
 
         var k = 0
         while (k < m) {
@@ -946,6 +951,10 @@ class Cumulative(
                 val newEst = newEstL.toInt()
                 val v = starts[taskIds[i]]
                 if (newEst > state.intDomains[v].min) {
+                    if (!antBuilt) {
+                        ant = state.composeIntVarAtomAntecedents(intVars)
+                        antBuilt = true
+                    }
                     if (!state.tightenIntMin(v, newEst, ant)) return false
                 }
             }
