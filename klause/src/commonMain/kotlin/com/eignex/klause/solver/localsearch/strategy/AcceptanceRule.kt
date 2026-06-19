@@ -6,7 +6,7 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 /**
- * The **acceptance axis** of an LS recipe (epic #721): how a [SourceDrivenStrategy] selects one move
+ * The **acceptance axis** of an LS recipe: how a [SourceDrivenStrategy] selects one move
  * from the scored candidate pools. Lifts the selection rules that were inlined across `Cbls`,
  * `FocusedLs.MoveSelection`, and `FeasibilityJump` into one pluggable, composable type, so an arm
  * picks its acceptance independently of its sources and scoring.
@@ -24,7 +24,7 @@ import kotlin.random.Random
  */
 sealed interface AcceptanceRule {
 
-    /** Choose a move from the candidate pools, or null when both are empty. [temperature] is the
+    /** Choose a move from the candidate pools, or null when both are empty. `temperature` is the
      *  schedule axis's current annealing temperature (the driver supplies it from
      *  `ScheduleBundle.temperature`); only [Metropolis] consults it, the others ignore it. */
     fun choose(
@@ -34,6 +34,11 @@ sealed interface AcceptanceRule {
         temperature: Double,
         score: (Move) -> Double,
     ): Move?
+
+    /** A copy of this rule steered by the schedule axis's diversification-noise [level] in `[0, 1]`
+     *  (0 = baseline, toward 1 = more random). The driver supplies the level from a
+     *  `ScheduleBundle.noise` controller each pick; the noise-free rules ignore it and return self. */
+    fun steered(level: Double): AcceptanceRule = this
 
     /** Strict greedy descent: the minimum-scored move over both pools (ties broken uniformly). */
     data object Greedy : AcceptanceRule {
@@ -69,6 +74,9 @@ sealed interface AcceptanceRule {
             if (noisePool.isNotEmpty() && rng.nextDouble() < noise) return noisePool[rng.nextInt(noisePool.size)]
             return bestBy(rng, noisePool, scorePool, score)
         }
+
+        /** The adaptive-noise WalkSAT: the steered level *is* the noise probability (Hoos 2002). */
+        override fun steered(level: Double): AcceptanceRule = WalkSatNoise(level)
     }
 
     /**
@@ -112,6 +120,10 @@ sealed interface AcceptanceRule {
             }
             return noisePool[noisePool.size - 1]
         }
+
+        /** Adaptive probSAT: a higher steered level flattens the roulette toward uniform by scaling
+         *  the break exponent down (`cb·(1 − level·0.5)`); level 0 keeps the baseline `cb`. */
+        override fun steered(level: Double): AcceptanceRule = ProbSat(cb * (1.0 - level * 0.5), eps)
     }
 
     /**
@@ -139,7 +151,7 @@ sealed interface AcceptanceRule {
     /**
      * Simulated-annealing / Metropolis acceptance: sample the noise pool and take the first candidate
      * whose scored delta passes the Metropolis test — `delta <= 0` (always accept) or
-     * `rng < exp(-delta / T)` at the [temperature] the driver supplies from the schedule axis
+     * `rng < exp(-delta / T)` at the `temperature` the driver supplies from the schedule axis
      * (`ScheduleBundle.temperature`). The rule is pure: it owns no schedule and does not cool — the
      * driver advances the temperature schedule per pick, keeping acceptance and schedule as
      * independent axes. Falls back to the deterministic best over the score-only pool when the noise

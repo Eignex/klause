@@ -24,8 +24,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Tests for the driver axis inputs added in #13 (the unblocker for re-expressing the bespoke
- * strategies as recipes): Break scoring, the weight/stall schedule, the perturbation hook, and the
+ * Tests for the driver axis inputs that let the bespoke strategies be re-expressed as recipes: Break
+ * scoring, the schedule axis (weights, temperature), the perturbation hook, and the
  * configuration-checking filter — each additive and defaulting to the prior behaviour.
  */
 class SourceDrivenStrategyAxisInputsTest {
@@ -149,7 +149,7 @@ class SourceDrivenStrategyAxisInputsTest {
         repeat(20) { strategy.pickMove(state)?.let { move -> state.apply(move) } }
         assertTrue(
             temperature.temperature < t0,
-            "the driver must step the schedule temperature each Metropolis pick (was $t0, now ${temperature.temperature})",
+            "the driver must step the schedule temperature each Metropolis pick (was $t0)",
         )
     }
 }

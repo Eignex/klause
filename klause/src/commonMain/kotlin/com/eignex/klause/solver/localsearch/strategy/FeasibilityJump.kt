@@ -8,8 +8,8 @@ import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 
 /**
- * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024; epic #698), re-expressed as a
- * [SourceDrivenStrategy] recipe (#721). FJ is exactly the driver's four axes pinned to the
+ * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024), re-expressed as a
+ * [SourceDrivenStrategy] recipe. FJ is exactly the driver's four axes pinned to the
  * jump-and-reweight regime:
  *
  *  - **sources** = `{`[ArgminJump]`}` — every step jumps a hot-spot variable directly to its
@@ -50,14 +50,16 @@ fun FeasibilityJump(
         sources = listOf(ConfiguredSource(ArgminJump(candidateVars, maxValueTries))),
         scoring = MoveScoring.Weighted,
         acceptance = AcceptanceRule.Greedy,
-        schedule = ScheduleBundle(weights = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay)),
+        schedule = ScheduleBundle(
+            weights = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay),
+        ),
         perturbation = if (perturbAfter > 0) StallPerturbation(perturbAfter) else null,
     )
 }
 
 /**
  * The Feasibility-Jump diversification kick as a driver [perturbation hook][SourceDrivenStrategy.perturbation]
- * (#721): after [perturbAfter] applied moves with no strict cost drop — long enough that weight
+ *: after [perturbAfter] applied moves with no strict cost drop — long enough that weight
  * escalation has had its chance — return one random hot-spot jump and restart the no-progress window.
  *
  * Stateful (one per search): it tracks the stall window off the engine-maintained `state.step`,

@@ -16,13 +16,14 @@ import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import kotlin.random.Random
 
 /**
- * One choice per LS axis — a composable arm spec (epic #721): `sources × scoring × acceptance ×
+ * One choice per LS axis — a composable arm spec: `sources × scoring × acceptance ×
  * restart`. [toWorkerConfig] assembles a [SourceDrivenStrategy] over the four axes into a portfolio
  * worker, building fresh stateful instances each call (per the portfolio's no-shared-state rule).
  *
- * The fourth axis is the **restart/perturbation cadence** — the schedule family reachable at the
- * worker level today; the temperature schedule rides inside the SA acceptance options, and the
- * weight schedule becomes a fifth axis once the driver gains a weight-policy input (#721 follow-ups).
+ * The fourth axis here is the **restart/perturbation cadence**; the SA temperature rides on its
+ * acceptance option (see [AcceptanceOption.temperature]). Folding all of these into the driver's
+ * single [com.eignex.klause.solver.localsearch.schedule.ScheduleBundle] schedule axis is the
+ * front-door follow-up.
  */
 internal class Recipe(
     val sources: SourcesPreset,
