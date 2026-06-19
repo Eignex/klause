@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.meta
+package com.eignex.klause.solver.meta.alns
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
