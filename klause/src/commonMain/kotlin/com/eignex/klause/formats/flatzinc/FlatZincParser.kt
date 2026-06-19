@@ -217,74 +217,72 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         return items
     }
 
-    private fun parseExpr(): FznExpr {
-        return when (val tok = peek()) {
-            is FznToken.Kw -> when (tok.keyword) {
-                "true" -> {
-                    advance()
-                    FznExpr.BoolLit(true)
-                }
-
-                "false" -> {
-                    advance()
-                    FznExpr.BoolLit(false)
-                }
-
-                else -> failHere("unexpected keyword '${tok.keyword}' in expression")
-            }
-
-            is FznToken.IntLit -> {
-                val lo = tok.value
+    private fun parseExpr(): FznExpr = when (val tok = peek()) {
+        is FznToken.Kw -> when (tok.keyword) {
+            "true" -> {
                 advance()
-                if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "..") {
-                    advance()
-                    val hi = expectIntLit()
-                    FznExpr.IntRangeLit(lo, hi)
-                } else {
-                    FznExpr.IntLit(lo)
-                }
+                FznExpr.BoolLit(true)
             }
 
-            is FznToken.FloatLit -> {
+            "false" -> {
                 advance()
-                FznExpr.FloatLit(tok.value)
+                FznExpr.BoolLit(false)
             }
 
-            is FznToken.StringLit -> {
-                advance()
-                FznExpr.StringLit(tok.value)
-            }
-
-            is FznToken.Ident -> {
-                val name = tok.name
-                advance()
-                if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "[") {
-                    advance()
-                    val idx = expectIntLit()
-                    expect("]", "expected `]` closing array access")
-                    FznExpr.ArrayAccess(name, idx.toInt())
-                } else if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "(") {
-                    advance()
-                    val args = ArrayList<FznExpr>()
-                    if (peek() !is FznToken.Punct || (peek() as FznToken.Punct).symbol != ")") {
-                        args.add(parseExpr())
-                        while (matchPunct(",")) args.add(parseExpr())
-                    }
-                    expect(")", "expected `)` closing call")
-                    FznExpr.AnnCall(name, args)
-                } else {
-                    FznExpr.Ident(name)
-                }
-            }
-
-            is FznToken.Punct -> when (tok.symbol) {
-                "[" -> parseArrayLit()
-                "{" -> parseIntSetLit()
-                else -> failHere("unexpected '${tok.symbol}' in expression")
-            }
-
-            is FznToken.Eof -> failHere("unexpected end of file in expression")
+            else -> failHere("unexpected keyword '${tok.keyword}' in expression")
         }
+
+        is FznToken.IntLit -> {
+            val lo = tok.value
+            advance()
+            if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "..") {
+                advance()
+                val hi = expectIntLit()
+                FznExpr.IntRangeLit(lo, hi)
+            } else {
+                FznExpr.IntLit(lo)
+            }
+        }
+
+        is FznToken.FloatLit -> {
+            advance()
+            FznExpr.FloatLit(tok.value)
+        }
+
+        is FznToken.StringLit -> {
+            advance()
+            FznExpr.StringLit(tok.value)
+        }
+
+        is FznToken.Ident -> {
+            val name = tok.name
+            advance()
+            if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "[") {
+                advance()
+                val idx = expectIntLit()
+                expect("]", "expected `]` closing array access")
+                FznExpr.ArrayAccess(name, idx.toInt())
+            } else if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "(") {
+                advance()
+                val args = ArrayList<FznExpr>()
+                if (peek() !is FznToken.Punct || (peek() as FznToken.Punct).symbol != ")") {
+                    args.add(parseExpr())
+                    while (matchPunct(",")) args.add(parseExpr())
+                }
+                expect(")", "expected `)` closing call")
+                FznExpr.AnnCall(name, args)
+            } else {
+                FznExpr.Ident(name)
+            }
+        }
+
+        is FznToken.Punct -> when (tok.symbol) {
+            "[" -> parseArrayLit()
+            "{" -> parseIntSetLit()
+            else -> failHere("unexpected '${tok.symbol}' in expression")
+        }
+
+        is FznToken.Eof -> failHere("unexpected end of file in expression")
     }
 
     private fun parseArrayLit(): FznExpr {

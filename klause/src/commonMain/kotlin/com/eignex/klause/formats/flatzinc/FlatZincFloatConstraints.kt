@@ -115,7 +115,6 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
         coeffs = intArrayOf(coefVar.toInt())
         vars = intArrayOf(varSide.varId)
     }
-    val finalOp = op
     val finalBound = if (op == LinearOp.LE && strict) scaledBound - 1 else scaledBound
     if (reified) {
         val r = resolveBoolLit(c.args[2])
@@ -124,12 +123,12 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
                 Lit.variable(r),
                 coeffs,
                 vars,
-                finalOp,
+                op,
                 finalBound.toInt(),
             ),
         )
     } else {
-        factors.add(Linear(coeffs, vars, finalOp, finalBound.toInt()))
+        factors.add(Linear(coeffs, vars, op, finalBound.toInt()))
     }
 }
 

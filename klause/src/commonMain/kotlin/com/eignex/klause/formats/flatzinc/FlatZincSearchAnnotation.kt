@@ -82,7 +82,7 @@ private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): SearchTier? {
     )
 }
 
-/** Resolve a search variable expression to bool/int ids in listed order. */
+/** Resolve a search variable expression to bool/int ids in the listed order. */
 private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: ArrayList<Int>, ints: ArrayList<Int>) {
     when (e) {
         is FznExpr.Ident -> {
