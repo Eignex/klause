@@ -16,30 +16,18 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVarOrConst(c.args[1])
     val op = when (c.name) {
-        "int_le" -> LinearOp.LE
-
-        "int_lt" -> {
-            factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), LinearOp.LE, -1 - b.offset))
-            return
-        }
-
+        "int_le", "int_lt" -> LinearOp.LE
         "int_eq" -> LinearOp.EQ
-
         "int_ne" -> LinearOp.NE
-
-        "int_ge" -> {
-            factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), LinearOp.GE, -b.offset))
-            return
-        }
-
-        "int_gt" -> {
-            factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), LinearOp.GE, 1 - b.offset))
-            return
-        }
-
+        "int_ge", "int_gt" -> LinearOp.GE
         else -> failHere("unhandled int cmp ${c.name}")
     }
-    factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), op, -b.offset))
+    val strictAdjust = when (c.name) {
+        "int_lt" -> -1
+        "int_gt" -> 1
+        else -> 0
+    }
+    factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), op, strictAdjust - b.offset))
 }
 
 /** An int var, possibly with a constant offset on the right side. */
@@ -180,9 +168,7 @@ private fun FlatZincCompiler.emitTruncDivMod(a: Int, b: Int, qVar: Int?, remVar:
 
 /**
  * `array_int_element(idx, arr, result)` / `array_var_int_element(idx, arr, result)`:
- * `result = arr(idx)` with 1-based indexing. Emits the native [Element] factor (graded
- * violation + direct repair moves, no aux-bool blow-up) rather than the old per-index
- * reified-linear + indicator-clause decomposition — see issue #37.
+ * `result = arr(idx)` with 1-based indexing.
  */
 internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Boolean) {
     require(c.args.size == 3)
@@ -203,19 +189,11 @@ internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
     val vars = intArrayOf(a, b)
     val (op, bound) = when (c.name) {
         "int_eq_reif" -> LinearOp.EQ to 0
-
         "int_ne_reif" -> LinearOp.NE to 0
-
         "int_le_reif" -> LinearOp.LE to 0
-
         "int_lt_reif" -> LinearOp.LE to -1
-
-        // a < b  ⇔  a - b ≤ -1
         "int_ge_reif" -> LinearOp.GE to 0
-
         "int_gt_reif" -> LinearOp.GE to 1
-
-        // a > b  ⇔  a - b ≥ 1
         else -> failHere("unhandled reified int cmp `${c.name}`")
     }
     factors.add(ReifiedLinear(r, coeffs, vars, op, bound))

@@ -30,14 +30,9 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     emitAllDifferentExcept(vars, intArrayOf(0))
 }
 
-/** Native `alldifferent_except(xs, except)` — `xs(i) != xs(j)` for every pair unless one of the
- *  two values is in [except]. Emits the [AllDifferent] factor with [AllDifferent.exceptSet]: the
- *  excepted values are modelled inside the shared `reginFilter` as capacity-n value copies, so this gets
- *  full Régin matching / Hall propagation — far stronger than the O(n²) reified gated-pairwise-NE
- *  decomposition this replaced (#433). 0 or 1 vars are trivially distinct; the factor requires ≥2
- *  (matching the std decomposition's empty `forall(i<j)`). */
-private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: IntArray) {
-    if (vars.size < 2) return
+/** Bounds of the union span of [vars]' integer domains, or `null` when [vars] is empty. */
+private fun FlatZincCompiler.intVarUnionBounds(vars: IntArray): Pair<Int, Int>? {
+    if (vars.isEmpty()) return null
     var lo = Int.MAX_VALUE
     var hi = Int.MIN_VALUE
     for (v in vars) {
@@ -45,7 +40,35 @@ private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: IntA
         if (d.min < lo) lo = d.min
         if (d.max > hi) hi = d.max
     }
-    factors.add(AllDifferent(vars = vars, domainMin = lo, domainSize = hi - lo + 1, exceptSet = except))
+    return lo to hi
+}
+
+/** Native `alldifferent_except(xs, except)` — `xs(i) != xs(j)` for every pair unless one of the
+ *  two values is in [except]. Emits the [AllDifferent] factor with [AllDifferent.exceptSet]: the
+ *  excepted values are modelled inside the shared `reginFilter` as capacity-n value copies, so this gets
+ *  full Régin matching / Hall propagation. 0 or 1 vars are trivially distinct; the factor requires ≥2
+ *  (matching the std decomposition's empty `forall(i<j)`). */
+private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: IntArray) {
+    emitAllDifferentCore(vars, exceptSet = except, boundsConsistent = false)
+}
+
+/** Shared [AllDifferent] emitter for the plain and except forms. */
+private fun FlatZincCompiler.emitAllDifferentCore(
+    vars: IntArray,
+    exceptSet: IntArray,
+    boundsConsistent: Boolean,
+) {
+    if (vars.size < 2) return
+    val (lo, hi) = checkNotNull(intVarUnionBounds(vars))
+    factors.add(
+        AllDifferent(
+            vars = vars,
+            domainMin = lo,
+            domainSize = hi - lo + 1,
+            exceptSet = exceptSet,
+            boundsConsistent = boundsConsistent,
+        ),
+    )
 }
 
 internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
@@ -83,10 +106,6 @@ internal fun FlatZincCompiler.emitSort(c: FznConstraint) {
 internal fun FlatZincCompiler.emitSymmetricAllDifferent(c: FznConstraint) {
     require(c.args.size == 1)
     val xs = evalIntVarArray(c.args[0])
-    // Self-inverse permutation over FlatZinc array index sets (always 1-based via MiniZinc's
-    // `index2int`), so the index base is structurally 1 — not something to read off a variable's
-    // domain. Inferring it from `intDomains[xs[0]].min` is wrong once MiniZinc tightens the first
-    // element's domain, the same root false-UNSAT bug fixed for inverse (#389).
     factors.add(SymmetricAllDifferent(xs, indexOffset = 1))
 }
 
@@ -106,8 +125,7 @@ internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
     val numSymbols = evalIntConst(c.args[2]).toInt()
     val transitions = evalIntConstArray(c.args[3])
     val q0 = evalIntConst(c.args[4]).toInt()
-    val fSet = c.args[5]
-    val accepting: IntArray = when (fSet) {
+    val accepting: IntArray = when (val fSet = c.args[5]) {
         is FznExpr.IntSetLit -> IntArray(fSet.values.size) { fSet.values[it].toInt() }
         is FznExpr.IntRangeLit -> IntArray((fSet.hi - fSet.lo + 1).toInt()) { (fSet.lo + it).toInt() }
         else -> failHere("regular: expected set literal for F, got ${fSet::class.simpleName}")
@@ -277,14 +295,6 @@ internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean
         require(c.args.size == 2)
         val f = evalIntVarArray(c.args[0])
         val g = evalIntVarArray(c.args[1])
-        // The bare `fzn_inverse(f, invf)` is `f[i] ∈ index_set(invf) ∧ invf[f[i]] = i` (and
-        // symmetrically), over FlatZinc array index sets — which are always 1-based, since
-        // MiniZinc's `index2int` normalises them before emitting. So the index base (offset) is
-        // structurally 1, NOT something to infer from a variable's domain: inferring it from
-        // `intDomains[f[0]].min` is wrong whenever MiniZinc has tightened the first element's
-        // domain (e.g. a `row[t] in 1..7` group split), which produced a root false-UNSAT on
-        // elitserien/handball (#389). The explicit-offset `inverse_offsets` form carries real
-        // offsets and takes the branch above.
         factors.add(Inverse(f, g, fOffset = 1, gOffset = 1))
     }
 }
@@ -292,21 +302,8 @@ internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean
 internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
-    // 0 or 1 variables are trivially all-different; the native AllDifferent factor requires
-    // ≥2, so skip it (matches the std decomposition's empty `forall(i<j)`).
-    if (vars.size < 2) return
-    // Find the union of all involved int domains to size AllDifferent.
-    var lo = Int.MAX_VALUE
-    var hi = Int.MIN_VALUE
-    for (v in vars) {
-        val d = intDomains[v]
-        if (d.min < lo) lo = d.min
-        if (d.max > hi) hi = d.max
-    }
-    // Honour the `::bounds` annotation: the modeller asked for bounds-consistency, not
-    // full GAC, so use AllDifferent's cheap forward-checking path instead of Régin matching.
     val bc = c.annotations.any { it.name == "bounds" }
-    factors.add(AllDifferent(vars = vars, domainMin = lo, domainSize = hi - lo + 1, boundsConsistent = bc))
+    emitAllDifferentCore(vars, exceptSet = EmptyIntArray, boundsConsistent = bc)
 }
 
 /**
@@ -556,13 +553,7 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
     val cover = if (xs.isEmpty()) {
         IntArray(0)
     } else {
-        var lo = Int.MAX_VALUE
-        var hi = Int.MIN_VALUE
-        for (v in xs) {
-            val d = intDomains[v]
-            if (d.min < lo) lo = d.min
-            if (d.max > hi) hi = d.max
-        }
+        val (lo, hi) = checkNotNull(intVarUnionBounds(xs))
         setValues.filter { it in lo..hi }.toIntArray()
     }
     if (cover.isEmpty()) {
