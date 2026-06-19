@@ -171,12 +171,12 @@ internal class FlatZincLexer(private val src: String) {
     private fun skipWhitespaceAndComments() {
         while (pos < src.length) {
             val ch = src[pos]
-            when {
-                ch == ' ' || ch == '\t' || ch == '\r' -> advance()
+            when (ch) {
+                ' ', '\t', '\r' -> advance()
 
-                ch == '\n' -> advance()
+                '\n' -> advance()
 
-                ch == '%' -> {
+                '%' -> {
                     while (pos < src.length && src[pos] != '\n') advance()
                 }
 
