@@ -3,7 +3,6 @@ package com.eignex.klause.solver.propagation
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * First-UIP (Unique Implication Point) conflict analyzer — the classical CDCL clause-learning
@@ -69,6 +68,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     // Marks variables currently on the [isRedundant] DFS path, so a back-edge (atom antecedent
     // graphs can be cyclic — see [resolved]) is detected as a cycle rather than re-pushed forever.
     private var onPath = BooleanArray(0)
+
+    // Per-minimization redundancy memo indexed by unified var id (`0 until universe`):
+    // stamp == [redundancyEpoch] means [redundancyMemo] is valid for that slot.
+    // Values: 0 = non-redundant, 1 = redundant.
+    private var redundancyMemo = IntArray(0)
+    private var redundancyStamp = IntArray(0)
+    private var redundancyEpoch = 0
 
     // Variables encountered (resolved through or kept) during the most recent analysis —
     // the canonical CDCL VSIDS bump set (MiniSAT/Glucose bump every var seen while walking
@@ -230,12 +236,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         universe = numBoolVars + atomCount
         seen = scratch(seen, universe)
         resolved = scratch(resolved, universe)
-        if (atomLevelStamp.size < atomCount) {
-            atomLevelStamp = IntArray(atomCount)
-            atomLevelMemo = IntArray(atomCount)
-            atomLevelEpoch = 0 // fresh arrays read as epoch 0, so don't start at 0
+        ensureAtomMemoCapacity(atomCount)
+        if (atomLevelEpoch == Int.MAX_VALUE) {
+            atomLevelStamp.fill(0)
+            atomLevelEpoch = 1
+        } else {
+            atomLevelEpoch++
         }
-        atomLevelEpoch++
         seenAtomList.clear()
         litsInLearned.clear()
         bumpBoolVars.clear()
@@ -366,7 +373,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * every exit path of [analyze] so all exit shapes get the same post-processing.
      */
     private fun finalizeClause(learned: IntArrayList, currentLevel: Int): AnalysisResult.Learned {
-        val minimized = binaryMinimize(minimize(learned, currentLevel), currentLevel)
+        // Self-subsuming minimization is valuable on short clauses, but on large atom-heavy clauses
+        // its DFS cost can dominate node time. Cap it to keep per-conflict work bounded.
+        val reduced = if (learned.size <= MAX_SSR_LITERALS) minimize(learned, currentLevel) else learned
+        val minimized = binaryMinimize(reduced, currentLevel)
         val levels = distinctLevelsOf(minimized)
         // A proper 1UIP clause carries exactly one literal at the conflict level; that lone
         // literal becomes the unit-asserting literal after the backjump. A conflict that genuinely
@@ -422,16 +432,20 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             val v = Lit.variable(learned[i])
             if (v < universeSize) inClause[v] = true
         }
-        // Per-call redundancy memo: -1 absent, 0 = non-redundant, 1 = redundant. A primitive
-        // int map avoids boxing the var key and the Boolean value per cached node.
-        val cache = MutableIntIntMap(learned.size * 4)
+        ensureRedundancyMemoCapacity(universeSize)
+        if (redundancyEpoch == Int.MAX_VALUE) {
+            redundancyStamp.fill(0)
+            redundancyEpoch = 1
+        } else {
+            redundancyEpoch++
+        }
         toDrop = scratch(toDrop, universeSize)
         var dropCount = 0
         for (i in 0 until learned.size) {
             val v = Lit.variable(learned[i])
             if (v >= universeSize) continue
             if (levelOf(v) == currentLevel) continue
-            if (isRedundant(v, inClause, cache)) {
+            if (isRedundant(v, inClause)) {
                 toDrop[v] = true
                 dropCount++
             }
@@ -515,11 +529,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * depth is bounded by the size of the implication graph reached, but the cache
      * keeps the total work linear.
      */
-    private fun isRedundant(root: Int, inClause: BooleanArray, cache: MutableIntIntMap): Boolean {
-        val cachedRoot = cache.getOrDefault(root, -1)
+    private fun isRedundant(root: Int, inClause: BooleanArray): Boolean {
+        val cachedRoot = cachedRedundancy(root)
         if (cachedRoot >= 0) return cachedRoot == 1
         val rootAnt = antecedentsOf(root) ?: run {
-            cache.put(root, 0)
+            setRedundancy(root, redundant = false)
             return false
         }
         // Iterative post-order DFS over the implication graph, replacing the former recursion
@@ -543,15 +557,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 val u = Lit.variable(ant[i])
                 i++
                 if (u == v) continue
-                if (levelOf(u) <= 0) continue
                 if (u < inClause.size && inClause[u]) continue
+                if (levelOf(u) <= 0) continue
                 // A back-edge to a variable already on the path is a cycle; it can't be proven
                 // redundant, so treat it (and thus v) as non-redundant — sound, just keeps the literal.
                 if (u < onPath.size && onPath[u]) {
                     failed = true
                     break
                 }
-                when (cache.getOrDefault(u, -1)) {
+                when (cachedRedundancy(u)) {
                     1 -> continue
 
                     0 -> {
@@ -562,7 +576,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     else -> {
                         val uAnt = antecedentsOf(u)
                         if (uAnt == null) {
-                            cache.put(u, 0)
+                            setRedundancy(u, redundant = false)
                             failed = true
                             break
                         }
@@ -582,12 +596,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 // current path — non-redundant. Mark them all and stop.
                 for (k in 0 until redVarStack.size) {
                     val a = redVarStack[k]
-                    cache.put(a, 0)
+                    setRedundancy(a, redundant = false)
                     if (a < onPath.size) onPath[a] = false
                 }
                 return false
             }
-            cache.put(v, 1) // all antecedents resolved redundant
+            setRedundancy(v, redundant = true) // all antecedents resolved redundant
             if (v < onPath.size) onPath[v] = false
             redVarStack.removeAt(top)
             redAntStack.removeAt(redAntStack.size - 1)
@@ -614,9 +628,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      *  invariant during one analysis (the path is frozen), so repeat queries — common, since the
      *  same atom recurs across reasons — return the cached value instead of re-running the
      *  reconstruct/hole-record derivation. Atoms materialised mid-analysis (id past the memo arrays)
-     *  fall through to the direct call. */
+     *  grow the memo on demand so repeat hits still stay O(1). */
     private fun cachedAtomLevel(id: Int): Int {
-        if (id >= atomLevelStamp.size) return state.atomLevelForConflict(id)
+        // conflictLevelOf() runs before analyzeFromSeed() seeds the per-analysis epoch.
+        // With epoch 0, memo slots are uninitialised; read through to the source.
+        if (atomLevelEpoch == 0) return state.atomLevelForConflict(id)
+        ensureAtomMemoCapacity(id + 1)
         if (atomLevelStamp[id] == atomLevelEpoch) return atomLevelMemo[id]
         val lv = state.atomLevelForConflict(id)
         atomLevelMemo[id] = lv
@@ -725,5 +742,38 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (lvl < currentLevel && lvl > best) best = lvl
         }
         return best
+    }
+
+    private fun cachedRedundancy(v: Int): Int {
+        if (v < 0 || v >= universe) return -1
+        return if (redundancyStamp[v] == redundancyEpoch) redundancyMemo[v] else -1
+    }
+
+    private fun setRedundancy(v: Int, redundant: Boolean) {
+        if (v < 0 || v >= universe) return
+        redundancyStamp[v] = redundancyEpoch
+        redundancyMemo[v] = if (redundant) 1 else 0
+    }
+
+    private fun ensureAtomMemoCapacity(minSize: Int) {
+        if (atomLevelStamp.size >= minSize) return
+        var newSize = atomLevelStamp.size.coerceAtLeast(1)
+        while (newSize < minSize) newSize = newSize shl 1
+        atomLevelStamp = atomLevelStamp.copyOf(newSize)
+        atomLevelMemo = atomLevelMemo.copyOf(newSize)
+    }
+
+    private fun ensureRedundancyMemoCapacity(minSize: Int) {
+        if (redundancyStamp.size >= minSize) return
+        var newSize = redundancyStamp.size.coerceAtLeast(1)
+        while (newSize < minSize) newSize = newSize shl 1
+        redundancyStamp = redundancyStamp.copyOf(newSize)
+        redundancyMemo = redundancyMemo.copyOf(newSize)
+    }
+
+    private companion object {
+        // Keep SSR on short clauses where it pays for itself; skip large clauses to prioritize
+        // throughput on propagation-heavy scheduling instances.
+        const val MAX_SSR_LITERALS = 16
     }
 }

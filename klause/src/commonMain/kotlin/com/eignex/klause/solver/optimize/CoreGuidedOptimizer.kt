@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
@@ -108,7 +109,11 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
         }
     }
 
-    fun minimize(softs: List<Soft>, params: BacktrackParams = BacktrackParams(), stratify: Boolean = true): Result {
+    fun minimize(
+        softs: List<Soft>,
+        params: BacktrackParams = BacktrackPresets.conflictDriven(),
+        stratify: Boolean = true,
+    ): Result {
         if (softs.isEmpty()) {
             return Oll.solveHardOnly(
                 baseProblem,

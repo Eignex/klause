@@ -13,6 +13,7 @@ import com.eignex.klause.solver.backtrack.selector.RandomVariable
 import com.eignex.klause.solver.backtrack.selector.SmallestDomain
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.propagation.ClauseExchange
 import com.eignex.klause.solver.result.SearchEvent
 
@@ -25,8 +26,8 @@ import com.eignex.klause.solver.result.SearchEvent
  *    [valueSelector]. `null` picks a fresh seed per call.
  *  - [assumptions] — variables pinned for the duration of the call.
  *  - [variableSelector] — picks the next variable to branch on. Defaults to
- *    [RandomVariable] for diverse search; CSP-typical alternatives are [SmallestDomain]
- *    (first-fail) and [InputOrder].
+ *    [Vsids] for conflict-driven search; alternatives include [SmallestDomain]
+ *    (first-fail), [InputOrder], and [RandomVariable].
  *  - [valueSelector] — picks the order in which to try values of the chosen variable.
  *    Defaults to [IndomainRandom]; alternatives include [IndomainMin] / [IndomainMax] /
  *    [IndomainMiddle] / [IndomainSet] for hole domains.
@@ -48,7 +49,7 @@ data class BacktrackParams(
     val maxInstructions: Long? = null,
     val randomSeed: Long? = null,
     val assumptions: Assumptions = Assumptions.None,
-    val variableSelector: VariableSelector = RandomVariable,
+    val variableSelector: VariableSelector = Vsids(),
     val valueSelector: ValueSelector = IndomainRandom,
     val minHammingDistance: Int = 0,
     val recentWindow: Int = 0,
@@ -58,8 +59,7 @@ data class BacktrackParams(
      * fresh from level 0. Phase-saving (see [phaseSaving]) and the B&B bound (in
      * [com.eignex.klause.solver.Optimizer.minimize]) survive the restart, so each
      * restart resumes with strictly more information than the previous run. Disabled
-     * by default — set to a moderate value (e.g. `100` or `200`) on hard instances
-     * where DFS gets stuck on bad subtrees.
+     * by default; set a unit (for example `256`) to enable Luby restarts.
      */
     val lubyRestartBase: Long? = null,
     /**
@@ -78,8 +78,7 @@ data class BacktrackParams(
      * On a fresh descent (after a backtrack or restart) the cached value is tried
      * first, so the search doesn't lose the work spent narrowing down the right
      * polarity each time. Standard CDCL-derived heuristic; combines naturally with
-     * [lubyRestartBase]. Disabled by default to keep the search deterministic given a
-     * fixed seed when no restarts are in play.
+     * [lubyRestartBase]. Disabled by default.
      */
     val phaseSaving: Boolean = false,
     /**
@@ -104,8 +103,7 @@ data class BacktrackParams(
      * forgetting pass runs on every Luby restart (gated by [lubyRestartBase]): clauses
      * with LBD ≤ [lbdGlueThreshold] are kept regardless ("glue clauses"); among the
      * rest, the lowest-LBD clauses are kept up to the cap and higher-LBD clauses are
-     * dropped. `null` (default) disables forgetting — clauses accumulate indefinitely.
-     * Set to a few thousand for hard instances where memory growth is a concern.
+     * dropped. `null` (default) disables forgetting so clauses accumulate indefinitely.
      */
     val maxLearnedClauses: Int? = null,
     /**
@@ -122,8 +120,7 @@ data class BacktrackParams(
      * that participate in a later conflict (detect it or force a unit) are promoted on the
      * next reduction; mid-tier clauses idle across a reduction are demoted. This gives more
      * selective deletion than the binary glue split and helps proof-search families (#117)
-     * where useful clauses are otherwise forgotten. Disabled by default — the binary glue
-     * policy stays the baseline.
+     * where useful clauses are otherwise forgotten. Disabled by default.
      */
     val tieredLearnedDb: Boolean = false,
     /**
@@ -458,6 +455,6 @@ data class BacktrackParams(
     override fun withCancellation(cancellation: Cancellation): BacktrackParams = copy(cancellation = cancellation)
 
     private companion object {
-        fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)
+        private fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)
     }
 }

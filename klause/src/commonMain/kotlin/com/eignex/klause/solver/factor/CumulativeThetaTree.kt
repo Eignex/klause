@@ -118,6 +118,29 @@ class CumulativeThetaTree(private val n: Int, capacity: Int) {
     /** Summed energy of active tasks in Θ. */
     fun energyOfTheta(): Long = energy[1]
 
+    /** Root envelope if [id] were activated with (`est`, [taskEnergy]), without mutating the tree. */
+    fun envIfActivated(id: Int, est: Int, taskEnergy: Long): Long {
+        require(id in 0 until n) { "task id $id out of 0..${n - 1}" }
+        require(taskEnergy >= 0L) { "task energy must be non-negative, got $taskEnergy" }
+        var k = leafOf[id]
+        var e = taskEnergy
+        var ev = capacityL * est.toLong() + taskEnergy
+        while (k > 1) {
+            val parent = k ushr 1
+            val left = parent shl 1
+            val right = left or 1
+            if (k == left) {
+                e += energy[right]
+                ev = maxOf(ev + energy[right], env[right])
+            } else {
+                e += energy[left]
+                ev = maxOf(env[left] + e - energy[left], ev)
+            }
+            k = parent
+        }
+        return ev
+    }
+
     private fun siftUp(start: Int) {
         var k = start ushr 1
         while (k >= 1) {

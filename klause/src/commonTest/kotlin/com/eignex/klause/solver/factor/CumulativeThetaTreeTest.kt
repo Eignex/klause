@@ -138,6 +138,20 @@ class CumulativeThetaTreeTest {
         assertEquals(2L, t.energyOfTheta())
     }
 
+    @Test fun `envIfActivated matches activate then deactivate`() {
+        val t = CumulativeThetaTree(n = 4, capacity = 3)
+        t.setLeafOrder(intArrayOf(0, 1, 2, 3))
+        t.activate(0, est = 1, taskEnergy = 4L)
+        t.activate(2, est = 6, taskEnergy = 5L)
+
+        val predicted = t.envIfActivated(id = 3, est = 4, taskEnergy = 2L)
+        t.activate(3, est = 4, taskEnergy = 2L)
+        val actual = t.envOfTheta()
+        t.deactivate(3)
+
+        assertEquals(predicted, actual)
+    }
+
     /** Brute-force reference: scan every non-empty subset of active tasks. O(2^n) so
      *  small inputs only. */
     private fun bruteEnv(capacity: Int, ests: IntArray, energies: LongArray, active: BooleanArray): Long {

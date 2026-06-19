@@ -3,7 +3,7 @@ package com.eignex.klause.solver.count
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.math.ceil
 import kotlin.math.min
@@ -117,8 +117,10 @@ internal object AnytimeCounter {
         yield(snapshot())
     }
 
-    private fun checkParams(config: ExactCountConfig, assumptions: Assumptions) =
-        BacktrackParams(assumptions = assumptions, maxDecisions = config.maxDecisionsPerCheck)
+    private fun checkParams(config: ExactCountConfig, assumptions: Assumptions) = BacktrackPresets.satOptimized().copy(
+        assumptions = assumptions,
+        maxDecisions = config.maxDecisionsPerCheck,
+    )
 
     private fun valuesOf(problem: Problem, intVar: Int): List<Int> {
         val dom = problem.intDomains[intVar]

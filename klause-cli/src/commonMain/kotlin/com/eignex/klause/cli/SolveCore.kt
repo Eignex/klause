@@ -13,10 +13,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.LpConfig
-import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -133,16 +132,11 @@ internal object SolveCore {
         useAnnotation: Boolean,
         allowSelectors: Boolean,
     ) {
-        // Fixed seed for determinism (a null seed makes optimality proofs flakily blow the budget);
-        // `-r` overrides. XCSP/SMT carry no annotation (null), so they fall back to this CDCL config.
+        // XCSP/SMT carry no annotation (null), so both naked backtrack engines fall back to
+        // the conflict-driven preset base.
+        // Seed remains unset unless `-r` (or `--param seed=`) pins one.
         val annotated = if (useAnnotation) solvable.annotatedBacktrackParams else null
-        val base = annotated ?: BacktrackParams(
-            randomSeed = 1L,
-            variableSelector = Vsids(),
-            phaseSaving = true,
-            lubyRestartBase = 100L,
-            maxLearnedClauses = 20_000,
-        )
+        val base = annotated ?: BacktrackPresets.conflictDriven()
         // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
         // LP-success measurement under `-s`); absent ⇒ keep the base config (LP off for naked CP).
         val lpConfig = common.lp?.let {
