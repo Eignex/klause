@@ -1,5 +1,6 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.localsearch
 
+import com.eignex.klause.solver.*
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink

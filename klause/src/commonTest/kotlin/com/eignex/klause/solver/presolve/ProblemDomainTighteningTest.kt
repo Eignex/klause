@@ -1,5 +1,6 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.solver.*
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.propagation.PropagationResult

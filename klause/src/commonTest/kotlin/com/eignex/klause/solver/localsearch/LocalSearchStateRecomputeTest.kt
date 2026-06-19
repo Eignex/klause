@@ -1,6 +1,8 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.localsearch
+
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.*
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
