@@ -14,45 +14,19 @@ import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.util.binarySearchInt
 
-/**
- * Translates a parsed [FznModel] into a klause [Problem] plus the auxiliary maps needed by
- * the solution writer. Supports the FlatZinc common-subset built-ins; anything else
- * throws [FlatZincParseException] with a clear "unsupported builtin" message.
- *
- * Float variables are discretized: each `var float: x` ∈ `[lo, hi]` becomes an int var with
- * domain `[0, buckets-1]`. Float linear constraints are rescaled to integer coefficients
- * and a rescaled bound.
- */
+/** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(
     internal val model: FznModel,
     internal val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     internal val floatScale: Long = DEFAULT_FLOAT_SCALE,
-    /**
-     * Per the MiniZinc Challenge LS-track rules, `symmetry_breaking_constraint(...)` and
-     * `redundant_constraint(...)` may be dropped by local-search solvers. Set this to
-     * `true` from LS-engine entry points to skip those constraints entirely. The CP
-     * default enforces them as `bool == true`.
-     */
+    /** When true, skip redundant/symmetry annotations for LS-track behavior. */
     internal val forLocalSearch: Boolean = false,
-    /**
-     * Default domain `[lo, hi]` for `var int` declarations that arrive without an explicit
-     * range. MiniZinc emits these for auxiliary intermediates; the surrounding linear /
-     * element constraints normally pin them via propagation. Wide enough by default to
-     * absorb typical CP arithmetic without int overflow during factor coefficient × value
-     * products; tune at the CLI boundary (env / flag) when a model needs different limits.
-     */
+    /** Default domain for unbounded `var int` declarations. */
     internal val unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
     internal val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
-    /**
-     * Cooperative-cancellation token forwarded to the constructed [Problem] so its
-     * construction-time bake honors a `-t` deadline. Defaults to [Cancellation.Never].
-     */
+    /** Cooperative cancellation token. */
     internal val cancellation: Cancellation = Cancellation.Never,
 ) {
-    // State is `internal` (not `private`) so the extension functions in
-    // `FlatZincExprEval.kt` / `FlatZincConstraints.kt` / `FlatZincSolveOutput.kt` can
-    // access it. The class itself is `internal`, so this is intra-module bookkeeping —
-    // no encapsulation leak to the public API.
     internal val params = HashMap<String, ParamValue>()
     internal val boolVars = HashMap<String, Int>()
     internal val intVars = HashMap<String, Int>()
@@ -62,22 +36,12 @@ internal class FlatZincCompiler(
     internal val factors = ArrayList<Factor>()
     internal var numBoolVars: Int = 0
 
-    /** Enum-typed int vars: declared label list per var name. Populated from
-     *  `klause_enum_labels([...])` annotations on the var decl. */
     internal val enumLabelsByVar = HashMap<String, List<String>>()
 
-    /** Per `var set of E: S` declaration, the bool-indicator decomposition. Populated by
-     *  [processDecl] when it sees a [FznType.SetOfInt]; consumed by the FZN writer to
-     *  reconstruct `{a, b, c}` MiniZinc output. Set predicates (`set_in`, `set_subset`,
-     *  `set_card`, ...) dispatch through these indicator bools at constraint-emit time. */
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     fun compile(): FlatZincProgram {
         for (decl in model.varDecls) processDecl(decl)
-        // Factor ids the model marked implied (`redundant_constraint` / `symmetry_breaking_constraint`,
-        // tagged by the klause MZN library): the slice of `factors` each such constraint appends. LS
-        // seeds these a lower violation weight so they don't swamp the landscape; a model symmetry
-        // break also tells presolve to skip its own.
         val impliedFactorIds = ArrayList<Int>()
         var hasSymmetryBreaking = false
         for (c in model.constraints) {
@@ -88,11 +52,7 @@ internal class FlatZincCompiler(
             if (symmetry) hasSymmetryBreaking = true
             if (redundant || symmetry) for (i in before until factors.size) impliedFactorIds.add(i)
         }
-        // compileSolve may pin a synthetic int/bool var (for `solve minimize <par-int>`),
-        // so resolve it before snapshotting var counts into Problem.
         val solveDirective = compileSolve()
-        // Construction-time SAC probes from the ambient presolve config (solution-preserving, so
-        // resolved under EMPTY); holes imply bounds.
         val presolve = KlauseConfig.current.presolveConfig()
         val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
         val impliedFactorMask = if (impliedFactorIds.isEmpty()) {
@@ -134,26 +94,15 @@ internal class FlatZincCompiler(
         )
     }
 
-    // ---- declarations -------------------------------------------------------
-
     internal fun processDecl(d: FznVarDecl) {
-        // Parameters (constants) — stash in params map; don't allocate solver vars.
         if (!d.isVar && d.value != null) {
             params[d.name] = evaluateParam(d.value, d.type)
-            // Parameter arrays also become FlatZincArray entries so output items can
-            // address them by name.
             (params[d.name] as? ParamValue.Array)?.let { arr ->
                 arrays[d.name] = arrayToFlatZincArray(arr)
             }
             return
         }
-        // A scalar `var T: name = <rhs>;` aliases `name` to another var (or pins it to a
-        // constant) — MiniZinc emits these for objective aliases and propagated equalities.
-        // Bind `name` to the RHS's existing var id (sharing it, like array-element aliases)
-        // instead of allocating a fresh, disconnected var: dropping the binding silently
-        // detaches `name` from its definition, so e.g. an aliased objective output var floats
-        // at its domain minimum regardless of the real objective (#478). Arrays / set vars
-        // already consume their initializer below, so they keep their own paths.
+        // Keep scalar aliases attached to the source var id.
         if (d.isVar && d.value != null && d.type !is FznType.Array && d.type !is FznType.SetOfInt) {
             aliasScalarVar(d.name, d.type, d.value)
             recordEnumLabels(d)
@@ -172,13 +121,7 @@ internal class FlatZincCompiler(
         recordEnumLabels(d)
     }
 
-    /**
-     * Bind a scalar `var T: name = <rhs>;` declaration. [rhs] is either another variable
-     * (alias) or a constant; resolve it to its var id and register [name] under that same id,
-     * so [name] reads the RHS's solved value. For a bounded-int alias the declared range is
-     * intersected into the shared target's domain — an alias may legitimately narrow it, and
-     * silently widening would be unsound.
-     */
+    /** Bind scalar aliases and constant pins to an existing solver variable id. */
     internal fun aliasScalarVar(name: String, type: FznType, rhs: FznExpr) {
         when (type) {
             FznType.Bool -> boolVars[name] = Lit.variable(resolveBoolLit(rhs))
@@ -205,11 +148,7 @@ internal class FlatZincCompiler(
         }
     }
 
-    /**
-     * Recognise `klause_enum_labels(["Red","Green","Blue"])` on a var decl. The klause MZN
-     * library emits this on enum-typed ints so the tag names survive into klause; without
-     * it MiniZinc lowers enums to bare `1..n` ints with the tag table only in `.ozn`.
-     */
+    /** Preserve enum labels emitted as `klause_enum_labels([...])`. */
     internal fun recordEnumLabels(d: FznVarDecl) {
         val ann = d.annotations.firstOrNull { it.name == "klause_enum_labels" } ?: return
         if (ann.args.size != 1) failHere("klause_enum_labels: expected 1 array arg")
@@ -224,7 +163,6 @@ internal class FlatZincCompiler(
 
     internal fun processArrayDecl(name: String, type: FznType.Array, value: FznExpr?, isVar: Boolean) {
         if (!isVar) {
-            // Parameter array — must have an initializer literal.
             value ?: failHere("parameter array `$name` requires an initializer")
             val lit = value as? FznExpr.ArrayLit
                 ?: failHere("parameter array `$name`: expected array literal initializer")
@@ -233,13 +171,6 @@ internal class FlatZincCompiler(
             params[name] = ParamValue.Array(arr)
             return
         }
-        // Array-of-set-of-int: materialise each element as its own SetVarLayout under name
-        // `<arr>[<i>]`. The FZN flattener routinely emits `array of var set of int: x = [...]`
-        // where elements are a mix of set-var name references (`X_INTRODUCED_*`) and set
-        // literals (`1..0` for empty, `{1,3}`, `1..3`). For Ident refs, alias the existing
-        // layout; for literals, allocate a fresh pinned layout sized to the literal's
-        // elements (unioned with sibling Ident universes so downstream uses see a uniform
-        // universe across the array).
         if (type.element is FznType.SetOfInt) {
             val layouts = ArrayList<SetVarLayout>(type.length)
             if (value is FznExpr.ArrayLit) {
@@ -294,8 +225,6 @@ internal class FlatZincCompiler(
             arrays[name] = FlatZincArray.SetVars(name, layouts)
             return
         }
-        // Variable array — allocate one var per element. The initializer may either be an
-        // array literal aliasing other vars, or absent (we allocate fresh).
         val length = type.length
         val varIds = IntArray(length)
         val bucketings = if (type.element is FznType.FloatRange ||
@@ -320,12 +249,10 @@ internal class FlatZincCompiler(
                     }
                 }
             }
-            // Build a Vars array referring to the existing vars.
             val kind = arrayElementKind(type.element)
             arrays[name] = FlatZincArray.Vars(name, varIds, kind, bucketings?.toList())
             return
         }
-        // No initializer — allocate vars per element.
         for (i in 0 until length) {
             val elemName = "$name[${i + 1}]"
             when (val t = type.element) {
@@ -372,8 +299,7 @@ internal class FlatZincCompiler(
         return id
     }
 
-    /** Allocate an int var whose initial domain is exactly the values of [t] — interior
-     *  values not in the set are excised from the contiguous `(min..max)` envelope. */
+    /** Allocate int var with an explicit sparse domain. */
     internal fun allocIntSet(name: String, t: FznType.IntSet): Int {
         val sorted = t.values.distinct().sorted().map { it.toInt() }
         require(sorted.isNotEmpty()) { "IntSet domain for `$name` is empty" }
@@ -388,13 +314,7 @@ internal class FlatZincCompiler(
         return id
     }
 
-    /**
-     * Materialise a `var set of E: name` declaration as one indicator bool per universe
-     * element. Resolves the universe to a sorted ascending int array; allocates one bool
-     * per element; records the layout in [setVarsByName] for downstream constraint dispatch
-     * and FZN output reconstruction. If [initializer] is present (e.g. `= { 1, 3, 5 }` or
-     * `= 1..3`), pins each indicator bool to its constant value via a unit clause.
-     */
+    /** Materialize a set var as parallel indicator bools. */
     internal fun allocSetVar(name: String, type: FznType.SetOfInt, initializer: FznExpr? = null) {
         val elements = universeElements(type.element, name)
         val indicatorIds = IntArray(elements.size) { i ->
@@ -415,7 +335,6 @@ internal class FlatZincCompiler(
         }
     }
 
-    /** Resolve the universe of a `var set of E` declaration to a sorted ascending int array. */
     internal fun universeElements(elem: FznType, ownerName: String): IntArray = when (elem) {
         is FznType.IntRange -> {
             require(elem.lo <= elem.hi) { "set `$ownerName`: empty universe ${elem.lo}..${elem.hi}" }
@@ -435,8 +354,6 @@ internal class FlatZincCompiler(
         return id
     }
 
-    // ---- parameter / expression evaluation ----------------------------------
-
     internal sealed interface ParamValue {
         data class Bool(val value: Boolean) : ParamValue
         data class Int(val value: Long) : ParamValue
@@ -444,8 +361,6 @@ internal class FlatZincCompiler(
         data class IntSet(val values: LongArray) : ParamValue
         data class Array(val arr: FlatZincArray) : ParamValue
     }
-
-    // ---- solve / output -----------------------------------------------------
 
     internal fun compileSolve(): SolveDirective = when (val s = model.solve) {
         is FznSolve.Satisfy -> SolveDirective.Satisfy
@@ -462,9 +377,6 @@ internal class FlatZincCompiler(
     }
 
     internal fun resolveObjVar(e: FznExpr): Pair<String, SolveDirective.ObjKind> {
-        // Inline int/float/bool literals: MiniZinc occasionally emits `solve minimize 4;`
-        // when the objective folds to a constant. Treat as a satisfy-equivalent by pinning
-        // a synthetic var to the literal value.
         when (e) {
             is FznExpr.IntLit -> {
                 val name = "__obj_const_${e.value}"
@@ -492,9 +404,6 @@ internal class FlatZincCompiler(
         }
         val name = (e as? FznExpr.Ident)?.name
             ?: failHere("solve objective must be a variable name")
-        // Par int / bool objective (e.g. `solve minimize X_INTRODUCED_27_` where the ident
-        // is a par constant produced by MiniZinc's flattener). Pin a synthetic var to the
-        // constant value so downstream search has something to track.
         (params[name] as? ParamValue.Int)?.let { p ->
             val pinName = "__obj_const_$name"
             val v = p.value.toInt()
@@ -523,12 +432,7 @@ internal class FlatZincCompiler(
         }
     }
 
-    /**
-     * When the FZN file has no explicit `output [...]` section, MiniZinc relies on
-     * `:: output_var` / `:: output_array(...)` annotations on individual var declarations
-     * to mark what to display. Synthesize an equivalent `OutputItem` list so the writer
-     * emits only the user-declared variables and skips internal `X_INTRODUCED_*` vars.
-     */
+    /** Build output items from `output_var` / `output_array` annotations. */
     internal fun synthesizeOutputItems(): List<OutputItem>? {
         val items = ArrayList<OutputItem>()
         for (decl in model.varDecls) {
@@ -548,7 +452,6 @@ internal class FlatZincCompiler(
                 }
             }
         }
-        // Returning null preserves the writer's "no annotations, print every var" fallback.
         return if (items.isEmpty()) null else items
     }
 
@@ -582,7 +485,7 @@ internal class FlatZincCompiler(
     internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, 0, 0)
 }
 
-/** Top-level entry point: parse + compile. */
+/** Parse and compile FlatZinc source. */
 fun parseFlatZinc(
     source: String,
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,

@@ -4,17 +4,11 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.*
 import kotlin.math.*
 
-
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
     require(c.args.size == if (reified) 4 else 3)
     val coefs = evalFloatConstArray(c.args[0])
     val varRefs = evalFloatVarArray(c.args[1])
     val bound = evalFloatConst(c.args[2])
-    // Each float var x_i ∈ [lo_i, hi_i] discretized to N buckets with step_i = (hi-lo)/(N-1).
-    // value(i_idx) = lo_i + i_idx * step_i.
-    // Σ c_i · value(idx_i) op bound
-    // ⇒ Σ c_i · step_i · idx_i op bound - Σ c_i · lo_i
-    // Scale all coefficients and bound by `floatScale` and round to integers.
     val scaled = scaleFloatLinear(coefs, varRefs, bound)
     val op = when (c.name.removeSuffix("_reif")) {
         "float_lin_le" -> LinearOp.LE
@@ -30,13 +24,7 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
     }
 }
 
-/**
- * `int2float(x_int, y_float)` — coerce x's int value into y's float value. y is
- * backed by a bucket-index int var with `value(idx) = lo + idx * step`. The
- * constraint is `x = lo + idx_y * step`, which rearranges (after scaling by
- * `floatScale`) to a single linear equality over (x, idx_y). Identity buckets
- * (step=1.0, lo integer) are the common case from `var int → var float` lifts.
- */
+/** Lower `int2float` as a scaled linear equality on bucket indices. */
 internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
     require(c.args.size == 2)
     val xInt = resolveIntVar(c.args[0])
@@ -44,7 +32,6 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
         ?: failHere("int2float: second arg must be a float var identifier")
     val yBk = floatVars[yName] ?: failHere("`$yName` is not a float var")
     val step = if (yBk.buckets > 1) (yBk.hi - yBk.lo) / (yBk.buckets - 1) else 0.0
-    // floatScale·x − floatScale·step·idx_y = floatScale·lo.
     val cX = floatScale
     val cIdxY = (-step * floatScale).roundToLong()
     val bound = (yBk.lo * floatScale).roundToLong()
@@ -58,11 +45,6 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
     )
 }
 
-/**
- * Look up a float var by name (rejecting constants and non-float identifiers). Used by
- * the binary float-cmp / min-max / times paths where every argument is expected to be a
- * declared `var float` rather than a parameter or array element.
- */
 private fun FlatZincCompiler.resolveFloatVarOrConst(e: FznExpr): FloatRef = when (e) {
     is FznExpr.FloatLit -> FloatRef.Const(e.value)
 
@@ -80,13 +62,7 @@ private sealed interface FloatRef {
     data class Const(val value: Double) : FloatRef
 }
 
-/**
- * `float_eq` / `float_le` / `float_lt` / `float_ne` (+ their `_reif` variants). Rewrites
- * `a op b` as the float-linear `1·a − 1·b op 0`, with [strict] adjusting LE by `-1` scaled
- * unit to encode strict-less. Constants on either side fold into the bound. Delegates to
- * [emitFloatLinear] by synthesising the equivalent `float_lin_*` constraint so the same
- * bucket-scaling logic runs in one place.
- */
+/** Lower float comparisons on bucket indices. */
 internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp, strict: Boolean, reified: Boolean) {
     require(c.args.size == if (reified) 3 else 2)
     val a = resolveFloatVarOrConst(c.args[0])
@@ -123,13 +99,10 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
     } else {
         (a as FloatRef.Const).value
     }
-    // Encode `1·a − 1·b op 0` as scaled coefficients/bound directly (the emitFloatLinear scaling),
-    // without round-tripping through FznExpr.
     val step = if (varSide.buckets > 1) (varSide.hi - varSide.lo) / (varSide.buckets - 1) else 0.0
     val coefVar = (sign * step * floatScale).roundToLong()
     var scaledBound = (-sign * constPart * floatScale).roundToLong() -
         (sign * varSide.lo * floatScale).roundToLong()
-    // Two-variable case folds the second var symmetrically.
     val coeffs: IntArray
     val vars: IntArray
     if (a is FloatRef.Var && b is FloatRef.Var) {
@@ -160,18 +133,13 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
     }
 }
 
-/**
- * `float_lin_lt(coeffs, vars, bound)` — strict `Σ c·v < bound`. Reduce to
- * `float_lin_le` with `bound − 1` scaled unit so the strict semantics is preserved at
- * bucket granularity (sound since `floatScale` is the smallest representable diff).
- */
+/** Strict float linear compare lowered to `<= bound - 1` in scaled space. */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
     require(c.args.size == if (reified) 4 else 3)
     val coefs = evalFloatConstArray(c.args[0])
     val varRefs = evalFloatVarArray(c.args[1])
     val bound = evalFloatConst(c.args[2])
     val scaled = scaleFloatLinear(coefs, varRefs, bound)
-    // Strict: subtract one scaled unit.
     val strictBound = scaled.bound - 1
     if (reified) {
         val aux = resolveBoolLit(c.args[3])
@@ -189,11 +157,7 @@ internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: B
     }
 }
 
-/**
- * `float_min(a, b, c)` / `float_max(a, b, c)` — c = min/max(a, b). Lowered as the pair
- * of bucket-level inequalities `c ≤ a, c ≤ b` (min) or `c ≥ a, c ≥ b` (max), plus a
- * reified disjunction `c = a ∨ c = b` so c is forced to the bound by one of the inputs.
- */
+/** Lower `float_min`/`float_max` with inequalities plus equality disjunction. */
 internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
     require(c.args.size == 3)
     val argA = c.args[0]
@@ -204,24 +168,18 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
         emitFloatBinaryCmp(fc, op = LinearOp.LE, strict = false, reified = false)
     }
     if (max) {
-        // c ≥ a  ⇔  a ≤ c
         emitIneq(argA, argC)
         emitIneq(argB, argC)
     } else {
-        // c ≤ a, c ≤ b
         emitIneq(argC, argA)
         emitIneq(argC, argB)
     }
-    // Disjunction c = a ∨ c = b via two reified equalities and a clause. Unique
-    // suffix ties the aux bools to this constraint's position in the factor list,
-    // so multiple float_min/max in one model don't collide.
+    // Keep aux names unique across multiple min/max constraints.
     val suffix = factors.size.toString()
     val auxA = allocBool("__fminmax_a_$suffix")
     val auxB = allocBool("__fminmax_b_$suffix")
     val eqA = FznConstraint("float_eq_reif", listOf(argA, argC, FznExpr.Ident("__fminmax_a_$suffix")), emptyList())
     val eqB = FznConstraint("float_eq_reif", listOf(argB, argC, FznExpr.Ident("__fminmax_b_$suffix")), emptyList())
-    // Note: emitFloatBinaryCmp resolves the bool lit via resolveBoolLit which looks up the
-    // identifier in [boolVars]; allocBool registers there.
     emitFloatBinaryCmp(eqA, op = LinearOp.EQ, strict = false, reified = true)
     emitFloatBinaryCmp(eqB, op = LinearOp.EQ, strict = false, reified = true)
     factors.add(
@@ -234,22 +192,13 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
     )
 }
 
-/**
- * `float_times(a, b, c)` — c = a · b. Non-linear, lowered by enumerating the Cartesian
- * product of (a, b) bucket indices and emitting an N_a · N_b row [Table] over
- * (idx_a, idx_b, idx_c). The c column is computed by `value(a)·value(b)` rounded to c's
- * closest bucket index; rows whose rounded c falls outside c's domain are dropped (the
- * constraint forbids them). Sound but quadratic in bucket counts — use with care on
- * coarsely bucketed floats.
- */
+/** Lower `float_times` to a bucket-index table. */
 internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     require(c.args.size == 3)
     val aRef = resolveFloatVarOrConst(c.args[0])
     val bRef = resolveFloatVarOrConst(c.args[1])
     val cRef = resolveFloatVarOrConst(c.args[2])
     if (aRef !is FloatRef.Var || bRef !is FloatRef.Var || cRef !is FloatRef.Var) {
-        // At least one side constant — degenerate to a linear constraint.
-        // (No corpus case exercises this; defer if encountered.)
         failHere("float_times with constant operand not yet handled (only var·var=var)")
     }
     val a = aRef.bk
@@ -282,7 +231,6 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         }
     }
     if (rows.isEmpty()) {
-        // No feasible row — infeasible.
         factors.add(Clause(IntArray(0)))
         return
     }
@@ -312,11 +260,7 @@ internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing
     else -> failHere("expected float var array, got ${e::class.simpleName}")
 }
 
-private data class ScaledFloatLinear(
-    val coeffs: IntArray,
-    val vars: IntArray,
-    val bound: Long,
-)
+private data class ScaledFloatLinear(val coeffs: IntArray, val vars: IntArray, val bound: Long)
 
 private fun FlatZincCompiler.scaleFloatLinear(
     coefs: DoubleArray,

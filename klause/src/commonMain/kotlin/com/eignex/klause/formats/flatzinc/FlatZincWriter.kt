@@ -2,18 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Sample
 
-/**
- * Render a klause [Sample] as a FlatZinc-compatible solution string. If the program had an
- * `output` declaration, items are rendered in order. Otherwise the writer emits one
- * `name = value;` line per declared variable in declaration order, then the terminating
- * `----------` line that MiniZinc expects per solution.
- *
- * When [outputObjective] is set and the model optimises, an extra `_objective = <value>;` line
- * is emitted before the terminator — the same special variable `minizinc --output-objective`
- * adds in dzn mode. The objective variable is otherwise often absent from the `output` section
- * (it is frequently a `var_is_introduced` aux var), so a downstream parser scraping the solution
- * stream has no other way to read the objective klause actually optimised.
- */
+/** Render one solved sample in FlatZinc output format. */
 fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObjective: Boolean = false): String {
     val sb = StringBuilder()
     val items = program.outputItems
@@ -26,9 +15,7 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
             }
         }
     } else {
-        // Default output: every declared bool / int / float / set var, in declaration order.
-        // Skip bool vars whose names start with `__set_` — those are internal set indicator
-        // bools synthesized by `allocSetVar`, not user-declared.
+        // Skip internal set-indicator bools in fallback output.
         val setIndicatorBools = program.setVarsByName.values.flatMap { it.indicatorBoolIds.toList() }.toSet()
         for ((name, id) in program.boolVarsByName) {
             if (id in setIndicatorBools) continue
@@ -52,7 +39,6 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
     return sb.toString()
 }
 
-/** The objective variable's FlatZinc name for an optimisation directive, else null (satisfy). */
 private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {
     is SolveDirective.Minimize -> solve.objVar
     is SolveDirective.Maximize -> solve.objVar
@@ -67,8 +53,7 @@ private fun renderScalar(program: FlatZincProgram, sample: Sample, name: String)
     throw IllegalArgumentException("output: unknown var `$name`")
 }
 
-/** Reconstruct MiniZinc set output `{a, b, c}` from indicator bools. Emits an empty `{}`
- *  when no element is in the set. */
+/** Reconstruct MiniZinc set output `{a, b, c}` from indicator bools. */
 private fun renderSet(sample: Sample, layout: SetVarLayout): String {
     val sb = StringBuilder("{")
     var first = true

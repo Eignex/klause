@@ -1,23 +1,14 @@
 package com.eignex.klause.formats.flatzinc
 
-/**
- * Recursive-descent parser for FlatZinc 1.6. Produces an [FznModel] containing the
- * declarations, constraints, solve directive, and (optionally) output items. Skips
- * predicate declarations entirely — they're metadata for the model, not constraints.
- *
- * Throws [FlatZincParseException] on malformed input. Doesn't validate constraint
- * semantics (that's the compiler's job).
- */
+/** Recursive-descent parser for FlatZinc 1.6. */
 internal class FlatZincParser(tokens: List<FznToken>) {
     private val tokens: List<FznToken> = tokens
     private var pos: Int = 0
 
     fun parse(): FznModel {
-        // Skip predicate declarations.
         while (peek() is FznToken.Kw && (peek() as FznToken.Kw).keyword == "predicate") {
             skipPredicate()
         }
-        // FlatZinc allows `annotation` declarations too, though uncommon — skip.
         while (peek() is FznToken.Kw && (peek() as FznToken.Kw).keyword == "annotation") {
             skipUntilSemicolon()
         }
@@ -37,8 +28,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         return FznModel(decls, constraints, solve, output)
     }
 
-    // ---- declarations -------------------------------------------------------
-
     private fun isStartOfVarDecl(): Boolean {
         val t = peek()
         if (t !is FznToken.Kw) return false
@@ -49,18 +38,12 @@ internal class FlatZincParser(tokens: List<FznToken>) {
     }
 
     private fun parseVarDecl(): FznVarDecl {
-        // Syntax variants:
-        //   var T : id [:: anns] [= expr] ;
-        //   par T : id = expr ;     (or T : id = expr — `par` is implicit)
-        //   array [1..N] of var T : id ... ;
-        //   bool : id = expr ;      (parameter form)
         var isVar = false
         if (matchKw("var")) {
             isVar = true
         } else if (matchKw("par")) {
             isVar = false
         }
-        // `array [1..N] of (var)? T` — handle.
         val type: FznType = parseType()
         expect(":", "expected `:` in variable declaration")
         val name = expectIdent()
@@ -71,16 +54,10 @@ internal class FlatZincParser(tokens: List<FznToken>) {
             value = parseExpr()
         }
         expect(";", "expected `;` ending declaration")
-        // FlatZinc array-of-var: the `var` modifier may have been inside the element type.
-        // We detect: if type is FznType.Array and the element is `var T`, then the array
-        // itself is a var array. Our parser doesn't distinguish var-vs-param at the array
-        // element level — we just record `isVar` for the whole decl, derived from either
-        // the top-level `var` keyword OR a `var` modifier inside the array element type.
         val isVarFinal = isVar || (type is FznType.Array && elementIsVar(type))
         return FznVarDecl(name, type, isVarFinal, anns, value)
     }
 
-    /** Whether the element type of an array was declared as `var T`. */
     private fun elementIsVar(t: FznType.Array): Boolean = t.elementIsVar
 
     private fun parseType(): FznType {
@@ -88,7 +65,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         if (tok is FznToken.Kw && tok.keyword == "array") {
             advance()
             expect("[", "expected `[` after `array`")
-            // index range: 1..N
             val lo = expectIntLit()
             expect("..", "expected `..` in array index range")
             val hi = expectIntLit()
@@ -97,12 +73,10 @@ internal class FlatZincParser(tokens: List<FznToken>) {
             }
             expect("]", "expected `]` closing index range")
             expectKw("of")
-            // `array [...] of var T` or `array [...] of T`.
             val elementIsVar = matchKw("var")
             val element = parseScalarType()
             return FznType.Array(hi.toInt(), element, elementIsVar)
         }
-        // Scalar type (possibly with `var` modifier we may have already eaten).
         return parseScalarType()
     }
 
@@ -135,7 +109,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                 else -> failHere("unexpected type keyword '${tok.keyword}'")
             }
         }
-        // Otherwise expect a range literal: `1..10` or `{1,3,5}` or `1.0..3.0`.
         if (tok is FznToken.IntLit) {
             val lo = tok.value
             advance()
@@ -186,8 +159,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         return FznAnnotation(name, args)
     }
 
-    // ---- constraints --------------------------------------------------------
-
     private fun parseConstraint(): FznConstraint {
         expectKw("constraint")
         val name = expectIdent()
@@ -202,8 +173,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         expect(";", "expected `;` after constraint")
         return FznConstraint(name, args, anns)
     }
-
-    // ---- solve / output -----------------------------------------------------
 
     private fun parseSolve(): FznSolve {
         expectKw("solve")
@@ -248,11 +217,8 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         return items
     }
 
-    // ---- expressions --------------------------------------------------------
-
     private fun parseExpr(): FznExpr {
-        val tok = peek()
-        return when (tok) {
+        return when (val tok = peek()) {
             is FznToken.Kw -> when (tok.keyword) {
                 "true" -> {
                     advance()
@@ -298,7 +264,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
                     expect("]", "expected `]` closing array access")
                     FznExpr.ArrayAccess(name, idx.toInt())
                 } else if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "(") {
-                    // Annotation-style call inside an expression context.
                     advance()
                     val args = ArrayList<FznExpr>()
                     if (peek() !is FznToken.Punct || (peek() as FznToken.Punct).symbol != ")") {
@@ -343,8 +308,6 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         expect("}", "expected `}` closing set literal")
         return FznExpr.IntSetLit(values.toLongArray())
     }
-
-    // ---- low-level helpers --------------------------------------------------
 
     private fun peek(): FznToken = tokens[pos]
     private fun advance(): FznToken = tokens[pos++]

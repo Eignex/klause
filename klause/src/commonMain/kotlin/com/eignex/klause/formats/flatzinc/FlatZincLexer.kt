@@ -1,37 +1,25 @@
 package com.eignex.klause.formats.flatzinc
 
-/** One lexical token from a FlatZinc source. */
+/** One lexical token from FlatZinc source. */
 internal sealed interface FznToken {
     val line: Int
     val col: Int
 
-    /** Keywords get their own subtype for cleaner parser pattern matching. */
     data class Kw(val keyword: String, override val line: Int, override val col: Int) : FznToken
     data class Ident(val name: String, override val line: Int, override val col: Int) : FznToken
     data class IntLit(val value: Long, override val line: Int, override val col: Int) : FznToken
     data class FloatLit(val value: Double, override val line: Int, override val col: Int) : FznToken
     data class StringLit(val value: String, override val line: Int, override val col: Int) : FznToken
 
-    /** Punctuation: ,;:=()[]{}.: */
     data class Punct(val symbol: String, override val line: Int, override val col: Int) : FznToken
     data class Eof(override val line: Int, override val col: Int) : FznToken
 }
 
-/**
- * Thrown when the lexer or parser hits malformed input. Carries `line:col` for diagnostics.
- */
-class FlatZincParseException(
-    message: String,
-    /** 1-based source line of the error. */
-    sourceLine: Int,
-    /** 1-based source column of the error. */
-    sourceCol: Int,
-) : RuntimeException("$message (at $sourceLine:$sourceCol)")
+/** Thrown on malformed FlatZinc with source location. */
+class FlatZincParseException(message: String, sourceLine: Int, sourceCol: Int) :
+    RuntimeException("$message (at $sourceLine:$sourceCol)")
 
-/**
- * Hand-rolled tokenizer for FlatZinc. Stateful, single-pass. Skips whitespace and `%`
- * line comments. FlatZinc strings use C-style escapes for `\\`, `\"`, `\n`, `\t`.
- */
+/** Single-pass FlatZinc tokenizer. */
 internal class FlatZincLexer(private val src: String) {
     private var pos: Int = 0
     private var line: Int = 1
@@ -43,7 +31,6 @@ internal class FlatZincLexer(private val src: String) {
         "output", "annotation", "any",
     )
 
-    /** Drain the source into a token list. Always ends with [FznToken.Eof]. */
     fun tokenize(): List<FznToken> {
         val out = ArrayList<FznToken>()
         while (true) {
