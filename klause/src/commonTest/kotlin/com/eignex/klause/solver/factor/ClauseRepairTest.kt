@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random

@@ -46,27 +46,27 @@ import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.PseudoBoolean
-import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
+import com.eignex.klause.solver.factor.bool.Xor
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
 import kotlin.math.ceil
 import kotlin.math.floor
-import com.eignex.klause.solver.factor.AllDifferent as AllDifferentFactor
-import com.eignex.klause.solver.factor.Circuit as CircuitFactor
-import com.eignex.klause.solver.factor.Cumulative as CumulativeFactor
-import com.eignex.klause.solver.factor.Diffn as DiffnFactor
-import com.eignex.klause.solver.factor.Disjunctive as DisjunctiveFactor
-import com.eignex.klause.solver.factor.GlobalCardinality as GccFactor
-import com.eignex.klause.solver.factor.Inverse as InverseFactor
-import com.eignex.klause.solver.factor.NValue as NValueFactor
-import com.eignex.klause.solver.factor.Regular as RegularFactor
-import com.eignex.klause.solver.factor.Sort as SortFactor
-import com.eignex.klause.solver.factor.Subcircuit as SubcircuitFactor
-import com.eignex.klause.solver.factor.SymmetricAllDifferent as SymmetricAllDifferentFactor
+import com.eignex.klause.solver.factor.circuit.Circuit as CircuitFactor
+import com.eignex.klause.solver.factor.circuit.Subcircuit as SubcircuitFactor
+import com.eignex.klause.solver.factor.global.AllDifferent as AllDifferentFactor
+import com.eignex.klause.solver.factor.global.GlobalCardinality as GccFactor
+import com.eignex.klause.solver.factor.global.Inverse as InverseFactor
+import com.eignex.klause.solver.factor.global.NValue as NValueFactor
+import com.eignex.klause.solver.factor.global.Sort as SortFactor
+import com.eignex.klause.solver.factor.global.SymmetricAllDifferent as SymmetricAllDifferentFactor
+import com.eignex.klause.solver.factor.scheduling.Cumulative as CumulativeFactor
+import com.eignex.klause.solver.factor.scheduling.Diffn as DiffnFactor
+import com.eignex.klause.solver.factor.scheduling.Disjunctive as DisjunctiveFactor
+import com.eignex.klause.solver.factor.table.Regular as RegularFactor
 
 /**
  * Top-level constraint assertion handlers for [Lowering]. The DSL drops a tree of

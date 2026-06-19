@@ -2,9 +2,9 @@ package com.eignex.klause.formats
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
 
 /** Shared CNF-lowering hooks for format front-ends. */
 internal interface CnfLowering {

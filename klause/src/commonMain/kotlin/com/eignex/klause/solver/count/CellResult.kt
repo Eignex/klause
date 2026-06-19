@@ -2,7 +2,7 @@ package com.eignex.klause.solver.count
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.Xor
 
 /**
  * Outcome of counting the satisfying assignments inside one XOR-hash cell, up to a cap.

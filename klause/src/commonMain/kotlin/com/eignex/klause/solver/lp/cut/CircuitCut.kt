@@ -4,7 +4,7 @@ import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.util.IntArrayDeque
 
 /**
- * Arc-indicator model for one [com.eignex.klause.solver.factor.Circuit]: the LP columns of the
+ * Arc-indicator model for one [com.eignex.klause.solver.factor.circuit.Circuit]: the LP columns of the
  * binary arc variables `y_ij` (1 iff `succ(i) = j`) that the base relaxation creates under the
  * circuit-arc flag, plus the node count. The degree and channelling rows tying these to the integer
  * `succ` columns live in the relaxation; this record is what a [CircuitSeparator] needs to read the
@@ -26,7 +26,7 @@ internal class CircuitArcModel(
 )
 
 /**
- * Genuine subtour-elimination cuts for [com.eignex.klause.solver.factor.Circuit]. The base
+ * Genuine subtour-elimination cuts for [com.eignex.klause.solver.factor.circuit.Circuit]. The base
  * relaxation's degree rows (each node has exactly one out- and one in-arc) make every *integer*
  * arc solution a permutation — a disjoint union of cycles. A Hamiltonian circuit is the single-cycle
  * case, so the gap to feasibility is exactly the subtours, removed by the directed cutset inequality

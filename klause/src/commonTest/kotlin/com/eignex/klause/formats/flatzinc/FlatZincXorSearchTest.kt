@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.Xor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

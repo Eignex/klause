@@ -7,6 +7,13 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
+import com.eignex.klause.solver.factor.bool.Xor
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedCardinality
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
+import com.eignex.klause.solver.factor.linear.ReifiedPseudoBoolean
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test

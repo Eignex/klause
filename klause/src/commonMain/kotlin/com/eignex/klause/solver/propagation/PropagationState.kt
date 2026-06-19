@@ -7,7 +7,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -484,7 +484,7 @@ class PropagationState(
      * Bool literals that forced the most-recent tightening of `intDomains[v].min`. Null
      * when no factor recorded antecedents — analyzer treats as a leaf, same as a
      * decision. Mirrors [boolAntecedents] on the int side; used by factors that pin
-     * bools based on int-domain state (e.g. [com.eignex.klause.solver.factor.ReifiedLinear])
+     * bools based on int-domain state (e.g. [com.eignex.klause.solver.factor.linear.ReifiedLinear])
      * so the aux pin's antecedents transitively reference the bool decisions that
      * narrowed the int domain.
      *

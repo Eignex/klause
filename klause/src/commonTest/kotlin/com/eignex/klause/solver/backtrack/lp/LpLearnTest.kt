@@ -5,8 +5,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
 import com.eignex.klause.solver.lp.ExactBasisCertifier
 import com.eignex.klause.solver.lp.LpBuilder
 import com.eignex.klause.solver.lp.Relation

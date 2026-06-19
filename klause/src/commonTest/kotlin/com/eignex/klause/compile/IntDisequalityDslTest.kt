@@ -2,7 +2,7 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.ne
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

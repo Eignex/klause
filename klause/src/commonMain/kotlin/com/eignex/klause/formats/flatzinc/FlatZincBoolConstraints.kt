@@ -1,14 +1,14 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Element
-import com.eignex.klause.solver.factor.LexLess
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.Xor
+import com.eignex.klause.solver.factor.global.LexLess
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
+import com.eignex.klause.solver.factor.table.Element
+import com.eignex.klause.solver.factor.table.Table
 
 internal fun FlatZincCompiler.emitBoolClause(c: FznConstraint) {
     require(c.args.size == 2)

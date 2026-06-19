@@ -3,8 +3,8 @@ package com.eignex.klause.solver.count
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.GaussianXor
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.GaussianXor
+import com.eignex.klause.solver.factor.bool.Xor
 import kotlin.random.Random
 
 /**

@@ -2,27 +2,27 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.Circuit
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Cumulative
-import com.eignex.klause.solver.factor.Diffn
-import com.eignex.klause.solver.factor.Disjunctive
-import com.eignex.klause.solver.factor.GlobalCardinality
-import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.LexLess
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.Mdd
-import com.eignex.klause.solver.factor.NValue
-import com.eignex.klause.solver.factor.Regular
-import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.Sort
-import com.eignex.klause.solver.factor.Subcircuit
-import com.eignex.klause.solver.factor.SymmetricAllDifferent
-import com.eignex.klause.solver.factor.Table
-import com.eignex.klause.solver.factor.ValuePrecede
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.circuit.Circuit
+import com.eignex.klause.solver.factor.circuit.Subcircuit
+import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.global.GlobalCardinality
+import com.eignex.klause.solver.factor.global.Inverse
+import com.eignex.klause.solver.factor.global.LexLess
+import com.eignex.klause.solver.factor.global.NValue
+import com.eignex.klause.solver.factor.global.Sort
+import com.eignex.klause.solver.factor.global.SymmetricAllDifferent
+import com.eignex.klause.solver.factor.global.ValuePrecede
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
+import com.eignex.klause.solver.factor.scheduling.Cumulative
+import com.eignex.klause.solver.factor.scheduling.Diffn
+import com.eignex.klause.solver.factor.scheduling.Disjunctive
+import com.eignex.klause.solver.factor.table.Mdd
+import com.eignex.klause.solver.factor.table.Regular
+import com.eignex.klause.solver.factor.table.Table
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)

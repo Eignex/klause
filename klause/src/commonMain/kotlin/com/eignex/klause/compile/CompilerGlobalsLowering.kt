@@ -13,7 +13,7 @@ import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.factor.Mdd
+import com.eignex.klause.solver.factor.table.Mdd
 
 /*
  * Decompositions for the "newer" globals. Each [decomposeXxx] returns a [BoolExpr] in

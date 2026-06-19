@@ -6,7 +6,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.lp.LpPlan
-import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
