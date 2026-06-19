@@ -4,8 +4,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.LpConfig
-import com.eignex.klause.solver.backtrack.LpEmphasis
+import com.eignex.klause.solver.backtrack.lp.LpConfig
+import com.eignex.klause.solver.backtrack.lp.LpEmphasis
 import com.eignex.klause.solver.backtrack.selector.IndomainMin
 import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.solver.backtrack.selector.SolutionGuided

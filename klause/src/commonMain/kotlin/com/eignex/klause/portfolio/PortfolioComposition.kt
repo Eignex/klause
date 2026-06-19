@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.backtrack.LpConfig
+import com.eignex.klause.solver.backtrack.lp.LpConfig
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective

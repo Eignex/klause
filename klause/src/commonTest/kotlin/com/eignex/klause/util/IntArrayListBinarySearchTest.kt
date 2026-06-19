@@ -1,5 +1,6 @@
 package com.eignex.klause.util
 
+import com.eignex.klause.solver.backtrack.lp.linearLowerBound
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

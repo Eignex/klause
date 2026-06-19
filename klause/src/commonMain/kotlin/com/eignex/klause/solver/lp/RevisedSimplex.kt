@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.lp
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.lp.cut.Cut
 import kotlin.math.abs
 
 /**

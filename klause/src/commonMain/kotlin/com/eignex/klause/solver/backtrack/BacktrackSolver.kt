@@ -8,6 +8,11 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.backtrack.lp.LpAutoConfig
+import com.eignex.klause.solver.backtrack.lp.LpEngine
+import com.eignex.klause.solver.backtrack.lp.harvestRootCuts
+import com.eignex.klause.solver.backtrack.lp.lpRoundingProbe
+import com.eignex.klause.solver.backtrack.lp.rootLpRelaxationBound
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.objective.LinearObjective

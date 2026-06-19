@@ -4,7 +4,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.LpConfig
+import com.eignex.klause.solver.backtrack.lp.LpConfig
 import com.eignex.klause.solver.backtrack.selector.Chb
 import com.eignex.klause.solver.backtrack.selector.DomainMaxRegret
 import com.eignex.klause.solver.backtrack.selector.IndomainMax
