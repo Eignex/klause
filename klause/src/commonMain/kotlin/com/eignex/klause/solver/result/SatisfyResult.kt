@@ -16,7 +16,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
  * are jointly unsat), a budget cap, and a globally-unsat problem (independent of the
  * assumptions).
  *
- * Used by the core-guided MaxSAT loop ([com.eignex.klause.solver.optimize.CoreGuidedOptimizer])
+ * Used by the core-guided MaxSAT loop ([com.eignex.klause.solver.meta.coreguided.CoreGuidedOptimizer])
  * which drives a sequence of `satisfy(assumptions)` calls and refines its lower bound off
  * each [UnsatUnderAssumptions.core].
  */

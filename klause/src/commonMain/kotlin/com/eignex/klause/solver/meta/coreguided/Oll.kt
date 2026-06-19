@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.optimize
+package com.eignex.klause.solver.meta.coreguided
 
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Assumptions
