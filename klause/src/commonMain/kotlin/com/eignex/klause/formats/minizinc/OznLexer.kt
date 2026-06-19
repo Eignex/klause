@@ -114,8 +114,7 @@ internal class OznLexer(private val source: String) {
     private fun punct(ln: Int): OznToken {
         val c = source[pos]
         if (pos + 1 < source.length) {
-            val pair = source.substring(pos, pos + 2)
-            val two = when (pair) {
+            val two = when (val pair = source.substring(pos, pos + 2)) {
                 "..", "==", "!=", "<=", ">=", "->", "<-", "++", "/\\", "\\/", "::" -> pair
                 else -> null
             }
