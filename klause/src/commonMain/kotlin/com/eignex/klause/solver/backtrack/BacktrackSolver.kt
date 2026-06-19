@@ -467,9 +467,10 @@ class BacktrackSolver(override val problem: Problem) :
          * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation
          * bound for the integrality-gap metric (search only bounds from level 1 down, so this is the
          * sole root capture). Run from [runUntilEvent]'s `started` guard — not at construction — so the
-         * live cancellation gates the LP solves it issues. Idempotent via that guard.
+         * live cancellation gates the LP solves it issues. Idempotent via that guard. [token] is the
+         * shared root-LP budget (#31) — the slice/global cancellation time-boxed to `LpPlan.rootBudgetFraction`.
          */
-        private fun initRootLp() {
+        private fun initRootLp(token: Cancellation) {
             val relaxer = lpEngine.lpRelaxer ?: return
             val gomory = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.gomory
             val mir = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.mir
@@ -480,14 +481,35 @@ class BacktrackSolver(override val problem: Problem) :
                     lpEngine.lpSeparators,
                     gomory,
                     mir,
-                    params.cancellation,
+                    token,
                 )
                 sink.observeLpCuts(lpEngine.lpGlobalCuts.size)
             }
             sink.observeRootLpBound(
                 0,
-                lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, params.cancellation),
+                lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token),
             )
+        }
+
+        /**
+         * The shared cooperative-cancellation budget for the pre-search root LP work (#31): the
+         * slice/global [BacktrackParams.cancellation] OR-ed with a wall-clock deadline of
+         * `LpPlan.rootBudgetFraction` of the time remaining in the current slice (capped at
+         * `LpPlan.rootBudgetMillis`). When the slice end is unknown (the non-pausable one-shot path)
+         * only the absolute cap applies. A non-positive fraction disables the cap — the prior behaviour.
+         */
+        private fun rootLpBudget(): Cancellation {
+            val fraction = params.lpPlan.rootBudgetFraction
+            if (fraction <= 0.0) return params.cancellation
+            val cap = params.lpPlan.rootBudgetMillis
+            val end = sliceEnd
+            val budgetMillis = if (end != null) {
+                val remaining = (end - TimeSource.Monotonic.markNow()).inWholeMilliseconds
+                minOf((remaining * fraction).toLong(), cap)
+            } else {
+                cap
+            }
+            return params.cancellation or Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
         }
 
         /** Advance the search to the next reportable event (a new incumbent, the terminal verdict, or —
@@ -500,11 +522,14 @@ class BacktrackSolver(override val problem: Problem) :
                 started = true
                 sink.start()
                 // Root LP work runs here, not at construction, so the cancellation is live while it solves.
-                initRootLp()
+                // One shared budget (#31) caps the cut harvest + root bound + probe together, so a slow
+                // root relaxation cannot starve search of its first node.
+                val rootToken = rootLpBudget()
+                initRootLp(rootToken)
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
                 if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
-                    val seed = lpEngine.lpRoundingProbe(objective, params.cancellation)
+                    val seed = lpEngine.lpRoundingProbe(objective, rootToken)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }
             }

@@ -183,6 +183,19 @@ data class LpPlan(
      */
     val autoOffReprobe: Boolean = true,
     /**
+     * Wall-clock budget for the one-shot pre-search root LP work (#31): the cut harvest, the root
+     * relaxation-bound capture, and the LP-rounding [probe] all share one deadline so a pathological
+     * root relaxation cannot consume the whole time budget before branch-and-bound gets its first node
+     * (the liner-sf failure mode). The budget is [rootBudgetFraction] of the time remaining when search
+     * starts — so search keeps the rest of every slice — capped at [rootBudgetMillis]. Each root step is
+     * cooperatively cancelled at the budget and degrades gracefully (a half-harvested cut pool, a `NaN`
+     * root bound, no probe seed), never unsoundly. `0.0` disables the cap (unbudgeted, the prior behaviour).
+     */
+    val rootBudgetFraction: Double = 0.5,
+    /** Absolute ceiling in milliseconds on the [rootBudgetFraction] pre-search root-LP budget; also the
+     *  sole cap when the time remaining is unknown (the non-pausable one-shot path). */
+    val rootBudgetMillis: Long = 30_000,
+    /**
      * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
      * [bounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
      * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
