@@ -183,7 +183,13 @@ internal object SolveCore {
         val strategy: Strategy = if (setup.sourcesSpec != null) {
             val sources = MoveSourceCatalog.parse(setup.sourcesSpec)
             if (sources.isEmpty()) usageError("ls-single: sources=`${setup.sourcesSpec}` selected no sources")
-            SourceDrivenStrategy(sources, scoring = setup.scoring, acceptance = setup.acceptance, tabu = tabu)
+            SourceDrivenStrategy(
+                sources,
+                scoring = setup.scoring,
+                acceptance = setup.acceptance,
+                schedule = setup.schedule,
+                tabu = tabu,
+            )
         } else {
             Cbls(
                 noiseProbability = setup.noise,

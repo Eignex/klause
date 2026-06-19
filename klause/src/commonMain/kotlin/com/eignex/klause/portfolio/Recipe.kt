@@ -7,6 +7,8 @@ import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.Reheating
+import com.eignex.klause.solver.localsearch.schedule.Schedule
+import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.strategy.AcceptanceRule
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
@@ -36,7 +38,13 @@ internal class Recipe(
      *  matching how the SAT-family / fjump arms are registered. */
     fun toWorkerConfig(tabu: TabuFilter = TabuFilter.Disabled): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
         "recipe/$label",
-        SourceDrivenStrategy(MoveSourceCatalog.parse(sources.spec), scoring, acceptance.build(), tabu = tabu),
+        SourceDrivenStrategy(
+            MoveSourceCatalog.parse(sources.spec),
+            scoring,
+            acceptance.build(),
+            schedule = ScheduleBundle(temperature = acceptance.temperature?.invoke()),
+            tabu = tabu,
+        ),
         restart.build(),
     )
 }
@@ -44,8 +52,13 @@ internal class Recipe(
 /** A named source-set, resolved through [MoveSourceCatalog] (the sources axis). */
 internal class SourcesPreset(val name: String, val spec: String)
 
-/** A named acceptance choice; a factory because some rules (SA/Metropolis) hold a stateful schedule. */
-internal class AcceptanceOption(val name: String, val build: () -> AcceptanceRule)
+/** A named acceptance choice. [temperature] supplies the schedule-axis annealing schedule for the
+ *  Metropolis rule (null for the non-temperature rules); a factory because schedules are stateful. */
+internal class AcceptanceOption(
+    val name: String,
+    val temperature: (() -> Schedule)? = null,
+    val build: () -> AcceptanceRule,
+)
 
 /** A named restart/perturbation cadence; a factory because restart policies are stateful per search. */
 internal class RestartOption(val name: String, val build: () -> RestartPolicy)
@@ -109,8 +122,10 @@ internal class RecipeSpace(
             AcceptanceOption("walksat") { AcceptanceRule.WalkSatNoise(noise = 0.2) },
             AcceptanceOption("probsat") { AcceptanceRule.ProbSat() },
             AcceptanceOption("skew") { AcceptanceRule.Skew(alpha = 0.5) },
-            AcceptanceOption("sa-geometric") { AcceptanceRule.Metropolis(Geometric()) },
-            AcceptanceOption("sa-reheat") { AcceptanceRule.Metropolis(Reheating(Geometric(), period = 20_000)) },
+            AcceptanceOption("sa-geometric", temperature = { Geometric() }) { AcceptanceRule.Metropolis },
+            AcceptanceOption("sa-reheat", temperature = { Reheating(Geometric(), period = 20_000) }) {
+                AcceptanceRule.Metropolis
+            },
         )
 
         val DEFAULT_RESTARTS: List<RestartOption> = listOf(

@@ -6,6 +6,7 @@ import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.Schedule
+import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import kotlin.math.pow
 
 /**
@@ -270,7 +271,8 @@ object SimulatedAnnealing {
     ): SourceDrivenStrategy = SourceDrivenStrategy(
         sources = focusedSources(),
         scoring = MoveScoring.Break,
-        acceptance = AcceptanceRule.Metropolis(schedule),
+        acceptance = AcceptanceRule.Metropolis,
+        schedule = ScheduleBundle(temperature = schedule),
         tabu = tabu,
         configurationChecking = configurationChecking,
     )

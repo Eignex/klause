@@ -38,7 +38,7 @@ class SourceDrivenStrategy(
     val scoring: MoveScoring = MoveScoring.Weighted,
     /** How a scored candidate is selected — greedy, WalkSAT noise, probSAT roulette, skewed-VNS, or SA. */
     val acceptance: AcceptanceRule = AcceptanceRule.Greedy,
-    /** The schedule axis (#721): the [ScheduleBundle] of tempo policies — temperature, violation
+    /** The schedule axis: the [ScheduleBundle] of tempo policies — temperature, violation
      *  weights, diversification noise, restart cadence. Each member is driven at its native cadence
      *  (weights per step; temperature per pick + per round; restart by the engine). The default empty
      *  bundle leaves every dimension off. */
@@ -64,13 +64,13 @@ class SourceDrivenStrategy(
      *  built-in descent. The unified-minimize path keys off this. */
     internal val drivesObjectiveDescent: Boolean get() = cblsSchedule != null
 
-    /** Round feedback drives the temperature schedule of a Metropolis (simulated-annealing)
-     *  acceptance rule; other rules ignore it, so accumulation is gated off for them. */
-    override val wantsRoundFeedback: Boolean get() = acceptance is AcceptanceRule.Metropolis
+    /** Round feedback retunes the schedule axis's temperature schedule (e.g. AdaptiveCooling);
+     *  accumulation is gated off when no temperature schedule is present. */
+    override val wantsRoundFeedback: Boolean get() = schedule.temperature != null
 
     override fun observeRound(acc: RoundAccumulator, step: Long) {
-        val schedule = (acceptance as? AcceptanceRule.Metropolis)?.schedule ?: return
-        schedule.observe(acc.snapshot(schedule.temperature, step))
+        val temperature = schedule.temperature ?: return
+        temperature.observe(acc.snapshot(temperature.temperature, step))
     }
 
     private val noiseSink = MoveSink()
@@ -112,7 +112,13 @@ class SourceDrivenStrategy(
         // layered on what survives it.
         val noiseMoves = tabu.filter(state, ccFilter(state, noiseSink.list))
         val scoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
-        return acceptance.choose(state.rng, noiseMoves, scoreMoves) { score(state, it) }
+        // Temperature is the schedule axis's; the acceptance rule only reads it (Metropolis). The
+        // driver advances the schedule once per pick that sampled the noise pool, matching the former
+        // step-per-Metropolis-choose cadence — so acceptance stays pure and schedule stays the axis.
+        val temperature = schedule.temperature?.temperature ?: Double.POSITIVE_INFINITY
+        val move = acceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { score(state, it) }
+        if (acceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
+        return move
     }
 
     /** Restrict [moves] to configuration-changed candidates when [configurationChecking] is on,
