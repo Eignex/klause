@@ -1,30 +1,25 @@
 package com.eignex.klause.formats.smtlib
 
-/**
- * Minimal S-expression model + reader for SMT-LIB scripts. An [SExpr] is either an [Atom]
- * (symbol or numeral token) or a [SList] (parenthesised sequence). Comments (`;` to
- * end-of-line) and whitespace are skipped. Sufficient for the QF_LIA subset this front-end
- * ingests; not a full SMT-LIB 2 reader (no quoted symbols, string literals, or `|...|`).
- */
+/** Minimal S-expression model for SMT-LIB scripts. */
 sealed interface SExpr {
-    /** An atom (symbol, keyword, or literal token). */
+    /** Atom token. */
     data class Atom(
-        /** The raw token text. */
+        /** Raw token text. */
         val text: String,
     ) : SExpr
 
-    /** A parenthesised list of S-expressions. */
+    /** Parenthesized list node. */
     data class SList(
-        /** The contained S-expressions. */
+        /** Child S-expressions. */
         val items: List<SExpr>,
     ) : SExpr
 }
 
-/** Streaming reader that tokenises and parses SMT-LIB S-expressions from [src]. */
+/** Streaming parser for S-expressions. */
 class SExprReader(private val src: String) {
     private var pos = 0
 
-    /** Parse all top-level S-expressions in the source. */
+    /** Parse all top-level forms. */
     fun readAll(): List<SExpr> {
         val out = ArrayList<SExpr>()
         while (true) {

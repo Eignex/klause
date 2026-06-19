@@ -22,43 +22,19 @@ class UnsupportedSmtException(msg: String) : RuntimeException("klause SMT-LIB QF
 
 /** A parsed SMT-LIB instance lifted into klause's representation. */
 data class SmtLibProblem(
-    /** The compiled solver problem. */
+    /** Compiled solver problem. */
     val problem: Problem,
-    /** The objective, or null for a pure satisfaction instance. */
+    /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
-    /** Declared `Int` var name → int var id. Lets a CLI render a named model. */
+    /** Declared `Int` variable name to int id. */
     val intVarNames: Map<String, Int> = emptyMap(),
-    /** Declared `Bool` var name → bool var id. */
+    /** Declared `Bool` variable name to bool id. */
     val boolVarNames: Map<String, Int> = emptyMap(),
-    /** True when the original directive was `(maximize …)` (the [objective] negates so the
-     *  engine minimises). Lets a CLI report the true objective value. */
+    /** True when the parsed objective was a maximize directive. */
     val maximize: Boolean = false,
 )
 
-/**
- * Pragmatic SMT-LIB 2 **QF_LIA** ingest → klause [Problem]. Quantifier-free linear integer
- * arithmetic is exactly klause's wheelhouse, so the mapping is direct:
- *
- *  - `(declare-const x Int)` / `(declare-fun x () Int)` → an int var; `Bool` → a bool var.
- *  - linear relations (`<= < >= > =`) over `+ - *`(by constant) terms → [Linear].
- *  - boolean structure (`and or not =>`) over those atoms → Tseitin-encoded with
- *    [ReifiedLinear] (atom ⇔ aux bool) + [Clause]s; a top-level `assert` forces its literal.
- *  - `(distinct …)` over ints → [AllDifferent] (simple-var case) or pairwise `≠`; over bools
- *    / mixed bool+int → pairwise not-equal with bools channelled onto 0/1 ints.
- *  - `(let ((x e) …) body)` → scoped, parallel bindings, each compiled once and shared by
- *    identity across uses (no re-expansion blowup).
- *  - `(to_real e)` / `(to_int e)` → identity over the integer domain.
- *  - `(minimize e)` / `(maximize e)` → a [LinearObjective] (maximize negates).
- *
- * **Bound inference.** SMT-LIB `Int` is unbounded; klause int vars need finite domains. A
- * bounds-propagation pass over the *conjunctive* top-level assertions (descending through
- * `and`) tightens each var from constant comparisons, linear inequalities and equalities to
- * a fixed point. Vars still open on a side fall back to ±`intBound`. With `strictBounds` set,
- * an unbounded var instead raises [UnsupportedSmtException] naming it.
- *
- * Out-of-subset constructs (nonlinear terms, arrays, `ite` over ints, real division, etc.)
- * raise [UnsupportedSmtException] rather than silently mis-encoding.
- */
+/** Parser/compiler for the supported SMT-LIB QF_LIA subset. */
 object SmtLibQfLia {
     /** Parse SMT-LIB QF_LIA [text] into an [SmtLibProblem]. */
     fun parse(text: String, intBound: Int = 100_000, strictBounds: Boolean = false): SmtLibProblem {
@@ -78,7 +54,6 @@ object SmtLibQfLia {
         private var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
         override var trueLitCache: Int = -1
 
-        // --- let environment: a stack of scopes; each binding compiled once and cached. ---
         private class Binding(val isBool: Boolean) {
             var lin: LinTerm? = null
             var lit: Int? = null
@@ -139,8 +114,6 @@ object SmtLibQfLia {
             )
         }
 
-        // --- bound inference -------------------------------------------------------------
-
         private fun inferBounds() {
             if (intNames.isEmpty()) return
             val lo = LongArray(nextInt) { NEG_INF }
@@ -158,7 +131,6 @@ object SmtLibQfLia {
                         val tv = r.vars[ti]
                         val ct = r.coeffs[ti].toLong()
                         if (ct == 0L) continue
-                        // Sum range of the other terms: S ∈ [sLo, sHi].
                         var sLo = 0L
                         var sHi = 0L
                         var sLoInf = false
@@ -274,8 +246,6 @@ object SmtLibQfLia {
             }
         }
 
-        // --- assertions ---
-
         private fun assert(t: SExpr) {
             if (t is SExpr.SList && t.items.isNotEmpty()) {
                 val h = (t.items[0] as? SExpr.Atom)?.text
@@ -313,8 +283,6 @@ object SmtLibQfLia {
         private fun forceTrue(lit: Int) {
             factors.add(Clause(intArrayOf(lit)))
         }
-
-        // --- boolean term → literal (klause Lit) ---
 
         private fun compileBool(t: SExpr): Int = when (t) {
             is SExpr.Atom -> when (t.text) {
@@ -370,16 +338,13 @@ object SmtLibQfLia {
             return b.lit ?: throw UnsupportedSmtException("'$name' has no compiled Bool value")
         }
 
-        /** `a ⇔ (c ? x : y)` ≡ `a ⇔ (c∧x)∨(¬c∧y)`. */
+        /** Reify boolean ite as `(c and x) or (!c and y)`. */
         private fun tseitinIte(c: Int, x: Int, y: Int): Int =
             tseitinOr(listOf(tseitinAnd(listOf(c, x)), tseitinAnd(listOf(Lit.negate(c), y))))
 
-        /** n-ary `=` as `⋀ (items[i] ≈ items[0])` for `i > 0`, where [relate] reifies one pairwise
-         *  equality (`reifyEq` for arithmetic terms, `tseitinIff` for bools). */
+        /** Compile n-ary equality as pairwise equality to the first operand. */
         private fun <T> chainEqToFirst(items: List<T>, relate: (T, T) -> Int): Int =
             tseitinAnd((1 until items.size).map { relate(items[0], items[it]) })
-
-        // --- let ---
 
         private inline fun <T> withLet(bindingList: SExpr, body: () -> T): T {
             val scope = HashMap<String, Binding>()
@@ -400,7 +365,7 @@ object SmtLibQfLia {
             }
         }
 
-        /** Syntactic sort classifier for a term (Bool vs Int result). */
+        /** Syntactic bool/int classifier for a term. */
         private fun isBoolExpr(t: SExpr): Boolean = when (t) {
             is SExpr.Atom ->
                 t.text == "true" || t.text == "false" ||
@@ -414,8 +379,6 @@ object SmtLibQfLia {
                 else -> false
             }
         }
-
-        // --- distinct (n-ary, over int / bool / mixed terms) ---
 
         private fun assertDistinct(args: List<SExpr>) {
             if (args.size < 2) return
@@ -435,7 +398,7 @@ object SmtLibQfLia {
             }
         }
 
-        /** Post `tᵢ ≠ tⱼ` (as a [Linear] NE) for every distinct pair — the hard-distinct fallback. */
+        /** Post pairwise `!=` as linear NE constraints. */
         private fun assertPairwiseNe(terms: List<LinTerm>) {
             for ((i, j) in pairs(terms.size)) factors.add(neLinear(terms[i], terms[j]))
         }
@@ -446,8 +409,7 @@ object SmtLibQfLia {
             return tseitinAnd(pairs(terms.size).map { (i, j) -> reifyNe(terms[i], terms[j]) })
         }
 
-        /** Channel a boolean literal onto a fresh 0/1 int var (`z = 1 ⇔ lit`) and return it
-         *  as a linear term — lets distinct mix bool and int operands uniformly. */
+        /** Channel a bool literal to a fresh 0/1 int term. */
         private fun litToIntTerm(lit: Int): LinTerm {
             val z = newInt(0, 1)
             val w = newBool() // w ⇔ lit
@@ -482,7 +444,7 @@ object SmtLibQfLia {
             return reifyLinear(coeffs, vars, op, bound)
         }
 
-        /** `a − b ⟨op⟩ 0` lowered to `coeffs·vars ⟨op⟩ bound`. */
+        /** Build linear coefficients for `a - b op 0`. */
         private fun diff(a: LinTerm, b: LinTerm): Triple<IntArray, IntArray, Int> {
             val combined = HashMap(a.coeffs)
             for ((v, c) in b.coeffs) combined[v] = (combined[v] ?: 0) - c
@@ -491,8 +453,6 @@ object SmtLibQfLia {
             val vars = combined.keys.toIntArray()
             return Triple(vars, IntArray(vars.size) { combined.getValue(vars[it]) }, bound)
         }
-
-        // --- arithmetic relations ---
 
         private fun isArithmeticRelation(t: SExpr.SList): Boolean {
             val arg = t.items.getOrNull(1) ?: return false
@@ -522,7 +482,7 @@ object SmtLibQfLia {
 
         private data class Rel(val vars: IntArray, val coeffs: IntArray, val op: LinearOp, val bound: Int)
 
-        /** Lower `(op lhs rhs)` to `coeffs·vars OP bound`. */
+        /** Lower `(op lhs rhs)` to one linear relation. */
         private fun relationToLinear(t: SExpr.SList): Rel {
             val op = (t.items[0] as SExpr.Atom).text
             if (t.items.size != 3) {
@@ -531,7 +491,6 @@ object SmtLibQfLia {
                 )
             }
             val (vars, coeffs, baseBound) = diff(linearTerm(t.items[1]), linearTerm(t.items[2]))
-            // op → (LinearOp, bound delta): strict `<`/`>` collapse to LE/GE with a ∓1 shift.
             val (linOp, delta) = when (op) {
                 "<=" -> LinearOp.LE to 0
                 ">=" -> LinearOp.GE to 0
@@ -543,8 +502,6 @@ object SmtLibQfLia {
             }
             return Rel(vars, coeffs, linOp, baseBound + delta)
         }
-
-        // --- linear int term → (coeffs, constant) ---
 
         private data class LinTerm(val coeffs: Map<Int, Int>, val constant: Int) {
             fun asSimpleVar(): Int? =
@@ -633,7 +590,7 @@ object SmtLibQfLia {
             private const val POS_INF = Long.MAX_VALUE / 4
             private const val MAX_BOUND_ITERS = 64
 
-            /** Pure-Kotlin floor/ceil integer division (no `java.lang.Math`, for multiplatform). */
+            /** Pure-Kotlin floor/ceil division for multiplatform builds. */
             private fun floorDiv(a: Long, b: Long): Long {
                 val q = a / b
                 return (if ((a xor b) < 0 && q * b != a) q - 1 else q).coerceIn(NEG_INF, POS_INF)

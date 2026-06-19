@@ -1,17 +1,8 @@
 package com.eignex.klause.formats.xcsp3
 
-/**
- * A minimal, multiplatform XML element tree — enough for the XCSP3-core subset. Holds the
- * tag, attributes, child elements, and the text directly under this element; [textContent]
- * mirrors the DOM notion (all descendant text concatenated).
- *
- * This is deliberately *not* a general XML implementation: it understands elements,
- * attributes (single- or double-quoted), text, comments, CDATA, the `<?xml…?>` prolog and a
- * `<!DOCTYPE…>` declaration, plus the five predefined entities. XCSP3 instances stay within
- * that subset; anything richer raises during parse.
- */
+/** Minimal XML element tree for XCSP3 parsing. */
 class XmlElement(
-    /** The element's tag name. */
+    /** Element tag name. */
     val tag: String,
     /** Attributes by name. */
     val attributes: Map<String, String>,
@@ -19,6 +10,7 @@ class XmlElement(
     val children: List<XmlElement>,
     private val directText: String,
 ) {
+    /** Concatenated text under this element and its descendants. */
     val textContent: String
         get() = if (children.isEmpty()) {
             directText
@@ -26,17 +18,13 @@ class XmlElement(
             directText + children.joinToString("") { it.textContent }
         }
 
-    /** Value of attribute [name], or empty string if absent. */
+    /** Attribute [name], or empty string if absent. */
     fun attr(name: String): String = attributes[name].orEmpty()
 
-    /** First direct child with the given [tag], or null. */
+    /** First direct child with [tag], or null. */
     fun child(tag: String): XmlElement? = children.firstOrNull { it.tag == tag }
 
-    /**
-     * Return a copy of this subtree with XCSP3 parameter placeholders substituted: `%i` →
-     * `tokens[i]`, and `%...` → all [tokens] space-joined. Used to instantiate a `<group>`
-     * template constraint against each `<args>` row.
-     */
+    /** Substitute `%i` and `%...` placeholders for group-template instantiation. */
     fun substituteParams(tokens: List<String>): XmlElement = XmlElement(
         tag,
         attributes,
@@ -64,7 +52,7 @@ private class XmlReader(private val s: String) {
         return parseElement()
     }
 
-    /** Skip whitespace, the `<?xml…?>` prolog, comments and a `<!DOCTYPE…>` declaration. */
+    /** Skip prolog, comments, doctype, and whitespace. */
     private fun skipMisc() {
         while (pos < s.length) {
             when {
@@ -112,7 +100,6 @@ private class XmlReader(private val s: String) {
             skipWs()
             attrs[an] = readAttrValue()
         }
-        // content
         val text = StringBuilder()
         val children = ArrayList<XmlElement>()
         while (true) {

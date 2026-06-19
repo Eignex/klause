@@ -6,24 +6,19 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
 
-/**
- * The CNF-lowering seam shared by the XCSP3 and SMT-LIB front-ends. Both compile boolean
- * structure to Tseitin gates and reify linear relations onto fresh aux bools over the same two
- * primitives — a [factors] sink and a fresh-bool allocator — so the gate/reify helpers below
- * live here once as extension functions rather than copy-pasted per format.
- */
+/** Shared CNF-lowering hooks for format front-ends. */
 internal interface CnfLowering {
-    /** Where emitted [Clause] / [ReifiedLinear] factors are collected. */
+    /** Sink for emitted factors. */
     val factors: MutableList<Factor>
 
     /** Allocate a fresh boolean variable id. */
     fun newBool(): Int
 
-    /** Backing cache for [trueLit]; implementers initialise to -1 (unallocated). */
+    /** Backing cache for [trueLit]; initialise to -1. */
     var trueLitCache: Int
 }
 
-/** A literal that is always true — allocated and unit-clamped lazily on first use, then cached. */
+/** Lazily allocated literal that is forced true. */
 internal fun CnfLowering.trueLit(): Int {
     if (trueLitCache < 0) {
         trueLitCache = Lit.make(newBool(), true)
@@ -32,7 +27,7 @@ internal fun CnfLowering.trueLit(): Int {
     return trueLitCache
 }
 
-/** A fresh aux literal `a` with `a ⇔ ⋀ lits`: `a → lᵢ` per operand plus `(⋀lᵢ) → a`. */
+/** Tseitin gate for conjunction. */
 internal fun CnfLowering.tseitinAnd(lits: List<Int>): Int {
     val a = Lit.make(newBool(), true)
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(a), l)))
@@ -40,7 +35,7 @@ internal fun CnfLowering.tseitinAnd(lits: List<Int>): Int {
     return a
 }
 
-/** A fresh aux literal `a` with `a ⇔ ⋁ lits`: `a → ⋁lᵢ` plus `lᵢ → a` per operand. */
+/** Tseitin gate for disjunction. */
 internal fun CnfLowering.tseitinOr(lits: List<Int>): Int {
     val a = Lit.make(newBool(), true)
     factors.add(Clause((lits + Lit.negate(a)).toIntArray()))
@@ -48,7 +43,7 @@ internal fun CnfLowering.tseitinOr(lits: List<Int>): Int {
     return a
 }
 
-/** A fresh aux literal `a` with `a ⇔ (x ⇔ y)`, from the four-row biconditional truth table. */
+/** Tseitin gate for biconditional. */
 internal fun CnfLowering.tseitinIff(x: Int, y: Int): Int {
     val a = Lit.make(newBool(), true)
     factors.add(Clause(intArrayOf(Lit.negate(a), Lit.negate(x), y)))
@@ -58,7 +53,7 @@ internal fun CnfLowering.tseitinIff(x: Int, y: Int): Int {
     return a
 }
 
-/** Reify a linear relation `coeffs·vars ⟨op⟩ bound` onto a fresh aux bool; returns its positive literal. */
+/** Reify one linear relation onto a fresh positive literal. */
 internal fun CnfLowering.reifyLinear(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int): Int {
     val aux = newBool()
     factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = coeffs, vars = vars, op = op, bound = bound))
