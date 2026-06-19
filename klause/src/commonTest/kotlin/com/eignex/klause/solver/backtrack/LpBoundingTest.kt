@@ -3,6 +3,7 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.selector.RandomVariable
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective
@@ -51,10 +52,12 @@ class LpBoundingTest {
     @Test
     fun `lp bounding prunes nodes the separable bound cannot`() {
         val problem = triangle()
-        val off = BacktrackSolver(problem).minimize(sumObjective, BacktrackParams(randomSeed = 1L))
+        // Keep this regression independent of evolving global defaults.
+        val base = BacktrackParams(randomSeed = 1L, variableSelector = RandomVariable)
+        val off = BacktrackSolver(problem).minimize(sumObjective, base)
         val on = BacktrackSolver(problem).minimize(
             sumObjective,
-            BacktrackParams(randomSeed = 1L, lpBounding = true),
+            base.copy(lpBounding = true),
         )
 
         // The LP bound fires (telemetry records it) and never explores more nodes than the baseline.
