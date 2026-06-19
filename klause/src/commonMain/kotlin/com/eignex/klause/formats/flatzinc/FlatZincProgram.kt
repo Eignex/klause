@@ -39,13 +39,6 @@ data class FlatZincProgram(
      */
     val defaultBacktrackParams: BacktrackParams?,
     /**
-     * Search recipe emitted alongside the joint GaussianXor system when the model carries
-     * two or more xor constraints: branch the system's rare variables first so error-pattern
-     * style decompositions fall out (see the compiler's xorSearchParams). Null when the model
-     * has fewer than two xors. Callers running a portfolio can race it as an extra worker.
-     */
-    val xorSearchParams: BacktrackParams? = null,
-    /**
      * For int vars that originated as MiniZinc enums, the ordered label list — index `i` (0-based)
      * corresponds to the FlatZinc integer value `i + 1`. Empty when no enum metadata was carried
      * through the FZN file.

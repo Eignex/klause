@@ -1,18 +1,13 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.backtrack.TieredVariableSelector
-import com.eignex.klause.solver.factor.GaussianXor
+import com.eignex.klause.solver.factor.Xor
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class FlatZincXorSearchTest {
 
     @Test
-    fun `multi-xor models gain a joint gaussian system and a rare-vars-first search recipe`() {
-        // b appears in both xors (a parity-bit shape); a and c are row-local (error shape).
+    fun `multi-xor models stay as plain xor factors`() {
         val src = """
             var bool: a;
             var bool: b;
@@ -22,14 +17,7 @@ class FlatZincXorSearchTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        assertEquals(1, program.problem.factors.count { it is GaussianXor })
-        val params = assertNotNull(program.xorSearchParams)
-        val tiers = (params.variableSelector as TieredVariableSelector).tiers
-        assertEquals(1, tiers.size)
-        val ordered = tiers[0].boolVars
-        // b occurs in 4 literal slots, a and c once each: b must come last.
-        assertEquals(assertNotNull(program.boolVarsByName["b"]), ordered.last())
-        assertTrue(params.phaseSaving)
+        assertEquals(2, program.problem.factors.count { it is Xor })
     }
 
     @Test
@@ -42,7 +30,6 @@ class FlatZincXorSearchTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        assertEquals(0, program.problem.factors.count { it is GaussianXor })
-        assertNull(program.xorSearchParams)
+        assertEquals(1, program.problem.factors.count { it is Xor })
     }
 }

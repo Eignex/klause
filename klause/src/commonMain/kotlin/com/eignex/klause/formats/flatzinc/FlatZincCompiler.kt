@@ -10,8 +10,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.GaussianXor
-import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.util.binarySearchInt
@@ -79,8 +77,7 @@ internal class FlatZincCompiler(
         // Factor ids the model marked implied (`redundant_constraint` / `symmetry_breaking_constraint`,
         // tagged by the klause MZN library): the slice of `factors` each such constraint appends. LS
         // seeds these a lower violation weight so they don't swamp the landscape; a model symmetry
-        // break also tells presolve to skip its own. Holds factor indices stable because the
-        // only later `factors` mutation (the GaussianXor append below) only grows the tail.
+        // break also tells presolve to skip its own.
         val impliedFactorIds = ArrayList<Int>()
         var hasSymmetryBreaking = false
         for (c in model.constraints) {
@@ -90,20 +87,6 @@ internal class FlatZincCompiler(
             val symmetry = c.annotations.any { it.name == "klause_symmetry" }
             if (symmetry) hasSymmetryBreaking = true
             if (redundant || symmetry) for (i in before until factors.size) impliedFactorIds.add(i)
-        }
-        // Joint GF(2) reasoning for multi-xor models: one GaussianXor system on top of the
-        // individual Xor factors (which keep their sharper unit-propagation reasons), plus
-        // a search recipe that branches the system's rare variables first. On
-        // learning-parity-with-noise shaped models the rare variables are the per-sample
-        // error indicators; fixing them first leaves a pure linear system the elimination
-        // solves instantly, which decomposes the search by error pattern (proves
-        // parity-learning at the reference optimum where every other config finds nothing).
-        val xors = factors.filterIsInstance<Xor>()
-        val xorParams = if (xors.size < 2) {
-            null
-        } else {
-            factors.add(GaussianXor(xors))
-            xorSearchParams(xors)
         }
         // compileSolve may pin a synthetic int/bool var (for `solve minimize <par-int>`),
         // so resolve it before snapshotting var counts into Problem.
@@ -140,7 +123,6 @@ internal class FlatZincCompiler(
             arraysByName = arrays,
             outputItems = model.output?.let { compileOutput(it) } ?: synthesizeOutputItems(),
             defaultBacktrackParams = compileSearchAnnotation(),
-            xorSearchParams = xorParams,
             enumLabelsByVar = enumLabelsByVar.toMap(),
             setVarsByName = setVarsByName.toMap(),
             lsObjective = when (solveDirective) {
@@ -328,7 +310,7 @@ internal class FlatZincCompiler(
                 "array `$name`: initializer length ${value.elements.size} ≠ declared $length"
             }
             for ((i, e) in value.elements.withIndex()) {
-                varIds[i] = resolveVarRef(e, type.element).also { id ->
+                varIds[i] = resolveVarRef(e, type.element).also { _ ->
                     if (bucketings != null) {
                         val bn = nameOfBoundVar(e)
                         bucketings.add(
@@ -391,7 +373,7 @@ internal class FlatZincCompiler(
     }
 
     /** Allocate an int var whose initial domain is exactly the values of [t] — interior
-     *  values not in the set are excised from the contiguous `[min..max]` envelope. */
+     *  values not in the set are excised from the contiguous `(min..max)` envelope. */
     internal fun allocIntSet(name: String, t: FznType.IntSet): Int {
         val sorted = t.values.distinct().sorted().map { it.toInt() }
         require(sorted.isNotEmpty()) { "IntSet domain for `$name` is empty" }

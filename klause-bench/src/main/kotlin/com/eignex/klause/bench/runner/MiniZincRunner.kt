@@ -41,7 +41,6 @@ internal class MiniZincRunner(
             lsObjective = program.lsObjective,
             definitionalSweep = program.definitionalSweep,
             searchParams = program.defaultBacktrackParams,
-            xorSearchParams = program.xorSearchParams,
         )
     }
 
