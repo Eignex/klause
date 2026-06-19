@@ -1,16 +1,20 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.driver
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.Pool
+import com.eignex.klause.solver.localsearch.schedule.NoiseSchedule
 import com.eignex.klause.solver.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.solver.localsearch.schedule.StallSchedule
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
- * The shared local-search driver: a [Strategy] expressed purely as *policy over move
- * sources*. It owns no generation loop — it collects candidates from a configured set of
+ * The shared local-search driver: the sole strategy, expressed purely as *policy over move sources*.
+ * It owns no generation loop — it collects candidates from a configured set of
  * [com.eignex.klause.solver.localsearch.movesource.MoveSource]s, then scores and selects. Every
  * gate the bespoke strategies used to re-implement per call lives here once:
  *
@@ -23,13 +27,13 @@ import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
  *    by source property, rather than re-encoded in each strategy.
  *
  * Because a source is consumed entirely by configuration, *any* source becomes available to *any*
- * strategy with no new generation code: a focused arm is `{ViolatedRepairs}`, a structured-descent
- * arm adds `{SatisfiedStructured, ObjectiveSeed}`, and so on. [scoring] (the scoring axis) and
- * [acceptance] (the acceptance axis) stay first-class, so the driver does not blur the distinct
- * strategy behaviours — it removes only the duplicated *generation*.
+ * recipe with no new generation code: a focused arm is `{ViolatedRepairs}`, a structured-descent arm
+ * adds `{SatisfiedStructured, ObjectiveSeed}`, and so on. [scoring] (the scoring axis), [acceptance]
+ * (the acceptance axis), and [schedule] (the schedule axis) stay first-class, so the recipe's
+ * behaviour is its four axes — the driver removes only the duplicated *generation*.
  *
- * This driver is the behaviour-neutral substrate the bespoke strategies migrate onto incrementally;
- * it is not itself a drop-in replacement for [Cbls]'s tuned stall/weight/ladder schedule.
+ * Every local-search arm — CBLS, Feasibility-Jump, the WalkSAT/probSAT/SA family — is a named recipe
+ * over this driver (see the `recipe` package).
  */
 class SourceDrivenStrategy(
     /** The sources this strategy draws from, with their per-source caps and enable gates. */
@@ -53,15 +57,17 @@ class SourceDrivenStrategy(
     val perturbation: ((LocalSearchState) -> Move?)? = null,
     /** Whether this strategy drives objective descent at feasibility (it has feasibility-phase
      *  sources that score satisfied/objective candidates at `cost == 0`), rather than bailing for the
-     *  engine's built-in descent. The unified-minimize path keys off this; the [Cbls] recipe sets it. */
+     *  engine's built-in descent. The unified-minimize path keys off this; the `Cbls` recipe sets it. */
     val drivesObjectiveDescent: Boolean = false,
-) : Strategy {
+) {
 
     /** Round feedback retunes the schedule axis's temperature schedule (e.g. AdaptiveCooling);
      *  accumulation is gated off when no temperature schedule is present. */
-    override val wantsRoundFeedback: Boolean get() = schedule.temperature != null
+    val wantsRoundFeedback: Boolean get() = schedule.temperature != null
 
-    override fun observeRound(acc: RoundAccumulator, step: Long) {
+    /** Feed a completed round of move statistics to the schedule axis's temperature schedule, the
+     *  round ending at engine [step]. Only meaningful when [wantsRoundFeedback]; a no-op otherwise. */
+    fun observeRound(acc: RoundAccumulator, step: Long) {
         val temperature = schedule.temperature ?: return
         temperature.observe(acc.snapshot(temperature.temperature, step))
     }
@@ -69,7 +75,8 @@ class SourceDrivenStrategy(
     private val noiseSink = MoveSink()
     private val scoreSink = MoveSink()
 
-    override fun pickMove(state: LocalSearchState): Move? {
+    /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
+    fun pickMove(state: LocalSearchState): Move? {
         // Stall-driven weight maintenance first, so the bumped gradient scores this pick's candidates.
         schedule.weights?.maintain(
             state.step,
@@ -150,7 +157,7 @@ class SourceDrivenStrategy(
 
     /** Scored value on the [scoring] basis. Weighted/raw net-delta add the objective change once
      *  feasible (gated behind `cost == 0` so the infeasibility fight keeps the constraint gradient);
-     *  the break basis already folds the shaped objective. Mirrors [Cbls]'s feasibility-first scoring. */
+     *  the break basis already folds the shaped objective. Mirrors the CBLS feasibility-first scoring. */
     private fun score(state: LocalSearchState, move: Move): Double = when (scoring) {
         MoveScoring.Break -> state.shapedBreakScore(move)
         MoveScoring.Weighted -> state.weightedNetDelta(move) + feasibleObjectiveDelta(state, move)

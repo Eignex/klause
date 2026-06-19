@@ -14,7 +14,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
  * domains), build the two-part [Move.Compound] — lives in [drawBoolSwap] / [drawIntSwap]. The
  * minimize engine consults those directly inside its own lazy first-improving loop, so its RNG draw
  * order and selection are unchanged by this extraction; [generate] is the eager fill-the-sink view
- * (up to [cap] of each kind) for any [com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy]
+ * (up to [cap] of each kind) for any [com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy]
  * that wants pair swaps as scored candidates.
  *
  * [Phase.Feasible] / [Pool.ScoreOnly]: pair swaps are an objective-descent move over the feasible

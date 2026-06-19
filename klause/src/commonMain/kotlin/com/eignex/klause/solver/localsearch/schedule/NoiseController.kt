@@ -1,7 +1,5 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.schedule
 
-import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
-import com.eignex.klause.solver.localsearch.schedule.RoundLog
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1

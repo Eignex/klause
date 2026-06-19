@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.recipe
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,7 +40,7 @@ class FeasibilityJumpTest {
         ),
     )
 
-    private fun drive(strategy: Strategy, state: LocalSearchState, maxSteps: Int): Int {
+    private fun drive(strategy: SourceDrivenStrategy, state: LocalSearchState, maxSteps: Int): Int {
         state.recompute()
         var steps = 0
         while (steps < maxSteps && state.cost > 0L) {

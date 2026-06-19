@@ -1,11 +1,14 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.recipe
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
 import com.eignex.klause.solver.localsearch.movesource.ArgminJump
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
  * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024), re-expressed as a

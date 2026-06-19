@@ -1,6 +1,5 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,7 +30,6 @@ class RecipeSpaceTest {
         for (recipe in RecipeSpace().all()) {
             val wc = recipe.toWorkerConfig()
             assertTrue(wc.label.startsWith("recipe/"), "worker label should be namespaced, got ${wc.label}")
-            assertTrue(wc.strategy is SourceDrivenStrategy, "a recipe builds a SourceDrivenStrategy")
             // Fresh instances each call (no shared stateful strategy/restart across workers).
             assertTrue(recipe.toWorkerConfig().strategy !== wc.strategy)
         }

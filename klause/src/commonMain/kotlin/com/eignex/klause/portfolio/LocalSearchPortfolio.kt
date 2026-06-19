@@ -16,20 +16,19 @@ import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LubyRestart
 import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
+import com.eignex.klause.solver.localsearch.driver.AspirationCriterion
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.driver.TabuFilter
+import com.eignex.klause.solver.localsearch.recipe.Cbls
+import com.eignex.klause.solver.localsearch.recipe.FeasibilityJump
+import com.eignex.klause.solver.localsearch.recipe.ProbSat
+import com.eignex.klause.solver.localsearch.recipe.SimulatedAnnealing
+import com.eignex.klause.solver.localsearch.recipe.WalkSat
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.LoopSchedule
 import com.eignex.klause.solver.localsearch.schedule.Reheating
 import com.eignex.klause.solver.localsearch.schedule.Segment
-import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.FeasibilityJump
-import com.eignex.klause.solver.localsearch.strategy.MoveScoring
-import com.eignex.klause.solver.localsearch.strategy.ProbSat
-import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
-import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.TabuFilter
-import com.eignex.klause.solver.localsearch.strategy.WalkSat
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -42,7 +41,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * Provides three coordinated capabilities:
  *
  *  - **Per-worker strategy selection** (`config`): each worker gets a distinct
- *    `(Strategy, RestartPolicy)` pair from the supplied [LocalSearchWorkerConfig] list,
+ *    `(SourceDrivenStrategy, RestartPolicy)` pair from the supplied [LocalSearchWorkerConfig] list,
  *    so the portfolio explores algorithmically-orthogonal trajectories in parallel.
  *  - **Best-feasible sharing** (`sharedBest`): workers publish their incumbent samples
  *    into a shared atomic reference exposed back through the [LocalSearchSession]'s
@@ -61,13 +60,13 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  */
 internal data class LocalSearchWorkerConfig(
     override val label: String,
-    val strategy: Strategy,
+    val strategy: SourceDrivenStrategy,
     val restartPolicy: RestartPolicy,
     /** Minimize-phase strategy. `null` reuses [strategy]. Set to a [Cbls] instance to engage
      *  the unified minimize path (CBLS drives both feasibility fight and objective descent);
      *  required for a CBLS worker to actually use CBLS for the objective rather than the
      *  built-in greedy descent. */
-    val optimizeStrategy: Strategy? = null,
+    val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Per-worker switch for the per-move invariant network (#153). Default on (when the
      *  model provides a definitional sweep). Off carves out a diversity niche: defined vars
      *  re-enter the move space, which is what cyclic-definitional successor encodings

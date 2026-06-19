@@ -19,12 +19,11 @@ import com.eignex.klause.solver.backtrack.LpConfig
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.driver.AspirationCriterion
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.driver.TabuFilter
 import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
-import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.solver.localsearch.recipe.Cbls
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.result.MinimizeResult
@@ -174,7 +173,7 @@ internal object SolveCore {
         val tabu = TabuFilter(tenure = setup.tabuTenure, aspiration = AspirationCriterion.OrImproving)
         // Recipe engine when `sources=` is given (A/B-test the four axes as a naked engine, #722);
         // otherwise the default tuned CBLS — byte-identical to before.
-        val strategy: Strategy = if (setup.sourcesSpec != null) {
+        val strategy: SourceDrivenStrategy = if (setup.sourcesSpec != null) {
             val sources = MoveSourceCatalog.parse(setup.sourcesSpec)
             if (sources.isEmpty()) usageError("ls-single: sources=`${setup.sourcesSpec}` selected no sources")
             SourceDrivenStrategy(

@@ -4,15 +4,15 @@ import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LubyRestart
 import com.eignex.klause.solver.localsearch.RestartPolicy
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.driver.TabuFilter
 import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.Reheating
 import com.eignex.klause.solver.localsearch.schedule.Schedule
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
-import com.eignex.klause.solver.localsearch.strategy.AcceptanceRule
-import com.eignex.klause.solver.localsearch.strategy.MoveScoring
-import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
-import com.eignex.klause.solver.localsearch.strategy.TabuFilter
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 import kotlin.random.Random
 
 /**

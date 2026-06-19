@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.recipe
 
 import com.eignex.klause.compile.compile
 import com.eignex.klause.schema.VariableSchema
@@ -7,6 +7,7 @@ import com.eignex.klause.schema.atMost
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.schedule.NoiseController
 import com.eignex.klause.solver.localsearch.schedule.RoundLog
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -3,7 +3,7 @@ package com.eignex.klause.solver.localsearch.movesource
 /**
  * The named **sources axis** of an LS recipe (epic #721): a registry mapping a stable label to a
  * default-configured [MoveSource], and a parser turning a `sources=…` spec into the
- * [ConfiguredSource] list a [com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy]
+ * [ConfiguredSource] list a [com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy]
  * draws from. The single place a source label resolves to an instance with its default numeric
  * params, so the CLI four-axis selector and the cross-product arm generator share one catalog
  * rather than hard-coding constructors.
