@@ -36,14 +36,14 @@ class IntDomainTest {
     @Test
     fun `excludeValues matches folding excludeValue across reps`() {
         val rng = Random(0xE7C1)
-        repeat(400) {
+        repeat(400) { _ ->
             val lo = rng.nextInt(-20, 20)
             val width = rng.nextInt(2, 600)
             val hi = lo + width
             val base = IntDomain(lo, hi)
             val picked = mutableSetOf<Int>()
             val k = rng.nextInt(0, width + 2)
-            repeat(k) { picked.add(rng.nextInt(lo, hi + 1)) }
+            repeat(k) { _ -> picked.add(rng.nextInt(lo, hi + 1)) }
             val values = picked.toIntArray().also { arr -> arr.sort() }
 
             val folded = run {
@@ -70,13 +70,13 @@ class IntDomainTest {
     @Test
     fun `wide reps agree with a brute-force set across operations`() {
         val rng = Random(0x5A17)
-        repeat(60) {
+        repeat(60) { _ ->
             val lo = rng.nextInt(0, 1000)
             val width = rng.nextInt(IntDomain.BITSET_THRESHOLD + 1, 20_000)
             val hi = lo + width
             val present = (lo..hi).toMutableSet()
             val carveFraction = rng.nextDouble()
-            val toExclude = (lo..hi).filter { rng.nextDouble() < carveFraction }.sorted()
+            val toExclude = (lo..hi).filter { _ -> rng.nextDouble() < carveFraction }.sorted()
             for (v in toExclude) present.remove(v)
             if (present.isEmpty()) return@repeat
 
@@ -90,23 +90,23 @@ class IntDomainTest {
 
             val ordered = present.sorted()
             val seen = mutableListOf<Int>()
-            d.forEach { seen.add(it) }
+            d.forEach { value -> seen.add(value) }
             assertEquals(ordered, seen, "forEach order")
             for (i in ordered.indices) assertEquals(ordered[i], d.valueAt(i), "valueAt($i)")
 
             val holes = mutableListOf<Int>()
-            d.forEachHole { holes.add(it) }
-            assertEquals((d.min + 1 until d.max).filter { it !in present }, holes, "forEachHole")
+            d.forEachHole { hole -> holes.add(hole) }
+            assertEquals((d.min + 1 until d.max).filter { value -> value !in present }, holes, "forEachHole")
 
             val tMin = rng.nextInt(lo, hi + 1)
-            val expectMin = present.filter { it >= tMin }
+            val expectMin = present.filter { value -> value >= tMin }
             if (expectMin.isNotEmpty()) {
                 val e = d.withMinAtLeast(tMin)
                 assertEquals(expectMin.min(), e.min, "withMinAtLeast($tMin).min")
                 assertEquals(expectMin.size, e.size, "withMinAtLeast($tMin).size")
             }
             val tMax = rng.nextInt(lo, hi + 1)
-            val expectMax = present.filter { it <= tMax }
+            val expectMax = present.filter { value -> value <= tMax }
             if (expectMax.isNotEmpty()) {
                 val e = d.withMaxAtMost(tMax)
                 assertEquals(expectMax.max(), e.max, "withMaxAtMost($tMax).max")
