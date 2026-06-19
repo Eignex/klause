@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.SearchTier
@@ -18,7 +17,6 @@ import com.eignex.klause.solver.backtrack.selector.IndomainSplit
 import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.backtrack.selector.LargestDomain
 import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
-import com.eignex.klause.solver.backtrack.selector.LastConflict
 import com.eignex.klause.solver.backtrack.selector.MaxRegret
 import com.eignex.klause.solver.backtrack.selector.RandomVariable
 import com.eignex.klause.solver.backtrack.selector.SmallestDomain
@@ -26,8 +24,6 @@ import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
-import com.eignex.klause.solver.backtrack.selector.Vsids
-import com.eignex.klause.solver.factor.Xor
 
 /**
  * Map the `solve :: int_search/bool_search/set_search/seq_search(...)` annotation onto
@@ -60,32 +56,6 @@ internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
     return base.copy(
         variableSelector = TieredVariableSelector(tiers, fallbackVar),
         valueSelector = wrappedValH,
-    )
-}
-
-/** Search recipe for a model carrying a multi-xor system: branch the system's bool vars
- *  in ascending xor-occurrence order (rare vars — typically per-row error/slack
- *  indicators — first, smallest value first), with conflict-driven free search
- *  completing the rest. */
-internal fun FlatZincCompiler.xorSearchParams(xors: List<Xor>): BacktrackParams {
-    val occ = LinkedHashMap<Int, Int>()
-    for (x in xors) {
-        for (lit in x.literals) {
-            val v = Lit.variable(lit)
-            occ[v] = (occ[v] ?: 0) + 1
-        }
-    }
-    val ordered = occ.entries.sortedBy { it.value }.map { it.key }.toIntArray()
-    val tier = SearchTier(ordered, IntArray(0), TierVarSelect.InputOrder, IndomainMin)
-    val base = BacktrackPresets.conflictDriven()
-    return base.copy(
-        variableSelector = TieredVariableSelector(listOf(tier), LastConflict(Vsids())),
-        valueSelector = TieredValueSelector(
-            listOf(tier),
-            SolutionGuided(IndomainMin),
-            numBoolVars,
-            intDomains.size,
-        ),
     )
 }
 
