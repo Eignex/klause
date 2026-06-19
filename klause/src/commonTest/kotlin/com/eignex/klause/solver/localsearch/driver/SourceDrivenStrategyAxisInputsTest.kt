@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.driver
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -8,6 +8,7 @@ import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.MoveSource
 import com.eignex.klause.solver.localsearch.movesource.MoveSourceId
@@ -17,6 +18,7 @@ import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,6 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
-
-import com.eignex.klause.solver.localsearch.schedule.RoundLog
+package com.eignex.klause.solver.localsearch.schedule
 
 /**
  * The CBLS plateau-escape stall signal as a schedule-axis member: it tracks the no-strict-cost-drop

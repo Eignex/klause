@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.driver
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -6,11 +6,13 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.movesource.StallSwaps
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
@@ -19,7 +21,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Acceptance test for the source-driven driver (epic #710): a [Strategy] is built *purely by
+ * Acceptance test for the source-driven driver (epic #710): a [SourceDrivenStrategy] is built *purely by
  * configuration* over the shared [com.eignex.klause.solver.localsearch.movesource.MoveSource]
  * catalog, with no per-strategy generation code. The same sources [Cbls] draws from are reused
  * here in a different strategy by listing them — demonstrating that adding a source to one place
@@ -36,7 +38,7 @@ class SourceDrivenStrategyTest {
         factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2)),
     )
 
-    private fun driveToFeasible(strategy: Strategy, state: LocalSearchState, steps: Int): Boolean {
+    private fun driveToFeasible(strategy: SourceDrivenStrategy, state: LocalSearchState, steps: Int): Boolean {
         state.recompute()
         repeat(steps) {
             if (state.cost == 0L) return true

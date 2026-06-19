@@ -171,7 +171,7 @@ class LocalSearchState(
     /** Lowest [cost] observed since this state was constructed. Updated at the end of
      *  every committed `apply(move)`; preserved across [restart] so the all-time minimum
      *  drives aspiration decisions even when individual restart epochs go uphill. Used
-     *  by [com.eignex.klause.solver.localsearch.strategy.AspirationCriterion.OrImprovesBestEver]
+     *  by [com.eignex.klause.solver.localsearch.driver.AspirationCriterion.OrImprovesBestEver]
      *  to admit tabu moves that would beat the historical low. */
     var bestCostSeen: Long = Long.MAX_VALUE
         internal set

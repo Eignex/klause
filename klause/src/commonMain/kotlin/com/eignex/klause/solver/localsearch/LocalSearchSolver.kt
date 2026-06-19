@@ -8,17 +8,16 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.localsearch.driver.AspirationCriterion
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.driver.TabuFilter
 import com.eignex.klause.solver.localsearch.movesource.GreedyInit
 import com.eignex.klause.solver.localsearch.movesource.PairSwap
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
+import com.eignex.klause.solver.localsearch.recipe.Cbls
+import com.eignex.klause.solver.localsearch.recipe.ProbSat
 import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.solver.localsearch.schedule.RoundAccumulator
-import com.eignex.klause.solver.localsearch.strategy.AspirationCriterion
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.ProbSat
-import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -50,18 +49,18 @@ class LocalSearchSolver(
     // the cb-tuning burden by widening the distribution during stalls and re-sharpening on
     // progress (Hoos 2002, Balint-Schöning 2012). Tabu aspiration admits individually
     // improving moves that would otherwise be blocked by the tenure window.
-    /** Strategy used during the satisfy phase. */
-    val strategy: Strategy = ProbSat.adaptive(
+    /** SourceDrivenStrategy used during the satisfy phase. */
+    val strategy: SourceDrivenStrategy = ProbSat.adaptive(
         tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
     ),
-    /** Strategy used during the feasibility-fight phase of [minimize]. `null` (default)
+    /** SourceDrivenStrategy used during the feasibility-fight phase of [minimize]. `null` (default)
      *  reuses [strategy], preserving backward-compat — users who override [strategy] for
      *  optimization workloads get that same strategy in minimize without re-passing it.
      *  Override explicitly to decouple the satisfy-mode and minimize-mode strategies; the
      *  common case is satisfy-mode [ProbSat.adaptive] + minimize-mode [Cbls] for decomposed CP
      *  problems, where CBLS's global weighted-violation gradient descends the objective on
      *  instances where probSAT alone plateaus. */
-    val optimizeStrategy: Strategy? = null,
+    val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Restart policy controlling diversification. */
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
     /** Cap on pair-swap candidates considered before the objective descent gives up at a
@@ -110,7 +109,7 @@ class LocalSearchSolver(
      *  declares one, else the solver-level [restartPolicy]. Lets a recipe own restart as a schedule
      *  dimension while non-recipe callers keep passing it directly. */
     private val configuredRestart: RestartPolicy =
-        (strategy as? SourceDrivenStrategy)?.schedule?.restart ?: restartPolicy
+        strategy.schedule.restart ?: restartPolicy
 
     /** The restart policy actually driven by the engine: when a [definitionalSweep] is present
      *  or [seedImplicitOnRestart] is set, every restart is followed by implicit feasible-init
@@ -473,11 +472,11 @@ class LocalSearchSolver(
         // split (strategy for satisfy, optimizeStrategy for descent) for non-unified
         // strategies that bail at feasibility (DDFW/ProbSat).
         val descentStrategy = optimizeStrategy
-        val unified = (descentStrategy as? SourceDrivenStrategy)?.drivesObjectiveDescent == true
+        val unified = descentStrategy?.drivesObjectiveDescent == true
         // Per-round feedback for adaptive schedules (#721): the feasibility-fight strategy is the one
         // whose moves form the rounds (the unified descent strategy when one drives both phases, else
         // the satisfy strategy). The helper is null (no overhead) unless it asks for feedback.
-        val satisfyStrategy: Strategy = if (unified) descentStrategy else strategy
+        val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
         // Feed round stats to the unwrapped restart policy so an adaptive one is detected and updated
         // even when a definitional-sweep wrapper stands in for shouldRestart/restart.
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
@@ -947,11 +946,14 @@ class LocalSearchSolver(
     /**
      * Accumulates per-step move statistics into rounds and flushes each completed round to a
      * strategy's adaptive policies (#721). Created only for a strategy that
-     * [Strategy.wantsRoundFeedback], so the common non-adaptive strategies allocate nothing and the
+     * [SourceDrivenStrategy.wantsRoundFeedback], so the common non-adaptive strategies allocate nothing and the
      * loops carry no overhead. A restart ends the current round ([endRound]) so a round never spans
      * one.
      */
-    private class RoundFeedback(private val strategy: Strategy?, private val restartObserver: AdaptivePolicy?) {
+    private class RoundFeedback(
+        private val strategy: SourceDrivenStrategy?,
+        private val restartObserver: AdaptivePolicy?,
+    ) {
         private val acc = RoundAccumulator()
         private var sinceRound = 0
 
@@ -979,7 +981,7 @@ class LocalSearchSolver(
         companion object {
             /** A feedback accumulator driving [strategy]'s schedules and/or an adaptive [restart]
              *  policy, or `null` when neither wants per-round feedback (no accumulation overhead). */
-            fun of(strategy: Strategy, restart: RestartPolicy): RoundFeedback? {
+            fun of(strategy: SourceDrivenStrategy, restart: RestartPolicy): RoundFeedback? {
                 val s = strategy.takeIf { it.wantsRoundFeedback }
                 val r = restart as? AdaptivePolicy
                 return if (s != null || r != null) RoundFeedback(s, r) else null

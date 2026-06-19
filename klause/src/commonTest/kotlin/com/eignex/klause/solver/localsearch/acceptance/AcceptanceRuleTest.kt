@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.acceptance
 
 import com.eignex.klause.solver.Move
 import kotlin.random.Random

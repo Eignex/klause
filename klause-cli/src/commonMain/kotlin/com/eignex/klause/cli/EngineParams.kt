@@ -25,11 +25,11 @@ import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.Schedule
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
-import com.eignex.klause.solver.localsearch.strategy.AcceptanceRule
-import com.eignex.klause.solver.localsearch.strategy.MoveScoring
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
  * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an

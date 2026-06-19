@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.recipe
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
@@ -7,6 +7,7 @@ import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,11 +15,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Tests for the unified [com.eignex.klause.solver.localsearch.strategy.FocusedLs] family —
- * both selection policies ([WalkSat] noise-greedy, [ProbSat] break-weighted), their adaptive
- * variants, and the configuration-checking knob (backed by [LocalSearchState.boolConfChange] /
- * [LocalSearchState.intConfChange]). Plain fixed-noise WalkSat solving is also covered by
- * TabuFilterTest.
+ * Tests for the focused-LS recipe family — [WalkSat] noise-greedy and [ProbSat] break-weighted,
+ * their adaptive variants, and the configuration-checking knob (backed by
+ * [LocalSearchState.boolConfChange] / [LocalSearchState.intConfChange]). Plain fixed-noise WalkSat
+ * solving is also covered by TabuFilterTest.
  */
 class FocusedLsTest {
 
@@ -49,7 +49,7 @@ class FocusedLsTest {
         Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
     )
 
-    private fun assertSolvesSat3(label: String, strategy: Strategy, seed: Long) {
+    private fun assertSolvesSat3(label: String, strategy: SourceDrivenStrategy, seed: Long) {
         val problem = Problem(3, 0, emptyArray(), sat3)
         val solver = LocalSearchSolver(problem, strategy = strategy)
         val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = seed)).assignment

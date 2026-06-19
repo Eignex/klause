@@ -1,10 +1,16 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.recipe
 
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.driver.TabuFilter
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.solver.localsearch.schedule.BanditNoiseController
 import com.eignex.klause.solver.localsearch.schedule.Geometric
+import com.eignex.klause.solver.localsearch.schedule.NoiseController
 import com.eignex.klause.solver.localsearch.schedule.Schedule
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
  * The focused-LS family — WalkSAT, probSAT, simulated annealing — as [SourceDrivenStrategy] recipes.

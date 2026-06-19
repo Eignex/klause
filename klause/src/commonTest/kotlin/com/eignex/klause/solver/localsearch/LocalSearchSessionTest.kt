@@ -6,11 +6,11 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.driver.TabuFilter
+import com.eignex.klause.solver.localsearch.recipe.Cbls
+import com.eignex.klause.solver.localsearch.recipe.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.schedule.AdaptiveCooling
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
-import com.eignex.klause.solver.localsearch.strategy.Strategy
-import com.eignex.klause.solver.localsearch.strategy.TabuFilter
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -161,7 +161,7 @@ class LocalSearchSessionTest {
         // On the UNSAT helper CBLS bumps violated weights every stall and never resets, so
         // bump-only weights grow without bound. Smoothing pulls them back toward baseWeight,
         // so after the same flip budget the smoothed run's peak weight must be strictly lower.
-        fun peakWeightAfterRun(strategy: Strategy): Double {
+        fun peakWeightAfterRun(strategy: SourceDrivenStrategy): Double {
             val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem(), strategy = strategy))
             session.sample(LocalSearchParams(maxFlips = 3_000L, randomSeed = 4L)).assignment
             return session.warmState.factorWeights!!.max()

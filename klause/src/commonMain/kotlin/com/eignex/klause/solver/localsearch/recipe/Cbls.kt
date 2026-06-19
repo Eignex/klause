@@ -1,8 +1,11 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.recipe
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.driver.TabuFilter
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.EjectionChains
 import com.eignex.klause.solver.localsearch.movesource.Frontier
@@ -13,7 +16,9 @@ import com.eignex.klause.solver.localsearch.movesource.StallKick
 import com.eignex.klause.solver.localsearch.movesource.StallSwaps
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.solver.localsearch.schedule.StallSchedule
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
+import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
  * Constraint-Based Local Search as a [SourceDrivenStrategy] recipe over the four axes. CBLS scores

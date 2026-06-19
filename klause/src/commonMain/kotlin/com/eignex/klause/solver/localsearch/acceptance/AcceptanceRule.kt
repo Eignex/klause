@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.strategy
+package com.eignex.klause.solver.localsearch.acceptance
 
 import com.eignex.klause.solver.Move
 import kotlin.math.exp
@@ -6,7 +6,7 @@ import kotlin.math.pow
 import kotlin.random.Random
 
 /**
- * The **acceptance axis** of an LS recipe: how a [SourceDrivenStrategy] selects one move
+ * The **acceptance axis** of an LS recipe: how a `SourceDrivenStrategy` selects one move
  * from the scored candidate pools. Lifts the selection rules that were inlined across `Cbls`,
  * `FocusedLs.MoveSelection`, and `FeasibilityJump` into one pluggable, composable type, so an arm
  * picks its acceptance independently of its sources and scoring.
