@@ -1,8 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
 /** Recursive-descent parser for FlatZinc 1.6. */
-internal class FlatZincParser(tokens: List<FznToken>) {
-    private val tokens: List<FznToken> = tokens
+internal class FlatZincParser(private val tokens: List<FznToken>) {
     private var pos: Int = 0
 
     fun parse(): FznModel {
@@ -345,8 +344,7 @@ internal class FlatZincParser(tokens: List<FznToken>) {
         return t.value
     }
     private fun expectFloatOrIntAsDouble(): Double {
-        val t = peek()
-        return when (t) {
+        return when (val t = peek()) {
             is FznToken.FloatLit -> {
                 advance()
                 t.value
