@@ -5,22 +5,13 @@ import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SetVarLayout
 import com.eignex.klause.solver.Sample
 
-/**
- * Top-level facade for `.ozn` output rendering. Parses the `.ozn` source once at
- * construction; per solution, extracts the variable bindings from a [Sample] (channeled
- * through a [FlatZincProgram]'s var-name maps) and feeds them to the [OznEvaluator].
- *
- * This is the klause-side analogue of MiniZinc's `solns2out`: take the .ozn template,
- * a solver-produced solution, and produce the human-readable string. Pair with
- * [klause-cli]'s `--ozn FILE` option to drop the `needsSolns2Out: true` dependency
- * on MiniZinc at runtime.
- */
+/** Renders solver samples through a parsed `.ozn` template. */
 class OznApplier(oznSource: String) {
     private val items: List<OznItem> =
         OznParser(OznLexer(oznSource).tokenize()).parse()
     private val evaluator: OznEvaluator = OznEvaluator(items)
 
-    /** Render one solution. The output ends with `----------\n` per MZN convention. */
+    /** Render one solution block ending with `----------\n`. */
     fun render(program: FlatZincProgram, sample: Sample): String {
         val bindings = extractBindings(program, sample)
         return evaluator.render(bindings)
@@ -28,25 +19,20 @@ class OznApplier(oznSource: String) {
 
     private fun extractBindings(program: FlatZincProgram, sample: Sample): Map<String, OznValue> {
         val out = HashMap<String, OznValue>()
-        // Scalar bools.
         for ((name, id) in program.boolVarsByName) {
             out[name] = OznValue.BoolV(sample.bools[id])
         }
-        // Scalar ints (skip ones that are float buckets — those are written under the
-        // float name).
+        // Float-backed int vars are rendered under their float names.
         for ((name, id) in program.intVarsByName) {
             if (program.floatVarsByName.containsKey(name)) continue
             out[name] = OznValue.IntV(sample.ints[id].toLong())
         }
-        // Floats.
         for ((name, b) in program.floatVarsByName) {
             out[name] = OznValue.FloatV(b.valueOf(sample.ints[b.varId]))
         }
-        // Sets.
         for ((name, layout) in program.setVarsByName) {
             out[name] = setBindingFrom(layout, sample)
         }
-        // Arrays (vars + params).
         for ((name, arr) in program.arraysByName) {
             out[name] = arrayBindingFrom(arr, sample)
         }

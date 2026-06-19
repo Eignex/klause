@@ -1,17 +1,6 @@
 package com.eignex.klause.formats.minizinc
 
-/**
- * Tokenizer for the subset of MiniZinc syntax that appears in `.ozn` files. MiniZinc
- * emits a restricted form into `.ozn`: top-level variable / parameter declarations and
- * a single `output [ ... ];` item. Inside `output`, expressions can include string
- * literals, calls (`show`, `show2d`, `array1d`, …), array literals, ranges, identifiers,
- * arithmetic, comparisons, conditionals, and comprehensions — broadly the same
- * expression sublanguage [com.eignex.klause.formats.flatzinc.FlatZincLexer] handles, but
- * with strings, comprehensions, and `if-then-else` added back.
- *
- * Whitespace and `%`-prefixed line comments are skipped. String literals support the
- * standard MZN escapes (`\n`, `\t`, `\\`, `\"`).
- */
+/** Tokenizer for the MiniZinc syntax subset used in `.ozn` files. */
 internal class OznLexer(private val source: String) {
     private var pos: Int = 0
     private val line: Int get() = source.substring(0, pos).count { it == '\n' } + 1
@@ -61,7 +50,7 @@ internal class OznLexer(private val source: String) {
 
     private fun stringLit(ln: Int): OznToken {
         require(source[pos] == '"')
-        pos++ // skip opening quote
+        pos++
         val sb = StringBuilder()
         while (pos < source.length && source[pos] != '"') {
             val c = source[pos]
@@ -83,14 +72,13 @@ internal class OznLexer(private val source: String) {
                 pos++
             }
         }
-        if (pos < source.length) pos++ // skip closing quote
+        if (pos < source.length) pos++
         return OznToken(OznTokenKind.STRING, sb.toString(), ln)
     }
 
     private fun numberOrRange(ln: Int): OznToken {
         val start = pos
         while (pos < source.length && source[pos].isDigit()) pos++
-        // Float?
         if (pos < source.length && source[pos] == '.' &&
             pos + 1 < source.length && source[pos + 1].isDigit()
         ) {
@@ -125,7 +113,6 @@ internal class OznLexer(private val source: String) {
 
     private fun punct(ln: Int): OznToken {
         val c = source[pos]
-        // Two-char operators first.
         if (pos + 1 < source.length) {
             val pair = source.substring(pos, pos + 2)
             val two = when (pair) {

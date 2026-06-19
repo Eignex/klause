@@ -1,38 +1,20 @@
 package com.eignex.klause.formats.minizinc
 import kotlin.math.abs
 
-/**
- * Evaluates a parsed `.ozn` program against a binding map from the FZN solver. Produces
- * the human-readable solution text MiniZinc would have produced via `solns2out`.
- *
- * Usage:
- *  1. Lex + parse the `.ozn` source into a list of [OznItem].
- *  2. Construct an [OznEvaluator] with the parsed items.
- *  3. Per solution, call [render] with the variable bindings (name → value) from the
- *     solver's FZN-format output. The returned string is the contents of one MiniZinc
- *     solution block, terminated by `----------\n`.
- *
- * Supported expression constructs: int / float / bool / string literals, identifiers,
- * ranges, array & set literals, calls (`show`, `show2d`, `show3d`, `show_int`, `fix`,
- * `array1d` / `array2d` / `array3d`, `bool2int`, `int2float`, `min`, `max`, `abs`,
- * `sum`, `product`), array subscripts, arithmetic, comparisons, conjunctions, `if-then-
- * elseif-else-endif`, `let`-bindings, and array / set comprehensions with optional
- * `where` filters. Unknown function calls throw [OznEvalException].
- */
+/** Evaluates `.ozn` expressions against solver bindings and renders output text. */
 internal class OznEvaluator(items: List<OznItem>) {
-    /** Top-level bindings: from `name` to its [OznItem.VarDecl] (with optional initializer). */
+    /** Top-level variable declarations by name. */
     private val decls: Map<String, OznItem.VarDecl> = items
         .filterIsInstance<OznItem.VarDecl>()
         .associateBy { it.name }
 
-    /** The single output item — there should be at most one in a well-formed .ozn. */
+    /** The unique output item, if present. */
     private val output: OznItem.Output? = items.filterIsInstance<OznItem.Output>().singleOrNull()
 
     fun render(bindings: Map<String, OznValue>): String {
         val ctx = Context(bindings, HashMap())
         val sb = StringBuilder()
         if (output == null) {
-            // No explicit output — render all top-level decls as `name = value;\n`.
             for ((name, decl) in decls) {
                 val v = resolveDecl(decl, ctx) ?: continue
                 sb.append("$name = ").append(formatValue(v)).append(";\n")
@@ -48,12 +30,10 @@ internal class OznEvaluator(items: List<OznItem>) {
         return sb.toString()
     }
 
-    /** Frame the evaluator carries around: top-level bindings + a comprehension /
-     *  let-binding scope stack. Lookups consult the local scope first, then bindings. */
-    private inner class Context(val bindings: Map<String, OznValue>, val locals: HashMap<String, OznValue>)
+    /** Evaluation frame containing bindings and local scope. */
+    private class Context(val bindings: Map<String, OznValue>, val locals: HashMap<String, OznValue>)
 
     private fun resolveDecl(decl: OznItem.VarDecl, ctx: Context): OznValue? {
-        // Initializer wins; else look in the FZN bindings.
         decl.initializer?.let { return eval(it, ctx) }
         return ctx.bindings[decl.name]
     }
@@ -90,8 +70,6 @@ internal class OznEvaluator(items: List<OznItem>) {
         is OznExpr.ArrayLit -> OznValue.ArrayV(e.elements.map { eval(it, ctx) })
 
         is OznExpr.SetLit -> {
-            // Sets in MZN-output are MZN sets — print as { a, b, c }. Internally hold
-            // the unioned integer values (only ints supported in output context today).
             val vals = e.elements.flatMap { elem ->
                 when (val v = eval(elem, ctx)) {
                     is OznValue.IntV -> listOf(v.value.toInt())
@@ -125,7 +103,6 @@ internal class OznEvaluator(items: List<OznItem>) {
         }
 
         is OznExpr.Let -> {
-            // Local frame: each decl's initializer (or binding) shadows. Sequential.
             val saved = ctx.locals.toMap()
             for (d in e.decls) {
                 val v = resolveDecl(d, ctx) ?: throw OznEvalException("let-binding `${d.name}` has no value")
@@ -153,7 +130,6 @@ internal class OznEvaluator(items: List<OznItem>) {
                 is OznValue.SetV -> src.values.toList()
 
                 is OznValue.ArrayV -> {
-                    // Iterate by element (rare but legal for `i in array`).
                     src.elements.forEachIndexed { _, v ->
                         for (name in gen.names) ctx.locals[name] = v
                         val whereOk = gen.where?.let { (eval(it, ctx) as OznValue.BoolV).value } ?: true
@@ -164,8 +140,6 @@ internal class OznEvaluator(items: List<OznItem>) {
 
                 else -> throw OznEvalException("comprehension source is not iterable: $src")
             }
-            // For multi-binding generators (`i, j in 1..n`), MZN gives the Cartesian
-            // product over the same source. Emulate by nested loops over `names.size`.
             val name = gen.names.first()
             fun loopOver(remaining: List<String>) {
                 if (remaining.isEmpty()) {
@@ -207,8 +181,6 @@ internal class OznEvaluator(items: List<OznItem>) {
             ->
                 OznValue.StringV(stringifyForShow(args.last()))
 
-            // `fix(x)` strips var-ness in MZN — for output evaluation it's an identity
-            // function: the value is already fully concrete here.
             "fix" -> args[0]
 
             "show2d" -> OznValue.StringV(stringify2d(args[0]))
@@ -216,7 +188,6 @@ internal class OznEvaluator(items: List<OznItem>) {
             "show3d" -> OznValue.StringV(stringify3d(args[0]))
 
             "array1d" -> {
-                // array1d(range, xs): flatten xs into a 1D MZN array indexed by `range`.
                 val xs = args.last() as OznValue.ArrayV
                 OznValue.ArrayV(xs.elements)
             }
@@ -244,8 +215,6 @@ internal class OznEvaluator(items: List<OznItem>) {
             }
 
             "array4d", "array5d", "array6d" -> {
-                // Higher-dim arrays — stringify as a flat MZN array. Display fidelity is
-                // a stretch goal; for output rendering, treat them as 1D.
                 args.last() as OznValue.ArrayV
             }
 
@@ -382,7 +351,6 @@ internal class OznEvaluator(items: List<OznItem>) {
     }
 
     private fun evalBinary(e: OznExpr.Binary, ctx: Context): OznValue {
-        // Short-circuit logicals.
         if (e.op == "/\\" || e.op == "\\/" || e.op == "->" || e.op == "<-") {
             val l = (eval(e.left, ctx) as OznValue.BoolV).value
             return when (e.op) {
@@ -396,14 +364,12 @@ internal class OznEvaluator(items: List<OznItem>) {
         val l = eval(e.left, ctx)
         val r = eval(e.right, ctx)
         if (e.op == "++") {
-            // String concat on strings, otherwise array concat.
             if (l is OznValue.StringV && r is OznValue.StringV) {
                 return OznValue.StringV(l.value + r.value)
             }
             if (l is OznValue.ArrayV && r is OznValue.ArrayV) {
                 return OznValue.ArrayV(l.elements + r.elements)
             }
-            // Mixed: stringify both.
             return OznValue.StringV(stringifyForShow(l) + stringifyForShow(r))
         }
         if (e.op == "in") {
@@ -414,7 +380,6 @@ internal class OznEvaluator(items: List<OznItem>) {
                 else -> throw OznEvalException("in: rhs not a set/range")
             }
         }
-        // Numeric/comparison.
         val (li, lf, isFloat) = numeric(l)
         val (ri, rf, isFloatR) = numeric(r)
         val asFloat = isFloat || isFloatR
@@ -467,7 +432,6 @@ private fun stringifyForShow(v: OznValue): String = when (v) {
     is OznValue.IntV -> v.value.toString()
 
     is OznValue.FloatV -> {
-        // MZN prints floats with `.0` when integral, like `3.0`, else default.
         if (v.value == v.value.toLong().toDouble()) "${v.value.toLong()}.0" else v.value.toString()
     }
 
@@ -507,8 +471,7 @@ private fun stringify3d(v: OznValue): String {
     return a.elements.joinToString(", ", "[", "]") { stringifyForShow(it) }
 }
 
-/** Render a value as it appears at the top level of `output [...]` — strings inline,
- *  everything else stringified via [stringifyForShow]. */
+/** Render a value in top-level `output [...]` context. */
 private fun stringifyForOutput(v: OznValue): String = when (v) {
     is OznValue.StringV -> v.value
     is OznValue.ArrayV -> v.elements.joinToString("") { stringifyForOutput(it) }
