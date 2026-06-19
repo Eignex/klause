@@ -5,11 +5,7 @@ import com.eignex.klause.solver.factor.*
 import kotlin.math.*
 
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
-    require(c.args.size == if (reified) 4 else 3)
-    val coefs = evalFloatConstArray(c.args[0])
-    val varRefs = evalFloatVarArray(c.args[1])
-    val bound = evalFloatConst(c.args[2])
-    val scaled = scaleFloatLinear(coefs, varRefs, bound)
+    val scaled = resolveScaledFloatLinear(c, reified)
     val op = when (c.name.removeSuffix("_reif")) {
         "float_lin_le" -> LinearOp.LE
         "float_lin_eq" -> LinearOp.EQ
@@ -134,11 +130,7 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
 
 /** Strict float linear compare lowered to `<= bound - 1` in scaled space. */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
-    require(c.args.size == if (reified) 4 else 3)
-    val coefs = evalFloatConstArray(c.args[0])
-    val varRefs = evalFloatVarArray(c.args[1])
-    val bound = evalFloatConst(c.args[2])
-    val scaled = scaleFloatLinear(coefs, varRefs, bound)
+    val scaled = resolveScaledFloatLinear(c, reified)
     val strictBound = scaled.bound - 1
     if (reified) {
         val aux = resolveBoolLit(c.args[3])
@@ -261,11 +253,11 @@ internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing
 
 private data class ScaledFloatLinear(val coeffs: IntArray, val vars: IntArray, val bound: Long)
 
-private fun FlatZincCompiler.scaleFloatLinear(
-    coefs: DoubleArray,
-    varRefs: List<FloatBucketing>,
-    bound: Double,
-): ScaledFloatLinear {
+private fun FlatZincCompiler.resolveScaledFloatLinear(c: FznConstraint, reified: Boolean): ScaledFloatLinear {
+    require(c.args.size == if (reified) 4 else 3)
+    val coefs = evalFloatConstArray(c.args[0])
+    val varRefs = evalFloatVarArray(c.args[1])
+    val bound = evalFloatConst(c.args[2])
     var scaledBound = (bound * floatScale).roundToLong()
     val scaledCoeffs = IntArray(coefs.size)
     val vars = IntArray(coefs.size)
