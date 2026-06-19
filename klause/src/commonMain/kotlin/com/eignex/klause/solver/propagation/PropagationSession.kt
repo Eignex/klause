@@ -5,7 +5,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.util.IntArrayList
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */

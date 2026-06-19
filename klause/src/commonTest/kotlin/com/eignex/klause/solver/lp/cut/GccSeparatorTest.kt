@@ -3,7 +3,7 @@ package com.eignex.klause.solver.lp.cut
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.GlobalCardinality
+import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation

@@ -1,9 +1,5 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.MoveSink
-import com.eignex.klause.solver.propagation.PropagationState
-
 /** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
  *  the two var spaces (purely-Boolean ones leave [Factor.intVars] empty; purely-integer
  *  ones leave [Factor.boolVars] empty) wire this in instead of allocating their own
@@ -11,33 +7,31 @@ import com.eignex.klause.solver.propagation.PropagationState
 internal val EmptyIntArray: IntArray = IntArray(0)
 
 /** Shared singleton empty `LongArray`, for scratch slots that some code paths leave unused
- *  (e.g. the wide-only term-contribution snapshot in [com.eignex.klause.solver.factor.propagateLinearBounds])
+ *  (e.g. the wide-only term-contribution snapshot in `propagateLinearBounds`)
  *  so the common path binds this instead of allocating. */
 internal val EmptyLongArray: LongArray = LongArray(0)
 
 /**
- * Constraint metadata for [Problem]. Variables touched by a factor split into two id
- * spaces: Boolean vars in [boolVars] and integer vars in [intVars]. Pure-Boolean factors
- * leave [intVars] empty; pure-integer factors leave [boolVars] empty; reified or mixed
- * factors populate both.
+ * Full constraint contract for [Problem]: the deductive half ([Propagator]), the local-search
+ * half ([Invariant]), and the presolve/symmetry concern below.
  *
- * A factor carries two contracts. The **deductive** half — the var sets plus [propagate] —
- * is what every solver backend needs. The **local-search** half — `initialize` /
- * `isViolated` / `applyBoolFlip` / `applyIntSet` / `deltaIf*` / `proposeRepairMoves` — is
- * what the LS engine ([com.eignex.klause.solver.localsearch.LocalSearchSolver]) drives. Both
- * halves default to a sound no-op, so a factor that only propagates (no LS support) just
+ * Variables touched by a factor split into two id spaces: Boolean vars in [boolVars] and
+ * integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty; pure-integer factors
+ * leave [boolVars] empty; reified or mixed factors populate both.
+ *
+ * Both halves default to a sound no-op, so a factor that only propagates (no LS support) just
  * inherits the LS defaults — it reports always-satisfied with zero deltas — and a pure-LS
  * factor leaves [propagate] at its no-op.
  */
-interface Factor {
-    val boolVars: IntArray
-    val intVars: IntArray
+interface Factor :
+    Propagator,
+    Invariant {
 
     /**
      * A copy of this factor with every Boolean variable id rewritten through [boolMap] and every
      * integer variable id through [intMap] (`newId = map[oldId]`). Non-variable data — coefficients,
      * bounds, constant arrays, domain offsets, DFA tables — is carried over unchanged. Used by
-     * presolve passes that renumber or substitute variables (#332).
+     * presolve passes that renumber or substitute variables.
      *
      * Every factor must implement this (no default): a variable being renumbered or substituted can
      * appear in any factor, so a silent miss would leave stale ids in the rewritten problem. A
@@ -49,7 +43,7 @@ interface Factor {
      * A canonical string identifying this constraint up to variable identity: same factor type,
      * same constants (coefficients, bounds, polarities), and the same multiset of variables — in a
      * representation that does not depend on internal ordering — produce the same key. Used by
-     * symmetry detection (#334) to check whether permuting variables maps the factor set to itself
+     * symmetry detection to check whether permuting variables maps the factor set to itself
      * (an automorphism). `null` (the default) means "not keyed"; verification falls back to the
      * conservative same-factor-set heuristic when any factor in the problem is unkeyed.
      */
@@ -58,7 +52,7 @@ interface Factor {
     /**
      * Whether this factor's meaning is invariant under *any* relabeling of domain values — i.e. it
      * treats values as interchangeable symbols (AllDifferent: distinctness ignores which values).
-     * Used by value-symmetry detection (#366): a value permutation is a symmetry only if every
+     * Used by value-symmetry detection: a value permutation is a symmetry only if every
      * factor is value-anonymous (and every variable's domain is invariant under it). Arithmetic and
      * value-meaningful constraints return `false` (the default), conservatively blocking value
      * symmetry for the whole problem.
@@ -67,277 +61,21 @@ interface Factor {
 
     /**
      * A copy of this factor with every *value-dependent constant* relabeled through [valueMap]
-     * (`newValue = valueMap(oldValue)`) — the value analog of [remap] (#374). Relabels things that
-     * name domain values: an [com.eignex.klause.solver.factor.GlobalCardinality] cover, a
-     * [com.eignex.klause.solver.factor.Table]'s tuples, an Element constant array, Regular/Mdd
+     * (`newValue = valueMap(oldValue)`) — the value analog of [remap]. Relabels things that
+     * name domain values: an [com.eignex.klause.solver.factor.global.GlobalCardinality] cover, a
+     * [com.eignex.klause.solver.factor.table.Table]'s tuples, an Element constant array, Regular/Mdd
      * symbols. Variable ids, coefficients, and structural positions are unchanged.
      *
      * Used by value-symmetry detection to *verify* that a value permutation maps the factor set to
      * itself: applying it to every factor and comparing the [structuralKey] multiset proves the
-     * permutation is a symmetry, the value analog of the [remap]-based automorphism check (#334).
+     * permutation is a symmetry, the value analog of the [remap]-based automorphism check.
      *
      * `null` (the default) means "not value-relabelable" — arithmetic / value-meaningful factors
-     * ([com.eignex.klause.solver.factor.Linear], Product) where a value carries magnitude, not just
+     * ([com.eignex.klause.solver.factor.arithmetic.Linear], Product) where a value carries magnitude, not just
      * identity, and a factor whose values live in more than one universe (e.g. a GCC with count
      * *variables*) which can't be relabeled by a single map. A `null` anywhere conservatively blocks
      * value symmetry for the whole problem. A [isValueAnonymous] factor returns `this` (no constant
      * names a value).
      */
     fun remapValues(valueMap: (Int) -> Int): Factor? = null
-
-    /**
-     * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
-     * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
-     * — sound but trivial. Factors override to participate in [Problem.propagate].
-     */
-    fun propagate(state: PropagationState, factorId: Int): Boolean = true
-
-    /**
-     * Boolean literals this factor wants per-literal wakeup on, or `null` for the default
-     * occurrence-list wakeup (fire on *any* change to a variable in [boolVars]). When
-     * non-null, the propagation engine routes bool wakeups through a per-literal index
-     * (`boolWatchersByLit[lit]`) instead of through [boolVars]: the factor fires only when
-     * the literal that just became *false* is in this set. The factor is responsible for
-     * keeping the index in sync as watches drift, via
-     * [com.eignex.klause.solver.propagation.moveBoolWatcher].
-     *
-     * Used by [com.eignex.klause.solver.factor.Clause] to implement two-watched-literal
-     * propagation (Zhang–Stickel / MiniSAT): only the two watched literals trigger
-     * wakeups, so a 50-literal clause fires on 2/50 var changes instead of 50/50. The
-     * same scheme generalises to Cardinality with k+1 watched literals — a future
-     * factor can adopt this contract without engine changes.
-     *
-     * Default is `null` — preserves the current "wake on any boolVars change" semantics
-     * for every factor that hasn't opted in.
-     */
-    val initialBoolWatchers: IntArray? get() = null
-
-    /**
-     * Optional blocking literals paired index-for-index with [initialBoolWatchers]. Entry
-     * `i` is a literal that, if currently true, *proves this factor already satisfied*, so
-     * the propagation engine can skip waking the factor when watcher `i`'s literal goes
-     * false (see `PropagationState.boolBlockersByLit`). The standard two-watched-literal
-     * BCP speedup (MiniSAT): the blocker is typically the other watched literal of the same
-     * clause, and a stale blocker only ever costs a missed skip — never correctness.
-     *
-     * Only meaningful for factors satisfied by *any* single true literal (disjunctions /
-     * [com.eignex.klause.solver.factor.Clause]). Must stay `null` for factors where one true
-     * literal does not imply satisfaction — e.g. cardinality, where a blocker would be
-     * unsound. `null` (default) means "no blocking literals": every watcher always fires,
-     * preserving the prior behaviour exactly.
-     */
-    val initialBoolWatcherBlockers: IntArray? get() = null
-
-    /**
-     * Typed integer-domain events this factor wants advisor-style wakeup on, or `null` (the
-     * default) for the occurrence-list wakeup — fire on *any* change to a variable in [intVars].
-     * Each entry encodes a `(intVar, kind)` pair via
-     * [com.eignex.klause.solver.propagation.IntEvent.pack], where `kind` is one of
-     * `IntEvent.LB_RAISED` / `UB_LOWERED` / `VALUE_REMOVED` / `FIXED`. When non-null, the engine
-     * routes wakeup for the subscribed variables through the per-`(var, kind)` index
-     * (`PropagationState.intEventWatchersBySlot`) instead of through [intVars]: the factor fires
-     * only when a kind it subscribed to actually occurs on that variable.
-     *
-     * This is the int-side analog of [initialBoolWatchers] and the scheduling substrate for
-     * incremental propagators (epic #619): a bounds-consistent factor can subscribe to only
-     * [com.eignex.klause.solver.propagation.IntEvent.LB_RAISED] / `UB_LOWERED` and skip waking on
-     * interior value removals it cannot act on; a factor that only reacts to assignment can
-     * subscribe to `FIXED` alone. A variable named here is removed from this factor's
-     * occurrence-list wakeup (see [com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences])
-     * — so the subscription must cover every kind the factor needs to stay correct; an under-broad
-     * subscription silently drops a wake. A variable in [intVars] but *not* named here keeps its
-     * normal occurrence-list wakeup.
-     *
-     * Default is `null` — preserves the current "wake on any intVars change" semantics for every
-     * factor that hasn't opted in (and the engine pays nothing when no factor in the problem does).
-     */
-    val initialIntEventWatches: IntArray? get() = null
-
-    /**
-     * Whether this factor consumes the engine-maintained **dirty-variable delta** (#624): the set of
-     * its subscribed variables that changed since it last drained, retrieved on a fire via
-     * [com.eignex.klause.solver.propagation.PropagationState.drainIntEventDirtyVars]. A
-     * domain-sensitive incremental propagator (Régin/GCC/Table/…) sets this `true` so it can scope
-     * its per-fire work to the changed variables instead of scanning all of [intVars].
-     *
-     * **Contract:** a consumer must also subscribe via [initialIntEventWatches] to *every* kind on
-     * *every* variable it depends on — the engine only accumulates a variable into the delta when an
-     * advisor it subscribed to fires, so an under-broad subscription drops a change and is unsound.
-     * The accumulated set is a *superset* of "changed since last fire" (a backtrack leaves stale
-     * entries, harmless because the consumer diffs its own reversible baseline). Default `false`:
-     * the factor gets typed wakeup (if it subscribes) but the engine accumulates no delta for it.
-     */
-    val consumesIntEventDelta: Boolean get() = false
-
-    /**
-     * If this factor just returned `false` from [propagate], the clause-form explanation
-     * of why — i.e. an array of literals, all currently *false* in [state], whose
-     * disjunction is unsatisfied. The propagation-graph conflict analyzer seeds its
-     * resolution loop with this set when computing a learned clause (lazy clause
-     * generation). Returns `null` for factors that can't produce a clause-form reason;
-     * the analyzer falls back to chronological backtrack in that case.
-     *
-     * Every factor must declare its own explanation: bool-pinning factors (Clause,
-     * Cardinality, PseudoBoolean, Xor, …) return a sharp factor-specific clause, and
-     * int-domain factors (Linear, AllDifferent, GlobalCardinality, Element, Cumulative,
-     * …) cite the order-literal atoms ([Lit] bounds/holes) that pinned the dead-end. A
-     * factor with no sharp reason returns `null` and accepts chronological backtrack
-     * rather than a coarse over-approximation, which would suppress learning under int
-     * decisions and risks unsoundness if the dead-end is not implied by bool pins alone.
-     */
-    fun conflictReason(state: PropagationState, factorId: Int): IntArray?
-
-    // ---------------------------------------------------------------------------------------
-    // Local-search contract. Every method below defaults to a sound no-op (always-satisfied,
-    // zero deltas, naive ±1 repair moves), so a propagation-only factor needs to implement
-    // nothing here. The LS engine drives these; the deductive half above is unused by it.
-    // ---------------------------------------------------------------------------------------
-
-    /** Build this factor's payload from the current assignment. Called once per restart.
-     *  Default no-op for stateless factors that maintain no payload. */
-    fun initialize(state: LocalSearchState, factorId: Int) {}
-
-    /** True iff this factor is violated under the current state. Default: never violated —
-     *  the correct answer for a propagation-only factor that carries no LS semantics. */
-    fun isViolated(state: LocalSearchState, factorId: Int): Boolean = false
-
-    /**
-     * **Graded violation degree**: `0` when satisfied, a positive magnitude that grows with
-     * "how far" the constraint is from being satisfied. The LS hard cost is
-     * `Σ violationDegree` over all factors — *not* a count of violated factors — so CBLS
-     * sees a descent gradient on tight arithmetic and global constraints (a move that shrinks
-     * an `int_lin_eq` residual from 1000 → 1 scores a real improvement instead of 0).
-     *
-     * The default delegates to the binary [isViolated] (degree `1` when violated, else `0`),
-     * which is the *correct* degree for inherently-binary factors — a violated clause, a
-     * single comparator, a table membership all genuinely have degree 1. Gradable factors
-     * (linear, count/cardinality, packing, scheduling, all-different, …) override this with
-     * a real magnitude.
-     *
-     * **Contract (must hold for cost/gradient consistency):** for every move kind,
-     * `deltaIf*` and `apply*` must return exactly `violationDegree(after) - violationDegree(before)`.
-     * The engine maintains `cost` and the per-factor degree incrementally from those deltas
-     * and only calls [violationDegree] at [LocalSearchState.recompute]; a delta that disagrees
-     * with this method silently desyncs the cost. Degrees should be clamped to a sane range
-     * to avoid `Int` overflow when summed across the factor set.
-     */
-    fun violationDegree(state: LocalSearchState, factorId: Int): Int = if (isViolated(state, factorId)) 1 else 0
-
-    /**
-     * Δ in this factor's [violationDegree] if the given move were applied, computed without
-     * mutating state. For a binary factor this is `+1` (satisfied → violated), `-1` (the
-     * opposite), or `0`; for a graded factor it is the signed change in magnitude (any
-     * integer). Default returns 0; factors override the methods relevant to the move kinds
-     * they handle.
-     */
-    fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
-
-    /** Δ violation-degree if [intVar] were set to [newValue], without mutating state. */
-    fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
-
-    /**
-     * Apply a committed move to this factor's payload. The assignment has already been
-     * updated, so factors compare current values against the saved `oldValue` (for int sets)
-     * or recover the pre-flip value by inversion. Returns the same Δ[violationDegree] the
-     * deltaIf* method would have returned before the move.
-     */
-    fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
-
-    /** Apply a committed int-set of [intVar] from [oldValue]; returns the Δ violation-degree. */
-    fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
-
-    /**
-     * Suggest moves that would (or might) repair this factor when violated. The default lists
-     * a Boolean flip per [boolVars] member plus an `IntSet(±1)` per [intVars] member. Factors
-     * with structural insight (e.g. a comparator can snap to its bound) override this.
-     */
-    fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        for (b in boolVars) sink.addBoolFlip(b)
-        for (i in intVars) {
-            val cur = state.assignment.intValue(i)
-            val d = state.problem.intDomains[i]
-            if (cur < d.max) sink.addChannelingIntSet(state, i, cur + 1)
-            if (cur > d.min) sink.addChannelingIntSet(state, i, cur - 1)
-        }
-    }
-
-    /**
-     * Suggest moves that the factor *currently* knows would preserve its own satisfaction
-     * (`isViolated → false` after the move). Called by the minimize engine during the
-     * objective-descent phase to collect candidate moves that don't break the constraint
-     * but might improve the LS objective. Pre-condition: `!isViolated(state, factorId)`
-     * — engines only consult this on already-feasible states.
-     *
-     * Default: no proposals. Factors with structural insight (e.g. `Linear EQ`'s "shift
-     * between two summed vars" or `Cardinality.exactlyOne`'s "swap a true literal with a
-     * false one") override to push self-preserving moves. The engine combines proposals
-     * from all factors and scores each against the objective; the constraint-aware
-     * "structured" set typically dwarfs random pair-swap in hit rate on decomposed CP
-     * models.
-     */
-    fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-    }
-
-    /**
-     * True iff this factor's [proposeStructuredMoves] generates a *feasibility-preserving*
-     * neighbourhood for a structural global — moves that keep the constraint satisfied while
-     * relocating values within its scope (e.g. an all-different value swap, a circuit tour
-     * re-link). Such factors are candidates for implicit-solving: the engine seeds them
-     * feasible and draws their structure-preserving moves even during infeasibility so they
-     * can clear violations in *coupled* constraints without ever breaking themselves.
-     *
-     * Default `false`. Factors with arithmetic structured moves that only make sense at
-     * feasibility (e.g. `Linear EQ` pair-shifts, `Cardinality` count-preserving swaps) leave
-     * this `false` — they are objective-descent helpers, not implicit-solving neighbourhoods.
-     */
-    val providesImplicitNeighbourhood: Boolean get() = false
-
-    /**
-     * Overwrite this factor's variables in [state]'s assignment with a configuration that
-     * satisfies the factor, used by the engine's implicit-solving feasible-init pass on a
-     * scope-disjoint set of elected globals (so seeds never clobber one another). Must leave
-     * variables frozen by [LocalSearchState.assumptions] untouched and may only write the
-     * factor's own [intVars] / [boolVars]. Returns true if it produced a fully satisfying
-     * configuration, false if the factor could not be seeded feasibly (over-constrained or
-     * frozen out) — the engine then falls back to the random assignment for those vars.
-     *
-     * Default: no-op returning false. Structural globals that provide an implicit
-     * neighbourhood ([providesImplicitNeighbourhood]) override this so the search can begin
-     * inside their feasible region.
-     */
-    fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean = false
-
-    /** True iff this factor maintains its contribution to [LocalSearchState.boolBreakCount]
-     *  and [LocalSearchState.boolMakeCount] incrementally via [updateBoolBreakMakeForFlip],
-     *  skipping the engine's brute-force O(arity²) per-flip subtract-add cycle.
-     *
-     *  Factors that override should: (a) set this to true, (b) implement
-     *  [updateBoolBreakMakeForFlip] so the post-flip counts match what brute-force would
-     *  produce, (c) maintain whatever internal state the update needs (e.g. `numTrueLits`
-     *  in [LocalSearchState.intPayload]). Default `false` keeps the brute-force fallback. */
-    val maintainsBreakMakeIncrementally: Boolean get() = false
-
-    /** Adjust [LocalSearchState.boolBreakCount] / [LocalSearchState.boolMakeCount] after
-     *  [flippedVar] has been flipped. Called *after* the assignment is updated and after
-     *  this factor's own [applyBoolFlip] has run, so any internal payload is current.
-     *
-     *  Only invoked when [maintainsBreakMakeIncrementally] is true. Net adjustment must
-     *  equal the brute-force "subtract pre-flip per-var deltas, add post-flip" pattern. */
-    fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {}
-
-    /** Mirror of [maintainsBreakMakeIncrementally] for the int-set path. When `true`, the
-     *  LS engine skips its brute-force [boolVars] walk after an `intVar` is set and calls
-     *  [updateIntBreakMakeForIntSet] instead. Factors whose [deltaIfBoolFlipped] doesn't
-     *  depend on int values (e.g. pure Boolean constraints with no [intVars]) get no
-     *  benefit from setting this flag — the engine already short-circuits when [intVars]
-     *  is empty via [Problem.intOccurrences]. */
-    val maintainsIntBreakMakeIncrementallyForIntSet: Boolean get() = false
-
-    /** Adjust [LocalSearchState.boolBreakCount] / [LocalSearchState.boolMakeCount] after
-     *  [intVar] has been set from [oldValue] to its new value (read via
-     *  `state.assignment.intValue(intVar)`). Called *after* the assignment is updated and
-     *  after this factor's own [applyIntSet] has run. Only invoked when
-     *  [maintainsIntBreakMakeIncrementallyForIntSet] is true. Net adjustment must equal
-     *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
-    fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {}
 }

@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.lp.relaxation
 
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.Cumulative
-import com.eignex.klause.solver.factor.Diffn
-import com.eignex.klause.solver.factor.Disjunctive
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.scheduling.Cumulative
+import com.eignex.klause.solver.factor.scheduling.Diffn
+import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.LpRowPremises

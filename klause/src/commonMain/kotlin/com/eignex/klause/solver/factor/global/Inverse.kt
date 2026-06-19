@@ -1,0 +1,488 @@
+package com.eignex.klause.solver.factor.global
+
+import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.factor.arithmetic.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.factor.compressViolation
+import com.eignex.klause.solver.factor.global.internals.ReginCache
+import com.eignex.klause.solver.factor.global.internals.reginFilter
+import com.eignex.klause.solver.factor.remapVars
+import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.propagation.IntEvent
+import com.eignex.klause.solver.propagation.PropagationState
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.IntIntMap
+
+/**
+ * `inverse(f, g)` with optional offsets: `f(i) = j  ⇔  g(j - gOffset + fOffset) = i`.
+ *
+ * The canonical 0-based form is `f(i) = j ⇔ g(j) = i`. MiniZinc emits with index offsets
+ * matching its 1-based default; the offsets are encoded into the factor so the dispatch
+ * doesn't have to allocate channel vars.
+ *
+ * Propagation: pin-forcing channels — whenever `f(i)` becomes singleton with value `j`,
+ * force `g(j')` to `i'` where the indices apply the offset; vice versa.
+ */
+class Inverse(
+    /** Forward mapping variable ids: `f(i)` is the image of `i`. */
+    val f: IntArray,
+    /** Inverse mapping variable ids: `g(j)` is the preimage of `j`. */
+    val g: IntArray,
+    /** Index offset for the [f] domain. */
+    val fOffset: Int = 0,
+    /** Index offset for the [g] domain. */
+    val gOffset: Int = 0,
+) : Factor {
+
+    init {
+        require(f.size == g.size) { "inverse: f and g must have equal length" }
+        require(f.isNotEmpty()) { "inverse: empty arrays" }
+    }
+
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
+        Inverse(f.remapVars(intMap), g.remapVars(intMap), fOffset, gOffset)
+
+    // Positional: f(i)/g(i) are channelled by index, so neither array is sorted. Encodes both
+    // offsets and the ordered f / g var sequences — fine enough that two non-equivalent Inverses
+    // never share a key (required for sound symmetry verification). The f/g sides are kept distinct
+    // (not canonicalised against each other); at worst this misses an f↔g symmetry, never unsound.
+    override fun structuralKey(): String =
+        "inverse:$fOffset:$gOffset:" + f.joinToString(",") + ":" + g.joinToString(",")
+
+    override val boolVars: IntArray = EmptyIntArray
+    override val intVars: IntArray = f + g
+
+    /** Advisor subscription (#623): channel GAC over interior domains, so subscribe to every kind on
+     *  every (distinct) channel variable and consume the dirty-variable delta (#624) — the propagator
+     *  scopes its O(n²) channel sweep to the rows/columns whose domain actually changed. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
+
+    /** var id → its index in [f] / [g] (`-1` when absent), so the dirty-variable delta (var ids)
+     *  maps to changed channel rows / columns without an O(n) domain-ref scan. */
+    private val fIndexOf: IntIntMap = IntIntMap.build(f, IntArray(f.size) { it }, absent = -1)
+    private val gIndexOf: IntIntMap = IntIntMap.build(g, IntArray(g.size) { it }, absent = -1)
+
+    private fun fValueToGIndex(j: Int): Int = j - gOffset
+    private fun gValueToFIndex(i: Int): Int = i - fOffset
+
+    /** Number of currently-violated channel cells: pairs where the f→g and g→f mappings
+     *  disagree. Maintained incrementally for LS scoring. */
+    private class State(var violated: Int)
+
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        var bad = 0
+        // For each f(i): read its value j, look up g(j - gOff) and require it equals i + fOff.
+        for (i in f.indices) {
+            val j = state.assignment.intValue(f[i])
+            val gIdx = fValueToGIndex(j)
+            if (gIdx !in g.indices) {
+                bad++
+                continue
+            }
+            val gVal = state.assignment.intValue(g[gIdx])
+            if (gVal != i + fOffset) bad++
+        }
+        // Symmetric check via g side.
+        for (i in g.indices) {
+            val j = state.assignment.intValue(g[i])
+            val fIdx = gValueToFIndex(j)
+            if (fIdx !in f.indices) {
+                bad++
+                continue
+            }
+            val fVal = state.assignment.intValue(f[fIdx])
+            if (fVal != i + gOffset) bad++
+        }
+        state.refPayload[factorId] = State(bad)
+    }
+
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
+        val s = state.refPayload[factorId] as State
+        return s.violated > 0
+    }
+
+    /** Graded violation: the number of mismatched channel cells, compressed — a move that
+     *  repairs some (but not all) cells scores a real improvement instead of 0. */
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
+        compressViolation((state.refPayload[factorId] as State).violated.toLong(), state.violationSoftCap)
+
+    /** Default brute-force: simulate, recount, return delta. Cost O(n) per query — fine
+     *  for the structurally simple inverse but sub-optimal vs. an incremental Δ. */
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val s = state.refPayload[factorId] as State
+        val current = state.assignment.intValue(intVar)
+        if (current == newValue) return 0
+        val after = simulateViolations(state, intVar, newValue)
+        return compressViolation(after.toLong(), state.violationSoftCap) -
+            compressViolation(s.violated.toLong(), state.violationSoftCap)
+    }
+
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        val s = state.refPayload[factorId] as State
+        val before = s.violated
+        s.violated = countViolations(state)
+        return compressViolation(s.violated.toLong(), state.violationSoftCap) -
+            compressViolation(before.toLong(), state.violationSoftCap)
+    }
+
+    private fun countViolations(state: LocalSearchState): Int {
+        var bad = 0
+        for (i in f.indices) {
+            val j = state.assignment.intValue(f[i])
+            val gIdx = fValueToGIndex(j)
+            if (gIdx !in g.indices) {
+                bad++
+                continue
+            }
+            val gVal = state.assignment.intValue(g[gIdx])
+            if (gVal != i + fOffset) bad++
+        }
+        for (i in g.indices) {
+            val j = state.assignment.intValue(g[i])
+            val fIdx = gValueToFIndex(j)
+            if (fIdx !in f.indices) {
+                bad++
+                continue
+            }
+            val fVal = state.assignment.intValue(f[fIdx])
+            if (fVal != i + gOffset) bad++
+        }
+        return bad
+    }
+
+    private fun simulateViolations(state: LocalSearchState, intVar: Int, newValue: Int): Int {
+        var bad = 0
+        for (i in f.indices) {
+            val j = if (f[i] == intVar) newValue else state.assignment.intValue(f[i])
+            val gIdx = fValueToGIndex(j)
+            if (gIdx !in g.indices) {
+                bad++
+                continue
+            }
+            val gVal = if (g[gIdx] == intVar) newValue else state.assignment.intValue(g[gIdx])
+            if (gVal != i + fOffset) bad++
+        }
+        for (i in g.indices) {
+            val j = if (g[i] == intVar) newValue else state.assignment.intValue(g[i])
+            val fIdx = gValueToFIndex(j)
+            if (fIdx !in f.indices) {
+                bad++
+                continue
+            }
+            val fVal = if (f[fIdx] == intVar) newValue else state.assignment.intValue(f[fIdx])
+            if (fVal != i + gOffset) bad++
+        }
+        return bad
+    }
+
+    /*
+     * GAC for the inverse channel. Three layers:
+     *   1. range-tighten each f[i] / g[j] to the legal index span and force singletons across
+     *      the channel;
+     *   2. bidirectional value removal — if `i + fOffset` is absent from `dom(g[j])`, also remove
+     *      `j + gOffset` from `dom(f[i])`, and symmetrically. This is the arc-consistent closure of
+     *      `f[i]=j ⇔ g[j]=i`;
+     *   3. Hall/matching filtering on f and on g (#541). The biconditional forces f and g to be
+     *      bijections (`f[i1]=f[i2]=j ⇒ g[j]=i1=i2`), so each side is all-different; the channel AC
+     *      alone reaches a mutual non-GAC fixpoint (e.g. it keeps `f2=0` because `g0=2` is unpruned
+     *      and vice versa). Régin matching on f and on g punches the Hall-set values the channel
+     *      misses, reusing the shared [reginFilter].
+     */
+
+    /** Hole-aware conflict reason, sharpened to the responsible channel var / pair captured
+     *  by [propagate]; falls back to all vars when no pair was recorded. The scratch lives
+     *  on the session's [InverseCache], not the factor, so portfolio workers sharing one
+     *  Problem never cross reasons (#182). */
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars)
+
+    /** Per-session warm-start / scoping cache (not level state — it **drifts** across push/pop, so it
+     *  is no longer a [PropagationState.SnapshottablePayload]). [initialized] gates the first full
+     *  channel sweep; afterwards the O(n²) value-removal sweep reprocesses only the rows/columns the
+     *  dirty-variable delta reports changed (a prune re-wakes its var, so cascades are caught across
+     *  fires). [fRegin] / [gRegin] warm-start the per-side Régin matching (#541), revalidated against
+     *  current domains every call, so a drifted seed is at worst a missed warm-start, never unsound. */
+    private class InverseCache(val fRegin: ReginCache = ReginCache(), val gRegin: ReginCache = ReginCache()) {
+        var initialized: Boolean = false
+
+        /** The channel var / pair (or Hall violator set) behind the most recent propagate failure
+         *  on this session; propagate-to-analysis transient, never needs to survive a backtrack. */
+        var conflictVars: IntArray? = null
+    }
+
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val cache = (state.refPayload[factorId] as? InverseCache) ?: run {
+            val fresh = InverseCache()
+            state.refPayload[factorId] = fresh
+            fresh
+        }
+        cache.conflictVars = null // stale-guard; set at each failure point below.
+        // Map the dirty-variable delta to changed channel rows / columns. The first fire (and any
+        // uninitialised cache) sweeps every pair; afterwards only changed rows / columns are revisited
+        // — a prune re-wakes its variable, so the delta carries cascades across fires.
+        val full = !cache.initialized
+        val fDirty = BooleanArray(f.size)
+        val gDirty = BooleanArray(g.size)
+        if (!full) {
+            for (v in state.drainIntEventDirtyVars(factorId)) {
+                val fi = fIndexOf[v]
+                if (fi >= 0) fDirty[fi] = true
+                val gi = gIndexOf[v]
+                if (gi >= 0) gDirty[gi] = true
+            }
+        } else {
+            state.drainIntEventDirtyVars(factorId) // clear the accumulator; the full sweep covers all
+        }
+        // Range tightens are structural (no input antecedents). A failure means that one var
+        // alone cannot reach the legal index span, so it is the sole reason.
+        val gLo = gOffset
+        val gHi = gOffset + g.size - 1
+        for (i in f.indices) {
+            if (!state.tightenIntMin(f[i], gLo)) {
+                cache.conflictVars = intArrayOf(f[i])
+                return false
+            }
+            if (!state.tightenIntMax(f[i], gHi)) {
+                cache.conflictVars = intArrayOf(f[i])
+                return false
+            }
+        }
+        val fLo = fOffset
+        val fHi = fOffset + f.size - 1
+        for (i in g.indices) {
+            if (!state.tightenIntMin(g[i], fLo)) {
+                cache.conflictVars = intArrayOf(g[i])
+                return false
+            }
+            if (!state.tightenIntMax(g[i], fHi)) {
+                cache.conflictVars = intArrayOf(g[i])
+                return false
+            }
+        }
+        // Singleton-forcing: the source var's int trail antecedents drive the pin. A failure
+        // implicates the pinned source and the target it forces across the channel.
+        for (i in f.indices) {
+            val d = state.intDomains[f[i]]
+            if (d.min != d.max) continue
+            val gIdx = d.min - gOffset
+            if (gIdx !in g.indices) {
+                cache.conflictVars = intArrayOf(f[i])
+                return false
+            }
+            val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
+            if (!state.tightenIntMin(g[gIdx], i + fOffset, ant)) {
+                cache.conflictVars = intArrayOf(f[i], g[gIdx])
+                return false
+            }
+            if (!state.tightenIntMax(g[gIdx], i + fOffset, ant)) {
+                cache.conflictVars = intArrayOf(f[i], g[gIdx])
+                return false
+            }
+        }
+        for (i in g.indices) {
+            val d = state.intDomains[g[i]]
+            if (d.min != d.max) continue
+            val fIdx = d.min - fOffset
+            if (fIdx !in f.indices) {
+                cache.conflictVars = intArrayOf(g[i])
+                return false
+            }
+            val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[i]))
+            if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) {
+                cache.conflictVars = intArrayOf(g[i], f[fIdx])
+                return false
+            }
+            if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) {
+                cache.conflictVars = intArrayOf(g[i], f[fIdx])
+                return false
+            }
+        }
+        // Bidirectional value removal: for each (i, gIdx) where gIdx is in range, the
+        // channel forces "j+gOffset in dom(f[i])  iff  i+fOffset in dom(g[gIdx])".
+        // Whichever side has the value missing, remove from the other. A wipe-out failure
+        // implicates exactly the channel pair (f[i], g[gIdx]). Incremental: a pair only needs
+        // reprocessing when one of its two endpoints' domains changed vs the cached baseline,
+        // so we sweep only changed rows and changed columns (each pair once).
+        fun fChanged(i: Int) = full || fDirty[i]
+        fun gChanged(j: Int) = full || gDirty[j]
+        fun pair(i: Int, gIdx: Int): Boolean {
+            val jVal = gIdx + gOffset // value f[i] would take to point to g[gIdx]
+            val iVal = i + fOffset // value g[gIdx] would take to point back to f[i]
+            val fHas = jVal in state.intDomains[f[i]]
+            val gHas = iVal in state.intDomains[g[gIdx]]
+            if (fHas && !gHas) {
+                val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
+                if (!state.excludeIntValue(f[i], jVal, ant)) {
+                    cache.conflictVars = intArrayOf(f[i], g[gIdx])
+                    return false
+                }
+            } else if (!fHas && gHas) {
+                val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
+                if (!state.excludeIntValue(g[gIdx], iVal, ant)) {
+                    cache.conflictVars = intArrayOf(f[i], g[gIdx])
+                    return false
+                }
+            }
+            return true
+        }
+        for (i in f.indices) {
+            if (!fChanged(i)) continue
+            for (gIdx in g.indices) if (!pair(i, gIdx)) return false
+        }
+        for (gIdx in g.indices) {
+            if (!gChanged(gIdx)) continue
+            for (i in f.indices) {
+                if (fChanged(i)) continue // already handled in the changed-row sweep
+                if (!pair(i, gIdx)) return false
+            }
+        }
+        // Hall/matching filtering: f and g are each bijections, so apply Régin all-different
+        // domain consistency to each side. This prunes the Hall-set values the pairwise channel
+        // AC leaves at its mutual fixpoint. On infeasibility the returned Hall violators become
+        // this session's conflict reason. Warm-started per side via the cache (#541).
+        val fHall = reginFilter(state, f, NO_EXCEPT, cache.fRegin)
+        if (fHall != null) {
+            cache.conflictVars = fHall
+            return false
+        }
+        val gHall = reginFilter(state, g, NO_EXCEPT, cache.gRegin)
+        if (gHall != null) {
+            cache.conflictVars = gHall
+            return false
+        }
+
+        cache.initialized = true
+        return true
+    }
+
+    private companion object {
+        /** Empty excepted-value set for the shared [reginFilter] (inverse's f and g are plain
+         *  bijections, no shared values). [reginFilter] only reads it, so one shared instance is
+         *  safe. */
+        val NO_EXCEPT = IntHashSet()
+
+        /** Cap on paired-transposition compounds offered per [proposeStructuredMoves] call. */
+        const val STRUCTURED_SWAP_CAP: Int = 4
+
+        /** Rejection-sampling attempts per requested swap before giving up. */
+        const val SWAP_ATTEMPT_STRIDE: Int = 6
+    }
+
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        // Find a mismatched cell and propose setting one side to match the other.
+        for (i in f.indices) {
+            val j = state.assignment.intValue(f[i])
+            val gIdx = fValueToGIndex(j)
+            if (gIdx !in g.indices) {
+                // f[i]'s value out of range: nudge into range.
+                val d = state.problem.intDomains[f[i]]
+                val mid = ((d.min + d.max) / 2)
+                if (mid in d && mid != j) sink.addChannelingIntSet(state, f[i], mid)
+                return
+            }
+            val gVal = state.assignment.intValue(g[gIdx])
+            if (gVal != i + fOffset) {
+                // Two repair candidates: align g side or change f's value.
+                val gd = state.problem.intDomains[g[gIdx]]
+                val target = i + fOffset
+                if (target in gd && target != gVal) sink.addChannelingIntSet(state, g[gIdx], target)
+                // Or change f[i] to point where g[gIdx] currently points back.
+                val gFwd = gVal - fOffset
+                if (gFwd in 0 until g.size) {
+                    val targetFwd = gFwd + gOffset
+                    val fd = state.problem.intDomains[f[i]]
+                    if (targetFwd in fd && targetFwd != j) sink.addChannelingIntSet(state, f[i], targetFwd)
+                }
+                // Symmetric: scan for some jPrime where g[jPrime] already equals (i+fOffset),
+                // and propose f[i] = jPrime + gOffset. Repairs i's constraint without touching
+                // any g[*]. Necessary when the desired value already lives elsewhere on g.
+                val fd = state.problem.intDomains[f[i]]
+                for (jPrime in g.indices) {
+                    if (state.assignment.intValue(g[jPrime]) == i + fOffset) {
+                        val tgt = jPrime + gOffset
+                        if (tgt in fd && tgt != j) {
+                            sink.addChannelingIntSet(state, f[i], tgt)
+                            break
+                        }
+                    }
+                }
+                return
+            }
+        }
+    }
+
+    override val providesImplicitNeighbourhood: Boolean get() = true
+
+    /** Feasibility-preserving neighbourhood: a paired transposition. When the channel holds,
+     *  swapping the images of two forward indices `i1`, `i2` (`f[i1]=a`, `f[i2]=b`) and
+     *  re-pointing the matching inverse cells (`g[a]→i2`, `g[b]→i1`) keeps `f` a permutation
+     *  and `g` its exact inverse — the constraint stays satisfied while the permutation is
+     *  perturbed, which can relocate a value to clear a coupled constraint. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        val n = f.size
+        if (n < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val i1 = state.rng.nextInt(n)
+            val i2 = state.rng.nextInt(n)
+            if (i1 == i2) continue
+            val a = state.assignment.intValue(f[i1])
+            val b = state.assignment.intValue(f[i2])
+            if (a == b) continue
+            val gIdxA = fValueToGIndex(a)
+            val gIdxB = fValueToGIndex(b)
+            if (gIdxA !in g.indices || gIdxB !in g.indices) continue
+            val newGA = i2 + fOffset
+            val newGB = i1 + fOffset
+            if (b !in state.problem.intDomains[f[i1]]) continue
+            if (a !in state.problem.intDomains[f[i2]]) continue
+            if (newGA !in state.problem.intDomains[g[gIdxA]]) continue
+            if (newGB !in state.problem.intDomains[g[gIdxB]]) continue
+            sink.addCompound(
+                listOf(
+                    Move.IntSet(f[i1], b),
+                    Move.IntSet(f[i2], a),
+                    Move.IntSet(g[gIdxA], newGA),
+                    Move.IntSet(g[gIdxB], newGB),
+                ),
+            )
+            emitted++
+        }
+    }
+
+    /** Feasible init: the identity permutation (`f[i] = i + gOffset`, `g[i] = i + fOffset`).
+     *  Returns false — leaving the random assignment — if any required value is out of domain
+     *  or a frozen var pins a non-identity value, so the seed never violates an assumption. */
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+        val n = f.size
+        for (i in 0 until n) {
+            val fv = i + gOffset
+            val gv = i + fOffset
+            if (fv !in state.problem.intDomains[f[i]] || gv !in state.problem.intDomains[g[i]]) return false
+            if (state.assumptions.isFrozenInt(f[i]) && state.assignment.intValue(f[i]) != fv) return false
+            if (state.assumptions.isFrozenInt(g[i]) && state.assignment.intValue(g[i]) != gv) return false
+        }
+        for (i in 0 until n) {
+            if (!state.assumptions.isFrozenInt(f[i])) state.assignment.setInt(f[i], i + gOffset)
+            if (!state.assumptions.isFrozenInt(g[i])) state.assignment.setInt(g[i], i + fOffset)
+        }
+        return true
+    }
+}

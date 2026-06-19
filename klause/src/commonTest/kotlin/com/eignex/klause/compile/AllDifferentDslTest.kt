@@ -3,7 +3,7 @@ package com.eignex.klause.compile
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.schema.implies
-import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

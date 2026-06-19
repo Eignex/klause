@@ -3,8 +3,8 @@ package com.eignex.klause.solver.lp.cut
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Inverse
-import com.eignex.klause.solver.factor.SymmetricAllDifferent
+import com.eignex.klause.solver.factor.global.Inverse
+import com.eignex.klause.solver.factor.global.SymmetricAllDifferent
 import com.eignex.klause.solver.lp.FloatLpResult
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex

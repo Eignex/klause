@@ -4,7 +4,7 @@ import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.not
 import com.eignex.klause.schema.xor
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.Xor
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.factor.AllDifferent
+import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random

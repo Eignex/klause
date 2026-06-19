@@ -2,7 +2,7 @@ package com.eignex.klause.formats.opb
 
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

@@ -2,7 +2,7 @@ package com.eignex.klause.solver.backtrack
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.propagation.ClauseTier
 import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned

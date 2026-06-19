@@ -7,6 +7,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.solver.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

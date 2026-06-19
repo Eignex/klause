@@ -4,6 +4,9 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test

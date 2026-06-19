@@ -6,9 +6,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -43,14 +43,14 @@ class LocalSearchState(
         numIntVars = problem.numIntVars,
     )
 
-    /** Factor ids currently violated (degree > 0). */
+    /** Invariant ids currently violated (degree > 0). */
     val violated: IntSwapSet = IntSwapSet(problem.numFactors)
 
-    /** Per-factor graded violation degree (0 = satisfied), the source of truth for both
+    /** Per-invariant graded violation degree (0 = satisfied), the source of truth for both
      *  [violated]-set membership (`degree > 0`) and [cost] (`Σ factorDegree`). Maintained
-     *  incrementally from each factor's `deltaIf*`/`apply*` and recomputed from
+     *  incrementally from each invariant's `deltaIf*`/`apply*` and recomputed from
      *  [Factor.violationDegree] at [recompute]. The graded sum gives CBLS a descent gradient on
-     *  tight arithmetic/global constraints rather than a flat count of violated factors. */
+     *  tight arithmetic/global constraints rather than a flat count of violated invariants. */
     val factorDegree: IntArray = IntArray(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
 
@@ -65,8 +65,8 @@ class LocalSearchState(
     val moveSink: MoveSink = MoveSink(assumptions)
 
     /** The problem's factors, aliased so the hot LS loops read `factors` directly. Every [Factor]
-     *  carries the local-search contract (with sound no-op defaults), so no capability check is
-     *  needed. */
+     *  is also an [com.eignex.klause.solver.Invariant] (violation scoring, move deltas, move
+     *  proposal), with sound no-op defaults, so no capability check is needed. */
     val factors: Array<Factor> = problem.factors
 
     /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals whose
@@ -142,9 +142,9 @@ class LocalSearchState(
     val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars)
 
     /** Eagerly-maintained make/break vectors for `Move.BoolFlip`. `boolBreakCount[v]` counts
-     *  currently-satisfied factors that would become violated if `v` is flipped; `boolMakeCount[v]`
-     *  is the symmetric count of currently-violated factors that would become satisfied. Both
-     *  updated incrementally in [applyBoolFlip] and [applyIntSet] over the move's factor
+     *  currently-satisfied invariants that would become violated if `v` is flipped; `boolMakeCount[v]`
+     *  is the symmetric count of currently-violated invariants that would become satisfied. Both
+     *  updated incrementally in [applyBoolFlip] and [applyIntSet] over the move's invariant
      *  neighbourhood. Strategies querying break/make per pick (probSat, WalkSat, DDFW) read these in
      *  O(1), trading an O(Σ arity²) per-flip update cost for predictable O(1) query latency. */
     internal val boolBreakCount: IntArray = IntArray(problem.numBoolVars)
@@ -181,8 +181,8 @@ class LocalSearchState(
     var violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP
         internal set
 
-    /** Per-factor weight, default 1.0. Not read by the engine itself; strategies that bias toward
-     *  repairing persistently-violated factors (DDFW, SAPS) read and mutate this between picks.
+    /** Per-invariant weight, default 1.0. Not read by the engine itself; strategies that bias toward
+     *  repairing persistently-violated invariants (DDFW, SAPS) read and mutate this between picks.
      *
      *  Lazily allocated on first access. Weight-blind strategies (WalkSat / ProbSat / SA) never
      *  touch it and pay no allocation; only CBLS triggers the `DoubleArray(numFactors)`.
@@ -195,13 +195,13 @@ class LocalSearchState(
     var normalizeWeightsByClass: Boolean = false
         internal set
 
-    /** Per-factor dynamic weights for weighted-violation strategies. Factors the model declared
+    /** Per-invariant dynamic weights for weighted-violation strategies. Invariants the model declared
      *  implied ([Problem.impliedFactorMask]) start at [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than
      *  1.0, so the implied bulk can't dominate the initial descent before structural constraints are
-     *  met; SAPS-style bumping still raises an implied factor's weight if it persistently blocks
+     *  met; SAPS-style bumping still raises an implied invariant's weight if it persistently blocks
      *  progress.
      *
-     *  When [normalizeWeightsByClass] is set, non-implied factors are additionally damped by class
+     *  When [normalizeWeightsByClass] is set, non-implied invariants are additionally damped by class
      *  population — see [initialFactorWeights]. */
     val factorWeights: DoubleArray
         get() {

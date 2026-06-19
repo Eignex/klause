@@ -4,9 +4,9 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

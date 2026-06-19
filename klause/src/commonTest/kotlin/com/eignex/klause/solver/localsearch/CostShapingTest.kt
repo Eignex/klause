@@ -6,7 +6,7 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective

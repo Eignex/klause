@@ -3,7 +3,7 @@ package com.eignex.klause.solver.localsearch
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.factor.Cardinality
+import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats

@@ -7,7 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.lp.LpPlan
-import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.MinimizeResult

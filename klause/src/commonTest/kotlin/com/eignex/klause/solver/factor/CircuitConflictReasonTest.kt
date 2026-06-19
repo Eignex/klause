@@ -7,6 +7,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.circuit.Circuit
+import com.eignex.klause.solver.factor.circuit.Subcircuit
+import com.eignex.klause.solver.factor.circuit.SuccessorCycleFactor
 import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
 import kotlin.test.assertEquals

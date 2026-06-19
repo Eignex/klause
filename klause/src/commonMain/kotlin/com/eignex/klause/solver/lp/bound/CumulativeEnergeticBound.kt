@@ -2,7 +2,7 @@ package com.eignex.klause.solver.lp.bound
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Cumulative
+import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.mulExact

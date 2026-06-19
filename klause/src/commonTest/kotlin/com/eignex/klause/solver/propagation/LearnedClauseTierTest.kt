@@ -4,7 +4,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

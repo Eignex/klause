@@ -4,6 +4,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.global.ValuePrecede
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

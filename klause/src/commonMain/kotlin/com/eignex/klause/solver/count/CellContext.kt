@@ -4,7 +4,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.Xor
 
 /**
  * Everything needed to count / sample one family of XOR-hash cells over a fixed projection of a
@@ -50,7 +50,7 @@ internal class CellContext private constructor(
      * decoded representative per distinct projection (see [CellResult]).
      *
      * The XOR hashes are propagated jointly by Gauss-Jordan elimination
-     * ([com.eignex.klause.solver.factor.GaussianXor], wired in by [withHashes]), so
+     * ([com.eignex.klause.solver.factor.bool.GaussianXor], wired in by [withHashes]), so
      * [BacktrackSolver.enumerate] finds every model in the hashed cell quickly — early parity
      * conflict/forcing keeps the search off infeasible branches. A [CELL_DECISION_BUDGET] cap bounds
      * the rare residual exhaustion-tail thrash; because Gaussian finds all models before that tail,

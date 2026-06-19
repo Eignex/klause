@@ -6,15 +6,15 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.LexLess
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.PseudoBoolean
-import com.eignex.klause.solver.factor.ValuePrecede
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
+import com.eignex.klause.solver.factor.bool.Xor
+import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.global.LexLess
+import com.eignex.klause.solver.factor.global.ValuePrecede
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
 

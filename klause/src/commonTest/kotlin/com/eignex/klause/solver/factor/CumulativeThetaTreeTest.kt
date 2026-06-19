@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.factor.scheduling.internals.CumulativeThetaTree
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

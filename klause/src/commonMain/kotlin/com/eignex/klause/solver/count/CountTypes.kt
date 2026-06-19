@@ -4,7 +4,7 @@ package com.eignex.klause.solver.count
  * Configuration for approximate model counting ([com.eignex.klause.solver.Solver.approximateCount]).
  *
  * Native counting path: XOR hashes are propagated jointly by Gauss-Jordan elimination (see
- * [com.eignex.klause.solver.factor.GaussianXor]) on the backtrack solver, which keeps hashed-cell
+ * [com.eignex.klause.solver.factor.bool.GaussianXor]) on the backtrack solver, which keeps hashed-cell
  * enumeration tractable. The result is correct within a multiplicative `(1 ± epsilon)` factor with
  * probability at least `1 - delta`.
  *

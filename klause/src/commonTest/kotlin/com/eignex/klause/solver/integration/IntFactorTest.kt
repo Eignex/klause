@@ -2,8 +2,8 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.reifiedIntCompare
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink

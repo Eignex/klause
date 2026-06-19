@@ -9,8 +9,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.result.SatisfyResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.satisfyUnderAssumptions

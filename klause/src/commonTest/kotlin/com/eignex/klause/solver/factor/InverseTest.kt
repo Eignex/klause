@@ -8,6 +8,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.global.Inverse
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.random.Random
 import kotlin.test.Test

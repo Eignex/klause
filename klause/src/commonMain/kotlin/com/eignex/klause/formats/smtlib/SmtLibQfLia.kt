@@ -10,11 +10,11 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** Raised when an SMT-LIB construct outside the supported QF_LIA subset is encountered. */

@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.NValue
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.global.NValue
 
 internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name) {
     "bool_clause" -> emitBoolClause(c)

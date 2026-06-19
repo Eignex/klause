@@ -6,6 +6,12 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.Product
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test

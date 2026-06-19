@@ -4,11 +4,11 @@ import com.eignex.klause.solver.*
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
-import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.Element
-import com.eignex.klause.solver.factor.GlobalCardinality
-import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.global.GlobalCardinality
+import com.eignex.klause.solver.factor.table.Element
+import com.eignex.klause.solver.factor.table.Table
 import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
 import kotlin.test.assertEquals
