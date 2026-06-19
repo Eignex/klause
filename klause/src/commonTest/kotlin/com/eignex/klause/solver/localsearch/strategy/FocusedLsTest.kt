@@ -3,7 +3,7 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState

@@ -6,8 +6,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.random.Random
 import kotlin.test.Test

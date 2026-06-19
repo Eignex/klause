@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test

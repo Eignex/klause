@@ -5,9 +5,9 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test

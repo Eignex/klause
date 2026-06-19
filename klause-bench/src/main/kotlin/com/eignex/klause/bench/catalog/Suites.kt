@@ -7,15 +7,15 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.PseudoBoolean
-import com.eignex.klause.solver.factor.ReifiedCardinality
-import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.Xor
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
+import com.eignex.klause.solver.factor.bool.Xor
+import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedCardinality
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
 
 /**
  * Catalog content: every [Suite] the bench knows about, grouped by where the instances come

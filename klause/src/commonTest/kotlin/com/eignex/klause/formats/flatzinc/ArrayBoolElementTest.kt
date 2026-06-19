@@ -3,7 +3,7 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.Element
+import com.eignex.klause.solver.factor.table.Element
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

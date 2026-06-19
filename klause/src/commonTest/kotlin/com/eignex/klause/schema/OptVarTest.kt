@@ -12,11 +12,11 @@ import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.le
 import com.eignex.klause.schema.nValueOpt
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.AllDifferent
-import com.eignex.klause.solver.factor.Cumulative
-import com.eignex.klause.solver.factor.Disjunctive
-import com.eignex.klause.solver.factor.GlobalCardinality
-import com.eignex.klause.solver.factor.NValue
+import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.global.GlobalCardinality
+import com.eignex.klause.solver.factor.global.NValue
+import com.eignex.klause.solver.factor.scheduling.Cumulative
+import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

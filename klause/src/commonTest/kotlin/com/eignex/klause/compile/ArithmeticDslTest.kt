@@ -8,9 +8,9 @@ import com.eignex.klause.schema.minus
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
 import com.eignex.klause.schema.unaryMinus
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

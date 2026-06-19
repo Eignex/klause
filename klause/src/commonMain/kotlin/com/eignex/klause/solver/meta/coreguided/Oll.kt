@@ -9,8 +9,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.PseudoBoolean
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.IntArrayList
 

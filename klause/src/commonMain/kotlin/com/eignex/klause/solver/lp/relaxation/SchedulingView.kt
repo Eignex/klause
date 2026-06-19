@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.lp.relaxation
 
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Cumulative
-import com.eignex.klause.solver.factor.Disjunctive
+import com.eignex.klause.solver.factor.scheduling.Cumulative
+import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.lp.bound.CumulativeFlowBound
 
 /**

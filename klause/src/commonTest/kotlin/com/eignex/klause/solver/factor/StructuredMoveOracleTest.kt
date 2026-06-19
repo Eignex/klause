@@ -3,6 +3,8 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.scheduling.Diffn
+import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import kotlin.test.Test
 
 /**

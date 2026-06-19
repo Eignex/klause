@@ -3,7 +3,7 @@ package com.eignex.klause.solver.lp.relaxation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Table
+import com.eignex.klause.solver.factor.table.Table
 import com.eignex.klause.solver.lp.LpSolution
 import com.eignex.klause.solver.lp.LpStatus
 import com.eignex.klause.solver.lp.solveLp

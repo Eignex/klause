@@ -25,10 +25,10 @@ import com.eignex.klause.model.SetSubsetOf
 import com.eignex.klause.model.SetUnion
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
 
 /**
  * Materialise a [SetExpr] into a [SetLayout]. Looks up named set vars; for compound

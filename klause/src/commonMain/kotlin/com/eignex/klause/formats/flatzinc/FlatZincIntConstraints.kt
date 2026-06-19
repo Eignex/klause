@@ -3,13 +3,13 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.ArrayMinMax
-import com.eignex.klause.solver.factor.Element
 import com.eignex.klause.solver.factor.IntFunctionLowering
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Product
-import com.eignex.klause.solver.factor.PseudoBoolean
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
+import com.eignex.klause.solver.factor.table.Element
 
 internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
     require(c.args.size == 2)

@@ -6,9 +6,9 @@ import com.eignex.klause.schema.cumulative
 import com.eignex.klause.schema.disjunctive
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.Circuit
-import com.eignex.klause.solver.factor.Cumulative
-import com.eignex.klause.solver.factor.Disjunctive
+import com.eignex.klause.solver.factor.circuit.Circuit
+import com.eignex.klause.solver.factor.scheduling.Cumulative
+import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

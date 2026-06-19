@@ -14,7 +14,7 @@ import com.eignex.klause.solver.backtrack.lp.harvestRootCuts
 import com.eignex.klause.solver.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.solver.backtrack.lp.rootLpRelaxationBound
 import com.eignex.klause.solver.backtrack.selector.VarRef
-import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult

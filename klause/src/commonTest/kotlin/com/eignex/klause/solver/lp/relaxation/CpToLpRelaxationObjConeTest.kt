@@ -6,9 +6,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.lp.LpPlan
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
+import com.eignex.klause.solver.factor.linear.Linear
+import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.linear.ReifiedLinear
 import com.eignex.klause.solver.lp.LpStatus
 import com.eignex.klause.solver.lp.solveLp
 import com.eignex.klause.solver.objective.LinearObjective

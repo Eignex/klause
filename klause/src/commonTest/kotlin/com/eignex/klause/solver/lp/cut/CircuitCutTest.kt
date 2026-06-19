@@ -3,7 +3,7 @@ package com.eignex.klause.solver.lp.cut
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.Circuit
+import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.lp.FloatLpResult
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex

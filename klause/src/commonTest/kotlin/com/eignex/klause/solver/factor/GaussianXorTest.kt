@@ -6,6 +6,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.bool.GaussianXor
+import com.eignex.klause.solver.factor.bool.Xor
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

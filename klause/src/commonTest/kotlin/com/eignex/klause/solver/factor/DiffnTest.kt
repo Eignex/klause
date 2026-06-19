@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.scheduling.Diffn
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.random.Random

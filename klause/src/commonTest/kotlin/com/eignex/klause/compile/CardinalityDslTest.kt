@@ -5,8 +5,8 @@ import com.eignex.klause.schema.atLeast
 import com.eignex.klause.schema.atMost
 import com.eignex.klause.schema.cardinality
 import com.eignex.klause.schema.implies
-import com.eignex.klause.solver.factor.Cardinality
-import com.eignex.klause.solver.factor.ReifiedCardinality
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.linear.ReifiedCardinality
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
