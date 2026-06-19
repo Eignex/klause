@@ -14,10 +14,9 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 
 /**
- * Move-set equivalence gate for the objective + stall-source extractions (epic #710): the
- * reference closures freeze the *old* `Cbls.seedObjectiveMoves`, `sampleStallSwaps`, and
- * `sampleStallChains` bodies verbatim, and the test asserts the extracted [ObjectiveSeed],
- * [StallSwaps], and [EjectionChains] emit identical multisets for a fixed seed and state.
+ * Move-set equivalence gate for [ObjectiveSeed], [StallSwaps], and [EjectionChains]: the reference
+ * closures hold the `Cbls.seedObjectiveMoves`, `sampleStallSwaps`, and `sampleStallChains` bodies,
+ * and the test asserts the sources emit identical multisets for a fixed seed and state.
  */
 class StallAndObjectiveEquivalenceTest {
 
@@ -25,8 +24,8 @@ class StallAndObjectiveEquivalenceTest {
     private val chainCap = 4
     private val chainDepth = 4
 
-    /** Infeasible linear ring (same as the other extraction gates): non-empty `violated`,
-     *  same-domain int pairs for swaps, coupled break structure for chains. */
+    /** Infeasible linear ring: non-empty `violated`, same-domain int pairs for swaps, coupled break
+     *  structure for chains. */
     private fun ringProblem(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 3,
@@ -51,8 +50,8 @@ class StallAndObjectiveEquivalenceTest {
 
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, -1))
 
-    /** Verbatim copy of the pre-extraction `Cbls.seedObjectiveMoves` body (sans the cost gate,
-     *  which stays in the strategy). */
+    /** The reference `Cbls.seedObjectiveMoves` body (sans the cost gate, which stays in the
+     *  strategy). */
     private fun oldSeedObjective(state: LocalSearchState, sink: MoveSink) {
         val obj = state.objective ?: return
         if (obj is LinearObjective) {
@@ -70,7 +69,7 @@ class StallAndObjectiveEquivalenceTest {
         }
     }
 
-    /** Verbatim copy of the pre-extraction `Cbls.sampleStallSwaps`. */
+    /** The reference `Cbls.sampleStallSwaps`. */
     private fun oldStallSwaps(state: LocalSearchState, sink: MoveSink) {
         if (swapCap <= 0 || state.violated.isEmpty()) return
         val rng = state.rng
@@ -105,7 +104,7 @@ class StallAndObjectiveEquivalenceTest {
         }
     }
 
-    /** Verbatim copy of the pre-extraction `Cbls.sampleStallChains`. */
+    /** The reference `Cbls.sampleStallChains`. */
     private fun oldStallChains(state: LocalSearchState, sink: MoveSink) {
         if (chainCap <= 0 || state.violated.isEmpty()) return
         var budget = chainCap

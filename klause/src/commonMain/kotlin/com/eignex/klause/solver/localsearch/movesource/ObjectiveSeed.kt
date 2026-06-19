@@ -6,19 +6,17 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
 /**
- * Objective-direction seed moves — the single implementation behind `Cbls.seedObjectiveMoves`
- * (epic #710). Without it, a fully-satisfied state where no factor proposes a structured move has
- * zero candidates and the strategy returns null, spuriously restarting. This seeds single-variable
- * moves directly on the objective's decision variables:
+ * Objective-direction seed moves. Without it, a fully-satisfied state where no factor proposes a
+ * structured move has zero candidates and the strategy returns null, spuriously restarting. This
+ * seeds single-variable moves directly on the objective's decision variables:
  *  - [LinearObjective]: a ±1 step on each nonzero-weight var in the direction its coefficient says
  *    reduces the objective, plus a flip on each nonzero-weight bool.
- *  - [FunctionalObjective]: *geometric* steps (±1, ±2, ±4, …, plus the domain endpoints) on each
- *    leaf var — its gradient lives in `deltaIfApplied`, not per-var coefficients, so we seed a
- *    spread of jump sizes and let the scoring keep the best.
+ *  - [FunctionalObjective]: geometric steps (±1, ±2, ±4, …, plus the domain endpoints) on each leaf
+ *    var — its gradient lives in `deltaIfApplied`, not per-var coefficients, so we seed a spread of
+ *    jump sizes and let the scoring keep the best.
  *  - other objective shapes: nothing (no per-var direction without inspecting the shape).
  *
- * [Phase.Feasible]: the objective gradient only matters at `cost == 0`; the gate the caller
- * re-checked is now declarative.
+ * [Phase.Feasible]: the objective gradient only matters at `cost == 0`.
  */
 class ObjectiveSeed : MoveSource {
 
@@ -37,20 +35,17 @@ class ObjectiveSeed : MoveSource {
                     if (obj.intCoefficients[v] == 0L) continue
                     val cur = state.assignment.intValue(v)
                     val d = state.problem.intDomains[v]
-                    // Step in the direction the coefficient says reduces the objective.
-                    // Channeling-aware so int-move + indicator updates stay atomic.
+                    // Step toward smaller objective; channeling-aware so int-move + indicator
+                    // updates stay atomic.
                     if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
                     if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
                 }
             }
 
             is FunctionalObjective -> {
-                // Decomposed objective: its gradient lives in deltaIfApplied, not in per-var
-                // coefficients, so we can't pick a direction a priori. Seed geometric steps
-                // (±1, ±2, ±4, …, plus the domain endpoints) on each decision (leaf) variable
-                // and let the move scoring (which folds in the functional objective delta) keep
-                // the best. Pure ±1 descends a wide-domain coordinate objective far too slowly;
-                // geometric steps let the search jump while still refining at unit resolution.
+                // No per-var direction a priori (gradient lives in deltaIfApplied), so seed
+                // geometric steps on each leaf var and let scoring keep the best. Pure ±1 descends
+                // a wide-domain coordinate objective far too slowly.
                 for (v in obj.leafVars) {
                     val cur = state.assignment.intValue(v)
                     val d = state.problem.intDomains[v]
@@ -72,7 +67,7 @@ class ObjectiveSeed : MoveSource {
         }
     }
 
-    /** Constants + identity. */
+    /** Catalog identity. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("objective-seed")

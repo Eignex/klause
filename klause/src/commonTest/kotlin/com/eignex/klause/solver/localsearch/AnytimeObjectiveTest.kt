@@ -17,12 +17,8 @@ import kotlin.test.assertTrue
  */
 class AnytimeObjectiveTest {
 
-    /** Budget exhausts before LS finds optimum on a small problem; we should still
-     *  receive *some* feasible solution rather than null. */
     @Test
     fun `minimize returns best feasible when budget runs out`() {
-        // Exactly-one over 4 bools, objective minimises a weighted sum. Three feasibles;
-        // any of them is a valid "best so far" return — just must not be null.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -33,7 +29,6 @@ class AnytimeObjectiveTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(10L, 1L, 100L, 50L))
-        // A budget of 50 flips is enough to find at least one feasible.
         val sample = LocalSearchSolver(
             problem,
         ).minimize(obj, LocalSearchParams(maxFlips = 50, randomSeed = 1L)).assignment
@@ -41,8 +36,6 @@ class AnytimeObjectiveTest {
         assertTrue(sample.bools.count { it } == 1, "must be a feasible exactly-one assignment")
     }
 
-    /** Cancel mid-search; we should get back whatever was the best feasible at the
-     *  moment of cancellation. */
     @Test
     fun `minimize on cancellation returns best feasible seen so far`() {
         val factor = Cardinality.exactlyOne(

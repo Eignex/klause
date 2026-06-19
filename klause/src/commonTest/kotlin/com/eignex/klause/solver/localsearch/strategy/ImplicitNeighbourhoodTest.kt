@@ -13,9 +13,9 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Implicit-solving neighbourhoods (Step 1): elected structural globals offer
- * feasibility-preserving structured moves even during infeasibility, and those moves win the
- * weighted-gradient race only when they clear a *coupled* constraint.
+ * Implicit-solving neighbourhoods: elected structural globals offer feasibility-preserving
+ * structured moves even during infeasibility, and those moves win the weighted-gradient race only
+ * when they clear a *coupled* constraint.
  *
  * Fixture: a 2×2 Latin square — vars laid out `v0 v1 / v2 v3` over `{0,1}` with an
  * all-different on each row and each column. From the assignment `(0,1,0,1)` both rows are

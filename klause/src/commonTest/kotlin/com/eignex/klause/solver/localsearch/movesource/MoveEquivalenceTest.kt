@@ -15,12 +15,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Validates the move-set equivalence harness itself — the gate every later #710 extraction relies
- * on. We have no production [MoveSource] yet (Foundation lands no wiring), so the proof is on a
- * test-only source that re-implements the violated-repair draw exactly like the generator it
- * stands in for: the harness must report equality for the faithful copy and inequality for a
- * source that draws differently. If it can't tell those apart, no later extraction is actually
- * gated.
+ * Validates the move-set equivalence harness itself. The proof is on a test-only source that
+ * re-implements the violated-repair draw exactly like the generator it stands in for: the harness
+ * must report equality for the faithful copy and inequality for a source that draws differently. If
+ * it can't tell those apart, no extraction is actually gated.
  */
 class MoveEquivalenceTest {
 

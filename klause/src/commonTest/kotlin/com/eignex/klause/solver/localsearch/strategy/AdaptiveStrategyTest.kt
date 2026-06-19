@@ -55,8 +55,7 @@ class AdaptiveStrategyTest {
 
     @Test
     fun `noise controller on the round channel matches the per-step path`() {
-        // Driving the controller off RoundLog.incumbentCost must reproduce the per-step observe(cost)
-        // trajectory exactly — same bump-on-stall, same decay-on-improvement.
+        // Driving off RoundLog.incumbentCost must reproduce the per-step observe(cost) trajectory.
         val perStep = NoiseController(initial = 0.2, theta = 3, phi = 0.2)
         val perRound = NoiseController(initial = 0.2, theta = 3, phi = 0.2)
         val costs = longArrayOf(10, 10, 10, 10, 9, 9, 8, 12, 12, 12, 12, 7)

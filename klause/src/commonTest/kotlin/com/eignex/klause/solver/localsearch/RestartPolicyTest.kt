@@ -174,9 +174,9 @@ class RestartPolicyTest {
 
     @Test
     fun `engine uses the restart policy from the strategy schedule bundle`() {
-        // Restart is a schedule-axis dimension: when the strategy's ScheduleBundle declares a restart
-        // policy, the engine must use it over the solver-level param. The spy never restarts but
-        // counts engine queries; if the solver param were used instead the spy would never be touched.
+        // When the strategy's ScheduleBundle declares a restart policy, the engine must use it over the
+        // solver-level param. The spy never restarts but counts queries; if the solver param were used
+        // the spy would never be touched.
         val spy = object : RestartPolicy {
             var queried = 0
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean {

@@ -23,12 +23,9 @@ import com.eignex.klause.solver.result.SearchEvent
 data class LocalSearchParams(
     val maxFlips: Long = Long.MAX_VALUE,
     /**
-     * Wall-clock-independent operation budget across all backends. For [LocalSearchSolver]
-     * one instruction = one flip (the same unit [maxFlips] counts). When both are set, the
-     * smaller wins. `null` = no instruction-budget cap. See [maxFlips] for the LS-specific
-     * description; this field exists so callers can use the same budget name across the
-     * BacktrackSolver / LocalSearchSolver / BruteForceSolver param objects without
-     * remembering which knob each one prefers.
+     * Wall-clock-independent operation budget across all backends. For [LocalSearchSolver] one
+     * instruction = one flip (the unit [maxFlips] counts); when both are set, the smaller wins.
+     * `null` = no cap. Exists so callers can use one budget name across the backends' param objects.
      */
     val maxInstructions: Long? = null,
     /** Seed for the search RNG; null picks a nondeterministic seed. */
@@ -53,28 +50,21 @@ data class LocalSearchParams(
     /**
      * Optional per-move *gradient view* of the objective for [LocalSearchSolver.minimize] /
      * `improvements`: when non-null, the descent scores and evaluates against this
-     * [com.eignex.klause.solver.objective.IncrementalObjective] instead of the [LinearObjective] passed to
-     * `minimize`. The canonical use is a functionally-defined MiniZinc objective (the
-     * `defines_var` cone behind `minimizeInt(V)`): the linear form has zero gradient on decision
-     * moves — moving a decision variable merely violates `V`'s defining constraint — while this
-     * view recomputes `V` from the leaves, giving CBLS the gradient that matters (see
-     * [com.eignex.klause.solver.objective.FunctionalObjective]). Must agree with the linear objective on
-     * every *feasible* assignment, so incumbent objectives stay comparable across engines.
-     * `null` (default) descends the linear objective directly. Ignored by `solve` / `samples` /
-     * `enumerate`.
+     * [com.eignex.klause.solver.objective.IncrementalObjective] instead of the [LinearObjective]
+     * passed to `minimize`. The canonical use is a functionally-defined objective whose linear form
+     * has zero gradient on decision moves; this view recomputes the defined var from the leaves,
+     * giving CBLS the gradient that matters (see
+     * [com.eignex.klause.solver.objective.FunctionalObjective]). Must agree with the linear objective
+     * on every *feasible* assignment so incumbents stay comparable across engines. `null` (default)
+     * descends the linear objective directly. Ignored by `solve` / `samples` / `enumerate`.
      */
     val lsObjective: IncrementalObjective? = null,
     /**
      * Optional warm-start *assignment* for [LocalSearchSolver.minimize] / `improvements`: when
-     * non-null, the descent begins from this assignment instead of a random restart, then
-     * optimises the objective from there. Intended for a hybrid pipeline that hands a feasible
-     * point found by the CP/backtrack solver to LS (the #54 misses reach feasibility trivially
-     * under CP but never under LS). Size-mismatched samples are ignored.
-     *
-     * Defaults to `null`: the pure-LS entry point ([com.eignex.klause] FZN CLI
-     * `runWithLocalSearch`) never sets it, keeping pure local search free of any CP dependency.
-     * Only the bench / hybrid driver populates it, behind an explicit opt-in. Ignored by
-     * `solve` / `samples` / `enumerate`.
+     * non-null, the descent begins from this assignment instead of a random restart, then optimises
+     * from there. Intended for a hybrid pipeline handing a CP/backtrack-found feasible point to LS.
+     * Size-mismatched samples are ignored. `null` (default) keeps pure local search free of any CP
+     * dependency. Ignored by `solve` / `samples` / `enumerate`.
      */
     val initialAssignment: Sample? = null,
     /**
@@ -89,13 +79,10 @@ data class LocalSearchParams(
     val violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP,
     /**
      * Seed the weighted-violation strategies' initial [LocalSearchState.factorWeights] so no single
-     * constraint *kind* dominates the landscape by sheer population. Every factor otherwise starts at
-     * 1.0, so a model padded with thousands of one constraint type steers the whole initial descent
-     * toward that type before the structural constraints are met. When set, an over-represented
-     * factor class (count above the mean class size) is damped so its aggregate initial weight is
-     * capped at that mean — purely monotone (it only lowers weights), so a rare constraint can never
-     * be amplified into a tyrant. Weight-blind strategies (WalkSat / ProbSat / SA) never read the
-     * weights, so this is a no-op for them. Off in raw params; the portfolio turns it on.
+     * constraint *kind* dominates the landscape by population. When set, an over-represented factor
+     * class (count above the mean class size) is damped so its aggregate initial weight is capped at
+     * that mean — purely monotone (it only lowers weights). Weight-blind strategies (WalkSat /
+     * ProbSat / SA) never read the weights, so this is a no-op for them.
      */
     val normalizeWeightsByClass: Boolean = false,
 ) : SolverParams {

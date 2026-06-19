@@ -4,12 +4,10 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
- * Plateau-escape **frontier moves** — the single implementation behind `Cbls.sampleFrontier`
- * (with its `addNeighbourMoves` helper) (epic #710). When the violated-only repair pool traps the
- * search, every repair of a violated factor breaks a *satisfied neighbour*, and the moves that
- * would first re-arrange those neighbours are never generated. This injects bounded ±1 int-steps
- * and bool flips on the variables of factors that *neighbour* a violated factor (share a variable),
- * giving the search — together with the raised stall noise the strategy applies — moves to step
+ * Plateau-escape frontier moves. When the violated-only repair pool traps the search, every repair
+ * of a violated factor breaks a satisfied neighbour, and the moves that would first re-arrange those
+ * neighbours are never generated. This injects bounded ±1 int-steps and bool flips on the variables
+ * of factors that neighbour a violated factor (share a variable), giving the search moves to step
  * through the basin wall.
  *
  * Capped at [moveCap] candidates per call, expanding the neighbours of up to [violatedSampleCount]
@@ -82,7 +80,7 @@ class Frontier(
         return b
     }
 
-    /** Identity. */
+    /** Catalog identity. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("frontier")

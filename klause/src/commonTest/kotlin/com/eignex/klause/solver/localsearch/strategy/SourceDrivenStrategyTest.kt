@@ -21,11 +21,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Acceptance test for the source-driven driver (epic #710): a [SourceDrivenStrategy] is built *purely by
+ * Acceptance test for the source-driven driver: a [SourceDrivenStrategy] is built *purely by
  * configuration* over the shared [com.eignex.klause.solver.localsearch.movesource.MoveSource]
- * catalog, with no per-strategy generation code. The same sources [Cbls] draws from are reused
- * here in a different strategy by listing them — demonstrating that adding a source to one place
- * makes it available to every strategy for free.
+ * catalog, with no per-strategy generation code. The same sources [Cbls] draws from are reused here
+ * by listing them, so adding a source in one place makes it available to every strategy.
  */
 class SourceDrivenStrategyTest {
 

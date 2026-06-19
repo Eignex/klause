@@ -5,17 +5,15 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
- * Random pair-swap candidate generation — the single implementation of the swap-construction logic
- * behind `LocalSearchSolver.pairSwapStep` (epic #710). A pair swap escapes plateaus where every
- * single flip breaks feasibility but a coordinated 2-flip preserves it (common in binary-decision
- * optimization like knapsack / packing). The pair set is Θ(n²), so candidates are drawn at random.
+ * Random pair-swap candidate generation. A pair swap escapes plateaus where every single flip
+ * breaks feasibility but a coordinated 2-flip preserves it (common in binary-decision optimization
+ * like knapsack / packing). The pair set is Θ(n²), so candidates are drawn at random.
  *
- * The candidate *construction* — pick two variables, validate (distinct, unfrozen, value-compatible
+ * The candidate construction — pick two variables, validate (distinct, unfrozen, value-compatible
  * domains), build the two-part [Move.Compound] — lives in [drawBoolSwap] / [drawIntSwap]. The
- * minimize engine consults those directly inside its own lazy first-improving loop, so its RNG draw
- * order and selection are unchanged by this extraction; [generate] is the eager fill-the-sink view
- * (up to [cap] of each kind) for any [com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy]
- * that wants pair swaps as scored candidates.
+ * minimize engine consults those directly inside its own lazy first-improving loop; [generate] is
+ * the eager fill-the-sink view (up to [cap] of each kind) for any strategy that wants pair swaps as
+ * scored candidates.
  *
  * [Phase.Feasible] / [Pool.ScoreOnly]: pair swaps are an objective-descent move over the feasible
  * region, selected by score, never by the noise draw.
@@ -43,8 +41,8 @@ class PairSwap(
         }
     }
 
-    /** Construction + identity. Each draw consumes exactly two RNG ints, mirroring the inline loop
-     *  it replaces, so a caller threading these through its own loop preserves RNG behaviour. */
+    /** Construction + identity. Each draw consumes exactly two RNG ints, so a caller threading these
+     *  through its own loop preserves RNG behaviour. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("pair-swap")

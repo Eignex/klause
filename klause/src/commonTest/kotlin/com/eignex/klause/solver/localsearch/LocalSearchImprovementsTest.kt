@@ -16,11 +16,8 @@ class LocalSearchImprovementsTest {
 
     @Test
     fun `improvements yields strictly decreasing intermediate bests then a terminal verdict`() {
-        // 4 bools with exactly-one true; weights `10, 5, 8, 3` so the optimum picks bool 3
-        // (weight 3). Pre-feasibility wandering means LS may discover non-optimal feasibles
-        // first; each strict improvement is yielded as a BestFound; the terminal yield
-        // carries the same `BestFound(reason = BudgetExhausted)` (LS is incomplete and
-        // never proves Optimal).
+        // Weights 10, 5, 8, 3 over exactly-one: optimum picks bool 3. Each strict improvement is a
+        // BestFound; the terminal yield is also a BestFound since LS never proves Optimal.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -36,11 +33,8 @@ class LocalSearchImprovementsTest {
             LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L),
         ).toList()
         assertTrue(seq.isNotEmpty(), "improvements must yield at least the terminal verdict")
-        // Last entry is the terminal verdict — a BestFound (LS can't prove Optimal).
         val terminal = seq.last()
         val termBest = assertIs<MinimizeResult.BestFound>(terminal)
-        // Earlier yields (if any) are strictly-decreasing BestFound events ending at the
-        // same objective as the terminal.
         var prev = Double.POSITIVE_INFINITY
         for (m in seq.dropLast(1)) {
             val bf = assertIs<MinimizeResult.BestFound>(m)
@@ -54,8 +48,6 @@ class LocalSearchImprovementsTest {
             termBest.objective <= prev,
             "terminal yield's objective must match the last intermediate or be no worse",
         )
-        // On this small instance the LS engine should reach the optimum (3.0) inside the
-        // budget.
         assertEquals(3.0, termBest.objective, "expected LS to reach the global optimum 3.0")
     }
 
@@ -91,7 +83,6 @@ class LocalSearchImprovementsTest {
         val stats = best.stats
         assertEquals("ls", stats.backend)
         assertTrue(stats.moves.sum > 0.0, "LS must report the moves it applied")
-        // The reached optimum is the incumbent fingerprint; it is feasible, so violation is 0.
         assertEquals(best.objective, stats.incumbentObjective, "incumbent objective mirrors the verdict")
         assertEquals(0.0, stats.incumbentViolation, "a feasible incumbent has zero violation")
         assertTrue(stats.timeToBestMs >= 0L, "time-to-best is stamped once an incumbent lands")
@@ -106,16 +97,12 @@ class LocalSearchImprovementsTest {
         val result = LocalSearchSolver(problem).solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
         val sat = assertIs<SolveResult.Sat>(result)
         assertEquals("ls", sat.stats.backend)
-        // Satisfy mode has no objective, so the incumbent fingerprint is feasibility alone.
         assertEquals(0.0, sat.stats.incumbentViolation, "a satisfied instance has zero violation")
         assertTrue(sat.stats.incumbentObjective.isNaN(), "no objective is tracked in satisfy mode")
     }
 
     @Test
     fun `improvements is lazy — consumer can take just the first event`() {
-        // Build a problem where finding feasibility requires some non-trivial LS work, so
-        // the first BestFound only arrives after enough flips. Taking just `first()` should
-        // short-circuit and not exhaust the maxFlips budget.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -126,8 +113,7 @@ class LocalSearchImprovementsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L, 1L))
-        // With Long.MAX_VALUE budget, a non-lazy implementation would never return.
-        // The lazy Sequence path must yield the first improvement and stop.
+        // With an unbounded budget, only the lazy Sequence path can yield the first improvement and stop.
         val first = LocalSearchSolver(problem).improvements(
             obj,
             LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 2L),

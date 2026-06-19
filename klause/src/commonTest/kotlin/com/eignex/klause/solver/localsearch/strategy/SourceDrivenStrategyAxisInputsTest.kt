@@ -26,9 +26,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Tests for the driver axis inputs that let the bespoke strategies be re-expressed as recipes: Break
- * scoring, the schedule axis (weights, temperature), the perturbation hook, and the
- * configuration-checking filter — each additive and defaulting to the prior behaviour.
+ * Tests for the driver axis inputs: Break scoring, the schedule axis (weights, temperature), the
+ * perturbation hook, and the configuration-checking filter.
  */
 class SourceDrivenStrategyAxisInputsTest {
 

@@ -12,11 +12,10 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 
 /**
- * Move-set equivalence gate for the Structured extraction (epic #710). The reference closures
- * freeze the *old* `Cbls.sampleFromSatisfied` (random-sampled scope) and the fill loop of
- * `LocalSearchSolver.structuredMoveStep` (enumerate-all scope) verbatim; the test asserts the
- * single extracted [SatisfiedStructured] emits the identical multiset in each scope. This is the
- * "duplication kill" — two near-identical loops now backed by one generator.
+ * Move-set equivalence gate for [SatisfiedStructured]. The reference closures hold the
+ * `Cbls.sampleFromSatisfied` (random-sampled scope) and the fill loop of
+ * `LocalSearchSolver.structuredMoveStep` (enumerate-all scope); the test asserts the single
+ * [SatisfiedStructured] emits the identical multiset in each scope.
  */
 class SatisfiedStructuredEquivalenceTest {
 
@@ -34,8 +33,8 @@ class SatisfiedStructuredEquivalenceTest {
         ),
     )
 
-    /** Verbatim copy of the pre-extraction `Cbls.sampleFromSatisfied` body (sans the cost gate,
-     *  which stays in the strategy). */
+    /** The reference `Cbls.sampleFromSatisfied` body (sans the cost gate, which stays in the
+     *  strategy). */
     private fun oldSampleFromSatisfied(state: LocalSearchState, sink: MoveSink) {
         val total = state.problem.numFactors
         if (total == 0) return
@@ -47,7 +46,7 @@ class SatisfiedStructuredEquivalenceTest {
         }
     }
 
-    /** Verbatim copy of the pre-extraction `structuredMoveStep` fill loop. */
+    /** The reference `structuredMoveStep` fill loop. */
     private fun oldStructuredAll(state: LocalSearchState, sink: MoveSink) {
         for (fid in 0 until state.problem.numFactors) {
             val f = state.factors[fid]
@@ -72,8 +71,8 @@ class SatisfiedStructuredEquivalenceTest {
         state.recompute()
     }
 
-    /** Verbatim copy of the pre-extraction `Cbls.sampleElectedStructured` body (sans the cap gate,
-     *  which stays in the strategy). */
+    /** The reference `Cbls.sampleElectedStructured` body (sans the cap gate, which stays in the
+     *  strategy). */
     private fun oldElectedStructured(state: LocalSearchState, sink: MoveSink) {
         val elected = state.electedImplicit
         if (elected.isEmpty()) return

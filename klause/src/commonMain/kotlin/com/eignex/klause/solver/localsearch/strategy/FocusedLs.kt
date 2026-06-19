@@ -50,9 +50,8 @@ object WalkSat {
     )
 
     /**
-     * Adaptive-noise WalkSAT: noise starts at [baselineNoise] and is steered in
-     * `[baselineNoise, 1.0]` — climbs on stalls, decays on improvement. Literature reports
-     * +10-30% on hard random instances over well-tuned fixed noise.
+     * Adaptive-noise WalkSAT (Hoos 2002): noise starts at [baselineNoise] and is steered in
+     * `[baselineNoise, 1.0]` — climbs on stalls, decays on improvement.
      */
     fun adaptive(
         baselineNoise: Double = 0.2,

@@ -6,17 +6,16 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Targeted-kick perturbation — the single implementation behind `Cbls.buildStallKick` (epic #710).
- * A **random walk** over the variable–factor occurrence graph starting at a random violated
- * factor, randomizing up to [kickVars] distinct variables along the way, flattened into one atomic
- * perturbation (first-write-wins per slot). A walk rather than a cone sample: coupled structures
- * (successor chains, channeling rings) stretch the stuck region many hops from the violated factor,
- * so following the coupling reaches e.g. the head of a parasitic successor chain whose dangling
- * tail is the only violation.
+ * Targeted-kick perturbation. A random walk over the variable–factor occurrence graph starting at a
+ * random violated factor, randomizing up to [kickVars] distinct variables along the way, flattened
+ * into one atomic perturbation (first-write-wins per slot). A walk rather than a cone sample because
+ * coupled structures (successor chains, channeling rings) stretch the stuck region many hops from
+ * the violated factor, so following the coupling reaches e.g. the head of a parasitic successor
+ * chain whose dangling tail is the only violation.
  *
  * Emits at most one move (the flattened perturbation) into the sink, or nothing when no eligible
  * variable is reachable. [Pool.ScoreOnly] / [Phase.Infeasible]: a kick is a rare, local escape for
- * the feasibility fight; the strategy fires it on a certified-stuck window, not by the noise draw.
+ * the feasibility fight, fired on a certified-stuck window, not by the noise draw.
  */
 class StallKick(
     /** Variables randomized per kick. */
@@ -102,7 +101,7 @@ class StallKick(
         }
     }
 
-    /** Constants + identity. */
+    /** Catalog identity. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("stall-kick")

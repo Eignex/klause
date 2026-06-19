@@ -12,11 +12,10 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 
 /**
- * Move-set equivalence gate for the [PairSwap] extraction (epic #710). The reference closure
- * inlines the *old* `pairSwapStep` candidate construction (the two-phase draw+validate) verbatim;
- * the test asserts [PairSwap.generate] emits the identical eager candidate multiset. The minimize
- * engine's lazy first-improving loop, refactored to call [PairSwap.drawBoolSwap]/[PairSwap.drawIntSwap],
- * keeps its RNG draw order and selection unchanged — covered by the engine's own tests.
+ * Move-set equivalence gate for [PairSwap]. The reference closure inlines the `pairSwapStep`
+ * candidate construction (the two-phase draw+validate); the test asserts [PairSwap.generate] emits
+ * the identical eager candidate multiset. The minimize engine's lazy first-improving loop, which
+ * calls [PairSwap.drawBoolSwap]/[PairSwap.drawIntSwap], is covered by the engine's own tests.
  */
 class PairSwapEquivalenceTest {
 
@@ -39,7 +38,7 @@ class PairSwapEquivalenceTest {
         state.recompute()
     }
 
-    /** Verbatim copy of the pre-extraction `pairSwapStep` candidate construction, eager-filled. */
+    /** The reference `pairSwapStep` candidate construction, eager-filled. */
     private fun oldPairSwapFill(state: LocalSearchState, sink: MoveSink) {
         val rng = state.rng
         val nBool = state.problem.numBoolVars

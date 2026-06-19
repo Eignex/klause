@@ -8,16 +8,15 @@ import kotlin.random.Random
 import kotlin.test.assertEquals
 
 /*
- * Move-set equivalence harness (epic #710). Every extraction of a generator into a MoveSource
- * lands behind this gate: for a fixed seed and state, the new source must emit the same multiset
- * of candidate moves as the generator it replaces. Multiset — not list — because the candidate
- * order within a pick is not observable behaviour (the strategy scores the whole pool and the
- * noise draw indexes uniformly), but duplicates matter (they weight the noise draw), so counts
- * are compared, order is not.
+ * Move-set equivalence harness. For a fixed seed and state, a source must emit the same multiset of
+ * candidate moves as the generator it replaces. Multiset — not list — because the candidate order
+ * within a pick is not observable behaviour (the strategy scores the whole pool and the noise draw
+ * indexes uniformly), but duplicates matter (they weight the noise draw), so counts are compared,
+ * order is not.
  *
- * The harness builds each side from a freshly-constructed LocalSearchState seeded identically,
- * so both runs draw the same RNG sequence — the precondition that makes "same draws ⇒ same
- * multiset" the actual equivalence being asserted rather than an accident of ordering.
+ * Each side is built from a freshly-constructed LocalSearchState seeded identically, so both runs
+ * draw the same RNG sequence — the precondition that makes "same draws ⇒ same multiset" the actual
+ * equivalence being asserted rather than an accident of ordering.
  */
 
 /** An order-independent, count-sensitive bag of [Move]s. [Move] subtypes are data classes, so

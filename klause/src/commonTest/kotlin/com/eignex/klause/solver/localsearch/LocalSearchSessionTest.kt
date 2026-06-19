@@ -20,12 +20,11 @@ import kotlin.test.assertTrue
 class LocalSearchSessionTest {
 
     private fun weightLearningProblem(): Problem {
-        // 6 bool vars; an odd-cycle of three `exactlyOne` cardinality factors over vars 0–2
-        // ({0,1}, {1,2}, {0,2}). Since 2·(x0+x1+x2)=3 has no integer solution the problem is
-        // unsatisfiable, so a weight-learning strategy (CBLS) never reaches cost 0 — it keeps
-        // hitting local minima and scaling factor weights off their defaults. That divergence
-        // is exactly the learned state the session must capture/persist. Vars 3–5 are left
-        // unconstrained so the variable-activity assertions still see all 6 slots.
+        // 6 bool vars; an odd-cycle of three exactlyOne cardinality factors over vars 0–2
+        // ({0,1}, {1,2}, {0,2}). Since 2·(x0+x1+x2)=3 has no integer solution the problem is UNSAT,
+        // so a weight-learning strategy never reaches cost 0 and keeps scaling factor weights off
+        // their defaults — the learned state the session must capture. Vars 3–5 are unconstrained so
+        // the variable-activity assertions still see all 6 slots.
         return Problem(
             numBoolVars = 6,
             numIntVars = 0,
@@ -157,9 +156,8 @@ class LocalSearchSessionTest {
 
     @Test
     fun `cbls smoothing bounds weight growth vs bump-only`() {
-        // On the UNSAT helper CBLS bumps violated weights every stall and never resets, so
-        // bump-only weights grow without bound. Smoothing pulls them back toward baseWeight,
-        // so after the same flip budget the smoothed run's peak weight must be strictly lower.
+        // On the UNSAT helper bump-only weights grow without bound; smoothing pulls them back toward
+        // baseWeight, so after the same flip budget the smoothed run's peak weight is strictly lower.
         fun peakWeightAfterRun(strategy: SourceDrivenStrategy): Double {
             val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem(), strategy = strategy))
             session.sample(LocalSearchParams(maxFlips = 3_000L, randomSeed = 4L)).assignment
@@ -176,12 +174,12 @@ class LocalSearchSessionTest {
 
     @Test
     fun `engine drives per-round feedback to an adaptive cooling schedule`() {
-        // AdaptiveCooling retunes its rate only when the engine calls observe at round boundaries
-        // (#721); on the UNSAT helper the satisfy loop runs well past several rounds, so its rate
-        // must move off the initial value — proving the loop drives the per-round feedback channel.
+        // AdaptiveCooling retunes its rate only when the engine calls observe at round boundaries; on
+        // the UNSAT helper the satisfy loop spans several rounds, so its rate must move off the
+        // initial value — proving the loop drives the per-round feedback channel.
         val cooling = AdaptiveCooling(initialRate = 0.999)
         // Tabu disabled so the tiny problem never starves the pick into a restart, which would reset
-        // the round before it completes — the production SA arms restart on a far coarser cadence.
+        // the round before it completes.
         val strategy = SimulatedAnnealing.withSchedule(cooling, tabu = TabuFilter.Disabled)
         val solver = LocalSearchSolver(weightLearningProblem(), strategy = strategy)
         LocalSearchSession(solver).sample(LocalSearchParams(maxFlips = 6_000L, randomSeed = 4L))

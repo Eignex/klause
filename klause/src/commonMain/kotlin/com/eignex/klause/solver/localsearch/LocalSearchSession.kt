@@ -9,26 +9,23 @@ import com.eignex.klause.solver.result.MinimizeResult
 
 /**
  * Stateful wrapper around a [LocalSearchSolver] that persists per-strategy learned state
- * (currently DDFW-style factor weights) across calls. The plain [LocalSearchSolver] keeps
- * its per-draw isolation property — concurrent callers don't interfere — by being
- * stateless across calls. Using a session is the opt-in path for callers that want
- * weights / heuristics to survive a `sample` / `solve` / `minimize` boundary.
+ * (DDFW-style factor weights) across calls. The plain [LocalSearchSolver] stays stateless across
+ * calls (per-draw isolation); a session is the opt-in path for callers wanting weights / heuristics
+ * to survive a `sample` / `solve` / `minimize` boundary.
  *
- * Implements [Session] so it slots into `solver.session()` like any other backend's
- * stateful handle; on top of the standard `solve` / `samples` / `enumerate` it offers
- * a `minimize` overload for the optimisation path (not part of the base interface
- * because not every backend's [com.eignex.klause.solver.Solver] is an
+ * Implements [Session]; on top of the standard `solve` / `samples` / `enumerate` it offers a
+ * `minimize` overload (not in the base interface because not every backend is an
  * [com.eignex.klause.solver.Optimizer]).
  *
- * Sessions are **not thread-safe**: one consumer per session. The same underlying
- * [solver] can be shared by multiple sessions if each session is used from one thread.
+ * **Not thread-safe**: one consumer per session. The same underlying [solver] can back multiple
+ * sessions if each is used from one thread.
  *
  * Sync points:
  *  - Sync-in: at the start of each call, the warm state is copied into the new
  *    [LocalSearchState.factorWeights] (only if size matches `problem.numFactors`).
- *  - Sync-out: at the end of the search loop (or when a streaming sequence completes
- *    naturally / its iterator is cancelled). Sequences abandoned mid-iteration may not
- *    sync — accepted loss; the next call still starts from the previous capture.
+ *  - Sync-out: at the end of the search loop, or when a streaming sequence completes / is
+ *    cancelled. Sequences abandoned mid-iteration may not sync (accepted loss); the next call
+ *    still starts from the previous capture.
  */
 class LocalSearchSession(override val solver: LocalSearchSolver) : Session<LocalSearchParams> {
 

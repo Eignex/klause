@@ -3,7 +3,7 @@ package com.eignex.klause.solver.localsearch.schedule
 import com.eignex.klause.solver.localsearch.RestartPolicy
 
 /**
- * The `schedule` axis of a local-search recipe (#721): the bundle of policies that govern a search's
+ * The `schedule` axis of a local-search recipe: the bundle of policies that govern a search's
  * tempo, all driven off the single per-round feedback channel.
  *
  *  - [temperature] — the annealing [Schedule] (cooling / reheating / combinators).

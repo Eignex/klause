@@ -10,11 +10,10 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.test.Test
 
 /**
- * Move-set equivalence gate for the Repair + Frontier extraction (epic #710). The reference
- * closures here freeze the *old* `Cbls.sampleFromViolated` / `sampleFrontier` (+ `addNeighbourMoves`)
- * generators verbatim; the test asserts the extracted [ViolatedRepairs] / [Frontier] sources emit
- * the identical candidate multiset for a fixed seed and state. If a later edit drifts a source
- * away from the behaviour it replaced, this fails.
+ * Move-set equivalence gate for [ViolatedRepairs] / [Frontier]. The reference closures here hold the
+ * `Cbls.sampleFromViolated` / `sampleFrontier` (+ `addNeighbourMoves`) generators; the test asserts
+ * the sources emit the identical candidate multiset for a fixed seed and state. If a later edit
+ * drifts a source away from the behaviour it replaced, this fails.
  */
 class RepairFrontierEquivalenceTest {
 
@@ -36,7 +35,7 @@ class RepairFrontierEquivalenceTest {
         ),
     )
 
-    /** Verbatim copy of the pre-extraction `Cbls.sampleFromViolated`. */
+    /** The reference `Cbls.sampleFromViolated`. */
     private fun oldSampleFromViolated(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         repeat(minOf(sampleCount, state.violated.size)) {
@@ -45,7 +44,7 @@ class RepairFrontierEquivalenceTest {
         }
     }
 
-    /** Verbatim copy of the pre-extraction `Cbls.sampleFrontier` + `addNeighbourMoves`. */
+    /** The reference `Cbls.sampleFrontier` + `addNeighbourMoves`. */
     private fun oldSampleFrontier(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         val problem = state.problem

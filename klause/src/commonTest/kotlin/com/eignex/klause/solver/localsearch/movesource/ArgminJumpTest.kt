@@ -12,7 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Behaviour tests for the Feasibility-Jump candidate source [ArgminJump] (#698): a jump must move a
+ * Behaviour tests for the Feasibility-Jump candidate source [ArgminJump]: a jump must move a
  * hot-spot variable to the value that minimizes its weighted violation, and so must never increase
  * weighted violation.
  */

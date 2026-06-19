@@ -1,14 +1,11 @@
 package com.eignex.klause.solver.localsearch
 
 /**
- * Mutable container for per-strategy state that survives a [LocalSearchSolver] call
- * boundary. Owned by [LocalSearchSession]; never created directly by callers.
+ * Mutable container for per-strategy state that survives a [LocalSearchSolver] call boundary. Owned
+ * by [LocalSearchSession]; never created directly by callers.
  *
- * Currently carries only `factorWeights` (DDFW-style learned weights). Other strategies
- * are stateless across calls today; adding fields here is the path to changing that.
- *
- * `null` fields mean "no warm state available — fall back to the strategy's default
- * initialisation." [reset] returns the state to that empty baseline.
+ * `null` fields mean "no warm state available — fall back to the strategy's default initialisation."
+ * [reset] returns the state to that empty baseline.
  */
 internal class WarmState {
     /** Per-factor weights, size = `problem.numFactors`, or `null` if not yet populated. */

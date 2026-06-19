@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** Temperature trajectories for the SA schedules (#699). All deterministic — no RNG involved. */
+/** Temperature trajectories for the SA schedules. All deterministic — no RNG involved. */
 class ScheduleTest {
 
     @Test
@@ -28,7 +28,7 @@ class ScheduleTest {
     }
 
     @Test
-    fun `geometric default reproduces the legacy annealing trajectory`() {
+    fun `geometric default cools by the default rate`() {
         val s = Geometric()
         assertEquals(1.0, s.temperature, 1e-9)
         s.step()

@@ -10,10 +10,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Behaviour test for the [GreedyInit] restart initializer extracted from `LocalSearchSolver`
- * (epic #710). It is not a candidate generator (it mutates in place), so the equivalence harness
- * does not apply; instead this pins the two properties the engine relies on: a forward pass reduces
- * (here eliminates) violation, and it is deterministic for a fixed seed.
+ * Behaviour test for the [GreedyInit] restart initializer. It is not a candidate generator (it
+ * mutates in place), so the equivalence harness does not apply; instead this pins the two properties
+ * the engine relies on: a forward pass reduces violation, and it is deterministic for a fixed seed.
  */
 class GreedyInitTest {
 

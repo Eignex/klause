@@ -68,14 +68,12 @@ class IteratedLocalSearchRestart(
      *  shred. Off by default (uniform crossover) to keep behaviour stable for callers
      *  that don't opt in. */
     val linkageAware: Boolean = false,
-    /** Optional contextual-bandit acceptance (#8): when non-null, the accept/reject of a new local
+    /** Optional contextual-bandit acceptance: when non-null, the accept/reject of a new local
      *  optimum is decided by any 2-arm kumulant [ContextualBandit] (arm 0 = accept, 1 = reject) over
      *  context features (margin vs the population's worst and best, stall fraction) instead of the
      *  fixed [acceptance] criterion. The bandit is rewarded by whether the population best improved
      *  by the next local optimum, so it learns *when* drifting through worse optima pays off. The
-     *  [acceptanceBandit] factory builds the default (`RegressionContextualBandit` + Thompson
-     *  posterior); any [ContextualBandit] (`Exp4Bandit`, `KnnContextualBandit`, a LinUCB-posterior
-     *  regression bandit, …) is accepted. Null (default) keeps the fixed criterion. */
+     *  [acceptanceBandit] factory builds the default; null (default) keeps the fixed criterion. */
     private val acceptanceBandit: ContextualBandit? = null,
 ) : RestartPolicy {
 
@@ -168,8 +166,8 @@ class IteratedLocalSearchRestart(
     }
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-        // Crossover restart: uniform-recombine two random population members. Skips
-        // perturbation since crossover itself diversifies. Only fires with ≥2 incumbents.
+        // Crossover restart: recombine two random population members; skips perturbation since
+        // crossover itself diversifies. Only fires with ≥2 incumbents.
         if (population.size >= 2 && state.rng.nextDouble() < crossoverRate) {
             val (parentA, parentB) = pickTwoDistinct(state.rng)
             val probA = crossoverBias.probParentA(parentA.objective, parentB.objective)
@@ -270,10 +268,9 @@ class IteratedLocalSearchRestart(
         private const val ACCEPT_ARM = 0
         private const val ACCEPT_FEATURES = 3
 
-        /** A 2-arm (accept / reject) contextual bandit over the acceptance features, mirroring the
-         *  kumulant construction the CP/LS move bandits use (Bayesian linear regression +
-         *  [MultivariateGaussian] Thompson posterior). Pass to [IteratedLocalSearchRestart]'s
-         *  `acceptanceBandit`. */
+        /** A 2-arm (accept / reject) contextual bandit over the acceptance features: Bayesian linear
+         *  regression + [MultivariateGaussian] Thompson posterior. Pass to
+         *  [IteratedLocalSearchRestart]'s `acceptanceBandit`. */
         fun acceptanceBandit(
             seed: Long = 0L,
             exploration: Double = 1.0,

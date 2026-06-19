@@ -5,16 +5,15 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.proposeRepairChains
 
 /**
- * Stall-gated ejection-chain proposals — the single implementation behind `Cbls.sampleStallChains`
- * (epic #710). Grows up to [cap] directed repair chains from random violated seed factors, each
- * chain entering the score-only race as one atomic compound. Construction is delegated to
- * [proposeRepairChains]: apply a violated factor's repair, find the factor it newly regressed,
- * append that factor's best eligible repair, and repeat to [maxDepth] — emitting the walk's best
- * ≥2-part prefix.
+ * Stall-gated ejection-chain proposals. Grows up to [cap] directed repair chains from random
+ * violated seed factors, each chain entering the score-only race as one atomic compound.
+ * Construction is delegated to [proposeRepairChains]: apply a violated factor's repair, find the
+ * factor it newly regressed, append that factor's best eligible repair, and repeat to [maxDepth] —
+ * emitting the walk's best two-or-more-part prefix.
  *
  * [Pool.ScoreOnly] / [Phase.Infeasible] for the same reason as [StallSwaps]: a coordinated
- * multi-variable move is the score-picked plateau escape that successor/path encodings need, and a
- * destructive perturbation if taken by dice.
+ * multi-variable move is the score-picked plateau escape, and a destructive perturbation if taken
+ * by dice.
  */
 class EjectionChains(
     /** Cap on chains produced per call. */
@@ -42,7 +41,7 @@ class EjectionChains(
         }
     }
 
-    /** Constants + identity. */
+    /** Catalog identity. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("ejection-chains")

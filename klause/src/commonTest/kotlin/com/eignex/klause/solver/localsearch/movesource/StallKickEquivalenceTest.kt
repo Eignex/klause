@@ -12,11 +12,10 @@ import com.eignex.klause.util.IntHashSet
 import kotlin.test.Test
 
 /**
- * Move-set equivalence gate for the [StallKick] extraction (epic #710). The reference closure
- * freezes the *old* `Cbls.buildStallKick` verbatim (returning its single flattened perturbation,
- * which the closure adds to the sink); the test asserts [StallKick] emits the identical move for a
- * fixed seed and state. The kick consumes RNG identically (same violated seed + walk draws), so the
- * one-element multiset must match.
+ * Move-set equivalence gate for [StallKick]. The reference closure holds `Cbls.buildStallKick`
+ * (returning its single flattened perturbation, which the closure adds to the sink); the test
+ * asserts [StallKick] emits the identical move for a fixed seed and state. The kick consumes RNG
+ * identically (same violated seed + walk draws), so the one-element multiset must match.
  */
 class StallKickEquivalenceTest {
 
@@ -35,7 +34,7 @@ class StallKickEquivalenceTest {
         ),
     )
 
-    /** Verbatim copy of the pre-extraction `Cbls.buildStallKick`, adding its result to the sink. */
+    /** The reference `Cbls.buildStallKick`, adding its result to the sink. */
     private fun oldBuildStallKick(state: LocalSearchState, out: MoveSink) {
         val kickSink = MoveSink()
         val move = run {

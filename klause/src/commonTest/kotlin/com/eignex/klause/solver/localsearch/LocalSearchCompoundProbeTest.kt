@@ -19,10 +19,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Validates issue #95: a `netDelta`/`breakScore` probe of a [Move.Compound] uses
- * apply-then-revert internally, but must leave the state *exactly* as it was — including
- * the cross-epoch [LocalSearchState.touchCount] activity counters that drive ALNS /
- * WarmState. After a mix of real applies and Compound probes:
+ * A `netDelta`/`breakScore` probe of a [Move.Compound] uses apply-then-revert internally, but must
+ * leave the state *exactly* as it was — including the cross-epoch [LocalSearchState.touchCount]
+ * activity counters that drive ALNS / WarmState. After a mix of real applies and Compound probes:
  *  - touchCount equals the count of *real* applies only (probes contribute nothing), and
  *  - the break/make vectors and cost match a fresh recompute (probes leave no residue).
  */
@@ -48,8 +47,7 @@ class LocalSearchCompoundProbeTest {
                 val expectedTouch = IntArray(totalSlots)
                 val rng = Random(seed.toLong() xor 0x5151L)
 
-                // Interleave real applies (which legitimately bump touchCount) with Compound
-                // probes (which must not). 30 rounds, each: one real move then several probes.
+                // Interleave real applies (which bump touchCount) with Compound probes (which must not).
                 repeat(30) {
                     val move = randomPrimitive(case.problem, state, rng)
                     if (move != null) {
@@ -58,7 +56,6 @@ class LocalSearchCompoundProbeTest {
                     }
                     repeat(3) {
                         val compound = randomCompound(case.problem, state, rng) ?: return@repeat
-                        // Both entry points route through evaluateCompound's apply/revert.
                         state.netDelta(compound)
                         state.breakScore(compound)
                     }

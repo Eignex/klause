@@ -37,10 +37,10 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     private var invariants: InvariantNetwork? = null
 
-    /** Install the per-move invariant index (issue #153): defined vars are determined, not
-     *  searched, so moves targeting them are filtered at the sink — the single choke point all
-     *  candidate sources go through. Compound parts on defined vars are dropped individually
-     *  (propagation recomputes them); a compound whose parts all drop is skipped. */
+    /** Install the per-move invariant index: defined vars are determined, not searched, so moves
+     *  targeting them are filtered at the sink — the single choke point all candidate sources go
+     *  through. Compound parts on defined vars are dropped individually; a compound whose parts all
+     *  drop is skipped. */
     fun setInvariants(net: InvariantNetwork?) {
         invariants = net
     }
@@ -116,10 +116,9 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      *  the occurrence-list walk.
      *
      *  Use this in any factor's `proposeRepairMoves` when proposing an int-set move on a
-     *  variable that could plausibly be part of a value-to-indicator channeling cluster
-     *  (the common decomposition of `x in S` / per-period choice / `course[i] = p` over
-     *  int vars). Without channeling synthesis, the LS engine has to chase one indicator
-     *  flip at a time after every int change — the cascade that stalls bacp-style models.
+     *  variable that could be part of a value-to-indicator channeling cluster (the common
+     *  decomposition of `x in S` / per-period choice / `course(i) = p` over int vars). Without
+     *  channeling synthesis, the engine chases one indicator flip at a time after every int change.
      */
     fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Int) {
         if (assumptions.isFrozenInt(varId)) return

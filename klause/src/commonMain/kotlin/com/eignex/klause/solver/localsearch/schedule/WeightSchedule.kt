@@ -9,9 +9,9 @@ import kotlin.random.Random
  * **relaxes** every weight back toward its seeded baseline (so stale escalations fade and the
  * gradient doesn't grow without bound).
  *
- * It unifies the two formerly-duplicated weight maintainers — `Cbls`'s SAPS-style bump + probabilistic
- * smoothing and `FeasibilityJump`'s bump + geometric decay — which are the same family. Both
- * relaxations are `w ← target + (w − target)·`[relaxKeep] with `target =` [relaxTargetScale]`·base`:
+ * It unifies two weight regimes of the same family — `Cbls`'s SAPS-style bump + probabilistic
+ * smoothing and `FeasibilityJump`'s bump + geometric decay. Both relaxations are
+ * `w ← target + (w − target)·`[relaxKeep] with `target =` [relaxTargetScale]`·base`:
  *
  *  - **FeasibilityJump**: [relaxKeep]`= weightDecay`, [relaxTargetScale]`= 1`, [relaxProbability]`= 1`,
  *    [relaxBeforeBump]`= true` (decay every bump, then escalate).

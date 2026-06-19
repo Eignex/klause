@@ -49,12 +49,11 @@ sealed interface AcceptanceCriterion {
      * schedule's mutable temperature state, so each `IteratedLocalSearchRestart` or `Alns` instance
      * should get its own.
      *
-     * The default [Geometric] schedule (start 1.0, cooling 0.999, floor 1e-3) reproduces the
-     * long-standing cool-only behaviour; pass an adaptive-cooling or reheating schedule for a
-     * stronger trajectory.
+     * The default [Geometric] schedule (start 1.0, cooling 0.999, floor 1e-3) is pure cool-only;
+     * pass an adaptive-cooling or reheating schedule for a stronger trajectory.
      */
     class SimulatedAnnealing(private val schedule: Schedule) : AcceptanceCriterion {
-        /** Fixed geometric cooling — the long-standing default schedule. */
+        /** Fixed geometric cooling — the default schedule. */
         constructor(
             initialTemperature: Double = 1.0,
             coolingRate: Double = 0.999,
