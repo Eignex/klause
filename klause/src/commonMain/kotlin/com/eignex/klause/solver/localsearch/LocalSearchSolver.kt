@@ -106,7 +106,7 @@ class LocalSearchSolver(
     /** Greedy-repair restart initializer (epic #710); shared by the satisfy and optimize restarts. */
     private val greedyInit: GreedyInit = GreedyInit()
 
-    /** The restart cadence carried by the strategy's schedule axis ([ScheduleBundle.restart]) when it
+    /** The restart cadence carried by the strategy's schedule axis (`ScheduleBundle.restart`) when it
      *  declares one, else the solver-level [restartPolicy]. Lets a recipe own restart as a schedule
      *  dimension while non-recipe callers keep passing it directly. */
     private val configuredRestart: RestartPolicy =

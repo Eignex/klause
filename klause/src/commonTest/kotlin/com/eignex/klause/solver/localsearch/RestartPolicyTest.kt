@@ -206,7 +206,7 @@ class RestartPolicyTest {
 
     @Test
     fun `engine drives per-round feedback to an adaptive restart policy`() {
-        // A restart policy that is also an AdaptivePolicy must be fed RoundLogs by the engine (#721),
+        // A restart policy that is also an AdaptivePolicy must be fed RoundLogs by the engine,
         // exactly like an adaptive schedule — proven by a spy whose observe count is non-zero after a
         // run that spans several rounds on the UNSAT helper.
         val spy = object : RestartPolicy, AdaptivePolicy {

@@ -9,7 +9,7 @@ import com.eignex.klause.solver.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 
 /**
- * The shared local-search driver (epic #710): a [Strategy] expressed purely as *policy over move
+ * The shared local-search driver: a [Strategy] expressed purely as *policy over move
  * sources*. It owns no generation loop — it collects candidates from a configured set of
  * [com.eignex.klause.solver.localsearch.movesource.MoveSource]s, then scores and selects. Every
  * gate the bespoke strategies used to re-implement per call lives here once:
@@ -51,7 +51,7 @@ class SourceDrivenStrategy(
     /** Optional perturbation: consulted once per pick before generation; a non-null result is taken
      *  immediately as a diversification kick. The closure owns its own trigger/stall state. */
     val perturbation: ((LocalSearchState) -> Move?)? = null,
-    /** Optional CBLS stall-schedule mode (#721): when set, the driver hands the pick to a stateful
+    /** Optional CBLS stall-schedule mode: when set, the driver hands the pick to a stateful
      *  weighted-violation orchestration (stall-gated source enabling, stall-aware noise, tabu/
      *  starvation fallbacks, targeted kick) that the flat collect→score→accept loop below cannot
      *  express. `null` (default) is the flat recipe mode — the [sources]/[acceptance] path. The two
@@ -112,12 +112,23 @@ class SourceDrivenStrategy(
         // layered on what survives it.
         val noiseMoves = tabu.filter(state, ccFilter(state, noiseSink.list))
         val scoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
+        // Diversification noise is the schedule axis's: a NoiseSchedule retunes its level off the
+        // running cost each pick that has candidates, steering the acceptance rule (WalkSAT noise /
+        // probSAT cb) — the adaptive WalkSAT/probSAT behaviour, now a recipe rather than a bespoke
+        // strategy. The noise-free rules ignore the level.
+        val noiseSchedule = schedule.noise as? NoiseSchedule
+        val effectiveAcceptance = if (noiseSchedule != null && (noiseMoves.isNotEmpty() || scoreMoves.isNotEmpty())) {
+            noiseSchedule.observe(state.cost)
+            acceptance.steered(noiseSchedule.level)
+        } else {
+            acceptance
+        }
         // Temperature is the schedule axis's; the acceptance rule only reads it (Metropolis). The
         // driver advances the schedule once per pick that sampled the noise pool, matching the former
         // step-per-Metropolis-choose cadence — so acceptance stays pure and schedule stays the axis.
         val temperature = schedule.temperature?.temperature ?: Double.POSITIVE_INFINITY
-        val move = acceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { score(state, it) }
-        if (acceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
+        val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { score(state, it) }
+        if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
         return move
     }
 

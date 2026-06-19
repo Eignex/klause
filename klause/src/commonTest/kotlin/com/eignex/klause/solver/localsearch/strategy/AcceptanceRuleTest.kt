@@ -8,7 +8,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Tests for the acceptance axis [AcceptanceRule] (#722): deterministic rules range over both pools,
+ * Tests for the acceptance axis [AcceptanceRule]: deterministic rules range over both pools,
  * stochastic rules draw from the noise pool only (never the score-only pool), and all return null on
  * empty input.
  */
