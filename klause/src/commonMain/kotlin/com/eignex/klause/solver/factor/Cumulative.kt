@@ -158,6 +158,15 @@ class Cumulative(
      *  multi-skill "presence" carried by a 0/1 resource var rather than a presence literal) are sharp. */
     private val sharpReasonEligible: Boolean = presents.isEmpty()
 
+    /** Whether every task's energy (`duration · resource`) and the capacity are compile-time
+     *  constants, i.e. the only citable variables this factor reads are the start times. Lets
+     *  edge-finding emit a reason scoped to the active set Θ_τ (the standard Schutt edge-finding
+     *  explanation, which depends only on the in-window tasks' start bounds) instead of the
+     *  constraint-wide all-starts reason; the energy / capacity premises a variable-arg instance
+     *  would also need are vacuous here. The common RCPSP shape (`cumulative(starts, d, r, C)`). */
+    private val constantEnergyAndCap: Boolean =
+        durationVars.isEmpty() && resourceVars.isEmpty() && capacityVar < 0
+
     // Var id → its position in the corresponding array (-1 when the var is not in that role).
     // IntIntMap keeps the lookup unboxed and array-backed for the dense var ids these hold.
     private val startPos: IntIntMap = IntIntMap.build(starts, IntArray(starts.size) { it }, absent = -1)
@@ -911,12 +920,22 @@ class Cumulative(
         val tree = CumulativeThetaTree(n = m, capacity = effCap)
         tree.setLeafOrder(leafPos)
         val capL = effCap.toLong()
-        // Cite all read int vars — edge-finding deductions depend on the fixed durations /
-        // resources / capacity, not just the start bounds (see [conflictReason]). Built lazily
-        // on the first actual tightening: the detection test fails on most fires, so the common
-        // pass tightens nothing and never pays for this constraint-wide reason. The first tighten
-        // computes it before any domain in this pass has moved, so it equals the pre-pass reason;
-        // later tightens reuse it (their cited bounds are looser-or-equal, hence still valid).
+        // Edge-finding reason. Built lazily on the first actual tightening: the detection test
+        // fails on most fires, so the common pass tightens nothing and never pays for a reason.
+        //
+        // Constant-energy instances ([constantEnergyAndCap]) get a reason scoped to the active set
+        // Θ_τ: the est(i) ≥ newEst deduction rests only on the in-window tasks' start bounds (their
+        // energy and the capacity are constants, and the bound is independent of i's own start), so
+        // citing just Θ_τ's start bounds is the sound Schutt explanation — far tighter than every
+        // task's bounds. The scoped reason is rebuilt per τ-group (its active set) and reused across
+        // the group's outside tasks, since the inner loop only tightens tasks not in Θ_τ.
+        //
+        // Variable-energy / variable-capacity instances fall back to the constraint-wide all-int-var
+        // reason (the energy / capacity premises matter there); it equals the pre-pass reason on its
+        // first build, and later tightens reuse it (cited bounds are looser-or-equal, still valid).
+        val activeStarts = if (constantEnergyAndCap) IntArrayList() else null
+        var scopedAnt: IntArray? = null
+        var scopedAntBuilt = false
         var ant: IntArray? = null
         var antBuilt = false
 
@@ -926,8 +945,11 @@ class Cumulative(
             while (k < m && lcts[lctOrder[k]] == tau) {
                 val j = lctOrder[k]
                 tree.activate(j, ests[j], energies[j])
+                activeStarts?.add(starts[taskIds[j]])
                 k++
             }
+            // New τ-group ⇒ a wider Θ_τ ⇒ rebuild the scoped reason lazily for this group.
+            scopedAntBuilt = false
             val envTheta = tree.envOfTheta()
             val capTau = capL * tau.toLong()
             // Overload: env(Θ_τ) = max_{Ω⊆Θ_τ} (C·est(Ω) + e(Ω)); if it exceeds C·τ some
@@ -951,11 +973,21 @@ class Cumulative(
                 val newEst = newEstL.toInt()
                 val v = starts[taskIds[i]]
                 if (newEst > state.intDomains[v].min) {
-                    if (!antBuilt) {
-                        ant = state.composeIntVarAtomAntecedents(intVars)
-                        antBuilt = true
+                    val reason: IntArray?
+                    if (activeStarts != null) {
+                        if (!scopedAntBuilt) {
+                            scopedAnt = state.composeIntVarAtomAntecedents(activeStarts.toIntArray())
+                            scopedAntBuilt = true
+                        }
+                        reason = scopedAnt
+                    } else {
+                        if (!antBuilt) {
+                            ant = state.composeIntVarAtomAntecedents(intVars)
+                            antBuilt = true
+                        }
+                        reason = ant
                     }
-                    if (!state.tightenIntMin(v, newEst, ant)) return false
+                    if (!state.tightenIntMin(v, newEst, reason)) return false
                 }
             }
         }
