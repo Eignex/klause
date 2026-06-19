@@ -51,18 +51,11 @@ class SourceDrivenStrategy(
     /** Optional perturbation: consulted once per pick before generation; a non-null result is taken
      *  immediately as a diversification kick. The closure owns its own trigger/stall state. */
     val perturbation: ((LocalSearchState) -> Move?)? = null,
-    /** Optional CBLS stall-schedule mode: when set, the driver hands the pick to a stateful
-     *  weighted-violation orchestration (stall-gated source enabling, stall-aware noise, tabu/
-     *  starvation fallbacks, targeted kick) that the flat collect→score→accept loop below cannot
-     *  express. `null` (default) is the flat recipe mode — the [sources]/[acceptance] path. The two
-     *  modes are exclusive; the [Cbls] factory builds the stall mode. */
-    internal val cblsSchedule: CblsSchedule? = null,
+    /** Whether this strategy drives objective descent at feasibility (it has feasibility-phase
+     *  sources that score satisfied/objective candidates at `cost == 0`), rather than bailing for the
+     *  engine's built-in descent. The unified-minimize path keys off this; the [Cbls] recipe sets it. */
+    val drivesObjectiveDescent: Boolean = false,
 ) : Strategy {
-
-    /** Whether this strategy drives objective descent at feasibility (the CBLS stall-schedule mode
-     *  scores satisfied/objective candidates at `cost == 0`), rather than bailing for the engine's
-     *  built-in descent. The unified-minimize path keys off this. */
-    internal val drivesObjectiveDescent: Boolean get() = cblsSchedule != null
 
     /** Round feedback retunes the schedule axis's temperature schedule (e.g. AdaptiveCooling);
      *  accumulation is gated off when no temperature schedule is present. */
@@ -77,10 +70,6 @@ class SourceDrivenStrategy(
     private val scoreSink = MoveSink()
 
     override fun pickMove(state: LocalSearchState): Move? {
-        // CBLS stall-schedule mode owns the whole pick (its own weight/noise/kick schedule); the flat
-        // recipe path below is bypassed entirely.
-        cblsSchedule?.let { return it.pickMove(state, scoring, tabu) }
-
         // Stall-driven weight maintenance first, so the bumped gradient scores this pick's candidates.
         schedule.weights?.maintain(
             state.step,
@@ -90,6 +79,12 @@ class SourceDrivenStrategy(
             state.violated.toIntArray(),
             state.rng,
         )
+        // The stall signal (schedule axis): advance the no-progress window, then gate the
+        // plateau-escape sources and the effective noise on it. A StallSchedule is the noise member
+        // and the gate at once; absent it, nothing is stall-gated.
+        val stall = schedule.noise as? StallSchedule
+        stall?.update(state.step, state.cost)
+        val stalled = stall?.stalled ?: false
         // Perturbation escalation: a triggered kick pre-empts the normal pick.
         perturbation?.invoke(state)?.let { return it }
 
@@ -101,7 +96,8 @@ class SourceDrivenStrategy(
         scoreSink.setInvariants(state.invariants)
         for (cs in sources) {
             if (!cs.enabled) continue
-            if (!cs.source.phase.appliesAt(state.cost)) continue
+            if (cs.stallGated && !stalled) continue
+            if (!cs.effectivePhase.appliesAt(state.cost)) continue
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             cs.source.generate(state, sink)
         }
@@ -110,15 +106,20 @@ class SourceDrivenStrategy(
         // both) and returns null when both pools are empty. CC precedes tabu (matching the focused
         // WalkSAT/probSAT order): the configuration filter is the primary focus, tabu the cycle-breaker
         // layered on what survives it.
-        val noiseMoves = tabu.filter(state, ccFilter(state, noiseSink.list))
+        val ccNoise = ccFilter(state, noiseSink.list)
+        val noiseFiltered = tabu.filter(state, ccNoise)
+        // While stalled, never let tabu starve the noise pool into a null pick (a full restart that
+        // discards plateau progress): fall back to the unfiltered candidates so the search keeps
+        // walking the plateau. Off-stall, an empty tabu pool still yields the normal restart path.
+        val noiseMoves = if (noiseFiltered.isEmpty() && stalled) ccNoise else noiseFiltered
         val scoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
-        // Diversification noise is the schedule axis's: a NoiseSchedule retunes its level off the
-        // running cost each pick that has candidates, steering the acceptance rule (WalkSAT noise /
-        // probSAT cb) — the adaptive WalkSAT/probSAT behaviour, now a recipe rather than a bespoke
-        // strategy. The noise-free rules ignore the level.
+        // Diversification noise is the schedule axis's: a NoiseSchedule retunes its level (the
+        // adaptive WalkSAT/probSAT controllers off the running cost, the StallSchedule off the stall
+        // window) and steers the acceptance rule (WalkSAT noise / probSAT cb). The noise-free rules
+        // ignore the level.
         val noiseSchedule = schedule.noise as? NoiseSchedule
         val effectiveAcceptance = if (noiseSchedule != null && (noiseMoves.isNotEmpty() || scoreMoves.isNotEmpty())) {
-            noiseSchedule.observe(state.cost)
+            if (stall == null) noiseSchedule.observe(state.cost)
             acceptance.steered(noiseSchedule.level)
         } else {
             acceptance
