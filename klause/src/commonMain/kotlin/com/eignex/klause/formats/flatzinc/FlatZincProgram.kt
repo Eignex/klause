@@ -19,7 +19,7 @@ data class FlatZincProgram(
     val floatVarsByName: Map<String, FloatBucketing>,
     /** Declared arrays by name. */
     val arraysByName: Map<String, FlatZincArray>,
-    /** Ordered output items, or null when no output clause exists. */
+    /** Ordered output items or null when no output clause exists. */
     val outputItems: List<OutputItem>?,
     /** Backtrack defaults inferred from search annotations. */
     val defaultBacktrackParams: BacktrackParams?,
@@ -35,7 +35,7 @@ data class FlatZincProgram(
 
 /** Bool-indicator layout of one FlatZinc set variable. */
 data class SetVarLayout(
-    /** Set variable name. */
+    /** Set the variable name. */
     val name: String,
     /** Sorted universe values. */
     val elements: IntArray,
@@ -45,9 +45,6 @@ data class SetVarLayout(
     init {
         require(elements.size == indicatorBoolIds.size) { "SetVarLayout: parallel arrays of unequal length" }
     }
-
-    /** Number of universe elements. */
-    val universeSize: Int get() = elements.size
 
     override fun equals(other: Any?): Boolean {
         if (other !is SetVarLayout) return false
