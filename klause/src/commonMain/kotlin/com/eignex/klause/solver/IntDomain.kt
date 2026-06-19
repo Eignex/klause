@@ -17,7 +17,7 @@ fun interface IntConsumer {
  * construction so storage and the hot membership / iteration paths stay compact regardless of how
  * wide the declared span is (spans here reach into the tens of millions):
  *
- *  - [com.eignex.klause.solver.intdomain.ContiguousDomain] — `[min..max]` with no holes; everything
+ *  - [com.eignex.klause.solver.intdomain.ContiguousDomain] — `(min..max)` with no holes; everything
  *    is O(1).
  *  - [com.eignex.klause.solver.intdomain.BitsetDomain] — one bit per value over a narrow span
  *    (`<=` [BITSET_THRESHOLD]); membership is an O(1) bit test at any density.
@@ -31,10 +31,10 @@ fun interface IntConsumer {
  * The run and survivor reps together keep both storage and the hot paths **independent of the
  * declared span**: the former "sorted hole list" (complement) rep degenerated to O(span) storage
  * and cache-thrashing binary searches once a wide domain was carved down to a small reachable set —
- * the throughput wall of #723. Between them every wide shape stays O(min(holes, survivors)).
+ * a pathological throughput cliff. Between them every wide shape stays O(min(holes, survivors)).
  *
  * **Representation choice** — construct via the factories (`IntDomain(min, max)` for the contiguous
- * case; the internal `intDomainOf*` factories pick the wide rep): a single run ⇒ contiguous; span
+ * case; the internal `intDomainFrom*` factories pick the wide rep): a single run ⇒ contiguous; span
  * `<=` [BITSET_THRESHOLD] ⇒ bitset; otherwise the run list when it is at least as compact as the
  * survivor list (`2·runs <= survivors`), else the survivor list. Domains are immutable, so every
  * mutation returns a fresh value and re-picks — there is no flip-flop cost.
@@ -121,7 +121,7 @@ interface IntDomain {
          *  run / survivor reps. */
         const val BITSET_THRESHOLD: Int = 4096
 
-        /** Construct the contiguous domain `[min..max]`. Source-compatible with the former class
+        /** Construct the contiguous domain `(min..max)`. Source-compatible with the former class
          *  constructor, so existing `IntDomain(min, max)` call sites are unchanged. */
         operator fun invoke(min: Int, max: Int): IntDomain = ContiguousDomain(min, max)
     }

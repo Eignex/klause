@@ -1,5 +1,6 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.intdomain
 
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Ignore
@@ -12,7 +13,7 @@ import kotlin.time.measureTime
  * pathological shapes from #723. Not run in CI — `@Ignore`d because they print timings rather than
  * assert, and are JIT/host sensitive. Run one explicitly, e.g.:
  *
- *   ./gradlew :klause:jvmTest --tests "com.eignex.klause.solver.IntDomainMicrobench" -Dkotest=… off
+ *   ./gradlew :klause:jvmTest --tests "com.eignex.klause.solver.intdomain.IntDomainMicrobench" -Dkotest=… off
  *   (or remove @Ignore locally / run from the IDE).
  *
  * The point each one makes:
