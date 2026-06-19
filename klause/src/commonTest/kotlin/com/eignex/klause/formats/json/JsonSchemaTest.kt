@@ -33,7 +33,6 @@ class JsonSchemaTest {
         val compiled = JsonSchema.parseCompiled(text)
         assertEquals(3, compiled.problem.numBoolVars, "nominal expands to 3 indicators")
         assertEquals(1, compiled.problem.numIntVars)
-        // CompiledProblem retains the var/indicator maps for decoding samples.
         assertEquals(setOf("a", "b", "c"), compiled.nominalIndicators["type"]?.keys)
         assertTrue("budget" in compiled.intVarIdByName)
     }

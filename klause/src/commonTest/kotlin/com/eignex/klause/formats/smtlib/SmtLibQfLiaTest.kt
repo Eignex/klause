@@ -10,7 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** Parser tests for the SMT-LIB QF_LIA frontend, solved with klause's own backtrack engine. */
 class SmtLibQfLiaTest {
 
     private fun solve(text: String): IntArray {
@@ -105,7 +104,6 @@ class SmtLibQfLiaTest {
         val p = SmtLibQfLia.parse(text).problem
         assertEquals(3, p.intDomains[0].min)
         assertEquals(7, p.intDomains[0].max)
-        // y >= 0 and x + y <= 10 with x >= 3 ⇒ y <= 7.
         assertEquals(0, p.intDomains[1].min)
         assertEquals(7, p.intDomains[1].max)
     }
@@ -114,7 +112,7 @@ class SmtLibQfLiaTest {
     fun `bound inference falls back to the default bound when unprovable`() {
         val p = SmtLibQfLia.parse("(declare-const x Int) (assert (<= x 4))", intBound = 50).problem
         assertEquals(4, p.intDomains[0].max)
-        assertEquals(-50, p.intDomains[0].min) // no lower bound provable ⇒ -intBound
+        assertEquals(-50, p.intDomains[0].min)
     }
 
     @Test
