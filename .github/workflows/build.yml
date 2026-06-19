@@ -20,8 +20,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
 
       - name: Set up JDK
         uses: actions/setup-java@v5
@@ -45,19 +43,14 @@ jobs:
           key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts') }}
           restore-keys: ${{ runner.os }}-konan-
 
-      - name: Grant execute permission for Gradle
-        run: chmod +x gradlew
-
       # Default target set is host-only (jvm + linuxX64); the full matrix (apple, windows,
       # js/wasm with their browser/node runtimes) is opt-in via -Ptargets.full and builds
       # and tests on release.
 
-      # One Gradle invocation: `build` already depends on `assemble` and `check`, so a
-      # single run lets Gradle dedup the task graph instead of paying configuration and
-      # up-to-date-check overhead three times over. Docs linting runs in the parallel
-      # `lint` job below, off the critical path.
-      - name: Run build and tests with coverage
-        run: ./gradlew build koverXmlReport
+      # `check` runs tests without lintDocs (detekt + dokka), which the parallel `lint` job
+      # already covers. Keeping them separate avoids running lintDocs twice per push.
+      - name: Run tests with coverage
+        run: ./gradlew check koverXmlReport
 
       - name: Upload test reports
         if: always()
@@ -88,8 +81,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 2
 
       - name: Set up JDK
         uses: actions/setup-java@v5
@@ -109,9 +100,6 @@ jobs:
           path: ~/.konan
           key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts') }}
           restore-keys: ${{ runner.os }}-konan-
-
-      - name: Grant execute permission for Gradle
-        run: chmod +x gradlew
 
       - name: Run linter
         run: ./gradlew lintDocs
