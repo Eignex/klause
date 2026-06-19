@@ -123,8 +123,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                 return
             }
             val gen = c.generators[genIdx]
-            val src = eval(gen.source, ctx)
-            val values: List<Int> = when (src) {
+            val values: List<Int> = when (val src = eval(gen.source, ctx)) {
                 is OznValue.RangeV -> (src.lo..src.hi).toList()
 
                 is OznValue.SetV -> src.values.toList()
