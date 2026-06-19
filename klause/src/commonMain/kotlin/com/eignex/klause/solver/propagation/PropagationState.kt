@@ -12,6 +12,7 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
@@ -182,6 +183,10 @@ class PropagationState(
     /** Number of decisions pushed so far. Equals the maximum level. */
     val numDecisions: Int get() = levelToDecisionVar.size
 
+    /** Reused dedup scratch for [composeIntVarAtomAntecedents] — packed `(var, side, bound)` keys,
+     *  cleared per call so the constraint-wide reason path allocates no set and boxes no key. */
+    private val composeAntecedentSeen: LongHashSet = LongHashSet()
+
     /** Emit per-bound atom-lit antecedents for every var in [vars]. For each var,
      *  if its current `min` is tighter than the initial domain min, emit `¬[v ≥ d.min]`;
      *  similarly for the `max` side. The deduction's implicit clause is then
@@ -196,7 +201,10 @@ class PropagationState(
      *  Returns `null` when no var's bounds have been tightened past the initial domain —
      *  the analyzer then treats the resulting int-fact as a level-0-style leaf. */
     fun composeIntVarAtomAntecedents(vars: IntArray): IntArray? {
-        val seen = HashSet<Long>()
+        // Reused, cleared per call (not re-entrant within one propagate) so the dedup pays no
+        // per-call set allocation nor the autoboxing a HashSet<Long> would on this hot reason path.
+        val seen = composeAntecedentSeen
+        seen.clear()
         val out = IntArrayList()
         for (v in vars) {
             val d = intDomains[v]
@@ -565,14 +573,17 @@ class PropagationState(
     internal val atomWatchersByLit: ArrayList<IntArrayList?> = ArrayList()
 
     /** For each int variable, the atoms whose truth depends on it — used to recompute
-     *  atom truth and fire watchers after a successful tighten / exclude. */
-    internal val atomsByIntVar: HashMap<Int, VarAtomIndex> = HashMap()
+     *  atom truth and fire watchers after a successful tighten / exclude. Dense-indexed by the
+     *  int-var id (always `0 until numIntVars`) so the post-tighten wake path pays no boxed-Int
+     *  hash probe; a null slot means "no atoms materialised for this var yet". */
+    internal val atomsByIntVar: Array<VarAtomIndex?> = arrayOfNulls(problem.numIntVars)
 
     /** Per-var sorted thresholds that some factor actually watches (either polarity of
      *  the atom's literal). Bound moves wake watchers by walking only this index — the
      *  full atom table grows with every reason ever materialised, but only watched atoms
-     *  need eager transition wakeups; everything else is derived on demand. */
-    internal val watchedAtomsByVar: HashMap<Int, VarAtomIndex> = HashMap()
+     *  need eager transition wakeups; everything else is derived on demand. Dense-indexed by the
+     *  int-var id like [atomsByIntVar]. */
+    internal val watchedAtomsByVar: Array<VarAtomIndex?> = arrayOfNulls(problem.numIntVars)
 
     /** Factor ids woken by atom-lit transitions during the current propagation step.
      *  Drained alongside dirty-int / dirty-bool processing in [runToFixpoint]. */
