@@ -7,27 +7,15 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.objective.LinearObjective
 
-/**
- * Parsed OPB (Pseudo-Boolean Optimization) instance: a [Problem] with one
- * [PseudoBoolean] factor per `… op rhs ;` constraint, plus an optional [LinearObjective]
- * if the file declared a `min: …` line.
- *
- * Variables in OPB are 1-indexed and map to klause Boolean ids `0..numBoolVars-1`.
- * Negated literals (`~x_i`) become `Lit.make(i-1, positive = false)`. Integer
- * coefficients pass through unchanged into `PseudoBoolean.weights`.
- */
+/** Parsed OPB instance and optional objective. */
 data class OpbProblem(
-    /** The compiled solver problem. */
+    /** Compiled solver problem. */
     val problem: Problem,
-    /** The objective, or null for a pure satisfaction instance. */
+    /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
 )
 
-/**
- * Parser for the OPB file format used by the Pseudo-Boolean Competition. Accepts the
- * `min: ` objective form, the three operators `>=`, `<=`, `=`, and `*` comments. Lines
- * are statement-terminated by `;`.
- */
+/** Parser for OPB pseudo-Boolean instances. */
 object Opb {
 
     /** Parse OPB [text] into an [OpbProblem]. */
@@ -64,7 +52,7 @@ object Opb {
                     if (Lit.isPositive(lit)) {
                         objWeights[v] = (objWeights[v] ?: 0.0) + w
                     } else {
-                        // c · (1 - x) contributes -c to the variable and +c to the constant.
+                        // c*(~x) in OPB objective is c*(1-x).
                         objWeights[v] = (objWeights[v] ?: 0.0) - w
                         objConstant += w
                     }
@@ -117,11 +105,7 @@ object Opb {
         return OpbProblem(problem, objective)
     }
 
-    /** Parses an even-length token sequence `coef var coef var …`, returning aligned
-     *  `(weights, literals)`. Negated literals (`~xN`) flip the literal's polarity but
-     *  preserve the raw coefficient sign — the caller folds that into either a
-     *  [PseudoBoolean] factor (which natively handles signed weights × literals) or
-     *  the linear-objective constant for the negated-`(1-x)` case. */
+    /** Parse `coef var` pairs into aligned weights and literals. */
     private fun parseTerms(tokens: List<String>): Pair<List<Int>, List<Int>> {
         require(tokens.size % 2 == 0) {
             "OPB term sequence must alternate coefficient/variable, got: ${tokens.joinToString(" ")}"

@@ -30,37 +30,17 @@ class UnsupportedXcsp3Exception(msg: String) : RuntimeException("klause XCSP3: $
 
 /** A parsed XCSP3 instance lifted into klause's representation. */
 data class Xcsp3Problem(
-    /** The compiled solver problem. */
+    /** Compiled solver problem. */
     val problem: Problem,
-    /** The objective, or null for a pure satisfaction instance. */
+    /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
-    /** Declared variable name (including array cells as `id[i]`) → int var id, in
-     *  declaration order. Lets a CLI render named solutions (XCSP3 `v <instantiation>`). */
+    /** Declared variable name to int var id. */
     val intVarNames: Map<String, Int> = emptyMap(),
-    /** True when the original `<objectives>` was a `maximize` (the [objective] negates so
-     *  the engine minimises). Lets a CLI report the true objective value in the `o` line. */
+    /** True when the parsed objective was maximize. */
     val maximize: Boolean = false,
 )
 
-/**
- * Pragmatic XCSP3 ingest → klause [Problem]. Covers the common integer CSP/COP core:
- *
- *  - `<var>` and 1-D `<array>` integer declarations with range / value-list domains;
- *  - `<extension>` positive (`<supports>`) and negative (`<conflicts>`, lowered to a
- *    positive [Table] over the domain complement) tables;
- *  - `<intension>` over a tree evaluator: arithmetic (`add sub mul neg`), comparisons
- *    (`eq ne lt le gt ge`) and boolean structure (`and or not imp iff xor`), reified onto
- *    aux bools where nested;
- *  - globals `<allDifferent> <sum> <count> <element> <channel> <regular> <cumulative>
- *    <circuit> <lex>` mapped to the matching native factors;
- *  - `<objectives>` `minimize` / `maximize` of a (weighted) `sum`, or the `minimum` /
- *    `maximum` of a variable list.
- *
- * Out-of-subset features (set/graph/float vars, n-D arrays, unsupported globals, nonlinear
- * intension) raise [UnsupportedXcsp3Exception] rather than silently producing a wrong model.
- *
- * `negTableCap` bounds the domain cartesian product enumerated when lowering a negative table.
- */
+/** Parser/compiler for the supported XCSP3 integer subset. */
 object Xcsp3 {
     /** Parse XCSP3 [text] into an [Xcsp3Problem]. */
     fun parse(text: String, negTableCap: Long = 1_000_000L): Xcsp3Problem = Builder(negTableCap).run {
@@ -79,15 +59,13 @@ object Xcsp3 {
         private var objective: LinearObjective? = null
         private var objectiveMaximize = false
 
-        // --- variables ---
-
         fun declareVar(e: XmlElement) {
             when (e.tag) {
                 "var" -> addVar(e.attr("id"), parseDomain(e.textContent.trim()))
 
                 "array" -> {
                     val id = e.attr("id")
-                    val size = Regex("""\[(\d+)\]""").find(e.attr("size"))?.groupValues?.get(1)?.toInt()
+                    val size = Regex("""\[(\d+)]""").find(e.attr("size"))?.groupValues?.get(1)?.toInt()
                         ?: throw UnsupportedXcsp3Exception("only 1-D arrays supported: ${e.attr("size")}")
                     val dom = parseDomain(e.textContent.trim())
                     for (i in 0 until size) addVar("$id[$i]", dom)
@@ -121,8 +99,6 @@ object Xcsp3 {
             return dom
         }
 
-        // --- constraints ---
-
         fun constraint(e: XmlElement) {
             when (e.tag) {
                 "allDifferent" -> allDifferent(e)
@@ -154,8 +130,6 @@ object Xcsp3 {
             factors.add(Linear(coeffs, vars, op, k))
         }
 
-        // --- extension (positive supports / negative conflicts) ---
-
         private fun extension(e: XmlElement) {
             val vars = listVars(e)
             val supports = e.child("supports")?.textContent?.trim()
@@ -179,8 +153,7 @@ object Xcsp3 {
             return tuples.toIntArray()
         }
 
-        /** Lower a negative table to a positive [Table] over the domain cartesian product
-         *  minus the forbidden rows. Guarded by `negTableCap` to avoid blowup. */
+        /** Lower a negative table to an allowed-tuple [Table]. */
         private fun negativeTable(vars: IntArray, conflicts: IntArray): Table {
             val arity = vars.size
             val valuesPer = vars.map { domainValues(it) }
@@ -215,8 +188,6 @@ object Xcsp3 {
             return Table(xs = vars, tuples = allowed.toIntArray())
         }
 
-        // --- intension (arithmetic + comparison + boolean tree) ---
-
         private fun intension(expr: String) {
             val node = FExpr.parse(expr)
             if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
@@ -231,7 +202,6 @@ object Xcsp3 {
 
             is FExpr.Ref -> reifyRel(FExpr.Call("ge", listOf(e, FExpr.Num(1))))
 
-            // 0/1 var truthiness
             is FExpr.Call -> when (e.fn) {
                 "not" -> Lit.negate(compileBool(e.args[0]))
                 "and" -> tseitinAnd(e.args.map { compileBool(it) })
@@ -251,9 +221,7 @@ object Xcsp3 {
             return reifyLinear(lin.coeffs, lin.vars, lin.op, lin.bound)
         }
 
-        /** Map an XCSP3 relation operator to its [LinearOp] plus the delta to fold into the bound:
-         *  strict `lt`/`gt` collapse to `LE`/`GE` with a ∓1 shift, the rest contribute 0. Null on an
-         *  unknown operator, so each caller throws with its own context. */
+        /** Map XCSP3 relation names to linear operators and strictness deltas. */
         private fun relOp(fn: String): Pair<LinearOp, Int>? = when (fn) {
             "le" -> LinearOp.LE to 0
             "lt" -> LinearOp.LE to -1
@@ -264,7 +232,7 @@ object Xcsp3 {
             else -> null
         }
 
-        /** `rel(lhs, rhs)` → a [Linear] `coeffs·vars OP bound`. */
+        /** Lower `rel(lhs, rhs)` to a [Linear] factor. */
         private fun relationLinear(node: FExpr.Call): Linear {
             val (op, delta) = relOp(node.fn) ?: throw UnsupportedXcsp3Exception("relation '${node.fn}'")
             val lhs = linear(node.args[0])
@@ -277,8 +245,6 @@ object Xcsp3 {
             return Linear(IntArray(vars.size) { combined.getValue(vars[it]) }, vars, op, bound)
         }
 
-        // --- count / element / channel / regular / cumulative / circuit / lex ---
-
         private fun count(e: XmlElement) {
             val vars = listVars(e)
             val values = parseInts(e.child("values")?.textContent)
@@ -286,8 +252,7 @@ object Xcsp3 {
             if (values.size != 1) throw UnsupportedXcsp3Exception("count: only a single value supported")
             val (op, k) = condition(requireNotNull(e.child("condition")).textContent.trim())
             val cnt = newAuxVar(0, vars.size)
-            // cnt = #{i : vars[i] = values[0]}: reify each equality, channel to a 0/1 int,
-            // then sum the channels into cnt via a Linear EQ. Replaces the dropped Count factor.
+            // Reify equalities and sum their 0/1 channels into `cnt`.
             val channels = IntArray(vars.size) { i ->
                 val aux = newBool()
                 factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, values[0]))
@@ -426,8 +391,6 @@ object Xcsp3 {
             }
         }
 
-        // --- objective ---
-
         fun objective(e: XmlElement) {
             val maximize = e.tag == "maximize"
             objectiveMaximize = maximize
@@ -452,8 +415,6 @@ object Xcsp3 {
                 else -> throw UnsupportedXcsp3Exception("objective type '$type'")
             }
         }
-
-        // --- arithmetic helpers ---
 
         private data class Lin(val coeffs: Map<Int, Int>, val constant: Int)
 
@@ -488,7 +449,7 @@ object Xcsp3 {
         }
         private fun scaleLin(a: Lin, k: Int) = Lin(a.coeffs.mapValues { it.value * k }, a.constant * k)
 
-        /** A single-variable term (`x`) → its var id; rejects compound expressions. */
+        /** Resolve one variable/constant term to a var id. */
         private fun singleTermVar(text: String): Int {
             val t = text.trim()
             varIds[t]?.let { return it }
@@ -499,11 +460,9 @@ object Xcsp3 {
             }
         }
 
-        // --- ref / domain helpers ---
-
         private fun listText(e: XmlElement): String = e.child("list")?.textContent ?: e.textContent
 
-        /** Vars referenced by the constraint's mandatory `<list>` child. */
+        /** Resolve vars from a constraint `<list>` child. */
         private fun listVars(e: XmlElement): IntArray = refList(
             requireNotNull(e.child("list")).textContent,
         ).toIntArray()
@@ -516,8 +475,7 @@ object Xcsp3 {
 
         private fun expandRef(tok: String): List<Int> = expandNames(tok).map { ref(it) }
 
-        /** Expand a list token to concrete variable names: `x[]` → all cells, `x[lo..hi]` →
-         *  the index range, `x[i]` / `x` → itself. */
+        /** Expand list tokens such as `x[]` and `x(lo..hi)`. */
         private fun expandNames(tok: String): List<String> {
             if (tok.endsWith("[]")) {
                 val base = tok.dropLast(2)
@@ -533,8 +491,7 @@ object Xcsp3 {
         }
         private fun ref(name: String): Int = varIds[name] ?: throw UnsupportedXcsp3Exception("unknown variable '$name'")
 
-        /** A `<group>`: one template constraint instantiated once per `<args>` row, with the
-         *  flattened argument tokens substituted into the template's `%i` / `%...` placeholders. */
+        /** Instantiate a `<group>` template for each `<args>` row. */
         private fun group(e: XmlElement) {
             val template = e.children.firstOrNull { it.tag != "args" }
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")

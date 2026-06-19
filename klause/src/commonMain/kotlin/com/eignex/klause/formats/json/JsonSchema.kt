@@ -8,12 +8,7 @@ import com.eignex.skema.SchemaDef
 import com.eignex.skema.schemaJsonConfig
 import kotlinx.serialization.json.Json
 
-/**
- * Parses a klause [SchemaDef] from its JSON representation and compiles it into a
- * solver-ready [Problem]. The JSON shape is the Skema configuration format —
- * `SchemaDef<SchemaEntry>` — that the [Compiler] consumes. See `schema/campaign.json` in
- * `klause-bench` for an example.
- */
+/** Parse and compile schema JSON into solver structures. */
 object JsonSchema {
 
     private val json: Json = Json {
@@ -21,10 +16,10 @@ object JsonSchema {
         ignoreUnknownKeys = true
     }
 
-    /** Parse + compile in one step; returns only the [Problem]. */
+    /** Parse and compile, returning only the [Problem]. */
     fun parseProblem(text: String): Problem = parseCompiled(text).problem
 
-    /** Parse + compile, returning the full [CompiledProblem] so callers can decode samples. */
+    /** Parse and compile, returning the full [CompiledProblem]. */
     fun parseCompiled(text: String): CompiledProblem {
         val def = json.decodeFromString(
             SchemaDef.serializer(SchemaEntry.serializer()),
