@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Unit tests for the minimal multiplatform XML reader backing the XCSP3 frontend. */
 class XmlTest {
 
     @Test

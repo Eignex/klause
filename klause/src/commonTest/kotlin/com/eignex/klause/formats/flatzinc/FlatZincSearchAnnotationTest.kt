@@ -7,8 +7,6 @@ import com.eignex.klause.solver.backtrack.selector.IndomainMax
 import com.eignex.klause.solver.backtrack.selector.IndomainMedian
 import com.eignex.klause.solver.backtrack.selector.IndomainMin
 import com.eignex.klause.solver.backtrack.selector.IndomainSplit
-import com.eignex.klause.solver.backtrack.selector.InputOrder
-import com.eignex.klause.solver.backtrack.selector.MaxRegret
 import com.eignex.klause.solver.backtrack.selector.SmallestDomain
 import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.solver.backtrack.selector.SolutionGuided

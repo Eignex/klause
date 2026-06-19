@@ -72,7 +72,6 @@ class DimacsTest {
 
     @Test
     fun `parses old wcnf format with top weight`() {
-        // 3 vars, 3 clauses. top=10 → weight 10 = hard, weights 1/2 = soft.
         val text = """
             c sample wcnf
             p wcnf 3 3 10
@@ -82,9 +81,7 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(3, w.numOriginalBoolVars)
-        // 3 original + 2 relaxation bools.
         assertEquals(5, w.problem.numBoolVars)
-        // 1 hard clause + 2 relaxed soft clauses.
         assertEquals(3, w.problem.factors.size)
         assertEquals(0L, w.objective.boolWeights[0])
         assertEquals(1L, w.objective.boolWeights[3])
@@ -93,8 +90,6 @@ class DimacsTest {
 
     @Test
     fun `old wcnf without top treats max-weight clause as hard`() {
-        // #86: header omits `top`. The Long.MAX_VALUE-weighted clause must be hard (not demoted to
-        // soft); the normal-weight clause stays soft.
         val text = """
             p wcnf 3 2
             9223372036854775807 1 2 0
@@ -102,20 +97,16 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(3, w.numOriginalBoolVars)
-        // Only the single soft clause allocates a relaxation bool → 3 original + 1.
         assertEquals(4, w.problem.numBoolVars)
-        // 1 hard clause + 1 relaxed soft clause.
         assertEquals(2, w.problem.factors.size)
-        // The relaxation bool for the soft clause carries weight 1; no relaxation bool for the hard.
         assertEquals(1L, w.objective.boolWeights[3])
     }
 
     @Test
     fun `old wcnf without top keeps normal-weight clauses soft`() {
-        // Sanity: a non-sentinel weight with no `top` stays soft (plain MaxSAT, no hard clauses).
         val w = Dimacs.parseWcnf("p wcnf 2 1\n5 -1 0\n")
         assertEquals(2, w.numOriginalBoolVars)
-        assertEquals(3, w.problem.numBoolVars) // 2 original + 1 relaxation bool
+        assertEquals(3, w.problem.numBoolVars)
         assertEquals(5L, w.objective.boolWeights[2])
     }
 
