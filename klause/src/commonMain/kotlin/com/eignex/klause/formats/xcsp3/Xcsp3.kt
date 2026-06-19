@@ -306,7 +306,7 @@ object Xcsp3 {
                 e.child("final"),
             ).textContent.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
             data class Tr(val src: String, val sym: Int, val dst: String)
-            val trs = Regex("""\(\s*([\w]+)\s*,\s*(-?\d+)\s*,\s*([\w]+)\s*\)""")
+            val trs = Regex("""\(\s*(\w+)\s*,\s*(-?\d+)\s*,\s*(\w+)\s*\)""")
                 .findAll(requireNotNull(e.child("transitions")).textContent)
                 .map { Tr(it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3]) }.toList()
             if (trs.isEmpty()) throw UnsupportedXcsp3Exception("regular: no transitions")
