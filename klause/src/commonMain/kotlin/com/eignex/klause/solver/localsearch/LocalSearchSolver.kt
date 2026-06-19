@@ -106,22 +106,28 @@ class LocalSearchSolver(
     /** Greedy-repair restart initializer (epic #710); shared by the satisfy and optimize restarts. */
     private val greedyInit: GreedyInit = GreedyInit()
 
+    /** The restart cadence carried by the strategy's schedule axis ([ScheduleBundle.restart]) when it
+     *  declares one, else the solver-level [restartPolicy]. Lets a recipe own restart as a schedule
+     *  dimension while non-recipe callers keep passing it directly. */
+    private val configuredRestart: RestartPolicy =
+        (strategy as? SourceDrivenStrategy)?.schedule?.restart ?: restartPolicy
+
     /** The restart policy actually driven by the engine: when a [definitionalSweep] is present
      *  or [seedImplicitOnRestart] is set, every restart is followed by implicit feasible-init
      *  and/or the sweep plus a state recompute, so all restart call sites (satisfy loop,
      *  optimize loop, streaming) get the same post-randomization treatment. */
     private val restarts: RestartPolicy = if (definitionalSweep == null && !seedImplicitOnRestart) {
-        restartPolicy
+        configuredRestart
     } else {
         object : RestartPolicy {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
-                restartPolicy.shouldRestart(stepsSinceLastRestart)
+                configuredRestart.shouldRestart(stepsSinceLastRestart)
 
             override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) =
-                restartPolicy.onLocalOptimum(state, sample, objective)
+                configuredRestart.onLocalOptimum(state, sample, objective)
 
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
-                restartPolicy.restart(state, bestSoFar)
+                configuredRestart.restart(state, bestSoFar)
                 if (seedImplicitOnRestart) state.seedImplicitFeasible()
                 definitionalSweep?.sweep(
                     state.assignment,
@@ -316,7 +322,7 @@ class LocalSearchSolver(
             var everFeasible = false
             // Per-round feedback for adaptive schedules / restart (#721); null unless one wants it.
             // Use the unwrapped restart policy so an adaptive one is detected past a sweep wrapper.
-            val roundFeedback = RoundFeedback.of(strategy, restartPolicy)
+            val roundFeedback = RoundFeedback.of(strategy, configuredRestart)
 
             try {
                 while (flipsSinceYield < maxFlips) {
@@ -474,7 +480,7 @@ class LocalSearchSolver(
         val satisfyStrategy: Strategy = if (unified) descentStrategy else strategy
         // Feed round stats to the unwrapped restart policy so an adaptive one is detected and updated
         // even when a definitional-sweep wrapper stands in for shouldRestart/restart.
-        val roundFeedback = RoundFeedback.of(satisfyStrategy, restartPolicy)
+        val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {

@@ -8,8 +8,12 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Cardinality
 import com.eignex.klause.solver.factor.Clause
+import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.solver.localsearch.schedule.RoundLog
+import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
@@ -166,6 +170,38 @@ class RestartPolicyTest {
         val state = LocalSearchState(Problem(1, 0, emptyArray(), emptyList()), Random(0))
         p.restart(state, bestSoFar = null)
         assertFalse(p.shouldRestart(0), "restart must clear the pending trigger")
+    }
+
+    @Test
+    fun `engine uses the restart policy from the strategy schedule bundle`() {
+        // Restart is a schedule-axis dimension: when the strategy's ScheduleBundle declares a restart
+        // policy, the engine must use it over the solver-level param. The spy never restarts but
+        // counts engine queries; if the solver param were used instead the spy would never be touched.
+        val spy = object : RestartPolicy {
+            var queried = 0
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean {
+                queried++
+                return false
+            }
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) = state.restart()
+        }
+        val problem = Problem(
+            numBoolVars = 6,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Cardinality.exactlyOne(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            ),
+        )
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 1))),
+            schedule = ScheduleBundle(restart = spy),
+        )
+        LocalSearchSolver(problem, strategy = strategy, restartPolicy = FixedCadenceRestart(1_000_000))
+            .solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 4L))
+        assertTrue(spy.queried > 0, "the engine must use the restart policy from the strategy's schedule bundle")
     }
 
     @Test
