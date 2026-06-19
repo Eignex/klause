@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.propagation
+package com.eignex.klause.solver.integration
 
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp

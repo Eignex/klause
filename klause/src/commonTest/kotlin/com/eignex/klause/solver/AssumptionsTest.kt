@@ -1,6 +1,5 @@
-package com.eignex.klause.solver.localsearch
+package com.eignex.klause.solver
 
-import com.eignex.klause.solver.*
 import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver

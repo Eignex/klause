@@ -1,8 +1,7 @@
-package com.eignex.klause.solver.factor
+package com.eignex.klause.solver.integration
 
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.reifiedIntCompare

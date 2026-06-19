@@ -10,7 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class SolverTest {
+class LocalSearchSolverTest {
 
     @Test
     fun `solves simple 3 sat instance`() {
