@@ -285,36 +285,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
         }
         return
     }
-    val r = resolveBoolLit(c.args[2])
-    val auxes = ArrayList<Int>()
-    val emitEqAux: (Int, Int, Int) -> Unit = { sBit, tBit, aux ->
-        factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, true), Lit.make(aux, true))))
-        factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, false), Lit.make(aux, false))))
-        factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, true), Lit.make(aux, false))))
-        factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, false), Lit.make(aux, true))))
-    }
-    for (i in s.elements.indices) {
-        val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearchInt(s.elements[i])
-        val aux = allocBool("__eq_aux_${s.name}_${t.name}_${s.elements[i]}")
-        auxes.add(Lit.make(aux, true))
-        if (tIdx < 0) {
-            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(sBit, false))))
-            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(sBit, true))))
-        } else {
-            emitEqAux(sBit, t.indicatorBoolIds[tIdx], aux)
-        }
-    }
-    for (i in t.elements.indices) {
-        if (s.elements.binarySearchInt(t.elements[i]) < 0) {
-            val tBit = t.indicatorBoolIds[i]
-            val aux = allocBool("__eq_aux_${s.name}_${t.name}_only_t_${t.elements[i]}")
-            auxes.add(Lit.make(aux, true))
-            factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(tBit, false))))
-            factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(tBit, true))))
-        }
-    }
-    reifyAndOfLits(auxes.toIntArray(), r)
+    emitSetEqChannel(s, t, resolveBoolLit(c.args[2]))
 }
 
 internal fun FlatZincCompiler.emitSetNe(c: FznConstraint, reified: Boolean) {
