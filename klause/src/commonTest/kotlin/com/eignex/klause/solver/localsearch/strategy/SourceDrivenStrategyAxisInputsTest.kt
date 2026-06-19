@@ -14,6 +14,7 @@ import com.eignex.klause.solver.localsearch.movesource.MoveSourceId
 import com.eignex.klause.solver.localsearch.movesource.Phase
 import com.eignex.klause.solver.localsearch.movesource.Pool
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 import kotlin.random.Random
 import kotlin.test.Test
@@ -69,10 +70,12 @@ class SourceDrivenStrategyAxisInputsTest {
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
             scoring = MoveScoring.Weighted,
-            weightSchedule = WeightSchedule.feasibilityJump(
-                weightBumpAfter = 1,
-                weightIncrement = 1.0,
-                weightDecay = 1.0,
+            schedule = ScheduleBundle(
+                weights = WeightSchedule.feasibilityJump(
+                    weightBumpAfter = 1,
+                    weightIncrement = 1.0,
+                    weightDecay = 1.0,
+                ),
             ),
         )
         val state = LocalSearchState(infeasibleRing(), Random(7))
