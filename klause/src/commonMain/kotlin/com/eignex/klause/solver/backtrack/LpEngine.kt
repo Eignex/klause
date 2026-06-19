@@ -37,9 +37,16 @@ import com.eignex.klause.solver.result.SolveStatsSink
 internal class LpEngine(
     val problem: Problem,
     private val objective: LinearObjective,
-    val params: BacktrackParams,
+    params0: BacktrackParams,
     private val sink: SolveStatsSink,
 ) {
+    /** The relaxation-bound family resolved from the high-level emphasis ([BacktrackParams.lpConfig])
+     *  against this problem's structure (#429); with no emphasis set, the explicit
+     *  [BacktrackParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for
+     *  the intent→plan step, so callers carry only the intent and never a separately-resolved copy. */
+    val params: BacktrackParams =
+        params0.lpConfig?.let { LpAutoConfig.resolve(problem, it, params0) } ?: params0
+
     val lpRelaxer = if (params.lpPlan.bounding) {
         CpToLpRelaxation(
             problem,
