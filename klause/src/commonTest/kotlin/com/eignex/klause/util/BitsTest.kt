@@ -57,4 +57,63 @@ class BitsTest {
         b.forEachSet { seen.add(it) }
         assertEquals(listOf(0, 63, 64, 100, 199), seen)
     }
+
+    @Test
+    fun `companion set has and clear round trip across words`() {
+        val bits = LongArray(3)
+        Bits.set(bits, 0)
+        Bits.set(bits, 63)
+        Bits.set(bits, 64)
+        Bits.set(bits, 129)
+        assertTrue(Bits.has(bits, 0))
+        assertTrue(Bits.has(bits, 63))
+        assertTrue(Bits.has(bits, 64))
+        assertTrue(Bits.has(bits, 129))
+        assertFalse(Bits.has(bits, 1))
+        assertFalse(Bits.has(bits, 128))
+        Bits.clear(bits, 64)
+        assertFalse(Bits.has(bits, 64))
+        assertTrue(Bits.has(bits, 63))
+    }
+
+    @Test
+    fun `fillRange sets a half open range across word boundaries`() {
+        val bits = LongArray(3)
+        Bits.fillRange(bits, 61, 67)
+        for (i in 0..60) assertFalse(Bits.has(bits, i), "bit $i")
+        for (i in 61..66) assertTrue(Bits.has(bits, i), "bit $i")
+        for (i in 67..140) assertFalse(Bits.has(bits, i), "bit $i")
+    }
+
+    @Test
+    fun `clearBelow clears only bits below exclusive boundary`() {
+        val bits = LongArray(3)
+        Bits.fillRange(bits, 0, 140)
+        Bits.clearBelow(bits, 65)
+        for (i in 0..64) assertFalse(Bits.has(bits, i), "bit $i")
+        for (i in 65..139) assertTrue(Bits.has(bits, i), "bit $i")
+    }
+
+    @Test
+    fun `clearAbove clears only bits above inclusive boundary`() {
+        val bits = LongArray(3)
+        Bits.fillRange(bits, 0, 140)
+        Bits.clearAbove(bits, 65)
+        for (i in 0..65) assertTrue(Bits.has(bits, i), "bit $i")
+        for (i in 66..139) assertFalse(Bits.has(bits, i), "bit $i")
+    }
+
+    @Test
+    fun `firstSet and lastSet return sentinel for empty and extremes for populated`() {
+        val empty = LongArray(2)
+        assertEquals(-1, Bits.firstSet(empty))
+        assertEquals(-1, Bits.lastSet(empty))
+
+        val bits = LongArray(3)
+        Bits.set(bits, 5)
+        Bits.set(bits, 73)
+        Bits.set(bits, 130)
+        assertEquals(5, Bits.firstSet(bits))
+        assertEquals(130, Bits.lastSet(bits))
+    }
 }
