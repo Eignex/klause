@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.localsearch.driver
+package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

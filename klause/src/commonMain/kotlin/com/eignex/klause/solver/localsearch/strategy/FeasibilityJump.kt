@@ -1,9 +1,8 @@
-package com.eignex.klause.solver.localsearch.recipe
+package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
-import com.eignex.klause.solver.localsearch.driver.SourceDrivenStrategy
 import com.eignex.klause.solver.localsearch.movesource.ArgminJump
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
