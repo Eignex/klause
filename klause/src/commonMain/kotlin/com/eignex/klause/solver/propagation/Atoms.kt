@@ -8,7 +8,7 @@ internal fun PropagationState.markAtomWatched(atomId: Int) {
     val v = atomIntVar[atomId]
     val kind = atomKind[atomId]
     val k = atomThreshold[atomId]
-    val idx = watchedAtomsByVar.getOrPut(v) { VarAtomIndex() }
+    val idx = watchedAtomsByVar[v] ?: VarAtomIndex().also { watchedAtomsByVar[v] = it }
     val keys = idx.keysOf(kind)
     val at = keys.lowerBound(k)
     if (at < keys.size && keys[at] == k) return // already tracked
@@ -168,7 +168,7 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
     atomWatchersByLit.add(null) // positive-literal watcher slot for this atom
     atomWatchersByLit.add(null) // negative-literal watcher slot
     atomByKey.put(key, id)
-    atomsByIntVar.getOrPut(intVar) { VarAtomIndex() }.insert(kind, threshold, id)
+    (atomsByIntVar[intVar] ?: VarAtomIndex().also { atomsByIntVar[intVar] = it }).insert(kind, threshold, id)
     return problem.numBoolVars + id
 }
 
