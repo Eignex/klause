@@ -10,20 +10,6 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.lp.AllDifferentSeparator
-import com.eignex.klause.solver.lp.AssignmentObjectiveCut
-import com.eignex.klause.solver.lp.Basis
-import com.eignex.klause.solver.lp.CircuitSeparator
-import com.eignex.klause.solver.lp.CliqueCutSeparator
-import com.eignex.klause.solver.lp.CpToLpRelaxation
-import com.eignex.klause.solver.lp.CumulativeEnergeticBound
-import com.eignex.klause.solver.lp.CumulativeFlowBound
-import com.eignex.klause.solver.lp.Cut
-import com.eignex.klause.solver.lp.CutSeparator
-import com.eignex.klause.solver.lp.GccSeparator
-import com.eignex.klause.solver.lp.KnapsackCoverSeparator
-import com.eignex.klause.solver.lp.KnapsackLagrangianBound
-import com.eignex.klause.solver.lp.LagrangianBound
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationResult
@@ -306,196 +292,22 @@ class BacktrackSolver(override val problem: Problem) :
         private val externalShared = params.objectiveBoundSupplier != null
         private val sink = SolveStatsSink(backend = "backtrack")
 
-        // --- LP-relaxation family state (built once; persists across slices = rolling warm starts). ---
-        private val lpRelaxer = if (params.lpBounding) {
-            CpToLpRelaxation(
-                problem,
-                objective,
-                elementHull = params.lpElement,
-                tableHull = params.lpTable,
-                cumulative = params.lpCumulative,
-                diffn = params.lpDiffn,
-                cumulativeTimeIndexed = params.lpCumulativeTimeIndexed,
-                nValueHull = params.lpNValue,
-                regularHull = params.lpRegular,
-                mddHull = params.lpMdd,
-                gccCountHull = params.lpGccCount,
-                circuitArcs = params.lpCircuit,
-                objectiveCone = params.lpObjectiveCone,
-            )
-        } else {
-            null
-        }
-
-        // Structure-based cut separators (#22/#705) run on the sparse LP point; circuit cuts are deferred
-        // until the arc model is rebuilt on the sparse relaxation.
-        private val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
-            buildList {
-                if (params.lpCuts) {
-                    add(AllDifferentSeparator())
-                    add(GccSeparator())
-                    add(KnapsackCoverSeparator())
-                    add(CliqueCutSeparator())
-                    val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
-                    add(AssignmentObjectiveCut(coef))
-                }
-                if (params.lpCircuit) add(CircuitSeparator())
-            }
-        } else {
-            emptyList()
-        }
-
-        // Persistent pool of global cuts harvested from the root relaxation (#22); filled in
-        // [initRootLp] where the cancellation token is live. Global, so sound at every node.
-        private var lpGlobalCuts: List<Cut> = emptyList()
-        private val lagBound = if (params.lagrangian) {
-            LagrangianBound(problem, objective).takeIf { it.applicable }
-        } else {
-            null
-        }
-        private var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
-        private val knapsackLagBound = if (params.lpKnapsackLagrangian) {
-            KnapsackLagrangianBound(problem, objective).takeIf { it.applicable }
-        } else {
-            null
-        }
-        private var knapsackLagMultipliers = LongArray(knapsackLagBound?.multiplierCount ?: 0)
-        private val energeticBound = if (params.energeticReasoning) {
-            CumulativeEnergeticBound(problem).takeIf { it.applicable }
-        } else {
-            null
-        }
-        private val cumulativeFlowBound = if (params.lpCumulativeFlow) {
-            CumulativeFlowBound(problem).takeIf { it.applicable }
-        } else {
-            null
-        }
-        private var lpCheckCounter = 0
-        private var energeticCheckCounter = 0
-        private var cumulativeFlowCheckCounter = 0
-
-        // Adaptive LP auto-off (#614, superseding the static #562 one-shot): gate the per-node LP on a
-        // rolling prune-rate window and re-probe a disabled LP on exponential backoff, so a relaxation
-        // that is useless near the root but tightens deeper is recovered. Sound: gating only drops a
-        // bound (loses pruning, never solutions), so `-t` is honoured (the gate only reduces work).
-        private val lpAutoOff = LpAutoOff(
-            reprobeBase = if (params.lpAutoOffReprobe) LpAutoOff.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
-        )
-        private val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
-        private val lpBasisByDepth = ArrayList<Basis?>()
-        private val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
-        private var lpBackjump: Learned? = null
+        // --- LP-relaxation family state (built once; persists across slices = rolling warm starts).
+        // Always constructed so the always-on linear lower bound runs; its internal bounds are null/empty
+        // when their feature flag is off. ---
+        private val lpEngine = LpEngine(problem, objective, params, sink)
 
         private val pruneIf: (PropagationSession) -> Boolean = { session ->
-            lpBackjump = null
-            // Fields captured into stable locals so the null-guards below smart-cast (a `val` property
-            // read across a lambda boundary does not on its own).
-            val lpRelaxerL = lpRelaxer
-            val lagBoundL = lagBound
-            val knapsackLagBoundL = knapsackLagBound
-            val energeticBoundL = energeticBound
-            val cumulativeFlowBoundL = cumulativeFlowBound
-            val lpNogoodsL = lpNogoods
             val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
-            when {
-                linearLowerBound(objective, session) >= effectiveBound -> true
-
-                energeticBoundL != null && ++energeticCheckCounter % params.energeticEvery == 0 &&
-                    energeticBoundL.isInfeasible(session) -> {
-                    sink.observeEnergeticPrune()
-                    if (lpNogoodsL != null) energeticBoundL.explain(session)?.let { lpNogoodsL.add(it) }
-                    true
-                }
-
-                cumulativeFlowBoundL != null &&
-                    ++cumulativeFlowCheckCounter % params.lpCumulativeFlowEvery == 0 &&
-                    cumulativeFlowBoundL.isInfeasible(session) -> {
-                    sink.observeEnergeticPrune() // same scheduling-feasibility-prune family
-                    if (lpNogoodsL != null) cumulativeFlowBoundL.explain(session)?.let { lpNogoodsL.add(it) }
-                    true
-                }
-
-                lagBoundL != null && run {
-                    val res = lagBoundL.computeBound(
-                        session,
-                        effectiveBound,
-                        lagMultipliers,
-                        params.lagrangianIterations,
-                    )
-                    if (res != null) {
-                        lagMultipliers = res.multipliers
-                        if (res.prune) sink.observeLagrangianPrune()
-                        res.prune
-                    } else {
-                        false
-                    }
-                } -> true
-
-                knapsackLagBoundL != null && run {
-                    val res = knapsackLagBoundL.computeBound(
-                        session,
-                        effectiveBound,
-                        knapsackLagMultipliers,
-                        params.lagrangianIterations,
-                    )
-                    if (res != null) {
-                        knapsackLagMultipliers = res.multipliers
-                        if (res.prune) sink.observeLagrangianPrune()
-                        res.prune
-                    } else {
-                        false
-                    }
-                } -> true
-
-                lpRelaxerL != null &&
-                    session.decisionLevel <= params.lpBoundMaxDepth &&
-                    ++lpCheckCounter % params.lpBoundEvery == 0 &&
-                    lpAutoOff.shouldRun() -> {
-                    val depth = session.decisionLevel
-                    // Warm-start this node's LP from the parent depth's optimal basis (#705): tightening
-                    // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
-                    val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
-                        lpBasisByDepth[depth - 1]
-                    } else {
-                        null
-                    }
-                    val outcome = lpBoundAndFix(
-                        lpRelaxerL,
-                        session,
-                        effectiveBound,
-                        sink,
-                        objectiveVar = singleObj?.varId ?: -1,
-                        objectiveAscending = singleObj?.ascending ?: true,
-                        globalCuts = lpGlobalCuts,
-                        cancellation = params.cancellation,
-                        hints = lpHints,
-                        learn = params.lpLearn,
-                        warm = warm,
-                    )
-                    if (outcome.basis != null) {
-                        while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
-                        lpBasisByDepth[depth] = outcome.basis
-                    }
-                    val explanation = outcome.explanation
-                    if (explanation != null) {
-                        val analyzed = session.analyzeConflictClause(explanation) as? Learned
-                        if (analyzed != null && analyzed.asserting) {
-                            lpBackjump = analyzed
-                        } else {
-                            lpNogoods?.add(
-                                explanation,
-                            )
-                        }
-                    }
-                    lpAutoOff.record(outcome.prune)
-                    outcome.prune
-                }
-
-                else -> false
-            }
+            lpEngine.pruneNode(
+                session,
+                effectiveBound,
+                singleObj?.varId ?: -1,
+                singleObj?.ascending ?: true,
+            )
         }
-        private val pruneLearned: () -> Learned? = { lpBackjump }
+        private val pruneLearned: () -> Learned? = { lpEngine.lastBackjump() }
 
         // --- Engine / DFS state (was driveSearch locals), all promoted to fields so a slice can pause. ---
         private val session = PropagationSession(problem)
@@ -657,21 +469,24 @@ class BacktrackSolver(override val problem: Problem) :
          * live cancellation gates the LP solves it issues. Idempotent via that guard.
          */
         private fun initRootLp() {
-            val relaxer = lpRelaxer ?: return
+            val relaxer = lpEngine.lpRelaxer ?: return
             val gomory = params.lpCuts && params.lpGomory
             val mir = params.lpCuts && params.lpMir
-            if (lpSeparators.isNotEmpty() || gomory || mir) {
-                lpGlobalCuts = harvestRootCuts(
+            if (lpEngine.lpSeparators.isNotEmpty() || gomory || mir) {
+                lpEngine.lpGlobalCuts = lpEngine.harvestRootCuts(
                     relaxer,
                     PropagationSession(problem),
-                    lpSeparators,
+                    lpEngine.lpSeparators,
                     gomory,
                     mir,
                     params.cancellation,
                 )
-                sink.observeLpCuts(lpGlobalCuts.size)
+                sink.observeLpCuts(lpEngine.lpGlobalCuts.size)
             }
-            sink.observeRootLpBound(0, rootLpRelaxationBound(relaxer, lpGlobalCuts, params.cancellation))
+            sink.observeRootLpBound(
+                0,
+                lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, params.cancellation),
+            )
         }
 
         /** Advance the search to the next reportable event (a new incumbent, the terminal verdict, or —
@@ -687,8 +502,8 @@ class BacktrackSolver(override val problem: Problem) :
                 initRootLp()
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
-                if (params.lpProbe && lpRelaxer != null) {
-                    val seed = lpRoundingProbe(objective, params.cancellation)
+                if (params.lpProbe && lpEngine.lpRelaxer != null) {
+                    val seed = lpEngine.lpRoundingProbe(objective, params.cancellation)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }
             }
@@ -748,7 +563,7 @@ class BacktrackSolver(override val problem: Problem) :
                             varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
                             boolTarget, boolTargetSet, rephaseMode, rng,
                         )
-                        val ordered = lpHints?.order(varRef, phased) ?: phased
+                        val ordered = lpEngine.lpHints?.order(varRef, phased) ?: phased
                         val node = makeNode(varRef, ordered)
                         val decsBefore = decisionsLeft
                         val out = advance(
@@ -930,6 +745,7 @@ class BacktrackSolver(override val problem: Problem) :
                     if (res is PropagationResult.Unsat) return terminalExhausted()
                 }
             }
+            val lpNogoods = lpEngine.lpNogoods
             if (lpNogoods != null) {
                 for (nogood in lpNogoods.drain()) {
                     val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)

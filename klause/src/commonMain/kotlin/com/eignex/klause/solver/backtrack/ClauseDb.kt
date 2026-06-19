@@ -428,6 +428,13 @@ internal fun BacktrackSolver.snapshotAssignment(session: PropagationSession): Sa
     return Sample(bools, ints)
 }
 
+internal fun LpEngine.snapshotAssignment(session: PropagationSession): Sample {
+    val sp = session.problem
+    val bools = BooleanArray(sp.numBoolVars) { v -> session.boolValue(v) ?: false }
+    val ints = IntArray(sp.numIntVars) { v -> session.intDomain(v).min }
+    return Sample(bools, ints)
+}
+
 internal fun BacktrackSolver.farEnough(candidate: Sample, window: ArrayDeque<Sample>, minDistance: Int): Boolean {
     if (minDistance <= 0 || window.isEmpty()) return true
     for (p in window) if (candidate.hammingDistanceTo(p) < minDistance) return false
