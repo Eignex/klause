@@ -343,20 +343,18 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
         advance()
         return t.value
     }
-    private fun expectFloatOrIntAsDouble(): Double {
-        return when (val t = peek()) {
-            is FznToken.FloatLit -> {
-                advance()
-                t.value
-            }
-
-            is FznToken.IntLit -> {
-                advance()
-                t.value.toDouble()
-            }
-
-            else -> failHere("expected float literal")
+    private fun expectFloatOrIntAsDouble(): Double = when (val t = peek()) {
+        is FznToken.FloatLit -> {
+            advance()
+            t.value
         }
+
+        is FznToken.IntLit -> {
+            advance()
+            t.value.toDouble()
+        }
+
+        else -> failHere("expected float literal")
     }
     private fun failHere(msg: String): Nothing {
         val t = peek()
