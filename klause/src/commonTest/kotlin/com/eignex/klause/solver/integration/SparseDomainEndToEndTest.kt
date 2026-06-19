@@ -1,5 +1,6 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.integration
 
+import com.eignex.klause.solver.*
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.InputOrder

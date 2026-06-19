@@ -1,5 +1,6 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.factor
 
+import com.eignex.klause.solver.*
 import com.eignex.klause.solver.factor.Product
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
