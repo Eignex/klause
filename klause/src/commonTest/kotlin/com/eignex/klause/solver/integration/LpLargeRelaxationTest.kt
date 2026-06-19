@@ -228,6 +228,77 @@ class LpLargeRelaxationTest {
         }
     }
 
+    @Test
+    fun `a starved root LP budget degrades gracefully without losing the optimum`() {
+        // #31: the pre-search root LP work (cut harvest + root-bound + probe) is time-boxed so a slow
+        // root relaxation can't starve search. A zero budget cancels every root step immediately; the
+        // solve must still reach the true optimum from search alone (graceful, sound degradation).
+        val rng = Random(31_31_31)
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
+            repeat(40) { _ ->
+                val n = rng.nextInt(3, 6)
+                val ub = IntArray(n) { rng.nextInt(2, 6) }
+                val cost = LongArray(n) { rng.nextLong(-6, 7) }
+                val cons = ArrayList<Pair<LongArray, Long>>()
+                repeat(rng.nextInt(1, 4)) { _ -> cons.add(LongArray(n) { rng.nextLong(-3, 4) } to rng.nextLong(0, 15)) }
+                val brute = bruteMin(n, ub, cost, cons)
+
+                val domains = Array(n) { IntDomain(0, ub[it]) }
+                val factors = cons.map { (c, r) ->
+                    Linear(c.map { it.toInt() }.toIntArray(), IntArray(n) { it }, LinearOp.LE, r.toInt())
+                }.toTypedArray<Factor>()
+                val problem = Problem(0, n, domains, factors)
+                val obj = LinearObjective(intCoefficients = cost)
+                val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 7L))
+                assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
+
+                // rootBudgetMillis = 0 ⇒ Cancellation.after(0) is already passed ⇒ every root step bails.
+                val starved = resolved.copy(lpPlan = resolved.lpPlan.copy(rootBudgetMillis = 0L))
+                when (val res = BacktrackSolver(problem).minimize(obj, starved)) {
+                    is MinimizeResult.Optimal ->
+                        assertEquals(
+                            (brute ?: error("solver Optimal but brute infeasible")).toDouble(),
+                            res.objective,
+                            1e-9,
+                        )
+
+                    is MinimizeResult.Infeasible -> assertTrue(brute == null, "solver Infeasible but brute feasible")
+
+                    else -> error("unexpected $res")
+                }
+            }
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
+    @Test
+    fun `an unbudgeted root LP still captures the root bound`() {
+        // The complement of the starvation guard: rootBudgetFraction = 0 disables the cap, so the root
+        // relaxation bound is captured (finite) exactly as before the #31 budget. A feasible-and-bounded
+        // small minimize has a finite LP relaxation, so a finite rootLpBound proves the root solve ran.
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
+            val problem = Problem(
+                0,
+                3,
+                Array(3) { IntDomain(0, 4) },
+                arrayOf<Factor>(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 5)),
+            )
+            val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
+            val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 2L))
+            val unbudgeted = resolved.copy(lpPlan = resolved.lpPlan.copy(rootBudgetFraction = 0.0))
+            val res = BacktrackSolver(problem).minimize(obj, unbudgeted)
+            assertTrue(res is MinimizeResult.Optimal && res.objective == 5.0, "expected optimum 5, got $res")
+            assertTrue(res.stats.rootLpBound.isFinite(), "the unbudgeted root LP must capture a finite root bound")
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
     /** Min x0 over feasible assignments (LE/GE/EQ), or null if infeasible — the brute oracle. */
     private fun bruteMinX0(n: Int, ub: IntArray, cons: List<Triple<IntArray, LinearOp, Int>>): Long? {
         val x = IntArray(n)
