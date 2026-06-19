@@ -75,7 +75,7 @@ internal fun FlatZincCompiler.compileParamArray(name: String, elem: FznType, lit
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
-internal fun FlatZincCompiler.arrayToFlatZincArray(arr: ParamValue.Array): FlatZincArray = arr.arr
+internal fun arrayToFlatZincArray(arr: ParamValue.Array): FlatZincArray = arr.arr
 
 /** Constant-evaluate `e` as an integer. */
 internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
@@ -138,18 +138,6 @@ internal fun FlatZincCompiler.evalFloatConst(e: FznExpr): Double = when (e) {
     }
 
     else -> failHere("expected float constant, got ${e::class.simpleName}")
-}
-
-internal fun FlatZincCompiler.evalBoolConst(e: FznExpr): Boolean = when (e) {
-    is FznExpr.BoolLit -> e.value
-
-    is FznExpr.Ident -> when (val p = params[e.name]) {
-        is ParamValue.Bool -> p.value
-        null -> failHere("`${e.name}` is not a constant bool")
-        else -> failHere("`${e.name}` is not a bool")
-    }
-
-    else -> failHere("expected bool constant, got ${e::class.simpleName}")
 }
 
 /** Resolve a constraint argument that's expected to be a list of int constants. */

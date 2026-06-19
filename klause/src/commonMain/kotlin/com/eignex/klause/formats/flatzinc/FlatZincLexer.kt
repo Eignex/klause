@@ -12,7 +12,7 @@ internal sealed interface FznToken {
     data class FloatLit(val value: Double, override val line: Int, override val col: Int) : FznToken
     data class StringLit(val value: String, override val line: Int, override val col: Int) : FznToken
 
-    /** Punctuation: `,`, `;`, `:`, `=`, `(`, `)`, `[`, `]`, `{`, `}`, `..`, `::`. */
+    /** Punctuation: ,;:=()[]{}.: */
     data class Punct(val symbol: String, override val line: Int, override val col: Int) : FznToken
     data class Eof(override val line: Int, override val col: Int) : FznToken
 }
@@ -23,9 +23,9 @@ internal sealed interface FznToken {
 class FlatZincParseException(
     message: String,
     /** 1-based source line of the error. */
-    val sourceLine: Int,
+    sourceLine: Int,
     /** 1-based source column of the error. */
-    val sourceCol: Int,
+    sourceCol: Int,
 ) : RuntimeException("$message (at $sourceLine:$sourceCol)")
 
 /**

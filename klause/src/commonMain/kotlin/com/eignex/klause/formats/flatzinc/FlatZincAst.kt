@@ -53,11 +53,10 @@ internal data class FznAnnotation(val name: String, val args: List<FznExpr>)
 internal data class FznVarDecl(
     val name: String,
     val type: FznType,
-    /** `true` for `var T`, `false` for parameter (constant) declarations. */
     val isVar: Boolean,
     val annotations: List<FznAnnotation>,
     /** Initialization expression. For parameters this is the constant value. For vars it
-     *  can be an alias of another var (e.g. `var int: y :: ... = x;`). */
+     *  can be an alias of another var. */
     val value: FznExpr?,
 )
 
@@ -74,6 +73,5 @@ internal data class FznModel(
     val varDecls: List<FznVarDecl>,
     val constraints: List<FznConstraint>,
     val solve: FznSolve,
-    /** Raw `output [...]` expression list; `null` if there's no output item. */
     val output: List<FznExpr>?,
 )
