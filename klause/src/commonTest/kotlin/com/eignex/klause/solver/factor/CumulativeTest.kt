@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
@@ -444,5 +445,74 @@ class CumulativeTest {
         )
         val ok = problem.propagate(Assumptions(ints = mapOf(1 to 0)))
         assertTrue(ok is PropagationResult.Implied, "task 1 at t=0 (before task 0) must stay feasible; got $ok")
+    }
+
+    @Test
+    fun `backtrack learning enumerates exactly the brute-force solution set`() {
+        // Each instance triggers wide time-tabling pushes (push > duration) under conflict-driven
+        // learning, exercising the window-scoped tightening reason. Small durations against a tight
+        // capacity make most shaves span several slots, so the analyzer learns clauses built from
+        // [Cumulative.windowOverloadReason]; an over-strong (unsound) reason would drop a feasible
+        // leaf, so equality with brute force is the soundness check.
+        data class Inst(val durs: IntArray, val res: IntArray, val cap: Int, val lo: Int, val hi: Int)
+        val instances = listOf(
+            // 4 unit tasks, unary capacity, shared window [0,3] → the 24 distinct-slot permutations.
+            Inst(intArrayOf(1, 1, 1, 1), intArrayOf(1, 1, 1, 1), cap = 1, lo = 0, hi = 3),
+            // 3 unit tasks demanding 2 of a capacity-3 resource: any overlap (2+2 > 3) is forbidden,
+            // so again distinct slots, over a wider window [0,4].
+            Inst(intArrayOf(1, 1, 1), intArrayOf(2, 2, 2), cap = 3, lo = 0, hi = 4),
+            // duration-2 tasks, unary, window [0,5]: feasible iff pairwise non-overlapping; pushes of
+            // 3+ (> the duration 2) occur as tasks serialise, hitting the wide-push branch.
+            Inst(intArrayOf(2, 2, 2), intArrayOf(1, 1, 1), cap = 1, lo = 0, hi = 5),
+            // mixed durations and demands under capacity 2 over [0,4].
+            Inst(intArrayOf(2, 1, 2), intArrayOf(1, 2, 1), cap = 2, lo = 0, hi = 4),
+        )
+        for ((idx, inst) in instances.withIndex()) {
+            val k = inst.durs.size
+            // Brute-force reference: every start combination whose summed usage never exceeds capacity.
+            val brute = HashSet<List<Int>>()
+            fun feasible(starts: IntArray): Boolean {
+                val occ = HashMap<Int, Int>()
+                for (i in 0 until k) {
+                    for (t in starts[i] until starts[i] + inst.durs[i]) {
+                        val u = (occ[t] ?: 0) + inst.res[i]
+                        if (u > inst.cap) return false
+                        occ[t] = u
+                    }
+                }
+                return true
+            }
+            fun rec(i: Int, acc: IntArray) {
+                if (i == k) {
+                    if (feasible(acc)) brute.add(acc.toList())
+                    return
+                }
+                for (v in inst.lo..inst.hi) {
+                    acc[i] = v
+                    rec(i + 1, acc)
+                }
+            }
+            rec(0, IntArray(k))
+
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = k,
+                intDomains = Array(k) { IntDomain(inst.lo, inst.hi) },
+                factors = arrayOf<Factor>(
+                    Cumulative(
+                        starts = IntArray(k) { it },
+                        durations = inst.durs,
+                        resources = inst.res,
+                        capacity = inst.cap,
+                    ),
+                ),
+            )
+            // CDCL so conflict analysis + clause learning (hence the window reasons) actually run;
+            // no restarts so enumeration completeness is simple to reason about.
+            val params = BacktrackParams(randomSeed = 1, variableSelector = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.toList() }.toHashSet()
+            assertEquals(brute, found, "instance #$idx: cumulative backtrack solution set must equal brute force")
+        }
     }
 }

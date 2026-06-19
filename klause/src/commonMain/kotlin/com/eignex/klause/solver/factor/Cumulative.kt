@@ -731,8 +731,9 @@ class Cumulative(
      * [newMin − d, newMin − 1]` makes `i` cover `t*` and overload it. With `i` already at or above
      * `[newMin − d]` (`newMin − oldMin ≤ d`), forbidding that window pushes the bound to [newMin].
      * Cites the profile at `t*` (blaming `i`, whose own part `overloadsAt` discounts) plus `i`'s own
-     * `start_i ≥ oldMin` premise when non-trivial. Returns `null` (caller falls back) when the push
-     * spans more than the duration, where a single point no longer covers the whole forbidden range.
+     * `start_i ≥ oldMin` premise when non-trivial. For a wider push (`newMin − oldMin > d`) a single
+     * point no longer covers the whole forbidden range, so it cites the window reason
+     * ([windowOverloadReason]) over the points any forbidden placement could cover.
      */
     private fun minTightenReason(
         state: PropagationState,
@@ -742,16 +743,20 @@ class Cumulative(
         newMin: Int,
         eff: Eff,
     ): IntArray? {
-        if (newMin - oldMin > d) return null
         val orig = state.problem.intDomains[starts[i]]
         val extra = if (oldMin > orig.min) Lit.make(state.atomVarGe(starts[i], oldMin), false) else 0
+        if (newMin - oldMin > d) {
+            // Forbidden placements [oldMin, newMin − 1] each occupy [v, v + d); their union of covered
+            // points is [oldMin, newMin − 1 + d).
+            return windowOverloadReason(state, i, oldMin, newMin - 1 + d, eff, extra)
+        }
         return pointwiseOverloadReason(state, newMin - 1, eff, blamed = i, blamedStart = extra)
     }
 
     /** Mirror of [minTightenReason] for lowering `start_i`'s upper bound from [oldMax] to [newMax].
      *  The blocking point is `t* = newMax + d` (the point [newMax] + 1's placement uncovers); any
      *  start in `[newMax + 1, newMax + d]` makes `i` cover it. Cites `i`'s `start_i ≤ oldMax` premise
-     *  when non-trivial. Returns `null` for pushes wider than the duration. */
+     *  when non-trivial. For a wider push it cites the window reason over `[newMax + 1, oldMax + d)`. */
     private fun maxTightenReason(
         state: PropagationState,
         i: Int,
@@ -760,10 +765,61 @@ class Cumulative(
         newMax: Int,
         eff: Eff,
     ): IntArray? {
-        if (oldMax - newMax > d) return null
         val orig = state.problem.intDomains[starts[i]]
         val extra = if (oldMax < orig.max) Lit.make(state.atomVarLe(starts[i], oldMax), false) else 0
+        if (oldMax - newMax > d) {
+            // Forbidden placements [newMax + 1, oldMax] each occupy [v, v + d); union [newMax + 1, oldMax + d).
+            return windowOverloadReason(state, i, newMax + 1, oldMax + d, eff, extra)
+        }
         return pointwiseOverloadReason(state, newMax + d, eff, blamed = i, blamedStart = extra)
+    }
+
+    /**
+     * Sound time-tabling reason for a wide push, scoped to a window of covered time points
+     * `[winLo, winHi)` rather than every task. Cites the current bounds of each other task whose
+     * compulsory part `[lst_k, ect_k) = [start_k.max, start_k.min + d_k)` overlaps the window, plus
+     * [extra] (the pushed task's prior bound) and the energy / capacity premises ([citeEnergyBounds]).
+     *
+     * Soundness: any model satisfying a cited task's bounds keeps `start_k ∈ [start_k.min, start_k.max]`,
+     * so `k` still occupies its whole compulsory part `[lst_k, ect_k)` — the mandatory profile over the
+     * window is therefore ≥ the one the push was computed against, so every placement of the pushed
+     * task across the forbidden range still overloads and the bound holds. Tasks whose compulsory part
+     * misses the window contribute no load there, so dropping them is sound; this is the constraint-wide
+     * reason restricted to the window's witnesses. A `null` return (no task cited, all bounds original)
+     * means the deduction rests only on the root domains — a level-0 fact, like the other reasons here.
+     */
+    private fun windowOverloadReason(
+        state: PropagationState,
+        i: Int,
+        winLo: Int,
+        winHi: Int,
+        eff: Eff,
+        extra: Int,
+    ): IntArray? {
+        val out = IntArrayList()
+        if (extra != 0) out.add(extra)
+        citeEnergyBounds(out, state, i, eff)
+        for (k in 0 until n) {
+            if (k == i) continue
+            val dk = eff.dur[k]
+            val rk = eff.res[k]
+            if (dk <= 0 || rk <= 0) continue
+            val dom = state.intDomains[starts[k]]
+            val lst = dom.max
+            val ect = dom.min + dk
+            if (lst >= ect) continue // no compulsory part
+            if (ect <= winLo || lst >= winHi) continue // compulsory part misses the window
+            val orig = state.problem.intDomains[starts[k]]
+            if (dom.min > orig.min) out.add(Lit.make(state.atomVarGe(starts[k], dom.min), false))
+            if (dom.max < orig.max) out.add(Lit.make(state.atomVarLe(starts[k], dom.max), false))
+            citeEnergyBounds(out, state, k, eff)
+        }
+        if (capacityVar >= 0) {
+            val orig = state.problem.intDomains[capacityVar]
+            if (eff.cap < orig.max) out.add(Lit.make(state.atomVarLe(capacityVar, eff.cap), false))
+        }
+        if (out.size == 0) return null
+        return out.toIntArray()
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
