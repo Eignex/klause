@@ -41,23 +41,17 @@ import kotlin.random.Random
  */
 class LocalSearchSolver(
     override val problem: Problem,
-    // SOTA defaults (2026): adaptive probSAT with the OrImproving tabu aspiration. probSAT's
-    // continuous-weighted candidate distribution handles mixed-degree factor problems more
-    // gracefully than WalkSat's binary noise/greedy split; the adaptive controller removes
-    // the cb-tuning burden by widening the distribution during stalls and re-sharpening on
-    // progress (Hoos 2002, Balint-Schöning 2012). Tabu aspiration admits individually
-    // improving moves that would otherwise be blocked by the tenure window.
-    /** SourceDrivenStrategy used during the satisfy phase. */
+    /** SourceDrivenStrategy used during the satisfy phase. Default is adaptive probSAT with the
+     *  OrImproving tabu aspiration: a continuous-weighted candidate distribution that handles
+     *  mixed-degree factor problems, self-tuning by widening on stalls and re-sharpening on
+     *  progress; the aspiration admits individually improving moves the tenure window would block. */
     val strategy: SourceDrivenStrategy = ProbSat.adaptive(
         tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
     ),
-    /** SourceDrivenStrategy used during the feasibility-fight phase of [minimize]. `null` (default)
-     *  reuses [strategy], preserving backward-compat — users who override [strategy] for
-     *  optimization workloads get that same strategy in minimize without re-passing it.
-     *  Override explicitly to decouple the satisfy-mode and minimize-mode strategies; the
-     *  common case is satisfy-mode [ProbSat.adaptive] + minimize-mode [Cbls] for decomposed CP
-     *  problems, where CBLS's global weighted-violation gradient descends the objective on
-     *  instances where probSAT alone plateaus. */
+    /** SourceDrivenStrategy for the feasibility-fight phase of [minimize]. `null` reuses [strategy].
+     *  Override to decouple satisfy-mode and minimize-mode strategies; the common case is satisfy
+     *  [ProbSat.adaptive] + minimize [Cbls] for decomposed CP problems, where CBLS's weighted-violation
+     *  gradient descends the objective on instances where probSAT plateaus. */
     val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Restart policy controlling diversification. */
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
@@ -66,53 +60,41 @@ class LocalSearchSolver(
      *  breaks feasibility but a coordinated 2-flip preserves it (common in
      *  binary-decision optimization like knapsack / packing). 0 disables pair-swap. */
     val pairSwapBudget: Int = 256,
-    /** When true (default), restarts run a greedy-repair pass after randomizing so the
-     *  search starts closer to feasibility. Large instances of decomposed CP problems
-     *  routinely produce thousands of violations from a random start; the greedy pass
-     *  walks vars in a randomized order and picks the value that minimizes immediate
-     *  violation contribution. Idempotent and bounded by [Problem.numBoolVars +
-     *  numIntVars]. */
+    /** When true (default), restarts run a greedy-repair pass after randomizing so the search starts
+     *  closer to feasibility. The pass walks vars in randomized order and picks the value that
+     *  minimizes immediate violation contribution. Idempotent and bounded by the variable count. */
     val greedyRepairOnRestart: Boolean = true,
-    /** Optional definitional sweep (see [com.eignex.klause.solver.localsearch.DefinitionalSweep]): after
-     *  every restart's randomization, defined (aux) vars are *evaluated* bottom-up from the
-     *  free decision vars instead of left random — decomposed models start each restart at
-     *  the "only real constraints violated" frontier rather than spending millions of flips
-     *  hand-repairing definitional channels. Wired by FlatZinc-facing callers from
-     *  `FlatZincProgram.definitionalSweep`; null = behavior unchanged. */
+    /** Optional definitional sweep (see [DefinitionalSweep]): after every restart's randomization,
+     *  defined (aux) vars are *evaluated* bottom-up from the free decision vars instead of left
+     *  random, so decomposed models start each restart at the "only real constraints violated"
+     *  frontier. Null = behavior unchanged. */
     val definitionalSweep: DefinitionalSweep? = null,
-    /** Per-move one-way invariants (issue #153, opt-in): maintain [definitionalSweep]'s
-     *  definitions incrementally after every applied move and exclude defined vars from move
-     *  generation entirely — the move space shrinks to true decision variables. Requires
-     *  [definitionalSweep]; the restart-time sweep stays active as the full (re)initializer. */
+    /** Per-move one-way invariants (opt-in): maintain [definitionalSweep]'s definitions incrementally
+     *  after every applied move and exclude defined vars from move generation, shrinking the move
+     *  space to true decision variables. Requires [definitionalSweep]; the restart-time sweep stays
+     *  active as the full (re)initializer. */
     val perMoveInvariants: Boolean = false,
-    /** Implicit-solving feasible init (opt-in, default off): after each restart's randomization
-     *  the engine seeds elected structural globals (see [LocalSearchState.electedImplicit]) into
-     *  a feasible configuration via [com.eignex.klause.solver.Factor.seedFeasible] — an
-     *  all-different becomes a partial permutation, a circuit a single tour — so the search
-     *  starts inside those constraints' feasible region and their structure-preserving moves
-     *  are productive from the first step. Off by default so existing convergence is unchanged;
-     *  enabled by the portfolio on permutation/assignment-shaped models. */
+    /** Implicit-solving feasible init (opt-in): after each restart's randomization the engine seeds
+     *  elected structural globals (see [LocalSearchState.electedImplicit]) into a feasible
+     *  configuration via [com.eignex.klause.solver.Factor.seedFeasible] — an all-different becomes a
+     *  partial permutation, a circuit a single tour — so the search starts inside those constraints'
+     *  feasible region and their structure-preserving moves are productive from the first step. */
     val seedImplicitOnRestart: Boolean = false,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
 
-    /** Enumerate-all structured-move source for [structuredMoveStep] — the same generator CBLS
-     *  draws from (random-sampled), shared per epic #710. */
     private val satisfiedStructured: SatisfiedStructured = SatisfiedStructured.all()
 
-    /** Greedy-repair restart initializer (epic #710); shared by the satisfy and optimize restarts. */
     private val greedyInit: GreedyInit = GreedyInit()
 
-    /** The restart cadence carried by the strategy's schedule axis (`ScheduleBundle.restart`) when it
-     *  declares one, else the solver-level [restartPolicy]. Lets a recipe own restart as a schedule
-     *  dimension while non-recipe callers keep passing it directly. */
+    // The strategy's schedule-axis restart cadence (`ScheduleBundle.restart`) when it declares one,
+    // else the solver-level restartPolicy.
     private val configuredRestart: RestartPolicy =
         strategy.schedule.restart ?: restartPolicy
 
-    /** The restart policy actually driven by the engine: when a [definitionalSweep] is present
-     *  or [seedImplicitOnRestart] is set, every restart is followed by implicit feasible-init
-     *  and/or the sweep plus a state recompute, so all restart call sites (satisfy loop,
-     *  optimize loop, streaming) get the same post-randomization treatment. */
+    // When a definitionalSweep is present or seedImplicitOnRestart is set, every restart is followed
+    // by implicit feasible-init and/or the sweep plus a recompute, so all restart call sites get the
+    // same post-randomization treatment.
     private val restarts: RestartPolicy = if (definitionalSweep == null && !seedImplicitOnRestart) {
         configuredRestart
     } else {
@@ -136,7 +118,6 @@ class LocalSearchSolver(
         }
     }
 
-    /** Install the per-move invariant index on a fresh state when enabled (issue #153). */
     private fun installInvariants(state: LocalSearchState) {
         if (!perMoveInvariants) return
         val sweep = definitionalSweep ?: return
@@ -254,7 +235,6 @@ class LocalSearchSolver(
         params: LocalSearchParams,
         warm: WarmState?,
     ): Sequence<MinimizeResult> = sequence {
-        // Wall-time-only stats, matching solveInternal's level of detail for this backend.
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
         val eff = effectiveAssumptions(params.assumptions)
@@ -290,7 +270,6 @@ class LocalSearchSolver(
         sink: SolveStatsSink? = null,
     ): Sequence<Sample> {
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        // Tighten with the cross-backend instruction budget when set.
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         return sequence {
             val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
@@ -303,21 +282,17 @@ class LocalSearchSolver(
             // random restart.
             restarts.restart(state, bestSoFar = null)
             var flipsSinceRestart = 0
-            // Best-cost-so-far snapshot (even while infeasible): an [IteratedLocalSearchRestart]
-            // perturbs from this instead of full-randomising, so a long descent/plateau-escape
-            // accumulates progress across restarts rather than resetting each cadence window.
-            // [FixedCadenceRestart] ignores it (full random), so threading it is a no-op there.
+            // Best-cost-so-far snapshot (even while infeasible): an IteratedLocalSearchRestart
+            // perturbs from this instead of full-randomising, accumulating progress across restarts.
             var bestCost = state.cost
             var bestSnap: Sample? = state.assignment.snapshot()
-            // Bound per yield, not per session: when [maxFlips] elapses without producing a
-            // fresh sample, we've effectively exhausted the search neighbourhood — end the
-            // sequence.
+            // Bounded per yield, not per session: maxFlips elapsing without a fresh sample means the
+            // search neighbourhood is effectively exhausted, so end the sequence.
             var flipsSinceYield = 0L
             var cancelCountdown = 0
             var moves = 0L
             var restartCount = 0L
             var everFeasible = false
-            // Per-round feedback for adaptive schedules / restart (#721); null unless one wants it.
             // Use the unwrapped restart policy so an adaptive one is detected past a sweep wrapper.
             val roundFeedback = RoundFeedback.of(strategy, configuredRestart)
 
@@ -331,10 +306,8 @@ class LocalSearchSolver(
                         if (!everFeasible) {
                             everFeasible = true
                             // Record at first feasibility, not in `finally`: the `firstOrNull` consumer
-                            // (a single `solve()`) suspends this coroutine at the `yield` below and never
-                            // resumes it, so `finally` would not fire on the success path. Satisfy mode has
-                            // no objective, so the incumbent fingerprint is feasibility alone, and the
-                            // counts here are exactly the work it took to reach it.
+                            // suspends this coroutine at the `yield` below and never resumes it, so
+                            // `finally` would not fire on the success path.
                             sink?.recordLsWork(moves = moves, restarts = restartCount, stalls = 0L)
                             sink?.recordLsIncumbent(
                                 objective = Double.NaN,
@@ -343,9 +316,8 @@ class LocalSearchSolver(
                             )
                         }
                         val snap = state.assignment.snapshot()
-                        // Sync warm state on every yield so streaming consumers (which
-                        // typically take just one or a few samples and never drain the
-                        // sequence) still see captured weights.
+                        // Sync warm state on every yield so streaming consumers that never drain the
+                        // sequence still see captured weights.
                         warm?.captureFrom(state)
                         yield(snap)
                         flipsSinceYield = 0
@@ -383,14 +355,12 @@ class LocalSearchSolver(
                     roundFeedback?.record(costBefore, state.cost, moves)
                 }
             } finally {
-                // Sync learned weights back into warm state when the loop exits naturally
-                // or when the consumer cancels (sequence builder closes the coroutine). On
-                // abandoned sequences this may not fire; that's accepted loss.
+                // Sync learned weights back into warm state on natural exit or consumer cancel.
+                // Abandoned sequences may not fire this; accepted loss.
                 warm?.captureFrom(state)
-                // Reached only when the sequence is fully drained or cancelled — i.e. the search never
-                // hit feasibility (the feasible path records at the yield above and suspends here). Report
-                // the lowest residual cost as the incumbent violation so an UNKNOWN run still shows how
-                // close it got. Null sink for samples/enumerate, which don't report stats.
+                // Reached only when the search never hit feasibility (the feasible path records at the
+                // yield above and suspends there). Report the lowest residual cost as the incumbent
+                // violation so an UNKNOWN run still shows how close it got.
                 if (!everFeasible) {
                     sink?.recordLsWork(moves = moves, restarts = restartCount, stalls = 0L)
                     sink?.recordLsIncumbent(objective = Double.NaN, violation = bestCost.toDouble(), foundAtMs = -1L)
@@ -422,32 +392,25 @@ class LocalSearchSolver(
         state.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
         warm?.applyTo(state)
-        // Plumb shaping into the state so strategies (e.g. WalkSat) consulting
-        // shapedBreakScore see the objective during pre-feasibility moves too. Only
-        // [CostShaping.Linear] contributes a non-zero lambda; FeasibilityFirst leaves
-        // the field at 0.0 so behavior is identical to the no-shaping path.
+        // Plumb shaping into the state so strategies consulting shapedBreakScore see the objective
+        // during pre-feasibility moves. Only CostShaping.Linear contributes a non-zero lambda;
+        // FeasibilityFirst leaves it at 0.0, identical to the no-shaping path.
         state.objective = objective
         state.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
-        // Warm-start the descent from a caller-supplied assignment (e.g. a CP-found feasible
-        // point) instead of a random restart, when one is provided and arity-compatible. Null
-        // by default → pure random restart (no CP dependency). See
-        // [LocalSearchParams.initialAssignment].
+        // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
+        // restart; null by default. See [LocalSearchParams.initialAssignment].
         val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
-        // No bestSample yet — first restart is always full random (unless we seeded above).
         if (!seeded) restarts.restart(state, bestSoFar = null)
-        // Greedy-repair is gated on problem size: on tiny problems the LS engine reaches
-        // feasibility in microseconds and the repair pass is pure overhead; the gating
-        // also avoids changing observable convergence on the existing small unit tests.
-        // Threshold is ~one cache line of var ids — pragmatically, anything above 32 vars
-        // benefits from the pre-seed.
+        // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
+        // microseconds and the repair pass is pure overhead.
         val largeEnoughForGreedy = (problem.numBoolVars + problem.numIntVars) >= 32
         if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
-        // Best-cost (still-infeasible) snapshot for ILS perturbation *before* feasibility is
-        // reached: when [bestSample] is null an [IteratedLocalSearchRestart] perturbs from this
-        // instead of full-randomising, so a long feasibility fight accumulates progress.
+        // Best-cost (still-infeasible) snapshot for ILS perturbation before feasibility: when
+        // bestSample is null an IteratedLocalSearchRestart perturbs from this, so a long
+        // feasibility fight accumulates progress.
         var bestCostInfeasible: Long = Long.MAX_VALUE
         var bestCostSnap: Sample? = null
         var flipsSinceRestart = 0
@@ -459,24 +422,19 @@ class LocalSearchSolver(
         val shaping = params.costShaping
         var cancelled = false
 
-        // Each restart counts as one unit of work against [maxFlips]. Otherwise a
-        // degenerate objective (e.g. all-zero) on a constraint-free problem would
-        // produce an infinite loop: cost stays at 0, greedy descent never improves,
-        // and the restart path otherwise wouldn't bump [totalFlips].
-        // Phase strategy: when [optimizeStrategy] is feasibility-aware (gates objective
-        // behind cost==0) it drives both phases — CBLS's pure-netDelta scoring at
-        // infeasibility beats ProbSat at multi-flip-cascade problems, and its
-        // weight-bumping helps escape SAT-shape local minima too. Fall back to phase
-        // split (strategy for satisfy, optimizeStrategy for descent) for non-unified
-        // strategies that bail at feasibility (DDFW/ProbSat).
+        // Each restart counts as one unit of work against maxFlips; otherwise a degenerate objective
+        // on a constraint-free problem would loop forever (cost stays 0, descent never improves, and
+        // the restart path wouldn't bump totalFlips).
+        // Phase strategy: when optimizeStrategy is feasibility-aware (gates objective behind cost==0)
+        // it drives both phases. Else split phases (strategy for satisfy, optimizeStrategy for
+        // descent) for non-unified strategies that bail at feasibility.
         val descentStrategy = optimizeStrategy
         val unified = descentStrategy?.drivesObjectiveDescent == true
-        // Per-round feedback for adaptive schedules (#721): the feasibility-fight strategy is the one
-        // whose moves form the rounds (the unified descent strategy when one drives both phases, else
-        // the satisfy strategy). The helper is null (no overhead) unless it asks for feedback.
+        // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
+        // when one drives both phases, else the satisfy strategy).
         val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
-        // Feed round stats to the unwrapped restart policy so an adaptive one is detected and updated
-        // even when a definitional-sweep wrapper stands in for shouldRestart/restart.
+        // Feed round stats to the unwrapped restart policy so an adaptive one is detected even when a
+        // definitional-sweep wrapper stands in for shouldRestart/restart.
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         while (totalFlips < maxFlips) {
@@ -488,18 +446,15 @@ class LocalSearchSolver(
                 cancelCountdown = CANCEL_CHECK_INTERVAL
             }
             if (state.cost == 0L) {
-                // Each descent step below is O(numVars); the once-per-CANCEL_CHECK_INTERVAL
-                // throttle above is too coarse to keep the optimize phase deadline-responsive
-                // (a step's inner poll bails the scan, but without this the loop could still
-                // spin many bounded steps before the throttle fires). One extra cancellation
-                // poll per descent step is negligible against the step's own cost (#94).
+                // Each descent step is O(numVars); the once-per-CANCEL_CHECK_INTERVAL throttle above
+                // is too coarse to keep the optimize phase deadline-responsive. One extra poll per
+                // descent step is negligible against the step's own cost.
                 if (params.cancellation()) {
                     cancelled = true
                     break
                 }
-                // Score the live assignment without copying it; the full snapshot is taken only when
-                // this point is a strict improvement, so the steady state of the descent allocates
-                // nothing per iteration.
+                // Score the live assignment without copying it; the snapshot is taken only on a strict
+                // improvement, so the steady state allocates nothing per iteration.
                 val obj = objective.evaluate(state.assignment)
                 if (obj < bestObj) {
                     bestObj = obj
@@ -507,14 +462,12 @@ class LocalSearchSolver(
                     bestSample = snap
                     bestFoundAtMs = sink.elapsedMs()
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
-                    // Yield each strict improvement as the inner loop discovers it.
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }
-                // Descent options, in order of "informedness". Each step gets one chance
-                // before we fall through to the next; stalling all of them triggers a
-                // restart. Order matters: greedy single-flip is cheapest, CBLS adds
-                // cross-factor weighted scoring, structured-move uses factor-aware swaps,
-                // pair-swap is the random fallback.
+                // Descent options in order of informedness; each gets one chance before falling
+                // through to the next, and stalling all of them triggers a restart. Cheapest first:
+                // greedy single-flip, then CBLS weighted scoring, factor-aware structured moves, then
+                // the random pair-swap fallback.
                 val descended = if (shaping.feasibilityGated) {
                     greedyObjectiveStep(state, objective, params.cancellation)
                 } else {
@@ -525,18 +478,13 @@ class LocalSearchSolver(
                     totalFlips++
                     continue
                 }
-                // CBLS descent: ask the optimizeStrategy for an objective-improving move.
-                // CBLS's pickMove at feasibility generates seed-objective moves +
-                // satisfied-factor structured moves and scores them by `weightedNetDelta
-                // + λ·objectiveDelta`. SAT-style strategies (ProbSat/DDFW) return null at
-                // feasibility — skip them here.
+                // CBLS descent: ask the optimizeStrategy for an objective-improving move. SAT-style
+                // strategies return null at feasibility, so this is a no-op for them.
                 if (descentStrategy != null) {
                     val m = descentStrategy.pickMove(state)
                     if (m != null) {
-                        // Only commit if the move keeps feasibility AND improves objective —
-                        // CBLS may propose moves that break feasibility (e.g. a true→false
-                        // flip that opens slack) which we don't want during the gated
-                        // descent phase.
+                        // Commit only if the move keeps feasibility AND improves the objective — CBLS
+                        // may propose feasibility-breaking moves we don't want in the gated phase.
                         val baseObj = objective.evaluate(state.assignment)
                         // Snapshot only to undo a rejected move; both objective reads are live.
                         val savedSnap = state.assignment.snapshot()
@@ -561,8 +509,8 @@ class LocalSearchSolver(
                     totalFlips++
                     continue
                 }
-                // A local optimum (all descent steps failed) is infrequent relative to descent steps,
-                // so snapshotting here for the restart policy stays off the per-iteration hot path.
+                // A local optimum (all descent steps failed) is infrequent, so snapshotting for the
+                // restart policy here stays off the per-iteration hot path.
                 restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
                 restarts.restart(state, bestSample)
                 if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
@@ -581,10 +529,8 @@ class LocalSearchSolver(
                 roundFeedback?.endRound()
                 continue
             }
-            // Pre-feasibility: drive through the unified strategy when one is configured,
-            // else use the satisfy-mode strategy. CBLS (when unified) scores by
-            // weightedNetDelta only at cost>0, which gives it equivalent feasibility-fight
-            // behavior to ProbSat plus better multi-flip handling.
+            // Pre-feasibility: drive through the unified strategy when one is configured, else the
+            // satisfy-mode strategy.
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
@@ -610,8 +556,8 @@ class LocalSearchSolver(
         sink.stop()
         sink.timedOut = reason == TerminationReason.BudgetExhausted
         sink.recordLsWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
-        // Feasible incumbent → violation 0 at [bestObj]; otherwise carry the lowest residual cost reached.
-        // Long.MAX_VALUE means we never improved on the initial assignment, so leave the violation NaN.
+        // Feasible incumbent → violation 0 at bestObj; else carry the lowest residual cost reached.
+        // Long.MAX_VALUE means we never improved on the initial assignment, so leave violation NaN.
         if (bestSample != null) {
             sink.recordLsIncumbent(objective = bestObj, violation = 0.0, foundAtMs = bestFoundAtMs)
         } else if (bestCostInfeasible != Long.MAX_VALUE) {
@@ -638,7 +584,7 @@ class LocalSearchSolver(
         if (sample.bools.size != problem.numBoolVars || sample.ints.size != problem.numIntVars) return false
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
-        // Respect caller pins exactly as restart() does, so a seed can't violate assumptions.
+        // Respect caller pins as restart() does, so a seed can't violate assumptions.
         state.assumptions.forEachBool { id, value ->
             if (state.assignment.boolValue(id) != value) state.assignment.flipBool(id)
         }
@@ -663,10 +609,8 @@ class LocalSearchSolver(
         objective: Objective,
         cancellation: Cancellation,
     ): Boolean {
-        // Score each candidate via netDelta (post-move cost, no commit) + objectiveDelta
-        // (O(arity)), so no snapshot/evaluate per candidate — only on commit. Every objective
-        // that can reach the descent is incremental ([LinearObjective] or the caller's
-        // [LocalSearchParams.lsObjective] gradient view), so there is no evaluate fallback.
+        // Score each candidate via netDelta + objectiveDelta, no snapshot/evaluate per candidate —
+        // only on commit. Every objective reaching the descent is incremental, so no evaluate fallback.
         val baseCost = state.cost
         val poll = IntArray(1)
         var bestDelta = 0.0
@@ -709,10 +653,9 @@ class LocalSearchSolver(
     }
 
     /** Poll [cancellation] once every [CANCEL_CHECK_INTERVAL] candidates, advancing the
-     *  single-element [counter] box so the count carries across calls within one descent
-     *  scan. Returns true when the candidate loop should abort. Keeps the per-var descent
-     *  loops deadline-responsive (issue #94) — a single step is O(numVars) and would
-     *  otherwise run well past the deadline before the outer loop's check. */
+     *  single-element [counter] box so the count carries across calls within one descent scan.
+     *  Returns true when the candidate loop should abort — keeps the O(numVars) descent steps
+     *  deadline-responsive. */
     private fun pollCancel(counter: IntArray, cancellation: Cancellation): Boolean {
         if (++counter[0] < CANCEL_CHECK_INTERVAL) return false
         counter[0] = 0
@@ -740,9 +683,8 @@ class LocalSearchSolver(
         cancellation: Cancellation,
     ): Boolean {
         // Anchor on one baseline evaluate, then score each candidate's shaped value from
-        // (baseCost + netDelta, baselineObj + objectiveDelta) — no per-candidate
-        // snapshot/evaluate, and no apply/revert (objectiveDelta reads the live assignment).
-        // Every reachable objective is incremental; there is no evaluate fallback.
+        // (baseCost + netDelta, baselineObj + objectiveDelta) — no per-candidate snapshot/evaluate
+        // and no apply/revert. Every reachable objective is incremental, so no evaluate fallback.
         val baseCost = state.cost
         val baselineObj = objective.evaluate(state.assignment)
         val poll = IntArray(1)
@@ -786,17 +728,12 @@ class LocalSearchSolver(
     }
 
     /**
-     * Greedy-repair pass over [state] right after a restart. Walks vars in randomized
-     * order; for each, picks the value (bool: true/false, int: any value in the domain
-     * for ≤16-size domains, otherwise sampled) that minimizes the current `state.cost`.
-     * Ties broken by keeping the current value. Single forward pass — no fixed-point
-     * loop. Idempotent on already-feasible states.
+     * Greedy-repair pass over [state] right after a restart. Walks vars in randomized order;
+     * for each, picks the value that minimizes the current `state.cost` (ties keep the current
+     * value). Single forward pass, idempotent on already-feasible states.
      *
-     * The point isn't to reach feasibility (LS strategies handle that) but to start the
-     * search from a low-violation pose so the feasibility-fight phase has fewer hard
-     * constraints to chase. On large decomposed instances (e.g. 2DBinPacking_100) a
-     * random start has 1000+ violations; this pass typically drops it by 30–60% before
-     * the main loop runs.
+     * The point isn't to reach feasibility (LS strategies handle that) but to start from a
+     * low-violation pose so the feasibility-fight phase has fewer hard constraints to chase.
      */
     private fun greedyRepairPass(state: LocalSearchState) = greedyInit.run(state)
 
@@ -822,9 +759,8 @@ class LocalSearchSolver(
     ): Boolean {
         val sink = state.moveSink
         sink.clear()
-        // Only consult factors that are currently satisfied. A violated factor would propose
-        // repair moves (which run before objective descent) so the enumerate-all source skips
-        // them — the same structured generator CBLS samples (epic #710).
+        // Only consult currently-satisfied factors; a violated factor proposes repair moves (which
+        // run before objective descent), so the enumerate-all source skips them.
         satisfiedStructured.generate(state, sink)
         val proposed = sink.list
         if (proposed.isEmpty()) return false
@@ -835,9 +771,8 @@ class LocalSearchSolver(
     }
 
     /** Incremental scoring of structured [proposed] moves: pick the most objective-improving
-     *  feasibility-preserving move via netDelta (post-move cost; the Compound path is
-     *  apply/revert-backed and fully restores state) + objectiveDelta — no per-move
-     *  snapshot/evaluate. Returns the best move (or the best found so far on cancellation). */
+     *  feasibility-preserving move via netDelta + objectiveDelta. Returns the best move, or the
+     *  best found so far on cancellation. */
     private fun bestStructuredIncremental(
         state: LocalSearchState,
         objective: Objective,
@@ -902,16 +837,14 @@ class LocalSearchSolver(
         val baseCost = state.cost
         val poll = IntArray(1)
         var tried = 0
-        // Bool-pair swaps: pick a true var and a false var, flip both. Candidate construction
-        // (draw + validate) is shared with PairSwap (epic #710); the lazy first-improving loop —
-        // and therefore the RNG draw order and selection — stays exactly as before.
+        // Bool-pair swaps: pick a true var and a false var, flip both.
         if (problem.numBoolVars >= 2) {
             while (tried < budget) {
                 if (pollCancel(poll, cancellation)) return false
                 tried++
                 val swap = PairSwap.drawBoolSwap(state) ?: continue
-                // Score the joint swap without committing: netDelta (apply/revert-backed for
-                // the Compound) for feasibility, objectiveDelta for the improvement test.
+                // Score the joint swap without committing: netDelta for feasibility, objectiveDelta
+                // for the improvement test.
                 if (baseCost + state.netDelta(swap) == 0L) {
                     val od = state.objectiveDelta(objective, swap)
                     if (od != null && od < 0.0) {
@@ -943,10 +876,9 @@ class LocalSearchSolver(
 
     /**
      * Accumulates per-step move statistics into rounds and flushes each completed round to a
-     * strategy's adaptive policies (#721). Created only for a strategy that
-     * [SourceDrivenStrategy.wantsRoundFeedback], so the common non-adaptive strategies allocate nothing and the
-     * loops carry no overhead. A restart ends the current round ([endRound]) so a round never spans
-     * one.
+     * strategy's adaptive policies. Created only for a strategy that
+     * [SourceDrivenStrategy.wantsRoundFeedback], so common non-adaptive strategies allocate nothing.
+     * A restart ends the current round ([endRound]) so a round never spans one.
      */
     private class RoundFeedback(
         private val strategy: SourceDrivenStrategy?,
@@ -963,7 +895,7 @@ class LocalSearchSolver(
             acc.observeCost(costAfter.toDouble())
             if (++sinceRound >= ROUND_FEEDBACK_STEPS) {
                 strategy?.observeRound(acc, step)
-                // The restart policy is temperature-agnostic; it keys off the round's cost trend.
+                // Temperature-agnostic restart policy keys off the round's cost trend.
                 restartObserver?.observe(acc.snapshot(temperature = 1.0, step = step))
                 acc.clear()
                 sinceRound = 0
@@ -991,10 +923,9 @@ class LocalSearchSolver(
         /** Polling interval for cooperative cancellation; see Cancellation.kt. */
         const val CANCEL_CHECK_INTERVAL: Int = 1024
 
-        /** Feasibility-fight moves per round of adaptive-schedule feedback (#721). A round is the
-         *  batch over which an adaptive [com.eignex.klause.solver.localsearch.schedule.Schedule]
-         *  retunes; sized so the acceptance-ratio estimate is stable yet the schedule still reacts
-         *  many times over a search. */
+        /** Feasibility-fight moves per round of adaptive-schedule feedback. A round is the batch over
+         *  which an adaptive [com.eignex.klause.solver.localsearch.schedule.Schedule] retunes; sized
+         *  so the acceptance-ratio estimate is stable yet the schedule still reacts many times. */
         const val ROUND_FEEDBACK_STEPS: Int = 1024
     }
 }

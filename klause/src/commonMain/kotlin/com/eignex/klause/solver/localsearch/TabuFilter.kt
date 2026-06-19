@@ -7,23 +7,19 @@ import kotlin.math.exp
 import kotlin.random.Random
 
 /**
- * Reusable candidate-set filter that removes moves whose variable was touched within the
- * last [tenure] accepted moves. Centralises the inline `if (tabuTenure > 0) ...` block
- * that every LS strategy used to carry, with two extensions over the original inline form:
+ * Reusable candidate-set filter that removes moves whose variable was touched within the last
+ * [tenure] accepted moves, with two extensions:
  *
- *   - [aspiration] decides whether a tabu move can still be admitted. The default
- *     ("when *every* candidate is tabu, drop the filter") preserves liveness when the
- *     tabu would otherwise starve the strategy. [AspirationCriterion.OrImproving]
- *     additionally admits individual tabu moves that strictly improve the current cost —
- *     the standard literature aspiration.
+ *   - [aspiration] decides whether a tabu move can still be admitted. The default ("when *every*
+ *     candidate is tabu, drop the filter") preserves liveness when the tabu would otherwise starve
+ *     the strategy. [AspirationCriterion.OrImproving] additionally admits individual tabu moves that
+ *     strictly improve the current cost — the standard literature aspiration.
  *
- *   - [dynamicTenure] lets the effective tenure scale with the search state. Default is
- *     constant; pass a function of `state.step` to vary the tenure over time (e.g. randomly
- *     within a band, or growing during stalls).
+ *   - [dynamicTenure] lets the effective tenure scale with the search state. Default is constant;
+ *     pass a function of `state.step` to vary the tenure over time.
  *
- * Strategies that want no tabu can pass [Disabled]. The filter is allocation-light: on the
- * common path it returns the input list unchanged when no moves are tabu, allocating only
- * when the filtered subset differs.
+ * Strategies that want no tabu can pass [Disabled]. The filter is allocation-light: on the common
+ * path it returns the input list unchanged when no moves are tabu.
  */
 data class TabuFilter(
     val tenure: Int = 10,
@@ -67,9 +63,9 @@ data class TabuFilter(
 
         /**
          * Dynamic-tenure preset: pick a fresh tenure uniformly at random in `[low, high]`
-         * on every call. Adds diversification without making the average tenure drift —
-         * the [Glover-Laguna 1997] "robust tabu" pattern, useful when a single fixed
-         * tenure either traps the search (too short) or starves it (too long).
+         * on every call. Adds diversification without making the average tenure drift — the
+         * "robust tabu" pattern, useful when a single fixed tenure either traps the search (too
+         * short) or starves it (too long).
          *
          * The randomness comes from a private [Random] seeded by [seed]; pass a stable
          * seed for reproducible runs, leave null for `Random.Default`.
@@ -159,7 +155,7 @@ sealed interface AspirationCriterion {
      * concurrent solvers.
      */
     class Cooling(private val schedule: Schedule) : AspirationCriterion {
-        /** Fixed geometric cooling — the long-standing default schedule. */
+        /** Fixed geometric cooling — the default schedule. */
         constructor(
             initialTemperature: Double = 1.0,
             coolingRate: Double = 0.999,

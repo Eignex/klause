@@ -7,8 +7,8 @@ package com.eignex.klause.solver.localsearch.schedule
  *
  * The fields are the round's raw scalar facts; cross-round judgements (e.g. "did this beat the
  * all-time best?") are left to each [AdaptivePolicy], which retains its own watermark. Per-factor
- * arrays (violated set, live weights) are not carried here — they stay in the search state and are
- * handed to the policies' apply-methods, so the record stays immutable and shareable.
+ * arrays (violated set, live weights) stay in the search state and are handed to the policies'
+ * apply-methods, so the record stays immutable and shareable.
  *
  * @property proposed moves proposed this round
  * @property accepted moves accepted this round (improving or Metropolis-accepted)

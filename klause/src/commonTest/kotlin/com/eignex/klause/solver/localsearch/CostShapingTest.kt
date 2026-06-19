@@ -60,8 +60,6 @@ class CostShapingTest {
 
     @Test
     fun `shapedBreakScore reduces to breakScore when no shaping configured`() {
-        // Default state: no objective injected, lambda 0 — shapedBreakScore must match
-        // breakScore exactly for every move.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -76,10 +74,8 @@ class CostShapingTest {
 
     @Test
     fun `shapedBreakScore incorporates linear objective delta when shaping is on`() {
-        // 2-var problem, bool 0 has objective weight 100, bool 1 has weight 1. Both
-        // currently false. Flipping bool 0 → true increases objective by 100; flipping
-        // bool 1 → true increases objective by 1. With lambda = 1.0, the shaped scores
-        // differ exactly by the weight gap.
+        // Both flips resolve cost 1 → 0, so they tie on break score; with weights 100 vs 1
+        // and lambda 1.0 the shaped scores differ exactly by the weight gap of 99.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -90,8 +86,6 @@ class CostShapingTest {
         state.shapingLambda = 1.0
         val score0 = state.shapedBreakScore(BoolFlip(0))
         val score1 = state.shapedBreakScore(BoolFlip(1))
-        // Both flips have the same break score (both resolve cost=1 → 0). Shaped scores
-        // differ by 99 (objective coefficient gap).
         assertEquals(99.0, score0 - score1, "shaped break gap must equal objective gap")
     }
 
@@ -101,9 +95,7 @@ class CostShapingTest {
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         state.recompute()
-        // No objective set → delta is 0 for any move.
         assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
-        // Objective set but lambda = 0 → still 0.
         state.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
         state.shapingLambda = 0.0
         assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
@@ -119,15 +111,15 @@ class CostShapingTest {
         state.recompute()
         state.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
         state.shapingLambda = 0.5
-        // Flipping bool 0 false → true adds 10 to objective; with lambda=0.5, delta = 5.
+        // Flipping bool 0 adds 10 to the objective; lambda 0.5 scales it to 5.
         assertEquals(5.0, state.shapedObjectiveDelta(BoolFlip(0)))
         assertEquals(0.5, state.shapedObjectiveDelta(BoolFlip(1)))
     }
 
     @Test
     fun `incremental objective drives shaped delta for non-linear objectives`() {
-        // |2·b0 - b1 - 1| — a piecewise-linear objective that LinearObjective can't express.
-        // Implement IncrementalObjective so the LS engine can fold it into shaped descent.
+        // |2·b0 - b1 - 1|: a piecewise-linear objective LinearObjective can't express, folded
+        // into shaped descent via IncrementalObjective.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -170,8 +162,7 @@ class CostShapingTest {
 
     @Test
     fun `non-incremental non-linear objective falls through to zero shaped delta`() {
-        // Generic Objective that doesn't implement IncrementalObjective — shaping must
-        // return 0.0 (descent objective-blind) rather than crash or apply-revert.
+        // A plain Objective without IncrementalObjective must yield 0.0 rather than crash or apply-revert.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -185,7 +176,6 @@ class CostShapingTest {
 
     @Test
     fun `linear shaping minimize on exact one cardinality finds the cheapest pick`() {
-        // Same setup as OptimizerTest's exactly-one weighted case, but using shaped descent.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),

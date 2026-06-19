@@ -4,31 +4,24 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
- * Feasibility-preserving structured moves drawn from currently-satisfied factors — the single
- * implementation behind `Cbls.sampleFromSatisfied`, `LocalSearchSolver.structuredMoveStep`, and the
- * implicit-neighbourhood `sampleElectedStructured` (epic #710). Each satisfied factor pushes moves
- * it knows preserve its own satisfaction (e.g. a `Linear EQ` pair-shift that keeps the sum, a
- * `Cardinality.exactlyOne` swap that keeps the count) via
+ * Feasibility-preserving structured moves drawn from currently-satisfied factors. Each satisfied
+ * factor pushes moves it knows preserve its own satisfaction (e.g. a `Linear EQ` pair-shift that
+ * keeps the sum, a `Cardinality.exactlyOne` swap that keeps the count) via
  * [com.eignex.klause.solver.Factor.proposeStructuredMoves].
  *
- * The former call sites differed only in *which* satisfied factors they consulted — exactly the
- * "one generator parameterised by factor set" the epic calls for, captured here by [scope]:
- *  - [Scope.Sampled] — `Cbls.sampleFromSatisfied`: draw [sampleCount] uniformly-random factors and
- *    keep the ones not in the maintained violated set. Cheaper than enumerating when the
- *    satisfied/violated split is not materialised.
- *  - [Scope.All] — `LocalSearchSolver.structuredMoveStep`: walk every factor and consult the ones
- *    that are not violated (queried directly via [com.eignex.klause.solver.Factor.isViolated]).
- *  - [Scope.Elected] — the implicit-neighbourhood variant (`Cbls.sampleElectedStructured`): draw
- *    [sampleCount] random factors from the state's elected implicit set
- *    ([com.eignex.klause.solver.localsearch.LocalSearchState.electedImplicit]) and keep the ones
- *    not in the maintained violated set. Iterates only the small elected set, so it stays cheap
- *    while the search is still closing violations — the implicit-neighbourhood source available to
- *    any strategy by configuration rather than as a copy-pasted loop.
+ * [scope] selects which satisfied factors are consulted:
+ *  - [Scope.Sampled]: draw [sampleCount] uniformly-random factors and keep the ones not in the
+ *    maintained violated set. Cheaper than enumerating when the satisfied/violated split is not
+ *    materialised.
+ *  - [Scope.All]: walk every factor and consult the ones not violated (queried directly via
+ *    [com.eignex.klause.solver.Factor.isViolated]).
+ *  - [Scope.Elected]: draw [sampleCount] random factors from the state's elected implicit set
+ *    ([com.eignex.klause.solver.localsearch.LocalSearchState.electedImplicit]) and keep the ones not
+ *    in the maintained violated set. Iterates only the small elected set, so it stays cheap while
+ *    the search is still closing violations.
  *
- * Each scope preserves the *exact* violated-skip predicate its former site used (set-membership vs
- * per-factor query) so the extraction is behaviour-identical. All belong to [Phase.Feasible]:
- * structured moves only matter once the search is at `cost == 0` looking for objective-improving
- * steps — the gate the callers re-checked is now declarative.
+ * All scopes belong to [Phase.Feasible]: structured moves only matter once the search is at
+ * `cost == 0` looking for objective-improving steps.
  */
 class SatisfiedStructured private constructor(
     private val scope: Scope,
@@ -38,13 +31,13 @@ class SatisfiedStructured private constructor(
 
     /** Which satisfied factors a [SatisfiedStructured] consults. */
     enum class Scope {
-        /** Draw a fixed number of uniformly-random factors (the CBLS sampling loop). */
+        /** Draw a fixed number of uniformly-random factors. */
         Sampled,
 
-        /** Walk every factor (the minimize-engine enumeration). */
+        /** Walk every factor. */
         All,
 
-        /** Walk a caller-supplied elected set (the implicit-neighbourhood loop). */
+        /** Walk the elected implicit set. */
         Elected,
     }
 
@@ -82,22 +75,22 @@ class SatisfiedStructured private constructor(
         }
     }
 
-    /** Factory + identity. */
+    /** Catalog identity and scope factories. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("satisfied-structured")
 
-        /** The CBLS random-sampling variant: keep [sampleCount] (≥ 0) random non-violated factors. */
+        /** Random-sampling variant: keep [sampleCount] (≥ 0) random non-violated factors. */
         fun sampled(sampleCount: Int): SatisfiedStructured {
             require(sampleCount >= 0) { "sampleCount >= 0, got $sampleCount" }
             return SatisfiedStructured(Scope.Sampled, sampleCount)
         }
 
-        /** The minimize-engine enumerate-all variant. */
+        /** Enumerate-all variant. */
         fun all(): SatisfiedStructured = SatisfiedStructured(Scope.All, sampleCount = 0)
 
-        /** The implicit-neighbourhood variant: draw [sampleCount] (≥ 0) random factors from the
-         *  state's elected implicit set, keeping the ones not currently violated. */
+        /** Elected-implicit variant: draw [sampleCount] (≥ 0) random factors from the state's elected
+         *  implicit set, keeping the ones not currently violated. */
         fun elected(sampleCount: Int): SatisfiedStructured {
             require(sampleCount >= 0) { "sampleCount >= 0, got $sampleCount" }
             return SatisfiedStructured(Scope.Elected, sampleCount)

@@ -10,9 +10,8 @@ import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
- * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024), re-expressed as a
- * [SourceDrivenStrategy] recipe. FJ is exactly the driver's four axes pinned to the
- * jump-and-reweight regime:
+ * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024) as a [SourceDrivenStrategy]
+ * recipe pinned to the jump-and-reweight regime:
  *
  *  - **sources** = `{`[ArgminJump]`}` — every step jumps a hot-spot variable directly to its
  *    weighted-violation argmin, rather than stepping by a flip or ±1.
@@ -21,15 +20,14 @@ import com.eignex.klause.solver.localsearch.scoring.MoveScoring
  *    FJ escapes minima by reweighting, not by a stochastic walk.
  *  - **weight schedule** = [WeightSchedule.feasibilityJump] — when cost stalls, fade old escalations
  *    by [weightDecay] and bump every violated factor by [weightIncrement], reshaping the argmin
- *    landscape toward the constraints that have been blocking progress (the FJ analogue of a restart).
+ *    landscape toward the constraints that have been blocking progress.
  *  - **perturbation** = [StallPerturbation] — after [perturbAfter] applied moves with no strict cost
- *    drop (long enough that the weight bumps alone have not escaped) inject one random hot-spot jump.
+ *    drop, inject one random hot-spot jump.
  *
- * Aggressive toward feasibility and orthogonal to the WalkSAT/CBLS/SA step families, so it is most
- * valuable raced alongside them in the parallel portfolio. The arm learns and prunes nothing, so it
- * carries no soundness obligation.
+ * Aggressive toward feasibility and orthogonal to the WalkSAT/CBLS/SA step families, so most valuable
+ * raced alongside them in the parallel portfolio. Learns and prunes nothing, so no soundness obligation.
  */
-@Suppress("FunctionNaming") // factory mirroring the historical strategy constructor it replaced
+@Suppress("FunctionNaming")
 fun FeasibilityJump(
     /** Hot-spot variables jumped per pick (passed to [ArgminJump]). */
     candidateVars: Int = 8,
@@ -60,13 +58,13 @@ fun FeasibilityJump(
 }
 
 /**
- * The Feasibility-Jump diversification kick as a driver [perturbation hook][SourceDrivenStrategy.perturbation]
- *: after [perturbAfter] applied moves with no strict cost drop — long enough that weight
- * escalation has had its chance — return one random hot-spot jump and restart the no-progress window.
+ * The Feasibility-Jump diversification kick as a driver [perturbation hook][SourceDrivenStrategy.perturbation]:
+ * after [perturbAfter] applied moves with no strict cost drop, return one random hot-spot jump and
+ * restart the no-progress window.
  *
- * Stateful (one per search): it tracks the stall window off the engine-maintained `state.step`,
- * re-anchoring on a restart (rewound step) and on every strict cost drop. Returns `null` when the
- * window has not elapsed or no variable is eligible, leaving the driver to its normal pick.
+ * Stateful (one per search): tracks the stall window off `state.step`, re-anchoring on a restart
+ * (rewound step) and on every strict cost drop. Returns `null` when the window has not elapsed or no
+ * variable is eligible.
  */
 class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> Move? {
     init {
@@ -79,7 +77,7 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
 
     override fun invoke(state: LocalSearchState): Move? {
         // Stall tracking off the engine step counter: the window resets on a restart and on every
-        // strict cost decrease, mirroring the schedule axis's own stall detection.
+        // strict cost decrease.
         if (state.step < lastSeenStep) {
             lastDropStep = state.step
             lastCost = state.cost

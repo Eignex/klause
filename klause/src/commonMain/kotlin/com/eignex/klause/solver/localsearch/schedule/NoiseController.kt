@@ -7,12 +7,12 @@ import com.eignex.kumulant.stat.decay.EwmaMeanStat
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/** Adaptive noise/cb schedule the focused-LS move selections consume: [level] in [0, 1] scales
+/** Adaptive noise/cb schedule the focused-LS move selections consume: [level] in `[0, 1]` scales
  *  diversification (higher = more random). It is an [AdaptivePolicy] over the shared per-round
  *  feedback channel — `observe(RoundLog)` keys off the round's incumbent cost — and additionally
  *  exposes a per-step `observe(cost)` for the focused-LS strategies that retune every flip.
  *  [NoiseController] is the hand-tuned bump-on-stall implementation; [BanditNoiseController] learns
- *  which schedule profile to run (#8). */
+ *  which schedule profile to run. */
 internal interface NoiseSchedule : AdaptivePolicy {
     val level: Double
     fun observe(cost: Long)
@@ -28,21 +28,17 @@ internal interface NoiseSchedule : AdaptivePolicy {
  *
  * Two improvement-detection modes:
  *  - **Best-cost** (default, [ewmaAlpha] is null): compares cost against the all-time low
- *    seen by this controller. Strict — only ratchets improvements. Reactive to noisy
- *    cost trajectories on factor problems with mixed objective and constraint terms.
+ *    seen by this controller. Strict — only ratchets improvements.
  *  - **EWMA-trend** ([ewmaAlpha] non-null): compares cost against a kumulant
  *    [EwmaMeanStat]-smoothed average. Detects "below local trend" rather than "beats
  *    all-time low" — less reactive to single-step jitter, follows drift in the cost
- *    landscape. `ewmaAlpha` ∈ (0, 1]; smaller = longer effective window. 0.05–0.2 is a
- *    reasonable starting point for problems with significant per-flip cost noise.
+ *    landscape. `ewmaAlpha` ∈ (0, 1]; smaller = longer effective window.
  *
  * Strategies map [level] to their own knob: WalkSat sets `noise = level`, ProbSat scales
  * its `cb` exponent down, DDFW scales `increment` up. Level 0 = baseline (most greedy);
  * level toward 1 = more diversification.
  *
- * The constants follow the original paper: phi=0.2, theta scales with problem size in the
- * literature but we expose it directly so callers can tune. Default 50 is a reasonable
- * starting point for small/medium instances.
+ * The constants follow the original paper (phi=0.2); [theta] is exposed directly so callers can tune.
  */
 internal class NoiseController(
     initial: Double,
@@ -77,10 +73,7 @@ internal class NoiseController(
 
     private fun observeCost(cost: Double) {
         val improving = if (ewma != null) {
-            // EWMA-trend mode: update the smoother and check whether the latest cost
-            // lies strictly below the smoothed average. Smoothing rejects single-step
-            // jitter that the best-cost mode would treat as a non-improvement and start
-            // bumping noise for.
+            // EWMA-trend mode: latest cost strictly below the smoothed average.
             ewma.update(cost, timestampNanos = 0L, weight = 1.0)
             cost < ewma.read(0L).mean
         } else {
@@ -143,11 +136,11 @@ internal class NoiseController(
 }
 
 /**
- * [NoiseSchedule] whose active profile is chosen by a kumulant bandit (#8): instead of one
- * hand-tuned bump-on-stall schedule, it runs one of several [NoiseController] profiles and, every
- * [window] observations, rewards the active profile by whether the cost improved over that window,
- * then lets a [MultiArmedBandit] pick the next. Per-session learning, so the schedule that suits
- * the instance wins out — a learned replacement for the single fixed controller.
+ * [NoiseSchedule] whose active profile is chosen by a kumulant bandit: instead of one hand-tuned
+ * bump-on-stall schedule, it runs one of several [NoiseController] profiles and, every [window]
+ * observations, rewards the active profile by whether the cost improved over that window, then lets
+ * a [MultiArmedBandit] pick the next. Per-session learning, so the schedule that suits the instance
+ * wins out.
  */
 internal class BanditNoiseController(
     private val profiles: List<NoiseController>,

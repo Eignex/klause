@@ -10,29 +10,25 @@ import com.eignex.klause.util.MutableIntIntMap
 private val EMPTY_INTS = IntArray(0)
 
 /**
- * **Directed ejection-chain proposal** (issue #154): grow a coordinated multi-variable
- * move by chaining repairs through the break structure. First moves are drawn from two
- * pools with separate budgets: [seedFactor]'s own repair proposals (the repair-first
- * shape) and primitives on neighbouring factors' variables (the ejection-first shape —
- * see `neighbourPrimitives`). Each accepted step is applied (with invariant propagation), the factor
- * it *newly regressed* is identified, and that factor's best-scoring repair — restricted
- * to variables the chain hasn't already touched — becomes the next step. The walk stops at
- * the first strict cost improvement, at [maxDepth] steps, or when no eligible repair
- * exists; the state is then reverted exactly and the walk's best (minimum-cost) ≥2-part
- * prefix is emitted into [sink] as one atomic [Move.Compound].
+ * **Directed ejection-chain proposal**: grow a coordinated multi-variable move by chaining repairs
+ * through the break structure. First moves are drawn from two pools with separate budgets:
+ * [seedFactor]'s own repair proposals (repair-first) and primitives on neighbouring factors'
+ * variables (ejection-first — see `neighbourPrimitives`). Each accepted step is applied (with
+ * invariant propagation), the factor it *newly regressed* is identified, and that factor's
+ * best-scoring repair — restricted to variables the chain hasn't already touched — becomes the next
+ * step. The walk stops at the first strict cost improvement, at [maxDepth] steps, or when no
+ * eligible repair exists; the state is then reverted exactly and the walk's best (minimum-cost)
+ * ≥2-part prefix is emitted into [sink] as one atomic [Move.Compound].
  *
- * This is the principled generalisation of the stall-swap plateau buster: where the swap
- * hard-codes the one coordinated shape reification plateaus need (a same-domain value
- * exchange), the chain *derives* the coordinated shape from which constraints actually
- * break — the move class successor/path encodings (pos/next models, prize-collecting)
- * need, where repairing a successor link requires re-linking predecessor, position and
- * chain tail in one move. Unlike the measured-negative random `couplingChain` (random
- * factors × random repairs entering the noise draw), chains are **directed** (each step
- * repairs the damage of the previous one) and only ever compete **on score**.
+ * Unlike the stall-swap plateau buster, which hard-codes one coordinated shape (a same-domain value
+ * exchange), the chain *derives* the coordinated shape from which constraints actually break — what
+ * successor/path encodings need, where repairing a successor link requires re-linking predecessor,
+ * position and chain tail in one move. Chains are **directed** (each step repairs the damage of the
+ * previous one) and only ever compete **on score**.
  *
- * Variables touched once are pinned for the rest of the chain, so a chain never undoes
- * itself and always terminates. Cost is bounded by [maxDepth] × (apply + propose + probe);
- * callers gate this behind the stall detector.
+ * Variables touched once are pinned for the rest of the chain, so a chain never undoes itself and
+ * always terminates. Cost is bounded by [maxDepth] × (apply + propose + probe); callers gate this
+ * behind the stall detector.
  *
  * Returns the number of chains emitted into [sink].
  */
@@ -45,11 +41,10 @@ internal fun LocalSearchState.proposeRepairChains(
     val propose = MoveSink(assumptions).also { it.setInvariants(invariants) }
     factors[seedFactor].proposeRepairMoves(this, seedFactor, propose)
     var emitted = sampleChainFirsts(propose.list, firstMoveCap, maxDepth, propose, sink)
-    // Ejection firsts: primitives on the variables of factors *neighbouring* the seed
-    // (sharing a variable). The repair-graph probe on prize-collecting proved cost-1
-    // orbits can be CLOSED under violated-factor repairs — every escape must first
-    // perturb a satisfied neighbour (eject) and then repair the cascade. Repair firsts
-    // keep their own budget above so the classic buster-shaped chains aren't crowded out.
+    // Ejection firsts: primitives on the variables of factors neighbouring the seed (sharing a
+    // variable). Some cost-1 orbits are closed under violated-factor repairs — every escape must
+    // first perturb a satisfied neighbour (eject), then repair the cascade. Repair firsts keep their
+    // own budget above so they aren't crowded out.
     propose.clear()
     neighbourPrimitives(seedFactor, propose)
     emitted += sampleChainFirsts(propose.list, firstMoveCap, maxDepth, propose, sink)
@@ -91,11 +86,10 @@ internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
     for (v in f.boolVars) for (nf in problem.boolOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
 }
 
-/** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated.
- *  Ints get ±1 steps *and* the domain endpoints: on successor/path encodings the min
- *  endpoint is the semantic "remove from the structure" eject (`next[i]` → 0), the move
- *  that lets a chain dismantle a parasitic successor fragment backwards — ±1 alone
- *  cannot express that jump and the prize-collecting orbit stays closed without it. */
+/** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated. Ints get ±1
+ *  steps *and* the domain endpoints: on successor/path encodings the min endpoint is the semantic
+ *  "remove from the structure" eject (`next(i)` → 0), letting a chain dismantle a parasitic
+ *  successor fragment backwards — ±1 alone cannot express that jump. */
 internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFactors: IntHashSet, sink: MoveSink) {
     if (nf == seed || !seenFactors.add(nf)) return
     val nfac = factors[nf]
@@ -110,15 +104,12 @@ internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFacto
     for (u in nfac.boolVars) sink.addBoolFlip(u)
 }
 
-/** Grow one chain from [first] (see [proposeRepairChains]), apply-evaluate-revert style.
- *  Returns the flattened primitive parts of the walk's minimum-cost prefix with ≥ 2
- *  parts, else null (single-part walks are already in the normal repair pool). The
- *  prefix is emitted even when it ends above the start cost — availability mirrors the
- *  stall swaps (candidates from any stalled state) and the score race arbitrates;
- *  pre-filtering to improving-only walks starves the pool on exactly the trajectories
- *  that need coordinated escapes, because the improving chains only exist at states the
- *  search can't reach without them. The state is restored exactly (assignment, cost,
- *  step, lastTouched / touchCount on touched slots, conf-change flags, best-cost
+/** Grow one chain from [first] (see [proposeRepairChains]), apply-evaluate-revert style. Returns the
+ *  flattened primitive parts of the walk's minimum-cost prefix with ≥ 2 parts, else null (single-part
+ *  walks are already in the normal repair pool). The prefix is emitted even when it ends above the
+ *  start cost, letting the score race arbitrate; pre-filtering to improving-only walks would starve
+ *  the pool on the trajectories that need coordinated escapes. The state is restored exactly
+ *  (assignment, cost, step, lastTouched / touchCount on touched slots, conf-change flags, best-cost
  *  watermark). */
 internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propose: MoveSink): List<Move>? {
     val startCost = cost

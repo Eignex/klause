@@ -13,9 +13,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Initial [LocalSearchState.factorWeights] seeding (#684 fix 1): with
- * [LocalSearchParams.normalizeWeightsByClass] on, an over-populated factor *kind* is damped so it
- * can't steer the descent by sheer count, while smaller kinds keep weight 1.0.
+ * Initial [LocalSearchState.factorWeights] seeding: with [LocalSearchParams.normalizeWeightsByClass]
+ * on, an over-populated factor *kind* is damped so it can't steer the descent by sheer count, while
+ * smaller kinds keep weight 1.0.
  */
 class FactorWeightNormalizationTest {
 

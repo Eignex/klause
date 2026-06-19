@@ -5,17 +5,15 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
- * Stall-gated int-pair swap proposals — the single implementation behind `Cbls.sampleStallSwaps`
- * (epic #710). Randomized rejection sampling: pick a violated factor, take one of its int vars `u`,
- * and pair it with either another var of the same factor or a var of a frontier (variable-sharing)
- * factor. A legal swap needs differing values and same-shaped domains — swaps target
- * permutation/assignment structure (course→period style vars over one value range) where a single
- * int-set breaks an equal-coefficient sum but a value exchange preserves it.
+ * Stall-gated int-pair swap proposals. Randomized rejection sampling: pick a violated factor, take
+ * one of its int vars u, and pair it with either another var of the same factor or a var of a
+ * frontier (variable-sharing) factor. A legal swap needs differing values and same-shaped domains —
+ * swaps target permutation/assignment structure (course→period style vars over one value range)
+ * where a single int-set breaks an equal-coefficient sum but a value exchange preserves it.
  *
  * [Pool.ScoreOnly]: a coordinated 2-variable move taken by the noise draw is a destructive
- * perturbation (measured to thrash assignment plateaus); score-picked it is the escape the
- * single-set repair pool can't produce. [Phase.Infeasible]: it is the feasibility-fight plateau
- * buster.
+ * perturbation; score-picked it is the escape the single-set repair pool can't produce.
+ * [Phase.Infeasible]: it is the feasibility-fight plateau buster.
  */
 class StallSwaps(
     /** Cap on swap candidates produced per call. */
@@ -49,15 +47,13 @@ class StallSwaps(
                 nvars[rng.nextInt(nvars.size)]
             }
             if (w == u) continue
-            // The private swap sink bypasses the state sink's assumption filtering — check
-            // frozen vars explicitly (mirrors the engine's post-feasibility pairSwapStep).
+            // Check frozen vars explicitly: the compound bypasses the state sink's assumption filter.
             if (state.assumptions.isFrozenInt(u) || state.assumptions.isFrozenInt(w)) continue
             val du = problem.intDomains[u]
             val dw = problem.intDomains[w]
-            // Same-shaped domains only: swaps target permutation/assignment structure
-            // (course→period style vars sharing one value range). Cross-domain swaps (e.g. a
-            // decision var against a derived load/count var) are semantically meaningless and
-            // measured to thrash the plateau rather than walk it.
+            // Same-shaped domains only: swaps target permutation/assignment structure sharing one
+            // value range. Cross-domain swaps (decision var vs derived load/count var) are
+            // semantically meaningless.
             if (du.min != dw.min || du.max != dw.max) continue
             val vu = state.assignment.intValue(u)
             val vw = state.assignment.intValue(w)
@@ -68,7 +64,7 @@ class StallSwaps(
         }
     }
 
-    /** Constants + identity. */
+    /** Catalog identity. */
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("stall-swaps")

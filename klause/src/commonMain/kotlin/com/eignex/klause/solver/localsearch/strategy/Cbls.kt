@@ -20,24 +20,21 @@ import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
- * Constraint-Based Local Search as a [SourceDrivenStrategy] recipe over the four axes. CBLS scores
- * moves against a *global* weighted-violation gradient and escapes plateaus by reweighting plus a
- * stall-gated broadening of the move pool — all expressed through the axes rather than a bespoke loop:
+ * Constraint-Based Local Search as a [SourceDrivenStrategy] recipe. CBLS scores moves against a
+ * *global* weighted-violation gradient and escapes plateaus by reweighting plus a stall-gated
+ * broadening of the move pool:
  *
  *  - **sources**: violated-factor repairs always; satisfied-factor structured moves + objective-seed
  *    moves at feasibility; elected implicit globals during the infeasibility fight; and, gated on the
- *    schedule's stall signal, frontier (neighbour) moves plus the score-only stall swaps / ejection
- *    chains that the reification plateaus need.
+ *    stall signal, frontier (neighbour) moves plus the score-only stall swaps / ejection chains that
+ *    the reification plateaus need.
  *  - **scoring**: [MoveScoring.Weighted] — the learned per-factor gradient (or [MoveScoring.Raw]).
  *  - **acceptance**: [AcceptanceRule.WalkSatNoise] — greedy on the gradient with a noise draw whose
- *    level the schedule's stall signal raises from [noiseProbability] to [stallNoise] while stalled.
+ *    level the stall signal raises from [noiseProbability] to [stallNoise] while stalled.
  *  - **schedule**: the SAPS-style weight bump+smooth ([WeightSchedule.cbls]) and the [StallSchedule]
  *    stall signal (window + effective noise); the targeted [StallKick] fires as the perturbation hook.
- *
- * Defaults match the yuck-style "moderate noise, gentle stall pressure" regime that generalises
- * across CP shapes.
  */
-// FunctionNaming: factory mirroring the historical strategy constructor. LongParameterList: the CBLS tuning surface.
+// LongParameterList: the CBLS tuning surface.
 @Suppress("FunctionNaming", "LongParameterList")
 fun Cbls(
     noiseProbability: Double = 0.05,
@@ -87,8 +84,8 @@ fun Cbls(
         add(ConfiguredSource(Frontier(violatedSampleCount, frontierMoveCap), stallGated = true))
         add(ConfiguredSource(SatisfiedStructured.sampled(satisfiedSampleCount)))
         if (implicitStructuredCap > 0) {
-            // Elected implicit globals are drawn during the infeasibility fight (not at feasibility,
-            // where the satisfied-structured source owns the pool), so override the source's phase.
+            // Elected implicit globals are drawn during the infeasibility fight, not at feasibility
+            // where the satisfied-structured source owns the pool, so override the phase.
             add(ConfiguredSource(SatisfiedStructured.elected(implicitStructuredCap), phase = Phase.Infeasible))
         }
         add(ConfiguredSource(ObjectiveSeed()))
@@ -119,10 +116,9 @@ fun Cbls(
 
 /**
  * The CBLS targeted kick as a driver perturbation hook: after [after] applied moves with no strict
- * cost drop (a certified-stuck window long enough that weight bumps, frontier moves, and noise have
- * all had their chance), inject one bounded [StallKick] perturbation and restart the no-progress
- * window. Stateful (one per search); returns `null` while feasible, before the window elapses, or when
- * no variable is eligible.
+ * cost drop, inject one bounded [StallKick] perturbation and restart the no-progress window. Stateful
+ * (one per search); returns `null` while feasible, before the window elapses, or when no variable is
+ * eligible.
  */
 internal class StallKickPerturbation(private val after: Int, stallKickVars: Int) : (LocalSearchState) -> Move? {
     init {

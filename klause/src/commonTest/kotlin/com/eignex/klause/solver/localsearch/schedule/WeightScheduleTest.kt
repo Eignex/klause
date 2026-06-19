@@ -5,7 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** The shared violation-weight schedule (#721): parity with the Cbls/FJ formulas + stall cadence. */
+/** The shared violation-weight schedule: parity with the Cbls/FJ formulas + stall cadence. */
 class WeightScheduleTest {
 
     @Test
@@ -15,7 +15,7 @@ class WeightScheduleTest {
         val w = doubleArrayOf(5.0, 1.0, 3.0)
         val base = doubleArrayOf(1.0, 1.0, 1.0)
         val violated = intArrayOf(0, 2)
-        // The exact arithmetic FeasibilityJump used inline: decay every weight toward base, then bump.
+        // FeasibilityJump arithmetic: decay every weight toward base, then bump.
         val expected = DoubleArray(w.size) { base[it] + (w[it] - base[it]) * decay }
         expected[0] += inc
         expected[2] += inc
@@ -32,7 +32,7 @@ class WeightScheduleTest {
         val w = doubleArrayOf(5.0, 1.0)
         val base = doubleArrayOf(1.0, 1.0)
         val violated = intArrayOf(0)
-        // Cbls inline: bump first, then w ← (1-smoothFactor)·w + smoothFactor·baseWeight·base.
+        // Cbls: bump first, then w ← (1-smoothFactor)·w + smoothFactor·baseWeight·base.
         val expected = doubleArrayOf(5.0 + 1.0, 1.0).also {
             for (i in it.indices) it[i] = (1.0 - smoothFactor) * it[i] + smoothFactor * baseWeight * base[i]
         }

@@ -13,8 +13,8 @@ package com.eignex.klause.solver.localsearch.schedule
  * [reset] returns to the start temperature (e.g. on restart). The schedule never touches the search
  * assignment, so reheating re-diversifies without discarding the incumbent.
  *
- * Implementations: [Geometric] (fixed cooling rate — the classic schedule), [AdaptiveCooling] (rate
- * tracks the observed acceptance ratio), and the [Reheating] decorator.
+ * Implementations: [Geometric] (fixed cooling rate), [AdaptiveCooling] (rate tracks the observed
+ * acceptance ratio), and the [Reheating] decorator.
  *
  * A schedule is an [AdaptivePolicy]: it `observe`s the shared per-round feedback channel and
  * `reset`s like every other adaptive policy, adding the temperature-specific `step`/`reheat` hooks.
@@ -75,9 +75,8 @@ abstract class AbstractSchedule(
 }
 
 /**
- * Classic geometric cooling: every [step] multiplies the temperature by [coolingRate] (in `(0, 1]`),
- * floored at the schedule's minimum. With `coolingRate == 1.0` the temperature is constant. The
- * defaults (start 1.0, rate 0.999, floor 1e-3) reproduce the long-standing annealing behaviour.
+ * Geometric cooling: every [step] multiplies the temperature by [coolingRate] (in `(0, 1]`),
+ * floored at the schedule's minimum. With `coolingRate == 1.0` the temperature is constant.
  */
 class Geometric(
     initialTemperature: Double = 1.0,

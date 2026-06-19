@@ -14,27 +14,21 @@ import com.eignex.klause.solver.localsearch.schedule.StallSchedule
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
 /**
- * The shared local-search driver: the sole strategy, expressed purely as *policy over move sources*.
- * It owns no generation loop — it collects candidates from a configured set of
- * [com.eignex.klause.solver.localsearch.movesource.MoveSource]s, then scores and selects. Every
- * gate the bespoke strategies used to re-implement per call lives here once:
+ * The shared local-search driver, expressed as *policy over move sources*. It collects candidates
+ * from a configured set of [com.eignex.klause.solver.localsearch.movesource.MoveSource]s, then scores
+ * and selects, applying two gates once:
  *
  *  - **Phase gating** — a source is consulted only when its
- *    [com.eignex.klause.solver.localsearch.movesource.Phase] applies to the current `state.cost`,
- *    replacing the per-generator `cost` re-checks.
+ *    [com.eignex.klause.solver.localsearch.movesource.Phase] applies to the current `state.cost`.
  *  - **Noise/score pool split** — [Pool.NoiseEligible] moves are routed to a pool the random/noise
  *    draw can take; [Pool.ScoreOnly] moves (coordinated swaps/chains) compete by score only, never
- *    by dice. The rule that "coordinated escapes never enter the noise draw" is enforced once,
- *    by source property, rather than re-encoded in each strategy.
+ *    by dice.
  *
- * Because a source is consumed entirely by configuration, *any* source becomes available to *any*
- * recipe with no new generation code: a focused arm is `{ViolatedRepairs}`, a structured-descent arm
- * adds `{SatisfiedStructured, ObjectiveSeed}`, and so on. [scoring] (the scoring axis), [acceptance]
- * (the acceptance axis), and [schedule] (the schedule axis) stay first-class, so the recipe's
- * behaviour is its four axes — the driver removes only the duplicated *generation*.
- *
- * Every local-search arm — CBLS, Feasibility-Jump, the WalkSAT/probSAT/SA family — is a named recipe
- * over this driver (the factory functions alongside it in this package).
+ * A source is consumed entirely by configuration, so any source is available to any recipe with no
+ * new generation code: a focused arm is `{ViolatedRepairs}`, a structured-descent arm adds
+ * `{SatisfiedStructured, ObjectiveSeed}`. The recipe's behaviour is its four axes — [sources],
+ * [scoring], [acceptance], [schedule]. Each local-search arm (CBLS, Feasibility-Jump, the
+ * WalkSAT/probSAT/SA family) is a named recipe over this driver, built by the factories in this package.
  */
 class SourceDrivenStrategy(
     /** The sources this strategy draws from, with their per-source caps and enable gates. */
@@ -43,10 +37,10 @@ class SourceDrivenStrategy(
     val scoring: MoveScoring = MoveScoring.Weighted,
     /** How a scored candidate is selected — greedy, WalkSAT noise, probSAT roulette, skewed-VNS, or SA. */
     val acceptance: AcceptanceRule = AcceptanceRule.Greedy,
-    /** The schedule axis: the [ScheduleBundle] of tempo policies — temperature, violation
-     *  weights, diversification noise, restart cadence. Each member is driven at its native cadence
-     *  (weights per step; temperature per pick + per round; restart by the engine). The default empty
-     *  bundle leaves every dimension off. */
+    /** The schedule axis: the [ScheduleBundle] of tempo policies — temperature, violation weights,
+     *  diversification noise, restart cadence. Each member is driven at its native cadence (weights
+     *  per step; temperature per pick + per round; restart by the engine). The default leaves every
+     *  dimension off. */
     val schedule: ScheduleBundle = ScheduleBundle(),
     /** Tabu filter applied to the combined candidate pool before selection. */
     val tabu: TabuFilter = TabuFilter.Disabled,
@@ -58,16 +52,15 @@ class SourceDrivenStrategy(
     val perturbation: ((LocalSearchState) -> Move?)? = null,
     /** Whether this strategy drives objective descent at feasibility (it has feasibility-phase
      *  sources that score satisfied/objective candidates at `cost == 0`), rather than bailing for the
-     *  engine's built-in descent. The unified-minimize path keys off this; the `Cbls` recipe sets it. */
+     *  engine's built-in descent. The unified-minimize path keys off this; the [Cbls] recipe sets it. */
     val drivesObjectiveDescent: Boolean = false,
 ) {
 
-    /** Round feedback retunes the schedule axis's temperature schedule (e.g. AdaptiveCooling);
-     *  accumulation is gated off when no temperature schedule is present. */
+    /** Whether round feedback retunes the temperature schedule; off when no temperature schedule is present. */
     val wantsRoundFeedback: Boolean get() = schedule.temperature != null
 
-    /** Feed a completed round of move statistics to the schedule axis's temperature schedule, the
-     *  round ending at engine [step]. Only meaningful when [wantsRoundFeedback]; a no-op otherwise. */
+    /** Feed a completed round of move statistics to the temperature schedule, the round ending at
+     *  engine [step]. A no-op unless [wantsRoundFeedback]. */
     fun observeRound(acc: RoundAccumulator, step: Long) {
         val temperature = schedule.temperature ?: return
         temperature.observe(acc.snapshot(temperature.temperature, step))
@@ -78,7 +71,7 @@ class SourceDrivenStrategy(
 
     /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
     fun pickMove(state: LocalSearchState): Move? {
-        // Stall-driven weight maintenance first, so the bumped gradient scores this pick's candidates.
+        // Weight maintenance first, so the bumped gradient scores this pick's candidates.
         schedule.weights?.maintain(
             state.step,
             state.cost,
@@ -87,13 +80,12 @@ class SourceDrivenStrategy(
             state.violated.toIntArray(),
             state.rng,
         )
-        // The stall signal (schedule axis): advance the no-progress window, then gate the
-        // plateau-escape sources and the effective noise on it. A StallSchedule is the noise member
-        // and the gate at once; absent it, nothing is stall-gated.
+        // The stall signal: advance the no-progress window, then gate the plateau-escape sources and
+        // the effective noise on it. A StallSchedule is the noise member and the gate at once.
         val stall = schedule.noise as? StallSchedule
         stall?.update(state.step, state.cost)
         val stalled = stall?.stalled ?: false
-        // Perturbation escalation: a triggered kick pre-empts the normal pick.
+        // A triggered kick pre-empts the normal pick.
         perturbation?.invoke(state)?.let { return it }
 
         noiseSink.clear()
@@ -109,22 +101,16 @@ class SourceDrivenStrategy(
             val sink = if (cs.source.pool == Pool.NoiseEligible) noiseSink else scoreSink
             cs.source.generate(state, sink)
         }
-        // The noise/score pool split is preserved across the CC + tabu filters; the acceptance rule
-        // applies it (stochastic rules draw from the noise pool only, deterministic ones range over
-        // both) and returns null when both pools are empty. CC precedes tabu (matching the focused
-        // WalkSAT/probSAT order): the configuration filter is the primary focus, tabu the cycle-breaker
-        // layered on what survives it.
+        // The noise/score pool split is preserved across the CC + tabu filters. CC precedes tabu: the
+        // configuration filter is the primary focus, tabu the cycle-breaker layered on what survives it.
         val ccNoise = ccFilter(state, noiseSink.list)
         val noiseFiltered = tabu.filter(state, ccNoise)
-        // While stalled, never let tabu starve the noise pool into a null pick (a full restart that
-        // discards plateau progress): fall back to the unfiltered candidates so the search keeps
-        // walking the plateau. Off-stall, an empty tabu pool still yields the normal restart path.
+        // While stalled, never let tabu starve the noise pool into a null pick (a restart that discards
+        // plateau progress): fall back to the unfiltered candidates so the search keeps walking the plateau.
         val noiseMoves = if (noiseFiltered.isEmpty() && stalled) ccNoise else noiseFiltered
         val scoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
-        // Diversification noise is the schedule axis's: a NoiseSchedule retunes its level (the
-        // adaptive WalkSAT/probSAT controllers off the running cost, the StallSchedule off the stall
-        // window) and steers the acceptance rule (WalkSAT noise / probSAT cb). The noise-free rules
-        // ignore the level.
+        // A NoiseSchedule retunes its level and steers the acceptance rule (WalkSAT noise / probSAT cb);
+        // noise-free rules ignore the level.
         val noiseSchedule = schedule.noise as? NoiseSchedule
         val effectiveAcceptance = if (noiseSchedule != null && (noiseMoves.isNotEmpty() || scoreMoves.isNotEmpty())) {
             if (stall == null) noiseSchedule.observe(state.cost)
@@ -132,9 +118,8 @@ class SourceDrivenStrategy(
         } else {
             acceptance
         }
-        // Temperature is the schedule axis's; the acceptance rule only reads it (Metropolis). The
-        // driver advances the schedule once per pick that sampled the noise pool, matching the former
-        // step-per-Metropolis-choose cadence — so acceptance stays pure and schedule stays the axis.
+        // The acceptance rule only reads the temperature (Metropolis); the driver advances the schedule
+        // once per pick that sampled the noise pool, so acceptance stays pure.
         val temperature = schedule.temperature?.temperature ?: Double.POSITIVE_INFINITY
         val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { score(state, it) }
         if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
@@ -156,9 +141,9 @@ class SourceDrivenStrategy(
         is Move.Compound -> move.parts.all { confChanged(state, it) }
     }
 
-    /** Scored value on the [scoring] basis. Weighted/raw net-delta add the objective change once
-     *  feasible (gated behind `cost == 0` so the infeasibility fight keeps the constraint gradient);
-     *  the break basis already folds the shaped objective. Mirrors the CBLS feasibility-first scoring. */
+    /** Scored value on the [scoring] basis. Weighted/raw net-delta add the objective change only once
+     *  feasible (gated on `cost == 0`, so the infeasibility fight keeps the constraint gradient); the
+     *  break basis already folds the shaped objective. */
     private fun score(state: LocalSearchState, move: Move): Double = when (scoring) {
         MoveScoring.Break -> state.shapedBreakScore(move)
         MoveScoring.Weighted -> state.weightedNetDelta(move) + feasibleObjectiveDelta(state, move)

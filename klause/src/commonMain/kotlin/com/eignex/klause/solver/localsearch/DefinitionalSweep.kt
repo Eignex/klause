@@ -21,15 +21,13 @@ import com.eignex.klause.util.IntArrayDeque
  * definitions decompositions lean on — comparison reifications, `bool2int` channels, literal
  * set membership, bool conjunction/disjunction — plus variable-index element access.
  *
- * Why this exists: MiniZinc decompositions routinely make most of a model definitional
- * (fast-food/ff1: 229 of 230 constraints; prize-collecting: 596 of 668). A local search that
- * treats those as ordinary hard constraints must hand-repair the DAG one move at a time:
- * measured on both instances, CBLS needs ~2M flips to walk a random assignment to within one
- * violated factor of feasible — far beyond a competition wall-clock budget. Sweeping instead
+ * Why this exists: MiniZinc decompositions routinely make most of a model definitional. A local
+ * search treating those as ordinary hard constraints must hand-repair the DAG one move at a time,
+ * needing millions of flips to walk a random assignment toward feasibility. Sweeping instead
  * *evaluates* every defined var bottom-up from the free (decision) variables, so a freshly
- * randomized assignment starts at the "only real constraints violated" frontier at the cost of
- * one pass. [network] extends the same nodes to **per-move** maintenance (issue #153): an
- * incremental one-way invariant index the engine consults after every applied move.
+ * randomized assignment starts at the "only real constraints violated" frontier at the cost of one
+ * pass. [network] extends the same nodes to **per-move** maintenance: an incremental one-way
+ * invariant index the engine consults after every applied move.
  *
  * Soundness: computed int values are clamped into the variable's domain, and an element access
  * with an out-of-range index leaves the output untouched. In both cases the affected
@@ -206,7 +204,7 @@ class DefinitionalSweep internal constructor(
     /** Number of swept definitions. */
     val size: Int get() = nodes.size
 
-    /** Build the per-move invariant index over these nodes (issue #153). */
+    /** Build the per-move invariant index over these nodes. */
     fun network(numIntVars: Int, numBoolVars: Int): InvariantNetwork = InvariantNetwork(nodes, numIntVars, numBoolVars)
 
     /**
@@ -243,7 +241,7 @@ class DefinitionalSweep internal constructor(
 }
 
 /**
- * Per-move one-way invariant index over a model's definitional nodes (issue #153): given the
+ * Per-move one-way invariant index over a model's definitional nodes: given the
  * vars a move touched, [affectedNodes] returns the cone of definitions to re-evaluate in
  * topological order. The local-search state drives the actual writes through its incremental
  * apply path so factor payloads and break/make counts stay maintained — this class is a passive

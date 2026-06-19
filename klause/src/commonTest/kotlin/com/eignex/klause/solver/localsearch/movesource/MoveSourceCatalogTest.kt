@@ -6,7 +6,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * Tests for the sources-axis registry [MoveSourceCatalog] (#721/#722): labels resolve to the right
+ * Tests for the sources-axis registry [MoveSourceCatalog]: labels resolve to the right
  * default-configured sources, the `sources=` parser preserves order and skips blanks, and unknown
  * labels fail loudly.
  */
@@ -14,7 +14,6 @@ class MoveSourceCatalogTest {
 
     @Test
     fun `every label resolves to its source id`() {
-        // The catalog is the single home of the sources axis; each label must produce its source.
         val expected = mapOf(
             "violated" to ViolatedRepairs.ID,
             "frontier" to Frontier.ID,

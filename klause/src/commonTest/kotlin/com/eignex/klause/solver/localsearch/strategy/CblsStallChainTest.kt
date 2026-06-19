@@ -64,9 +64,8 @@ class CblsStallChainTest {
         val emitted = state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = sink)
 
         assertTrue(emitted >= 1, "the F0 repair must seed at least one chain (got $emitted)")
-        // The repair-first walk must derive the directed two-step chain: repair(F0) followed
-        // by the repair of the factor it regressed (F1). Ejection-first chains (neighbour
-        // primitives) may add further compounds; the directed one must be among them.
+        // The repair-first walk derives the directed two-step chain: repair(F0) then the repair of the
+        // factor it regressed (F1). Ejection-first chains may add others; the directed one must be present.
         val expected = listOf(Move.IntSet(0, 2), Move.IntSet(1, 0))
         val chain = sink.list.filterIsInstance<Move.Compound>().firstOrNull { it.parts == expected }
         assertTrue(chain != null, "the directed repair chain $expected must be emitted (got ${sink.list})")

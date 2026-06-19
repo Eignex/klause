@@ -7,9 +7,8 @@ import kotlin.random.Random
 
 /**
  * The **acceptance axis** of an LS recipe: how a `SourceDrivenStrategy` selects one move
- * from the scored candidate pools. Lifts the selection rules that were inlined across `Cbls`,
- * `FocusedLs.MoveSelection`, and `FeasibilityJump` into one pluggable, composable type, so an arm
- * picks its acceptance independently of its sources and scoring.
+ * from the scored candidate pools. One pluggable, composable type, so an arm picks its acceptance
+ * independently of its sources and scoring.
  *
  * [choose] receives two pools — the **noise-eligible** moves (the stochastic draw may take these)
  * and the **score-only** moves (coordinated escapes that may be selected only deterministically,
@@ -53,8 +52,7 @@ sealed interface AcceptanceRule {
 
     /**
      * WalkSAT-style noisy greedy (Selman 1994): with probability [noise] take a uniformly-random
-     * move from the noise pool, otherwise the greedy best over both pools. Reproduces the driver's
-     * former `noiseProbability` behaviour exactly (and the CBLS noise draw).
+     * move from the noise pool, otherwise the greedy best over both pools.
      */
     data class WalkSatNoise(
         /** Probability of taking a uniformly-random noise-pool move instead of the greedy best. */

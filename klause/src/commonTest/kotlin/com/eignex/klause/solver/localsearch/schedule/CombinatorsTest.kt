@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/** Sequencing/looping of sub-schedules (#699 combinators). All deterministic — no RNG. */
+/** Sequencing/looping of sub-schedules. All deterministic — no RNG. */
 class CombinatorsTest {
 
     private fun geo(initial: Double) = Geometric(

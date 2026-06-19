@@ -1,15 +1,12 @@
 package com.eignex.klause.solver.localsearch.movesource
 
 /**
- * The named **sources axis** of an LS recipe (epic #721): a registry mapping a stable label to a
- * default-configured [MoveSource], and a parser turning a `sources=…` spec into the
- * [ConfiguredSource] list a [com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy]
- * draws from. The single place a source label resolves to an instance with its default numeric
- * params, so the CLI four-axis selector and the cross-product arm generator share one catalog
- * rather than hard-coding constructors.
- *
- * Each label produces a source with the defaults the bespoke strategies use today; per-source
- * numeric overrides are a caller (CLI / recipe) concern layered on top.
+ * The named sources axis of an LS recipe: a registry mapping a stable label to a default-configured
+ * [MoveSource], and a parser turning a `sources=…` spec into the [ConfiguredSource] list a
+ * source-driven strategy draws from. The single place a source label resolves to an instance with
+ * its default numeric params, so the CLI selector and the cross-product arm generator share one
+ * catalog rather than hard-coding constructors. Per-source numeric overrides are a caller concern
+ * layered on top.
  */
 object MoveSourceCatalog {
 
@@ -39,7 +36,6 @@ object MoveSourceCatalog {
     fun parse(spec: String): List<ConfiguredSource> =
         spec.split(',').map { it.trim() }.filter { it.isNotEmpty() }.map { configured(it) }
 
-    /** Default per-source numeric params — the values the bespoke strategies use today. */
     private const val DEFAULT_VIOLATED_SAMPLE = 4
     private const val DEFAULT_FRONTIER_CAP = 32
     private const val DEFAULT_SATISFIED_SAMPLE = 4

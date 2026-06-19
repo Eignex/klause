@@ -74,9 +74,8 @@ internal fun anchorAndPerturb(
             }
 
             PerturbationKind.BasinHopping -> {
-                // Pick `perturbationStrength` factors at random; for each, randomise every
-                // variable in that factor's scope. The localisation produces a coordinated
-                // kick that traverses a single decision-graph subregion in one shot.
+                // Pick `perturbationStrength` factors at random; randomise every variable in each
+                // factor's scope, for a coordinated kick across a single decision-graph subregion.
                 val numFactors = problem.numFactors
                 if (numFactors == 0) {
                     repeat(perturbationStrength) { kickRandomVar(state, problem) }
@@ -132,15 +131,11 @@ class AdaptivePerturbationRestart(val maxFlipsBeforeRestart: Int = 10_000, val p
 }
 
 /**
- * Stagnation-driven restart on the shared per-round feedback channel ([AdaptivePolicy], #721): rather
- * than a fixed flip cadence, restart after [patience] consecutive rounds ([RoundLog]) with no strict
+ * Stagnation-driven restart on the shared per-round feedback channel ([AdaptivePolicy]): rather than
+ * a fixed flip cadence, restart after [patience] consecutive rounds ([RoundLog]) with no strict
  * improvement in the best cost seen. A [maxFlipsBeforeRestart] ceiling still forces a restart if a
- * round never completes (e.g. the search keeps restarting for another reason), so the policy can't
- * wedge. Anchors to `bestSoFar` with a [perturbationStrength] perturbation when one exists, else a
- * full random restart.
- *
- * The engine feeds rounds only when this policy is installed, so the common fixed-cadence arms carry
- * no accumulation overhead. Adoption by a portfolio arm is bench-gated.
+ * round never completes, so the policy can't wedge. Anchors to `bestSoFar` with a
+ * [perturbationStrength] perturbation when one exists, else a full random restart.
  */
 class StagnationRestart(
     /** Consecutive no-improvement rounds before a restart fires. */
