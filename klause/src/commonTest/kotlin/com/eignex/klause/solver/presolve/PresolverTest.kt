@@ -3,6 +3,7 @@ package com.eignex.klause.solver.presolve
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -10,8 +11,10 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.factor.Circuit
+import com.eignex.klause.solver.factor.Clause
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
+import com.eignex.klause.solver.factor.Xor
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
@@ -32,9 +35,10 @@ class PresolverTest {
     @Test
     fun `parse handles aliases and comma-lists`() {
         val ctx = PresolveContext.EMPTY
-        // null / default / auto → all auto: the three problem passes run for a non-sensitive query.
+        // null / default / auto → all auto passes run for a non-sensitive query.
         val autoProblem = listOf(
             PresolvePass.STRENGTHEN_COEFFICIENTS,
+            PresolvePass.DERIVE_XOR_UNITS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.REMOVE_REDUNDANT,
             PresolvePass.BREAK_SYMMETRIES,
@@ -135,10 +139,11 @@ class PresolverTest {
         val ctx = PresolveContext.EMPTY
         // off → nothing.
         assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
-        // conservative → FAST tier only (strengthen + affine + subsume), no symmetry, single round.
+        // conservative → FAST tier only (strengthen + xor-units + affine + subsume), no symmetry.
         assertEquals(
             listOf(
                 PresolvePass.STRENGTHEN_COEFFICIENTS,
+                PresolvePass.DERIVE_XOR_UNITS,
                 PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
                 PresolvePass.REMOVE_REDUNDANT,
             ),
@@ -248,6 +253,42 @@ class PresolverTest {
         val full = pre.reconstruct(result.assignment)
         assertEquals(2 * full.ints[1] + 1, full.ints[0], "affine var not reconstructed: x should be 2y+1")
         assertTrue(isFeasible(problem, full), "reconstructed sample infeasible in the original problem")
+    }
+
+    @Test
+    fun `xor-units pass emits implied unit clauses and is idempotent`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(
+                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true)), targetParity = 0), // x0 = x1
+                Xor(intArrayOf(Lit.make(1, true)), targetParity = 1), // x1 = true
+            ),
+        )
+        val config = PresolveConfig.parse("xor-units")
+        val pre = Presolver.run(problem, config)
+        val units = pre.problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }
+        assertEquals(setOf(Lit.make(0, true), Lit.make(1, true)), units.map { it.literals[0] }.toSet())
+        // Re-running on the transformed problem should be a no-op (no duplicate unit clauses).
+        assertSame(pre.problem, Presolver.run(pre.problem, config).problem)
+    }
+
+    @Test
+    fun `xor-units pass turns a contradictory xor core into contradictory units`() {
+        val problem = Problem(
+            numBoolVars = 1,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(
+                Xor(intArrayOf(Lit.make(0, true)), targetParity = 1),
+                Xor(intArrayOf(Lit.make(0, true)), targetParity = 0),
+            ),
+        )
+        val pre = Presolver.run(problem, PresolveConfig.parse("xor-units"))
+        val units = pre.problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }
+        assertTrue(units.any { it.literals[0] == Lit.make(0, true) })
+        assertTrue(units.any { it.literals[0] == Lit.make(0, false) })
     }
 
     @Test
