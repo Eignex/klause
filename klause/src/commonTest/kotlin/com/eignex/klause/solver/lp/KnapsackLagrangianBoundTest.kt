@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpPlan
 import com.eignex.klause.solver.factor.PseudoBoolean
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
@@ -126,7 +127,7 @@ class KnapsackLagrangianBoundTest {
         val obj = LinearObjective(boolWeights = longArrayOf(-3, -2, -2, -1))
         val base = BacktrackParams(randomSeed = 1L)
         val noBound = BacktrackSolver(p).minimize(obj, base)
-        val knap = BacktrackSolver(p).minimize(obj, base.copy(lpKnapsackLagrangian = true))
+        val knap = BacktrackSolver(p).minimize(obj, base.copy(lpPlan = LpPlan(knapsackLagrangian = true)))
         assertTrue(noBound is MinimizeResult.Optimal, "baseline should solve, got $noBound")
         assertTrue(knap is MinimizeResult.Optimal, "knapsack-Lagrangian solve should be optimal, got $knap")
         assertEquals(-4.0, knap.objective, 1e-9, "best profit selection is -4")

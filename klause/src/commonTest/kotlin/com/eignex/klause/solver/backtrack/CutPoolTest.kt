@@ -33,11 +33,11 @@ class CutPoolTest {
         val p = problem()
         val noPool = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)),
         )
         val pool = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true, lpCutPool = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true, cutPool = true)),
         )
         assertTrue(noPool is MinimizeResult.Optimal && pool is MinimizeResult.Optimal)
         assertEquals(4.0, noPool.objectiveValue)

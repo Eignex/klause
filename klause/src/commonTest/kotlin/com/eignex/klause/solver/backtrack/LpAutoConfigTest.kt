@@ -33,12 +33,12 @@ class LpAutoConfigTest {
     fun `linear structure enables the bounding stack but no cuts`() {
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
         val r = LpAutoConfig.recommend(p)
-        assertTrue(r.lpBounding)
+        assertTrue(r.lpPlan.bounding)
         // The bounding-stack techniques that need no extra structure ride along.
-        assertTrue(r.lpLearn)
-        assertTrue(r.lpProbe)
-        assertFalse(r.lpCuts)
-        assertFalse(r.lpCutPool)
+        assertTrue(r.lpPlan.learn)
+        assertTrue(r.lpPlan.probe)
+        assertFalse(r.lpPlan.cuts)
+        assertFalse(r.lpPlan.cutPool)
         assertFalse(r.lagrangian)
         assertFalse(r.energeticReasoning)
     }
@@ -51,12 +51,15 @@ class LpAutoConfigTest {
         val saved = KlauseConfig.current
         try {
             KlauseConfig.current = saved.copy(lpCeilingTableauCells = Long.MAX_VALUE)
-            assertTrue(LpAutoConfig.recommend(p).lpBounding, "a large ceiling must enable auto LP")
+            assertTrue(LpAutoConfig.recommend(p).lpPlan.bounding, "a large ceiling must enable auto LP")
             // Over the base cap but within the ceiling: LP still on.
             KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
-            assertTrue(LpAutoConfig.recommend(p).lpBounding, "over the base cap but within the ceiling, LP stays on")
+            assertTrue(
+                LpAutoConfig.recommend(p).lpPlan.bounding,
+                "over the base cap but within the ceiling, LP stays on",
+            )
             KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
-            assertFalse(LpAutoConfig.recommend(p).lpBounding, "a 1-cell ceiling must disable auto LP")
+            assertFalse(LpAutoConfig.recommend(p).lpPlan.bounding, "a 1-cell ceiling must disable auto LP")
         } finally {
             KlauseConfig.current = saved
         }
@@ -66,9 +69,9 @@ class LpAutoConfigTest {
     fun `all-different enables bounding and cuts and pool and lagrangian`() {
         val p = problem(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6))
         val r = LpAutoConfig.recommend(p)
-        assertTrue(r.lpBounding)
-        assertTrue(r.lpCuts)
-        assertTrue(r.lpCutPool)
+        assertTrue(r.lpPlan.bounding)
+        assertTrue(r.lpPlan.cuts)
+        assertTrue(r.lpPlan.cutPool)
         assertTrue(r.lagrangian)
         assertFalse(r.energeticReasoning)
     }
@@ -83,8 +86,8 @@ class LpAutoConfigTest {
             closed = true,
         )
         val r = LpAutoConfig.recommend(problem(gcc))
-        assertTrue(r.lpBounding)
-        assertTrue(r.lpCuts)
+        assertTrue(r.lpPlan.bounding)
+        assertTrue(r.lpPlan.cuts)
         assertFalse(r.lagrangian)
     }
 
@@ -93,10 +96,10 @@ class LpAutoConfigTest {
         val p = problem(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
         val r = LpAutoConfig.recommend(p)
         assertTrue(r.energeticReasoning)
-        assertFalse(r.lpBounding)
-        assertFalse(r.lpCuts)
-        assertFalse(r.lpLearn)
-        assertFalse(r.lpProbe)
+        assertFalse(r.lpPlan.bounding)
+        assertFalse(r.lpPlan.cuts)
+        assertFalse(r.lpPlan.learn)
+        assertFalse(r.lpPlan.probe)
     }
 
     @Test
@@ -110,9 +113,9 @@ class LpAutoConfigTest {
         )
         val p = Problem(0, 4, Array(4) { IntDomain(0, 20) }, factors)
         val r = LpAutoConfig.recommend(p)
-        assertTrue(r.lpCumulative)
-        assertTrue(r.lpBounding) // the scheduling makespan turns the bounding stack on
-        assertTrue(r.lpLearn)
+        assertTrue(r.lpPlan.cumulative)
+        assertTrue(r.lpPlan.bounding) // the scheduling makespan turns the bounding stack on
+        assertTrue(r.lpPlan.learn)
         assertTrue(r.energeticReasoning) // the feasibility check rides along on the Cumulative
     }
 
@@ -131,9 +134,9 @@ class LpAutoConfigTest {
         // Small declared start horizon + a verified makespan: both the time-indexed LP (#453) and the
         // preemptive flow prune (#454) auto-enable.
         val r = LpAutoConfig.recommend(makespanScheduling(startHi = 10))
-        assertTrue(r.lpCumulativeFlow, "the flow prune rides along on any scheduling global")
-        assertTrue(r.lpCumulativeTimeIndexed, "a small bounded horizon fits the time-indexed tableau")
-        assertTrue(r.lpCumulative, "the energetic makespan row is on too")
+        assertTrue(r.lpPlan.cumulativeFlow, "the flow prune rides along on any scheduling global")
+        assertTrue(r.lpPlan.cumulativeTimeIndexed, "a small bounded horizon fits the time-indexed tableau")
+        assertTrue(r.lpPlan.cumulative, "the energetic makespan row is on too")
     }
 
     @Test
@@ -141,8 +144,8 @@ class LpAutoConfigTest {
         // A 200000-wide start horizon blows the O(n·H) time-indexed column budget, so it stays off;
         // the horizon-independent flow prune still rides along.
         val r = LpAutoConfig.recommend(makespanScheduling(startHi = 200_000))
-        assertTrue(r.lpCumulativeFlow)
-        assertFalse(r.lpCumulativeTimeIndexed, "the huge horizon must keep the time-indexed model off")
+        assertTrue(r.lpPlan.cumulativeFlow)
+        assertFalse(r.lpPlan.cumulativeTimeIndexed, "the huge horizon must keep the time-indexed model off")
     }
 
     @Test
@@ -157,8 +160,8 @@ class LpAutoConfigTest {
             val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n) }
             val big = Problem(0, n + 1, domains, arrayOf<Factor>(NValue(n, IntArray(n) { it })))
             val rBig = LpAutoConfig.recommend(big)
-            assertFalse(rBig.lpNValue, "the over-budget NValue hull must be shed")
-            assertTrue(rBig.lpBounding, "the base LP still runs; only the hull is shed")
+            assertFalse(rBig.lpPlan.nValue, "the over-budget NValue hull must be shed")
+            assertTrue(rBig.lpPlan.bounding, "the base LP still runs; only the hull is shed")
 
             // A small NValue (3×3 = 9 cells) fits comfortably and is enabled.
             val small = Problem(
@@ -167,7 +170,7 @@ class LpAutoConfigTest {
                 Array(4) { if (it < 3) IntDomain(0, 2) else IntDomain(0, 3) },
                 arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))),
             )
-            assertTrue(LpAutoConfig.recommend(small).lpNValue, "a small NValue hull fits and is enabled")
+            assertTrue(LpAutoConfig.recommend(small).lpPlan.nValue, "a small NValue hull fits and is enabled")
         } finally {
             KlauseConfig.current = saved
         }
@@ -193,8 +196,8 @@ class LpAutoConfigTest {
                 arrayOf<Factor>(Table(tableXs, tuples), NValue(total - 1, xs)),
             )
             val r = LpAutoConfig.recommend(p)
-            assertFalse(r.lpTable && r.lpNValue, "two stacked hulls cannot both be enabled past the budget")
-            assertTrue(r.lpTable || r.lpNValue, "the cheaper hull is still kept")
+            assertFalse(r.lpPlan.table && r.lpPlan.nValue, "two stacked hulls cannot both be enabled past the budget")
+            assertTrue(r.lpPlan.table || r.lpPlan.nValue, "the cheaper hull is still kept")
         } finally {
             KlauseConfig.current = saved
         }
@@ -210,23 +213,26 @@ class LpAutoConfigTest {
             Cumulative(intArrayOf(0, 1, 2), intArrayOf(1, 1, 1), intArrayOf(1, 1, 1), capacity = 1),
         )
         val off = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.OFF))
-        assertFalse(off.lpBounding || off.lpCuts || off.lagrangian || off.energeticReasoning || off.lpCumulativeFlow)
+        assertFalse(
+            off.lpPlan.bounding || off.lpPlan.cuts || off.lagrangian || off.energeticReasoning ||
+                off.lpPlan.cumulativeFlow,
+        )
 
         val conservative = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.CONSERVATIVE))
-        assertTrue(conservative.lagrangian && conservative.energeticReasoning && conservative.lpCumulativeFlow)
-        assertFalse(conservative.lpBounding, "MEDIUM simplex stays off at CONSERVATIVE")
-        assertFalse(conservative.lpCuts, "EXHAUSTIVE cuts stay off at CONSERVATIVE")
+        assertTrue(conservative.lagrangian && conservative.energeticReasoning && conservative.lpPlan.cumulativeFlow)
+        assertFalse(conservative.lpPlan.bounding, "MEDIUM simplex stays off at CONSERVATIVE")
+        assertFalse(conservative.lpPlan.cuts, "EXHAUSTIVE cuts stay off at CONSERVATIVE")
 
         val default = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.DEFAULT))
-        assertTrue(default.lpBounding && default.lagrangian)
-        assertFalse(default.lpCuts, "EXHAUSTIVE cuts stay off at DEFAULT")
+        assertTrue(default.lpPlan.bounding && default.lagrangian)
+        assertFalse(default.lpPlan.cuts, "EXHAUSTIVE cuts stay off at DEFAULT")
 
         val aggressive = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.AGGRESSIVE))
-        assertTrue(aggressive.lpBounding && aggressive.lpCuts)
+        assertTrue(aggressive.lpPlan.bounding && aggressive.lpPlan.cuts)
         // AGGRESSIVE reproduces the historical structural recommend (every applicable technique on).
         val rec = LpAutoConfig.recommend(p)
-        assertEquals(rec.lpBounding, aggressive.lpBounding)
-        assertEquals(rec.lpCuts, aggressive.lpCuts)
+        assertEquals(rec.lpPlan.bounding, aggressive.lpPlan.bounding)
+        assertEquals(rec.lpPlan.cuts, aggressive.lpPlan.cuts)
         assertEquals(rec.lagrangian, aggressive.lagrangian)
     }
 
@@ -263,11 +269,11 @@ class LpAutoConfigTest {
         factors.add(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6))
         val p = Problem(0, n, Array(n) { IntDomain(0, 5) }, factors.toTypedArray())
         val r = LpAutoConfig.recommend(p)
-        assertTrue(r.lpBounding)
+        assertTrue(r.lpPlan.bounding)
         // The AllDifferent makes the instance cut-eligible; cuts gate on lpActive (#705).
-        assertTrue(r.lpCuts)
-        assertTrue(r.lpProbe)
-        assertTrue(r.lpLearn)
+        assertTrue(r.lpPlan.cuts)
+        assertTrue(r.lpPlan.probe)
+        assertTrue(r.lpPlan.learn)
         assertTrue(r.lagrangian)
 
         // Past the ceiling ⇒ the LP family fully declines; the Lagrangian still runs.
@@ -275,7 +281,7 @@ class LpAutoConfigTest {
         try {
             KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
             val off = LpAutoConfig.recommend(p)
-            assertFalse(off.lpBounding)
+            assertFalse(off.lpPlan.bounding)
             assertTrue(off.lagrangian)
         } finally {
             KlauseConfig.current = saved
@@ -314,8 +320,8 @@ class LpAutoConfigTest {
     @Test
     fun `circuit enables circuit cuts and bounding`() {
         val r = LpAutoConfig.recommend(problem(Circuit(intArrayOf(0, 1, 2))))
-        assertTrue(r.lpBounding)
-        assertTrue(r.lpCircuit)
+        assertTrue(r.lpPlan.bounding)
+        assertTrue(r.lpPlan.circuit)
     }
 
     @Test
@@ -323,35 +329,35 @@ class LpAutoConfigTest {
         val constArr = LpAutoConfig.recommend(
             problem(Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 0)),
         )
-        assertTrue(constArr.lpBounding)
-        assertTrue(constArr.lpElement)
+        assertTrue(constArr.lpPlan.bounding)
+        assertTrue(constArr.lpPlan.element)
 
         val varArr = LpAutoConfig.recommend(
             problem(Element(idx = 0, result = 1, arr = intArrayOf(2), arrIsVars = true, indexOffset = 0)),
         )
-        assertFalse(varArr.lpElement)
+        assertFalse(varArr.lpPlan.element)
     }
 
     @Test
     fun `table enables table hull and bounding`() {
         val r = LpAutoConfig.recommend(problem(Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 1))))
-        assertTrue(r.lpBounding)
-        assertTrue(r.lpTable)
+        assertTrue(r.lpPlan.bounding)
+        assertTrue(r.lpPlan.table)
     }
 
     @Test
     fun `pseudo-boolean enables cover cuts`() {
         val pb = PseudoBoolean(intArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4)
         val r = LpAutoConfig.recommend(Problem(2, 0, emptyArray(), arrayOf<Factor>(pb)))
-        assertTrue(r.lpCuts)
-        assertTrue(r.lpBounding)
+        assertTrue(r.lpPlan.cuts)
+        assertTrue(r.lpPlan.bounding)
     }
 
     @Test
     fun `pure boolean problem enables nothing`() {
         val r = LpAutoConfig.recommend(Problem(2, 0, emptyArray(), arrayOf<Factor>()))
-        assertFalse(r.lpBounding)
-        assertFalse(r.lpCuts)
+        assertFalse(r.lpPlan.bounding)
+        assertFalse(r.lpPlan.cuts)
         assertFalse(r.lagrangian)
         assertFalse(r.energeticReasoning)
     }
@@ -360,9 +366,9 @@ class LpAutoConfigTest {
     fun `caller-set flags are never turned off`() {
         // A Cumulative-only problem would not enable lpBounding, but an explicit base setting stays.
         val p = problem(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
-        val r = LpAutoConfig.recommend(p, BacktrackParams(lpBounding = true, lpGomory = false))
-        assertTrue(r.lpBounding)
-        assertFalse(r.lpGomory)
+        val r = LpAutoConfig.recommend(p, BacktrackParams(lpPlan = LpPlan(bounding = true, gomory = false)))
+        assertTrue(r.lpPlan.bounding)
+        assertFalse(r.lpPlan.gomory)
         assertTrue(r.energeticReasoning)
     }
 
@@ -376,7 +382,7 @@ class LpAutoConfigTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val auto = LpAutoConfig.recommend(p, BacktrackParams(randomSeed = 1L))
-        assertTrue(auto.lpBounding)
+        assertTrue(auto.lpPlan.bounding)
         val result = BacktrackSolver(p).minimize(obj, auto)
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)

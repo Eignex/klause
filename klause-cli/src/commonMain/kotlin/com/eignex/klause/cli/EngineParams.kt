@@ -140,9 +140,9 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
     p.int("mid-lbd")?.let { out = out.copy(midLbdThreshold = it) }
     p.bool("vivification")?.let { out = out.copy(vivification = it) }
     p.int("vivify-batch")?.let { out = out.copy(vivifyBatch = it) }
-    p.bool("lp-objective-cone")?.let { out = out.copy(lpObjectiveCone = it) }
-    p.bool("lp-auto-off-reprobe")?.let { out = out.copy(lpAutoOffReprobe = it) }
-    p.bool("lp-knapsack-lagrangian")?.let { out = out.copy(lpKnapsackLagrangian = it) }
+    p.bool("lp-objective-cone")?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
+    p.bool("lp-auto-off-reprobe")?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
+    p.bool("lp-knapsack-lagrangian")?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
     if (allowSelectors) {
         p.varSelector("var-selector", out.randomSeed)?.let { out = out.copy(variableSelector = it) }
         p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }

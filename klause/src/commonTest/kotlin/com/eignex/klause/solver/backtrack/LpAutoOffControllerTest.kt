@@ -100,7 +100,7 @@ class LpAutoOffControllerTest {
 
     @Test
     fun `an Int-MAX reprobe base makes a disable irreversible like the static one-shot`() {
-        // BacktrackParams.lpAutoOffReprobe=false wires reprobeBase=Int.MAX_VALUE — the #562 behaviour.
+        // LpPlan.autoOffReprobe=false wires reprobeBase=Int.MAX_VALUE — the #562 behaviour.
         val c = LpAutoOff(warmup = 4, window = 4, reprobeBase = Int.MAX_VALUE)
         repeat(4) {
             c.shouldRun()

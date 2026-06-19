@@ -34,11 +34,11 @@ class LpWarmStartTest {
             val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
             val cold = BacktrackSolver(p).minimize(
                 obj,
-                BacktrackParams(randomSeed = 1L, lpBounding = true, lpWarmStart = false),
+                BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, warmStart = false)),
             )
             val warm = BacktrackSolver(p).minimize(
                 obj,
-                BacktrackParams(randomSeed = 1L, lpBounding = true, lpWarmStart = true),
+                BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, warmStart = true)),
             )
             assertTrue(cold is MinimizeResult.Optimal && warm is MinimizeResult.Optimal)
             assertEquals(cold.objectiveValue, warm.objectiveValue, "n=$n optimum diverged")
@@ -51,7 +51,7 @@ class LpWarmStartTest {
         val obj = LinearObjective(intCoefficients = LongArray(6) { 1L })
         val result = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpWarmStart = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, warmStart = true)),
         )
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(11.0, result.objectiveValue)
@@ -66,7 +66,7 @@ class LpWarmStartTest {
         val obj = LinearObjective(intCoefficients = LongArray(3) { 1L })
         val result = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 2L, lpBounding = true, lpWarmStart = true),
+            BacktrackParams(randomSeed = 2L, lpPlan = LpPlan(bounding = true, warmStart = true)),
         )
         assertTrue(result is MinimizeResult.Optimal)
         // Pairwise x_i+x_j>=5 over three vars: summing forces 2·Σ >= 15, so Σ >= 8 (ceil 7.5).

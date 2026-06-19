@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpPlan
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective
@@ -39,7 +40,7 @@ class LpExactBoundTest {
             val factors = cons.map { (c, v, r) -> Linear(c.map { it.toInt() }.toIntArray(), v, LinearOp.LE, r.toInt()) }
             val problem = Problem(0, n, domains, factors.toTypedArray<Factor>())
             val obj = LinearObjective(intCoefficients = cost)
-            val params = BacktrackParams(randomSeed = 5L, lpBounding = true)
+            val params = BacktrackParams(randomSeed = 5L, lpPlan = LpPlan(bounding = true))
 
             when (val res = BacktrackSolver(problem).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {

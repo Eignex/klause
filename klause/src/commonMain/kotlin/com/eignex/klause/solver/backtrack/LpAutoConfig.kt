@@ -33,26 +33,26 @@ import com.eignex.klause.util.IntHashSet
  * structural fact, so this never *speculates* about performance; it just stops the LP machinery
  * from being a manual per-instance decision:
  *
- *  - **[BacktrackParams.lpBounding]** — there is genuine integer-linear structure ([Linear] /
+ *  - **[LpPlan.bounding]** — there is genuine integer-linear structure ([Linear] /
  *    [ReifiedLinear]) the relaxation can exploit, or a global whose relaxation/cuts need the LP
  *    ([AllDifferent], [GlobalCardinality], [Circuit], constant-array [Element], [Table]). With it
  *    come the bounding-stack techniques that need no extra structure: per-node objective propagation,
- *    Farkas learning ([BacktrackParams.lpLearn]) and the LP-rounding incumbent probe
- *    ([BacktrackParams.lpProbe]).
- *  - **[BacktrackParams.lpCuts]** — an [AllDifferent] (Hall / assignment cuts),
+ *    Farkas learning ([LpPlan.learn]) and the LP-rounding incumbent probe
+ *    ([LpPlan.probe]).
+ *  - **[LpPlan.cuts]** — an [AllDifferent] (Hall / assignment cuts),
  *    [GlobalCardinality] (occurrence sum cuts), or [PseudoBoolean] (knapsack cover cuts) is
- *    present; the persistent root pool ([BacktrackParams.lpCutPool]) rides along.
- *  - **[BacktrackParams.lpCircuit]** — a [Circuit] is present (subtour-elimination cuts).
- *  - **[BacktrackParams.lpElement]** — a constant-array [Element] is present (its convex hull).
- *  - **[BacktrackParams.lpTable]** — a [Table] is present (its convex hull).
- *  - **[BacktrackParams.lpNValue]** — an [NValue] is present (its one-hot value hull, #435).
+ *    present; the persistent root pool ([LpPlan.cutPool]) rides along.
+ *  - **[LpPlan.circuit]** — a [Circuit] is present (subtour-elimination cuts).
+ *  - **[LpPlan.element]** — a constant-array [Element] is present (its convex hull).
+ *  - **[LpPlan.table]** — a [Table] is present (its convex hull).
+ *  - **[LpPlan.nValue]** — an [NValue] is present (its one-hot value hull, #435).
  *  - **[BacktrackParams.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
  *  - **[BacktrackParams.energeticReasoning]** — a [Cumulative] is present. When the auto path is
  *    the one enabling it, [BacktrackParams.energeticEvery] is derived from the models' task counts
  *    so the O(windows² · tasks) window scan stays a bounded fraction of a node's cost (a per-check
  *    budget normalization, [ENERGETIC_OPS_PER_CHECK] — the same class of guard as the tableau
  *    cap, not a tuning judgement); a caller who enabled the check explicitly keeps their cadence.
- *  - **[BacktrackParams.lpCumulative]** — a [Cumulative] / [Disjunctive] with a *verifiable*
+ *  - **[LpPlan.cumulative]** — a [Cumulative] / [Disjunctive] with a *verifiable*
  *    makespan variable is present (the energetic makespan LP row, #430). Applicability is the
  *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
  *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
@@ -211,7 +211,7 @@ object LpAutoConfig {
                 table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0
         // #571: an explicit objective-cone request drops the disjunctive big-M rows and every variable
         // disconnected from the objective, so it always fits the cap even when the full model is over it.
-        val coneRequested = base.lpObjectiveCone
+        val coneRequested = base.lpPlan.objectiveCone
         val baseFits = coneRequested || cells <= baseCap
         // LP runs whenever the model is structurally amenable, the emphasis permits it, and the base
         // relaxation fits the ceiling (a cone request always fits).
@@ -250,26 +250,29 @@ object LpAutoConfig {
         val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
-            lpBounding = base.lpBounding || lpActive,
-            lpCuts = base.lpCuts || cuts,
-            lpCutPool = base.lpCutPool || cuts,
-            // LP learning rides on the bounding path: the objective-bound reason is built from the
-            // exact basis-certificate the sparse solve already computes.
-            lpLearn = base.lpLearn || lpActive,
-            // The LP-rounding probe solves the root relaxation through the sparse revised simplex.
-            lpProbe = base.lpProbe || lpActive,
-            lpCircuit = base.lpCircuit || (LpTechnique.CIRCUIT in acceptedHulls),
-            lpElement = base.lpElement || (LpTechnique.ELEMENT in acceptedHulls),
-            lpTable = base.lpTable || (LpTechnique.TABLE in acceptedHulls),
-            lpNValue = base.lpNValue || (LpTechnique.NVALUE in acceptedHulls),
-            lpRegular = base.lpRegular || (LpTechnique.REGULAR in acceptedHulls),
-            lpMdd = base.lpMdd || (LpTechnique.MDD in acceptedHulls),
-            lpGccCount = base.lpGccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
-            lpCumulative = base.lpCumulative || makespanLp,
-            lpDiffn = base.lpDiffn || (diffnLp && config.resolved(LpTechnique.DIFFN)),
-            lpCumulativeTimeIndexed = base.lpCumulativeTimeIndexed ||
-                (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
-            lpCumulativeFlow = base.lpCumulativeFlow || (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
+            lpPlan = base.lpPlan.copy(
+                bounding = base.lpPlan.bounding || lpActive,
+                cuts = base.lpPlan.cuts || cuts,
+                cutPool = base.lpPlan.cutPool || cuts,
+                // LP learning rides on the bounding path: the objective-bound reason is built from the
+                // exact basis-certificate the sparse solve already computes.
+                learn = base.lpPlan.learn || lpActive,
+                // The LP-rounding probe solves the root relaxation through the sparse revised simplex.
+                probe = base.lpPlan.probe || lpActive,
+                circuit = base.lpPlan.circuit || (LpTechnique.CIRCUIT in acceptedHulls),
+                element = base.lpPlan.element || (LpTechnique.ELEMENT in acceptedHulls),
+                table = base.lpPlan.table || (LpTechnique.TABLE in acceptedHulls),
+                nValue = base.lpPlan.nValue || (LpTechnique.NVALUE in acceptedHulls),
+                regular = base.lpPlan.regular || (LpTechnique.REGULAR in acceptedHulls),
+                mdd = base.lpPlan.mdd || (LpTechnique.MDD in acceptedHulls),
+                gccCount = base.lpPlan.gccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
+                cumulative = base.lpPlan.cumulative || makespanLp,
+                diffn = base.lpPlan.diffn || (diffnLp && config.resolved(LpTechnique.DIFFN)),
+                cumulativeTimeIndexed = base.lpPlan.cumulativeTimeIndexed ||
+                    (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
+                cumulativeFlow = base.lpPlan.cumulativeFlow ||
+                    (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
+            ),
             lagrangian = base.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
             energeticReasoning = base.energeticReasoning || energetic,
             // Derive the cadence only when the auto path is the one enabling the check — an

@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpPlan
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.Subcircuit
@@ -53,7 +54,7 @@ class CpToLpRelaxationSubcircuitArcTest {
         val p = problem()
         val base = BacktrackParams(randomSeed = 1L)
         val noLp = BacktrackSolver(p).minimize(objective, base)
-        val lp = BacktrackSolver(p).minimize(objective, base.copy(lpBounding = true, lpCircuit = true))
+        val lp = BacktrackSolver(p).minimize(objective, base.copy(lpPlan = LpPlan(bounding = true, circuit = true)))
         assertTrue(noLp is MinimizeResult.Optimal, "baseline should solve, got $noLp")
         assertTrue(lp is MinimizeResult.Optimal, "subcircuit-LP solve should be optimal, got $lp")
         // succ[0] >= 1 forces node 0 included; the cheapest is succ[0] = 1 (e.g. the 2-cycle 0->1->0).

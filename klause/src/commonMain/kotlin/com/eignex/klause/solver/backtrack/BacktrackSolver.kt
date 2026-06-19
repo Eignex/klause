@@ -470,8 +470,8 @@ class BacktrackSolver(override val problem: Problem) :
          */
         private fun initRootLp() {
             val relaxer = lpEngine.lpRelaxer ?: return
-            val gomory = params.lpCuts && params.lpGomory
-            val mir = params.lpCuts && params.lpMir
+            val gomory = params.lpPlan.cuts && params.lpPlan.gomory
+            val mir = params.lpPlan.cuts && params.lpPlan.mir
             if (lpEngine.lpSeparators.isNotEmpty() || gomory || mir) {
                 lpEngine.lpGlobalCuts = lpEngine.harvestRootCuts(
                     relaxer,
@@ -502,7 +502,7 @@ class BacktrackSolver(override val problem: Problem) :
                 initRootLp()
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
-                if (params.lpProbe && lpEngine.lpRelaxer != null) {
+                if (params.lpPlan.probe && lpEngine.lpRelaxer != null) {
                     val seed = lpEngine.lpRoundingProbe(objective, params.cancellation)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }

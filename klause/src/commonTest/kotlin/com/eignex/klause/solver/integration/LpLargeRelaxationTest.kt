@@ -38,12 +38,12 @@ class LpLargeRelaxationTest {
             // Over the base cap but within the ceiling ⇒ LP still on (the hull budget shrinks, not LP).
             KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
             val r = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
-            assertTrue(r.lpBounding, "lpBounding should be on within the ceiling")
+            assertTrue(r.lpPlan.bounding, "lpBounding should be on within the ceiling")
 
             // Ceiling = 1 cell ⇒ nothing fits ⇒ LP off.
             KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
             val off = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
-            assertFalse(off.lpBounding)
+            assertFalse(off.lpPlan.bounding)
         } finally {
             KlauseConfig.current = saved
         }
@@ -78,7 +78,7 @@ class LpLargeRelaxationTest {
                 val problem = Problem(0, n, domains, factors.toTypedArray<Factor>())
                 val obj = LinearObjective(intCoefficients = cost)
                 val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 5L))
-                assertTrue(resolved.lpBounding, "LP bounding must activate for this model")
+                assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {
@@ -129,7 +129,7 @@ class LpLargeRelaxationTest {
                 val problem = Problem(0, nx + 1, domains, factors.toTypedArray())
                 val obj = LinearObjective(intCoefficients = LongArray(nx + 1) { if (it == zVar) 1L else 0L })
                 val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 9L))
-                assertTrue(resolved.lpBounding, "LP bounding must activate for this model")
+                assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {
@@ -167,8 +167,8 @@ class LpLargeRelaxationTest {
                 ),
             )
             val resolved = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 1L))
-            assertTrue(resolved.lpBounding, "LP bounding must activate")
-            assertTrue(resolved.lpTable, "the Table hull must be wired onto the LP path")
+            assertTrue(resolved.lpPlan.bounding, "LP bounding must activate")
+            assertTrue(resolved.lpPlan.table, "the Table hull must be wired onto the LP path")
             // And the solve is sound: minimise x0 over the table {(0,5),(2,2),(4,0)} ⇒ 0.
             val res = BacktrackSolver(p).minimize(LinearObjective(intCoefficients = longArrayOf(1L, 0L)), resolved)
             assertTrue(res is MinimizeResult.Optimal && res.objective == 0.0, "expected optimum x0=0, got $res")
@@ -202,7 +202,7 @@ class LpLargeRelaxationTest {
                 val problem = Problem(0, n, domains, factors)
                 val obj = LinearObjective(intCoefficients = LongArray(n) { if (it == 0) 1L else 0L })
                 val resolved = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 3L))
-                assertTrue(resolved.lpBounding, "LP bounding must activate for this model")
+                assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {

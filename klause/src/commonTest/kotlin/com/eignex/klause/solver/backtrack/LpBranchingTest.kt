@@ -3,6 +3,7 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.LpPlan
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
@@ -65,10 +66,10 @@ class LpBranchingTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
         val on = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpBranching = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, branching = true)),
         )
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(3.0, off.objectiveValue)
@@ -91,7 +92,7 @@ class LpBranchingTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val on = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpProbe = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, probe = true)),
         )
         assertTrue(on is MinimizeResult.Optimal)
         assertEquals(3.0, on.objectiveValue)

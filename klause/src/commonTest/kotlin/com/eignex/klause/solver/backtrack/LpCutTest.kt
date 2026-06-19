@@ -28,8 +28,10 @@ class LpCutTest {
     fun `cuts preserve the optimum`() {
         val p = allDiff(4, 6)
         val obj = LinearObjective(intCoefficients = LongArray(4) { 1L })
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
-        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true))
+        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
+        val on = BacktrackSolver(
+            p,
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)))
 
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(6.0, off.objectiveValue) // 0+1+2+3
@@ -40,7 +42,9 @@ class LpCutTest {
     fun `cuts fire on an all-different objective`() {
         val p = allDiff(4, 6)
         val obj = LinearObjective(intCoefficients = LongArray(4) { 1L })
-        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true))
+        val on = BacktrackSolver(
+            p,
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)))
         assertTrue(on is MinimizeResult.Optimal)
         assertEquals(6.0, on.objectiveValue)
         assertTrue(on.stats.lpCuts.sum > 0.0, "expected AllDifferent cuts, got ${on.stats.lpCuts.sum}")
@@ -60,10 +64,10 @@ class LpCutTest {
         val p = Problem(0, n, Array(n) { IntDomain(0, 3) }, rows.toTypedArray())
         val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
 
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
         val on = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true, lpGomory = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true, gomory = true)),
         )
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(off.objectiveValue, on.objectiveValue, "Gomory cuts changed the optimum")

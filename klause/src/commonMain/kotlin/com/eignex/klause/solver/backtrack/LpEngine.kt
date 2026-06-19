@@ -40,21 +40,21 @@ internal class LpEngine(
     val params: BacktrackParams,
     private val sink: SolveStatsSink,
 ) {
-    val lpRelaxer = if (params.lpBounding) {
+    val lpRelaxer = if (params.lpPlan.bounding) {
         CpToLpRelaxation(
             problem,
             objective,
-            elementHull = params.lpElement,
-            tableHull = params.lpTable,
-            cumulative = params.lpCumulative,
-            diffn = params.lpDiffn,
-            cumulativeTimeIndexed = params.lpCumulativeTimeIndexed,
-            nValueHull = params.lpNValue,
-            regularHull = params.lpRegular,
-            mddHull = params.lpMdd,
-            gccCountHull = params.lpGccCount,
-            circuitArcs = params.lpCircuit,
-            objectiveCone = params.lpObjectiveCone,
+            elementHull = params.lpPlan.element,
+            tableHull = params.lpPlan.table,
+            cumulative = params.lpPlan.cumulative,
+            diffn = params.lpPlan.diffn,
+            cumulativeTimeIndexed = params.lpPlan.cumulativeTimeIndexed,
+            nValueHull = params.lpPlan.nValue,
+            regularHull = params.lpPlan.regular,
+            mddHull = params.lpPlan.mdd,
+            gccCountHull = params.lpPlan.gccCount,
+            circuitArcs = params.lpPlan.circuit,
+            objectiveCone = params.lpPlan.objectiveCone,
         )
     } else {
         null
@@ -62,9 +62,9 @@ internal class LpEngine(
 
     // Structure-based cut separators (#22/#705) run on the sparse LP point; circuit cuts are deferred
     // until the arc model is rebuilt on the sparse relaxation.
-    val lpSeparators: List<CutSeparator> = if (params.lpCuts || params.lpCircuit) {
+    val lpSeparators: List<CutSeparator> = if (params.lpPlan.cuts || params.lpPlan.circuit) {
         buildList {
-            if (params.lpCuts) {
+            if (params.lpPlan.cuts) {
                 add(AllDifferentSeparator())
                 add(GccSeparator())
                 add(KnapsackCoverSeparator())
@@ -72,7 +72,7 @@ internal class LpEngine(
                 val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
                 add(AssignmentObjectiveCut(coef))
             }
-            if (params.lpCircuit) add(CircuitSeparator())
+            if (params.lpPlan.circuit) add(CircuitSeparator())
         }
     } else {
         emptyList()
@@ -87,7 +87,7 @@ internal class LpEngine(
         null
     }
     private var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
-    private val knapsackLagBound = if (params.lpKnapsackLagrangian) {
+    private val knapsackLagBound = if (params.lpPlan.knapsackLagrangian) {
         KnapsackLagrangianBound(problem, objective).takeIf { it.applicable }
     } else {
         null
@@ -98,7 +98,7 @@ internal class LpEngine(
     } else {
         null
     }
-    private val cumulativeFlowBound = if (params.lpCumulativeFlow) {
+    private val cumulativeFlowBound = if (params.lpPlan.cumulativeFlow) {
         CumulativeFlowBound(problem).takeIf { it.applicable }
     } else {
         null
@@ -112,11 +112,11 @@ internal class LpEngine(
     // that is useless near the root but tightens deeper is recovered. Sound: gating only drops a
     // bound (loses pruning, never solutions), so `-t` is honoured (the gate only reduces work).
     private val lpAutoOff = LpAutoOff(
-        reprobeBase = if (params.lpAutoOffReprobe) LpAutoOff.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
+        reprobeBase = if (params.lpPlan.autoOffReprobe) LpAutoOff.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
     )
-    val lpNogoods: LpNogoodPool? = if (params.lpLearn) LpNogoodPool() else null
+    val lpNogoods: LpNogoodPool? = if (params.lpPlan.learn) LpNogoodPool() else null
     private val lpBasisByDepth = ArrayList<Basis?>()
-    val lpHints = if (params.lpBranching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+    val lpHints = if (params.lpPlan.branching) LpHints(problem.numIntVars, problem.numBoolVars) else null
     private var lpBackjump: Learned? = null
 
     /** The asserting LP backjump clause derived during the last [pruneNode] (#280), or null. */
@@ -154,7 +154,7 @@ internal class LpEngine(
             }
 
             cumulativeFlowBoundL != null &&
-                ++cumulativeFlowCheckCounter % params.lpCumulativeFlowEvery == 0 &&
+                ++cumulativeFlowCheckCounter % params.lpPlan.cumulativeFlowEvery == 0 &&
                 cumulativeFlowBoundL.isInfeasible(session) -> {
                 sink.observeEnergeticPrune() // same scheduling-feasibility-prune family
                 if (lpNogoodsL != null) cumulativeFlowBoundL.explain(session)?.let { lpNogoodsL.add(it) }
@@ -194,13 +194,13 @@ internal class LpEngine(
             } -> true
 
             lpRelaxerL != null &&
-                session.decisionLevel <= params.lpBoundMaxDepth &&
-                ++lpCheckCounter % params.lpBoundEvery == 0 &&
+                session.decisionLevel <= params.lpPlan.boundMaxDepth &&
+                ++lpCheckCounter % params.lpPlan.boundEvery == 0 &&
                 lpAutoOff.shouldRun() -> {
                 val depth = session.decisionLevel
                 // Warm-start this node's LP from the parent depth's optimal basis (#705): tightening
                 // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
-                val warm = if (params.lpWarmStart && depth - 1 in lpBasisByDepth.indices) {
+                val warm = if (params.lpPlan.warmStart && depth - 1 in lpBasisByDepth.indices) {
                     lpBasisByDepth[depth - 1]
                 } else {
                     null
@@ -215,7 +215,7 @@ internal class LpEngine(
                     globalCuts = lpGlobalCuts,
                     cancellation = params.cancellation,
                     hints = lpHints,
-                    learn = params.lpLearn,
+                    learn = params.lpPlan.learn,
                     warm = warm,
                 )
                 if (outcome.basis != null) {
