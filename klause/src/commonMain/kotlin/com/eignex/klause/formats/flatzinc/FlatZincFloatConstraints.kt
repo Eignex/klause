@@ -1,14 +1,9 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.Clause
-import com.eignex.klause.solver.factor.Linear
-import com.eignex.klause.solver.factor.LinearOp
-import com.eignex.klause.solver.factor.ReifiedLinear
-import com.eignex.klause.solver.factor.Table
-import kotlin.math.abs
-import kotlin.math.round
-import kotlin.math.roundToLong
+import com.eignex.klause.solver.factor.*
+import kotlin.math.*
+
 
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
     require(c.args.size == if (reified) 4 else 3)
@@ -20,16 +15,7 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
     // Σ c_i · value(idx_i) op bound
     // ⇒ Σ c_i · step_i · idx_i op bound - Σ c_i · lo_i
     // Scale all coefficients and bound by `floatScale` and round to integers.
-    var scaledBound = (bound * floatScale).roundToLong()
-    val scaledCoeffs = IntArray(coefs.size)
-    val vars = IntArray(coefs.size)
-    for (i in coefs.indices) {
-        val bk = varRefs[i]
-        val step = if (bk.buckets > 1) (bk.hi - bk.lo) / (bk.buckets - 1) else 0.0
-        scaledCoeffs[i] = (coefs[i] * step * floatScale).roundToLong().toInt()
-        vars[i] = bk.varId
-        scaledBound -= (coefs[i] * bk.lo * floatScale).roundToLong()
-    }
+    val scaled = scaleFloatLinear(coefs, varRefs, bound)
     val op = when (c.name.removeSuffix("_reif")) {
         "float_lin_le" -> LinearOp.LE
         "float_lin_eq" -> LinearOp.EQ
@@ -38,9 +24,9 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
     }
     if (reified) {
         val aux = resolveBoolLit(c.args[3])
-        factors.add(ReifiedLinear(Lit.variable(aux), scaledCoeffs, vars, op, scaledBound.toInt()))
+        factors.add(ReifiedLinear(Lit.variable(aux), scaled.coeffs, scaled.vars, op, scaled.bound.toInt()))
     } else {
-        factors.add(Linear(scaledCoeffs, vars, op, scaledBound.toInt()))
+        factors.add(Linear(scaled.coeffs, scaled.vars, op, scaled.bound.toInt()))
     }
 }
 
@@ -180,34 +166,26 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
  * bucket granularity (sound since `floatScale` is the smallest representable diff).
  */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
+    require(c.args.size == if (reified) 4 else 3)
     val coefs = evalFloatConstArray(c.args[0])
     val varRefs = evalFloatVarArray(c.args[1])
     val bound = evalFloatConst(c.args[2])
-    var scaledBound = (bound * floatScale).roundToLong()
-    val scaledCoeffs = IntArray(coefs.size)
-    val vars = IntArray(coefs.size)
-    for (i in coefs.indices) {
-        val bk = varRefs[i]
-        val step = if (bk.buckets > 1) (bk.hi - bk.lo) / (bk.buckets - 1) else 0.0
-        scaledCoeffs[i] = (coefs[i] * step * floatScale).roundToLong().toInt()
-        vars[i] = bk.varId
-        scaledBound -= (coefs[i] * bk.lo * floatScale).roundToLong()
-    }
+    val scaled = scaleFloatLinear(coefs, varRefs, bound)
     // Strict: subtract one scaled unit.
-    scaledBound -= 1
+    val strictBound = scaled.bound - 1
     if (reified) {
         val aux = resolveBoolLit(c.args[3])
         factors.add(
             ReifiedLinear(
                 Lit.variable(aux),
-                scaledCoeffs,
-                vars,
+                scaled.coeffs,
+                scaled.vars,
                 LinearOp.LE,
-                scaledBound.toInt(),
+                strictBound.toInt(),
             ),
         )
     } else {
-        factors.add(Linear(scaledCoeffs, vars, LinearOp.LE, scaledBound.toInt()))
+        factors.add(Linear(scaled.coeffs, scaled.vars, LinearOp.LE, strictBound.toInt()))
     }
 }
 
@@ -332,4 +310,28 @@ internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing
     }
 
     else -> failHere("expected float var array, got ${e::class.simpleName}")
+}
+
+private data class ScaledFloatLinear(
+    val coeffs: IntArray,
+    val vars: IntArray,
+    val bound: Long,
+)
+
+private fun FlatZincCompiler.scaleFloatLinear(
+    coefs: DoubleArray,
+    varRefs: List<FloatBucketing>,
+    bound: Double,
+): ScaledFloatLinear {
+    var scaledBound = (bound * floatScale).roundToLong()
+    val scaledCoeffs = IntArray(coefs.size)
+    val vars = IntArray(coefs.size)
+    for (i in coefs.indices) {
+        val bk = varRefs[i]
+        val step = if (bk.buckets > 1) (bk.hi - bk.lo) / (bk.buckets - 1) else 0.0
+        scaledCoeffs[i] = (coefs[i] * step * floatScale).roundToLong().toInt()
+        vars[i] = bk.varId
+        scaledBound -= (coefs[i] * bk.lo * floatScale).roundToLong()
+    }
+    return ScaledFloatLinear(scaledCoeffs, vars, scaledBound)
 }
