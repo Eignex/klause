@@ -142,109 +142,191 @@ internal class LpEngine(
         objectiveAscending: Boolean,
     ): Boolean {
         lpBackjump = null
-        // Fields captured into stable locals so the null-guards below smart-cast (a `val` property
-        // read across a lambda boundary does not on its own).
-        val lpRelaxerL = lpRelaxer
-        val lagBoundL = lagBound
-        val knapsackLagBoundL = knapsackLagBound
-        val energeticBoundL = energeticBound
-        val cumulativeFlowBoundL = cumulativeFlowBound
-        val lpNogoodsL = lpNogoods
-        return when {
-            linearLowerBound(objective, session) >= effectiveBound -> true
+        for (b in bounds) {
+            if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true
+        }
+        return false
+    }
 
-            energeticBoundL != null && ++energeticCheckCounter % params.energeticEvery == 0 &&
-                energeticBoundL.isInfeasible(session) -> {
-                sink.observeEnergeticPrune()
-                if (lpNogoodsL != null) energeticBoundL.explain(session)?.let { lpNogoodsL.add(it) }
-                true
+    /** Lower-bound dominance against the incumbent — the cheapest, always-applicable arm. */
+    private inner class LinearBound : RelaxationBound {
+        override val applicable: Boolean get() = true
+
+        override fun prune(
+            session: PropagationSession,
+            effectiveBound: Double,
+            objectiveVar: Int,
+            objectiveAscending: Boolean,
+        ): Boolean = linearLowerBound(objective, session) >= effectiveBound
+    }
+
+    /** Energetic-reasoning scheduling-feasibility bound (#562). */
+    private inner class EnergeticBoundArm : RelaxationBound {
+        override val applicable: Boolean get() = energeticBound != null
+
+        override fun prune(
+            session: PropagationSession,
+            effectiveBound: Double,
+            objectiveVar: Int,
+            objectiveAscending: Boolean,
+        ): Boolean {
+            val energeticBoundL = energeticBound ?: return false
+            if (++energeticCheckCounter % params.energeticEvery != 0 || !energeticBoundL.isInfeasible(session)) {
+                return false
             }
-
-            cumulativeFlowBoundL != null &&
-                ++cumulativeFlowCheckCounter % params.lpPlan.cumulativeFlowEvery == 0 &&
-                cumulativeFlowBoundL.isInfeasible(session) -> {
-                sink.observeEnergeticPrune() // same scheduling-feasibility-prune family
-                if (lpNogoodsL != null) cumulativeFlowBoundL.explain(session)?.let { lpNogoodsL.add(it) }
-                true
-            }
-
-            lagBoundL != null && run {
-                val res = lagBoundL.computeBound(
-                    session,
-                    effectiveBound,
-                    lagMultipliers,
-                    params.lagrangianIterations,
-                )
-                if (res != null) {
-                    lagMultipliers = res.multipliers
-                    if (res.prune) sink.observeLagrangianPrune()
-                    res.prune
-                } else {
-                    false
-                }
-            } -> true
-
-            knapsackLagBoundL != null && run {
-                val res = knapsackLagBoundL.computeBound(
-                    session,
-                    effectiveBound,
-                    knapsackLagMultipliers,
-                    params.lagrangianIterations,
-                )
-                if (res != null) {
-                    knapsackLagMultipliers = res.multipliers
-                    if (res.prune) sink.observeLagrangianPrune()
-                    res.prune
-                } else {
-                    false
-                }
-            } -> true
-
-            lpRelaxerL != null &&
-                session.decisionLevel <= params.lpPlan.boundMaxDepth &&
-                ++lpCheckCounter % params.lpPlan.boundEvery == 0 &&
-                lpAutoOff.shouldRun() -> {
-                val depth = session.decisionLevel
-                // Warm-start this node's LP from the parent depth's optimal basis (#705): tightening
-                // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
-                val warm = if (params.lpPlan.warmStart && depth - 1 in lpBasisByDepth.indices) {
-                    lpBasisByDepth[depth - 1]
-                } else {
-                    null
-                }
-                val outcome = lpBoundAndFix(
-                    lpRelaxerL,
-                    session,
-                    effectiveBound,
-                    sink,
-                    objectiveVar = objectiveVar,
-                    objectiveAscending = objectiveAscending,
-                    globalCuts = lpGlobalCuts,
-                    cancellation = params.cancellation,
-                    hints = lpHints,
-                    learn = params.lpPlan.learn,
-                    warm = warm,
-                )
-                if (outcome.basis != null) {
-                    while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
-                    lpBasisByDepth[depth] = outcome.basis
-                }
-                val explanation = outcome.explanation
-                if (explanation != null) {
-                    val analyzed = session.analyzeConflictClause(explanation) as? Learned
-                    if (analyzed != null && analyzed.asserting) {
-                        lpBackjump = analyzed
-                    } else {
-                        lpNogoods?.add(
-                            explanation,
-                        )
-                    }
-                }
-                lpAutoOff.record(outcome.prune)
-                outcome.prune
-            }
-
-            else -> false
+            sink.observeEnergeticPrune()
+            val lpNogoodsL = lpNogoods
+            if (lpNogoodsL != null) energeticBoundL.explain(session)?.let { lpNogoodsL.add(it) }
+            return true
         }
     }
+
+    /** Cumulative-flow scheduling-feasibility bound — same prune family as energetic. */
+    private inner class CumulativeFlowBoundArm : RelaxationBound {
+        override val applicable: Boolean get() = cumulativeFlowBound != null
+
+        override fun prune(
+            session: PropagationSession,
+            effectiveBound: Double,
+            objectiveVar: Int,
+            objectiveAscending: Boolean,
+        ): Boolean {
+            val cumulativeFlowBoundL = cumulativeFlowBound ?: return false
+            if (++cumulativeFlowCheckCounter % params.lpPlan.cumulativeFlowEvery != 0 ||
+                !cumulativeFlowBoundL.isInfeasible(session)
+            ) {
+                return false
+            }
+            sink.observeEnergeticPrune() // same scheduling-feasibility-prune family
+            val lpNogoodsL = lpNogoods
+            if (lpNogoodsL != null) cumulativeFlowBoundL.explain(session)?.let { lpNogoodsL.add(it) }
+            return true
+        }
+    }
+
+    /** Lagrangian dual bound (#429); reassigns the persistent multiplier vector each call. */
+    private inner class LagrangianArm : RelaxationBound {
+        override val applicable: Boolean get() = lagBound != null
+
+        override fun prune(
+            session: PropagationSession,
+            effectiveBound: Double,
+            objectiveVar: Int,
+            objectiveAscending: Boolean,
+        ): Boolean {
+            val lagBoundL = lagBound ?: return false
+            val res = lagBoundL.computeBound(
+                session,
+                effectiveBound,
+                lagMultipliers,
+                params.lagrangianIterations,
+            )
+            return if (res != null) {
+                lagMultipliers = res.multipliers
+                if (res.prune) sink.observeLagrangianPrune()
+                res.prune
+            } else {
+                false
+            }
+        }
+    }
+
+    /** Knapsack-Lagrangian dual bound; reassigns the persistent knapsack multiplier vector. */
+    private inner class KnapsackLagrangianArm : RelaxationBound {
+        override val applicable: Boolean get() = knapsackLagBound != null
+
+        override fun prune(
+            session: PropagationSession,
+            effectiveBound: Double,
+            objectiveVar: Int,
+            objectiveAscending: Boolean,
+        ): Boolean {
+            val knapsackLagBoundL = knapsackLagBound ?: return false
+            val res = knapsackLagBoundL.computeBound(
+                session,
+                effectiveBound,
+                knapsackLagMultipliers,
+                params.lagrangianIterations,
+            )
+            return if (res != null) {
+                knapsackLagMultipliers = res.multipliers
+                if (res.prune) sink.observeLagrangianPrune()
+                res.prune
+            } else {
+                false
+            }
+        }
+    }
+
+    /** LP-relaxation simplex bound with depth/freq/auto-off gating, warm-start basis caching and
+     *  LP-learned backjump/nogood recording. Sets the outer [lpBackjump] when it derives an
+     *  asserting clause (#280). */
+    private inner class LpSimplexBound : RelaxationBound {
+        override val applicable: Boolean get() = lpRelaxer != null
+
+        override fun prune(
+            session: PropagationSession,
+            effectiveBound: Double,
+            objectiveVar: Int,
+            objectiveAscending: Boolean,
+        ): Boolean {
+            val lpRelaxerL = lpRelaxer ?: return false
+            if (session.decisionLevel > params.lpPlan.boundMaxDepth ||
+                ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
+                !lpAutoOff.shouldRun()
+            ) {
+                return false
+            }
+            val depth = session.decisionLevel
+            // Warm-start this node's LP from the parent depth's optimal basis (#705): tightening
+            // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
+            val warm = if (params.lpPlan.warmStart && depth - 1 in lpBasisByDepth.indices) {
+                lpBasisByDepth[depth - 1]
+            } else {
+                null
+            }
+            val outcome = lpBoundAndFix(
+                lpRelaxerL,
+                session,
+                effectiveBound,
+                sink,
+                objectiveVar = objectiveVar,
+                objectiveAscending = objectiveAscending,
+                globalCuts = lpGlobalCuts,
+                cancellation = params.cancellation,
+                hints = lpHints,
+                learn = params.lpPlan.learn,
+                warm = warm,
+            )
+            if (outcome.basis != null) {
+                while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
+                lpBasisByDepth[depth] = outcome.basis
+            }
+            val explanation = outcome.explanation
+            if (explanation != null) {
+                val analyzed = session.analyzeConflictClause(explanation) as? Learned
+                if (analyzed != null && analyzed.asserting) {
+                    lpBackjump = analyzed
+                } else {
+                    lpNogoods?.add(
+                        explanation,
+                    )
+                }
+            }
+            lpAutoOff.record(outcome.prune)
+            return outcome.prune
+        }
+    }
+
+    /** The per-node prune cascade, in short-circuit order: cheap lower bound → scheduling-feasibility
+     *  bounds → Lagrangian bounds → LP relaxation. [pruneNode] tries each in turn; the first true
+     *  prune wins, exactly as the former hand-coded `when`. */
+    private val bounds: List<RelaxationBound> = listOf(
+        LinearBound(),
+        EnergeticBoundArm(),
+        CumulativeFlowBoundArm(),
+        LagrangianArm(),
+        KnapsackLagrangianArm(),
+        LpSimplexBound(),
+    )
 }
