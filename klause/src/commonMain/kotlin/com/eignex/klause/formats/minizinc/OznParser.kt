@@ -1,17 +1,6 @@
 package com.eignex.klause.formats.minizinc
 
-/**
- * Recursive-descent parser for the `.ozn` subset of MiniZinc. Produces a list of
- * [OznItem]s from a token stream produced by [OznLexer]. Expression precedence mirrors
- * MiniZinc's grammar (lowest → highest):
- *   if/let → logical (\/, /\, ->) → comparison → additive → multiplicative → unary →
- *   postfix (subscript, call) → atom.
- *
- * Designed to handle the constructs MiniZinc emits into .ozn — comprehensions,
- * conditionals, calls, ranges, and the standard literal / operator set — but not the
- * full MZN expression grammar (no enum types, no opt types, no annotation expressions,
- * no tuples). Errors land as [OznParseException] with line numbers.
- */
+/** Recursive-descent parser for the `.ozn` subset of MiniZinc. */
 internal class OznParser(private val tokens: List<OznToken>) {
     private var pos: Int = 0
 
@@ -33,26 +22,18 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parseOutputItem(): OznItem.Output {
         expectKeyword("output")
-        // `output` takes a single array-valued expression: a literal `[...]`, a
-        // comprehension `[body | gens]`, or any combination joined by `++` (string /
-        // array concatenation). Parse a full expression and let the evaluator unwrap
-        // the resulting array.
         val expr = parseExpr()
         expectPunct(";")
         return OznItem.Output(listOf(expr))
     }
 
     private fun parseVarDecl(): OznItem.VarDecl {
-        // Optional 'var' / 'par' prefix — .ozn typically omits both since FZN-side
-        // bindings are already variables; we accept either for tolerance.
         if (peekKeyword("var") || peekKeyword("par")) advance()
         val type = parseType()
         expectPunct(":")
         val name = expectIdent()
-        // Annotations are dropped at parse time — .ozn doesn't carry them but be tolerant.
         while (peekPunct("::")) {
             advance()
-            // Skip an annotation: ident, optionally followed by `(...)` or other annotation.
             expectIdent()
             if (peekPunct("(")) {
                 advance()
@@ -112,15 +93,11 @@ internal class OznParser(private val tokens: List<OznToken>) {
             }
 
             else -> {
-                // Could be a range / domain: parse an expression and treat as int domain.
-                // .ozn doesn't really emit domain-typed names; tolerate `1..n` style.
                 parseExpr()
                 OznType.Int
             }
         }
     }
-
-    // --- Expressions (recursive descent over precedence ladder) ---------------------
 
     fun parseExpr(): OznExpr = parseLogical()
 
@@ -158,7 +135,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
     }
 
     private fun parseLogical(): OznExpr {
-        // \/ /\ -> <- xor — coarse same-precedence chain; correct enough for .ozn output.
         var left = parseComparison()
         while (peek().kind == OznTokenKind.PUNCT && (
                 peek().text == "\\/" || peek().text == "/\\" ||
@@ -237,7 +213,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parsePostfix(): OznExpr {
         var atom = parseAtom()
-        // Subscript x[i, j, ...]
         while (peek().kind == OznTokenKind.PUNCT && peek().text == "[") {
             advance()
             val idx = ArrayList<OznExpr>()
@@ -254,9 +229,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parseAtom(): OznExpr {
         val t = peek()
-        // `if-then-else-endif` and `let { ... } in expr` can appear as subexpressions of
-        // larger operator expressions (e.g. `show(x) ++ if c then a else b endif`).
-        // Recurse to the top precedence level so they're parsed correctly here.
         if (t.kind == OznTokenKind.KEYWORD && t.text == "if") return parseIf()
         if (t.kind == OznTokenKind.KEYWORD && t.text == "let") return parseLet()
         return when (t.kind) {
@@ -282,7 +254,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
             OznTokenKind.IDENT, OznTokenKind.KEYWORD -> {
                 val name = advance().text
-                // Function call?
                 if (peekPunct("(")) {
                     advance()
                     val args = if (peekPunct(")")) emptyList() else parseExprList(stopPunct = ")")
@@ -317,10 +288,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
             advance()
             return OznExpr.ArrayLit(emptyList())
         }
-        // 2D-array literal `[| r1c1, r1c2 | r2c1, r2c2 | ... |]`. Detected by the
-        // leading `|` immediately after `[`. Rows are pipe-separated; cells within a
-        // row are comma-separated. Lowered to `array2d(1..rows, 1..cols, [flat])` so
-        // the evaluator's array2d path handles indexing / display.
+        // Lower row-table `[| ... |]` syntax to `array2d(...)`.
         if (peekPunct("|")) {
             advance()
             val rows = ArrayList<List<OznExpr>>()
@@ -360,7 +328,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
             )
         }
         val first = parseExpr()
-        // Detect comprehension: `expr | ident in ...`.
         if (peekPunct("|")) {
             advance()
             val gens = parseGenerators()
@@ -396,17 +363,12 @@ internal class OznParser(private val tokens: List<OznToken>) {
         val names = ArrayList<String>()
         names.add(expectIdent())
         while (peekPunct(",")) {
-            // Multi-binding requires we look ahead — if next-after-comma is `ident in`,
-            // it's a new generator, not a same-generator multi-binding. MZN syntax for
-            // multi-bound generator: `i, j in 1..n`. We disambiguate by checking whether
-            // the second ident is followed by `in` or `,` (then in).
+            // Disambiguate `i, j in ...` (same generator) from `i in ..., j in ...`.
             val save = pos
             advance() // consume comma
             if (peek().kind == OznTokenKind.IDENT) {
                 val nxt = peek().text
                 advance()
-                // Lookahead: if followed by `in` (same generator) or `,<ident> in` we're in
-                // multi-binding; if followed by `]`/`|`/etc., we backtrack to caller.
                 if (peekKeyword("in") || peekPunct(",")) {
                     names.add(nxt)
                     continue
@@ -435,10 +397,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
         return parseCommaSeparated(parseExpr()) { parseExpr() }
     }
 
-    // --- Token helpers ----------------------------------------------------------
-
-    /** A non-empty comma-separated list: [first] (already parsed) followed by `, item` repetitions,
-     *  each parsed via [parseItem]. The caller consumes the surrounding delimiters. */
+    /** Parse a non-empty comma-separated list. */
     private fun <T> parseCommaSeparated(first: T, parseItem: () -> T): MutableList<T> {
         val list = ArrayList<T>()
         list.add(first)
