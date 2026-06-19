@@ -17,7 +17,6 @@ import com.eignex.klause.solver.backtrack.selector.IndomainSplit
 import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.backtrack.selector.LargestDomain
 import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
-import com.eignex.klause.solver.backtrack.selector.MaxRegret
 import com.eignex.klause.solver.backtrack.selector.RandomVariable
 import com.eignex.klause.solver.backtrack.selector.SmallestDomain
 import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
@@ -25,15 +24,7 @@ import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 
-/**
- * Map the `solve :: int_search/bool_search/set_search/seq_search(...)` annotation onto
- * [BacktrackParams]. Each search block becomes a [SearchTier] over the variables its
- * array actually lists, in order; `seq_search` contributes its blocks as consecutive
- * tiers. A [TieredVariableSelector] explores the tiers first and falls back to the
- * first block's strategy applied globally for the remaining (introduced) variables,
- * with a matching [TieredValueSelector] on the value side. Returns `null` when no
- * recognised search annotation is present or no block lists any resolvable variable.
- */
+/** Map `solve :: *_search(...)` annotations to [BacktrackParams]. */
 internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
     val blocks = model.solve.annotations.filter(::isSearchAnnotation).flatMap(::searchBlocksOf)
     val tiers = blocks.mapNotNull(::compileSearchBlock)
@@ -45,9 +36,7 @@ internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
     val fallbackVal = firstBlockValName?.let(::mapValueStrategy)
         ?: IndomainMin
     val tieredVal = TieredValueSelector(tiers, fallbackVal, numBoolVars, intDomains.size)
-    // For minimize / maximize, wrap the value side in SolutionGuided so each new
-    // incumbent biases the next descent toward "near the last good solution" — the
-    // standard SOTA phase-saving-for-BnB pattern.
+    // Optimization search keeps incumbents as value guidance.
     val wrappedValH = when (model.solve) {
         is FznSolve.Minimize, is FznSolve.Maximize -> SolutionGuided(tieredVal)
         is FznSolve.Satisfy -> tieredVal
@@ -59,25 +48,23 @@ internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
     )
 }
 
-internal fun FlatZincCompiler.isSearchAnnotation(a: FznAnnotation): Boolean =
+internal fun isSearchAnnotation(a: FznAnnotation): Boolean =
     a.name == "int_search" || a.name == "bool_search" || a.name == "set_search" || a.name == "seq_search"
 
-/** Flatten an annotation into its concrete search blocks: a plain block is itself;
- *  `seq_search` lists its blocks in order (recursing through nested seq_search). */
+/** Flatten one search annotation to concrete blocks. */
 internal fun FlatZincCompiler.searchBlocksOf(a: FznAnnotation): List<FznAnnotation> = when (a.name) {
     "int_search", "bool_search", "set_search" -> listOf(a)
 
     "seq_search" -> {
         val list = (a.args.firstOrNull() as? FznExpr.ArrayLit)?.elements.orEmpty()
-        list.mapNotNull { it as? FznExpr.AnnCall }
+        list.filterIsInstance<FznExpr.AnnCall>()
             .flatMap { searchBlocksOf(FznAnnotation(it.name, it.args)) }
     }
 
     else -> emptyList()
 }
 
-/** One search block → one [SearchTier], or null when the block lists no resolvable
- *  variable. Signature: `search(varArray, var_strategy, value_strategy, complete)`. */
+/** Build one [SearchTier] from one search block. */
 private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): SearchTier? {
     if (a.args.size < 3) return null
     val bools = ArrayList<Int>()
@@ -89,17 +76,13 @@ private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): SearchTier? {
     return SearchTier(
         boolVars = bools.toIntArray(),
         intVars = ints.toIntArray(),
-        // An unrecognised variable strategy keeps the tier (the var list is the
-        // valuable part) and labels it in listed order.
         varSelect = varName?.let(::mapTierVarSelect) ?: TierVarSelect.InputOrder,
         valueSelector = valName?.let(::mapValueStrategy)
             ?: IndomainMin,
     )
 }
 
-/** Resolve a search block's variable-array expression into engine var ids, in listed
- *  order. Set vars contribute their indicator bools; float vars their bucket int var;
- *  constants are skipped (models do list literals in search arrays). */
+/** Resolve a search variable expression to bool/int ids in listed order. */
 private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: ArrayList<Int>, ints: ArrayList<Int>) {
     when (e) {
         is FznExpr.Ident -> {
@@ -148,12 +131,11 @@ private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: ArrayList<Int>
             }
         }
 
-        // Constants and anything else contribute no search variables.
         else -> {}
     }
 }
 
-internal fun FlatZincCompiler.mapTierVarSelect(name: String): TierVarSelect? = when (name) {
+internal fun mapTierVarSelect(name: String): TierVarSelect? = when (name) {
     "input_order" -> TierVarSelect.InputOrder
     "first_fail", "most_constrained", "dom_w_deg", "occurrence" -> TierVarSelect.SmallestDomain
     "anti_first_fail" -> TierVarSelect.LargestDomain
@@ -164,7 +146,7 @@ internal fun FlatZincCompiler.mapTierVarSelect(name: String): TierVarSelect? = w
     else -> null
 }
 
-internal fun FlatZincCompiler.mapVariableStrategy(name: String): VariableSelector? = when (name) {
+internal fun mapVariableStrategy(name: String): VariableSelector? = when (name) {
     "input_order" -> InputOrder
     "first_fail", "most_constrained" -> SmallestDomain
     "dom_w_deg" -> DomWdeg()
@@ -176,7 +158,7 @@ internal fun FlatZincCompiler.mapVariableStrategy(name: String): VariableSelecto
     else -> null
 }
 
-internal fun FlatZincCompiler.mapValueStrategy(name: String): ValueSelector? = when (name) {
+internal fun mapValueStrategy(name: String): ValueSelector? = when (name) {
     "indomain_min", "indomain" -> IndomainMin
     "indomain_max" -> IndomainMax
     "indomain_middle" -> IndomainMiddle

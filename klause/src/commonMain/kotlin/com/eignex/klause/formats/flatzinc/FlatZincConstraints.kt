@@ -3,17 +3,7 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.NValue
 
-/**
- * Builtin-constraint dispatch for [FlatZincCompiler]: [processConstraint] maps each FlatZinc
- * builtin name to its `emitX(c: FznConstraint)` extension. The emitters themselves live in the
- * sibling per-family files — FlatZincBoolConstraints, FlatZincIntConstraints,
- * FlatZincFloatConstraints, FlatZincGlobalConstraints, FlatZincSetConstraints — pulling factors /
- * state from the [FlatZincCompiler] receiver. Adding a new builtin: register a `when`-arm here and
- * write the `emitX` extension in the matching family file.
- */
-
 internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name) {
-    // Bool-only constraints
     "bool_clause" -> emitBoolClause(c)
 
     "bool_eq" -> emitBoolEq(c, negate = false)
@@ -46,33 +36,24 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "bool_lt_reif" -> emitBoolCmpReif(c, BoolCmpOp.LT)
 
-    // Int comparisons (binary)
     "int_le", "int_lt", "int_eq", "int_ne", "int_ge", "int_gt" -> emitIntCmp(c)
 
-    // Reified int comparisons.
     "int_eq_reif", "int_ne_reif", "int_le_reif", "int_lt_reif",
     "int_ge_reif", "int_gt_reif",
     -> emitIntCmpReif(c)
 
-    // Int linear
     "int_lin_le", "int_lin_eq", "int_lin_ne" -> emitIntLinear(c, reified = false)
 
     "int_lin_le_reif", "int_lin_eq_reif", "int_lin_ne_reif" -> emitIntLinear(c, reified = true)
 
-    // Bool linear / PB (encoded as int_lin with 0/1 coefs in FlatZinc emitters)
     "bool_lin_le", "bool_lin_eq" -> emitBoolLinear(c)
 
-    // Float linear (translated through bucket indices)
     "float_lin_le", "float_lin_eq", "float_lin_ne" -> emitFloatLinear(c, reified = false)
 
     "float_lin_le_reif", "float_lin_eq_reif", "float_lin_ne_reif" -> emitFloatLinear(c, reified = true)
 
-    // int↔float coercion: bind the int var to the float var's bucket index.
     "int2float" -> emitInt2Float(c)
 
-    // Float scalar comparisons + min/max/times — all reduced to bucket-index lowering
-    // via Linear / ReifiedLinear / Table factors. See [emitFloatBinaryCmp] for the
-    // binary cmp path and [emitFloatMinMax] / [emitFloatTimes] for the rest.
     "float_eq" -> emitFloatBinaryCmp(c, op = LinearOp.EQ, strict = false, reified = false)
 
     "float_eq_reif" -> emitFloatBinaryCmp(c, op = LinearOp.EQ, strict = false, reified = true)
@@ -99,7 +80,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "float_times" -> emitFloatTimes(c)
 
-    // float_div(a, b, c) ⇔ float_times(b, c, a):  a = b · c.
     "float_div" -> emitFloatTimes(
         FznConstraint(
             name = "float_times",
@@ -108,7 +88,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
         ),
     )
 
-    // Global
     "all_different_int", "klause_all_different_int" -> emitAllDifferent(c)
 
     "alldifferent_except_0", "fzn_alldifferent_except_0", "klause_alldifferent_except_0" ->
@@ -165,7 +144,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
     "disjunctive_strict", "fzn_disjunctive_strict",
     -> emitDisjunctive(c)
 
-    // Arithmetic
     "int_times" -> emitIntTimes(c)
 
     "int_plus" -> emitIntPlus(c)
@@ -182,7 +160,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "int_mod" -> emitIntMod(c)
 
-    // Array element
     "array_int_element" -> emitArrayIntElement(c, varArray = false)
 
     "array_var_int_element" -> emitArrayIntElement(c, varArray = true)
@@ -191,7 +168,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "array_var_bool_element" -> emitArrayBoolElement(c, varArray = true)
 
-    // Counting
     "at_least_int", "fzn_at_least_int" -> emitAtLeast(c)
 
     "at_most_int", "fzn_at_most_int" -> emitAtMost(c)
@@ -211,7 +187,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "distribute", "fzn_distribute" -> emitDistribute(c)
 
-    // Ordering
     "increasing_int", "fzn_increasing_int", "klause_increasing_int" -> emitMonotone(c, MonotoneOp.INCREASING)
 
     "decreasing_int", "fzn_decreasing_int" -> emitMonotone(c, MonotoneOp.DECREASING)
@@ -221,7 +196,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "strictly_decreasing_int", "fzn_strictly_decreasing_int" -> emitMonotone(c, MonotoneOp.STRICTLY_DECREASING)
 
-    // Array min/max
     "array_int_maximum", "fzn_array_int_maximum",
     "maximum_int", "fzn_maximum_int",
     -> emitArrayMinMax(c, max = true)
@@ -232,9 +206,6 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "exactly_int", "fzn_exactly_int" -> emitExactly(c)
 
-    // Bool variants of int globals — channel each bool lit to a 0/1 int and reuse the
-    // existing int factor. Channels are allocated lazily per constraint; the engine
-    // handles deduplication via standard propagation.
     "increasing_bool", "fzn_increasing_bool" -> emitMonotoneBool(c, MonotoneOp.INCREASING)
 
     "decreasing_bool", "fzn_decreasing_bool" -> emitMonotoneBool(c, MonotoneOp.DECREASING)
@@ -249,15 +220,10 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "table_bool", "fzn_table_bool" -> emitTableBool(c)
 
-    // MZN Challenge LS-track conventions: when [FlatZincCompiler.forLocalSearch] is set,
-    // both annotations drop entirely; otherwise they assert their bool arg is true so the
-    // wrapped constraint is enforced as the CP solver expects.
     "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
     "redundant_constraint", "fzn_redundant_constraint",
     -> emitAnnotationConstraint(c)
 
-    // Set predicates: bool-indicator decomposition. Each `var set of E` materialises as one
-    // bool per universe element; set algebra becomes bool algebra over those indicators.
     "set_in", "fzn_set_in" -> emitSetIn(c, reified = false)
 
     "set_in_reif", "fzn_set_in_reif" -> emitSetIn(c, reified = true)

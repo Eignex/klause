@@ -30,11 +30,9 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
     factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), op, strictAdjust - b.offset))
 }
 
-/** An int var, possibly with a constant offset on the right side. */
 internal data class IntVarRef(val varId: Int, val offset: Int)
 internal fun FlatZincCompiler.resolveIntVarOrConst(e: FznExpr): IntVarRef = when (e) {
     is FznExpr.IntLit -> {
-        // Allocate a singleton var holding the constant.
         val v = resolveIntVar(e)
         IntVarRef(v, 0)
     }
@@ -62,8 +60,7 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
 }
 
 internal fun FlatZincCompiler.emitBoolLinear(c: FznConstraint) {
-    // bool_lin_*(coefs, bools, k): a PseudoBoolean over the bool literals. Negative coefficients
-    // would need bool2int channels (a Linear over channelled ints), unsupported — reject them.
+    // Negative coefficients would require bool-to-int channeling.
     require(c.args.size == 3)
     val coefs = evalIntConstArray(c.args[0])
     val bools = evalBoolVarArray(c.args[1])
@@ -88,7 +85,6 @@ internal fun FlatZincCompiler.emitIntTimes(c: FznConstraint) {
     )
 }
 
-/** `int_plus(a, b, r)` / `int_minus(a, b, r)`: `a ± b = r` as `a + [bCoeff]·b − r = 0`. */
 private fun FlatZincCompiler.emitIntAddSub(c: FznConstraint, bCoeff: Int) {
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
@@ -102,7 +98,6 @@ internal fun FlatZincCompiler.emitIntPlus(c: FznConstraint) = emitIntAddSub(c, b
 internal fun FlatZincCompiler.emitIntMinus(c: FznConstraint) = emitIntAddSub(c, bCoeff = -1)
 
 internal fun FlatZincCompiler.emitIntAbs(c: FznConstraint) {
-    // int_abs(a, r): r = |a|. Shared encoding — see [IntFunctionLowering.absFactors].
     require(c.args.size == 2)
     val a = resolveIntVar(c.args[0])
     val r = resolveIntVar(c.args[1])
@@ -111,7 +106,6 @@ internal fun FlatZincCompiler.emitIntAbs(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
-    // int_max(a, b, r) / int_min(a, b, r). Shared encoding — see [IntFunctionLowering.minMaxFactors].
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
@@ -122,16 +116,7 @@ internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
     )
 }
 
-/**
- * `int_div(a, b, q)` — truncated-toward-zero `q = a / b`. Encoded as:
- *  - `q · b + rem = a` (via [Product] on `q · b` and a [Linear] sum)
- *  - `|rem| < |b|` (via two [Linear]s gated by aux bool indicating sign of `b`)
- *  - `sign(rem) ∈ {0, sign(a)}` (truncated semantics — via reified linears)
- *
- * Klause-internal `int_div` uses Euclidean div elsewhere; this emitter implements
- * FlatZinc's truncated semantics specifically. `b = 0` is left to propagation (the
- * caller's responsibility — typical models constrain `b != 0` via domains).
- */
+/** FlatZinc `int_div` uses truncated-toward-zero semantics. */
 internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
@@ -140,8 +125,7 @@ internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
     emitTruncDivMod(a, b, qVar = q, remVar = null)
 }
 
-/** `int_mod(a, b, rem)` — same constraint shape as [emitIntDiv], but with `rem` exposed
- *  and `q` allocated as the auxiliary quotient. */
+/** `int_mod` shares truncated div/mod lowering with [emitIntDiv]. */
 internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
@@ -150,7 +134,6 @@ internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
     emitTruncDivMod(a, b, qVar = null, remVar = rem)
 }
 
-/** Bridge the FlatZinc allocator onto the shared [IntFunctionLowering.truncatedDivMod]. */
 private fun FlatZincCompiler.emitTruncDivMod(a: Int, b: Int, qVar: Int?, remVar: Int?) {
     var n = 0
     val res = IntFunctionLowering.truncatedDivMod(
@@ -166,10 +149,6 @@ private fun FlatZincCompiler.emitTruncDivMod(a: Int, b: Int, qVar: Int?, remVar:
     factors.addAll(res.factors)
 }
 
-/**
- * `array_int_element(idx, arr, result)` / `array_var_int_element(idx, arr, result)`:
- * `result = arr(idx)` with 1-based indexing.
- */
 internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Boolean) {
     require(c.args.size == 3)
     val idx = resolveIntVar(c.args[0])
@@ -179,8 +158,6 @@ internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Bo
 }
 
 internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
-    // int_{eq,ne,le,lt,ge,gt}_reif(a, b, r): r ↔ (a ⟨op⟩ b). All reduce to
-    // ReifiedLinear with appropriate coeffs / bound.
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
@@ -199,7 +176,6 @@ internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
     factors.add(ReifiedLinear(r, coeffs, vars, op, bound))
 }
 
-/** `array_int_maximum(result, xs)` / `array_int_minimum(...)` — single [ArrayMinMax] factor. */
 internal fun FlatZincCompiler.emitArrayMinMax(c: FznConstraint, max: Boolean) {
     require(c.args.size == 2)
     val result = resolveIntVar(c.args[0])

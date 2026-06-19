@@ -77,7 +77,6 @@ internal fun FlatZincCompiler.compileParamArray(name: String, elem: FznType, lit
 
 internal fun arrayToFlatZincArray(arr: ParamValue.Array): FlatZincArray = arr.arr
 
-/** Constant-evaluate `e` as an integer. */
 internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
     is FznExpr.IntLit -> e.value
 
@@ -99,8 +98,7 @@ internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
     else -> failHere("expected int constant, got ${e::class.simpleName}")
 }
 
-/** Non-throwing variant of [evalIntConst]. Returns `null` when `e` refers to a
- *  solver variable rather than a compile-time constant. */
+/** Nullable variant of [evalIntConst]. */
 internal fun FlatZincCompiler.evalIntConstOrNull(e: FznExpr): Long? = when (e) {
     is FznExpr.IntLit -> e.value
 
@@ -140,7 +138,6 @@ internal fun FlatZincCompiler.evalFloatConst(e: FznExpr): Double = when (e) {
     else -> failHere("expected float constant, got ${e::class.simpleName}")
 }
 
-/** Resolve a constraint argument that's expected to be a list of int constants. */
 internal fun FlatZincCompiler.evalIntConstArray(e: FznExpr): IntArray = when (e) {
     is FznExpr.ArrayLit -> IntArray(e.elements.size) { evalIntConst(e.elements[it]).toInt() }
 
@@ -152,10 +149,7 @@ internal fun FlatZincCompiler.evalIntConstArray(e: FznExpr): IntArray = when (e)
     else -> failHere("expected int array, got ${e::class.simpleName}")
 }
 
-/** Non-throwing variant of [evalIntConstArray]: returns `null` if `e` isn't a known
- *  int-const array (because it's an int-var array, a non-array expression, or a
- *  different param kind). Used at call sites that accept either constant or var
- *  arrays and need to dispatch on the actual form (e.g. GCC's `counts` argument). */
+/** Nullable variant of [evalIntConstArray]. */
 internal fun FlatZincCompiler.tryEvalIntConstArray(e: FznExpr): IntArray? = when (e) {
     is FznExpr.ArrayLit -> {
         val out = IntArray(e.elements.size)
@@ -176,7 +170,6 @@ internal fun FlatZincCompiler.tryEvalIntConstArray(e: FznExpr): IntArray? = when
     else -> null
 }
 
-/** Resolve a constraint argument that's expected to be a list of float constants. */
 internal fun FlatZincCompiler.evalFloatConstArray(e: FznExpr): DoubleArray = when (e) {
     is FznExpr.ArrayLit -> DoubleArray(e.elements.size) { evalFloatConst(e.elements[it]) }
 
@@ -189,7 +182,6 @@ internal fun FlatZincCompiler.evalFloatConstArray(e: FznExpr): DoubleArray = whe
     else -> failHere("expected float array, got ${e::class.simpleName}")
 }
 
-/** Resolve a constraint argument as an array of bool variables/literals. */
 internal fun FlatZincCompiler.evalBoolVarArray(e: FznExpr): IntArray = when (e) {
     is FznExpr.ArrayLit -> IntArray(e.elements.size) { resolveBoolLit(e.elements[it]) }
 
@@ -219,7 +211,6 @@ internal fun FlatZincCompiler.evalBoolConstArray(e: FznExpr): BooleanArray = whe
     else -> failHere("expected bool const array, got ${e::class.simpleName}")
 }
 
-/** Resolve a constraint argument as an array of int variables. */
 internal fun FlatZincCompiler.evalIntVarArray(e: FznExpr): IntArray = when (e) {
     is FznExpr.ArrayLit -> IntArray(e.elements.size) { resolveIntVar(e.elements[it]) }
 
@@ -240,11 +231,7 @@ internal fun FlatZincCompiler.evalIntVarArray(e: FznExpr): IntArray = when (e) {
     else -> failHere("expected int var array, got ${e::class.simpleName}")
 }
 
-/**
- * Resolve a bool reference (var or literal) into a klause [Lit]. Constants are
- * compiled as fresh trivial-bound bool vars when needed, but in factor positions we
- * fold them directly into the constraint.
- */
+/** Resolve a bool reference to a solver literal. */
 internal fun FlatZincCompiler.resolveBoolLit(e: FznExpr): Int = when (e) {
     is FznExpr.Ident -> {
         val id = boolVars[e.name] ?: failHere("undefined bool var `${e.name}`")
@@ -252,8 +239,6 @@ internal fun FlatZincCompiler.resolveBoolLit(e: FznExpr): Int = when (e) {
     }
 
     is FznExpr.BoolLit -> {
-        // Allocate a fresh constant-pinned bool — Clause/Cardinality treat it as
-        // already-determined. Cheap and simple.
         val name = "__const_${if (e.value) "T" else "F"}_${boolVars.size}"
         val id = allocBool(name)
         factors.add(Clause(intArrayOf(Lit.make(id, e.value))))
@@ -272,7 +257,7 @@ internal fun FlatZincCompiler.resolveBoolLit(e: FznExpr): Int = when (e) {
     else -> failHere("expected bool var or literal, got ${e::class.simpleName}")
 }
 
-/** Resolve an int reference into a klause int-var id. Pins int constants as singletons. */
+/** Resolve an int reference into a solver int var id. */
 internal fun FlatZincCompiler.resolveIntVar(e: FznExpr): Int = when (e) {
     is FznExpr.Ident -> intVars[e.name] ?: failHere("undefined int var `${e.name}`")
 
@@ -290,7 +275,7 @@ internal fun FlatZincCompiler.resolveIntVar(e: FznExpr): Int = when (e) {
     else -> failHere("expected int var, got ${e::class.simpleName}")
 }
 
-/** Resolve a reference (used in array-of-var initializers) into a var id. */
+/** Resolve an array-initializer reference to a var id. */
 internal fun FlatZincCompiler.resolveVarRef(e: FznExpr, declaredElement: FznType): Int = when (declaredElement) {
     FznType.Bool -> {
         val lit = resolveBoolLit(e)

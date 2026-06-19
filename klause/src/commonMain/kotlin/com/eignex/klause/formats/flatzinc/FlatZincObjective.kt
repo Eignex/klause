@@ -6,34 +6,23 @@ import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
 
-/**
- * Build a [FunctionalObjective] for `solve minimize/maximize <objName>` from the MiniZinc
- * `:: defines_var(V)` annotations — the cone of constraints that functionally compute the
- * objective variable. Returns `null` (so the caller falls back to a plain
- * [com.eignex.klause.solver.objective.LinearObjective]) when the objective is a bare decision variable
- * (no cone) or the cone contains any node shape this evaluator can't reproduce exactly. The
- * returned objective is therefore always an *exact* mirror of the objective variable.
- *
- * See [FunctionalObjective] for why this matters: it gives CBLS a real gradient to the decision
- * variables of a decomposed objective, which a coefficient-on-V-only `LinearObjective` cannot.
- */
+/** Build an exact [FunctionalObjective] from `defines_var` annotations when possible. */
 internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? {
     val objId = intVars[objName] ?: return null
-    // Each int var that some constraint functionally defines → that constraint.
     val byDef = HashMap<Int, FznConstraint>()
     for (c in model.constraints) {
         val ann = c.annotations.firstOrNull { it.name == "defines_var" } ?: continue
         val defId = varIdOrNull(ann.args.firstOrNull() ?: continue) ?: continue
         if (defId !in byDef) byDef[defId] = c
     }
-    if (objId !in byDef) return null // bare decision-var objective — LinearObjective is already exact
+    if (objId !in byDef) return null
 
     val nodes = ArrayList<FunctionalObjective.Node>()
     val visited = HashSet<Int>()
     var ok = true
     fun visit(id: Int) {
         if (!ok || id in visited) return
-        val c = byDef[id] ?: return // leaf: a decision var (or otherwise not cone-defined)
+        val c = byDef[id] ?: return
         visited.add(id)
         val node = buildObjNode(c, id)
         if (node == null) {
@@ -44,27 +33,17 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
             visit(inId)
             if (!ok) return
         }
-        nodes.add(node) // post-order ⇒ inputs precede this node (topological)
+        nodes.add(node)
     }
     visit(objId)
     if (!ok) return null
-    // Leaf vars = input vars referenced by some node but not themselves cone-defined (the
-    // decision variables a search should move to descend the objective).
     val defined = nodes.map { it.out }.toHashSet()
     val leaves = LinkedHashSet<Int>()
     for (n in nodes) for (inId in nodeInputVarIds(n)) if (inId !in defined) leaves.add(inId)
     return FunctionalObjective(objId, minimize, nodes, leaves.toIntArray())
 }
 
-/**
- * Build the model-wide [DefinitionalSweep] from every `defines_var` constraint whose shape a
- * sweep node can mirror. Int definitions reuse the [buildObjNode] algebra plus `bool2int` and
- * element access; bool definitions cover the comparison reifications (`int_*_reif`,
- * `int_lin_*_reif`), literal `set_in_reif`, and `array_bool_and`/`or`. Unhandled shapes are
- * skipped — their definitions simply stay ordinary searched factors. The visit is a post-order
- * walk across *both* value spaces (a bool reification reads int vars; `bool2int` feeds int
- * chains), so emitted nodes are topologically ordered. Returns null when nothing is buildable.
- */
+/** Build a [DefinitionalSweep] from evaluable `defines_var` constraints. */
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
     val byIntDef = HashMap<Int, FznConstraint>()
@@ -83,23 +62,30 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
     if (byIntDef.isEmpty() && byBoolDef.isEmpty()) return null
 
     val nodes = ArrayList<DefinitionalSweep.SweepNode>(byIntDef.size + byBoolDef.size)
-    // Three-color DFS (gray = on the current path, black = finished): a definition re-entered
-    // while gray sits on a definitional CYCLE (e.g. prize-collecting's `pos` defined via
-    // element over `next`, feeding back). A cycle has no topological order — one-pass sweep
-    // evaluation reads stale values forever and the per-move invariant network would mark its
-    // members defined (search-excluded) while being unable to maintain them, starving the
-    // move pool (measured on prize-collecting: pickMove starvation at cost ≈166 vs the
-    // cost-1 walk without invariants). Dropping the re-entered definition breaks the cycle —
-    // that var stays a searched factor input — and keeps the rest maximally defined.
+    // Cycles cannot be topologically swept in one pass, so cycle members are left as searched vars.
     val grayInt = HashSet<Int>()
     val grayBool = HashSet<Int>()
     val doneInt = HashSet<Int>()
     val doneBool = HashSet<Int>()
     val cyclicInt = HashSet<Int>()
     val cyclicBool = HashSet<Int>()
-    // Bool definitions read int vars and vice versa (bool2int), so the two visits are
-    // mutually recursive; a local holder breaks the forward reference without shared state.
     var visitBoolRef: ((Int) -> Unit)? = null
+    fun finishVisit(
+        id: Int,
+        built: DefinitionalSweep.SweepNode?,
+        cyclic: Set<Int>,
+        gray: MutableSet<Int>,
+        done: MutableSet<Int>,
+        visitInt: (Int) -> Unit,
+    ) {
+        if (built != null) {
+            for (inId in built.intInputs) visitInt(inId)
+            for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
+            if (id !in cyclic) nodes.add(built)
+        }
+        gray.remove(id)
+        done.add(id)
+    }
 
     fun visitInt(id: Int) {
         if (id in doneInt) return
@@ -107,18 +93,10 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
             cyclicInt.add(id)
             return
         }
-        val c = byIntDef[id] ?: return // free var: a sweep input, not a node
+        val c = byIntDef[id] ?: return
         grayInt.add(id)
-        // Unbuildable definitions stay searched factors; inputs of a built node are visited
-        // before the node is appended so the surviving order is topological.
         val built = buildIntSweepNode(c, id)
-        if (built != null) {
-            for (inId in built.intInputs) visitInt(inId)
-            for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
-            if (id !in cyclicInt) nodes.add(built)
-        }
-        grayInt.remove(id)
-        doneInt.add(id)
+        finishVisit(id, built, cyclicInt, grayInt, doneInt, ::visitInt)
     }
 
     fun visitBool(id: Int) {
@@ -130,13 +108,7 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
         val c = byBoolDef[id] ?: return
         grayBool.add(id)
         val built = buildBoolSweepNode(c, id)
-        if (built != null) {
-            for (inId in built.intInputs) visitInt(inId)
-            for (inId in built.boolInputs) visitBoolRef?.invoke(inId)
-            if (id !in cyclicBool) nodes.add(built)
-        }
-        grayBool.remove(id)
-        doneBool.add(id)
+        finishVisit(id, built, cyclicBool, grayBool, doneBool, ::visitInt)
     }
     visitBoolRef = ::visitBool
     for (id in byIntDef.keys.sorted()) visitInt(id)
@@ -145,7 +117,6 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
     return DefinitionalSweep(nodes)
 }
 
-/** Bool var id for `e` (a positive bool literal), else null. */
 private fun FlatZincCompiler.boolIdOrNull(e: FznExpr): Int? = try {
     val lit = resolveBoolLit(e)
     if (Lit.isPositive(lit)) Lit.variable(lit) else null
@@ -153,7 +124,6 @@ private fun FlatZincCompiler.boolIdOrNull(e: FznExpr): Int? = try {
     null
 }
 
-/** Int-defined sweep node: the [buildObjNode] algebra, `bool2int`, and element access. */
 private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int): DefinitionalSweep.SweepNode? {
     when (c.name) {
         "bool2int" -> {
@@ -187,7 +157,6 @@ private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int)
     }
 }
 
-/** Bool-defined sweep node: comparison reifications, literal set membership, bool folds. */
 @Suppress("CyclomaticComplexMethod")
 private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int): DefinitionalSweep.SweepNode? {
     fun cmp(opName: String, lin: Boolean): DefinitionalSweep.SweepNode? {
@@ -286,7 +255,6 @@ private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int
     }
 }
 
-/** Int var id for `e`, or null if it's a constant / bool / float / unresolvable. */
 private fun FlatZincCompiler.varIdOrNull(e: FznExpr): Int? {
     if (evalIntConstOrNull(e) != null) return null
     return try {
@@ -296,7 +264,6 @@ private fun FlatZincCompiler.varIdOrNull(e: FznExpr): Int? {
     }
 }
 
-/** `e` as an [Operand]: a constant term or an int-var reference; null if neither. */
 private fun FlatZincCompiler.operandOf(e: FznExpr): Operand? {
     evalIntConstOrNull(e)?.let { return Operand.c(it) }
     return try {
@@ -306,7 +273,6 @@ private fun FlatZincCompiler.operandOf(e: FznExpr): Operand? {
     }
 }
 
-/** Operands for an array argument (inline literal or named array). */
 private fun FlatZincCompiler.arrayOperands(e: FznExpr): Array<Operand>? = when (e) {
     is FznExpr.ArrayLit -> {
         val out = ArrayList<Operand>(e.elements.size)
@@ -344,7 +310,6 @@ private fun FlatZincCompiler.buildObjNode(c: FznConstraint, definedId: Int): Fun
         }
 
         "array_int_maximum", "array_int_minimum" -> {
-            // (result, array): result = max/min(array). result == definedId.
             val xs = arrayOperands(c.args[1]) ?: return null
             FunctionalObjective.Extreme(definedId, xs, max = c.name.endsWith("maximum"))
         }
@@ -367,7 +332,6 @@ private fun FlatZincCompiler.buildObjNode(c: FznConstraint, definedId: Int): Fun
     }
 }
 
-/** `int_lin_eq((coeffs), (vars), c)` defining [definedId]: solve `Σ coeff·var = c` for it. */
 private fun FlatZincCompiler.buildLinNode(c: FznConstraint, definedId: Int): FunctionalObjective.Node? {
     val coeffs = try {
         evalIntConstArray(c.args[0])
