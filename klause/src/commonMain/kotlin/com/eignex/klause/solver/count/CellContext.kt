@@ -2,7 +2,7 @@ package com.eignex.klause.solver.count
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.Xor
 
@@ -57,7 +57,7 @@ internal class CellContext private constructor(
      * cutting it leaves the count correct.
      */
     fun countCell(hashes: List<Xor>, cap: Int): CellResult {
-        val params = BacktrackParams(maxDecisions = CELL_DECISION_BUDGET)
+        val params = BacktrackPresets.satOptimized().copy(maxDecisions = CELL_DECISION_BUDGET)
         val enumeration = BacktrackSolver(problem.withHashes(hashes)).enumerate(params)
         // For hashed cells, cap+1 models decide ">cap" while staying out of the exhaustion tail; the
         // un-hashed base has no parity slices and must be enumerated fully for an exact projected count.

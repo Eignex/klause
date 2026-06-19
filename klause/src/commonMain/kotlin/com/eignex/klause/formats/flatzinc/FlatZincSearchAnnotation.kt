@@ -2,6 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.SearchTier
 import com.eignex.klause.solver.backtrack.TierVarSelect
 import com.eignex.klause.solver.backtrack.TieredValueSelector
@@ -55,26 +56,10 @@ internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
         is FznSolve.Minimize, is FznSolve.Maximize -> SolutionGuided(tieredVal)
         is FznSolve.Satisfy -> tieredVal
     }
-    return BacktrackParams(
+    val base = BacktrackPresets.conflictDriven()
+    return base.copy(
         variableSelector = TieredVariableSelector(tiers, fallbackVar),
         valueSelector = wrappedValH,
-        // Phase saving on top of the annotation: each variable's last successfully-pinned value
-        // is retried first on re-descent, with the annotation's value order filling the rest.
-        // The first descent is therefore unchanged (no saved phase yet), so the annotation is
-        // still honoured; only post-backtrack re-descents are biased toward the values that
-        // last worked. On scheduling-style models this lets the search rebuild good partial
-        // assignments instead of re-deriving them from the annotation default every time, which
-        // is the difference between thrashing and conflict-driven progress (#543).
-        phaseSaving = true,
-        // With trail-resident order literals, conflict analysis now learns asserting clauses at
-        // a high rate (#588), so the annotated/FD track behaves like a real LCG solver and needs
-        // the same database hygiene choco-lcg uses, or the learned clauses pile up unbounded and
-        // drown BCP. Luby restarts (deterministic budget — NOT adaptive, which would bypass the
-        // Luby budget and never fire here) drive [forgetIfOverCap] to bound the database; phase
-        // saving + solution-guided value order above keep the annotation honoured on re-descent.
-        lubyRestartBase = 2_000L,
-        maxLearnedClauses = 4_000,
-        tieredLearnedDb = true,
     )
 }
 
@@ -92,7 +77,8 @@ internal fun FlatZincCompiler.xorSearchParams(xors: List<Xor>): BacktrackParams 
     }
     val ordered = occ.entries.sortedBy { it.value }.map { it.key }.toIntArray()
     val tier = SearchTier(ordered, IntArray(0), TierVarSelect.InputOrder, IndomainMin)
-    return BacktrackParams(
+    val base = BacktrackPresets.conflictDriven()
+    return base.copy(
         variableSelector = TieredVariableSelector(listOf(tier), LastConflict(Vsids())),
         valueSelector = TieredValueSelector(
             listOf(tier),
@@ -100,7 +86,6 @@ internal fun FlatZincCompiler.xorSearchParams(xors: List<Xor>): BacktrackParams 
             numBoolVars,
             intDomains.size,
         ),
-        phaseSaving = true,
     )
 }
 

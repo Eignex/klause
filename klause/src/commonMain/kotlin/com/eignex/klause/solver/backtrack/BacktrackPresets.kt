@@ -35,7 +35,7 @@ object BacktrackPresets {
      * ~0.73-0.77× the baseline's conflicts either way). It stays available via [vivify] for
      * hard-UNSAT campaigns that restart infrequently, where the probing pays for itself.
      *
-     *  - [randomSeed] seeds the engine RNG.
+     *  - [randomSeed] optionally seeds the engine RNG; null uses a fresh seed per call.
      *  - [maxLearnedClauses] caps the learned database (the three-tier reduction runs at each
      *    restart once over the cap).
      *  - [vivify] opts the periodic clause-vivification inprocessing pass back in.
@@ -43,22 +43,22 @@ object BacktrackPresets {
      *    seams through unchanged.
      */
     fun satOptimized(
-        randomSeed: Long = 0L,
+        randomSeed: Long? = null,
         maxLearnedClauses: Int = 20_000,
         vivify: Boolean = false,
         cancellation: Cancellation = Cancellation.Never,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
         randomSeed = randomSeed,
-        variableSelector = Vsids(),
+        cancellation = cancellation,
+        onEvent = onEvent,
+    ).copy(
         phaseSaving = true,
         targetPhasing = true,
         adaptiveRestart = true,
         maxLearnedClauses = maxLearnedClauses,
         tieredLearnedDb = true,
         vivification = vivify,
-        cancellation = cancellation,
-        onEvent = onEvent,
     )
 
     /**
@@ -72,23 +72,24 @@ object BacktrackPresets {
      * of the [com.eignex.klause.portfolio.PortfolioBuilder] backtrack pool, so the same
      * composition drives both the solo competition track and the parallel portfolio.
      *
-     *  - [randomSeed] seeds the engine RNG.
+     *  - [randomSeed] optionally seeds the engine RNG; null uses a fresh seed per call.
      *  - [lubyRestartBase] sets the Luby restart unit (anytime default 256).
      *  - [cancellation] / [onEvent] thread the usual cooperative-cancellation and observation
      *    seams through unchanged.
      */
     fun conflictDriven(
-        randomSeed: Long = 0L,
+        randomSeed: Long? = null,
         lubyRestartBase: Long = 256L,
         cancellation: Cancellation = Cancellation.Never,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
         randomSeed = randomSeed,
+        cancellation = cancellation,
+        onEvent = onEvent,
+    ).copy(
         variableSelector = LastConflict(Vsids()),
         valueSelector = SolutionGuided(IndomainMin),
         phaseSaving = true,
         lubyRestartBase = lubyRestartBase,
-        cancellation = cancellation,
-        onEvent = onEvent,
     )
 }

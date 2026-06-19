@@ -934,12 +934,10 @@ class Cumulative(
                 val eI = energies[i]
                 val cI = cs[i]
                 // Detection: env(Θ_τ ∪ {i}) > C·τ. Insert i (it is inactive — lct(i) > τ) so the
-                // envelope folds i's own est into the anchor, read it, then restore the tree.
-                // The flat `envTheta + e_i` upper-bounds env(Θ∪{i}) and over-detects when
-                // est_i < est(Ω) — wrongly forcing a task that could run before Θ to come after.
-                tree.activate(i, ests[i], eI)
-                val envWith = tree.envOfTheta()
-                tree.deactivate(i)
+                // envelope folds i's own est into the anchor. The flat `envTheta + e_i`
+                // upper-bounds env(Θ∪{i}) and over-detects when est_i < est(Ω) — wrongly forcing
+                // a task that could run before Θ to come after.
+                val envWith = tree.envIfActivated(i, ests[i], eI)
                 if (envWith <= capTau) continue
                 val numerator = envTheta - (effCap - cI).toLong() * tau.toLong()
                 if (numerator <= 0L) continue

@@ -15,6 +15,7 @@ import com.eignex.klause.schema.OptNominalHandle
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.maximizeBool
 import com.eignex.klause.solver.objective.maximizeInt
@@ -42,7 +43,7 @@ class CompiledProblem internal constructor(
     val floatDecoders: Map<String, FloatSpec>,
     /** Default branching params derived from the schema's `search { … }` annotation, if
      *  any. `null` when the schema didn't declare one — callers should fall back to
-     *  `BacktrackParams()` in that case. The convenience [backtrackParams] handles that
+     *  [BacktrackPresets.conflictDriven] in that case. The convenience [backtrackParams] handles that
      *  fallback. */
     val defaultBacktrackParams: BacktrackParams? = null,
     /** Per-set-var indicator layout: parallel `(universe[i], indicatorBoolId[i])`. Used by
@@ -56,7 +57,7 @@ class CompiledProblem internal constructor(
     /** Return the schema's declared `BacktrackParams` if any, else a fresh default
      *  [BacktrackParams]. Convenience for the common
      *  pattern `BacktrackSolver(p.problem).solve(p.backtrackParams())`. */
-    fun backtrackParams(): BacktrackParams = defaultBacktrackParams ?: BacktrackParams()
+    fun backtrackParams(): BacktrackParams = defaultBacktrackParams ?: BacktrackPresets.conflictDriven()
 
     /** Decode [handle]'s Boolean value from [sample]. */
     fun decode(handle: BoolHandle, sample: Sample): Boolean {

@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.ReifiedCardinality
 import com.eignex.klause.solver.factor.ReifiedPseudoBoolean
@@ -63,7 +64,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
         }
     }
 
-    fun minimize(softs: List<Soft>, params: BacktrackParams = BacktrackParams()): Result {
+    fun minimize(softs: List<Soft>, params: BacktrackParams = BacktrackPresets.conflictDriven()): Result {
         if (softs.isEmpty()) {
             return Oll.solveHardOnly(
                 baseProblem,
@@ -152,7 +153,10 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
      * needs at most one new reification); the rebuild cost mirrors the per-core rebuild in
      * [CoreGuidedOptimizer] and is far cheaper than baking thousands of unused PB factors.
      */
-    fun minimizeWeighted(softs: List<WeightedSoft>, params: BacktrackParams = BacktrackParams()): Result {
+    fun minimizeWeighted(
+        softs: List<WeightedSoft>,
+        params: BacktrackParams = BacktrackPresets.conflictDriven(),
+    ): Result {
         if (softs.isEmpty()) {
             return Oll.solveHardOnly(
                 baseProblem,
