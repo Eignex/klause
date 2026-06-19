@@ -367,7 +367,7 @@ private fun FlatZincCompiler.buildObjNode(c: FznConstraint, definedId: Int): Fun
     }
 }
 
-/** `int_lin_eq([coeffs], [vars], c)` defining [definedId]: solve `Σ coeff·var = c` for it. */
+/** `int_lin_eq((coeffs), (vars), c)` defining [definedId]: solve `Σ coeff·var = c` for it. */
 private fun FlatZincCompiler.buildLinNode(c: FznConstraint, definedId: Int): FunctionalObjective.Node? {
     val coeffs = try {
         evalIntConstArray(c.args[0])
