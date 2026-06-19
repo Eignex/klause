@@ -97,8 +97,19 @@ class ConfiguredSource(
     val cap: Int = Int.MAX_VALUE,
     /** Static enable gate (a disabled configured source is skipped without consulting [source]). */
     val enabled: Boolean = true,
+    /** When true, the source is consulted only while the search is *stalled* (the schedule axis's
+     *  stall signal) — the plateau-escape sources (frontier / stall swaps / ejection chains) that
+     *  broaden the pool only once the in-place repair pool has trapped the search. */
+    val stallGated: Boolean = false,
+    /** Overrides the source's declared [MoveSource.phase] for this configuration; `null` keeps the
+     *  source's own phase. Lets a feasibility-phase source (e.g. elected structured globals) be
+     *  drawn during the infeasibility fight instead. */
+    val phase: Phase? = null,
 ) {
     init {
         require(cap >= 0) { "cap >= 0, got $cap" }
     }
+
+    /** The phase actually applied to this configuration — the [phase] override, else the source's. */
+    val effectivePhase: Phase get() = phase ?: source.phase
 }
