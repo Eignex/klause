@@ -40,7 +40,7 @@ class LpBoundingTest {
         val off = BacktrackSolver(problem).minimize(sumObjective, BacktrackParams(randomSeed = 1L))
         val on = BacktrackSolver(problem).minimize(
             sumObjective,
-            BacktrackParams(randomSeed = 1L, lpBounding = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)),
         )
 
         assertTrue(off is MinimizeResult.Optimal, "baseline should prove optimality")
@@ -57,7 +57,7 @@ class LpBoundingTest {
         val off = BacktrackSolver(problem).minimize(sumObjective, base)
         val on = BacktrackSolver(problem).minimize(
             sumObjective,
-            base.copy(lpBounding = true),
+            base.copy(lpPlan = base.lpPlan.copy(bounding = true)),
         )
 
         // The LP bound fires (telemetry records it) and never explores more nodes than the baseline.
@@ -73,10 +73,12 @@ class LpBoundingTest {
         // #287: the root LP of the triangle is integral at (1,1,1), so the probe rounds it into a
         // feasible incumbent (objective 3) before search. The proven optimum must be unchanged.
         val problem = triangle()
-        val off = BacktrackSolver(problem).minimize(sumObjective, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val off = BacktrackSolver(
+            problem,
+        ).minimize(sumObjective, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
         val on = BacktrackSolver(problem).minimize(
             sumObjective,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpProbe = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, probe = true)),
         )
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(3.0, off.objectiveValue)
@@ -90,11 +92,14 @@ class LpBoundingTest {
         val problem = triangle()
         val deep = BacktrackSolver(problem).minimize(
             sumObjective,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true, lpRootCutRounds = 16),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true, rootCutRounds = 16)),
         )
         val shallow = BacktrackSolver(problem).minimize(
             sumObjective,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpCuts = true, lpRootCutRounds = 1, lpCutRounds = 1),
+            BacktrackParams(
+                randomSeed = 1L,
+                lpPlan = LpPlan(bounding = true, cuts = true, rootCutRounds = 1, cutRounds = 1),
+            ),
         )
         assertTrue(deep is MinimizeResult.Optimal && shallow is MinimizeResult.Optimal)
         assertEquals(3.0, deep.objectiveValue)
@@ -111,7 +116,7 @@ class LpBoundingTest {
         val problem = triangle()
         val result = BacktrackSolver(problem).minimize(
             sumObjective,
-            BacktrackParams(randomSeed = 7L, lpBounding = true, lpBoundEvery = 3),
+            BacktrackParams(randomSeed = 7L, lpPlan = LpPlan(bounding = true, boundEvery = 3)),
         )
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)
@@ -125,7 +130,7 @@ class LpBoundingTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1L))
         val result = BacktrackSolver(problem).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)),
         )
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(0.0, result.objectiveValue)

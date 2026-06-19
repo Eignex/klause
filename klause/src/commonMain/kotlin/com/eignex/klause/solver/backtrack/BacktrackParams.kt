@@ -170,238 +170,21 @@ data class BacktrackParams(
      */
     val lpConfig: LpConfig? = null,
     /**
-     * Native LP-relaxation bounding for branch-and-bound minimisation (#20). When true, scheduled
-     * nodes solve an exact integer LP relaxation of the live problem and prune when the relaxation
-     * is infeasible or its objective bound, rounded up to the next integer, is `≥` the incumbent.
-     * This strictly dominates the cheap per-term lower bound (which still runs first as a fast
-     * pre-filter) but costs an LP solve per scheduled node. Disabled by default; a no-op for
-     * problems with no LP-emittable factors (the relaxation is then empty and never prunes).
+     * The resolved per-technique LP-relaxation plan; see [LpPlan]. [LpAutoConfig.resolve] OR-es the
+     * structurally-applicable techniques onto this from [lpConfig]'s emphasis. The raw default is the
+     * all-off [LpPlan] (no LP unless a field is set or [lpConfig] resolves one on).
      */
-    val lpBounding: Boolean = false,
-    /**
-     * Frequency policy for [lpBounding]: solve the LP at one in every [lpBoundEvery] pruning checks
-     * rather than at every node, since the LP solve dominates a node's cost. `1` solves at every
-     * checked node; larger values trade pruning power for throughput. Must be positive.
-     */
-    val lpBoundEvery: Int = 1,
-    /**
-     * Depth policy for [lpBounding]: skip the LP solve below this decision depth. The relaxation is
-     * tightest and most valuable near the root where bounds are loose; deep nodes are nearly fixed
-     * and rarely repay the solve. `Int.MAX_VALUE` (default) applies LP bounding at every depth.
-     */
-    val lpBoundMaxDepth: Int = Int.MAX_VALUE,
-    /**
-     * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
-     * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
-     * re-optimises in a handful of dual pivots. The constraint matrix is identical across nodes
-     * (only bounds change), so the basis transfers directly. Sound either way — a stale or singular
-     * basis just falls back to a cold solve; this only changes pivot count, never the result.
-     * Enabled by default when [lpBounding] is on.
-     */
-    val lpWarmStart: Boolean = true,
-    /**
-     * LP-guided value ordering (#246): when the per-node LP has solved (requires [lpBounding]), order
-     * each branch variable's candidate values by closeness to its fractional LP value
-     * (round-toward-LP diving). Pure search-order guidance — it changes which solutions are found
-     * first, never the optimum or feasibility — so it is correctness-neutral. Off by default; a no-op
-     * for variables with no current LP value.
-     */
-    val lpBranching: Boolean = false,
-    /**
-     * LP-rounding primal heuristic (#287): before search, solve the root LP and try to round its
-     * fractional point into a feasible assignment by pinning each variable toward its LP value and
-     * propagating. A complete conflict-free pass is a feasible incumbent (propagation enforces every
-     * factor, so the result is sound by construction); it seeds the branch-and-bound bound so pruning
-     * and reduced-cost fixing bite from the first node. A conflict on the single pass abandons the
-     * probe (no backtracking). Requires a LinearObjective; off by default; never changes the optimum.
-     */
-    val lpProbe: Boolean = false,
-    /**
-     * Cut generation (#22): at a scheduled node, after the LP solve, run separators that add valid
-     * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
-     * cuts), re-solving to tighten the bound. Requires [lpBounding]; off by default.
-     */
-    val lpCuts: Boolean = false,
-    /** Maximum separation rounds per node for [lpCuts]; each round adds cuts and re-solves. */
-    val lpCutRounds: Int = 4,
-    /**
-     * Separation rounds at the root node (decision level 0) for [lpCuts] (#285). The root relaxation
-     * is solved once and bounds the whole tree, so spending more rounds there to drive a strong root
-     * cut closure pays off broadly; deeper nodes keep the cheaper [lpCutRounds]. Defaults to a deeper
-     * closure than per-node; capped to at least [lpCutRounds].
-     */
-    val lpRootCutRounds: Int = 16,
-    /**
-     * Cut staleness tolerance (#565): end separation at a node once a round improves the LP objective
-     * bound by less than this fraction of `max(1, |bound|)` — diminishing returns. Cuts that no longer
-     * move the bound only cost per-node solve time and starve search (on ghoulomb the aggressive tier
-     * added ~15795 cuts over 24s of a 30s budget for zero prunes while the incumbent regressed). The
-     * first round whose gain falls below the tolerance ends separation for that node. `0.0` disables
-     * the check, separating to [lpCutRounds] / [lpRootCutRounds] as before.
-     */
-    val lpCutMinGain: Double = 1e-3,
-    /**
-     * Hard cap on the total cuts added at one node across all separation rounds (#565) — a backstop on
-     * the per-node solve cost of a large live cut pool (a round's fresh cuts are trimmed to fit, and
-     * reaching the cap ends separation for that node). The staleness check ([lpCutMinGain]) is the
-     * primary control; this only bounds the worst case where each round keeps moving the bound.
-     */
-    val lpMaxCutsPerNode: Int = 2048,
-    /**
-     * Persistent global cut pool. When true (and [lpCuts]), the structural separators are run
-     * once at the root and the cuts they find are cached and re-added to every node's relaxation,
-     * instead of being re-separated per node. These cuts are computed from the root (= declared)
-     * domains and problem structure, so they are globally valid — a root Hall/cover/assignment/subtour
-     * cut stays a valid (if weaker) bound at every tighter descendant. Gives a cheap baseline
-     * strengthening at every node on top of per-node separation. Off by default.
-     */
-    val lpCutPool: Boolean = false,
-    /**
-     * Include Gomory integrality cuts among the [lpCuts] separators. These come from the simplex
-     * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
-     * tableau makes them numerically clean. On by default when [lpCuts] is set.
-     */
-    val lpGomory: Boolean = true,
-    /**
-     * Include Gomory mixed-integer (MIR) cuts among the [lpCuts] separators. Derived from the same
-     * tableau rows as [lpGomory] but with the stronger mixed-integer rounding multiplier, so they
-     * dominate the pure-integer cut on rows with fractional nonbasic coefficients. Like [lpGomory]
-     * they need no problem structure and stay exact in the integer tableau. On by default when
-     * [lpCuts] is set.
-     */
-    val lpMir: Boolean = true,
-    /**
-     * Genuine subtour-elimination cuts for Circuit globals (#22). When true and [lpBounding] holds,
-     * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
-     * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
-     * Adds O(n²) columns per circuit (skipped above a node-count cap), so it is opt-in and off by
-     * default; a no-op when no Circuit exists.
-     */
-    val lpCircuit: Boolean = false,
-    /**
-     * Linearize constant-array Element globals with a one-hot selector model (#22). When true and
-     * [lpBounding] holds, each Element over a constant table gets selector columns and channelling
-     * rows — its exact convex hull `result = Σ arr[p]·[idx=p]` — so the LP sees `result`'s dependence
-     * on `idx`. Adds O(len) columns per Element (skipped above a length cap), so it is opt-in and off
-     * by default; a no-op when no constant-array Element exists. Variable-array Element is deferred.
-     */
-    val lpElement: Boolean = false,
-    /**
-     * Linearize Table globals with their convex hull (#22). When true and [lpBounding] holds, each
-     * Table gets one selector column per allowed tuple with `Σ y_t = 1` and per-column channels
-     * `xs[j] = Σ tuple_t[j]·y_t`, so the LP sees the exact convex hull of the allowed tuples. Adds
-     * O(numTuples) columns per Table (skipped above a tuple-count cap), so it is opt-in and off by
-     * default; a no-op when no Table exists.
-     */
-    val lpTable: Boolean = false,
-    /**
-     * One-hot NValue value hull (#435). When true and [lpBounding] holds, each NValue contributes a
-     * per-value "used"-indicator model so the distinct-count target gets an LP bound (a real lower
-     * bound under minimisation). Sound by construction; off by default; a no-op when no NValue exists.
-     */
-    val lpNValue: Boolean = false,
-    /**
-     * Regular DFA flow hull (#655). When true and [lpBounding] holds, each Regular contributes the
-     * layer-expanded automaton flow model (arc vars + flow-conservation + channel rows) — the exact
-     * convex hull of its accepting strings, so an objective over the sequence gets a tight LP bound.
-     * Sound by construction; off by default; a no-op when no Regular exists or the unfolding exceeds
-     * the arc cap.
-     */
-    val lpRegular: Boolean = false,
-    /**
-     * Mdd layered flow hull (#655). When true and [lpBounding] holds, each Mdd contributes the layered
-     * flow model (arc vars + flow-conservation + value channel + cost channel) — the exact convex hull
-     * of its accepting paths, so an objective over the sequence (or a cost-MDD's cost var) gets a tight
-     * LP bound. Sound by construction; off by default; a no-op when no Mdd exists or the unfolding
-     * exceeds the arc cap.
-     */
-    val lpMdd: Boolean = false,
-    /**
-     * Count-variable GlobalCardinality count hull (#655). When true and [lpBounding] holds, each
-     * count-variable GCC contributes a one-hot selector model (`Σ_v z_iv = 1`, channel
-     * `Σ_v v·z_iv = xs(i)`, and `Σ_i z_{i,cover(k)} = counts(k)` per cover value) so a count variable
-     * in the objective gets an exact LP bound. Sound by construction; off by default; a no-op when no
-     * count-variable GCC exists or the selector count exceeds the cell cap.
-     */
-    val lpGccCount: Boolean = false,
-    /**
-     * Objective-cone / precedence-only sub-relaxation (#571). When true and [lpBounding] holds, the
-     * per-node LP is built over **only** the variables and rows transitively connected to the
-     * objective, with every big-M [com.eignex.klause.solver.factor.ReifiedLinear] disjunctive row
-     * dropped — for scheduling, the critical-path / longest-path bound (precedence + objective). The
-     * point is that this subset has no disjunctive ordering bools, so it always fits the relaxation-size
-     * cap where the full relaxation does not; it is a cheaper, looser, always-sound bound (any subset
-     * of constraints is a relaxation). Forces the hull / circuit / cut / cumulative LP features off.
-     * Off by default.
-     */
-    val lpObjectiveCone: Boolean = false,
-    /**
-     * Whether the adaptive LP auto-off (#614) may **re-probe** a disabled per-node LP on exponential
-     * backoff to recover subtrees where the relaxation becomes useful again. `true` is the adaptive
-     * default; `false` makes a disable irreversible — the static-one-shot behaviour of #562, kept as a
-     * toggle for measuring the re-probe's value. No effect when [lpBounding] is off.
-     */
-    val lpAutoOffReprobe: Boolean = true,
-    /**
-     * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
-     * [lpBounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
-     * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
-     * `capacity·M ≥ cap·t1 + Σ energy-after(t1)` — the energetic / area objective bound the
-     * start-variable LP otherwise lacks for scheduling. Sound by construction (a missing row only
-     * loosens; the makespan link is never guessed); off by default; a no-op without a verifiable
-     * scheduling makespan. See [com.eignex.klause.solver.lp.CumulativeRelaxation].
-     */
-    val lpCumulative: Boolean = false,
-    /**
-     * Diffn per-axis cumulative makespan bound (#655). When true and [lpBounding] holds, each
-     * constant-size Diffn is projected onto both axes as a cumulative (capacity = the maximum
-     * perpendicular extent) and contributes the same energetic makespan row as [lpCumulative] — a
-     * sound lower bound on a strip-length / extent variable (its `t1 = min-est` case is the area bound
-     * `Σ wᵢ·hᵢ ≤ W·H`). Sound by construction; off by default; a no-op unless an axis extent is a
-     * verifiable upper bound on every task end. See [com.eignex.klause.solver.lp.CumulativeRelaxation].
-     */
-    val lpDiffn: Boolean = false,
-    /**
-     * Time-indexed LP reformulation of the scheduling globals (#453). When true and [lpBounding]
-     * holds, each Cumulative / Disjunctive over a bounded horizon gets binary `x_{i,t}` start
-     * columns with assignment, start-channel and per-time-point resource rows — the resource–time
-     * coupling the start-variable LP lacks, so the LP bound is far tighter than the energetic row
-     * ([lpCumulative]) alone. Adds O(n·H) columns, hard-gated on the horizon, so it is opt-in and off
-     * by default; a no-op without a bounded-horizon scheduling global.
-     */
-    val lpCumulativeTimeIndexed: Boolean = false,
-    /**
-     * Preemptive min-cost-flow feasibility / makespan bound for the scheduling globals (#454). When
-     * true, a node is pruned if the tasks' energy cannot be preemptively packed into their release /
-     * deadline windows at capacity (an exact max-flow feasibility test, strictly stronger than the
-     * pairwise-window [energeticReasoning] scan and horizon-independent — it keys off the O(n)
-     * start-bound breakpoints, not the time axis), and the verified makespan variable is lower-bounded
-     * by the smallest feasible completion time. Pure relaxation; off by default; a no-op without a
-     * scheduling global. See [com.eignex.klause.solver.lp.CumulativeFlowBound].
-     */
-    val lpCumulativeFlow: Boolean = false,
-    /** Frequency policy for [lpCumulativeFlow]: run the max-flow check at one in every this-many
-     *  pruning checks, mirroring [energeticEvery]. Must be positive. */
-    val lpCumulativeFlowEvery: Int = 1,
+    val lpPlan: LpPlan = LpPlan(),
     /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
      * constraints over them dualized) and prunes when that bound — rounded up — reaches the incumbent.
-     * Independent of [lpBounding]; off by default; a no-op when no eligible AllDifferent exists.
+     * Independent of [LpPlan.bounding]; off by default; a no-op when no eligible AllDifferent exists.
      */
     val lagrangian: Boolean = false,
-    /**
-     * 0/1 multi-knapsack subgradient Lagrangian bounding (#632). When true and the objective is a
-     * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound for
-     * problems with several `PseudoBoolean` capacity rows: one capacity row is kept and solved **exactly**
-     * by 0/1-knapsack DP while the rest are dualized, so the bound captures integrality the monolithic LP
-     * relaxes away. Shares [lagrangianIterations]. Independent of [lpBounding]; off by default; a no-op
-     * unless a clean capacity `PseudoBoolean` (positive literals/weights, `≤`) is present.
-     */
-    val lpKnapsackLagrangian: Boolean = false,
-    /** Subgradient ascent iterations per node for [lagrangian] / [lpKnapsackLagrangian]; more iterations
-     *  tighten the bound. */
+    /** Subgradient ascent iterations per node for [lagrangian] / [LpPlan.knapsackLagrangian]; more
+     *  iterations tighten the bound. */
     val lagrangianIterations: Int = 15,
     /**
      * Energetic-reasoning infeasibility check for Cumulative globals (#22/#23). When true, a node is
@@ -412,27 +195,13 @@ data class BacktrackParams(
     val energeticReasoning: Boolean = false,
     /**
      * Frequency policy for [energeticReasoning]: run the window scan at one in every
-     * [energeticEvery] pruning checks, mirroring [lpBoundEvery]. The scan is O(windows² · tasks)
+     * [energeticEvery] pruning checks, mirroring [LpPlan.boundEvery]. The scan is O(windows² · tasks)
      * per Cumulative with no incremental state, so on task-heavy models it dominates a node's
      * cost; a cadence trades missed prunes for throughput. `1` (default) checks at every pruned
      * node. [LpAutoConfig] derives a size-aware cadence from the task counts when *it* enables
      * the check. Must be positive.
      */
     val energeticEvery: Int = 1,
-    /**
-     * Learn a clause from an infeasible node (#247). When true, an infeasibility proof is turned into
-     * a nogood over absolute variable-bound atoms — a globally valid clause implied by the original
-     * constraints — and registered at the next restart (where its literals are no longer all-false),
-     * so the dead region is pruned in sibling subtrees. Two sources: the node LP's Farkas
-     * infeasibility certificate (requires [lpBounding]) and the energetic over-subscription window
-     * (requires [energeticReasoning]). When the certificate resolves to an asserting 1UIP clause the
-     * engine backjumps and learns immediately (#280), so this now helps even with restarts off;
-     * non-asserting certificates still fall back to restart-time registration. A certificate
-     * leaning on a live-big-M reified row cites the bounds that justify the M alongside its column
-     * seats; one leaning on a node-local cut is not expressible as a globally valid bound-atom
-     * clause and is withheld — the prune itself still happens. Off by default.
-     */
-    val lpLearn: Boolean = false,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

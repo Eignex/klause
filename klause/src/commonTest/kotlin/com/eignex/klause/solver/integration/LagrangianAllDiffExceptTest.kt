@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpPlan
 import com.eignex.klause.solver.factor.AllDifferent
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -34,7 +35,7 @@ class LagrangianAllDiffExceptTest {
         // Lagrangian on (the AllDifferent bound) + the LP bounding stack — the #714 trigger.
         val r = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lagrangian = true),
+            BacktrackParams(randomSeed = 1L, lagrangian = true, lpPlan = LpPlan(bounding = true)),
         )
         // Feasible: all zero ⇒ objective 0. A false UNSAT (the bug) would surface as Infeasible here.
         val opt = assertIs<MinimizeResult.Optimal>(r)

@@ -30,7 +30,9 @@ class LpReducedCostFixingTest {
     fun `reduced-cost fixing preserves the optimum`() {
         val problem = weighted()
         val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 1L))
-        val on = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val on = BacktrackSolver(
+            problem,
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
 
         assertEquals(off.objectiveValue, on.objectiveValue, "fixing must not change the optimum")
         assertEquals(5.0, on.objectiveValue)
@@ -43,7 +45,7 @@ class LpReducedCostFixingTest {
         val problem = weighted()
         val result = BacktrackSolver(problem).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, objectiveBoundSupplier = { 6.0 }),
+            BacktrackParams(randomSeed = 1L, objectiveBoundSupplier = { 6.0 }, lpPlan = LpPlan(bounding = true)),
         )
         assertTrue(result.objectiveValue == 5.0, "optimum should still be reached, got ${result.objectiveValue}")
         assertTrue(result.stats.lpFixed.sum > 0.0, "expected reduced-cost fixings, got ${result.stats.lpFixed.sum}")
@@ -63,7 +65,9 @@ class LpReducedCostFixingTest {
             ),
         )
         val triObj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
-        val result = BacktrackSolver(problem).minimize(triObj, BacktrackParams(randomSeed = 4L, lpBounding = true))
+        val result = BacktrackSolver(
+            problem,
+        ).minimize(triObj, BacktrackParams(randomSeed = 4L, lpPlan = LpPlan(bounding = true)))
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)
     }

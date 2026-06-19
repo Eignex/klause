@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpPlan
 import com.eignex.klause.solver.factor.Cumulative
 import com.eignex.klause.solver.factor.Disjunctive
 import com.eignex.klause.solver.factor.Linear
@@ -250,12 +251,14 @@ class CpToLpRelaxationCumulativeTimeIndexedTest {
             val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
             val params = BacktrackParams(
                 randomSeed = 7L,
-                lpBounding = true,
-                lpLearn = true,
-                lpCumulative = true,
-                lpCumulativeTimeIndexed = true,
-                lpCumulativeFlow = true,
                 energeticReasoning = true,
+                lpPlan = LpPlan(
+                    bounding = true,
+                    learn = true,
+                    cumulative = true,
+                    cumulativeTimeIndexed = true,
+                    cumulativeFlow = true,
+                ),
             )
             when (val res = BacktrackSolver(p).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {

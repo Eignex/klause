@@ -96,10 +96,10 @@ class LpLearnTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpBounding = true))
+        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
         val on = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpLearn = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, learn = true)),
         )
         assertIs<MinimizeResult.Optimal>(off)
         val onOpt = assertIs<MinimizeResult.Optimal>(on)

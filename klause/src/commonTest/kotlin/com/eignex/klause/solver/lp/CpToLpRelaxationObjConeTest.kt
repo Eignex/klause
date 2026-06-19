@@ -5,6 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.backtrack.LpPlan
 import com.eignex.klause.solver.factor.Linear
 import com.eignex.klause.solver.factor.LinearOp
 import com.eignex.klause.solver.factor.ReifiedLinear
@@ -89,7 +90,7 @@ class CpToLpRelaxationObjConeTest {
         val baseline = BacktrackSolver(p).minimize(objective, BacktrackParams(randomSeed = 1L))
         val cone = BacktrackSolver(p).minimize(
             objective,
-            BacktrackParams(randomSeed = 1L, lpBounding = true, lpObjectiveCone = true),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveCone = true)),
         )
 
         assertTrue(baseline is MinimizeResult.Optimal, "baseline should solve, got $baseline")
