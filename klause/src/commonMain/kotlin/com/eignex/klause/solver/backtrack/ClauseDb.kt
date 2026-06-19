@@ -421,14 +421,9 @@ internal fun BacktrackSolver.backjumpAndLearn(
     return BackjumpTerm.Stuck
 }
 
-internal fun BacktrackSolver.snapshotAssignment(session: PropagationSession): Sample {
-    val sp = session.problem
-    val bools = BooleanArray(sp.numBoolVars) { v -> session.boolValue(v) ?: false }
-    val ints = IntArray(sp.numIntVars) { v -> session.intDomain(v).min }
-    return Sample(bools, ints)
-}
-
-internal fun LpEngine.snapshotAssignment(session: PropagationSession): Sample {
+/** Materialize the session's current assignment as a [Sample]: each bool at its value (unset ⇒ false),
+ *  each int at its domain minimum. Receiver-free — depends only on [session]. */
+internal fun snapshotAssignment(session: PropagationSession): Sample {
     val sp = session.problem
     val bools = BooleanArray(sp.numBoolVars) { v -> session.boolValue(v) ?: false }
     val ints = IntArray(sp.numIntVars) { v -> session.intDomain(v).min }
