@@ -36,7 +36,7 @@ internal class Recipe(
      *  matching how the SAT-family / fjump arms are registered. */
     fun toWorkerConfig(tabu: TabuFilter = TabuFilter.Disabled): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
         "recipe/$label",
-        SourceDrivenStrategy(MoveSourceCatalog.parse(sources.spec), scoring, acceptance.build(), tabu),
+        SourceDrivenStrategy(MoveSourceCatalog.parse(sources.spec), scoring, acceptance.build(), tabu = tabu),
         restart.build(),
     )
 }

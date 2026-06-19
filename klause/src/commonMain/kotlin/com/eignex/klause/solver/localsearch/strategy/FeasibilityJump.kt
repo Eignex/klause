@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.movesource.ArgminJump
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 
 /**
@@ -49,7 +50,7 @@ fun FeasibilityJump(
         sources = listOf(ConfiguredSource(ArgminJump(candidateVars, maxValueTries))),
         scoring = MoveScoring.Weighted,
         acceptance = AcceptanceRule.Greedy,
-        weightSchedule = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay),
+        schedule = ScheduleBundle(weights = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay)),
         perturbation = if (perturbAfter > 0) StallPerturbation(perturbAfter) else null,
     )
 }

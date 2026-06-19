@@ -6,7 +6,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.Pool
 import com.eignex.klause.solver.localsearch.schedule.RoundAccumulator
-import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
+import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 
 /**
  * The shared local-search driver (epic #710): a [Strategy] expressed purely as *policy over move
@@ -38,11 +38,13 @@ class SourceDrivenStrategy(
     val scoring: MoveScoring = MoveScoring.Weighted,
     /** How a scored candidate is selected — greedy, WalkSAT noise, probSAT roulette, skewed-VNS, or SA. */
     val acceptance: AcceptanceRule = AcceptanceRule.Greedy,
+    /** The schedule axis (#721): the [ScheduleBundle] of tempo policies — temperature, violation
+     *  weights, diversification noise, restart cadence. Each member is driven at its native cadence
+     *  (weights per step; temperature per pick + per round; restart by the engine). The default empty
+     *  bundle leaves every dimension off. */
+    val schedule: ScheduleBundle = ScheduleBundle(),
     /** Tabu filter applied to the combined candidate pool before selection. */
     val tabu: TabuFilter = TabuFilter.Disabled,
-    /** Optional violation-weight schedule (the CBLS/FJ stall-bump+decay family). Maintained off
-     *  `(state.step, state.cost)` each pick; `null` (default) leaves the weights untouched. */
-    val weightSchedule: WeightSchedule? = null,
     /** Configuration checking (CCASat): restrict candidates to variables whose configuration changed
      *  since their last flip, falling back to the full pool when all are CC-blocked. */
     val configurationChecking: Boolean = false,
@@ -80,7 +82,7 @@ class SourceDrivenStrategy(
         cblsSchedule?.let { return it.pickMove(state, scoring, tabu) }
 
         // Stall-driven weight maintenance first, so the bumped gradient scores this pick's candidates.
-        weightSchedule?.maintain(
+        schedule.weights?.maintain(
             state.step,
             state.cost,
             state.factorWeights,
