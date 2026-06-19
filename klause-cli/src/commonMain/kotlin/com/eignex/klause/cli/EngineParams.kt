@@ -26,6 +26,8 @@ import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.schedule.Geometric
+import com.eignex.klause.solver.localsearch.schedule.Schedule
+import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.strategy.AcceptanceRule
 import com.eignex.klause.solver.localsearch.strategy.MoveScoring
 
@@ -171,6 +173,8 @@ internal class LsSetup(
     val scoring: MoveScoring,
     /** Acceptance axis (built from `acceptance=` + its numeric knobs). */
     val acceptance: AcceptanceRule,
+    /** Schedule axis: the temperature/weights/noise/restart bundle the acceptance/scoring knobs imply. */
+    val schedule: ScheduleBundle = ScheduleBundle(),
 )
 
 /** Split `--param` overrides for the naked `ls-single` engine into per-call [LocalSearchParams] and
@@ -187,6 +191,13 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
     val initTemp = p.double("initial-temp") ?: 1.0
     val coolRate = p.double("cooling-rate") ?: 0.999
     val minTemp = p.double("min-temp") ?: 1e-3
+    val acceptanceName = p.string("acceptance")?.lowercase()
+    // The schedule axis: the simulated-annealing acceptance reads its temperature from here.
+    val temperature: Schedule? = if (acceptanceName == "sa") {
+        Geometric(initialTemperature = initTemp, coolingRate = coolRate, minTemperature = minTemp)
+    } else {
+        null
+    }
     val setup = LsSetup(
         tabuTenure = p.int("tabu-tenure") ?: 10,
         pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
@@ -203,21 +214,15 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
             "break" -> MoveScoring.Break
             else -> usageError("ls-single: scoring expects weighted|raw|break, got `$s`")
         },
-        acceptance = when (val a = p.string("acceptance")?.lowercase()) {
+        acceptance = when (acceptanceName) {
             null, "greedy" -> AcceptanceRule.Greedy
-
             "walksat" -> AcceptanceRule.WalkSatNoise(noise)
-
             "probsat" -> AcceptanceRule.ProbSat(cb)
-
             "skew" -> AcceptanceRule.Skew(skewAlpha)
-
-            "sa" -> AcceptanceRule.Metropolis(
-                Geometric(initialTemperature = initTemp, coolingRate = coolRate, minTemperature = minTemp),
-            )
-
-            else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew|sa, got `$a`")
+            "sa" -> AcceptanceRule.Metropolis
+            else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew|sa, got `$acceptanceName`")
         },
+        schedule = ScheduleBundle(temperature = temperature),
     )
     p.finish(
         "ls",

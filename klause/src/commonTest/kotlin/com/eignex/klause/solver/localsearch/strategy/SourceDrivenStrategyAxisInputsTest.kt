@@ -14,6 +14,7 @@ import com.eignex.klause.solver.localsearch.movesource.MoveSourceId
 import com.eignex.klause.solver.localsearch.movesource.Phase
 import com.eignex.klause.solver.localsearch.movesource.Pool
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.schedule.WeightSchedule
 import kotlin.random.Random
@@ -128,5 +129,27 @@ class SourceDrivenStrategyAxisInputsTest {
         // When every candidate is CC-blocked, fall back to the full pool rather than null.
         state.intConfChange[1] = false
         assertNotNull(strategy.pickMove(state), "all-blocked CC must fall back, not starve the pick")
+    }
+
+    @Test
+    fun `driver cools the schedule temperature for a metropolis acceptance`() {
+        // Temperature lives in the schedule axis, not the acceptance rule: the driver must advance it
+        // once per pick that sampled the noise pool. A permanently-infeasible problem keeps the noise
+        // pool non-empty, so a Geometric schedule's temperature must fall over a run of picks.
+        val temperature = Geometric(initialTemperature = 1.0, coolingRate = 0.9)
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
+            scoring = MoveScoring.Break,
+            acceptance = AcceptanceRule.Metropolis,
+            schedule = ScheduleBundle(temperature = temperature),
+        )
+        val state = LocalSearchState(infeasibleRing(), Random(7))
+        state.recompute()
+        val t0 = temperature.temperature
+        repeat(20) { strategy.pickMove(state)?.let { move -> state.apply(move) } }
+        assertTrue(
+            temperature.temperature < t0,
+            "the driver must step the schedule temperature each Metropolis pick (was $t0, now ${temperature.temperature})",
+        )
     }
 }

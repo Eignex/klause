@@ -1,8 +1,6 @@
 package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.schedule.Geometric
-import com.eignex.klause.solver.localsearch.schedule.Schedule
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.random.Random
@@ -20,19 +18,32 @@ import kotlin.random.Random
  * from the noise pool only and fall through to a deterministic best otherwise; deterministic rules
  * ([Greedy], [Skew]) range over both pools.
  *
- * Temperature-based acceptance (Metropolis / simulated annealing) is deliberately **not** here: it
- * consumes a cooling `schedule` (the separate schedule axis), so it lands as an additive variant
- * once that axis is in (see #721).
+ * Temperature-based acceptance ([Metropolis] / simulated annealing) reads the current annealing
+ * temperature the driver supplies from the **schedule axis** (`ScheduleBundle.temperature`); it owns
+ * no schedule itself, keeping acceptance and schedule independent.
  */
 sealed interface AcceptanceRule {
 
-    /** Choose a move from the candidate pools, or null when both are empty. */
-    fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double): Move?
+    /** Choose a move from the candidate pools, or null when both are empty. [temperature] is the
+     *  schedule axis's current annealing temperature (the driver supplies it from
+     *  `ScheduleBundle.temperature`); only [Metropolis] consults it, the others ignore it. */
+    fun choose(
+        rng: Random,
+        noisePool: List<Move>,
+        scorePool: List<Move>,
+        temperature: Double,
+        score: (Move) -> Double,
+    ): Move?
 
     /** Strict greedy descent: the minimum-scored move over both pools (ties broken uniformly). */
     data object Greedy : AcceptanceRule {
-        override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double) =
-            bestBy(rng, noisePool, scorePool, score)
+        override fun choose(
+            rng: Random,
+            noisePool: List<Move>,
+            scorePool: List<Move>,
+            temperature: Double,
+            score: (Move) -> Double,
+        ) = bestBy(rng, noisePool, scorePool, score)
     }
 
     /**
@@ -48,7 +59,13 @@ sealed interface AcceptanceRule {
             require(noise in 0.0..1.0) { "noise ∈ [0, 1], got $noise" }
         }
 
-        override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double): Move? {
+        override fun choose(
+            rng: Random,
+            noisePool: List<Move>,
+            scorePool: List<Move>,
+            temperature: Double,
+            score: (Move) -> Double,
+        ): Move? {
             if (noisePool.isNotEmpty() && rng.nextDouble() < noise) return noisePool[rng.nextInt(noisePool.size)]
             return bestBy(rng, noisePool, scorePool, score)
         }
@@ -71,7 +88,13 @@ sealed interface AcceptanceRule {
             require(eps > 0.0) { "eps > 0, got $eps" }
         }
 
-        override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double): Move? {
+        override fun choose(
+            rng: Random,
+            noisePool: List<Move>,
+            scorePool: List<Move>,
+            temperature: Double,
+            score: (Move) -> Double,
+        ): Move? {
             if (noisePool.isEmpty()) return bestBy(rng, emptyList(), scorePool, score)
             if (noisePool.size == 1) return noisePool[0] // a lone candidate is taken unconditionally, no draw
             val scores = DoubleArray(noisePool.size) { score(noisePool[it]) }
@@ -104,31 +127,38 @@ sealed interface AcceptanceRule {
             require(alpha >= 0.0) { "alpha >= 0, got $alpha" }
         }
 
-        override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double) =
-            bestBy(rng, noisePool, scorePool) { score(it) + alpha * moveSize(it) }
+        override fun choose(
+            rng: Random,
+            noisePool: List<Move>,
+            scorePool: List<Move>,
+            temperature: Double,
+            score: (Move) -> Double,
+        ) = bestBy(rng, noisePool, scorePool) { score(it) + alpha * moveSize(it) }
     }
 
     /**
-     * Simulated-annealing / Metropolis acceptance: sample the noise pool and take the first
-     * candidate whose scored delta passes the Metropolis test — `delta <= 0` (always accept) or
-     * `rng < exp(-delta / T)` at the [schedule]'s current temperature — cooling one [Schedule.step]
-     * per call. This is the one rule that consumes the *schedule* axis (epic #721) — it bridges
-     * acceptance × schedule. Falls back to the deterministic best over the score-only pool when the
-     * noise pool is empty (score-only moves are never accepted stochastically). [schedule] is
-     * stateful: one per strategy instance, never shared across concurrent searches.
+     * Simulated-annealing / Metropolis acceptance: sample the noise pool and take the first candidate
+     * whose scored delta passes the Metropolis test — `delta <= 0` (always accept) or
+     * `rng < exp(-delta / T)` at the [temperature] the driver supplies from the schedule axis
+     * (`ScheduleBundle.temperature`). The rule is pure: it owns no schedule and does not cool — the
+     * driver advances the temperature schedule per pick, keeping acceptance and schedule as
+     * independent axes. Falls back to the deterministic best over the score-only pool when the noise
+     * pool is empty (score-only moves are never accepted stochastically).
      */
-    data class Metropolis(val schedule: Schedule = Geometric()) : AcceptanceRule {
-        override fun choose(rng: Random, noisePool: List<Move>, scorePool: List<Move>, score: (Move) -> Double): Move? {
+    data object Metropolis : AcceptanceRule {
+        override fun choose(
+            rng: Random,
+            noisePool: List<Move>,
+            scorePool: List<Move>,
+            temperature: Double,
+            score: (Move) -> Double,
+        ): Move? {
             if (noisePool.isEmpty()) return bestBy(rng, emptyList(), scorePool, score)
             repeat(noisePool.size) {
                 val m = noisePool[rng.nextInt(noisePool.size)]
                 val delta = score(m)
-                if (delta <= 0.0 || rng.nextDouble() < exp(-delta / schedule.temperature)) {
-                    schedule.step()
-                    return m
-                }
+                if (delta <= 0.0 || rng.nextDouble() < exp(-delta / temperature)) return m
             }
-            schedule.step()
             return noisePool[rng.nextInt(noisePool.size)]
         }
     }

@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.localsearch.strategy
 
 import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.schedule.Geometric
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,64 +24,71 @@ class AcceptanceRuleTest {
 
     private fun rng() = Random(7)
 
+    // Acceptance is pure with respect to the schedule axis: only Metropolis reads the temperature,
+    // the others ignore it, so a fixed value suffices for the non-Metropolis cases.
+    private val anyTemp = 1.0
+
     @Test
     fun `greedy takes the minimum over both pools`() {
         // swap (score-only, -0.5) beats b (noise, 1.0): deterministic rules see both pools.
-        assertEquals(swap, AcceptanceRule.Greedy.choose(rng(), listOf(a, b), listOf(swap), score))
+        assertEquals(swap, AcceptanceRule.Greedy.choose(rng(), listOf(a, b), listOf(swap), anyTemp, score))
     }
 
     @Test
     fun `walksat noise=1 draws only from the noise pool`() {
         val r = rng()
         repeat(50) {
-            val m = AcceptanceRule.WalkSatNoise(1.0).choose(r, listOf(a, b), listOf(swap), score)
+            val m = AcceptanceRule.WalkSatNoise(1.0).choose(r, listOf(a, b), listOf(swap), anyTemp, score)
             assertTrue(m == a || m == b, "hot noise must pick a noise-eligible move, never the score-only $m")
         }
     }
 
     @Test
     fun `walksat noise=0 is greedy over both pools`() {
-        assertEquals(swap, AcceptanceRule.WalkSatNoise(0.0).choose(rng(), listOf(a, b), listOf(swap), score))
+        assertEquals(swap, AcceptanceRule.WalkSatNoise(0.0).choose(rng(), listOf(a, b), listOf(swap), anyTemp, score))
     }
 
     @Test
     fun `probsat draws from the noise pool and falls back to greedy on the score pool`() {
         val r = rng()
         repeat(50) {
-            val m = AcceptanceRule.ProbSat().choose(r, listOf(a, b), listOf(swap), score)
+            val m = AcceptanceRule.ProbSat().choose(r, listOf(a, b), listOf(swap), anyTemp, score)
             assertTrue(m == a || m == b, "probSAT roulette must stay in the noise pool, not $m")
         }
         // Empty noise pool → the score-only moves are selected greedily (never roulette-drawn).
-        assertEquals(swap, AcceptanceRule.ProbSat().choose(rng(), emptyList(), listOf(swap, flip), score))
+        assertEquals(swap, AcceptanceRule.ProbSat().choose(rng(), emptyList(), listOf(swap, flip), anyTemp, score))
     }
 
     @Test
     fun `skew prefers the smaller move when alpha is large`() {
         // flip (size 1, score 0.0) vs swap (size 2, score -0.5): greedy picks swap; skew(1.0) keys
         // flip=0+1=1.0 vs swap=-0.5+2=1.5, so skew picks the smaller flip.
-        assertEquals(swap, AcceptanceRule.Greedy.choose(rng(), listOf(flip), listOf(swap), score))
-        assertEquals(flip, AcceptanceRule.Skew(1.0).choose(rng(), listOf(flip), listOf(swap), score))
+        assertEquals(swap, AcceptanceRule.Greedy.choose(rng(), listOf(flip), listOf(swap), anyTemp, score))
+        assertEquals(flip, AcceptanceRule.Skew(1.0).choose(rng(), listOf(flip), listOf(swap), anyTemp, score))
         // alpha = 0 is exactly greedy.
-        assertEquals(swap, AcceptanceRule.Skew(0.0).choose(rng(), listOf(flip), listOf(swap), score))
+        assertEquals(swap, AcceptanceRule.Skew(0.0).choose(rng(), listOf(flip), listOf(swap), anyTemp, score))
     }
 
     @Test
     fun `metropolis stays in the noise pool and falls back to greedy on the score pool`() {
         val r = rng()
         repeat(50) {
-            val m = AcceptanceRule.Metropolis(Geometric()).choose(r, listOf(a, b), listOf(swap), score)
+            val m = AcceptanceRule.Metropolis.choose(r, listOf(a, b), listOf(swap), anyTemp, score)
             assertTrue(m == a || m == b, "Metropolis must accept from the noise pool, not the score-only $m")
         }
         // Empty noise pool → the score-only moves are selected greedily (never accepted stochastically).
-        assertEquals(swap, AcceptanceRule.Metropolis(Geometric()).choose(rng(), emptyList(), listOf(swap, flip), score))
+        assertEquals(swap, AcceptanceRule.Metropolis.choose(rng(), emptyList(), listOf(swap, flip), anyTemp, score))
     }
 
     @Test
-    fun `metropolis cools its schedule each call`() {
-        val schedule = Geometric(initialTemperature = 1.0, coolingRate = 0.9)
-        val t0 = schedule.temperature
-        AcceptanceRule.Metropolis(schedule).choose(rng(), listOf(b), emptyList(), score)
-        assertTrue(schedule.temperature < t0, "Metropolis must step (cool) the schedule once per call")
+    fun `metropolis accepts an improving move regardless of temperature`() {
+        // b has delta 1.0 (worsening) and the only other noise option is a (2.0); at a near-zero
+        // temperature the worsening test almost never passes, so the rule takes its random fallback —
+        // still a noise-pool move. The acceptance reads the supplied temperature, owning no schedule.
+        val improving = Move.IntSet(4, 1) // delta -1.0
+        val improvingScore: (Move) -> Double = { if (it == improving) -1.0 else scores.getValue(it) }
+        val m = AcceptanceRule.Metropolis.choose(rng(), listOf(improving), emptyList(), 1e-6, improvingScore)
+        assertEquals(improving, m, "an improving move (delta ≤ 0) is always accepted, even when cold")
     }
 
     @Test
@@ -92,9 +98,9 @@ class AcceptanceRuleTest {
             AcceptanceRule.WalkSatNoise(0.5),
             AcceptanceRule.ProbSat(),
             AcceptanceRule.Skew(0.3),
-            AcceptanceRule.Metropolis(Geometric()),
+            AcceptanceRule.Metropolis,
         )) {
-            assertNull(rule.choose(rng(), emptyList(), emptyList(), score), "$rule must be null on empty")
+            assertNull(rule.choose(rng(), emptyList(), emptyList(), anyTemp, score), "$rule must be null on empty")
         }
     }
 }
