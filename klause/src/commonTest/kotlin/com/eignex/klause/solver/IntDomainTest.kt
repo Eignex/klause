@@ -1,6 +1,5 @@
-package com.eignex.klause.solver.intdomain
+package com.eignex.klause.solver
 
-import com.eignex.klause.solver.*
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test

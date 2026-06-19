@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.presolve
+package com.eignex.klause.solver.integration
 
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.factor.Cardinality
