@@ -341,13 +341,17 @@ internal fun FlatZincCompiler.emitSetIntersect(c: FznConstraint) {
         if (sIdx >= 0 && tIdx >= 0) {
             val sBit = s.indicatorBoolIds[sIdx]
             val tBit = t.indicatorBoolIds[tIdx]
-            factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(sBit, true))))
-            factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(tBit, true))))
+            emitIntersectUImpliesInputs(uBit, sBit, tBit)
             factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(tBit, false), Lit.make(uBit, true))))
         } else {
             factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
         }
     }
+}
+
+private fun FlatZincCompiler.emitIntersectUImpliesInputs(uBit: Int, sBit: Int, tBit: Int) {
+    factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(sBit, true))))
+    factors.add(Clause(intArrayOf(Lit.make(uBit, false), Lit.make(tBit, true))))
 }
 
 internal fun FlatZincCompiler.emitSetDiff(c: FznConstraint) {
