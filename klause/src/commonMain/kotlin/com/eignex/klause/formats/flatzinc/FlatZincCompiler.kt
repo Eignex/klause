@@ -515,10 +515,10 @@ internal class FlatZincCompiler(
             }
             return pinName to SolveDirective.ObjKind.Bool
         }
-        return when {
-            name in boolVars -> name to SolveDirective.ObjKind.Bool
-            name in floatVars -> name to SolveDirective.ObjKind.Float
-            name in intVars -> name to SolveDirective.ObjKind.Int
+        return when (name) {
+            in boolVars -> name to SolveDirective.ObjKind.Bool
+            in floatVars -> name to SolveDirective.ObjKind.Float
+            in intVars -> name to SolveDirective.ObjKind.Int
             else -> failHere("solve objective `$name` is not a declared variable")
         }
     }
