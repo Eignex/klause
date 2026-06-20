@@ -14,4 +14,7 @@ internal object CliKnobs {
 
     /** Default portfolio arm-pool size: `klause.portfolio.arms` / `KLAUSE_PORTFOLIO_ARMS`. */
     val portfolioArms by propertyKnob()
+
+    /** Default LP relaxation ceiling spec (parsed by `LpConfig.parse`): `klause.lp` / `KLAUSE_LP`. */
+    val lp by propertyKnob()
 }
