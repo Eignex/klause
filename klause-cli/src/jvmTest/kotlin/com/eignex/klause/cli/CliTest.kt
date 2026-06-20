@@ -264,6 +264,26 @@ class CliTest {
             main(arrayOf("-e", "ls", "--param", "scoring=cbls.break", "--param", "dry-run=on", fzn.absolutePath))
         }
         assertTrue("scoring=Break" in scoped, scoped)
+
+        // An acceptance edit to sa attaches a cooling schedule to arms that carried none.
+        val annealed = captureErr {
+            main(arrayOf("-e", "ls", "--param", "acceptance=sa", "--param", "dry-run=on", fzn.absolutePath))
+        }
+        assertTrue("acceptance=Metropolis" in annealed, annealed)
+        assertTrue("temperature=Geometric" in annealed, annealed)
+    }
+
+    @Test
+    fun `ls numeric knobs no axis consumes are reported as ineffective`() {
+        // noise is meaningless on the curated pool (no walksat acceptance) — rejected, not ignored.
+        assertEquals(listOf("noise"), ineffectiveNumerics("auto", emptySet(), listOf("noise")))
+        // The cbls base consumes noise/smoothing/tabu; a walksat acceptance edit consumes noise.
+        assertTrue(ineffectiveNumerics("cbls", emptySet(), listOf("noise", "smooth-prob", "tabu-tenure")).isEmpty())
+        assertTrue(ineffectiveNumerics("auto", setOf("walksat"), listOf("noise")).isEmpty())
+        assertTrue(ineffectiveNumerics("probsat", emptySet(), listOf("cb")).isEmpty())
+        assertTrue(ineffectiveNumerics("sa", emptySet(), listOf("initial-temp", "cooling-rate", "min-temp")).isEmpty())
+        // feasibility-jump ignores tabu, so a tabu-tenure knob is ineffective there.
+        assertEquals(listOf("tabu-tenure"), ineffectiveNumerics("fjump", emptySet(), listOf("tabu-tenure")))
     }
 
     @Test
