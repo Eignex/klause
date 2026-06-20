@@ -116,10 +116,12 @@ internal fun LpEngine.lpBoundAndFix(
     hints: LpHints? = null,
     learn: Boolean = false,
     warm: Basis? = null,
+    cutsAllowed: Boolean = false,
 ): LpNodeOutcome = try {
     sink.lpClockStart()
     sparseSafePrune(
         relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending, hints, learn, warm,
+        cutsAllowed,
     )
 } catch (_: LpOverflowException) {
     // A determinant or coefficient overflow in the relaxation build loses the bound; recover a sound
@@ -150,6 +152,7 @@ internal fun LpEngine.sparseSafePrune(
     hints: LpHints? = null,
     learn: Boolean = false,
     warm: Basis? = null,
+    cutsAllowed: Boolean = false,
 ): LpNodeOutcome {
     val relaxation = nodeRelaxation(relaxer, session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
@@ -195,7 +198,7 @@ internal fun LpEngine.sparseSafePrune(
     // relaxation; the cached warm-start basis stays the un-tightened one for the children.
     var boundRel = relaxation
     var boundRes = result
-    if (params.lpPlan.cuts && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
+    if (cutsAllowed && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
         lpSeparators.isNotEmpty()
     ) {
         val localCuts = ArrayList<Cut>()
