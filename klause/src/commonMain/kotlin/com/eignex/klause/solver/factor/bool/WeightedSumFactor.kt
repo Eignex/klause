@@ -48,7 +48,7 @@ internal fun linearHolds(sum: Long, op: LinearOp, bound: Int): Boolean = when (o
 }
 
 /**
- * Graded residual magnitude — the [com.eignex.klause.solver.factor.compressViolation]-compressed
+ * Graded residual magnitude — the `compressViolation`-compressed
  * distance the sum must move to satisfy the comparison. Defined for any [sum]; callers gate it
  * behind `linearHolds` (a satisfied relation has degree 0). `NE` has no natural magnitude, so it
  * is the unit residual (sum is pinned to `bound`).

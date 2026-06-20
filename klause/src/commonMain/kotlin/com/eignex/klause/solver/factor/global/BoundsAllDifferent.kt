@@ -46,7 +46,7 @@ internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): 
 }
 
 /**
- * Pure core of [boundsAllDifferentFilter] (extracted so it can be brute-force oracle-tested):
+ * Pure core of `boundsAllDifferentFilter` (extracted so it can be brute-force oracle-tested):
  * given variable lower/upper bounds, fill [newLo]/[newHi] with the bounds-consistent tightened
  * bounds and return `true` if feasible, `false` if a Hall interval is over-full (no solution).
  * López-Ortiz / Quimper / van Beek / Tremblay / Marchand (CP-AI-OR 2003).
@@ -72,7 +72,7 @@ internal fun computeBoundsAllDifferent(lo: IntArray, hi: IntArray, newLo: IntArr
  * One half of bounds consistency: raise each variable's lower bound to the top of the Hall
  * interval that confines it, in place into [outLo] (pre-seeded with [lo]). Returns `false` if a
  * Hall interval is over-full. The López-Ortiz "raise minima" sweep; the symmetric upper-bound
- * pass is obtained by negation (see [computeBoundsAllDifferent]).
+ * pass is obtained by negation (see `computeBoundsAllDifferent`).
  */
 private fun raiseMins(lo: IntArray, hi: IntArray, outLo: IntArray): Boolean {
     val n = lo.size

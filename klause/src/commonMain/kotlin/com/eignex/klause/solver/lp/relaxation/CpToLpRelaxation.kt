@@ -382,7 +382,7 @@ internal class CpToLpRelaxation(
         private val colReq = ArrayList<IntArray?>()
         private val colPresentUpper = LongArrayList()
 
-        /** Arc-indicator models recorded by [buildCircuitArcs] for the subtour-elimination separator. */
+        /** Arc-indicator models recorded by `buildCircuitArcs` for the subtour-elimination separator. */
         private val circuitModels = ArrayList<CircuitArcModel>()
 
         /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc.
@@ -411,7 +411,7 @@ internal class CpToLpRelaxation(
         private fun buildCircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = false, sec = true)
 
         /**
-         * Arc-indicator relaxation of one [Subcircuit] over `succ[0..n)`. As [buildCircuitArcs] but the
+         * Arc-indicator relaxation of one [Subcircuit] over `succ[0..n)`. As `buildCircuitArcs` but the
          * self-loop arc `y_ii` (= "node i is excluded") is a candidate, so the degree + channel rows
          * describe the **permutation** polytope (each node has exactly one in- and out-arc, fixed points
          * allowed). **No subtour-elimination model is registered**: the Hamiltonian SEC is *unsound* for

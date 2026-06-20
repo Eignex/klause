@@ -174,7 +174,7 @@ class LocalSearchState(
     var shapingLambda: Double = 0.0
         internal set
 
-    /** Soft cap for [com.eignex.klause.solver.factor.compressViolation]: residuals at or below it
+    /** Soft cap for `compressViolation`: residuals at or below it
      *  keep exact unit resolution, above it a log tail bounds how much one large-magnitude factor
      *  dominates the cost sum. Set by the engine from [LocalSearchParams.violationSoftCap] once per
      *  solve, before the first [recompute]; every graded factor shares this one cap. */

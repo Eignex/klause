@@ -69,7 +69,7 @@ data class LocalSearchParams(
     val initialAssignment: Sample? = null,
     /**
      * Soft cap for the graded violation cost (see
-     * [com.eignex.klause.solver.factor.compressViolation]). Per-factor residuals at or below this
+     * `compressViolation`). Per-factor residuals at or below this
      * contribute their exact magnitude; above it they grow only logarithmically, so a handful of
      * large-magnitude constraints (a wide `int_lin_eq`, a deep cumulative overload) can't dominate
      * the cost sum and starve the many small violations feasibility needs. Lower it toward `0` for
