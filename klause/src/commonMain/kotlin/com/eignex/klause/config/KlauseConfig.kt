@@ -33,6 +33,12 @@ const val DEFAULT_LP_MAX_TABLEAU_CELLS: Long = 1L shl 20
  *  ceiling. A pure cost guard (the bound is sound). */
 const val DEFAULT_LP_CEILING_TABLEAU_CELLS: Long = 1L shl 26
 
+/** Default span threshold (inclusive) below which a non-contiguous int domain is stored as a bitset
+ *  rather than a wide run / survivor rep. 4096 ⇒ ≤ 64 longs (512 bytes), which keeps membership O(1)
+ *  across the moderate-span middle ground; only genuinely wide domains fall through to the wide reps.
+ *  A pure storage/speed tradeoff — the domain semantics are identical either way. */
+const val DEFAULT_BITSET_THRESHOLD: Int = 4096
+
 /**
  * Central, process-wide configuration for klause's core (compiler + frontends).
  *
@@ -94,6 +100,10 @@ data class KlauseConfig(
     /** Ceiling relaxation-size cap (see [DEFAULT_LP_CEILING_TABLEAU_CELLS]): the absolute size past
      *  which LP is declined, and the hull budget for an over-base-cap but in-ceiling model. */
     val lpCeilingTableauCells: Long = DEFAULT_LP_CEILING_TABLEAU_CELLS,
+
+    /** Span threshold (inclusive) below which a non-contiguous int domain is stored as a bitset
+     *  rather than a wide rep (see [DEFAULT_BITSET_THRESHOLD]). A pure storage/speed tradeoff. */
+    val bitsetThreshold: Int = DEFAULT_BITSET_THRESHOLD,
 
     // Presolve: an emphasis level plus one tri-state override knob per pass (`true` forces the pass
     // on, `false` off, `null` defers to the emphasis). Assembled into a [PresolveConfig] via

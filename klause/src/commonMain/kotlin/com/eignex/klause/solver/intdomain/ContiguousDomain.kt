@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.intdomain
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.IntConsumer
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.Bits
@@ -25,7 +26,7 @@ internal class ContiguousDomain(override val min: Int, override val max: Int) : 
 
             else -> {
                 val span = max - min + 1
-                if (span <= IntDomain.BITSET_THRESHOLD) {
+                if (span <= KlauseConfig.current.bitsetThreshold) {
                     val bits = LongArray((span + 63) ushr 6)
                     Bits.fillRange(bits, 0, span)
                     Bits.clear(bits, value - min)

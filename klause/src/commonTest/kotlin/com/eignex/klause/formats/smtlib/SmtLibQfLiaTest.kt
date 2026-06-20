@@ -110,7 +110,11 @@ class SmtLibQfLiaTest {
 
     @Test
     fun `bound inference falls back to the default bound when unprovable`() {
-        val p = SmtLibQfLia.parse("(declare-const x Int) (assert (<= x 4))", intBound = 50).problem
+        val p = SmtLibQfLia.parse(
+            "(declare-const x Int) (assert (<= x 4))",
+            unboundedIntLo = -50,
+            unboundedIntHi = 50,
+        ).problem
         assertEquals(4, p.intDomains[0].max)
         assertEquals(-50, p.intDomains[0].min)
     }
