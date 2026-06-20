@@ -95,10 +95,10 @@ internal object SolveMetric {
         search: KlauseSearch = KlauseSearch(),
         profile: ProfileConfig? = null,
         label: String? = null,
-    ) {
+    ): File? {
         if (profile != null) {
             profileEngine(entries, budget, solverId, search, profile)
-            return
+            return null
         }
         val settings = SolverInvocation.Settings(
             engine = if (solverId == SolverInvocation.KLAUSE) search.engine else null,
@@ -142,6 +142,7 @@ internal object SolveMetric {
             println("$mark [${rec.problem}] $kind = ${display(rec)}")
         }
         println("\n$feasible/${entries.size} feasible, $proved proved  (output/$tag/)")
+        return outDir
     }
 
     /** Filesystem-safe, self-sufficient config identifier: solver + engine + processors + search mode
@@ -164,7 +165,11 @@ internal object SolveMetric {
         append("-t").append(budget.timeoutMillis / 1000).append('s')
         s.lp?.let { append("-lp-").append(it.replace(Regex("[^A-Za-z0-9.+-]"), "")) }
         if (s.params.isNotEmpty()) {
-            append('-').append(s.params.joinToString("_") { it.replace('=', '-') })
+            // Filesystem-safe: '=' → '-', then any other unsafe char (e.g. '/' in an arm label like
+            // `cbls/fixed`) → '_', so a param value never spills into a subdirectory.
+            append(
+                '-',
+            ).append(s.params.joinToString("_") { it.replace('=', '-').replace(Regex("[^A-Za-z0-9._-]"), "_") })
         }
         // Free-form run [label] (e.g. a klause version / fix name) so re-runs of the same config
         // coexist as distinct dirs+cache namespaces instead of overwriting. Filesystem-sanitised.

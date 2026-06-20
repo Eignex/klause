@@ -274,6 +274,26 @@ class CliTest {
     }
 
     @Test
+    fun `ls arm selects exactly one curated arm in isolation`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        // arm= resolves a one-arm pool of exactly that catalog arm (the fair-tester sweep).
+        val dry = captureErr {
+            main(
+                arrayOf("-e", "ls", "--param", "arm=cbls-plateau/ils-basin", "--param", "dry-run=on", fzn.absolutePath),
+            )
+        }
+        assertTrue("ls dry-run: 1 arm(s)" in dry, dry)
+        assertTrue("cbls-plateau/ils-basin" in dry, dry)
+        // It also solves as a single isolated arm.
+        val out = capture { main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath)) }
+        assertTrue("x = " in out, out)
+        assertTrue("----------" in out, out)
+    }
+
+    @Test
     fun `ls numeric knobs no axis consumes are reported as ineffective`() {
         // noise is meaningless on the curated pool (no walksat acceptance) — rejected, not ignored.
         assertEquals(listOf("noise"), ineffectiveNumerics("auto", emptySet(), listOf("noise")))
