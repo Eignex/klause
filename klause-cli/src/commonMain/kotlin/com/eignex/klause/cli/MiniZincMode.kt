@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
@@ -46,10 +47,9 @@ internal object MiniZincMode : CliMode {
         )
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            // Translate env vars / system properties into the central config, install it as the
-            // process-wide ambient config so the compiler picks it up. Unbounded `var int`
-            // resolution: CLI flag → KlauseConfig → built-in default (matches Gecode/Chuffed).
-            val config = installCliConfig()
+            // The ambient config was installed once in `main`. Unbounded `var int` resolution:
+            // CLI flag → KlauseConfig → built-in default (matches Gecode/Chuffed).
+            val config = KlauseConfig.current
             val source = readTextFile(path)
             // Honor `-t` during the construction-time bake (Problem.computeBaked): a wide-domain
             // model can otherwise wedge the bake before any solver/cancellation exists.

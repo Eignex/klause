@@ -103,11 +103,11 @@ internal class FlagSpec(
     val apply: (String?) -> Unit,
 )
 
-/** The engine for a bare invocation (no `-e`, no `-f`): the `KLAUSE_FZN_ENGINE` env var /
- *  `klause.fzn.engine` property when set — so a packaged image (e.g. a MiniZinc-Challenge-compliant
+/** The engine for a bare invocation (no `-e`, no `-f`): the `KLAUSE_ENGINE` env var /
+ *  `klause.engine` property when set — so a packaged image (e.g. a MiniZinc-Challenge-compliant
  *  Docker build) can ship a different default — else [Engine.DEFAULT]. `-e` and `-f` override it. */
-internal fun defaultEngine(): Engine = cliProp("klause.fzn.engine")
-    ?.let { Engine.fromId(it) ?: usageError("unknown KLAUSE_FZN_ENGINE `$it`; expected ${Engine.ids()}") }
+internal fun defaultEngine(): Engine = cliProp(CliKnobs.engine)
+    ?.let { Engine.fromId(it) ?: usageError("unknown KLAUSE_ENGINE `$it`; expected ${Engine.ids()}") }
     ?: Engine.DEFAULT
 
 /** The solver-control flags every mode accepts. Mode-specific flags are appended per mode. */
@@ -181,7 +181,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.ENGINE,
         valueLabel = "name",
         help = "${Engine.ids()}; -f selects cp",
-        // env-aware: KLAUSE_FZN_ENGINE overrides the built-in default, and --help reflects it.
+        // env-aware: KLAUSE_ENGINE overrides the built-in default, and --help reflects it.
         default = defaultEngine().id,
     ) { o.engine = it },
     FlagSpec(

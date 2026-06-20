@@ -74,7 +74,7 @@ Solver-control flags are common to **every** mode:
   run sequentially at `n=1` and as an `n`-worker parallel pool at `n>1`; the naked engines
   (`fixed`/`cp-single`) are single-core. Pool size auto-tunes from `n`, overridable with
   `--param arms=N` (or the `ls=N`/`bt=N` split).
-- `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.fzn.engine` property):
+- `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.engine` property):
   - `fixed` *(default)* — single naked backtrack following the model's `int_search` annotation (FD).
   - `cp` — backtrack-only portfolio (free). `mixed` — bt+ls portfolio. `ls` — local-search portfolio.
   - `cp-single` — single naked free backtrack; the **only** engine that accepts `var-selector`/
@@ -100,6 +100,22 @@ MiniZinc-mode-only flags:
   `solns2out`.
 - `--unbounded-int-lo N` / `--unbounded-int-hi N` — default domain for unbounded `var int`
   declarations.
+
+## Environment knobs
+
+Process-wide defaults a packaged image can ship without touching the command line. Each is read as
+a JVM system property (the dotted name) or an environment variable (the same name uppercased with
+`.` → `_`, e.g. `KLAUSE_FLOAT_BUCKETS`). A command-line flag, where one exists, overrides it. The
+names are derived from a single declaration each (`KlauseConfigSchema` / `CliKnobs`), never spelled
+twice.
+
+- `klause.engine` — default engine for a bare invocation (`-e` overrides).
+- `klause.portfolio.arms` — default portfolio arm-pool size (`--param arms=N` overrides).
+- Core compiler/solver knobs from `KlauseConfigSchema`: `klause.pin.absent.opt.vars`,
+  `klause.unbounded.int.lo` / `.hi`, `klause.float.buckets`, `klause.float.scale`,
+  `klause.lp.max.tableau.cells`, `klause.lp.ceiling.tableau.cells`.
+
+Presolve is *not* an env knob — set it per run with `--presolve`.
 
 ## Dependencies
 

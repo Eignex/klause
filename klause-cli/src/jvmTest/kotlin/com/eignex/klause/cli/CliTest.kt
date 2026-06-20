@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.backtrack.lp.LpConfig
 import com.eignex.klause.solver.backtrack.lp.LpEmphasis
 import com.eignex.klause.solver.backtrack.lp.LpTechnique
@@ -82,17 +83,39 @@ class CliTest {
     }
 
     @Test
-    fun `default engine is mixed and is overridable via the KLAUSE_FZN_ENGINE property`() {
+    fun `default engine is mixed and is overridable via the KLAUSE_ENGINE property`() {
         assertTrue(defaultEngine() == Engine.MIXED, defaultEngine().id)
         // cliProp reads the system property first on the JVM, so it stands in for the env var.
-        System.setProperty("klause.fzn.engine", "fixed")
+        System.setProperty("klause.engine", "fixed")
         try {
             assertTrue(defaultEngine() == Engine.FIXED, defaultEngine().id)
             // The override must surface in --help so a packaged image's default is visible.
             val out = capture { main(arrayOf("--help")) }
             assertTrue("default: fixed" in out, out)
         } finally {
-            System.clearProperty("klause.fzn.engine")
+            System.clearProperty("klause.engine")
+        }
+    }
+
+    @Test
+    fun `core config env overrides install for non-MiniZinc front-ends too`() {
+        // The install happens once in main, before the front-end is picked — so an XCSP3 run picks
+        // up KLAUSE_* overrides just like MiniZinc does (regression: it used to install only on the
+        // MiniZinc load path, leaving XCSP3/SMT-LIB on built-in defaults).
+        val saved = KlauseConfig.current
+        val xml = File.createTempFile("cli", ".xml").apply {
+            writeText(
+                """<instance type="CSP"><variables><var id="a"> 1..3 </var></variables><constraints/></instance>""",
+            )
+            deleteOnExit()
+        }
+        System.setProperty("klause.float.scale", "777")
+        try {
+            capture { main(arrayOf("-t", "5000", xml.absolutePath)) }
+            assertEquals(777L, KlauseConfig.current.floatScale)
+        } finally {
+            System.clearProperty("klause.float.scale")
+            KlauseConfig.current = saved
         }
     }
 
