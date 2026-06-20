@@ -24,11 +24,7 @@ internal class LongHashSet(initialCapacity: Int = 8) {
     private var mask: Int = 0
 
     /** Backing size to allocate on the first [add] — next power of two keeping load ≤ 0.5. */
-    private val initialCap: Int = run {
-        var c = 8
-        while (c < initialCapacity * 2) c *= 2
-        c
-    }
+    private val initialCap: Int = openAddressingCapacity(initialCapacity)
 
     /** Number of members currently in the set. */
     var size: Int = 0
@@ -116,8 +112,7 @@ internal class LongHashSet(initialCapacity: Int = 8) {
             j = (j + 1) and mask
             if (!used[j]) return
             val home = mix(keys[j]) and mask
-            val mustStay = if (i <= j) home > i && home <= j else home > i || home <= j
-            if (mustStay) continue
+            if (mustStayDuringShift(home, i, j)) continue
             keys[i] = keys[j]
             used[i] = true
             i = j
