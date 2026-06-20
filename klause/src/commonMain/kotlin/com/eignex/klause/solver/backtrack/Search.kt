@@ -167,6 +167,11 @@ internal fun BacktrackSolver.driveSearch(
         return@sequence
     }
     val session = PropagationSession(problem)
+    // Builder helpers below capture the mutable search state. They never `yield`
+    // themselves — a `yield` needs the `sequence { }` builder's `SequenceScope`
+    // receiver, which a plain local function does not have — so each exhaustion site
+    // keeps its own `yield(exhausted())` while the [SearchOutcome] construction and the
+    // shared bookkeeping move here.
     // Bridge backtrack-time unassigns to a heuristic that removes assigned vars from its
     // order structure on pick (VSIDS): decode the combined index and re-offer the var.
     // Only wired when the heuristic opts in, so other heuristics pay no per-revert cost.
@@ -182,11 +187,19 @@ internal fun BacktrackSolver.driveSearch(
     // post-seed DFS decisions.
     val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
     val touchedSeedLevels = if (numSeed > 0) HashSet<Int>() else null
+
+    // Union the seed-level decision levels referenced by a conflict into the touched set.
+    fun recordTouchedSeedLevels(levels: IntArray) {
+        if (touchedSeedLevels == null) return
+        for (l in levels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+    }
+
+    // The DFS-walk exhaustion outcome (no root core; only the touched seed levels carry over).
+    fun exhausted(): SearchOutcome.Exhausted =
+        SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels))
     val seedResult = session.seed(params.assumptions)
     if (seedResult is PropagationResult.Unsat) {
-        if (touchedSeedLevels != null) {
-            for (l in seedResult.conflictLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
-        }
+        recordTouchedSeedLevels(seedResult.conflictLevels)
         yield(SearchOutcome.Exhausted(coreOf(seedResult), touchedToArray(touchedSeedLevels)))
         return@sequence
     }
@@ -227,6 +240,14 @@ internal fun BacktrackSolver.driveSearch(
         }
     }
 
+    // Pop every decision frame, reverting the session in lockstep, back to the post-seed root.
+    fun popTrailToRoot(trail: MutableList<TrailNode>) {
+        while (trail.isNotEmpty()) {
+            session.popLast()
+            trail.removeAt(trail.size - 1)
+        }
+    }
+
     val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
     val rng = Random(baseSeed)
     // The effective budget tightens the two limits — whichever is smaller wins. This
@@ -247,6 +268,21 @@ internal fun BacktrackSolver.driveSearch(
         if (n > 1) sink?.observeRelearn()
         n > RELEARN_FALLBACK_THRESHOLD
     }
+
+    // One pin attempt against [session], wiring the budget probe/decrement and the conflict
+    // callbacks. The caller folds `decisionsLeft`'s drop into its per-run decision count.
+    fun runAdvance(node: TrailNode): AdvanceOutcome = advance(
+        node,
+        session,
+        params,
+        pruneIf,
+        { decisionsLeft },
+        { decisionsLeft-- },
+        sink,
+        relearnTripped,
+        onConflictTick,
+        pruneLearned,
+    )
 
     // Outer restart loop. Each iteration is one Luby-bounded DFS run from the root.
     // When `lubyRestartBase` is null the loop runs exactly once with infinite per-run
@@ -334,10 +370,7 @@ internal fun BacktrackSolver.driveSearch(
             // Either way pop back to root and restart.
             if (decisionsThisRun >= perRunBudget || restartRequested) {
                 restartRequested = false
-                while (trail.isNotEmpty()) {
-                    session.popLast()
-                    trail.removeAt(trail.size - 1)
-                }
+                popTrailToRoot(trail)
                 val restartBlock = pendingBlock
                 if (restartBlock != null) {
                     pendingBlock = null
@@ -348,11 +381,7 @@ internal fun BacktrackSolver.driveSearch(
                         val nogood = session.assignmentNogood(restartBlock.bools, restartBlock.ints)
                         val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
                         if (res is PropagationResult.Unsat) {
-                            yield(
-                                SearchOutcome.Exhausted(
-                                    touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                ),
-                            )
+                            yield(exhausted())
                             return@sequence
                         }
                     }
@@ -365,11 +394,7 @@ internal fun BacktrackSolver.driveSearch(
                     for (nogood in drained) {
                         val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
                         if (res is PropagationResult.Unsat) {
-                            yield(
-                                SearchOutcome.Exhausted(
-                                    touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                ),
-                            )
+                            yield(exhausted())
                             return@sequence
                         }
                     }
@@ -380,7 +405,7 @@ internal fun BacktrackSolver.driveSearch(
                 // surfaces on the next fixpoint, not here. No-op when not in a sharing portfolio.
                 params.clauseExchange?.onRestart(session)
                 if (assertObjectiveBoundAtRoot()) {
-                    yield(SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels)))
+                    yield(exhausted())
                     return@sequence
                 }
                 params.variableSelector.onRestart()
@@ -418,18 +443,7 @@ internal fun BacktrackSolver.driveSearch(
                 )
                 val node = makeNode(varRef, phased)
                 val decsBefore = decisionsLeft
-                val out = advance(
-                    node,
-                    session,
-                    params,
-                    pruneIf,
-                    { decisionsLeft },
-                    { decisionsLeft-- },
-                    sink,
-                    relearnTripped,
-                    onConflictTick,
-                    pruneLearned,
-                )
+                val out = runAdvance(node)
                 decisionsThisRun += decsBefore - decisionsLeft
                 when (out) {
                     AdvanceOutcome.Success -> {
@@ -456,9 +470,7 @@ internal fun BacktrackSolver.driveSearch(
                     }
 
                     is AdvanceOutcome.Backjump -> {
-                        if (touchedSeedLevels != null) {
-                            for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
-                        }
+                        recordTouchedSeedLevels(out.learned.decisionLevels)
                         // Feed the learned clause's LBD and the current depth to the
                         // adaptive restart policy (trail size == decision level here; the
                         // failed pin was self-reverted by the session).
@@ -478,11 +490,7 @@ internal fun BacktrackSolver.driveSearch(
                             }
 
                             BackjumpTerm.Exhausted -> {
-                                yield(
-                                    SearchOutcome.Exhausted(
-                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                    ),
-                                )
+                                yield(exhausted())
                                 return@sequence
                             }
 
@@ -500,52 +508,30 @@ internal fun BacktrackSolver.driveSearch(
                     // conflict nor assert mid-trail; a root contradiction proves the
                     // remaining space empty.
                     pendingBlock = null
-                    while (trail.isNotEmpty()) {
-                        session.popLast()
-                        trail.removeAt(trail.size - 1)
-                    }
+                    popTrailToRoot(trail)
                     val nogood = session.assignmentNogood(rootBlock.bools, rootBlock.ints)
                     if (nogood.isNotEmpty()) {
                         val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
                         if (res is PropagationResult.Unsat) {
-                            yield(
-                                SearchOutcome.Exhausted(
-                                    touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                ),
-                            )
+                            yield(exhausted())
                             return@sequence
                         }
                     }
                     if (assertObjectiveBoundAtRoot()) {
-                        yield(SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels)))
+                        yield(exhausted())
                         return@sequence
                     }
                     descend = true
                     continue@inner
                 }
                 if (trail.isEmpty()) {
-                    yield(
-                        SearchOutcome.Exhausted(
-                            touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                        ),
-                    )
+                    yield(exhausted())
                     return@sequence
                 }
                 val top = trail.last()
                 session.popLast()
                 val decsBefore = decisionsLeft
-                val out = advance(
-                    top,
-                    session,
-                    params,
-                    pruneIf,
-                    { decisionsLeft },
-                    { decisionsLeft-- },
-                    sink,
-                    relearnTripped,
-                    onConflictTick,
-                    pruneLearned,
-                )
+                val out = runAdvance(top)
                 decisionsThisRun += decsBefore - decisionsLeft
                 when (out) {
                     AdvanceOutcome.Success -> {
@@ -564,9 +550,7 @@ internal fun BacktrackSolver.driveSearch(
                     }
 
                     is AdvanceOutcome.Backjump -> {
-                        if (touchedSeedLevels != null) {
-                            for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
-                        }
+                        recordTouchedSeedLevels(out.learned.decisionLevels)
                         if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
                             restartRequested = true
                         }
@@ -583,11 +567,7 @@ internal fun BacktrackSolver.driveSearch(
                             }
 
                             BackjumpTerm.Exhausted -> {
-                                yield(
-                                    SearchOutcome.Exhausted(
-                                        touchedAssumptionLevels = touchedToArray(touchedSeedLevels),
-                                    ),
-                                )
+                                yield(exhausted())
                                 return@sequence
                             }
 
