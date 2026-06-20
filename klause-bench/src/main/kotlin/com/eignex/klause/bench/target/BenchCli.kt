@@ -128,8 +128,8 @@ object BenchCli {
     }
 
     /** Read each arm's isolated `solve` output dir back into per-instance [ArmCalibration.Instance]s,
-     *  grouping by problem. Each arm's anytime stream is its `%%%klause-arm:` attribution; an arm that
-     *  found a feasible solution but emitted no stream collapses to a single incumbent at its best. */
+     *  grouping by problem. Time-to-first-feasible is the arm's first attributed improvement (or the
+     *  time-to-best when it emitted no stream). */
     private fun loadCalibration(armDirs: Map<String, File>): List<ArmCalibration.Instance> {
         val byProblem = LinkedHashMap<String, MutableList<Pair<String, SolveRecord>>>()
         for ((arm, dir) in armDirs) {
@@ -141,34 +141,20 @@ object BenchCli {
             }
         }
         return byProblem.map { (problem, runs) ->
-            val sample = runs.first().second
             ArmCalibration.Instance(
                 problem = problem,
-                maximize = sample.maximize,
-                budgetMs = sample.budgetMs,
+                maximize = runs.first().second.maximize,
                 runs = runs.map { (arm, rec) -> toArmRun(arm, rec) },
             )
         }
     }
 
-    private fun toArmRun(arm: String, rec: SolveRecord): ArmCalibration.ArmRun {
-        val incumbents = rec.attribution
-            .mapNotNull { a -> a.objective?.let { ArmCalibration.Incumbent(a.elapsedMs, it) } }
-            .ifEmpty {
-                if (rec.feasible == true && rec.objective != null) {
-                    listOf(ArmCalibration.Incumbent(rec.timeToBestMs ?: 0L, rec.objective))
-                } else {
-                    emptyList()
-                }
-            }
-        return ArmCalibration.ArmRun(
-            arm = arm,
-            feasible = rec.feasible == true,
-            finalObjective = rec.objective,
-            timeToFeasibleMs = incumbents.firstOrNull()?.ms ?: rec.timeToBestMs,
-            incumbents = incumbents,
-        )
-    }
+    private fun toArmRun(arm: String, rec: SolveRecord): ArmCalibration.ArmRun = ArmCalibration.ArmRun(
+        arm = arm,
+        feasible = rec.feasible == true,
+        finalObjective = rec.objective,
+        timeToFeasibleMs = rec.attribution.firstOrNull()?.elapsedMs ?: rec.timeToBestMs,
+    )
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
      *  Returns null when none are set. Defaults: `engine` unset ⇒ no `-e`, so klause follows the cli's

@@ -1,7 +1,6 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.metric.ArmCalibration.ArmRun
-import com.eignex.klause.bench.metric.ArmCalibration.Incumbent
 import com.eignex.klause.bench.metric.ArmCalibration.Instance
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,95 +8,51 @@ import kotlin.test.assertTrue
 
 class ArmCalibrationTest {
 
-    private fun run(arm: String, feasible: Boolean, incs: List<Pair<Long, Double>>): ArmRun {
-        val incumbents = incs.map { Incumbent(it.first, it.second) }
-        return ArmRun(
-            arm = arm,
-            feasible = feasible,
-            finalObjective = incumbents.lastOrNull()?.objective,
-            timeToFeasibleMs = incumbents.firstOrNull()?.ms,
-            incumbents = incumbents,
-        )
+    private fun arm(name: String, objective: Double?, feasibleMs: Long?): ArmRun =
+        ArmRun(name, feasible = objective != null, finalObjective = objective, timeToFeasibleMs = feasibleMs)
+
+    @Test
+    fun `a sole win scores one and a shared win splits`() {
+        // p1: A alone has the best objective. p2: A and B tie for the best objective.
+        val p1 = Instance("p1", maximize = false, runs = listOf(arm("A", 1.0, 100), arm("B", 5.0, 100)))
+        val p2 = Instance("p2", maximize = false, runs = listOf(arm("A", 2.0, 100), arm("B", 2.0, 100)))
+        val report = ArmCalibration.score(listOf(p1, p2))
+        val a = report.scores.first { it.arm == "A" }
+        // A: sole quality win on p1 (1.0) + shared quality win on p2 (0.5); speed ties everywhere (0.5 each).
+        assertEquals(2, a.qualityWins, "A wins quality on p1 and ties on p2")
+        assertTrue(a.winShare > report.scores.first { it.arm == "B" }.winShare, "A's unique win outscores B")
     }
 
     @Test
-    fun `a faster-to-feasible arm at equal objective has the lower primal integral`() {
-        // Both reach objective 10 within a 1000ms budget; fast reaches it at 100ms, slow at 900ms.
-        val inst = Instance(
-            "p",
-            maximize = false,
-            budgetMs = 1000,
-            runs = listOf(
-                run("fast", true, listOf(100L to 10.0)),
-                run("slow", true, listOf(900L to 10.0)),
-            ),
-        )
-        val fast = ArmCalibration.primalIntegral(inst, inst.runs[0])
-        val slow = ArmCalibration.primalIntegral(inst, inst.runs[1])
-        assertTrue(fast < slow, "fast=$fast slow=$slow")
+    fun `an infeasible arm never wins and is redundant`() {
+        val p = Instance("p", maximize = false, runs = listOf(arm("good", 5.0, 100), arm("none", null, null)))
+        val report = ArmCalibration.score(listOf(p))
+        assertEquals(0.0, report.scores.first { it.arm == "none" }.winShare)
+        assertEquals("good", report.diverse.single().arm)
     }
 
     @Test
-    fun `an infeasible arm has the worst primal integral and never wins`() {
-        val inst = Instance(
-            "p",
+    fun `the diverse palette keeps complementary specialists across both lenses`() {
+        // fast: always first-feasible but poor objective. deep: best objective but slow. dud: neither.
+        val p1 = Instance(
+            "p1",
             maximize = false,
-            budgetMs = 1000,
-            runs = listOf(
-                run("good", true, listOf(100L to 5.0)),
-                run("none", false, emptyList()),
-            ),
+            runs = listOf(arm("fast", 9.0, 10), arm("deep", 1.0, 900), arm("dud", 5.0, 500)),
         )
-        assertEquals(1.0, ArmCalibration.primalIntegral(inst, inst.runs[1]))
-        assertTrue(ArmCalibration.primalIntegral(inst, inst.runs[0]) < 1.0)
-        val report = ArmCalibration.score(listOf(inst))
-        assertEquals("good", report.diverse.first().arm)
-        assertTrue(report.diverse.none { it.arm == "none" }, "an infeasible arm is redundant")
+        val p2 = Instance(
+            "p2",
+            maximize = false,
+            runs = listOf(arm("fast", 8.0, 10), arm("deep", 2.0, 900), arm("dud", 5.0, 500)),
+        )
+        val palette = ArmCalibration.score(listOf(p1, p2)).diverse.map { it.arm }
+        assertEquals(setOf("fast", "deep"), palette.toSet(), "fast wins speed, deep wins quality; dud is redundant")
     }
 
     @Test
-    fun `the diverse palette keeps arms that win different instances`() {
-        // Arm A wins instance 1 (fast + good), arm B wins instance 2; a dominated arm C wins neither.
-        val i1 = Instance(
-            "i1",
-            maximize = false,
-            budgetMs = 1000,
-            runs = listOf(
-                run("A", true, listOf(50L to 1.0)),
-                run("B", true, listOf(800L to 5.0)),
-                run("C", true, listOf(900L to 9.0)),
-            ),
-        )
-        val i2 = Instance(
-            "i2",
-            maximize = false,
-            budgetMs = 1000,
-            runs = listOf(
-                run("A", true, listOf(900L to 9.0)),
-                run("B", true, listOf(50L to 1.0)),
-                run("C", true, listOf(800L to 5.0)),
-            ),
-        )
-        val report = ArmCalibration.score(listOf(i1, i2))
-        val palette = report.diverse.map { it.arm }
-        assertEquals(setOf("A", "B"), palette.toSet(), "A and B each win one instance; C is redundant")
-        assertEquals(2, report.diverse.size, "two slots, one per covered instance")
-    }
-
-    @Test
-    fun `maximize direction is honoured`() {
-        // Higher objective is better when maximize; arm hi should beat lo.
-        val inst = Instance(
-            "p",
-            maximize = true,
-            budgetMs = 1000,
-            runs = listOf(
-                run("hi", true, listOf(100L to 100.0)),
-                run("lo", true, listOf(100L to 10.0)),
-            ),
-        )
-        assertTrue(
-            ArmCalibration.primalIntegral(inst, inst.runs[0]) < ArmCalibration.primalIntegral(inst, inst.runs[1]),
-        )
+    fun `maximize direction is honoured for the quality lens`() {
+        val p = Instance("p", maximize = true, runs = listOf(arm("hi", 100.0, 100), arm("lo", 10.0, 100)))
+        val report = ArmCalibration.score(listOf(p))
+        assertEquals(1, report.scores.first { it.arm == "hi" }.qualityWins, "higher objective wins when maximizing")
+        assertEquals(0, report.scores.first { it.arm == "lo" }.qualityWins)
     }
 }
