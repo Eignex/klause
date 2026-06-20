@@ -16,14 +16,9 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.lp.LpConfig
-import com.eignex.klause.solver.localsearch.AspirationCriterion
 import com.eignex.klause.solver.localsearch.CostShaping
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.TabuFilter
-import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
-import com.eignex.klause.solver.localsearch.strategy.Cbls
-import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.result.MinimizeResult
@@ -89,8 +84,8 @@ internal object SolveCore {
                 runBacktrack(solvable, common, output, cancel, deadline, useAnnotation = false, allowSelectors = true)
             }
 
-            // Naked single local search — the only engine that takes the ls strategy --params
-            // (tabu-tenure, pair-swap-budget, lambda, noise, max-flips).
+            // Naked single local search — the only engine that takes the ls strategy --params: a
+            // `strategy=` base recipe plus the four-axis overrides (sources/scoring/acceptance/schedule).
             Engine.LS_SINGLE -> {
                 rejectParallel(engine, cores, alt = Engine.LS)
                 runLocalSearch(solvable, common, output, cancel, deadline)
@@ -170,27 +165,7 @@ internal object SolveCore {
             LocalSearchParams(randomSeed = common.randomSeed),
             EngineParams(common.engineParams),
         )
-        val tabu = TabuFilter(tenure = setup.tabuTenure, aspiration = AspirationCriterion.OrImproving)
-        // Recipe engine when `sources=` is given (A/B-test the four axes as a naked engine, #722);
-        // otherwise the default tuned CBLS — byte-identical to before.
-        val strategy: SourceDrivenStrategy = if (setup.sourcesSpec != null) {
-            val sources = MoveSourceCatalog.parse(setup.sourcesSpec)
-            if (sources.isEmpty()) usageError("ls-single: sources=`${setup.sourcesSpec}` selected no sources")
-            SourceDrivenStrategy(
-                sources,
-                scoring = setup.scoring,
-                acceptance = setup.acceptance,
-                schedule = setup.schedule,
-                tabu = tabu,
-            )
-        } else {
-            Cbls(
-                noiseProbability = setup.noise,
-                smoothProb = setup.smoothProb,
-                smoothFactor = setup.smoothFactor,
-                tabu = tabu,
-            )
-        }
+        val strategy = setup.strategy
         val solver = LocalSearchSolver(
             solvable.problem,
             strategy = strategy,
@@ -208,13 +183,9 @@ internal object SolveCore {
             normalizeWeightsByClass = true,
         )
         cliLogger(common.verbose).v {
-            if (setup.sourcesSpec != null) {
-                "engine ls-single: seed=${cblsParams.randomSeed} recipe sources=${setup.sourcesSpec} " +
-                    "scoring=${setup.scoring} acceptance=${setup.acceptance} tabu=${setup.tabuTenure}"
-            } else {
-                "engine ls-single: seed=${cblsParams.randomSeed} tabu=${setup.tabuTenure} noise=${setup.noise} " +
-                    "smooth=${setup.smoothProb}/${setup.smoothFactor}"
-            }
+            val s = setup.strategy
+            "engine ls-single: seed=${cblsParams.randomSeed} sources=${s.sources.size} scoring=${s.scoring} " +
+                "acceptance=${s.acceptance}"
         }
         runGeneric(solver, cblsParams, solvable, common, output, complete = false, deadline)
     }

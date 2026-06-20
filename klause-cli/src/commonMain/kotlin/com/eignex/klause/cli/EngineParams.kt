@@ -24,12 +24,20 @@ import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.localsearch.AspirationCriterion
 import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.TabuFilter
 import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.solver.localsearch.schedule.Geometric
-import com.eignex.klause.solver.localsearch.schedule.Schedule
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
+import com.eignex.klause.solver.localsearch.strategy.Cbls
+import com.eignex.klause.solver.localsearch.strategy.FeasibilityJump
+import com.eignex.klause.solver.localsearch.strategy.ProbSat
+import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
+import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.solver.localsearch.strategy.WalkSat
 
 /**
  * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
@@ -40,9 +48,11 @@ import com.eignex.klause.solver.localsearch.scoring.MoveScoring
  * Keys per engine:
  *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
  *    `var-selector` (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind])
- *  - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
- *    `smooth-factor`; recipe axes `sources` (e.g. `violated,argmin`), `scoring` (`weighted|raw`),
- *    `acceptance` (`greedy|walksat|probsat|skew|sa`) + `cb`/`skew-alpha`/`cooling-rate`
+ *  - `ls`: `strategy` (base recipe `cbls|feasibilityjump|walksat|probsat|sa|bare`, default `cbls`)
+ *    plus per-axis overrides — `sources` (e.g. `violated,argmin`), `scoring` (`weighted|raw|break`),
+ *    `acceptance` (`greedy|walksat|probsat|skew|sa`) and the axis numerics `noise`/`cb`/`skew-alpha`,
+ *    `initial-temp`/`cooling-rate`/`min-temp`, `smooth-prob`/`smooth-factor`; engine knobs `seed`,
+ *    `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
  *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
  */
 internal class EngineParams(pairs: List<String>) {
@@ -157,77 +167,115 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
     return out
 }
 
-/** Constructor/strategy-level LS knobs for the `ls-single` engine (the rest ride on
- *  [LocalSearchParams]). When [sourcesSpec] is non-null the engine builds a recipe
- *  [SourceDrivenStrategy] over the four axes; otherwise it uses the default [Cbls]. */
-internal class LsSetup(
-    val tabuTenure: Int,
-    val pairSwapBudget: Int,
-    val lambda: Double,
-    val noise: Double,
-    val smoothProb: Double,
-    val smoothFactor: Double,
-    /** `sources=` recipe spec, or null for the default CBLS engine. */
-    val sourcesSpec: String?,
-    /** Scoring axis. */
-    val scoring: MoveScoring,
-    /** Acceptance axis (built from `acceptance=` + its numeric knobs). */
-    val acceptance: AcceptanceRule,
-    /** Schedule axis: the temperature/weights/noise/restart bundle the acceptance/scoring knobs imply. */
-    val schedule: ScheduleBundle = ScheduleBundle(),
-)
+/** Resolved ls-single engine config: the fully-built four-axis [SourceDrivenStrategy] plus the
+ *  solver knobs the strategy itself doesn't own. */
+internal class LsSetup(val pairSwapBudget: Int, val lambda: Double, val strategy: SourceDrivenStrategy)
 
-/** Split `--param` overrides for the naked `ls-single` engine into per-call [LocalSearchParams] and
- *  the constructor/strategy knobs ([LsSetup]). The recipe axes — `sources`, `scoring`, `acceptance`
- *  (+ `cb`/`skew-alpha`) — let each LS axis be A/B-tested as a naked engine (#722); omitting
- *  `sources` keeps the default CBLS path byte-identical. */
+private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
+    "weighted" -> MoveScoring.Weighted
+    "raw" -> MoveScoring.Raw
+    "break" -> MoveScoring.Break
+    else -> usageError("ls-single: scoring expects weighted|raw|break, got `$s`")
+}
+
+private fun parseAcceptance(s: String, noise: Double?, cb: Double, skewAlpha: Double): AcceptanceRule =
+    when (s.lowercase()) {
+        "greedy" -> AcceptanceRule.Greedy
+        "walksat" -> AcceptanceRule.WalkSatNoise(noise ?: 0.5)
+        "probsat" -> AcceptanceRule.ProbSat(cb)
+        "skew" -> AcceptanceRule.Skew(skewAlpha)
+        "sa" -> AcceptanceRule.Metropolis
+        else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew|sa, got `$s`")
+    }
+
+/**
+ * Split `--param` overrides for the `ls-single` engine into per-call [LocalSearchParams] and the
+ * built strategy ([LsSetup]).
+ *
+ * `strategy=` picks a base recipe — `cbls` (default) / `feasibilityjump` / `walksat` / `probsat` /
+ * `sa`, or `bare` for a driver with no preset schedule. Each axis param then *overrides* that base's
+ * corresponding axis: `sources=`, `scoring=`, `acceptance=`, and the numeric knobs the chosen
+ * acceptance reads (`noise`/`cb`/`skew-alpha`) and the temperature schedule (`initial-temp`/
+ * `cooling-rate`/`min-temp`). Unset axes keep the base's. Every combination is valid: each axis has a
+ * conservative default, and a temperature schedule is auto-attached when the acceptance is
+ * simulated annealing but none is otherwise present. Omitting `strategy`/`sources` keeps the default
+ * tuned CBLS engine byte-identical.
+ */
 internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<LocalSearchParams, LsSetup> {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
     p.long("max-flips")?.let { out = out.copy(maxFlips = it) }
-    val noise = p.double("noise") ?: 0.05
+    val noise = p.double("noise")
     val cb = p.double("cb") ?: 2.06
     val skewAlpha = p.double("skew-alpha") ?: 0.0
     val initTemp = p.double("initial-temp") ?: 1.0
     val coolRate = p.double("cooling-rate") ?: 0.999
     val minTemp = p.double("min-temp") ?: 1e-3
-    val acceptanceName = p.string("acceptance")?.lowercase()
-    // The schedule axis: the simulated-annealing acceptance reads its temperature from here.
-    val temperature: Schedule? = if (acceptanceName == "sa") {
-        Geometric(initialTemperature = initTemp, coolingRate = coolRate, minTemperature = minTemp)
-    } else {
-        null
+    val smoothProb = p.double("smooth-prob") ?: 0.4
+    val smoothFactor = p.double("smooth-factor") ?: 0.8
+    val tabu = TabuFilter(tenure = p.int("tabu-tenure") ?: 10, aspiration = AspirationCriterion.OrImproving)
+
+    // Base recipe: a named preset, or a bare driver when only axes are given.
+    val sourcesSpec = p.string("sources")
+    val strategyName = p.string("strategy")?.lowercase() ?: if (sourcesSpec != null) "bare" else "cbls"
+    val baseRecipe: SourceDrivenStrategy? = when (strategyName) {
+        "cbls" -> Cbls(noiseProbability = noise ?: 0.05, smoothProb = smoothProb, smoothFactor = smoothFactor)
+
+        "feasibilityjump", "feasibility-jump", "fjump" -> FeasibilityJump()
+
+        "walksat" -> WalkSat(noise = noise ?: 0.5)
+
+        "probsat" -> ProbSat(cb = cb)
+
+        "sa", "annealing" -> SimulatedAnnealing(initTemp, coolRate, minTemp)
+
+        "bare", "custom" -> null
+
+        else -> usageError(
+            "ls-single: strategy expects cbls|feasibilityjump|walksat|probsat|sa|bare, got `$strategyName`",
+        )
     }
+
+    // Per-axis overrides: each replaces the base's axis; unset axes keep the base's.
+    val sources = sourcesSpec?.let { spec ->
+        MoveSourceCatalog.parse(
+            spec,
+        ).also { if (it.isEmpty()) usageError("ls-single: sources=`$spec` selected no sources") }
+    } ?: baseRecipe?.sources ?: usageError("ls-single: strategy=bare needs a sources= spec")
+    val scoring = p.string("scoring")?.let { parseScoring(it) } ?: baseRecipe?.scoring ?: MoveScoring.Weighted
+    val acceptance = p.string("acceptance")?.let { parseAcceptance(it, noise, cb, skewAlpha) }
+        ?: baseRecipe?.acceptance ?: AcceptanceRule.Greedy
+
+    // Schedule axis: keep the base's members; auto-attach a temperature when the acceptance is
+    // simulated annealing and none is present, so any acceptance override stays runnable.
+    val baseSchedule = baseRecipe?.schedule ?: ScheduleBundle()
+    val temperature = baseSchedule.temperature
+        ?: if (acceptance is AcceptanceRule.Metropolis) Geometric(initTemp, coolRate, minTemp) else null
+    val schedule = ScheduleBundle(
+        temperature = temperature,
+        weights = baseSchedule.weights,
+        noise = baseSchedule.noise,
+        restart = baseSchedule.restart,
+    )
+
     val setup = LsSetup(
-        tabuTenure = p.int("tabu-tenure") ?: 10,
         pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
         lambda = p.double("lambda") ?: 1.0,
-        noise = noise,
-        // Smoothing on by default: the proactive landscape (per-class / implied seeding) only holds
-        // if the reactive bumping decays back toward it. Mirrors the portfolio's smoothing arms.
-        smoothProb = p.double("smooth-prob") ?: 0.4,
-        smoothFactor = p.double("smooth-factor") ?: 0.8,
-        sourcesSpec = p.string("sources"),
-        scoring = when (val s = p.string("scoring")?.lowercase()) {
-            null, "weighted" -> MoveScoring.Weighted
-            "raw" -> MoveScoring.Raw
-            "break" -> MoveScoring.Break
-            else -> usageError("ls-single: scoring expects weighted|raw|break, got `$s`")
-        },
-        acceptance = when (acceptanceName) {
-            null, "greedy" -> AcceptanceRule.Greedy
-            "walksat" -> AcceptanceRule.WalkSatNoise(noise)
-            "probsat" -> AcceptanceRule.ProbSat(cb)
-            "skew" -> AcceptanceRule.Skew(skewAlpha)
-            "sa" -> AcceptanceRule.Metropolis
-            else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew|sa, got `$acceptanceName`")
-        },
-        schedule = ScheduleBundle(temperature = temperature),
+        strategy = SourceDrivenStrategy(
+            sources = sources,
+            scoring = scoring,
+            acceptance = acceptance,
+            schedule = schedule,
+            tabu = tabu,
+            configurationChecking = baseRecipe?.configurationChecking ?: false,
+            perturbation = baseRecipe?.perturbation,
+            drivesObjectiveDescent = baseRecipe?.drivesObjectiveDescent ?: false,
+        ),
     )
     p.finish(
         "ls",
-        "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, noise, smooth-prob, smooth-factor, " +
-            "sources, scoring, acceptance, cb, skew-alpha, initial-temp, cooling-rate, min-temp",
+        "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, strategy, sources, scoring, acceptance, " +
+            "noise, cb, skew-alpha, smooth-prob, smooth-factor, initial-temp, cooling-rate, min-temp",
     )
     return out to setup
 }
