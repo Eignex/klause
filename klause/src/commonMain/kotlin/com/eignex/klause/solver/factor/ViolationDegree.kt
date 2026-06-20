@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.factor
 
-/** Default soft cap for [compressViolation] — the value
+/** Default soft cap for `compressViolation` — the value
  *  [com.eignex.klause.solver.localsearch.LocalSearchParams.violationSoftCap] defaults to. Residuals
  *  at or below it keep exact unit resolution; above, a log tail bounds domination. 16 is a balanced
  *  middle (raw ≈ ∞, pure-log ≈ 0). */

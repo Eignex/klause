@@ -16,7 +16,7 @@ import com.eignex.klause.solver.propagation.IntEvent
  * of [arr] is selected by `idx = 1`.
  *
  * Stateless (no payload): every query reads the live assignment, O(1) for the selected
- * element. Graded violation `|result − arr(idx)|` (run through [compressViolation]) gives a
+ * element. Graded violation `|result − arr(idx)|` (run through `compressViolation`) gives a
  * descent gradient that pushes `result` toward the selected element (or the element toward
  * `result`); an out-of-range `idx` is graded by its distance back into range. Repair moves
  * snap `result` to the selected element, snap the selected element to `result`, or re-point

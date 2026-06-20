@@ -27,7 +27,7 @@ import com.eignex.klause.solver.propagation.IntEvent
  *     `i` and `start_i.min ≥ est_j + dur_j`. Catches the "two tasks both want to run on
  *     the resource and one is provably first" pattern that drives most JSP / SMT
  *     scheduling decompositions.
- *  3. **Edge-finding (Vilím Θ-tree, O(n² log n))**. Routed through [CumulativeThetaTree] at
+ *  3. **Edge-finding (Vilím Θ-tree, O(n² log n))**. Routed through `CumulativeThetaTree` at
  *     capacity 1 — the unary special case. For each LCT threshold τ the envelope
  *     `Env(Θ_τ) = max_{Ω⊆Θ_τ} (est(Ω) + e(Ω)) = ect(Θ_τ)`; a task `i ∉ Θ_τ` whose insertion
  *     pushes `Env(Θ_τ ∪ {i}) > τ` must end after all of Θ_τ, giving `start_i.min ≥ Env(Θ_τ)`.
