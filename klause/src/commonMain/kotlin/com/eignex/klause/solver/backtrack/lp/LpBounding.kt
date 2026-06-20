@@ -13,6 +13,7 @@ import com.eignex.klause.solver.lp.VarStatus
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.cut.Cut
 import com.eignex.klause.solver.lp.cut.CutContext
+import com.eignex.klause.solver.lp.cut.CutPool
 import com.eignex.klause.solver.lp.cut.CutSeparator
 import com.eignex.klause.solver.lp.mulExact
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
@@ -446,8 +447,7 @@ internal fun LpEngine.harvestRootCuts(
 ): List<Cut> {
     if (session.isUnsatAtRoot) return emptyList()
     if (separators.isEmpty() && !gomory && !mir) return emptyList()
-    val pool = HashSet<String>()
-    val cuts = ArrayList<Cut>()
+    val pool = CutPool()
     try {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return emptyList()
@@ -464,18 +464,19 @@ internal fun LpEngine.harvestRootCuts(
             // non-global (big-M) row. Only the genuinely-global ones may join the tree-wide pool.
             val gomoryCuts = if (gomory) simplex.gomoryCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
             val mirCuts = if (mir) simplex.mirCuts(GOMORY_CUTS_PER_ROUND) else emptyList()
-            val fresh = (structural + (gomoryCuts + mirCuts).filter { it.global })
-                .filter { pool.add(it.key()) }
-            if (fresh.isEmpty()) break
-            cuts.addAll(fresh)
-            relaxation = relaxer.build(session, cuts)
+            val added = pool.addAll(structural + (gomoryCuts + mirCuts).filter { it.global })
+            if (added == 0) break
+            relaxation = relaxer.build(session, pool.cuts())
             simplex = RevisedSimplex(relaxation.model, cancellation)
             result = simplex.solve() ?: break
         }
+        // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
+        // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
+        pool.retainMostActive(result.primal)
     } catch (_: LpOverflowException) {
-        return cuts // keep whatever stayed within 64-bit determinants — still globally valid
+        return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
     }
-    return cuts
+    return pool.cuts()
 }
 
 /**
