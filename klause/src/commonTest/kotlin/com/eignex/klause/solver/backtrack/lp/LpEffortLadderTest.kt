@@ -142,13 +142,44 @@ class LpEffortLadderTest {
     }
 
     @Test
-    fun `a cut ladder starting at CUTS runs cuts while pruning`() {
-        val c = LpEffortLadder(top = LpEffort.CUTS, warmup = 4, window = 4)
+    fun `a cut ladder holds when its prunes clear the cost-weighted floor`() {
+        // cutCostWeight = 3 ⇒ the cut rung must prune ≥ 3 per window of 4 to justify its re-solves.
+        val c = LpEffortLadder(top = LpEffort.CUTS, warmup = 4, window = 4, cutCostWeight = 3)
         repeat(12) {
             assertTrue(c.shouldRun())
-            c.record(it % 4 == 0) // one prune per window keeps the top rung
+            c.record(it % 4 != 0) // three prunes per window of four clears 1 × 3
         }
-        assertEquals(LpEffort.CUTS, c.rung, "a pruning ladder holds the cut rung")
+        assertEquals(LpEffort.CUTS, c.rung, "a cut rung clearing its cost-weighted floor holds")
         assertTrue(c.cutsEnabled)
+    }
+
+    @Test
+    fun `the cut rung is demoted when its prunes do not justify its cost`() {
+        // Reward-driven (#33): one prune per window keeps the bare BOUND rung (cost 1) but not the cut
+        // rung (cost 3) — the cuts prune, yet not enough to earn their extra re-solves.
+        val cuts = LpEffortLadder(top = LpEffort.CUTS, warmup = 4, window = 4, cutCostWeight = 3)
+        repeat(4) {
+            cuts.shouldRun()
+            cuts.record(it == 0) // exactly one prune in the window
+        }
+        assertEquals(LpEffort.BOUND, cuts.rung, "one prune does not clear the cut rung's 1 × 3 floor")
+
+        val bound = LpEffortLadder(top = LpEffort.BOUND, warmup = 4, window = 4, cutCostWeight = 3)
+        repeat(4) {
+            bound.shouldRun()
+            bound.record(it == 0) // the same single prune
+        }
+        assertEquals(LpEffort.BOUND, bound.rung, "the cheaper bound holds on one prune")
+    }
+
+    @Test
+    fun `cutCostWeight of one reverts to the cost-blind rule`() {
+        // weight 1 ⇒ the cut rung holds on a single prune, exactly like #32.
+        val c = LpEffortLadder(top = LpEffort.CUTS, warmup = 4, window = 4, cutCostWeight = 1)
+        repeat(12) {
+            assertTrue(c.shouldRun())
+            c.record(it % 4 == 0) // one prune per window
+        }
+        assertEquals(LpEffort.CUTS, c.rung, "with weight 1 the cut rung holds on one prune per window")
     }
 }
