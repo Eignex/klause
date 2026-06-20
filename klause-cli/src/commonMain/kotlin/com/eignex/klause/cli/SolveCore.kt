@@ -155,9 +155,10 @@ internal object SolveCore {
         for (r in recipes) {
             val sources = r.strategy.sources.joinToString(",") { it.source.id.label }
             val restart = r.strategy.schedule.restart?.let { it::class.simpleName } ?: "default"
+            val temperature = r.strategy.schedule.temperature?.let { it::class.simpleName } ?: "none"
             errPrintln(
                 "  ${r.label}: sources=[$sources] scoring=${r.strategy.scoring} " +
-                    "acceptance=${r.strategy.acceptance} restart=$restart",
+                    "acceptance=${r.strategy.acceptance} restart=$restart temperature=$temperature",
             )
         }
     }

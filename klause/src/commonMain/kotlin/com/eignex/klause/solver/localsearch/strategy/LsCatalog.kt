@@ -14,6 +14,7 @@ import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.LoopSchedule
 import com.eignex.klause.solver.localsearch.schedule.Reheating
+import com.eignex.klause.solver.localsearch.schedule.Schedule
 import com.eignex.klause.solver.localsearch.schedule.Segment
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
@@ -57,6 +58,11 @@ class LsRecipe(
     /** A copy whose restart cadence (the schedule axis's restart member) is replaced. */
     fun withRestart(restart: RestartPolicy): LsRecipe =
         mapStrategies { it.copy(schedule = it.schedule.copy(restart = restart)) }
+
+    /** A copy whose schedule-axis temperature is replaced — used to attach a cooling schedule when an
+     *  acceptance edit turns a recipe into simulated annealing but it carried no temperature. */
+    fun withTemperature(temperature: Schedule): LsRecipe =
+        mapStrategies { it.copy(schedule = it.schedule.copy(temperature = temperature)) }
 }
 
 /**

@@ -31,6 +31,7 @@ import com.eignex.klause.solver.localsearch.LubyRestart
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.TabuFilter
 import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 import com.eignex.klause.solver.localsearch.strategy.AxisEdits
 import com.eignex.klause.solver.localsearch.strategy.AxisToken
@@ -273,16 +274,22 @@ private fun applyEdits(
     noise: Double?,
     cb: Double,
     skewAlpha: Double,
+    saTemperature: () -> Geometric,
 ): LsRecipe {
     var r = recipe
     val src = sources.filter { it.appliesTo(r.label) }
     if (src.isNotEmpty()) r = r.withSources { AxisEdits.applySources(it, src) }
     scoring.filter { it.appliesTo(r.label) }.forEach { r = r.withScoring(parseScoring(it.value)) }
-    acceptance.filter {
-        it.appliesTo(
-            r.label,
-        )
-    }.forEach { r = r.withAcceptance(parseAcceptance(it.value, noise, cb, skewAlpha)) }
+    val acceptEdits = acceptance.filter { it.appliesTo(r.label) }
+    acceptEdits.forEach { r = r.withAcceptance(parseAcceptance(it.value, noise, cb, skewAlpha)) }
+    // An acceptance edit to simulated annealing needs a cooling schedule; attach one (a fresh
+    // stateful instance) when the recipe carried none — a named `strategy=sa` already has one.
+    if (acceptEdits.isNotEmpty() &&
+        r.strategy.acceptance is AcceptanceRule.Metropolis &&
+        r.strategy.schedule.temperature == null
+    ) {
+        r = r.withTemperature(saTemperature())
+    }
     restart.filter { it.appliesTo(r.label) }.forEach { r = r.withRestart(parseRestart(it.value)) }
     return r
 }
@@ -299,15 +306,23 @@ private fun applyEdits(
  */
 internal fun resolveLsRecipes(p: EngineParams): LsResolution {
     val dryRun = p.bool("dry-run") ?: false
-    val noise = p.double("noise")
-    val cb = p.double("cb") ?: 2.06
-    val skewAlpha = p.double("skew-alpha") ?: 0.0
-    val initTemp = p.double("initial-temp") ?: 1.0
-    val coolRate = p.double("cooling-rate") ?: 0.999
-    val minTemp = p.double("min-temp") ?: 1e-3
-    val smoothProb = p.double("smooth-prob") ?: 0.4
-    val smoothFactor = p.double("smooth-factor") ?: 0.8
-    val tabu = TabuFilter(tenure = p.int("tabu-tenure") ?: 10, aspiration = AspirationCriterion.OrImproving)
+    val noiseRaw = p.double("noise")
+    val cbRaw = p.double("cb")
+    val skewRaw = p.double("skew-alpha")
+    val initTempRaw = p.double("initial-temp")
+    val coolRateRaw = p.double("cooling-rate")
+    val minTempRaw = p.double("min-temp")
+    val smoothProbRaw = p.double("smooth-prob")
+    val smoothFactorRaw = p.double("smooth-factor")
+    val tabuRaw = p.int("tabu-tenure")
+    val cb = cbRaw ?: 2.06
+    val skewAlpha = skewRaw ?: 0.0
+    val initTemp = initTempRaw ?: 1.0
+    val coolRate = coolRateRaw ?: 0.999
+    val minTemp = minTempRaw ?: 1e-3
+    val smoothProb = smoothProbRaw ?: 0.4
+    val smoothFactor = smoothFactorRaw ?: 0.8
+    val tabu = TabuFilter(tenure = tabuRaw ?: 10, aspiration = AspirationCriterion.OrImproving)
 
     val sourcesSpec = p.string("sources")
     val sources = sourcesSpec?.let { AxisEdits.tokens(it) }.orEmpty()
@@ -317,7 +332,32 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
     val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
     val strategyName = p.string("strategy")?.lowercase() ?: if (sourcesSpec != null) "bare" else "auto"
 
-    fun edit(recipe: LsRecipe) = applyEdits(recipe, sources, scoring, acceptance, restart, noise, cb, skewAlpha)
+    rejectIneffectiveNumerics(
+        canonicalBase(strategyName),
+        acceptance.map { it.value.lowercase() }.toSet(),
+        provided = listOfNotNull(
+            noiseRaw?.let { "noise" },
+            cbRaw?.let { "cb" },
+            skewRaw?.let { "skew-alpha" },
+            initTempRaw?.let { "initial-temp" },
+            coolRateRaw?.let { "cooling-rate" },
+            minTempRaw?.let { "min-temp" },
+            smoothProbRaw?.let { "smooth-prob" },
+            smoothFactorRaw?.let { "smooth-factor" },
+            tabuRaw?.let { "tabu-tenure" },
+        ),
+    )
+
+    fun edit(recipe: LsRecipe) = applyEdits(
+        recipe,
+        sources,
+        scoring,
+        acceptance,
+        restart,
+        noiseRaw,
+        cb,
+        skewAlpha,
+    ) { Geometric(initTemp, coolRate, minTemp) }
 
     val pool: List<() -> LsRecipe>? = when {
         strategyName == "auto" && !hasEdits -> null
@@ -331,11 +371,60 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
 
         else -> {
             val base =
-                namedFactory(strategyName, noise, cb, initTemp, coolRate, minTemp, smoothProb, smoothFactor, tabu)
+                namedFactory(strategyName, noiseRaw, cb, initTemp, coolRate, minTemp, smoothProb, smoothFactor, tabu)
             listOf({ edit(base()) })
         }
     }
     return LsResolution(pool, dryRun)
+}
+
+/** Canonical base name for consumption checks — collapses the `strategy=` aliases. */
+private fun canonicalBase(strategyName: String): String = when (strategyName) {
+    "annealing" -> "sa"
+    "feasibility-jump", "feasibilityjump" -> "fjump"
+    else -> strategyName
+}
+
+private val LS_KNOWN_BASES = setOf("auto", "cbls", "walksat", "probsat", "sa", "fjump", "bare")
+private val LS_TABU_BASES = setOf("cbls", "walksat", "probsat", "sa", "bare")
+
+/** The [provided] numeric knobs that the resolved [canonical] base + [acceptanceValues] edits can't
+ *  consume (e.g. `noise` on the curated pool with no walksat acceptance). An unknown base consumes
+ *  nothing here — its own factory reports the bad name. */
+internal fun ineffectiveNumerics(
+    canonical: String,
+    acceptanceValues: Set<String>,
+    provided: List<String>,
+): List<String> {
+    if (canonical !in LS_KNOWN_BASES) return emptyList()
+    val consumed = buildSet {
+        if (canonical == "cbls" || canonical == "walksat" || "walksat" in acceptanceValues) add("noise")
+        if (canonical == "cbls") {
+            add("smooth-prob")
+            add("smooth-factor")
+        }
+        if (canonical == "probsat" || "probsat" in acceptanceValues) add("cb")
+        if ("skew" in acceptanceValues) add("skew-alpha")
+        if (canonical == "sa" || "sa" in acceptanceValues) {
+            add("initial-temp")
+            add("cooling-rate")
+            add("min-temp")
+        }
+        if (canonical in LS_TABU_BASES) add("tabu-tenure")
+    }
+    return provided.filterNot { it in consumed }
+}
+
+/** Reject numeric knobs the resolved base + acceptance edits can't consume, rather than silently
+ *  ignoring them. */
+private fun rejectIneffectiveNumerics(canonical: String, acceptanceValues: Set<String>, provided: List<String>) {
+    val unconsumed = ineffectiveNumerics(canonical, acceptanceValues, provided)
+    if (unconsumed.isNotEmpty()) {
+        usageError(
+            "ls: ${unconsumed.joinToString()} set but no axis consumes ${if (unconsumed.size == 1) "it" else "them"} " +
+                "(strategy=$canonical); set the matching strategy or acceptance",
+        )
+    }
 }
 
 /**
