@@ -951,7 +951,14 @@ internal class CpToLpRelaxation(
                     if (v !in live[col]) liveFeasible = false
                 }
                 if (!declaredFeasible) continue
-                selCols.add(auxColumn(0L, if (liveFeasible) 1L else 0L))
+                // The tuple's selector is present while every entry stays in its column's live domain —
+                // the membership conjunction that lets the persistent relaxation re-bind this column.
+                val presence = IntArray(arity * 2)
+                for (col in 0 until arity) {
+                    presence[col * 2] = factor.xs[col]
+                    presence[col * 2 + 1] = factor.tuples[t * arity + col]
+                }
+                selCols.add(auxColumn(0L, if (liveFeasible) 1L else 0L, presence = presence))
                 rows.add(t)
             }
             val k = selCols.size
