@@ -15,21 +15,6 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-/** Relational operator for a [Linear] constraint. */
-enum class LinearOp {
-    /** `≤`. */
-    LE,
-
-    /** `=`. */
-    EQ,
-
-    /** `≥`. */
-    GE,
-
-    /** `≠`. */
-    NE,
-}
-
 /**
  * `Σ coeffs(i) * intVars(i) ⟨op⟩ bound`. Payload at `intPayload(factorId)` is the current
  * weighted sum, kept in sync incrementally by [applyIntSet]. Repair moves propose, for each
