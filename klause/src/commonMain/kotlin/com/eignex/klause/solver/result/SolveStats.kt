@@ -115,47 +115,35 @@ data class SolveStats(
     fun mergedWith(other: SolveStats): SolveStats {
         if (this == EMPTY) return other
         if (other == EMPTY) return this
-        val weights = depthMean.totalWeights + other.depthMean.totalWeights
-        val mean = when {
-            depthMean.totalWeights == 0.0 -> other.depthMean.mean
-
-            other.depthMean.totalWeights == 0.0 -> depthMean.mean
-
-            else ->
-                (depthMean.mean * depthMean.totalWeights + other.depthMean.mean * other.depthMean.totalWeights) /
-                    weights
-        }
+        fun sum(field: SolveStats.() -> SumResult) = SumResult(field().sum + other.field().sum)
+        fun max(field: SolveStats.() -> MaxResult) = MaxResult(maxOf(field().max, other.field().max))
         return SolveStats(
             backend = if (backend == other.backend) backend else "mixed",
-            nodes = SumResult(nodes.sum + other.nodes.sum),
-            fails = SumResult(fails.sum + other.fails.sum),
-            restarts = SumResult(restarts.sum + other.restarts.sum),
-            propagations = SumResult(propagations.sum + other.propagations.sum),
-            learnedClauses = SumResult(learnedClauses.sum + other.learnedClauses.sum),
-            caNotApplicable = SumResult(caNotApplicable.sum + other.caNotApplicable.sum),
-            caNonAsserting = SumResult(caNonAsserting.sum + other.caNonAsserting.sum),
-            caRejectedTrueLit = SumResult(caRejectedTrueLit.sum + other.caRejectedTrueLit.sum),
-            lpSolves = SumResult(lpSolves.sum + other.lpSolves.sum),
-            lpPruned = SumResult(lpPruned.sum + other.lpPruned.sum),
-            lpInfeasible = SumResult(lpInfeasible.sum + other.lpInfeasible.sum),
+            nodes = sum { nodes },
+            fails = sum { fails },
+            restarts = sum { restarts },
+            propagations = sum { propagations },
+            learnedClauses = sum { learnedClauses },
+            caNotApplicable = sum { caNotApplicable },
+            caNonAsserting = sum { caNonAsserting },
+            caRejectedTrueLit = sum { caRejectedTrueLit },
+            lpSolves = sum { lpSolves },
+            lpPruned = sum { lpPruned },
+            lpInfeasible = sum { lpInfeasible },
             // Same root across workers, so the tightest finite bound represents it; NaN defers.
-            rootLpBound = when {
-                rootLpBound.isNaN() -> other.rootLpBound
-                other.rootLpBound.isNaN() -> rootLpBound
-                else -> maxOf(rootLpBound, other.rootLpBound)
-            },
+            rootLpBound = naNDeferring(rootLpBound, other.rootLpBound, ::maxOf),
             lpMs = lpMs + other.lpMs,
-            lpFixed = SumResult(lpFixed.sum + other.lpFixed.sum),
-            lpPivots = SumResult(lpPivots.sum + other.lpPivots.sum),
-            lpLuMaxFill = MaxResult(maxOf(lpLuMaxFill.max, other.lpLuMaxFill.max)),
-            lpLuMaxDensity = MaxResult(maxOf(lpLuMaxDensity.max, other.lpLuMaxDensity.max)),
-            lpCuts = SumResult(lpCuts.sum + other.lpCuts.sum),
-            lpBackjumps = SumResult(lpBackjumps.sum + other.lpBackjumps.sum),
-            lpSeeded = SumResult(lpSeeded.sum + other.lpSeeded.sum),
-            lagrangianPruned = SumResult(lagrangianPruned.sum + other.lagrangianPruned.sum),
-            energeticPruned = SumResult(energeticPruned.sum + other.energeticPruned.sum),
-            moves = SumResult(moves.sum + other.moves.sum),
-            stalls = SumResult(stalls.sum + other.stalls.sum),
+            lpFixed = sum { lpFixed },
+            lpPivots = sum { lpPivots },
+            lpLuMaxFill = max { lpLuMaxFill },
+            lpLuMaxDensity = max { lpLuMaxDensity },
+            lpCuts = sum { lpCuts },
+            lpBackjumps = sum { lpBackjumps },
+            lpSeeded = sum { lpSeeded },
+            lagrangianPruned = sum { lagrangianPruned },
+            energeticPruned = sum { energeticPruned },
+            moves = sum { moves },
+            stalls = sum { stalls },
             // Earliest time-to-best across workers (the portfolio reports the first to reach its best);
             // -1 sentinels defer to any real reading.
             timeToBestMs = when {
@@ -171,13 +159,9 @@ data class SolveStats(
                 other.incumbentViolation,
                 other.incumbentObjective,
             ),
-            incumbentViolation = when {
-                incumbentViolation.isNaN() -> other.incumbentViolation
-                other.incumbentViolation.isNaN() -> incumbentViolation
-                else -> minOf(incumbentViolation, other.incumbentViolation)
-            },
-            peakDepth = MaxResult(maxOf(peakDepth.max, other.peakDepth.max)),
-            depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
+            incumbentViolation = naNDeferring(incumbentViolation, other.incumbentViolation, ::minOf),
+            peakDepth = max { peakDepth },
+            depthMean = mergeDepthMean(depthMean, other.depthMean),
             wallMs = maxOf(wallMs, other.wallMs),
             timedOut = timedOut || other.timedOut,
         )
@@ -195,6 +179,24 @@ data class SolveStats(
             violB.isNaN() -> objA
             violB < violA -> objB
             else -> objA
+        }
+
+        /** Combine two readings under [reduce], treating NaN as "unpopulated" so it defers to a real value. */
+        private inline fun naNDeferring(a: Double, b: Double, reduce: (Double, Double) -> Double): Double = when {
+            a.isNaN() -> b
+            b.isNaN() -> a
+            else -> reduce(a, b)
+        }
+
+        /** Weight-combine two depth means; an empty side (zero weight) defers to the other. */
+        private fun mergeDepthMean(a: WeightedMeanResult, b: WeightedMeanResult): WeightedMeanResult {
+            val weights = a.totalWeights + b.totalWeights
+            val mean = when {
+                a.totalWeights == 0.0 -> b.mean
+                b.totalWeights == 0.0 -> a.mean
+                else -> (a.mean * a.totalWeights + b.mean * b.totalWeights) / weights
+            }
+            return WeightedMeanResult(totalWeights = weights, mean = mean)
         }
 
         /** Empty stats — the default for backends that don't populate. */
