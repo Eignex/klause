@@ -67,7 +67,7 @@ class Element(
      * it subscribes to *every* kind on every variable and consumes the dirty-variable delta (#624)
      * to scope its unchanged-domains gate to the variables that actually changed, instead of the
      * O(`intVars.size`) ref-scan on every (often redundant fixpoint) re-fire. The **constant-array**
-     * path keeps occurrence wakeup and its own reversible `domRef` fast path in [ElementConstState]
+     * path keeps occurrence wakeup and its own reversible `domRef` fast path in `ElementConstState`
      * (two variables — `idx`/`result` — so a delta would buy nothing). Subscriptions cover all kinds
      * because the var array's consistency is hole-aware membership, not just bounds.
      */

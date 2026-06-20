@@ -79,7 +79,7 @@ class Regular(
 
     /** Advisor subscription (#623): GAC over interior domains, so subscribe to every kind on every
      *  (distinct) sequence variable and consume the dirty-variable delta (#624) — the incremental
-     *  propagator ([RegularIncrementalState]) recomputes only the layers a changed position reaches. */
+     *  propagator (`RegularIncrementalState`) recomputes only the layers a changed position reaches. */
     override val initialIntEventWatches: IntArray = run {
         val distinct = seq.toHashSet()
         val out = IntArray(distinct.size * IntEvent.COUNT)
@@ -96,7 +96,7 @@ class Regular(
     override val consumesIntEventDelta: Boolean = true
 
     /*
-     * Pesant's layered-DAG GAC, now reversible and delta-driven (see [RegularIncrementalState]):
+     * Pesant's layered-DAG GAC, now reversible and delta-driven (see `RegularIncrementalState`):
      * per layer a state-bitset records forward-reachability from q0 and backward-co-reachability to
      * an accepting state, both on the engine undo trail. A symbol `s ∈ dom(seq[i])` survives iff some
      * forward-reachable state at `i` transitions on it to a co-reachable state at `i+1`; the conflict

@@ -92,7 +92,7 @@ class Mdd(
     /** Advisor subscription (#623): the layered reachability sweep reads each sequence variable's
      *  bounds (`sym in min..max`), not interior holes, so it wakes on bound moves only — interior
      *  [IntEvent.VALUE_REMOVED] carves cannot change the reachability bitsets. Consumes the dirty-
-     *  variable delta (#624); the incremental propagator ([MddIncrementalState]) recomputes only the
+     *  variable delta (#624); the incremental propagator (`MddIncrementalState`) recomputes only the
      *  layers a changed position reaches. */
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
