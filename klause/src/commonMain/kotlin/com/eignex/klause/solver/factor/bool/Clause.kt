@@ -52,7 +52,7 @@ class Clause(override val literals: IntArray) :
      *  is satisfied by any single true literal, so if the partner watch is true the engine
      *  can skip waking this clause when the watched literal goes false. A unit clause has no
      *  partner, so no blockers. Kept in sync as watches drift via the `blocker` argument to
-     *  [PropagationState.moveBoolWatcher]. */
+     *  `moveBoolWatcher`. */
     override val initialBoolWatcherBlockers: IntArray? =
         if (literals.size == 1) null else intArrayOf(literals[1], literals[0])
 

@@ -25,7 +25,7 @@ import com.eignex.klause.util.IntIntMap
  *   `cost = Σ_t max(0, usage(t) − capacity)`
  * — broken assignments rank by total energy overflow rather than by a flat boolean,
  * giving the search a real gradient toward the cumulative bound. This energy overage is
- * the factor's [violationDegree] (run through [compressViolation] so a deeply-overloaded
+ * the factor's [violationDegree] (run through `compressViolation` so a deeply-overloaded
  * profile can't dominate the global cost); [deltaIfIntSet] / [applyIntSet] and the
  * bool-flip paths return its compressed delta. The raw overage is also mirrored to
  * `state.intPayload(factorId)` for strategies that read it directly (as ALNS does).
@@ -40,7 +40,7 @@ import com.eignex.klause.util.IntIntMap
  * mirroring the rest of the factor catalog's bounds-consistency style.
  *
  * Time-tabling is the baseline, paired here with an O(n²) Vilím Θ-tree edge-finder
- * (Vilím 2009 / Schutt-Feydy-Stuckey 2009) running off [CumulativeThetaTree]. The
+ * (Vilím 2009 / Schutt-Feydy-Stuckey 2009) running off `CumulativeThetaTree`. The
  * edge-finder catches energy-overflow deductions on subsets that have no compulsory
  * profile, which time-tabling cannot see.
  *

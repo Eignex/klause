@@ -36,7 +36,7 @@ class AllDifferent(
     /** Values exempt from the distinctness requirement: any number of variables may share a
      *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family, #433).
      *  Empty for plain all-different — then this factor behaves exactly as before. Excepted
-     *  values are modelled inside [reginFilter] as capacity-n value copies, so the exact
+     *  values are modelled inside `reginFilter` as capacity-n value copies, so the exact
      *  Hall/matching machinery applies unchanged. */
     override val exceptSet: IntArray = EmptyIntArray,
     /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller

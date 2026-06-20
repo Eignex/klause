@@ -52,7 +52,7 @@ class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int
     override val boolVars: IntArray = EmptyIntArray
 
     /**
-     * Advisor subscription (#623): [propagateLinearBounds] derives everything from the interval
+     * Advisor subscription (#623): `propagateLinearBounds` derives everything from the interval
      * `[c·min, c·max]` of each term — it reads only `min`/`max` and never inspects interior holes
      * (the `NE` branch excludes a value, but only once the *other* terms are fixed, which it detects
      * from their bounds; an interior hole cannot change any term's min/max, so it can never enable a
