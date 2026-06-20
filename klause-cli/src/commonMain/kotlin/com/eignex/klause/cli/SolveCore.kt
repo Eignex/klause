@@ -132,8 +132,9 @@ internal object SolveCore {
         val annotated = if (useAnnotation) solvable.annotatedBacktrackParams else null
         val base = annotated ?: BacktrackPresets.conflictDriven()
         // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
-        // LP-success measurement under `-s`); absent ⇒ keep the base config (LP off for naked CP).
-        val lpConfig = common.lp?.let {
+        // LP-success measurement under `-s`); the flag wins, then the `klause.lp` env default, else the
+        // base config (LP off for naked CP).
+        val lpConfig = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: base.lpConfig
         val params = applyBacktrackParams(
@@ -200,9 +201,10 @@ internal object SolveCore {
     ) {
         // Default arm-pool size: an env override, else auto-tuned from the core count (#406).
         val defaultArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull() ?: autoArms(cores)
-        // #429: `--lp CEILING` caps the portfolio's LP emphasis; absent ⇒ AGGRESSIVE (uncapped — the
-        // pool spreads the LP intensity itself), `off` disables LP across the pool.
-        val lpCeiling = common.lp?.let {
+        // #429: `--lp CEILING` caps the portfolio's LP emphasis; the flag wins, then the `klause.lp`
+        // env default, else AGGRESSIVE (uncapped — the pool spreads the LP intensity itself); `off`
+        // disables LP across the pool.
+        val lpCeiling = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: LpConfig.AGGRESSIVE
         val scenario = buildPortfolioScenario(

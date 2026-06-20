@@ -111,6 +111,7 @@ twice.
 
 - `klause.engine` — default engine for a bare invocation (`-e` overrides).
 - `klause.portfolio.arms` — default portfolio arm-pool size (`--param arms=N` overrides).
+- `klause.lp` — default LP relaxation ceiling spec, parsed like `--lp` (`--lp` overrides).
 - Core compiler/solver knobs from `KlauseConfigSchema`: `klause.pin.absent.opt.vars`,
   `klause.unbounded.int.lo` / `.hi` (the default int range for unbounded FlatZinc *and* SMT-LIB
   vars), `klause.float.buckets`, `klause.float.scale`, `klause.lp.max.tableau.cells`,

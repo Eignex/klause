@@ -98,6 +98,21 @@ class CliTest {
     }
 
     @Test
+    fun `the LP ceiling default is overridable via the KLAUSE_LP property`() {
+        assertEquals(null, defaultLp())
+        // cliProp reads the system property first on the JVM, so it stands in for the env var.
+        System.setProperty("klause.lp", "conservative")
+        try {
+            assertEquals("conservative", defaultLp())
+            // The override must surface in --help so a packaged image's default is visible.
+            val out = capture { main(arrayOf("--help")) }
+            assertTrue("default: conservative" in out, out)
+        } finally {
+            System.clearProperty("klause.lp")
+        }
+    }
+
+    @Test
     fun `core config env overrides install for non-MiniZinc front-ends too`() {
         // The install happens once in main, before the front-end is picked — so an XCSP3 run picks
         // up KLAUSE_* overrides just like MiniZinc does (regression: it used to install only on the

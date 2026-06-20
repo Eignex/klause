@@ -110,6 +110,11 @@ internal fun defaultEngine(): Engine = cliProp(CliKnobs.engine)
     ?.let { Engine.fromId(it) ?: usageError("unknown KLAUSE_ENGINE `$it`; expected ${Engine.ids()}") }
     ?: Engine.DEFAULT
 
+/** The `--lp` ceiling spec for a bare invocation: the `KLAUSE_LP` env var / `klause.lp` property when
+ *  set — so a packaged image can ship a different LP default — else null (the per-engine built-in
+ *  default applies). An explicit `--lp` overrides it. The spec is parsed by `LpConfig.parse`. */
+internal fun defaultLp(): String? = cliProp(CliKnobs.lp)
+
 /** The solver-control flags every mode accepts. Mode-specific flags are appended per mode. */
 internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     FlagSpec(
@@ -213,7 +218,8 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.KLAUSE,
         valueLabel = "ceiling",
         help = "LP relaxation ceiling: " + LpEmphasis.ids() + "; append +/-<technique> to toggle one",
-        default = LpEmphasis.AGGRESSIVE.id,
+        // env-aware: KLAUSE_LP overrides the built-in default, and --help reflects it.
+        default = defaultLp() ?: LpEmphasis.AGGRESSIVE.id,
     ) { o.lp = it },
     FlagSpec(
         listOf("-h", "--help"),
