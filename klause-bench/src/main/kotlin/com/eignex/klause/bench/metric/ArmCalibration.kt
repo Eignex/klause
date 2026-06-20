@@ -1,108 +1,123 @@
 package com.eignex.klause.bench.metric
 
+import kotlin.math.abs
+
 /**
  * Fair-tester scoring, aimed at a **complementary, diverse** arm set rather than the single best arm.
  * Each arm is run in **isolation** (one subprocess, full budget, no shared incumbent), so its result
- * on a problem is purely its own. Then, looking at each problem individually:
+ * on a problem is purely its own. Looking at each problem individually, the best arm(s) *win* it (ties
+ * shared); an arm's score is its summed **win share** (`1/co-winners` per problem won) so wins score
+ * highly and unique wins score highest, and the **diverse palette** is a greedy set-cover over the
+ * per-problem winners — keep arms that win where others don't, drop the redundant ones.
  *
- *  - Arms compete under two lenses, one per axis we care about: **objective quality** (best final
- *    objective) and **feasibility speed** (fastest to a first feasible solution). The best arm under a
- *    lens *wins* that problem-lens (ties shared).
- *  - An arm's headline score is its summed **win share** — `1/(number of co-winners)` for every
- *    problem-lens it wins, summed across all of them. A clean sole win scores 1, a loser scores 0, so
- *    wins score highly and *unique* wins (the complementary ones) score highest.
- *  - The **diverse palette** is a greedy set-cover over the (problem × lens) units: each slot goes to
- *    the arm covering the most still-uncovered units. This is the credit-system algorithm, fed by
- *    per-problem winners — it keeps arms that win where others don't (objective specialists *and*
- *    fast-feasible specialists) and drops arms whose wins are all covered by a kept arm.
+ * Winners follow the MiniZinc-Challenge comparison (mirrors `compare.sh`), per [complete]:
+ *  - **incomplete** (local search): only objective quality counts — best objective among the feasible
+ *    arms wins; optimality and time are ignored, so equal-objective arms share the win.
+ *  - **complete** (backtrack / CP): the chain solved > proved-optimal > objective > faster — a proved
+ *    optimum beats an unproved equal, and among otherwise-equal arms the faster one wins.
+ * A problem every arm ties on (all reach the same outcome) discriminates nothing and is dropped.
  */
 internal object ArmCalibration {
 
     /** One arm's isolated run on one optimize instance (model-oriented [finalObjective]). */
-    data class ArmRun(val arm: String, val feasible: Boolean, val finalObjective: Double?, val timeToFeasibleMs: Long?)
+    data class ArmRun(
+        val arm: String,
+        val feasible: Boolean,
+        val finalObjective: Double?,
+        val proven: Boolean,
+        val timeToBestMs: Long?,
+    )
 
     /** Every arm's run on one optimize instance, with the per-instance direction. */
     data class Instance(val problem: String, val maximize: Boolean, val runs: List<ArmRun>)
 
-    /** The two competition lenses — the axes a diverse set should span. */
-    enum class Lens { QUALITY, SPEED }
-
-    /** Per-arm scores: the summed win share plus the per-lens win counts. */
-    data class ArmScore(val arm: String, val winShare: Double, val qualityWins: Int, val speedWins: Int)
+    /** Per-arm scores: the summed win share and the count of problems won. */
+    data class ArmScore(val arm: String, val winShare: Double, val wins: Int)
 
     /** One slot of the recalibrated palette: [newlyCovered] is the arm's marginal contribution (new
-     *  problem-lens units it wins that no earlier slot did), [cumulativeCovered] the running total. */
+     *  problems it wins that no earlier slot did), [cumulativeCovered] the running total. */
     data class DiverseSlot(val rank: Int, val arm: String, val newlyCovered: Int, val cumulativeCovered: Int)
 
-    /** The calibration outcome: per-arm scores (win-share desc) and the marginal-contribution palette
-     *  over [totalUnits] problem-lens units — take the first k slots for a diverse k-arm portfolio. */
+    /** The calibration outcome over [totalWon] discriminating problems — take the first k palette
+     *  slots for a diverse k-arm portfolio. */
     data class Report(
         val instances: Int,
-        val totalUnits: Int,
+        val complete: Boolean,
+        val totalWon: Int,
         val scores: List<ArmScore>,
         val diverse: List<DiverseSlot>,
     )
 
     private const val EPS = 1e-9
 
-    /** One problem under one lens: the arms that tie for the win (empty when no arm was feasible). */
-    private data class WinUnit(val winners: Set<String>)
-
-    /** Lower-is-better value of [run] under [lens]; an infeasible arm is worst (never a winner). */
-    private fun value(inst: Instance, run: ArmRun, lens: Lens): Double {
-        if (!run.feasible) return Double.MAX_VALUE
-        return when (lens) {
-            Lens.QUALITY -> (if (inst.maximize) -1.0 else 1.0) * (run.finalObjective ?: return Double.MAX_VALUE)
-            Lens.SPEED -> (run.timeToFeasibleMs ?: return Double.MAX_VALUE).toDouble()
+    /** The win-ranking key (higher is better, compared lexicographically). Infeasible sorts worst; in
+     *  [complete] mode a proved optimum and then a faster time break ties the way the Challenge does. */
+    private fun rankKey(inst: Instance, run: ArmRun, complete: Boolean): DoubleArray {
+        val solved = if (run.feasible) 1.0 else 0.0
+        val quality = if (run.feasible && run.finalObjective != null) {
+            if (inst.maximize) run.finalObjective else -run.finalObjective
+        } else {
+            Double.NEGATIVE_INFINITY
+        }
+        return if (complete) {
+            val proven = if (run.feasible && run.proven) 1.0 else 0.0
+            val faster = -(run.timeToBestMs?.toDouble() ?: Double.MAX_VALUE)
+            doubleArrayOf(solved, proven, quality, faster)
+        } else {
+            doubleArrayOf(solved, quality)
         }
     }
 
-    private fun winnersOf(inst: Instance, lens: Lens): Set<String> {
-        val values = inst.runs.associate { it.arm to value(inst, it, lens) }
-        val best = values.values.min()
-        if (best == Double.MAX_VALUE) return emptySet() // no feasible arm — non-discriminating
-        val winners = values.filterValues { it <= best + EPS }.keys
-        // A problem-lens every arm ties on says nothing about complementarity; drop it like a no-solve.
+    private fun lexCompare(a: DoubleArray, b: DoubleArray): Int {
+        for (i in a.indices) {
+            if (a[i] == b[i]) continue
+            val d = a[i] - b[i]
+            if (d.isFinite() && abs(d) <= EPS) continue
+            return if (a[i] < b[i]) -1 else 1
+        }
+        return 0
+    }
+
+    /** The arms that win [inst]: those maximal on the [complete] ranking key (ties shared). Empty when
+     *  no arm is feasible, or when every arm ties (non-discriminating). */
+    private fun winnersOf(inst: Instance, complete: Boolean): Set<String> {
+        val keys = inst.runs.associate { it.arm to rankKey(inst, it, complete) }
+        val best = keys.values.reduce { a, b -> if (lexCompare(a, b) >= 0) a else b }
+        if (best[0] == 0.0) return emptySet() // no feasible arm
+        val winners = keys.filterValues { lexCompare(it, best) == 0 }.keys
         return if (winners.size == inst.runs.size) emptySet() else winners
     }
 
-    /** Score and recalibrate [instances] (optimize instances only). */
-    fun score(instances: List<Instance>): Report {
+    /** Score and recalibrate [instances] under the [complete] (CP) or incomplete (LS) Challenge rules. */
+    fun score(instances: List<Instance>, complete: Boolean): Report {
         val arms = instances.flatMap { inst -> inst.runs.map { it.arm } }.distinct()
-        val units = instances.flatMap { inst -> Lens.entries.map { WinUnit(winnersOf(inst, it)) } }
-            .filter { it.winners.isNotEmpty() }
+        val won = instances.map { winnersOf(it, complete) }.filter { it.isNotEmpty() }
 
         val winShare = HashMap<String, Double>()
-        for (unit in units) {
-            val share = 1.0 / unit.winners.size
-            for (arm in unit.winners) winShare[arm] = (winShare[arm] ?: 0.0) + share
+        val wins = HashMap<String, Int>()
+        for (winners in won) {
+            val share = 1.0 / winners.size
+            for (arm in winners) {
+                winShare[arm] = (winShare[arm] ?: 0.0) + share
+                wins[arm] = (wins[arm] ?: 0) + 1
+            }
         }
-        val qualityWins = winCounts(instances, Lens.QUALITY)
-        val speedWins = winCounts(instances, Lens.SPEED)
 
-        val scores = arms.map { arm ->
-            ArmScore(arm, winShare[arm] ?: 0.0, qualityWins[arm] ?: 0, speedWins[arm] ?: 0)
-        }.sortedByDescending { it.winShare }
-
-        return Report(instances.size, units.size, scores, greedyDiverse(arms, units, winShare))
+        val scores = arms.map { ArmScore(it, winShare[it] ?: 0.0, wins[it] ?: 0) }
+            .sortedByDescending { it.winShare }
+        return Report(instances.size, complete, won.size, scores, greedyDiverse(arms, won, winShare))
     }
 
-    private fun winCounts(instances: List<Instance>, lens: Lens): Map<String, Int> {
-        val counts = HashMap<String, Int>()
-        for (inst in instances) for (arm in winnersOf(inst, lens)) counts[arm] = (counts[arm] ?: 0) + 1
-        return counts
-    }
-
-    /** Rank *every* arm by greedy marginal contribution over the (problem × lens) [units]: each slot
-     *  goes to the arm winning the most still-uncovered units, ties broken by total win share. Ranking
-     *  continues past full coverage (those tail slots add 0), so any prefix of length k is a diverse
-     *  k-arm portfolio and the cumulative-coverage curve shows where the returns flatten. */
+    /** Rank *every* arm by greedy marginal contribution over the per-problem [won] winner sets: each
+     *  slot goes to the arm winning the most still-uncovered problems, ties broken by total win share.
+     *  Ranking continues past full coverage (those tail slots add 0), so any prefix of length k is a
+     *  diverse k-arm portfolio and the cumulative-coverage curve shows where the returns flatten. */
     private fun greedyDiverse(
         arms: List<String>,
-        units: List<WinUnit>,
+        won: List<Set<String>>,
         winShare: Map<String, Double>,
     ): List<DiverseSlot> {
-        val covered = BooleanArray(units.size)
+        val covered = BooleanArray(won.size)
         val taken = HashSet<String>()
         val palette = ArrayList<DiverseSlot>()
         var cumulative = 0
@@ -112,7 +127,7 @@ internal object ArmCalibration {
             var bestShare = -1.0
             for (arm in arms) {
                 if (arm in taken) continue
-                val cover = units.indices.count { !covered[it] && arm in units[it].winners }
+                val cover = won.indices.count { !covered[it] && arm in won[it] }
                 val share = winShare[arm] ?: 0.0
                 if (cover > bestCover || (cover == bestCover && share > bestShare)) {
                     bestArm = arm
@@ -121,7 +136,7 @@ internal object ArmCalibration {
                 }
             }
             val arm = bestArm ?: break
-            units.indices.forEach { if (arm in units[it].winners && !covered[it]) covered[it] = true }
+            won.indices.forEach { if (arm in won[it] && !covered[it]) covered[it] = true }
             cumulative += bestCover
             taken += arm
             palette += DiverseSlot(palette.size + 1, arm, bestCover, cumulative)
@@ -131,19 +146,18 @@ internal object ArmCalibration {
 
     /** Render a [Report] as a plain-text table for the bench console. */
     fun render(report: Report): String = buildString {
+        val mode = if (report.complete) "complete" else "incomplete"
         appendLine(
-            "=== arm calibration  (${report.instances} optimize instances; win share over quality+speed lenses) ===",
+            "=== arm calibration ($mode): ${report.instances} instances, ${report.totalWon} discriminating ===",
         )
-        appendLine("--- win share | objective-quality wins | feasibility-speed wins ---")
-        for (s in report.scores) {
-            appendLine("  ${s.arm.padEnd(28)} ${fmt(s.winShare)}  ${s.qualityWins}  ${s.speedWins}")
-        }
+        appendLine("--- win share | problems won ---")
+        for (s in report.scores) appendLine("  ${s.arm.padEnd(28)} ${fmt(s.winShare)}  ${s.wins}")
         appendLine("")
         appendLine("--- marginal-contribution ranking (take the first k for a diverse k-arm set) ---")
         for (slot in report.diverse) {
             appendLine(
                 "  ${slot.rank.toString().padStart(2)}  ${slot.arm.padEnd(28)} " +
-                    "+covered=${slot.newlyCovered}  (${slot.cumulativeCovered}/${report.totalUnits})",
+                    "+covered=${slot.newlyCovered}  (${slot.cumulativeCovered}/${report.totalWon})",
             )
         }
     }
