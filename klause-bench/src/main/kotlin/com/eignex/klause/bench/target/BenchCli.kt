@@ -38,7 +38,7 @@ import java.io.File
  *
  * Other commands:
  *  - `calibrate [filters…]` — the fair arm tester: run every LS arm in isolation over the selection
- *    and recalibrate a diverse palette scored by Borda anytime (see [calibrate]).
+ *    and recalibrate a diverse palette by per-problem wins under the Challenge rules (see [calibrate]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
@@ -90,11 +90,17 @@ object BenchCli {
         )
     }
 
-    /** The fair arm tester: run every candidate LS arm **in isolation** (one subprocess each, full
-     *  budget, single core — no shared incumbent) over the selection, then score the arms by Borda
-     *  anytime and recalibrate a diverse palette (see [ArmCalibration]). Only optimize instances are
-     *  scored (the primal integral needs an objective), so pass `kind=cop`. `arms=a,b` restricts the
-     *  candidate set; default is the whole [LsCatalog]. */
+    /** The fair arm tester: run every candidate arm **in isolation** (one subprocess each, full
+     *  budget, single core — no shared incumbent) over the selection, then score by the MiniZinc-
+     *  Challenge rules and recalibrate a diverse palette (see [ArmCalibration]). Optimize instances
+     *  only (pass `kind=cop`).
+     *
+     *  - `engine=ls` (default): candidates are [LsCatalog] arm labels (or an `arms=a,b` subset), each
+     *    run as `-e ls --param arm=<label>`; scored **incomplete** (LS proves nothing).
+     *  - `engine=cp-single`: candidates are the `var-selector` heuristics given in `arms=v1,v2`, each
+     *    run as `-e cp-single --param var-selector=<v>`; scored **complete**.
+     *
+     *  `mode=complete|incomplete` overrides the per-engine default. */
     private fun calibrate(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
@@ -102,11 +108,24 @@ object BenchCli {
             println("(no problems matched the selection)")
             return
         }
+        val engine = f["engine"]?.lowercase() ?: "ls"
+        val (paramKey, defaults) = when (engine) {
+            "ls" -> "arm" to LsCatalog.labels()
+            "cp-single", "cpsingle" -> "var-selector" to emptyList()
+            else -> error("calibrate supports engine=ls | cp-single, got '$engine'")
+        }
+        val arms = f["arms"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
+            ?: defaults.ifEmpty { error("engine=$engine needs an arms= list (e.g. arms=vsids,chb,linucb)") }
+        val complete = when (f["mode"]?.lowercase()) {
+            "complete" -> true
+            "incomplete" -> false
+            null -> engine != "ls"
+            else -> error("mode must be complete|incomplete, got '${f["mode"]}'")
+        }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
-        val arms = f["arms"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: LsCatalog.labels()
         val entries = BenchLoad.resolveRefs(refs)
         println(
-            "=== calibrate: ${arms.size} arm(s) × ${refs.size} instance(s), " +
+            "=== calibrate ($engine): ${arms.size} arm(s) × ${refs.size} instance(s), " +
                 "${budget.timeoutMillis}ms each (isolated) ===",
         )
         val armDirs = arms.mapNotNull { arm ->
@@ -114,7 +133,7 @@ object BenchCli {
                 entries,
                 budget,
                 SolverInvocation.KLAUSE,
-                KlauseSearch(engine = "ls", processors = 1, params = listOf("arm=$arm")),
+                KlauseSearch(engine = engine, processors = 1, params = listOf("$paramKey=$arm")),
             )
             dir?.let { arm to it }
         }.toMap()
@@ -124,12 +143,11 @@ object BenchCli {
             return
         }
         println()
-        println(ArmCalibration.render(ArmCalibration.score(instances)))
+        println(ArmCalibration.render(ArmCalibration.score(instances, complete)))
     }
 
     /** Read each arm's isolated `solve` output dir back into per-instance [ArmCalibration.Instance]s,
-     *  grouping by problem. Time-to-first-feasible is the arm's first attributed improvement (or the
-     *  time-to-best when it emitted no stream). */
+     *  grouping by problem. */
     private fun loadCalibration(armDirs: Map<String, File>): List<ArmCalibration.Instance> {
         val byProblem = LinkedHashMap<String, MutableList<Pair<String, SolveRecord>>>()
         for ((arm, dir) in armDirs) {
@@ -153,7 +171,8 @@ object BenchCli {
         arm = arm,
         feasible = rec.feasible == true,
         finalObjective = rec.objective,
-        timeToFeasibleMs = rec.attribution.firstOrNull()?.elapsedMs ?: rec.timeToBestMs,
+        proven = rec.proven,
+        timeToBestMs = rec.timeToBestMs,
     )
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
@@ -272,7 +291,7 @@ object BenchCli {
             |
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
-            |  bench calibrate [filters…]            fair-test LS arms in isolation; Borda-anytime diverse palette (kind=cop)
+            |  bench calibrate [filters…]            fair-test arms in isolation; per-problem-win diverse palette (kind=cop; engine=ls|cp-single, mode=)
             |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |
