@@ -82,7 +82,7 @@ internal class IntIntMap private constructor(private val backing: Backing, priva
     ) : Backing {
         override fun get(key: Int, absent: Int): Int {
             val mask = keys.size - 1
-            var i = mix(key) and mask
+            var i = mixIntKey(key) and mask
             while (present[i]) {
                 if (keys[i] == key) return values[i]
                 i = (i + 1) and mask
@@ -92,15 +92,13 @@ internal class IntIntMap private constructor(private val backing: Backing, priva
 
         companion object {
             fun build(keys: IntArray, values: IntArray): HashBacking {
-                // Capacity = next power of two such that load factor ≤ 0.5.
-                var cap = 8
-                while (cap < keys.size * 2) cap *= 2
+                val cap = openAddressingCapacity(keys.size)
                 val k = IntArray(cap)
                 val v = IntArray(cap)
                 val p = BooleanArray(cap)
                 val mask = cap - 1
                 for (i in keys.indices) {
-                    var idx = mix(keys[i]) and mask
+                    var idx = mixIntKey(keys[i]) and mask
                     while (p[idx]) {
                         if (k[idx] == keys[i]) break
                         idx = (idx + 1) and mask
@@ -111,9 +109,6 @@ internal class IntIntMap private constructor(private val backing: Backing, priva
                 }
                 return HashBacking(k, v, p)
             }
-
-            /** Fibonacci-multiplicative hash; good distribution for sequential int keys. */
-            private fun mix(x: Int): Int = (x * -0x61c88647).ushr(0)
         }
     }
 }

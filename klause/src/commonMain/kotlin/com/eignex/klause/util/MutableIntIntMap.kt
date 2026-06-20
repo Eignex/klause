@@ -27,8 +27,7 @@ internal class MutableIntIntMap(initialCapacity: Int = 8) {
         private set
 
     init {
-        var cap = 8
-        while (cap < initialCapacity * 2) cap *= 2
+        val cap = openAddressingCapacity(initialCapacity)
         keys = IntArray(cap)
         values = IntArray(cap)
         used = BooleanArray(cap)
@@ -132,8 +131,8 @@ internal class MutableIntIntMap(initialCapacity: Int = 8) {
     @PublishedApi internal val usedInternal: BooleanArray get() = used
 
     /** Backward-shift deletion (Knuth 6.4 algorithm R): after freeing slot [start], pull any
-     *  later probe-chain entry forward when its home slot lies outside the cyclic gap `(i, j]`,
-     *  so the chain stays contiguous and no tombstone is needed. */
+     *  later probe-chain entry forward (per [mustStayDuringShift]) so the chain stays contiguous
+     *  and no tombstone is needed. */
     private fun deleteSlot(start: Int) {
         var i = start
         used[i] = false
@@ -142,10 +141,7 @@ internal class MutableIntIntMap(initialCapacity: Int = 8) {
             j = (j + 1) and mask
             if (!used[j]) return
             val home = mix(keys[j]) and mask
-            // If `home` is cyclically within (i, j], entry j is still reachable past the hole
-            // and must not move; otherwise it would be stranded, so shift it into the hole.
-            val mustStay = if (i <= j) home > i && home <= j else home > i || home <= j
-            if (mustStay) continue
+            if (mustStayDuringShift(home, i, j)) continue
             keys[i] = keys[j]
             values[i] = values[j]
             used[i] = true
@@ -173,6 +169,5 @@ internal class MutableIntIntMap(initialCapacity: Int = 8) {
         }
     }
 
-    /** Fibonacci-multiplicative hash; good distribution for sequential int keys. */
-    private fun mix(x: Int): Int = (x * -0x61c88647).ushr(0)
+    private fun mix(x: Int): Int = mixIntKey(x)
 }

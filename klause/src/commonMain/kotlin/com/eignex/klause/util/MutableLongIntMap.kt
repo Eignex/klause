@@ -25,8 +25,7 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
         private set
 
     init {
-        var cap = 8
-        while (cap < initialCapacity * 2) cap *= 2
+        val cap = openAddressingCapacity(initialCapacity)
         keys = LongArray(cap)
         values = IntArray(cap)
         used = BooleanArray(cap)
@@ -151,8 +150,7 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
             j = (j + 1) and mask
             if (!used[j]) return
             val home = mix(keys[j]) and mask
-            val mustStay = if (i <= j) home > i && home <= j else home > i || home <= j
-            if (mustStay) continue
+            if (mustStayDuringShift(home, i, j)) continue
             keys[i] = keys[j]
             values[i] = values[j]
             used[i] = true
