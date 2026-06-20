@@ -12,6 +12,7 @@ import com.eignex.klause.solver.localsearch.schedule.Reheating
 import com.eignex.klause.solver.localsearch.schedule.Schedule
 import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
+import com.eignex.klause.solver.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
 import kotlin.random.Random
 
@@ -20,10 +21,10 @@ import kotlin.random.Random
  * restart`. [toWorkerConfig] assembles a [SourceDrivenStrategy] over the four axes into a portfolio
  * worker, building fresh stateful instances each call (per the portfolio's no-shared-state rule).
  *
- * The fourth axis here is the **restart/perturbation cadence**; the SA temperature rides on its
- * acceptance option (see [AcceptanceOption.temperature]). Folding all of these into the driver's
- * single [com.eignex.klause.solver.localsearch.schedule.ScheduleBundle] schedule axis is the
- * front-door follow-up.
+ * All four axes fold into the driver's single
+ * [com.eignex.klause.solver.localsearch.schedule.ScheduleBundle] schedule axis: the restart cadence
+ * as its `restart` member, the SA temperature (via [AcceptanceOption.temperature]) as its
+ * `temperature` member.
  */
 internal class Recipe(
     val sources: SourcesPreset,
@@ -38,15 +39,16 @@ internal class Recipe(
      *  built-in objective descent owns the optimize phase (the recipe drives the feasibility fight),
      *  matching how the SAT-family / fjump arms are registered. */
     fun toWorkerConfig(tabu: TabuFilter = TabuFilter.Disabled): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        "recipe/$label",
-        SourceDrivenStrategy(
-            MoveSourceCatalog.parse(sources.spec),
-            scoring,
-            acceptance.build(),
-            schedule = ScheduleBundle(temperature = acceptance.temperature?.invoke()),
-            tabu = tabu,
+        LsRecipe(
+            "recipe/$label",
+            SourceDrivenStrategy(
+                MoveSourceCatalog.parse(sources.spec),
+                scoring,
+                acceptance.build(),
+                schedule = ScheduleBundle(temperature = acceptance.temperature?.invoke(), restart = restart.build()),
+                tabu = tabu,
+            ),
         ),
-        restart.build(),
     )
 }
 

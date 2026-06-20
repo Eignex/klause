@@ -17,7 +17,7 @@ import com.eignex.klause.solver.localsearch.RestartPolicy
  * bundle's cadence member without being re-plumbed through `observe`. Any member may be `null`,
  * making a recipe that simply omits that axis (e.g. a pure greedy arm with no temperature).
  */
-class ScheduleBundle(
+data class ScheduleBundle(
     val temperature: Schedule? = null,
     val weights: WeightSchedule? = null,
     val noise: AdaptivePolicy? = null,

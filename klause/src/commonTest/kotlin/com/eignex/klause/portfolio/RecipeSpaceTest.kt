@@ -31,7 +31,7 @@ class RecipeSpaceTest {
             val wc = recipe.toWorkerConfig()
             assertTrue(wc.label.startsWith("recipe/"), "worker label should be namespaced, got ${wc.label}")
             // Fresh instances each call (no shared stateful strategy/restart across workers).
-            assertTrue(recipe.toWorkerConfig().strategy !== wc.strategy)
+            assertTrue(recipe.toWorkerConfig().recipe.strategy !== wc.recipe.strategy)
         }
     }
 

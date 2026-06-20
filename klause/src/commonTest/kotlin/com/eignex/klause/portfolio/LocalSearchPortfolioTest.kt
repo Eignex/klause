@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.localsearch.strategy.LsArm
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
