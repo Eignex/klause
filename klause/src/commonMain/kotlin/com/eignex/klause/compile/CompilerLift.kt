@@ -21,7 +21,7 @@ import com.eignex.klause.model.Not
 import com.eignex.klause.model.SetCard
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.factor.IntFunctionLowering
-import com.eignex.klause.solver.factor.Product
+import com.eignex.klause.solver.factor.arithmetic.Product
 
 /**
  * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the

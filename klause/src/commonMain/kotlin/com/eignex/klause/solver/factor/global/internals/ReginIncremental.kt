@@ -1,6 +1,6 @@
-package com.eignex.klause.solver.factor.global
+package com.eignex.klause.solver.factor.global.internals
 
-import com.eignex.klause.solver.factor.linear.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.factor.arithmetic.collectHoleAndBoundAntecedents
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet

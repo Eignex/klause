@@ -12,11 +12,11 @@ import com.eignex.klause.solver.backtrack.selector.RandomVariable
 import com.eignex.klause.solver.backtrack.selector.SmallestDomain
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.ReifiedLinear
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult.Unsat

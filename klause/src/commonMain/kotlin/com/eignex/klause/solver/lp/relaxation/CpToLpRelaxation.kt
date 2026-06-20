@@ -4,7 +4,12 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.ArrayMinMax
+import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
@@ -12,11 +17,6 @@ import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.circuit.Subcircuit
 import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.factor.global.NValue
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.ReifiedCardinality
-import com.eignex.klause.solver.factor.linear.ReifiedLinear
-import com.eignex.klause.solver.factor.linear.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.factor.table.Mdd
 import com.eignex.klause.solver.factor.table.Regular

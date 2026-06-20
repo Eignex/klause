@@ -171,7 +171,7 @@ data class IntCompare(
  * comparison operators. The compiler does two things with it:
  *
  * It buckets each float variable to an int variable in the factor system and emits a
- * scaled-integer [com.eignex.klause.solver.factor.linear.Linear] factor — what every backend solves over.
+ * scaled-integer [com.eignex.klause.solver.factor.arithmetic.Linear] factor — what every backend solves over.
  *
  * The AST node lives in [BoolExpr] so the constraint pipeline can carry it through
  * `And` / `Or` / `Implies` etc. before the compiler intercepts it at lowering time.

@@ -1,11 +1,11 @@
-package com.eignex.klause.solver.factor.scheduling
+package com.eignex.klause.solver.factor.scheduling.internals
 
 import kotlin.math.max
 import kotlin.math.min
 
 /**
  * Shared mandatory-profile (compulsory-part) machinery for the time-tabling propagators
- * [Cumulative] and [Disjunctive].
+ * `Cumulative` and `Disjunctive`.
  *
  * A present task with start domain `[s.min, s.max]` and fixed duration `d` has a
  * *compulsory part* `[lst, ect) = [s.max, s.min + d)` that it must occupy wherever it

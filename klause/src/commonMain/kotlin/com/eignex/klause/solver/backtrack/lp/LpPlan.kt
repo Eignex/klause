@@ -133,7 +133,7 @@ data class LpPlan(
     /**
      * Objective-cone / precedence-only sub-relaxation (#571). When true and [bounding] holds, the
      * per-node LP is built over **only** the variables and rows transitively connected to the
-     * objective, with every big-M [com.eignex.klause.solver.factor.linear.ReifiedLinear] disjunctive row
+     * objective, with every big-M [com.eignex.klause.solver.factor.arithmetic.ReifiedLinear] disjunctive row
      * dropped — for scheduling, the critical-path / longest-path bound (precedence + objective). The
      * point is that this subset has no disjunctive ordering bools, so it always fits the relaxation-size
      * cap where the full relaxation does not; it is a cheaper, looser, always-sound bound (any subset

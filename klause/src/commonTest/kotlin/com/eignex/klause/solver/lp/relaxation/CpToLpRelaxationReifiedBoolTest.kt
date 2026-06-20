@@ -4,8 +4,8 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.linear.ReifiedCardinality
-import com.eignex.klause.solver.factor.linear.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.test.Test
 import kotlin.test.assertTrue

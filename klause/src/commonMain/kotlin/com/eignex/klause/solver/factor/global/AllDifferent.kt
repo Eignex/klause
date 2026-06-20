@@ -6,8 +6,10 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
+import com.eignex.klause.solver.factor.arithmetic.collectHoleAndBoundAntecedents
 import com.eignex.klause.solver.factor.compressViolation
-import com.eignex.klause.solver.factor.linear.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.factor.global.internals.ReginCache
+import com.eignex.klause.solver.factor.global.internals.reginFilter
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
