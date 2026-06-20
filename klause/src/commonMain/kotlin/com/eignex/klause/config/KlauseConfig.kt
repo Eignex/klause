@@ -41,18 +41,20 @@ const val DEFAULT_LP_CEILING_TABLEAU_CELLS: Long = 1L shl 26
  * that affect *compilation and solving semantics* into a single immutable value object.
  *
  * Two usage modes:
- *  - **Ambient:** set [current] once at startup (e.g. a JVM entry point translating env vars
- *    via `klauseConfigFromEnv`) and let APIs that don't take an explicit config read it.
+ *  - **Ambient:** set [current] once at startup (e.g. a CLI entry point translating env vars
+ *    via [fromProps]) and let APIs that don't take an explicit config read it.
  *  - **Explicit:** pass a [KlauseConfig] straight to [com.eignex.klause.compile.Compiler] or
  *    `VariableSchema.compile(config)` when you need per-call control (tests, embedding).
  *
  * The core stays pure Kotlin with no platform dependencies — reading env vars / system
- * properties is the responsibility of platform entry points, which build a [KlauseConfig] and
- * assign it to [current].
+ * properties is the responsibility of platform entry points, which feed a property [fromProps]
+ * lookup and assign the result to [current].
  *
- * Note: bench-harness tuning (the `klause.bench.*` system properties) is deliberately *not*
- * here — those configure the benchmarking harness, not solving semantics, and live in their
- * own `klause.bench.*` namespace.
+ * Two things are deliberately *not* env-configurable here:
+ *  - **Presolve** — the presolve* fields are set programmatically (embedding) or per-invocation
+ *    via the CLI `--presolve` flag; there is no env key for them.
+ *  - **Bench-harness tuning** (the `klause.bench.*` system properties) — those configure the
+ *    benchmarking harness, not solving semantics, and live in their own namespace.
  */
 data class KlauseConfig(
     /**
@@ -65,35 +67,32 @@ data class KlauseConfig(
      * solution space for enumeration / model-counting and gives clean, deterministic decoded
      * values for absent vars.
      *
-     * Disable via `KLAUSE_PIN_ABSENT_OPT=0` (e.g. for the MiniZinc challenge, where absent
+     * Disable via `KLAUSE_PIN_ABSENT_OPT_VARS=0` (e.g. for the MiniZinc challenge, where absent
      * opt-var output values are unconstrained by spec, so the extra clauses are pure overhead).
      */
     val pinAbsentOptVars: Boolean = true,
 
     /** Lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries with no
-     *  explicit range). Env: `KLAUSE_FZN_UNBOUNDED_INT_LO`. */
+     *  explicit range). */
     val unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
 
-    /** Upper bound counterpart to [unboundedIntLo]. Env: `KLAUSE_FZN_UNBOUNDED_INT_HI`. */
+    /** Upper bound counterpart to [unboundedIntLo]. */
     val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
 
     /** Number of uniformly-spaced buckets a `floatVar` is discretised into when no explicit
-     *  count is given. Higher = finer precision, more bits per float var. Env:
-     *  `KLAUSE_FLOAT_BUCKETS`. */
+     *  count is given. Higher = finer precision, more bits per float var. */
     val floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
 
     /** Fixed-point scale used by the FlatZinc float-linear lowering (real coefficients and
-     *  bounds are multiplied by this and rounded to integers). Env: `KLAUSE_FLOAT_SCALE`. */
+     *  bounds are multiplied by this and rounded to integers). */
     val floatScale: Long = DEFAULT_FLOAT_SCALE,
 
     /** Base relaxation-size cap (see [DEFAULT_LP_MAX_TABLEAU_CELLS]): a model whose base relaxation
-     *  fits it budgets its gated hulls against it. A pure cost guard — the bound is always sound.
-     *  Env: `KLAUSE_FZN_LP_MAX_TABLEAU_CELLS` / `klause.fzn.lpMaxTableauCells`. */
+     *  fits it budgets its gated hulls against it. A pure cost guard — the bound is always sound. */
     val lpMaxTableauCells: Long = DEFAULT_LP_MAX_TABLEAU_CELLS,
 
     /** Ceiling relaxation-size cap (see [DEFAULT_LP_CEILING_TABLEAU_CELLS]): the absolute size past
-     *  which LP is declined, and the hull budget for an over-base-cap but in-ceiling model.
-     *  Env: `KLAUSE_FZN_LP_CEILING_TABLEAU_CELLS` / `klause.fzn.lpCeilingTableauCells`. */
+     *  which LP is declined, and the hull budget for an over-base-cap but in-ceiling model. */
     val lpCeilingTableauCells: Long = DEFAULT_LP_CEILING_TABLEAU_CELLS,
 
     // Presolve: an emphasis level plus one tri-state override knob per pass (`true` forces the pass
@@ -147,5 +146,20 @@ data class KlauseConfig(
          * startup, before compiling. Defaults to [DEFAULT].
          */
         var current: KlauseConfig = DEFAULT
+
+        /**
+         * Layer property/env/file overrides onto [base], reading each knob through [lookup] — a
+         * function from a knob's [ConfigKey.propertyKey] (e.g. `klause.float.buckets`) to its raw
+         * string value, or `null` when unset. The recognised knobs, their keys and their parsing all
+         * come from [KlauseConfigSchema] (one declaration per knob), so this never re-spells a key.
+         * Unset / unparseable values leave the [base] value untouched.
+         *
+         * Platform entry points supply the [lookup]: a CLI maps the dotted key to a system property
+         * and/or the `KLAUSE_FLOAT_BUCKETS`-style env var; a config file maps it to a parsed value.
+         */
+        fun fromProps(base: KlauseConfig = current, lookup: (String) -> String?): KlauseConfig =
+            KlauseConfigSchema.keys.fold(base) { config, key ->
+                lookup(key.propertyKey)?.let { key.applyRaw(config, it) } ?: config
+            }
     }
 }

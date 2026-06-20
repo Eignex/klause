@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioWorker
@@ -22,30 +21,6 @@ import kotlin.system.exitProcess
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun cliProp(name: String): String? = getenv(name.uppercase().replace('.', '_'))?.toKString()
-
-/** Native counterpart of `klauseConfigFromEnv`: env vars only (no system properties). */
-internal actual fun installCliConfig(): KlauseConfig {
-    val falsey = setOf("0", "false", "off", "no")
-    val base = KlauseConfig.current
-    val config = base.copy(
-        pinAbsentOptVars = cliProp("klause.pinAbsentOpt")?.let { it.trim().lowercase() !in falsey }
-            ?: base.pinAbsentOptVars,
-        unboundedIntLo = cliProp("klause.fzn.unboundedIntLo")?.trim()?.toIntOrNull()
-            ?: base.unboundedIntLo,
-        unboundedIntHi = cliProp("klause.fzn.unboundedIntHi")?.trim()?.toIntOrNull()
-            ?: base.unboundedIntHi,
-        floatBuckets = cliProp("klause.floatBuckets")?.trim()?.toIntOrNull()
-            ?: base.floatBuckets,
-        floatScale = cliProp("klause.floatScale")?.trim()?.toLongOrNull()
-            ?: base.floatScale,
-        lpMaxTableauCells = cliProp("klause.fzn.lpMaxTableauCells")?.trim()?.toLongOrNull()
-            ?: base.lpMaxTableauCells,
-        lpCeilingTableauCells = cliProp("klause.fzn.lpCeilingTableauCells")?.trim()?.toLongOrNull()
-            ?: base.lpCeilingTableauCells,
-    )
-    KlauseConfig.current = config
-    return config
-}
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun errPrintln(message: String) {

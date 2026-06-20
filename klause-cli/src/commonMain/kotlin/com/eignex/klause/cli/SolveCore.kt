@@ -199,7 +199,7 @@ internal object SolveCore {
         cancel: Cancellation,
     ) {
         // Default arm-pool size: an env override, else auto-tuned from the core count (#406).
-        val defaultArms = cliProp("klause.fzn.portfolio.arms")?.toIntOrNull() ?: autoArms(cores)
+        val defaultArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull() ?: autoArms(cores)
         // #429: `--lp CEILING` caps the portfolio's LP emphasis; absent ⇒ AGGRESSIVE (uncapped — the
         // pool spreads the LP intensity itself), `off` disables LP across the pool.
         val lpCeiling = common.lp?.let {

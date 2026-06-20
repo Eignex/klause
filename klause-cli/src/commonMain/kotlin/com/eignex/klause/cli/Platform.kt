@@ -8,15 +8,15 @@ import kotlin.time.TimeSource
 // Platform seams for the CLI: the complete list of what differs between the JVM
 // distribution and the native executables. Everything else is common code.
 
-/** Read a CLI tuning knob. JVM: system property, then the env var spelled as the dotted
- *  name uppercased with `.` mapped to `_` (e.g. `klause.fzn.engine` becomes
- *  `KLAUSE_FZN_ENGINE`). Native: the env var only. */
+/** Read a CLI tuning knob by its dotted property name. JVM: the system property, then the env var
+ *  spelled as the name uppercased with `.` mapped to `_` (e.g. `klause.engine` becomes
+ *  `KLAUSE_ENGINE`). Native: that env var only (no system properties). */
 internal expect fun cliProp(name: String): String?
 
-/** Load core [KlauseConfig] from the process environment and install it as the ambient
- *  config. JVM: `installKlauseConfigFromEnv` (system properties win over env vars).
- *  Native: env vars only. */
-internal expect fun installCliConfig(): KlauseConfig
+/** Load core [KlauseConfig] from the process environment via [cliProp] and install it as the
+ *  ambient config consulted by the compiler/solver. Call once at startup, before loading a model. */
+internal fun installCliConfig(): KlauseConfig =
+    KlauseConfig.fromProps(lookup = ::cliProp).also { KlauseConfig.current = it }
 
 internal expect fun errPrintln(message: String)
 
