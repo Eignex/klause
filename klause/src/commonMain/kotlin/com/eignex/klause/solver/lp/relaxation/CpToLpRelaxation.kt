@@ -64,34 +64,64 @@ internal class LpRelaxation(
     val circuitArcs: List<CircuitArcModel> = emptyList(),
     /**
      * Whether this relaxation's layout is node-invariant, so a search node may [rebound] it (re-bind
-     * column bounds over the fixed matrix) instead of rebuilding. True only when every structural
-     * column is backed by a CP variable (no auxiliary hull / circuit / time-indexed columns) and no
-     * row's coefficients depend on the live domains (no live-M reified rows). For an eligible
-     * relaxation [rebound] reproduces exactly the model a per-node build would emit.
+     * column bounds over the fixed matrix) instead of rebuilding. True when no row's coefficients
+     * depend on the live domains and every structural column is re-derivable from the live session —
+     * either CP-var-backed (re-bound from its own domain) or an auxiliary column with a [colReq]
+     * presence rule (re-bound by pinning). For an eligible relaxation [rebound] reproduces exactly the
+     * model a per-node build would emit.
      */
     val persistentEligible: Boolean = false,
+    /**
+     * Per structural column, an auxiliary column's presence requirement as flat `(intVar, value)`
+     * membership pairs — the column is present (upper [colPresentUpper]) only while every named value
+     * stays in its variable's live domain. Null for CP-var-backed columns and for auxiliary columns
+     * with no rule (which make the relaxation persistent-ineligible). Empty by default.
+     */
+    val colReq: Array<IntArray?> = arrayOfNulls(model.n),
+    /** Per structural column, the upper bound an auxiliary column takes when present (see [colReq]);
+     *  unused for CP-var columns. */
+    val colPresentUpper: LongArray = LongArray(model.n),
 )
 
 /**
  * The same relaxation re-bound to [session]'s live column bounds, reusing the fixed matrix and column
- * maps (see [LpRelaxation.persistentEligible] and [LpModel.rebind]). Only valid on an eligible
- * relaxation — every structural column must be CP-var-backed — which the caller checks before building
- * the persistent relaxation once and re-binding it at each node.
+ * maps (see [LpRelaxation.persistentEligible] and [LpModel.rebind]). A CP-var column takes its live
+ * domain (or pin); an auxiliary column with a [LpRelaxation.colReq] rule is pinned to `[0, 0]` once any
+ * required value has left its variable's live domain, else `[0, present-upper]`. Only valid on an
+ * eligible relaxation, which the caller checks before building the persistent relaxation once.
  */
 internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
     val n = model.n
     val lo = LongArray(n)
     val hi = LongArray(n)
     for (j in 0 until n) {
-        val v = colVarId[j]
-        if (colIsBool[j]) {
-            val pinned = session.boolValue(v)
-            lo[j] = if (pinned == true) 1L else 0L
-            hi[j] = if (pinned == false) 0L else 1L
-        } else {
-            val d = session.intDomain(v)
-            lo[j] = d.min.toLong()
-            hi[j] = d.max.toLong()
+        val req = colReq[j]
+        when {
+            req != null -> {
+                var present = true
+                var k = 0
+                while (k < req.size) {
+                    if (!session.intDomain(req[k]).contains(req[k + 1])) {
+                        present = false
+                        break
+                    }
+                    k += 2
+                }
+                lo[j] = 0L
+                hi[j] = if (present) colPresentUpper[j] else 0L
+            }
+
+            colIsBool[j] -> {
+                val pinned = session.boolValue(colVarId[j])
+                lo[j] = if (pinned == true) 1L else 0L
+                hi[j] = if (pinned == false) 0L else 1L
+            }
+
+            else -> {
+                val d = session.intDomain(colVarId[j])
+                lo[j] = d.min.toLong()
+                hi[j] = d.max.toLong()
+            }
         }
     }
     return LpRelaxation(
@@ -103,6 +133,8 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
         boolColOf = boolColOf,
         circuitArcs = circuitArcs,
         persistentEligible = true,
+        colReq = colReq,
+        colPresentUpper = colPresentUpper,
     )
 }
 
@@ -198,15 +230,17 @@ internal class CpToLpRelaxation(
         }
 
     /**
-     * Whether this relaxer's layout is node-invariant (#39), the structural half of
-     * [LpRelaxation.persistentEligible]: no feature that emits live-domain-dependent rows or auxiliary
-     * columns is enabled, and the problem has no live-M reified rows. The column half (every structural
-     * column CP-var-backed) is checked at build, since a degenerate hull can still leave aux columns.
-     * When true, a node may [rebound] the once-built relaxation instead of rebuilding it.
+     * Whether this relaxer emits no row whose coefficients depend on the live domains (#39), the
+     * row-side half of [LpRelaxation.persistentEligible]: the objective cone (different per-cone
+     * structure), the cumulative / diffn energetic rows (live-coefficient rows with no auxiliary
+     * column to gate them), and live-M reified rows are excluded. Auxiliary-column hulls (circuit,
+     * table, …) stay candidates here — their rows are fixed and the live restriction rides on the
+     * column bounds, which the per-column presence rule re-binds; an un-ruled aux column is what keeps
+     * a not-yet-wired hull off the persistent path (checked at build). When this holds and every
+     * column is re-derivable, a node may [rebound] the once-built relaxation instead of rebuilding it.
      */
     private val structurallyPersistent: Boolean =
-        !objectiveCone && !elementHull && !tableHull && !nValueHull && !regularHull && !mddHull &&
-            !gccCountHull && !circuitArcs && !cumulative && !diffn && !cumulativeTimeIndexed &&
+        !objectiveCone && !cumulative && !diffn &&
             problem.factors.none {
                 it is ReifiedLinear || it is ReifiedPseudoBoolean || it is ReifiedCardinality
             }
@@ -339,14 +373,27 @@ internal class CpToLpRelaxation(
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
 
+        // Per-column live-bound rule for the persistent relaxation (#39/#43). For an auxiliary column,
+        // colReq[c] holds its presence requirement as flat (intVar, value) membership pairs and
+        // colPresentUpper[c] the upper bound when present — so a node can re-bind the column (upper = 0
+        // when any required value left the live domain, else the present-upper) instead of rebuilding.
+        // null/0 for CP-var columns (re-bound from the variable's own domain) and for un-ruled aux
+        // columns (which keep the relaxation off the persistent path).
+        private val colReq = ArrayList<IntArray?>()
+        private val colPresentUpper = LongArrayList()
+
         /** Arc-indicator models recorded by [buildCircuitArcs] for the subtour-elimination separator. */
         private val circuitModels = ArrayList<CircuitArcModel>()
 
-        /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc. */
-        private fun auxColumn(lo: Long, hi: Long): Int {
+        /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc.
+         *  [presence] names the `(intVar, value)` memberships that must all hold for the column to be
+         *  present (upper [hi]); when given, the column can be re-bound on the persistent path. */
+        private fun auxColumn(lo: Long, hi: Long, presence: IntArray? = null): Int {
             val c = builder.addVar(lo, hi, cost = 0L, tag = -1)
             colVarId.add(-1)
             colIsBool.add(0)
+            colReq.add(presence)
+            colPresentUpper.add(hi)
             return c
         }
 
@@ -400,7 +447,9 @@ internal class CpToLpRelaxation(
                 problem.intDomains[succ[i]].forEach { j ->
                     if ((!selfLoops && j == i) || j < 0 || j >= n) return@forEach
                     val present = live.contains(j)
-                    val col = auxColumn(0L, if (present) 1L else 0L)
+                    // The arc is present exactly while head j stays in succ[i]'s live domain — the single
+                    // membership that lets the persistent relaxation re-bind this column (#43).
+                    val col = auxColumn(0L, if (present) 1L else 0L, presence = intArrayOf(succ[i], j))
                     outCols.add(col)
                     chanCols.add(col)
                     chanCoef.add(j)
@@ -441,6 +490,8 @@ internal class CpToLpRelaxation(
                 intCol[i] = c
                 colVarId.add(i)
                 colIsBool.add(0)
+                colReq.add(null)
+                colPresentUpper.add(0L)
             }
             return c
         }
@@ -456,6 +507,8 @@ internal class CpToLpRelaxation(
                 boolCol[b] = c
                 colVarId.add(b)
                 colIsBool.add(1)
+                colReq.add(null)
+                colPresentUpper.add(0L)
             }
             return c
         }
@@ -848,10 +901,14 @@ internal class CpToLpRelaxation(
             val model = builder.build(Sense.MINIMIZE)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
             val colVarIds = IntArray(colVarId.size) { colVarId[it] }
-            // Persistent re-binding needs every column CP-var-backed (no aux) so live bounds fully
-            // describe the node; the global cuts folded in here are fixed rows over existing columns, so
-            // they stay valid under re-binding. Empty relaxations are not worth persisting.
-            val eligible = structurallyPersistent && model.n > 0 && colVarIds.all { it >= 0 }
+            val reqs = colReq.toTypedArray()
+            val presentUpper = LongArray(colPresentUpper.size) { colPresentUpper[it] }
+            // Persistent re-binding needs each column re-derivable from the live session: either
+            // CP-var-backed (re-bound from its own domain) or an auxiliary column carrying a presence
+            // rule (re-bound by pinning). The global cuts folded in here are fixed rows over existing
+            // columns. Empty relaxations are not worth persisting.
+            val eligible = structurallyPersistent && model.n > 0 &&
+                colVarIds.indices.all { colVarIds[it] >= 0 || reqs[it] != null }
             return LpRelaxation(
                 model = model,
                 colVarId = colVarIds,
@@ -861,6 +918,8 @@ internal class CpToLpRelaxation(
                 boolColOf = boolCol.copyOf(),
                 circuitArcs = circuitModels,
                 persistentEligible = eligible,
+                colReq = reqs,
+                colPresentUpper = presentUpper,
             )
         }
 
