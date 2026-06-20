@@ -16,3 +16,6 @@ out/
 .fleet/
 .kotlin/
 /tools/
+
+# Generated bench solve/calibrate artifacts (keep the committed *.sh scorers at output/ root)
+klause-bench/output/*/
