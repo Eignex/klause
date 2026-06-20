@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SolveStats
@@ -18,7 +19,9 @@ internal object SmtLibMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val parsed = SmtLibQfLia.parse(readTextFile(path))
+            // Unbounded SMT ints use the ambient default int range (shared with the FlatZinc front-end).
+            val config = KlauseConfig.current
+            val parsed = SmtLibQfLia.parse(readTextFile(path), config.unboundedIntLo, config.unboundedIntHi)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
                     "factors=${parsed.problem.numFactors}"

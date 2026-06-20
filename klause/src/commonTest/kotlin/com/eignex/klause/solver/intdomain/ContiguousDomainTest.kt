@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.intdomain
 
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -143,10 +143,10 @@ class ContiguousDomainTest {
 
     @Test
     fun `excludeValue should use runs domain for wide interior carve`() {
-        val d = ContiguousDomain(0, IntDomain.BITSET_THRESHOLD + 10).excludeValue(100)
+        val d = ContiguousDomain(0, DEFAULT_BITSET_THRESHOLD + 10).excludeValue(100)
         assertTrue(d is RunsDomain)
         assertEquals(0, d.min)
-        assertEquals(IntDomain.BITSET_THRESHOLD + 10, d.max)
+        assertEquals(DEFAULT_BITSET_THRESHOLD + 10, d.max)
         assertFalse(100 in d)
         assertTrue(99 in d)
         assertTrue(101 in d)

@@ -20,7 +20,8 @@ fun interface IntConsumer {
  *  - [com.eignex.klause.solver.intdomain.ContiguousDomain] — `(min..max)` with no holes; everything
  *    is O(1).
  *  - [com.eignex.klause.solver.intdomain.BitsetDomain] — one bit per value over a narrow span
- *    (`<=` [BITSET_THRESHOLD]); membership is an O(1) bit test at any density.
+ *    (`<=` [com.eignex.klause.config.KlauseConfig.bitsetThreshold]); membership is an O(1) bit test
+ *    at any density.
  *  - [com.eignex.klause.solver.intdomain.RunsDomain] — a sorted list of disjoint present runs;
  *    membership O(log runs), storage O(runs). The wide-span rep for relatively few runs (few holes,
  *    or clustered survivors).
@@ -35,12 +36,12 @@ fun interface IntConsumer {
  *
  * **Representation choice** — construct via the factories (`IntDomain(min, max)` for the contiguous
  * case; the internal `intDomainFrom*` factories pick the wide rep): a single run ⇒ contiguous; span
- * `<=` [BITSET_THRESHOLD] ⇒ bitset; otherwise the run list when it is at least as compact as the
- * survivor list (`2·runs <= survivors`), else the survivor list. Domains are immutable, so every
- * mutation returns a fresh value and re-picks — there is no flip-flop cost.
+ * `<=` [com.eignex.klause.config.KlauseConfig.bitsetThreshold] ⇒ bitset; otherwise the run list when
+ * it is at least as compact as the survivor list (`2·runs <= survivors`), else the survivor list.
+ * Domains are immutable, so every mutation returns a fresh value and re-picks — no flip-flop cost.
  *
- * Callers depend only on this interface and `IntDomain(min, max)` / [IntDomain.BITSET_THRESHOLD];
- * the concrete reps are an implementation detail.
+ * Callers depend only on this interface and `IntDomain(min, max)`; the concrete reps are an
+ * implementation detail.
  */
 interface IntDomain {
     /** Inclusive lower bound; always an in-domain value. */
@@ -113,14 +114,9 @@ interface IntDomain {
         else -> value.toInt()
     }
 
-    /** Factory and shared constants for [IntDomain]. */
+    /** Factory for [IntDomain]; the bitset/wide-rep cutoff is
+     *  [com.eignex.klause.config.KlauseConfig.bitsetThreshold]. */
     companion object {
-        /** Span threshold (inclusive) below which a non-contiguous domain is stored as a bitset
-         *  instead of a wide rep. 4096 ⇒ ≤ 64 longs (512 bytes), which keeps membership O(1) for
-         *  the whole moderate-span middle ground; only genuinely wide domains fall through to the
-         *  run / survivor reps. */
-        const val BITSET_THRESHOLD: Int = 4096
-
         /** Construct the contiguous domain `(min..max)`. Source-compatible with the former class
          *  constructor, so existing `IntDomain(min, max)` call sites are unchanged. */
         operator fun invoke(min: Int, max: Int): IntDomain = ContiguousDomain(min, max)

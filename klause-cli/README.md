@@ -112,8 +112,9 @@ twice.
 - `klause.engine` — default engine for a bare invocation (`-e` overrides).
 - `klause.portfolio.arms` — default portfolio arm-pool size (`--param arms=N` overrides).
 - Core compiler/solver knobs from `KlauseConfigSchema`: `klause.pin.absent.opt.vars`,
-  `klause.unbounded.int.lo` / `.hi`, `klause.float.buckets`, `klause.float.scale`,
-  `klause.lp.max.tableau.cells`, `klause.lp.ceiling.tableau.cells`.
+  `klause.unbounded.int.lo` / `.hi` (the default int range for unbounded FlatZinc *and* SMT-LIB
+  vars), `klause.float.buckets`, `klause.float.scale`, `klause.lp.max.tableau.cells`,
+  `klause.lp.ceiling.tableau.cells`, `klause.bitset.threshold`.
 
 Presolve is *not* an env knob — set it per run with `--presolve`.
 

@@ -1,5 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
@@ -36,14 +38,21 @@ data class SmtLibProblem(
 
 /** Parser/compiler for the supported SMT-LIB QF_LIA subset. */
 object SmtLibQfLia {
-    /** Parse SMT-LIB QF_LIA [text] into an [SmtLibProblem]. */
-    fun parse(text: String, intBound: Int = 100_000, strictBounds: Boolean = false): SmtLibProblem {
-        val b = Builder(intBound, strictBounds)
+    /** Parse SMT-LIB QF_LIA [text] into an [SmtLibProblem]. A variable with no provable bound (and a
+     *  derived bound past the range) falls back to / is clamped into `[unboundedIntLo, unboundedIntHi]`
+     *  — the same default int range as the FlatZinc front-end ([com.eignex.klause.config.KlauseConfig]). */
+    fun parse(
+        text: String,
+        unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
+        unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+        strictBounds: Boolean = false,
+    ): SmtLibProblem {
+        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds)
         for (cmd in SExprReader(text).readAll()) b.command(cmd)
         return b.build()
     }
 
-    private class Builder(val intBound: Int, val strictBounds: Boolean) : CnfLowering {
+    private class Builder(val unboundedIntLo: Int, val unboundedIntHi: Int, val strictBounds: Boolean) : CnfLowering {
         private val boolNames = HashMap<String, Int>()
         private val intNames = HashMap<String, Int>()
         private var nextBool = 0
@@ -66,7 +75,7 @@ object SmtLibQfLia {
 
         override fun newBool(): Int = nextBool++
         private fun newInt(): Int {
-            intDomains.add(IntDomain(-intBound, intBound))
+            intDomains.add(IntDomain(unboundedIntLo, unboundedIntHi))
             return nextInt++
         }
         private fun newInt(lo: Int, hi: Int): Int {
@@ -172,14 +181,14 @@ object SmtLibQfLia {
                 var vhi = hi[v]
                 if (vlo <= NEG_INF) {
                     if (strictBounds) throw UnsupportedSmtException("no provable lower bound for '$name'")
-                    vlo = -intBound.toLong()
+                    vlo = unboundedIntLo.toLong()
                 }
                 if (vhi >= POS_INF) {
                     if (strictBounds) throw UnsupportedSmtException("no provable upper bound for '$name'")
-                    vhi = intBound.toLong()
+                    vhi = unboundedIntHi.toLong()
                 }
-                val clo = vlo.coerceIn(-intBound.toLong(), intBound.toLong()).toInt()
-                val chi = vhi.coerceIn(-intBound.toLong(), intBound.toLong()).toInt()
+                val clo = vlo.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong()).toInt()
+                val chi = vhi.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong()).toInt()
                 intDomains[v] = if (clo <= chi) IntDomain(clo, chi) else IntDomain(clo, clo)
             }
         }

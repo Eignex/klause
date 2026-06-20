@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.intdomain
 
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -38,7 +38,7 @@ class RunsDomainTest {
 
     @Test
     fun `includeInteriorValue should bridge adjacent runs into a contiguous domain`() {
-        val wide = ContiguousDomain(0, IntDomain.BITSET_THRESHOLD + 20).excludeValue(100)
+        val wide = ContiguousDomain(0, DEFAULT_BITSET_THRESHOLD + 20).excludeValue(100)
         val restored = wide.includeInteriorValue(100)
         assertTrue(restored is ContiguousDomain)
         assertTrue(100 in restored)
@@ -46,14 +46,14 @@ class RunsDomainTest {
 
     @Test
     fun `withMinAtLeast should skip holes at the lower bound`() {
-        val d = ContiguousDomain(0, IntDomain.BITSET_THRESHOLD + 20).excludeValue(10).excludeValue(11)
+        val d = ContiguousDomain(0, DEFAULT_BITSET_THRESHOLD + 20).excludeValue(10).excludeValue(11)
         val tightened = d.withMinAtLeast(10)
         assertEquals(12, tightened.min)
     }
 
     @Test
     fun `forEachHoleInRange should report only holes inside the given slice`() {
-        val d = ContiguousDomain(0, IntDomain.BITSET_THRESHOLD + 20).excludeValue(100).excludeValue(150)
+        val d = ContiguousDomain(0, DEFAULT_BITSET_THRESHOLD + 20).excludeValue(100).excludeValue(150)
         val holes = mutableListOf<Int>()
         d.forEachHoleInRange(90, 120) { holes.add(it) }
         assertEquals(listOf(100), holes)

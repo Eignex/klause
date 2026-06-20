@@ -138,4 +138,7 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
     val lpCeilingTableauCells by long(KlauseConfig.DEFAULT.lpCeilingTableauCells) { c, v ->
         c.copy(lpCeilingTableauCells = v)
     }
+
+    /** Override for [KlauseConfig.bitsetThreshold]. */
+    val bitsetThreshold by int(KlauseConfig.DEFAULT.bitsetThreshold) { c, v -> c.copy(bitsetThreshold = v) }
 }

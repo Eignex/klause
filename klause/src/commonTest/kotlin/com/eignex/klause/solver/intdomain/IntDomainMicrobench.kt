@@ -9,7 +9,7 @@ import kotlin.time.measureTime
 
 /**
  * Microbenchmarks justifying the [IntDomain] rep selection (the `2·runs <= survivors` crossover and
- * the [IntDomain.BITSET_THRESHOLD] cutoff) and confirming the wide reps are span-independent on the
+ * the bitset cutoff) and confirming the wide reps are span-independent on the
  * pathological shapes from #723. Not run in CI — `@Ignore`d because they print timings rather than
  * assert, and are JIT/host sensitive. Run one explicitly, e.g.:
  *

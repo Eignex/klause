@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test
@@ -72,7 +73,7 @@ class IntDomainTest {
         val rng = Random(0x5A17)
         repeat(60) { _ ->
             val lo = rng.nextInt(0, 1000)
-            val width = rng.nextInt(IntDomain.BITSET_THRESHOLD + 1, 20_000)
+            val width = rng.nextInt(DEFAULT_BITSET_THRESHOLD + 1, 20_000)
             val hi = lo + width
             val present = (lo..hi).toMutableSet()
             val carveFraction = rng.nextDouble()

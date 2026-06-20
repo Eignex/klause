@@ -1,12 +1,13 @@
 package com.eignex.klause.solver.intdomain
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayList
 
 /**
  * Build a domain from a non-empty sorted-distinct survivor array. Picks the most compact rep:
- * gap-free ⇒ contiguous; span `<=` [IntDomain.BITSET_THRESHOLD] ⇒ bitset; otherwise the run list
+ * gap-free ⇒ contiguous; span `<=` [KlauseConfig.bitsetThreshold] ⇒ bitset; otherwise the run list
  * when it is at least as compact as the survivor list (`2·runs <= survivors`), else the survivor
  * list. The array is adopted by-reference for the survivor rep, so callers must not mutate it after.
  */
@@ -16,7 +17,7 @@ internal fun intDomainFromSurvivors(sv: IntArray): IntDomain {
     val newMax = sv[s - 1]
     val span = newMax - newMin + 1
     if (s == span) return ContiguousDomain(newMin, newMax)
-    if (span <= IntDomain.BITSET_THRESHOLD) {
+    if (span <= KlauseConfig.current.bitsetThreshold) {
         val bits = LongArray((span + 63) ushr 6)
         for (i in 0 until s) Bits.set(bits, sv[i] - newMin)
         return BitsetDomain(newMin, newMax, bits, newMin)
@@ -58,7 +59,7 @@ internal fun intDomainFromRuns(runs: IntArrayList): IntDomain {
         s += runs[k + 1] - runs[k] + 1
         k += 2
     }
-    if (span <= IntDomain.BITSET_THRESHOLD) {
+    if (span <= KlauseConfig.current.bitsetThreshold) {
         val bits = LongArray((span + 63) ushr 6)
         k = 0
         while (k < runs.size) {
