@@ -3,6 +3,7 @@ package com.eignex.klause.solver.lp.relaxation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.linear.Linear
 import com.eignex.klause.solver.factor.linear.LinearOp
 import com.eignex.klause.solver.factor.linear.ReifiedLinear
@@ -82,6 +83,30 @@ class CpToLpRelaxationReboundTest {
 
         val node = PropagationSession(problem)
         node.pinInt(1, 5)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `rebound reproduces a circuit arc relaxation when an arc is pruned`() {
+        // A 3-node circuit: arc columns are laid out from the declared domains and pinned live, so the
+        // relaxation is persistent-eligible. Pruning value 2 from succ[0] drops arc 0->2; re-binding
+        // must pin that arc column to 0 exactly as a per-node rebuild does.
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(Circuit(intArrayOf(0, 1, 2))),
+        )
+        val relaxer = CpToLpRelaxation(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(0, 0, 0)),
+            circuitArcs = true,
+        )
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a circuit arc relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 1) // drop value 2 from succ[0]
         assertSameModel(relaxer.build(node).model, base.rebound(node).model)
     }
 
