@@ -159,6 +159,18 @@ internal class Bits(val size: Int) {
             }
         }
 
+        /** XOR [src] into [dst] word-by-word: `dst ^= src`. Both arrays must be the same length. */
+        fun xorInto(dst: LongArray, src: LongArray) {
+            for (i in dst.indices) dst[i] = dst[i] xor src[i]
+        }
+
+        /** Number of set bits across all words. */
+        fun popcount(bits: LongArray): Int {
+            var c = 0
+            for (w in bits) c += w.countOneBits()
+            return c
+        }
+
         fun firstSet(bits: LongArray): Int {
             for (w in bits.indices) {
                 if (bits[w] != 0L) return (w shl 6) + bits[w].countTrailingZeroBits()

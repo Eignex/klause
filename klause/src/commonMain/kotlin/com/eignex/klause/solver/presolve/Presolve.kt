@@ -15,6 +15,7 @@ import com.eignex.klause.solver.factor.bool.Xor
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.global.ValuePrecede
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
 
@@ -104,7 +105,7 @@ object Presolve {
                 occParity[v] = (occParity[v] ?: 0) xor 1
                 if (!Lit.isPositive(lit)) negParity = negParity xor 1
             }
-            for ((v, parity) in occParity) if (parity == 1) setBit(row, colOfVar.getValue(v))
+            for ((v, parity) in occParity) if (parity == 1) Bits.set(row, colOfVar.getValue(v))
             rhs[r] = x.targetParity xor negParity
         }
 
@@ -112,7 +113,7 @@ object Presolve {
         for (col in vars.indices) {
             var sel = -1
             for (r in pivotRow until rows.size) {
-                if (getBit(rows[r], col)) {
+                if (Bits.has(rows[r], col)) {
                     sel = r
                     break
                 }
@@ -127,8 +128,8 @@ object Presolve {
                 rhs[sel] = tmpRhs
             }
             for (r in rows.indices) {
-                if (r != pivotRow && getBit(rows[r], col)) {
-                    xorInto(rows[r], rows[pivotRow])
+                if (r != pivotRow && Bits.has(rows[r], col)) {
+                    Bits.xorInto(rows[r], rows[pivotRow])
                     rhs[r] = rhs[r] xor rhs[pivotRow]
                 }
             }
@@ -139,14 +140,14 @@ object Presolve {
         var contradiction = false
         val forced = HashMap<Int, Boolean>()
         for (r in rows.indices) {
-            when (popcount(rows[r])) {
+            when (Bits.popcount(rows[r])) {
                 0 -> if (rhs[r] == 1) {
                     contradiction = true
                     break
                 }
 
                 1 -> {
-                    val v = vars[firstSetBit(rows[r])]
+                    val v = vars[Bits.firstSet(rows[r])]
                     val value = rhs[r] == 1
                     val previous = forced[v]
                     if (previous == null) {
@@ -915,30 +916,6 @@ object Presolve {
         probeTotalBudget = problem.probeTotalBudget,
         probeSeed = problem.probeSeed,
     )
-
-    private fun setBit(bits: LongArray, bit: Int) {
-        bits[bit ushr 6] = bits[bit ushr 6] or (1L shl (bit and 63))
-    }
-
-    private fun getBit(bits: LongArray, bit: Int): Boolean = (bits[bit ushr 6] ushr (bit and 63)) and 1L == 1L
-
-    private fun xorInto(dst: LongArray, src: LongArray) {
-        for (i in dst.indices) dst[i] = dst[i] xor src[i]
-    }
-
-    private fun popcount(bits: LongArray): Int {
-        var c = 0
-        for (w in bits) c += w.countOneBits()
-        return c
-    }
-
-    private fun firstSetBit(bits: LongArray): Int {
-        for (i in bits.indices) {
-            val w = bits[i]
-            if (w != 0L) return (i shl 6) + w.countTrailingZeroBits()
-        }
-        return -1
-    }
 
     /** Relation common to [LinearOp] and [PbOp] so the bound rewrite is written once. */
     private enum class Rel { LE, GE, EQ, NE }
