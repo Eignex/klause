@@ -475,13 +475,15 @@ class BacktrackSolver(override val problem: Problem) :
             val gomory = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.gomory
             val mir = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.mir
             if (lpEngine.lpSeparators.isNotEmpty() || gomory || mir) {
-                lpEngine.lpGlobalCuts = lpEngine.harvestRootCuts(
-                    relaxer,
-                    PropagationSession(problem),
-                    lpEngine.lpSeparators,
-                    gomory,
-                    mir,
-                    token,
+                lpEngine.cutPool.addAll(
+                    lpEngine.harvestRootCuts(
+                        relaxer,
+                        PropagationSession(problem),
+                        lpEngine.lpSeparators,
+                        gomory,
+                        mir,
+                        token,
+                    ),
                 )
                 sink.observeLpCuts(lpEngine.lpGlobalCuts.size)
             }
@@ -806,6 +808,10 @@ internal const val GOMORY_CUTS_PER_ROUND: Int = 8
 
 /** Separation rounds when harvesting the persistent root cut pool. */
 internal const val CUT_POOL_ROUNDS: Int = 8
+
+/** Separation rounds per during-search node (#41) — fewer than the root harvest, since the node solve
+ *  repeats deeper in the tree. */
+internal const val SEARCH_CUT_ROUNDS: Int = 4
 
 /** Cap on cascading CDB backjumps within a single search step. Defensive; under
  *  a well-formed analyzer the loop terminates well before this. */
