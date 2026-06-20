@@ -135,12 +135,13 @@ internal class LpEngine(
     private var energeticCheckCounter = 0
     private var cumulativeFlowCheckCounter = 0
 
-    // Adaptive LP auto-off (#614, superseding the static #562 one-shot): gate the per-node LP on a
-    // rolling prune-rate window and re-probe a disabled LP on exponential backoff, so a relaxation
-    // that is useless near the root but tightens deeper is recovered. Sound: gating only drops a
-    // bound (loses pruning, never solutions), so `-t` is honoured (the gate only reduces work).
-    private val lpAutoOff = LpAutoOff(
-        reprobeBase = if (params.lpPlan.autoOffReprobe) LpAutoOff.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
+    // Adaptive LP effort ladder (#32, generalizing the #614 auto-off): the emphasis sets the ceiling
+    // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
+    // at a time — shedding during-search cuts before the bound — re-probing upward on backoff. Sound:
+    // every rung is a valid bound / off, so the gate only changes work, never solutions.
+    private val lpLadder = LpEffortLadder(
+        top = if (params.lpPlan.cuts) LpEffort.CUTS else LpEffort.BOUND,
+        reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
     )
     val lpNogoods: LpNogoodPool? = if (params.lpPlan.learn) LpNogoodPool() else null
     private val lpBasisByDepth = ArrayList<Basis?>()
@@ -321,10 +322,12 @@ internal class LpEngine(
             val lpRelaxerL = lpRelaxer ?: return false
             if (session.decisionLevel > params.lpPlan.boundMaxDepth ||
                 ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
-                !lpAutoOff.shouldRun()
+                !lpLadder.shouldRun()
             ) {
                 return false
             }
+            // The ladder's run rung decides whether during-search cuts separate at this node (#32).
+            val cutsAllowed = lpLadder.cutsEnabled
             val depth = session.decisionLevel
             // Warm-start this node's LP from the parent depth's optimal basis (#705): tightening
             // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
@@ -345,6 +348,7 @@ internal class LpEngine(
                 hints = lpHints,
                 learn = params.lpPlan.learn,
                 warm = warm,
+                cutsAllowed = cutsAllowed,
             )
             if (outcome.basis != null) {
                 while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
@@ -361,7 +365,7 @@ internal class LpEngine(
                     )
                 }
             }
-            lpAutoOff.record(outcome.prune)
+            lpLadder.record(outcome.prune)
             return outcome.prune
         }
     }
