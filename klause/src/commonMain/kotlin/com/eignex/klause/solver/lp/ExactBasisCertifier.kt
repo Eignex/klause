@@ -5,6 +5,7 @@ import com.eignex.klause.solver.lp.relaxation.LpExplanation
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * Exact lower bound on the minimized objective `cᵀz`, certified from a (float-found) [Basis] using
@@ -158,7 +159,7 @@ internal object ExactBasisCertifier {
         }
         // Row-major view of the structural matrix, for back-substituting a ≤-row slack to its columns.
         val rowCols = Array(m) { IntArrayList() }
-        val rowVals = Array(m) { ArrayList<Long>() }
+        val rowVals = Array(m) { LongArrayList() }
         for (k in 0 until n) {
             model.forEachInColumn(k) { i, v ->
                 rowCols[i].add(k)
@@ -201,7 +202,7 @@ internal object ExactBasisCertifier {
         status: Array<VarStatus>,
         rho: Array<BigRational>,
         rowCols: Array<IntArrayList>,
-        rowVals: Array<ArrayList<Long>>,
+        rowVals: Array<LongArrayList>,
         f0: BigRational,
         mir: Boolean,
         one: BigRational,

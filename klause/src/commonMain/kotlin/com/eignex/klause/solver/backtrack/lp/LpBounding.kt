@@ -28,6 +28,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import kotlin.math.ceil
 import kotlin.math.round
 
@@ -310,7 +311,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     val supportCols = IntArrayList()
     val supportLits = IntArrayList()
     if (canLearn) {
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         val premLits = IntArrayList()
         if (LpExplanation.addDualRowPremiseLits(premLits, seen, relaxation, cert, session)) {
             for (k in 0 until premLits.size) {
