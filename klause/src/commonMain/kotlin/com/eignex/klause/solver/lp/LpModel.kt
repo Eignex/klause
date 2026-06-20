@@ -88,9 +88,44 @@ internal class LpModel(
      * Always null where [rowGlobal] is true.
      */
     val rowPremises: Array<LpRowPremises?> = arrayOfNulls(m),
+    /**
+     * Right-hand side per row after the `>=`-to-`<=` flip but **before** the lower-bound shift — i.e.
+     * `rhs[i] = flippedRhs[i] − Σ_j csc(i,j)·loShift[j]`. Retained so a persistent relaxation can
+     * [rebind] new column bounds over the fixed [csc] without re-running [LpBuilder]: the structure
+     * (matrix, costs, tags, row relations) is node-invariant, only the bound-derived vectors change.
+     * Defaults to the post-shift [rhs] for models that never rebind.
+     */
+    val flippedRhs: LongArray = rhs,
 ) {
     /** Total variable count: structural plus slack. */
     val numVars: Int get() = n + m
+
+    /**
+     * A model identical in structure ([csc], [cost], [tag], [rowGlobal], [rowPremises], slack
+     * relations) but with fresh structural-column bounds `[lo[j], hi[j]]`. Recomputes only the
+     * bound-derived vectors — [rhs] (via the lower-bound shift over the fixed matrix), [upper],
+     * [loShift] and [objConstant] — in `O(nnz)`. For a relaxation whose layout is node-invariant
+     * (no auxiliary columns, no live-M rows) this yields the same model a per-node rebuild would,
+     * so a search node can re-bind the persistent relaxation instead of rebuilding it.
+     */
+    fun rebind(lo: LongArray, hi: LongArray): LpModel {
+        require(lo.size == n && hi.size == n) { "rebind expects $n bounds, got ${lo.size}/${hi.size}" }
+        val newRhs = flippedRhs.copyOf()
+        val newUpper = upper.copyOf()
+        var newObjConstant = 0L
+        for (j in 0 until n) {
+            require(lo[j] <= hi[j]) { "empty domain [${lo[j]}, ${hi[j]}] for column $j" }
+            forEachInColumn(j) { i, v -> newRhs[i] = subExact(newRhs[i], mulExact(v, lo[j])) }
+            newUpper[j] = subExact(hi[j], lo[j])
+            newObjConstant = addExact(newObjConstant, mulExact(cost[j], lo[j]))
+        }
+        return LpModel(
+            n = n, m = m, csc = csc, rhs = newRhs, cost = cost,
+            upper = newUpper, hasUpper = hasUpper, loShift = lo.copyOf(),
+            objConstant = newObjConstant, sense = sense, tag = tag,
+            rowGlobal = rowGlobal, rowPremises = rowPremises, flippedRhs = flippedRhs,
+        )
+    }
 
     /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
@@ -205,12 +240,16 @@ internal class LpBuilder {
         val n = lo.size
         val m = rows.size
         val rhs = LongArray(m)
+        // Base rhs after the >=-to-<= flip but before the lower-bound shift; retained on the model so a
+        // persistent relaxation can re-derive `rhs` for fresh bounds (see LpModel.rebind / flippedRhs).
+        val flippedRhs = LongArray(m)
         val loShift = LongArray(n) { lo[it] }
 
         for ((i, row) in rows.withIndex()) {
             // Normalize >= to <= by negating both sides; == stays put (its slack is fixed at zero).
             val flip = row.rel == Relation.GE
             var b = if (flip) -row.rhs else row.rhs
+            flippedRhs[i] = b
             for (k in row.cols.indices) {
                 val j = row.cols[k]
                 val coeff = if (flip) -row.vals[k] else row.vals[k]
@@ -251,6 +290,7 @@ internal class LpBuilder {
             objConstant = objConstant, sense = sense, tag = IntArray(n) { tags[it] },
             rowGlobal = BooleanArray(m) { rows[it].global },
             rowPremises = Array(m) { rows[it].premises },
+            flippedRhs = flippedRhs,
         )
     }
 

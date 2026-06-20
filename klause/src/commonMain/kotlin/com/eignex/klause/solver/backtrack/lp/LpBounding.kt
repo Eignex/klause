@@ -149,7 +149,7 @@ internal fun LpEngine.sparseSafePrune(
     learn: Boolean = false,
     warm: Basis? = null,
 ): LpNodeOutcome {
-    val relaxation = relaxer.build(session, globalCuts)
+    val relaxation = nodeRelaxation(relaxer, session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
@@ -386,7 +386,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     cancellation: Cancellation,
 ): LpNodeOutcome {
     if (!bound.isFinite()) return LpNodeOutcome(false, null) // no incumbent to prune against
-    val relaxation = relaxer.build(session, globalCuts)
+    val relaxation = nodeRelaxation(relaxer, session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
     val result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
