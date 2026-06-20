@@ -179,33 +179,6 @@ data class BacktrackParams(
      * all-off [LpPlan] (no LP unless a field is set or [lpConfig] resolves one on).
      */
     val lpPlan: LpPlan = LpPlan(),
-    /**
-     * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
-     * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
-     * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
-     * constraints over them dualized) and prunes when that bound — rounded up — reaches the incumbent.
-     * Independent of [LpPlan.bounding]; off by default; a no-op when no eligible AllDifferent exists.
-     */
-    val lagrangian: Boolean = false,
-    /** Subgradient ascent iterations per node for [lagrangian] / [LpPlan.knapsackLagrangian]; more
-     *  iterations tighten the bound. */
-    val lagrangianIterations: Int = 15,
-    /**
-     * Energetic-reasoning infeasibility check for Cumulative globals (#22/#23). When true, a node is
-     * pruned if some Cumulative is energetically over-subscribed (required mandatory energy in a time
-     * window exceeds capacity·width). Pure feasibility test; off by default; a no-op without a
-     * Cumulative. Currently applied on the minimization path alongside the other LP bounds.
-     */
-    val energeticReasoning: Boolean = false,
-    /**
-     * Frequency policy for [energeticReasoning]: run the window scan at one in every
-     * [energeticEvery] pruning checks, mirroring [LpPlan.boundEvery]. The scan is O(windows² · tasks)
-     * per Cumulative with no incremental state, so on task-heavy models it dominates a node's
-     * cost; a cadence trades missed prunes for throughput. `1` (default) checks at every pruned
-     * node. [LpAutoConfig] derives a size-aware cadence from the task counts when *it* enables
-     * the check. Must be positive.
-     */
-    val energeticEvery: Int = 1,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

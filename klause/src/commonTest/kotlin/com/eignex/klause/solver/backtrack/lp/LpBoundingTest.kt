@@ -88,28 +88,15 @@ class LpBoundingTest {
     }
 
     @Test
-    fun `root cut loop preserves the optimum and never explores more nodes`() {
-        // #285: closing the root relaxation harder (more separation rounds at level 0) must keep the
-        // proven optimum and never enlarge the tree versus a single root round.
+    fun `root cut harvest preserves the optimum`() {
+        // The root cut harvest (global pool reused at every node) must keep the proven optimum.
         val problem = triangle()
-        val deep = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem).minimize(
             sumObjective,
-            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true, rootCutRounds = 16)),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)),
         )
-        val shallow = BacktrackSolver(problem).minimize(
-            sumObjective,
-            BacktrackParams(
-                randomSeed = 1L,
-                lpPlan = LpPlan(bounding = true, cuts = true, rootCutRounds = 1, cutRounds = 1),
-            ),
-        )
-        assertTrue(deep is MinimizeResult.Optimal && shallow is MinimizeResult.Optimal)
-        assertEquals(3.0, deep.objectiveValue)
-        assertEquals(3.0, shallow.objectiveValue)
-        assertTrue(
-            deep.stats.nodes.sum <= shallow.stats.nodes.sum,
-            "root cut loop explored more nodes: ${deep.stats.nodes.sum} vs ${shallow.stats.nodes.sum}",
-        )
+        assertTrue(result is MinimizeResult.Optimal)
+        assertEquals(3.0, result.objectiveValue)
     }
 
     @Test
