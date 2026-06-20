@@ -3,10 +3,11 @@ package com.eignex.klause.solver.lp.relaxation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.solver.factor.circuit.Circuit
+import com.eignex.klause.solver.factor.global.NValue
 import com.eignex.klause.solver.factor.table.Table
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.objective.LinearObjective
@@ -135,7 +136,9 @@ class CpToLpRelaxationReboundTest {
     }
 
     @Test
-    fun `a hull relaxation with auxiliary columns is not persistent-eligible`() {
+    fun `rebound reproduces a table hull when a tuple becomes infeasible`() {
+        // Table {(0,5),(2,2),(4,0)}: each tuple's selector is present while every entry stays live.
+        // Pruning value 5 from x1 drops the (0,5) selector; re-binding must pin it to 0 like a rebuild.
         val problem = Problem(
             0,
             2,
@@ -143,9 +146,28 @@ class CpToLpRelaxationReboundTest {
             arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 5, 2, 2, 4, 0))),
         )
         val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0)), tableHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a table hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(1, 4) // value 5 leaves x1 — tuple (0,5) infeasible
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `an un-wired hull relaxation is not persistent-eligible`() {
+        // The NValue hull's selectors carry no presence rule yet, so it stays on the per-node rebuild.
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
+            arrayOf<Factor>(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
+        )
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), nValueHull = true)
         assertFalse(
             relaxer.build(PropagationSession(problem)).persistentEligible,
-            "selector columns are not CP-var-backed, so the table hull cannot be re-bound",
+            "an auxiliary column with no presence rule keeps a hull off the persistent path",
         )
     }
 }
