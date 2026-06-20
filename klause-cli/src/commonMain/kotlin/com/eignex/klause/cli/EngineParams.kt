@@ -24,16 +24,20 @@ import com.eignex.klause.solver.backtrack.selector.SolutionGuided
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.solver.localsearch.AspirationCriterion
-import com.eignex.klause.solver.localsearch.LocalSearchParams
+import com.eignex.klause.solver.localsearch.FixedCadenceRestart
+import com.eignex.klause.solver.localsearch.LubyRestart
+import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.TabuFilter
 import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
-import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
-import com.eignex.klause.solver.localsearch.schedule.Geometric
-import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
+import com.eignex.klause.solver.localsearch.strategy.AxisEdits
+import com.eignex.klause.solver.localsearch.strategy.AxisToken
 import com.eignex.klause.solver.localsearch.strategy.Cbls
 import com.eignex.klause.solver.localsearch.strategy.FeasibilityJump
+import com.eignex.klause.solver.localsearch.strategy.LsCatalog
+import com.eignex.klause.solver.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.localsearch.strategy.ProbSat
 import com.eignex.klause.solver.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
@@ -48,12 +52,14 @@ import com.eignex.klause.solver.localsearch.strategy.WalkSat
  * Keys per engine:
  *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
  *    `var-selector` (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind])
- *  - `ls`: `strategy` (base recipe `cbls|feasibilityjump|walksat|probsat|sa|bare`, default `cbls`)
- *    plus per-axis overrides — `sources` (e.g. `violated,argmin`), `scoring` (`weighted|raw|break`),
- *    `acceptance` (`greedy|walksat|probsat|skew|sa`) and the axis numerics `noise`/`cb`/`skew-alpha`,
- *    `initial-temp`/`cooling-rate`/`min-temp`, `smooth-prob`/`smooth-factor`; engine knobs `seed`,
- *    `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`
- *  - `portfolio`: `ls`, `bt`, `seed`, `lambda`
+ *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
+ *    | `bare`) plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
+ *    `+`/`-` add/remove), `scoring` (`weighted|raw|break`), `acceptance`
+ *    (`greedy|walksat|probsat|skew|sa`), `restart` (`fixed|luby|perturb`); any token may carry an
+ *    arm-family selector (`cbls.break`). Axis numerics `noise`/`cb`/`skew-alpha`/`initial-temp`/
+ *    `cooling-rate`/`min-temp`/`smooth-prob`/`smooth-factor`/`tabu-tenure`; portfolio knobs `arms`,
+ *    `ls`, `bt`, `seed`, `lambda`; `dry-run` lists the resolved arms instead of solving
+ *  - `portfolio`: `arms`, `ls`, `bt`, `seed`, `lambda`
  */
 internal class EngineParams(pairs: List<String>) {
     private val map: MutableMap<String, String> = mutableMapOf()
@@ -167,15 +173,16 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
     return out
 }
 
-/** Resolved ls-single engine config: the fully-built four-axis [SourceDrivenStrategy] plus the
- *  solver knobs the strategy itself doesn't own. */
-internal class LsSetup(val pairSwapBudget: Int, val lambda: Double, val strategy: SourceDrivenStrategy)
+/** Resolved local-search arm pool for the `ls` engine: per-arm factories (a *fresh* recipe per slot,
+ *  so parallel workers never share mutable strategy state). A null [pool] means the default curated
+ *  pool — the portfolio builds it unchanged. [dryRun] short-circuits the solve to print the pool. */
+internal class LsResolution(val pool: List<() -> LsRecipe>?, val dryRun: Boolean)
 
 private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
     "weighted" -> MoveScoring.Weighted
     "raw" -> MoveScoring.Raw
     "break" -> MoveScoring.Break
-    else -> usageError("ls-single: scoring expects weighted|raw|break, got `$s`")
+    else -> usageError("ls: scoring expects weighted|raw|break, got `$s`")
 }
 
 private fun parseAcceptance(s: String, noise: Double?, cb: Double, skewAlpha: Double): AcceptanceRule =
@@ -185,26 +192,113 @@ private fun parseAcceptance(s: String, noise: Double?, cb: Double, skewAlpha: Do
         "probsat" -> AcceptanceRule.ProbSat(cb)
         "skew" -> AcceptanceRule.Skew(skewAlpha)
         "sa" -> AcceptanceRule.Metropolis
-        else -> usageError("ls-single: acceptance expects greedy|walksat|probsat|skew|sa, got `$s`")
+        else -> usageError("ls: acceptance expects greedy|walksat|probsat|skew|sa, got `$s`")
     }
 
+private fun parseRestart(s: String): RestartPolicy = when (s.lowercase()) {
+    "fixed" -> FixedCadenceRestart()
+    "luby" -> LubyRestart(unit = 200)
+    "perturb", "adaptive-perturb" -> AdaptivePerturbationRestart()
+    else -> usageError("ls: restart expects fixed|luby|perturb, got `$s`")
+}
+
+/** Parse a single-valued axis spec into its tokens, rejecting `+`/`-` (only the sources list axis
+ *  takes set edits). */
+private fun scalarTokens(spec: String?, axis: String): List<AxisToken> {
+    val tokens = spec?.let { AxisEdits.tokens(it) } ?: return emptyList()
+    tokens.firstOrNull { it.op != AxisToken.Op.SET }?.let {
+        usageError("ls: $axis is single-valued and takes no +/- edit (got `${it.value}`)")
+    }
+    return tokens
+}
+
+private fun cblsStrategy(noise: Double?, smoothProb: Double, smoothFactor: Double, tabu: TabuFilter) =
+    Cbls(noiseProbability = noise ?: 0.05, smoothProb = smoothProb, smoothFactor = smoothFactor, tabu = tabu)
+
+/** A factory for a named base recipe with the CLI numerics applied. CBLS gets an independent optimize
+ *  strategy (the unified minimize path); the SAT-family / fjump arms leave it null so the engine's
+ *  built-in objective descent owns the optimize phase. */
+private fun namedFactory(
+    name: String,
+    noise: Double?,
+    cb: Double,
+    initTemp: Double,
+    coolRate: Double,
+    minTemp: Double,
+    smoothProb: Double,
+    smoothFactor: Double,
+    tabu: TabuFilter,
+): () -> LsRecipe = when (name) {
+    "cbls" -> {
+        {
+            LsRecipe(
+                "cbls",
+                cblsStrategy(noise, smoothProb, smoothFactor, tabu),
+                optimizeStrategy = cblsStrategy(noise, smoothProb, smoothFactor, tabu),
+            )
+        }
+    }
+
+    "feasibilityjump", "feasibility-jump", "fjump" -> {
+        { LsRecipe("fjump", FeasibilityJump()) }
+    }
+
+    "walksat" -> {
+        { LsRecipe("walksat", WalkSat(noise = noise ?: 0.5, tabu = tabu)) }
+    }
+
+    "probsat" -> {
+        { LsRecipe("probsat", ProbSat(cb = cb, tabu = tabu)) }
+    }
+
+    "sa", "annealing" -> {
+        { LsRecipe("sa", SimulatedAnnealing(initTemp, coolRate, minTemp, tabu = tabu)) }
+    }
+
+    else -> usageError("ls: strategy expects auto|cbls|feasibilityjump|walksat|probsat|sa|bare, got `$name`")
+}
+
+/** A bare driver with no preset axes; its sources are supplied by a force-exactly `sources=` spec. */
+private fun bareRecipe(tabu: TabuFilter): LsRecipe = LsRecipe(
+    "bare",
+    SourceDrivenStrategy(sources = emptyList(), tabu = tabu),
+)
+
+private fun applyEdits(
+    recipe: LsRecipe,
+    sources: List<AxisToken>,
+    scoring: List<AxisToken>,
+    acceptance: List<AxisToken>,
+    restart: List<AxisToken>,
+    noise: Double?,
+    cb: Double,
+    skewAlpha: Double,
+): LsRecipe {
+    var r = recipe
+    val src = sources.filter { it.appliesTo(r.label) }
+    if (src.isNotEmpty()) r = r.withSources { AxisEdits.applySources(it, src) }
+    scoring.filter { it.appliesTo(r.label) }.forEach { r = r.withScoring(parseScoring(it.value)) }
+    acceptance.filter {
+        it.appliesTo(
+            r.label,
+        )
+    }.forEach { r = r.withAcceptance(parseAcceptance(it.value, noise, cb, skewAlpha)) }
+    restart.filter { it.appliesTo(r.label) }.forEach { r = r.withRestart(parseRestart(it.value)) }
+    return r
+}
+
 /**
- * Split `--param` overrides for the `ls-single` engine into per-call [LocalSearchParams] and the
- * built strategy ([LsSetup]).
- *
- * `strategy=` picks a base recipe — `cbls` (default) / `feasibilityjump` / `walksat` / `probsat` /
- * `sa`, or `bare` for a driver with no preset schedule. Each axis param then *overrides* that base's
- * corresponding axis: `sources=`, `scoring=`, `acceptance=`, and the numeric knobs the chosen
- * acceptance reads (`noise`/`cb`/`skew-alpha`) and the temperature schedule (`initial-temp`/
- * `cooling-rate`/`min-temp`). Unset axes keep the base's. Every combination is valid: each axis has a
- * conservative default, and a temperature schedule is auto-attached when the acceptance is
- * simulated annealing but none is otherwise present. Omitting `strategy`/`sources` keeps the default
- * tuned CBLS engine byte-identical.
+ * Resolve the `ls` engine's `--param` overrides into an arm pool. `strategy=` picks the base —
+ * `auto` (default; the curated [LsCatalog] pool), a named recipe (`cbls`/`feasibilityjump`/`walksat`/
+ * `probsat`/`sa`), or `bare` (a driver whose sources come from a force-exactly `sources=` spec). The
+ * axis keys then *edit* the base across all matching arms, presolve-style: `sources=` takes a bare
+ * force-exactly list or `+`/`-` add/remove; `scoring`/`acceptance`/`restart` set a single value. Any
+ * token may carry an arm-family selector (`cbls.break`) so an edit scopes to part of the pool. Plain
+ * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run=on` lists the
+ * resolved arms instead of solving.
  */
-internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<LocalSearchParams, LsSetup> {
-    var out = base
-    p.long("seed")?.let { out = out.copy(randomSeed = it) }
-    p.long("max-flips")?.let { out = out.copy(maxFlips = it) }
+internal fun resolveLsRecipes(p: EngineParams): LsResolution {
+    val dryRun = p.bool("dry-run") ?: false
     val noise = p.double("noise")
     val cb = p.double("cb") ?: 2.06
     val skewAlpha = p.double("skew-alpha") ?: 0.0
@@ -215,69 +309,33 @@ internal fun applyLsParams(base: LocalSearchParams, p: EngineParams): Pair<Local
     val smoothFactor = p.double("smooth-factor") ?: 0.8
     val tabu = TabuFilter(tenure = p.int("tabu-tenure") ?: 10, aspiration = AspirationCriterion.OrImproving)
 
-    // Base recipe: a named preset, or a bare driver when only axes are given.
     val sourcesSpec = p.string("sources")
-    val strategyName = p.string("strategy")?.lowercase() ?: if (sourcesSpec != null) "bare" else "cbls"
-    val baseRecipe: SourceDrivenStrategy? = when (strategyName) {
-        "cbls" -> Cbls(noiseProbability = noise ?: 0.05, smoothProb = smoothProb, smoothFactor = smoothFactor)
+    val sources = sourcesSpec?.let { AxisEdits.tokens(it) }.orEmpty()
+    val scoring = scalarTokens(p.string("scoring"), "scoring")
+    val acceptance = scalarTokens(p.string("acceptance"), "acceptance")
+    val restart = scalarTokens(p.string("restart"), "restart")
+    val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
+    val strategyName = p.string("strategy")?.lowercase() ?: if (sourcesSpec != null) "bare" else "auto"
 
-        "feasibilityjump", "feasibility-jump", "fjump" -> FeasibilityJump()
+    fun edit(recipe: LsRecipe) = applyEdits(recipe, sources, scoring, acceptance, restart, noise, cb, skewAlpha)
 
-        "walksat" -> WalkSat(noise = noise ?: 0.5)
+    val pool: List<() -> LsRecipe>? = when {
+        strategyName == "auto" && !hasEdits -> null
 
-        "probsat" -> ProbSat(cb = cb)
+        strategyName == "auto" -> LsCatalog.factories().map { factory -> { edit(factory()) } }
 
-        "sa", "annealing" -> SimulatedAnnealing(initTemp, coolRate, minTemp)
+        strategyName == "bare" -> {
+            if (sources.isEmpty()) usageError("ls: strategy=bare needs a sources= spec")
+            listOf({ edit(bareRecipe(tabu)) })
+        }
 
-        "bare", "custom" -> null
-
-        else -> usageError(
-            "ls-single: strategy expects cbls|feasibilityjump|walksat|probsat|sa|bare, got `$strategyName`",
-        )
+        else -> {
+            val base =
+                namedFactory(strategyName, noise, cb, initTemp, coolRate, minTemp, smoothProb, smoothFactor, tabu)
+            listOf({ edit(base()) })
+        }
     }
-
-    // Per-axis overrides: each replaces the base's axis; unset axes keep the base's.
-    val sources = sourcesSpec?.let { spec ->
-        MoveSourceCatalog.parse(
-            spec,
-        ).also { if (it.isEmpty()) usageError("ls-single: sources=`$spec` selected no sources") }
-    } ?: baseRecipe?.sources ?: usageError("ls-single: strategy=bare needs a sources= spec")
-    val scoring = p.string("scoring")?.let { parseScoring(it) } ?: baseRecipe?.scoring ?: MoveScoring.Weighted
-    val acceptance = p.string("acceptance")?.let { parseAcceptance(it, noise, cb, skewAlpha) }
-        ?: baseRecipe?.acceptance ?: AcceptanceRule.Greedy
-
-    // Schedule axis: keep the base's members; auto-attach a temperature when the acceptance is
-    // simulated annealing and none is present, so any acceptance override stays runnable.
-    val baseSchedule = baseRecipe?.schedule ?: ScheduleBundle()
-    val temperature = baseSchedule.temperature
-        ?: if (acceptance is AcceptanceRule.Metropolis) Geometric(initTemp, coolRate, minTemp) else null
-    val schedule = ScheduleBundle(
-        temperature = temperature,
-        weights = baseSchedule.weights,
-        noise = baseSchedule.noise,
-        restart = baseSchedule.restart,
-    )
-
-    val setup = LsSetup(
-        pairSwapBudget = p.int("pair-swap-budget") ?: 1024,
-        lambda = p.double("lambda") ?: 1.0,
-        strategy = SourceDrivenStrategy(
-            sources = sources,
-            scoring = scoring,
-            acceptance = acceptance,
-            schedule = schedule,
-            tabu = tabu,
-            configurationChecking = baseRecipe?.configurationChecking ?: false,
-            perturbation = baseRecipe?.perturbation,
-            drivesObjectiveDescent = baseRecipe?.drivesObjectiveDescent ?: false,
-        ),
-    )
-    p.finish(
-        "ls",
-        "seed, max-flips, lambda, tabu-tenure, pair-swap-budget, strategy, sources, scoring, acceptance, " +
-            "noise, cb, skew-alpha, smooth-prob, smooth-factor, initial-temp, cooling-rate, min-temp",
-    )
-    return out to setup
+    return LsResolution(pool, dryRun)
 }
 
 /**
@@ -302,6 +360,7 @@ internal fun buildPortfolioScenario(
     defaultEngine: EngineMix,
     defaultArms: Int,
     lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
+    lsPool: List<() -> LsRecipe>? = null,
 ): PortfolioScenario {
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
     val lambda = p.double("lambda") ?: 1.0
@@ -334,6 +393,7 @@ internal fun buildPortfolioScenario(
         seed = seed,
         lsLambda = lambda,
         lpCeiling = lpCeiling,
+        lsPool = lsPool,
     )
 }
 

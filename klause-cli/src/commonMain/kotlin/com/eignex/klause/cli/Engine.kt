@@ -25,16 +25,18 @@ internal enum class Engine(
     CP("cp", mix = EngineMix.BACKTRACK, aliases = listOf("backtrack", "bt")),
 
     /** Local-search-only portfolio. */
-    LS("ls", pureLs = true, mix = EngineMix.LOCAL_SEARCH, aliases = listOf("localsearch", "local-search")),
+    LS(
+        "ls",
+        pureLs = true,
+        mix = EngineMix.LOCAL_SEARCH,
+        aliases = listOf("localsearch", "local-search", "ls-single", "lssingle"),
+    ),
 
     /** Mixed backtrack + local-search portfolio. */
     MIXED("mixed", mix = EngineMix.MIXED, aliases = listOf("portfolio", "pf")),
 
     /** Single naked free backtrack — the only engine that takes var-/val-selector `--param`s. */
     CP_SINGLE("cp-single", aliases = listOf("cpsingle")),
-
-    /** Single naked local search — takes the ls strategy `--param`s. */
-    LS_SINGLE("ls-single", pureLs = true, aliases = listOf("lssingle")),
     ;
 
     companion object {

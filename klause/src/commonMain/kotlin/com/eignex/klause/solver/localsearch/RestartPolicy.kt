@@ -192,7 +192,7 @@ class StagnationRestart(
  * `factorWeights` and DDFW-style learnt state survive (`state.restart()` doesn't touch
  * them); only the assignment, `lastTouched`, and `step` reset.
  */
-internal class LubyRestart(val unit: Int = 100) : RestartPolicy {
+class LubyRestart(val unit: Int = 100) : RestartPolicy {
     private var u: Int = 1
     private var v: Int = 1
     private var cadence: Int = unit

@@ -25,6 +25,18 @@ class CliTest {
         return buf.toString()
     }
 
+    private fun captureErr(block: () -> Unit): String {
+        val buf = ByteArrayOutputStream()
+        val old = System.err
+        System.setErr(PrintStream(buf))
+        try {
+            block()
+        } finally {
+            System.setErr(old)
+        }
+        return buf.toString()
+    }
+
     @Test
     fun `cp-single accepts every var- and val-selector value the enums expose`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
@@ -178,8 +190,8 @@ class CliTest {
         for (engineArgs in listOf(
             // cp-single is the only engine that takes the per-solver var-/val-selector knobs.
             arrayOf("-e", "cp-single", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
-            // ls-single takes the ls strategy knobs (tabu-tenure / noise); ls is the portfolio.
-            arrayOf("-e", "ls-single", "--param", "tabu-tenure=5", "--param", "noise=0.1", "-t", "5000"),
+            // ls resolves a four-axis arm pool; a named base takes the strategy knobs (tabu / noise).
+            arrayOf("-e", "ls", "--param", "strategy=cbls", "--param", "tabu-tenure=5", "-t", "5000"),
             arrayOf("-e", "ls", "--param", "seed=7", "--param", "lambda=2.0", "-t", "5000"),
         )) {
             val out = capture { main(engineArgs + fzn.absolutePath) }
@@ -189,32 +201,31 @@ class CliTest {
     }
 
     @Test
-    fun `ls-single recipe axes select sources scoring and acceptance`() {
+    fun `ls bare recipe axes select sources scoring and acceptance`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // Each four-axis recipe builds a SourceDrivenStrategy as the naked ls-single engine (#722).
+        // A `sources=` spec with no `strategy=` is a bare four-axis recipe over the driver.
         for (recipe in listOf(
             arrayOf("--param", "sources=violated,argmin", "--param", "acceptance=walksat", "--param", "noise=0.2"),
             arrayOf("--param", "sources=violated,frontier", "--param", "scoring=raw", "--param", "acceptance=greedy"),
             arrayOf("--param", "sources=argmin", "--param", "acceptance=probsat", "--param", "cb=2.0"),
             arrayOf("--param", "sources=violated", "--param", "acceptance=sa", "--param", "cooling-rate=0.99"),
         )) {
-            val out = capture { main(arrayOf("-e", "ls-single", "-t", "5000") + recipe + fzn.absolutePath) }
+            val out = capture { main(arrayOf("-e", "ls", "-t", "5000") + recipe + fzn.absolutePath) }
             assertTrue("x = " in out, out)
             assertTrue("----------" in out, out)
         }
     }
 
     @Test
-    fun `ls-single strategy base plus per-axis overrides are all valid`() {
+    fun `ls strategy base plus per-axis overrides are all valid`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // A named base strategy, and overriding a single axis on a base (incl. sa acceptance whose
-        // temperature schedule is auto-attached). Every combination is a valid runnable strategy.
+        // A named base strategy, and overriding a single axis on a base. Every combination is valid.
         for (args in listOf(
             arrayOf("--param", "strategy=cbls"),
             arrayOf("--param", "strategy=feasibilityjump"),
@@ -225,10 +236,34 @@ class CliTest {
             arrayOf("--param", "strategy=cbls", "--param", "acceptance=sa"),
             arrayOf("--param", "strategy=walksat", "--param", "scoring=raw", "--param", "noise=0.3"),
         )) {
-            val out = capture { main(arrayOf("-e", "ls-single", "-t", "5000") + args + fzn.absolutePath) }
+            val out = capture { main(arrayOf("-e", "ls", "-t", "5000") + args + fzn.absolutePath) }
             assertTrue("x = " in out, "$args -> $out")
             assertTrue("----------" in out, "$args -> $out")
         }
+    }
+
+    @Test
+    fun `ls dry-run lists the resolved arm pool with axis edits applied`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        // The default pool lists the curated arms; no solve output on stdout.
+        val default = captureErr { main(arrayOf("-e", "ls", "--param", "dry-run=on", fzn.absolutePath)) }
+        assertTrue("ls dry-run:" in default, default)
+        assertTrue("cbls/fixed" in default, default)
+
+        // A global source removal drops `violated` from every arm.
+        val removed = captureErr {
+            main(arrayOf("-e", "ls", "--param", "sources=-violated", "--param", "dry-run=on", fzn.absolutePath))
+        }
+        assertTrue("violated-repairs" !in removed, removed)
+
+        // A scoped scalar edit sets break scoring on the cbls family only.
+        val scoped = captureErr {
+            main(arrayOf("-e", "ls", "--param", "scoring=cbls.break", "--param", "dry-run=on", fzn.absolutePath))
+        }
+        assertTrue("scoring=Break" in scoped, scoped)
     }
 
     @Test
@@ -290,7 +325,7 @@ class CliTest {
         // The LS incumbent objective is reported in the model's orientation, not the engine's internal
         // minimise frame: a maximize incumbent reads as a positive value, never negated. LS optimize is
         // incomplete (it never proves the optimum), so the run is bounded by a short deadline.
-        val maxOut = capture { main(arrayOf("-s", "-e", "ls-single", "-t", "100", opt.absolutePath)) }
+        val maxOut = capture { main(arrayOf("-s", "-e", "ls", "-t", "100", opt.absolutePath)) }
         assertTrue("%%%mzn-stat: lsIncumbentObjective=" in maxOut, maxOut)
         assertTrue("%%%mzn-stat: lsIncumbentObjective=-" !in maxOut, maxOut)
     }

@@ -68,7 +68,7 @@ class LsRecipe(
  * sinks), so every portfolio slot must get fresh objects — sharing one across two parallel workers is
  * a data race.
  */
-internal object LsCatalog {
+object LsCatalog {
     private fun cblsTabu() = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving)
 
     private fun ilsBasin() = IteratedLocalSearchRestart(
@@ -276,6 +276,11 @@ internal object LsCatalog {
 
     /** One fresh recipe for every arm, in credit order. */
     fun auto(): List<LsRecipe> = ranked.map { make(it) }
+
+    /** Per-arm factories in credit order — each builds a *fresh* recipe. Lets a caller layer axis
+     *  edits over the curated pool while still handing every portfolio slot its own instance (the
+     *  strategies carry mutable per-search state, so slots must not share one). */
+    fun factories(): List<() -> LsRecipe> = ranked.map { arm -> { make(arm) } }
 
     /** The top-[count] prefix of the credit-ordered pool (wrapping past the pool size). Every slot is
      *  a fresh instance even when arms repeat. */
