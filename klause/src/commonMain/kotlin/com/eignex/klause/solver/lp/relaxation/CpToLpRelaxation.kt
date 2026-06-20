@@ -62,7 +62,49 @@ internal class LpRelaxation(
     val boolColOf: IntArray,
     /** Arc-indicator models of any Circuit factors, for the subtour-elimination separator. */
     val circuitArcs: List<CircuitArcModel> = emptyList(),
+    /**
+     * Whether this relaxation's layout is node-invariant, so a search node may [rebound] it (re-bind
+     * column bounds over the fixed matrix) instead of rebuilding. True only when every structural
+     * column is backed by a CP variable (no auxiliary hull / circuit / time-indexed columns) and no
+     * row's coefficients depend on the live domains (no live-M reified rows). For an eligible
+     * relaxation [rebound] reproduces exactly the model a per-node build would emit.
+     */
+    val persistentEligible: Boolean = false,
 )
+
+/**
+ * The same relaxation re-bound to [session]'s live column bounds, reusing the fixed matrix and column
+ * maps (see [LpRelaxation.persistentEligible] and [LpModel.rebind]). Only valid on an eligible
+ * relaxation — every structural column must be CP-var-backed — which the caller checks before building
+ * the persistent relaxation once and re-binding it at each node.
+ */
+internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
+    val n = model.n
+    val lo = LongArray(n)
+    val hi = LongArray(n)
+    for (j in 0 until n) {
+        val v = colVarId[j]
+        if (colIsBool[j]) {
+            val pinned = session.boolValue(v)
+            lo[j] = if (pinned == true) 1L else 0L
+            hi[j] = if (pinned == false) 0L else 1L
+        } else {
+            val d = session.intDomain(v)
+            lo[j] = d.min.toLong()
+            hi[j] = d.max.toLong()
+        }
+    }
+    return LpRelaxation(
+        model = model.rebind(lo, hi),
+        colVarId = colVarId,
+        colIsBool = colIsBool,
+        objectiveConstant = objectiveConstant,
+        intColOf = intColOf,
+        boolColOf = boolColOf,
+        circuitArcs = circuitArcs,
+        persistentEligible = true,
+    )
+}
 
 /**
  * Walks [Problem.factors] and emits an [LpModel] relaxation for the LP-emittable factor types,
@@ -154,6 +196,20 @@ internal class CpToLpRelaxation(
         } else {
             null
         }
+
+    /**
+     * Whether this relaxer's layout is node-invariant (#39), the structural half of
+     * [LpRelaxation.persistentEligible]: no feature that emits live-domain-dependent rows or auxiliary
+     * columns is enabled, and the problem has no live-M reified rows. The column half (every structural
+     * column CP-var-backed) is checked at build, since a degenerate hull can still leave aux columns.
+     * When true, a node may [rebound] the once-built relaxation instead of rebuilding it.
+     */
+    private val structurallyPersistent: Boolean =
+        !objectiveCone && !elementHull && !tableHull && !nValueHull && !regularHull && !mddHull &&
+            !gccCountHull && !circuitArcs && !cumulative && !diffn && !cumulativeTimeIndexed &&
+            problem.factors.none {
+                it is ReifiedLinear || it is ReifiedPseudoBoolean || it is ReifiedCardinality
+            }
 
     /**
      * #571 objective-cone membership, structural (depends only on [Problem.factors] and the
@@ -791,14 +847,20 @@ internal class CpToLpRelaxation(
 
             val model = builder.build(Sense.MINIMIZE)
             val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
+            val colVarIds = IntArray(colVarId.size) { colVarId[it] }
+            // Persistent re-binding needs every column CP-var-backed (no aux) so live bounds fully
+            // describe the node; the global cuts folded in here are fixed rows over existing columns, so
+            // they stay valid under re-binding. Empty relaxations are not worth persisting.
+            val eligible = structurallyPersistent && model.n > 0 && colVarIds.all { it >= 0 }
             return LpRelaxation(
                 model = model,
-                colVarId = IntArray(colVarId.size) { colVarId[it] },
+                colVarId = colVarIds,
                 colIsBool = kinds,
                 objectiveConstant = objective?.constant ?: 0L,
                 intColOf = intCol.copyOf(),
                 boolColOf = boolCol.copyOf(),
                 circuitArcs = circuitModels,
+                persistentEligible = eligible,
             )
         }
 

@@ -16,6 +16,8 @@ import com.eignex.klause.solver.lp.cut.CutSeparator
 import com.eignex.klause.solver.lp.cut.GccSeparator
 import com.eignex.klause.solver.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.solver.lp.relaxation.LpRelaxation
+import com.eignex.klause.solver.lp.relaxation.rebound
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.solver.propagation.PropagationSession
@@ -126,6 +128,33 @@ internal class LpEngine(
     private val lpBasisByDepth = ArrayList<Basis?>()
     val lpHints = if (params.lpPlan.branching) LpHints(problem.numIntVars, problem.numBoolVars) else null
     private var lpBackjump: Learned? = null
+
+    // Persistent global LP (#39): for a node-invariant relaxation (no auxiliary columns, no live-M
+    // rows) the per-node delta is column bounds only, so the relaxation is built once from the declared
+    // domains and re-bound at each node instead of rebuilt. `resolved` makes the one-time probe lazy —
+    // it runs after the root-cut harvest so the global cuts are folded into the persistent structure.
+    private var persistentResolved = false
+    private var persistentRelaxation: LpRelaxation? = null
+
+    /**
+     * The LP relaxation for the current node (#39): the persistent relaxation re-bound to [session]'s
+     * live column bounds when eligible, else a fresh per-node build. On first call it builds a base
+     * relaxation from the declared domains (with the harvested [globalCuts]); if that base is
+     * [LpRelaxation.persistentEligible] it is cached and every node re-binds it — bit-identical to a
+     * rebuild for eligible models, but skipping the matrix reconstruction.
+     */
+    internal fun nodeRelaxation(
+        relaxer: CpToLpRelaxation,
+        session: PropagationSession,
+        globalCuts: List<Cut>,
+    ): LpRelaxation {
+        if (!persistentResolved) {
+            persistentResolved = true
+            val base = relaxer.build(PropagationSession(problem), globalCuts)
+            if (base.persistentEligible) persistentRelaxation = base
+        }
+        return persistentRelaxation?.rebound(session) ?: relaxer.build(session, globalCuts)
+    }
 
     /** The asserting LP backjump clause derived during the last [pruneNode] (#280), or null. */
     fun lastBackjump(): Learned? = lpBackjump
