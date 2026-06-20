@@ -30,11 +30,18 @@ internal object ArmCalibration {
     /** Per-arm scores: the summed win share plus the per-lens win counts. */
     data class ArmScore(val arm: String, val winShare: Double, val qualityWins: Int, val speedWins: Int)
 
-    /** One slot of the recalibrated diverse palette. */
-    data class DiverseSlot(val rank: Int, val arm: String, val newlyCovered: Int)
+    /** One slot of the recalibrated palette: [newlyCovered] is the arm's marginal contribution (new
+     *  problem-lens units it wins that no earlier slot did), [cumulativeCovered] the running total. */
+    data class DiverseSlot(val rank: Int, val arm: String, val newlyCovered: Int, val cumulativeCovered: Int)
 
-    /** The calibration outcome: per-arm scores (win-share desc) and the diverse set-cover palette. */
-    data class Report(val instances: Int, val scores: List<ArmScore>, val diverse: List<DiverseSlot>)
+    /** The calibration outcome: per-arm scores (win-share desc) and the marginal-contribution palette
+     *  over [totalUnits] problem-lens units — take the first k slots for a diverse k-arm portfolio. */
+    data class Report(
+        val instances: Int,
+        val totalUnits: Int,
+        val scores: List<ArmScore>,
+        val diverse: List<DiverseSlot>,
+    )
 
     private const val EPS = 1e-9
 
@@ -75,7 +82,7 @@ internal object ArmCalibration {
             ArmScore(arm, winShare[arm] ?: 0.0, qualityWins[arm] ?: 0, speedWins[arm] ?: 0)
         }.sortedByDescending { it.winShare }
 
-        return Report(instances.size, scores, greedyDiverse(arms, units, winShare))
+        return Report(instances.size, units.size, scores, greedyDiverse(arms, units, winShare))
     }
 
     private fun winCounts(instances: List<Instance>, lens: Lens): Map<String, Int> {
@@ -84,9 +91,10 @@ internal object ArmCalibration {
         return counts
     }
 
-    /** Greedy set-cover over the (problem × lens) [units]: each slot goes to the arm covering the most
-     *  still-uncovered units, ties broken by total win share. Omitted arms are redundant — a kept arm
-     *  wins everywhere they do. */
+    /** Rank *every* arm by greedy marginal contribution over the (problem × lens) [units]: each slot
+     *  goes to the arm winning the most still-uncovered units, ties broken by total win share. Ranking
+     *  continues past full coverage (those tail slots add 0), so any prefix of length k is a diverse
+     *  k-arm portfolio and the cumulative-coverage curve shows where the returns flatten. */
     private fun greedyDiverse(
         arms: List<String>,
         units: List<WinUnit>,
@@ -95,24 +103,26 @@ internal object ArmCalibration {
         val covered = BooleanArray(units.size)
         val taken = HashSet<String>()
         val palette = ArrayList<DiverseSlot>()
-        while (true) {
+        var cumulative = 0
+        while (taken.size < arms.size) {
             var bestArm: String? = null
-            var bestCover = 0
+            var bestCover = -1
             var bestShare = -1.0
             for (arm in arms) {
                 if (arm in taken) continue
                 val cover = units.indices.count { !covered[it] && arm in units[it].winners }
                 val share = winShare[arm] ?: 0.0
-                if (cover > bestCover || (cover == bestCover && cover > 0 && share > bestShare)) {
+                if (cover > bestCover || (cover == bestCover && share > bestShare)) {
                     bestArm = arm
                     bestCover = cover
                     bestShare = share
                 }
             }
-            if (bestArm == null || bestCover == 0) break
-            units.indices.forEach { if (bestArm in units[it].winners) covered[it] = true }
-            taken += bestArm
-            palette += DiverseSlot(palette.size + 1, bestArm, bestCover)
+            val arm = bestArm ?: break
+            units.indices.forEach { if (arm in units[it].winners && !covered[it]) covered[it] = true }
+            cumulative += bestCover
+            taken += arm
+            palette += DiverseSlot(palette.size + 1, arm, bestCover, cumulative)
         }
         return palette
     }
@@ -127,9 +137,12 @@ internal object ArmCalibration {
             appendLine("  ${s.arm.padEnd(28)} ${fmt(s.winShare)}  ${s.qualityWins}  ${s.speedWins}")
         }
         appendLine("")
-        appendLine("--- recalibrated diverse palette (greedy set cover; omitted arms are redundant) ---")
+        appendLine("--- marginal-contribution ranking (take the first k for a diverse k-arm set) ---")
         for (slot in report.diverse) {
-            appendLine("  ${slot.rank.toString().padStart(2)}  ${slot.arm.padEnd(28)} +covered=${slot.newlyCovered}")
+            appendLine(
+                "  ${slot.rank.toString().padStart(2)}  ${slot.arm.padEnd(28)} " +
+                    "+covered=${slot.newlyCovered}  (${slot.cumulativeCovered}/${report.totalUnits})",
+            )
         }
     }
 

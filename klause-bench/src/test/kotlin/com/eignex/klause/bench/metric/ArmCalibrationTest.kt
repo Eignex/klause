@@ -24,15 +24,18 @@ class ArmCalibrationTest {
     }
 
     @Test
-    fun `an infeasible arm never wins and is redundant`() {
+    fun `an infeasible arm never wins and contributes nothing`() {
         val p = Instance("p", maximize = false, runs = listOf(arm("good", 5.0, 100), arm("none", null, null)))
         val report = ArmCalibration.score(listOf(p))
         assertEquals(0.0, report.scores.first { it.arm == "none" }.winShare)
-        assertEquals("good", report.diverse.single().arm)
+        // good leads the ranking with real coverage; none is ranked last adding zero.
+        assertEquals("good", report.diverse.first().arm)
+        assertTrue(report.diverse.first().newlyCovered > 0)
+        assertEquals(0, report.diverse.first { it.arm == "none" }.newlyCovered)
     }
 
     @Test
-    fun `the diverse palette keeps complementary specialists across both lenses`() {
+    fun `the marginal-contribution ranking puts complementary specialists first and the dud last`() {
         // fast: always first-feasible but poor objective. deep: best objective but slow. dud: neither.
         val p1 = Instance(
             "p1",
@@ -44,8 +47,13 @@ class ArmCalibrationTest {
             maximize = false,
             runs = listOf(arm("fast", 8.0, 10), arm("deep", 2.0, 900), arm("dud", 5.0, 500)),
         )
-        val palette = ArmCalibration.score(listOf(p1, p2)).diverse.map { it.arm }
-        assertEquals(setOf("fast", "deep"), palette.toSet(), "fast wins speed, deep wins quality; dud is redundant")
+        val report = ArmCalibration.score(listOf(p1, p2))
+        // The first two slots (the diverse k=2 set) are the two specialists; their cumulative coverage
+        // reaches all four units. The dud is ranked last with zero marginal contribution.
+        assertEquals(setOf("fast", "deep"), report.diverse.take(2).map { it.arm }.toSet())
+        assertEquals(report.totalUnits, report.diverse[1].cumulativeCovered, "k=2 covers every unit")
+        assertEquals("dud", report.diverse.last().arm)
+        assertEquals(0, report.diverse.last().newlyCovered)
     }
 
     @Test
