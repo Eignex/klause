@@ -59,6 +59,28 @@ class SourceDrivenStrategy(
     val drivesObjectiveDescent: Boolean = false,
 ) {
 
+    /** A copy with selected axes replaced, used by recipe assembly and the axis-edit transform to
+     *  swap one dimension while preserving the rest. */
+    fun copy(
+        sources: List<ConfiguredSource> = this.sources,
+        scoring: MoveScoring = this.scoring,
+        acceptance: AcceptanceRule = this.acceptance,
+        schedule: ScheduleBundle = this.schedule,
+        tabu: TabuFilter = this.tabu,
+        configurationChecking: Boolean = this.configurationChecking,
+        perturbation: ((LocalSearchState) -> Move?)? = this.perturbation,
+        drivesObjectiveDescent: Boolean = this.drivesObjectiveDescent,
+    ): SourceDrivenStrategy = SourceDrivenStrategy(
+        sources = sources,
+        scoring = scoring,
+        acceptance = acceptance,
+        schedule = schedule,
+        tabu = tabu,
+        configurationChecking = configurationChecking,
+        perturbation = perturbation,
+        drivesObjectiveDescent = drivesObjectiveDescent,
+    )
+
     /** Whether round feedback retunes the temperature schedule; off when no temperature schedule is present. */
     val wantsRoundFeedback: Boolean get() = schedule.temperature != null
 
