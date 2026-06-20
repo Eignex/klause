@@ -256,10 +256,10 @@ class CpToLpRelaxationCumulativeTimeIndexedTest {
             val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
             val params = BacktrackParams(
                 randomSeed = 7L,
-                energeticReasoning = true,
                 lpPlan = LpPlan(
                     bounding = true,
                     learn = true,
+                    energeticReasoning = true,
                     cumulative = true,
                     cumulativeTimeIndexed = true,
                     cumulativeFlow = true,

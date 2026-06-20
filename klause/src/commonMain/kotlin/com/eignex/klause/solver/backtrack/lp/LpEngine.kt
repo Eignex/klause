@@ -89,7 +89,7 @@ internal class LpEngine(
     // Persistent pool of global cuts harvested from the root relaxation (#22); filled in
     // [initRootLp] where the cancellation token is live. Global, so sound at every node.
     var lpGlobalCuts: List<Cut> = emptyList()
-    private val lagBound = if (params.lagrangian) {
+    private val lagBound = if (params.lpPlan.lagrangian) {
         LagrangianBound(problem, objective).takeIf { it.applicable }
     } else {
         null
@@ -101,7 +101,7 @@ internal class LpEngine(
         null
     }
     private var knapsackLagMultipliers = LongArray(knapsackLagBound?.multiplierCount ?: 0)
-    private val energeticBound = if (params.energeticReasoning) {
+    private val energeticBound = if (params.lpPlan.energeticReasoning) {
         CumulativeEnergeticBound(problem).takeIf { it.applicable }
     } else {
         null
@@ -172,7 +172,7 @@ internal class LpEngine(
             objectiveAscending: Boolean,
         ): Boolean {
             val energeticBoundL = energeticBound ?: return false
-            if (++energeticCheckCounter % params.energeticEvery != 0 || !energeticBoundL.isInfeasible(session)) {
+            if (++energeticCheckCounter % params.lpPlan.energeticEvery != 0 || !energeticBoundL.isInfeasible(session)) {
                 return false
             }
             sink.observeEnergeticPrune()
@@ -220,7 +220,7 @@ internal class LpEngine(
                 session,
                 effectiveBound,
                 lagMultipliers,
-                params.lagrangianIterations,
+                params.lpPlan.lagrangianIterations,
             )
             return if (res != null) {
                 lagMultipliers = res.multipliers
@@ -247,7 +247,7 @@ internal class LpEngine(
                 session,
                 effectiveBound,
                 knapsackLagMultipliers,
-                params.lagrangianIterations,
+                params.lpPlan.lagrangianIterations,
             )
             return if (res != null) {
                 knapsackLagMultipliers = res.multipliers

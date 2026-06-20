@@ -28,20 +28,15 @@ class CutPoolTest {
 
     @Test
     fun `cut pool preserves the optimum`() {
-        // The pooled cuts are globally valid, so the proven optimum is unchanged. (Node count is not
-        // asserted: valid cuts shift the LP vertex, hence reduced-cost fixings and branching, either
-        // way — the same non-monotonicity warm-starting has.)
+        // The root-harvested pooled cuts are globally valid (it rides on `cuts`), so the proven optimum
+        // is unchanged. (Node count is not asserted: valid cuts shift the LP vertex, hence reduced-cost
+        // fixings and branching, either way — the same non-monotonicity warm-starting has.)
         val p = problem()
-        val noPool = BacktrackSolver(p).minimize(
+        val pool = BacktrackSolver(p).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)),
         )
-        val pool = BacktrackSolver(p).minimize(
-            obj,
-            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true, cutPool = true)),
-        )
-        assertTrue(noPool is MinimizeResult.Optimal && pool is MinimizeResult.Optimal)
-        assertEquals(4.0, noPool.objectiveValue)
+        assertTrue(pool is MinimizeResult.Optimal)
         assertEquals(4.0, pool.objectiveValue)
     }
 }

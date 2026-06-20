@@ -3,6 +3,7 @@ package com.eignex.klause.solver.backtrack
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.backtrack.lp.LpPlan
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.linear.Linear
 import com.eignex.klause.solver.factor.linear.LinearOp
@@ -27,7 +28,7 @@ class LagrangianBnbTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4))
         val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
-        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lagrangian = true))
+        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(lagrangian = true)))
 
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(10.0, off.objectiveValue)
@@ -57,7 +58,7 @@ class LagrangianBnbTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 3L))
-        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 3L, lagrangian = true))
+        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 3L, lpPlan = LpPlan(lagrangian = true)))
 
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(off.objectiveValue, on.objectiveValue, "Lagrangian changed the optimum")
@@ -73,7 +74,9 @@ class LagrangianBnbTest {
             arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1))
-        val result = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lagrangian = true))
+        val result = BacktrackSolver(
+            p,
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(lagrangian = true)))
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)
         assertEquals(0.0, result.stats.lagrangianPruned.sum)

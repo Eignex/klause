@@ -40,9 +40,8 @@ class LpAutoConfigTest {
         assertTrue(r.lpPlan.learn)
         assertTrue(r.lpPlan.probe)
         assertFalse(r.lpPlan.cuts)
-        assertFalse(r.lpPlan.cutPool)
-        assertFalse(r.lagrangian)
-        assertFalse(r.energeticReasoning)
+        assertFalse(r.lpPlan.lagrangian)
+        assertFalse(r.lpPlan.energeticReasoning)
     }
 
     @Test
@@ -68,14 +67,13 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `all-different enables bounding and cuts and pool and lagrangian`() {
+    fun `all-different enables bounding and cuts and lagrangian`() {
         val p = problem(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6))
         val r = LpAutoConfig.recommend(p)
         assertTrue(r.lpPlan.bounding)
         assertTrue(r.lpPlan.cuts)
-        assertTrue(r.lpPlan.cutPool)
-        assertTrue(r.lagrangian)
-        assertFalse(r.energeticReasoning)
+        assertTrue(r.lpPlan.lagrangian)
+        assertFalse(r.lpPlan.energeticReasoning)
     }
 
     @Test
@@ -90,14 +88,14 @@ class LpAutoConfigTest {
         val r = LpAutoConfig.recommend(problem(gcc))
         assertTrue(r.lpPlan.bounding)
         assertTrue(r.lpPlan.cuts)
-        assertFalse(r.lagrangian)
+        assertFalse(r.lpPlan.lagrangian)
     }
 
     @Test
     fun `cumulative enables energetic reasoning only`() {
         val p = problem(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
         val r = LpAutoConfig.recommend(p)
-        assertTrue(r.energeticReasoning)
+        assertTrue(r.lpPlan.energeticReasoning)
         assertFalse(r.lpPlan.bounding)
         assertFalse(r.lpPlan.cuts)
         assertFalse(r.lpPlan.learn)
@@ -118,7 +116,7 @@ class LpAutoConfigTest {
         assertTrue(r.lpPlan.cumulative)
         assertTrue(r.lpPlan.bounding) // the scheduling makespan turns the bounding stack on
         assertTrue(r.lpPlan.learn)
-        assertTrue(r.energeticReasoning) // the feasibility check rides along on the Cumulative
+        assertTrue(r.lpPlan.energeticReasoning) // the feasibility check rides along on the Cumulative
     }
 
     /** Makespan COP: ints 0..n-1 starts, n is the makespan with `M ≥ startᵢ + durᵢ`, plus a cumulative. */
@@ -216,17 +214,20 @@ class LpAutoConfigTest {
         )
         val off = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.OFF))
         assertFalse(
-            off.lpPlan.bounding || off.lpPlan.cuts || off.lagrangian || off.energeticReasoning ||
+            off.lpPlan.bounding || off.lpPlan.cuts || off.lpPlan.lagrangian || off.lpPlan.energeticReasoning ||
                 off.lpPlan.cumulativeFlow,
         )
 
         val conservative = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.CONSERVATIVE))
-        assertTrue(conservative.lagrangian && conservative.energeticReasoning && conservative.lpPlan.cumulativeFlow)
+        assertTrue(
+            conservative.lpPlan.lagrangian && conservative.lpPlan.energeticReasoning &&
+                conservative.lpPlan.cumulativeFlow,
+        )
         assertFalse(conservative.lpPlan.bounding, "MEDIUM simplex stays off at CONSERVATIVE")
         assertFalse(conservative.lpPlan.cuts, "EXHAUSTIVE cuts stay off at CONSERVATIVE")
 
         val default = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.DEFAULT))
-        assertTrue(default.lpPlan.bounding && default.lagrangian)
+        assertTrue(default.lpPlan.bounding && default.lpPlan.lagrangian)
         assertFalse(default.lpPlan.cuts, "EXHAUSTIVE cuts stay off at DEFAULT")
 
         val aggressive = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.AGGRESSIVE))
@@ -235,7 +236,7 @@ class LpAutoConfigTest {
         val rec = LpAutoConfig.recommend(p)
         assertEquals(rec.lpPlan.bounding, aggressive.lpPlan.bounding)
         assertEquals(rec.lpPlan.cuts, aggressive.lpPlan.cuts)
-        assertEquals(rec.lagrangian, aggressive.lagrangian)
+        assertEquals(rec.lpPlan.lagrangian, aggressive.lpPlan.lagrangian)
     }
 
     @Test
@@ -249,14 +250,17 @@ class LpAutoConfigTest {
             ),
         )
         // 27 tasks: ~20k scan ops per check, under the per-check budget — full cadence.
-        assertEquals(1, LpAutoConfig.recommend(cumulative(27)).energeticEvery)
+        assertEquals(1, LpAutoConfig.recommend(cumulative(27)).lpPlan.energeticEvery)
         // 256 tasks: ~16.7M ops — the cadence normalises it back to the budget.
         val big = LpAutoConfig.recommend(cumulative(256))
-        assertTrue(big.energeticReasoning)
-        assertEquals(128, big.energeticEvery)
+        assertTrue(big.lpPlan.energeticReasoning)
+        assertEquals(128, big.lpPlan.energeticEvery)
         // A caller who enabled the check explicitly keeps their cadence untouched.
-        val explicit = LpAutoConfig.recommend(cumulative(256), BacktrackParams(energeticReasoning = true))
-        assertEquals(1, explicit.energeticEvery)
+        val explicit = LpAutoConfig.recommend(
+            cumulative(256),
+            BacktrackParams(lpPlan = LpPlan(energeticReasoning = true)),
+        )
+        assertEquals(1, explicit.lpPlan.energeticEvery)
     }
 
     @Test
@@ -276,7 +280,7 @@ class LpAutoConfigTest {
         assertTrue(r.lpPlan.cuts)
         assertTrue(r.lpPlan.probe)
         assertTrue(r.lpPlan.learn)
-        assertTrue(r.lagrangian)
+        assertTrue(r.lpPlan.lagrangian)
 
         // Past the ceiling ⇒ the LP family fully declines; the Lagrangian still runs.
         val saved = KlauseConfig.current
@@ -284,7 +288,7 @@ class LpAutoConfigTest {
             KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
             val off = LpAutoConfig.recommend(p)
             assertFalse(off.lpPlan.bounding)
-            assertTrue(off.lagrangian)
+            assertTrue(off.lpPlan.lagrangian)
         } finally {
             KlauseConfig.current = saved
         }
@@ -360,8 +364,8 @@ class LpAutoConfigTest {
         val r = LpAutoConfig.recommend(Problem(2, 0, emptyArray(), arrayOf<Factor>()))
         assertFalse(r.lpPlan.bounding)
         assertFalse(r.lpPlan.cuts)
-        assertFalse(r.lagrangian)
-        assertFalse(r.energeticReasoning)
+        assertFalse(r.lpPlan.lagrangian)
+        assertFalse(r.lpPlan.energeticReasoning)
     }
 
     @Test
@@ -371,7 +375,7 @@ class LpAutoConfigTest {
         val r = LpAutoConfig.recommend(p, BacktrackParams(lpPlan = LpPlan(bounding = true, gomory = false)))
         assertTrue(r.lpPlan.bounding)
         assertFalse(r.lpPlan.gomory)
-        assertTrue(r.energeticReasoning)
+        assertTrue(r.lpPlan.energeticReasoning)
     }
 
     @Test

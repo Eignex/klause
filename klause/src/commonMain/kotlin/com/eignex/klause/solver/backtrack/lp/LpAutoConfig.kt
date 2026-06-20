@@ -42,14 +42,14 @@ import com.eignex.klause.util.IntHashSet
  *    ([LpPlan.probe]).
  *  - **[LpPlan.cuts]** — an [AllDifferent] (Hall / assignment cuts),
  *    [GlobalCardinality] (occurrence sum cuts), or [PseudoBoolean] (knapsack cover cuts) is
- *    present; the persistent root pool ([LpPlan.cutPool]) rides along.
+ *    present; the cuts found are harvested once at the root into a global pool reused at every node.
  *  - **[LpPlan.circuit]** — a [Circuit] is present (subtour-elimination cuts).
  *  - **[LpPlan.element]** — a constant-array [Element] is present (its convex hull).
  *  - **[LpPlan.table]** — a [Table] is present (its convex hull).
  *  - **[LpPlan.nValue]** — an [NValue] is present (its one-hot value hull, #435).
- *  - **[BacktrackParams.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
- *  - **[BacktrackParams.energeticReasoning]** — a [Cumulative] is present. When the auto path is
- *    the one enabling it, [BacktrackParams.energeticEvery] is derived from the models' task counts
+ *  - **[LpPlan.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
+ *  - **[LpPlan.energeticReasoning]** — a [Cumulative] is present. When the auto path is
+ *    the one enabling it, [LpPlan.energeticEvery] is derived from the models' task counts
  *    so the O(windows² · tasks) window scan stays a bounded fraction of a node's cost (a per-check
  *    budget normalization, [ENERGETIC_OPS_PER_CHECK] — the same class of guard as the tableau
  *    cap, not a tuning judgement); a caller who enabled the check explicitly keeps their cadence.
@@ -74,7 +74,7 @@ import com.eignex.klause.util.IntHashSet
 object LpAutoConfig {
 
     /**
-     * Per-check operation budget the auto-derived [BacktrackParams.energeticEvery] normalises to:
+     * Per-check operation budget the auto-derived [LpPlan.energeticEvery] normalises to:
      * `cadence = ceil(Σ tasksᵢ³ / budget)` over the Cumulatives the scan actually visits (factors
      * past the bound's own task cap are skipped there and cost nothing). A 48-task model stays at
      * cadence 1; a 256-task model lands around 128.
@@ -254,7 +254,6 @@ object LpAutoConfig {
             lpPlan = base.lpPlan.copy(
                 bounding = base.lpPlan.bounding || lpActive,
                 cuts = base.lpPlan.cuts || cuts,
-                cutPool = base.lpPlan.cutPool || cuts,
                 // LP learning rides on the bounding path: the objective-bound reason is built from the
                 // exact basis-certificate the sparse solve already computes.
                 learn = base.lpPlan.learn || lpActive,
@@ -273,17 +272,17 @@ object LpAutoConfig {
                     (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
                 cumulativeFlow = base.lpPlan.cumulativeFlow ||
                     (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
+                lagrangian = base.lpPlan.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
+                energeticReasoning = base.lpPlan.energeticReasoning || energetic,
+                // Derive the cadence only when the auto path is the one enabling the check — an
+                // explicit caller enablement keeps the caller's cadence untouched.
+                energeticEvery = if (energetic && !base.lpPlan.energeticReasoning) {
+                    maxOf(base.lpPlan.energeticEvery.toLong(), 1L + (energeticOps - 1L) / ENERGETIC_OPS_PER_CHECK)
+                        .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                } else {
+                    base.lpPlan.energeticEvery
+                },
             ),
-            lagrangian = base.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
-            energeticReasoning = base.energeticReasoning || energetic,
-            // Derive the cadence only when the auto path is the one enabling the check — an
-            // explicit caller enablement keeps the caller's cadence untouched.
-            energeticEvery = if (energetic && !base.energeticReasoning) {
-                maxOf(base.energeticEvery.toLong(), 1L + (energeticOps - 1L) / ENERGETIC_OPS_PER_CHECK)
-                    .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-            } else {
-                base.energeticEvery
-            },
         )
     }
 

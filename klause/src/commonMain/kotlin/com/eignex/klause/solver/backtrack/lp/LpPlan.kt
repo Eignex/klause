@@ -62,40 +62,6 @@ data class LpPlan(
      * cuts), re-solving to tighten the bound. Requires [bounding]; off by default.
      */
     val cuts: Boolean = false,
-    /** Maximum separation rounds per node for [cuts]; each round adds cuts and re-solves. */
-    val cutRounds: Int = 4,
-    /**
-     * Separation rounds at the root node (decision level 0) for [cuts] (#285). The root relaxation
-     * is solved once and bounds the whole tree, so spending more rounds there to drive a strong root
-     * cut closure pays off broadly; deeper nodes keep the cheaper [cutRounds]. Defaults to a deeper
-     * closure than per-node; capped to at least [cutRounds].
-     */
-    val rootCutRounds: Int = 16,
-    /**
-     * Cut staleness tolerance (#565): end separation at a node once a round improves the LP objective
-     * bound by less than this fraction of `max(1, |bound|)` — diminishing returns. Cuts that no longer
-     * move the bound only cost per-node solve time and starve search (on ghoulomb the aggressive tier
-     * added ~15795 cuts over 24s of a 30s budget for zero prunes while the incumbent regressed). The
-     * first round whose gain falls below the tolerance ends separation for that node. `0.0` disables
-     * the check, separating to [cutRounds] / [rootCutRounds] as before.
-     */
-    val cutMinGain: Double = 1e-3,
-    /**
-     * Hard cap on the total cuts added at one node across all separation rounds (#565) — a backstop on
-     * the per-node solve cost of a large live cut pool (a round's fresh cuts are trimmed to fit, and
-     * reaching the cap ends separation for that node). The staleness check ([cutMinGain]) is the
-     * primary control; this only bounds the worst case where each round keeps moving the bound.
-     */
-    val maxCutsPerNode: Int = 2048,
-    /**
-     * Persistent global cut pool. When true (and [cuts]), the structural separators are run
-     * once at the root and the cuts they find are cached and re-added to every node's relaxation,
-     * instead of being re-separated per node. These cuts are computed from the root (= declared)
-     * domains and problem structure, so they are globally valid — a root Hall/cover/assignment/subtour
-     * cut stays a valid (if weaker) bound at every tighter descendant. Gives a cheap baseline
-     * strengthening at every node on top of per-node separation. Off by default.
-     */
-    val cutPool: Boolean = false,
     /**
      * Include Gomory integrality cuts among the [cuts] separators. These come from the simplex
      * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
@@ -227,31 +193,58 @@ data class LpPlan(
      * Preemptive min-cost-flow feasibility / makespan bound for the scheduling globals (#454). When
      * true, a node is pruned if the tasks' energy cannot be preemptively packed into their release /
      * deadline windows at capacity (an exact max-flow feasibility test, strictly stronger than the
-     * pairwise-window [BacktrackParams.energeticReasoning] scan and horizon-independent — it keys off
+     * pairwise-window [energeticReasoning] scan and horizon-independent — it keys off
      * the O(n) start-bound breakpoints, not the time axis), and the verified makespan variable is
      * lower-bounded by the smallest feasible completion time. Pure relaxation; off by default; a no-op
      * without a scheduling global. See [com.eignex.klause.solver.lp.bound.CumulativeFlowBound].
      */
     val cumulativeFlow: Boolean = false,
     /** Frequency policy for [cumulativeFlow]: run the max-flow check at one in every this-many
-     *  pruning checks, mirroring [BacktrackParams.energeticEvery]. Must be positive. */
+     *  pruning checks, mirroring [energeticEvery]. Must be positive. */
     val cumulativeFlowEvery: Int = 1,
     /**
      * 0/1 multi-knapsack subgradient Lagrangian bounding (#632). When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound for
      * problems with several `PseudoBoolean` capacity rows: one capacity row is kept and solved **exactly**
      * by 0/1-knapsack DP while the rest are dualized, so the bound captures integrality the monolithic LP
-     * relaxes away. Shares [BacktrackParams.lagrangianIterations]. Independent of [bounding]; off by
+     * relaxes away. Shares [lagrangianIterations]. Independent of [bounding]; off by
      * default; a no-op unless a clean capacity `PseudoBoolean` (positive literals/weights, `≤`) is present.
      */
     val knapsackLagrangian: Boolean = false,
+    /**
+     * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
+     * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
+     * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
+     * constraints over them dualized) and prunes when that bound — rounded up — reaches the incumbent.
+     * Independent of [bounding]; off by default; a no-op when no eligible AllDifferent exists.
+     */
+    val lagrangian: Boolean = false,
+    /** Subgradient ascent iterations per node for [lagrangian] / [knapsackLagrangian]; more
+     *  iterations tighten the bound. */
+    val lagrangianIterations: Int = 15,
+    /**
+     * Energetic-reasoning infeasibility check for Cumulative globals (#22/#23). When true, a node is
+     * pruned if some Cumulative is energetically over-subscribed (required mandatory energy in a time
+     * window exceeds capacity·width). Pure feasibility test; off by default; a no-op without a
+     * Cumulative. Currently applied on the minimization path alongside the other LP bounds.
+     */
+    val energeticReasoning: Boolean = false,
+    /**
+     * Frequency policy for [energeticReasoning]: run the window scan at one in every
+     * [energeticEvery] pruning checks, mirroring [boundEvery]. The scan is O(windows² · tasks)
+     * per Cumulative with no incremental state, so on task-heavy models it dominates a node's
+     * cost; a cadence trades missed prunes for throughput. `1` (default) checks at every pruned
+     * node. [LpAutoConfig] derives a size-aware cadence from the task counts when *it* enables
+     * the check. Must be positive.
+     */
+    val energeticEvery: Int = 1,
     /**
      * Learn a clause from an infeasible node (#247). When true, an infeasibility proof is turned into
      * a nogood over absolute variable-bound atoms — a globally valid clause implied by the original
      * constraints — and registered at the next restart (where its literals are no longer all-false),
      * so the dead region is pruned in sibling subtrees. Two sources: the node LP's Farkas
      * infeasibility certificate (requires [bounding]) and the energetic over-subscription window
-     * (requires [BacktrackParams.energeticReasoning]). When the certificate resolves to an asserting
+     * (requires [energeticReasoning]). When the certificate resolves to an asserting
      * 1UIP clause the engine backjumps and learns immediately (#280), so this now helps even with
      * restarts off; non-asserting certificates still fall back to restart-time registration. A
      * certificate leaning on a live-big-M reified row cites the bounds that justify the M alongside its

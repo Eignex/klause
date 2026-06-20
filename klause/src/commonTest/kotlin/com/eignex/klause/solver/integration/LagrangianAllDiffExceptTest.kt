@@ -35,7 +35,7 @@ class LagrangianAllDiffExceptTest {
         // Lagrangian on (the AllDifferent bound) + the LP bounding stack — the #714 trigger.
         val r = BacktrackSolver(p).minimize(
             obj,
-            BacktrackParams(randomSeed = 1L, lagrangian = true, lpPlan = LpPlan(bounding = true)),
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, lagrangian = true)),
         )
         // Feasible: all zero ⇒ objective 0. A false UNSAT (the bug) would surface as Infeasible here.
         val opt = assertIs<MinimizeResult.Optimal>(r)
