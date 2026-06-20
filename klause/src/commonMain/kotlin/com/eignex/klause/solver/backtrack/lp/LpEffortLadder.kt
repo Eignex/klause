@@ -1,14 +1,31 @@
 package com.eignex.klause.solver.backtrack.lp
 
 /**
- * Ordered LP effort rungs (#32), cheapest first. The `--lp` emphasis sets the **ceiling** — the rung
- * the [LpEffortLadder] starts at — and the controller only ever descends from there under cost, then
- * re-probes upward. Each rung is a strictly cheaper, still-sound amount of per-node LP work:
- *  - [CUTS]  — the per-node LP plus during-search cut separation (the most expensive tier).
- *  - [BOUND] — the per-node LP bound / infeasibility prune, no during-search cuts.
- *  - [OFF]   — no per-node LP.
+ * Ordered LP effort rungs (#32), cheapest first — the **runtime** counterpart of the static
+ * [LpTiming] technique tiers. Where [LpTiming] / [LpEmphasis] decide *which* relaxation techniques a
+ * solve may build (a config-time ceiling), these rungs decide *how hard* the per-node simplex is
+ * pushed during search, and the [LpEffortLadder] descends them under cost. The two vocabularies meet
+ * at the emphasis→ceiling boundary, one rung per simplex tier:
+ *  - [CUTS]  — the per-node LP plus during-search cut separation; the runtime form of [LpTiming.EXHAUSTIVE].
+ *  - [BOUND] — the per-node LP bound / infeasibility prune, no during-search cuts; the [LpTiming.MEDIUM] tier.
+ *  - [OFF]   — no per-node LP (the bare combinatorial [LpTiming.FAST] arms, if any, are separate and
+ *              not governed by this ladder).
+ *
+ * The [LpEmphasis] ceiling fixes the ladder's top rung via [ceiling]: AGGRESSIVE (cuts permitted) →
+ * [CUTS], DEFAULT (simplex, no cuts) → [BOUND]; a lower emphasis leaves the simplex off, so no ladder.
  */
-internal enum class LpEffort { OFF, BOUND, CUTS }
+internal enum class LpEffort {
+    OFF,
+    BOUND,
+    CUTS,
+    ;
+
+    companion object {
+        /** The ladder's ceiling rung for a resolved plan: [CUTS] when during-search cuts are permitted,
+         *  else the bare [BOUND]. The single source of the emphasis→top-rung mapping (#45). */
+        fun ceiling(cutsPermitted: Boolean): LpEffort = if (cutsPermitted) CUTS else BOUND
+    }
+}
 
 /**
  * Adaptive per-node LP effort ladder (#32), generalizing the two-rung auto-off (#614) to the ordered

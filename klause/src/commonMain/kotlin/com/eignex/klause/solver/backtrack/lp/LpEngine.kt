@@ -140,7 +140,7 @@ internal class LpEngine(
     // at a time — shedding during-search cuts before the bound — re-probing upward on backoff. Sound:
     // every rung is a valid bound / off, so the gate only changes work, never solutions.
     private val lpLadder = LpEffortLadder(
-        top = if (params.lpPlan.cuts) LpEffort.CUTS else LpEffort.BOUND,
+        top = LpEffort.ceiling(cutsPermitted = params.lpPlan.cuts),
         reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
     )
     val lpNogoods: LpNogoodPool? = if (params.lpPlan.learn) LpNogoodPool() else null

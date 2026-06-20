@@ -3,7 +3,13 @@ package com.eignex.klause.solver.backtrack.lp
 /**
  * Cost tier of an LP-relaxation technique — the LP analogue of
  * [com.eignex.klause.solver.presolve.PresolveTiming]. [LpEmphasis] enables a *set* of tiers, so the
- * emphasis level is "how expensive an LP technique may be" — a cost ceiling.
+ * emphasis level is "how expensive an LP technique may be" — a config-time cost ceiling.
+ *
+ * This is the **static** half of the LP cost model: it decides which techniques a solve may build. Its
+ * **runtime** counterpart is [com.eignex.klause.solver.backtrack.lp.LpEffort] — the per-node effort the
+ * controller actually pushes the simplex to, descending under cost. The simplex tiers line up rung for
+ * rung: [MEDIUM] ↔ `LpEffort.BOUND`, [EXHAUSTIVE] ↔ `LpEffort.CUTS`; [FAST] is the combinatorial arms
+ * that sit outside the simplex ladder.
  */
 enum class LpTiming {
     /** Cheap, no dense tableau: the combinatorial feasibility / bound checks. */
@@ -23,6 +29,10 @@ enum class LpTiming {
  * `--lp` spec list and `klause.lp`) and its cost [timing]. Whether a technique actually runs is
  * `override ?: (timing in emphasis.timings)` *and* its structural applicability (resolved in
  * [LpAutoConfig]); a technique can never run above the emphasis ceiling.
+ *
+ * The everyday dial is the [LpEmphasis] level (`--lp default|aggressive|…`); the per-technique
+ * `+/-<technique>` overrides ([LpConfig.overrides]) are an **advanced / benchmarking** surface for
+ * isolating one technique (A/B a single cut family, force a hull off), not a knob a normal solve sets.
  *
  * @property id serializable token for the `--lp` spec list and the `klause.lp` property.
  * @property timing the cost tier gating which emphasis levels may run this technique.
