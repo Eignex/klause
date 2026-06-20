@@ -4,9 +4,6 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.propagation.RevInt
-import com.eignex.klause.solver.propagation.RevIntArray
-import com.eignex.klause.solver.propagation.RevLongArray
 
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over
@@ -32,7 +29,10 @@ import com.eignex.klause.solver.propagation.RevLongArray
  * factors posted alongside it, which carry the same parity semantics *with* real LS support,
  * so LS enforces each parity row via those siblings.
  */
-class GaussianXor(private val constraints: List<Xor>) : Factor {
+class GaussianXor(override val constraints: List<Xor>) :
+    Factor,
+    GaussianXorPropagator,
+    GaussianXorInvariant {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         GaussianXor(constraints.map { it.remap(boolMap, intMap) as Xor })
@@ -75,31 +75,14 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
         }
     }
 
-    /**
-     * Per-[PropagationState] reversible incremental Gauss-Jordan state (never shared across worker
-     * threads). The reduced matrix is maintained *across* fires on the engine undo trail instead of
-     * being rebuilt every fire: [mask] (free-variable matrix, `rows × words` flattened), [reason]
-     * (per-row assigned-support bitsets), [rhs], and the basis maps [basicCol] (pivot column of each
-     * row, -1 if none) / [pivotRow] (row a column is the basis of, -1 if non-basic). [seenVal] is
-     * the value each variable was substituted into the matrix with (-1 = still free in the matrix);
-     * a backtrack rolls it back in lockstep with the matrix. [valid] is 0 until [rebuildReduce]
-     * seeds the state at the current level; a backtrack above that level resets it to
-     * 0, forcing a fresh rebuild (the reversible cells cannot be trusted below their seed level).
-     */
-    private class IncrState(state: PropagationState, rows: Int, cols: Int, words: Int) {
-        val mask = RevLongArray(state, rows * words)
-        val reason = RevLongArray(state, rows * words)
-        val rhs = RevIntArray(state, rows)
-        val basicCol = RevIntArray(state, rows, -1)
-        val pivotRow = RevIntArray(state, cols, -1)
-        val seenVal = RevIntArray(state, cols, -1)
-        val valid = RevInt(state, 0)
-        var conflictVars: IntArray? = null
-    }
-
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val cache = (state.refPayload[factorId] as? IncrState)
-            ?: IncrState(state, rowMask.size, boolVars.size, words).also { state.refPayload[factorId] = it }
+        val cache = (state.refPayload[factorId] as? GaussianXorPropagator.IncrState)
+            ?: GaussianXorPropagator.IncrState(
+                state,
+                rowMask.size,
+                boolVars.size,
+                words,
+            ).also { state.refPayload[factorId] = it }
         cache.conflictVars = null
         return if (cache.valid.value == 0) rebuildReduce(state, cache) else incrementalStep(state, cache)
     }
@@ -107,7 +90,7 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
     /** Full Gauss-Jordan reduction over the current partial assignment, written into the reversible
      *  matrix and basis maps. Used on the first fire and after a backtrack invalidated the state.
      *  Pins forced variables / reports conflicts identically to the pre-incremental version. */
-    private fun rebuildReduce(state: PropagationState, cache: IncrState): Boolean {
+    private fun rebuildReduce(state: PropagationState, cache: GaussianXorPropagator.IncrState): Boolean {
         val n = rowMask.size
         val mask = Array(n) { LongArray(words) }
         val reason = Array(n) { LongArray(words) }
@@ -202,7 +185,7 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
      *  column drop per assigned non-basic variable), then pin newly-forced variables / report
      *  conflicts. The reduced-row-echelon-over-free-variables invariant is preserved throughout, so
      *  this detects exactly the same forced pins and conflicts as a full re-reduction. */
-    private fun incrementalStep(state: PropagationState, cache: IncrState): Boolean {
+    private fun incrementalStep(state: PropagationState, cache: GaussianXorPropagator.IncrState): Boolean {
         val n = rowMask.size
         val cols = boolVars.size
         var progress = true
@@ -248,7 +231,7 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
      *  dropped from its own row, which then re-pivots on another free variable (eliminated from the
      *  other rows) — or, if none remains, becomes an assigned-only row caught by the unit/conflict
      *  scan. */
-    private fun applyAssignment(cache: IncrState, col: Int, bit: Int, n: Int) {
+    private fun applyAssignment(cache: GaussianXorPropagator.IncrState, col: Int, bit: Int, n: Int) {
         val owner = cache.pivotRow[col]
         if (owner >= 0) {
             cache.pivotRow[col] = -1
@@ -266,9 +249,6 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
             for (r in 0 until n) if (rowGetBit(cache, r, col)) substituteOut(cache, r, col, bit)
         }
     }
-
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        (state.refPayload[factorId] as? IncrState)?.conflictVars
 
     /**
      * Clause-form reason for a forced pin or conflict: one currently-false literal per assigned
@@ -292,14 +272,14 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
 
     // ---- Reversible flattened-row helpers (row r occupies `mask`/`reason` words [r·words, +words)). ----
 
-    private fun rowPopCount(cache: IncrState, r: Int): Int {
+    private fun rowPopCount(cache: GaussianXorPropagator.IncrState, r: Int): Int {
         var c = 0
         val base = r * words
         for (w in 0 until words) c += cache.mask[base + w].countOneBits()
         return c
     }
 
-    private fun rowFirstCol(cache: IncrState, r: Int): Int {
+    private fun rowFirstCol(cache: GaussianXorPropagator.IncrState, r: Int): Int {
         val base = r * words
         for (w in 0 until words) {
             val word = cache.mask[base + w]
@@ -308,12 +288,12 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
         return -1
     }
 
-    private fun rowGetBit(cache: IncrState, r: Int, col: Int): Boolean =
+    private fun rowGetBit(cache: GaussianXorPropagator.IncrState, r: Int, col: Int): Boolean =
         (cache.mask[r * words + (col ushr 6)] ushr (col and 63)) and 1L == 1L
 
     /** Substitute the assigned variable [col]=[bit] out of row [r]: drop its mask bit, flip the rhs
      *  if it was 1, and record it in the row's reason support. */
-    private fun substituteOut(cache: IncrState, r: Int, col: Int, bit: Int) {
+    private fun substituteOut(cache: GaussianXorPropagator.IncrState, r: Int, col: Int, bit: Int) {
         val mIdx = r * words + (col ushr 6)
         cache.mask[mIdx] = cache.mask[mIdx] and (1L shl (col and 63)).inv()
         if (bit == 1) cache.rhs[r] = cache.rhs[r] xor 1
@@ -322,7 +302,7 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
     }
 
     /** XOR row [src] into row [dst] (mask, reason and rhs) — one GF(2) elimination step. */
-    private fun xorRowInto(cache: IncrState, dst: Int, src: Int) {
+    private fun xorRowInto(cache: GaussianXorPropagator.IncrState, dst: Int, src: Int) {
         val db = dst * words
         val sb = src * words
         for (w in 0 until words) {
@@ -334,7 +314,12 @@ class GaussianXor(private val constraints: List<Xor>) : Factor {
 
     /** Clause-form reason for a pin/conflict read from the reversible reason row [r] (see
      *  [reasonLiterals]); [excludeCol] is the variable being pinned. */
-    private fun rowReasonLiterals(state: PropagationState, cache: IncrState, r: Int, excludeCol: Int): IntArray? {
+    private fun rowReasonLiterals(
+        state: PropagationState,
+        cache: GaussianXorPropagator.IncrState,
+        r: Int,
+        excludeCol: Int,
+    ): IntArray? {
         val base = r * words
         var count = 0
         for (i in boolVars.indices) {

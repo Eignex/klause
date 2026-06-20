@@ -38,7 +38,9 @@ import kotlin.math.abs
 class Subcircuit(
     /** Successor variable id per node; `succ(i) = i` excludes node i, the rest form one cycle. */
     succ: IntArray,
-) : SuccessorCycleFactor(succ) {
+) : SuccessorCycleFactor(succ),
+    SubcircuitPropagator,
+    SubcircuitInvariant {
 
     init {
         require(succ.isNotEmpty()) { "Subcircuit needs at least one var, got ${succ.size}" }

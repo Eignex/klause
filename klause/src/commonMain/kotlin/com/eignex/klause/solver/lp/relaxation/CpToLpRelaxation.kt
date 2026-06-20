@@ -1132,7 +1132,7 @@ internal class CpToLpRelaxation(
             val s = factor.alphabetSize
             val trans = factor.transitions
             fun delta(state: Int, sym: Int): Int = trans[(state - 1) * s + (sym - 1)] // 1-based; 0 = dead
-            val accepting = factor.acceptingSet
+            val accepting = factor.accepting
             // States are 1-based ids in `1..numStates`, so the per-layer state→arc-columns maps are
             // dense arrays indexed straight by the state id rather than boxed `HashMap<Int, _>` (#678).
             val ns = factor.numStates
