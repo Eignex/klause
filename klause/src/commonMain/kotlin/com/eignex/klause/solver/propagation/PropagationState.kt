@@ -484,7 +484,7 @@ class PropagationState(
      * Bool literals that forced the most-recent tightening of `intDomains[v].min`. Null
      * when no factor recorded antecedents — analyzer treats as a leaf, same as a
      * decision. Mirrors [boolAntecedents] on the int side; used by factors that pin
-     * bools based on int-domain state (e.g. [com.eignex.klause.solver.factor.linear.ReifiedLinear])
+     * bools based on int-domain state (e.g. [com.eignex.klause.solver.factor.arithmetic.ReifiedLinear])
      * so the aux pin's antecedents transitively reference the bool decisions that
      * narrowed the int domain.
      *

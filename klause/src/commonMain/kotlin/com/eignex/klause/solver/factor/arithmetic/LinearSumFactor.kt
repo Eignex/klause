@@ -1,13 +1,13 @@
-package com.eignex.klause.solver.factor.linear
+package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.factor.CoeffLookup
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.CoalescedTerms
 import com.eignex.klause.solver.factor.bool.WeightedSumFactor
 import com.eignex.klause.solver.factor.bool.linearDegree
 import com.eignex.klause.solver.factor.bool.linearHolds
 import com.eignex.klause.solver.factor.bool.linearResidual
 import com.eignex.klause.solver.factor.bool.snapLinearTarget
-import com.eignex.klause.solver.factor.linear.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /** Body abstraction for the integer weighted-sum factors [Linear] and [ReifiedLinear]:

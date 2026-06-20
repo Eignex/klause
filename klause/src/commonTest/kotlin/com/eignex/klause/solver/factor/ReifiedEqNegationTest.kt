@@ -2,9 +2,9 @@ package com.eignex.klause.solver.factor
 
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.ReifiedLinear
-import com.eignex.klause.solver.factor.linear.ReifiedPseudoBoolean
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.test.Test

@@ -1,7 +1,7 @@
-package com.eignex.klause.solver.factor.table
+package com.eignex.klause.solver.factor.table.internals
 
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.factor.linear.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.factor.arithmetic.collectHoleAndBoundAntecedents
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevInt
 import com.eignex.klause.solver.propagation.RevIntArray
@@ -33,7 +33,7 @@ import com.eignex.klause.util.MutableIntIntMap
  * oracle (AllFactorsOracle) and ElementTest across deep backtracking.
  */
 
-/** Per-[Element] reversible state for incremental constant-array GAC. Built once per factor (the
+/** Per-`Element` reversible state for incremental constant-array GAC. Built once per factor (the
  *  value→position structure is static); the support counts and domain refs are trailed. */
 internal class ElementConstState(
     state: PropagationState,

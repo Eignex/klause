@@ -3,8 +3,8 @@ package com.eignex.klause.solver.localsearch.strategy
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource

@@ -8,13 +8,13 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.factor.global.NValue
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.factor.table.Table

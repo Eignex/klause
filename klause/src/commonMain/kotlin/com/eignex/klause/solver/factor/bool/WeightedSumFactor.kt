@@ -3,10 +3,10 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ceilDivLong
+import com.eignex.klause.solver.factor.arithmetic.floorDivLong
 import com.eignex.klause.solver.factor.compressViolation
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.ceilDivLong
-import com.eignex.klause.solver.factor.linear.floorDivLong
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet

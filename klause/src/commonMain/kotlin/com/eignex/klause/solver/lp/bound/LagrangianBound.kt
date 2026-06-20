@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.lp.bound
 
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.global.AllDifferent
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.mulExact

@@ -9,9 +9,9 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.InputOrder
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

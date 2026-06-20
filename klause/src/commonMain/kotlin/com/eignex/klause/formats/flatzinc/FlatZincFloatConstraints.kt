@@ -2,8 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.*
+import com.eignex.klause.solver.factor.arithmetic.*
 import com.eignex.klause.solver.factor.bool.*
-import com.eignex.klause.solver.factor.linear.*
 import com.eignex.klause.solver.factor.table.*
 import kotlin.math.*
 

@@ -3,8 +3,8 @@ package com.eignex.klause.solver.factor.global
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.factor.arithmetic.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.compressViolation
-import com.eignex.klause.solver.factor.linear.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink

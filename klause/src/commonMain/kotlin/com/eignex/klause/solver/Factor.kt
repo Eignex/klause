@@ -7,8 +7,8 @@ package com.eignex.klause.solver
 internal val EmptyIntArray: IntArray = IntArray(0)
 
 /** Shared singleton empty `LongArray`, for scratch slots that some code paths leave unused
- *  (e.g. the wide-only term-contribution snapshot in [com.eignex.klause.solver.factor.linear.propagateLinearBounds])
- *  so the common path binds this instead of allocating. */
+ *  (e.g. the wide-only term-contribution snapshot in `propagateLinearBounds`) so the
+ *  common path binds this instead of allocating. */
 internal val EmptyLongArray: LongArray = LongArray(0)
 
 /**
@@ -71,7 +71,7 @@ interface Factor :
      * permutation is a symmetry, the value analog of the [remap]-based automorphism check.
      *
      * `null` (the default) means "not value-relabelable" — arithmetic / value-meaningful factors
-     * ([com.eignex.klause.solver.factor.linear.Linear], Product) where a value carries magnitude, not just
+     * ([com.eignex.klause.solver.factor.arithmetic.Linear], Product) where a value carries magnitude, not just
      * identity, and a factor whose values live in more than one universe (e.g. a GCC with count
      * *variables*) which can't be relabeled by a single map. A `null` anywhere conservatively blocks
      * value symmetry for the whole problem. A [isValueAnonymous] factor returns `this` (no constant

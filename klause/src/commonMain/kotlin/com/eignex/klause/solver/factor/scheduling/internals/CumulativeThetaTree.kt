@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.factor.scheduling
+package com.eignex.klause.solver.factor.scheduling.internals
 
 /**
  * Vilím-style Θ-tree for cumulative scheduling envelope reasoning. The data-structure

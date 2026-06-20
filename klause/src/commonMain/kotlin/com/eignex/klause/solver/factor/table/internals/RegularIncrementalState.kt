@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.factor.table
+package com.eignex.klause.solver.factor.table.internals
 
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevInt

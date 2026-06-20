@@ -3,6 +3,13 @@ package com.eignex.klause.solver.factor
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.Product
+import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.GaussianXor
@@ -17,11 +24,6 @@ import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.global.NValue
 import com.eignex.klause.solver.factor.global.Sort
 import com.eignex.klause.solver.factor.global.SymmetricAllDifferent
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.ReifiedCardinality
-import com.eignex.klause.solver.factor.linear.ReifiedLinear
-import com.eignex.klause.solver.factor.linear.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.factor.scheduling.Diffn
 import com.eignex.klause.solver.factor.scheduling.Disjunctive

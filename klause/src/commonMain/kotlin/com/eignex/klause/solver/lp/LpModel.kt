@@ -74,7 +74,7 @@ internal class LpModel(
     /**
      * Per-row global validity: `true` when row `i` holds at **every integer solution of the
      * problem** — not merely inside the current search node's box. Rows built from live
-     * (branch-tightened) information — a [com.eignex.klause.solver.factor.linear.ReifiedLinear] big-M row
+     * (branch-tightened) information — a [com.eignex.klause.solver.factor.arithmetic.ReifiedLinear] big-M row
      * whose M came from tightened domains, a locally separated cut, a Gomory/MIR tableau cut — are
      * marked `false`. Learned artifacts (Farkas nogoods, objective-bound and reduced-cost reasons)
      * cite only variable-bound atoms and keep the rows implicit, so they are only valid when every

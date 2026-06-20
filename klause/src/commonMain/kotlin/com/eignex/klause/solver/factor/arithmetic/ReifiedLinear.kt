@@ -1,16 +1,16 @@
-package com.eignex.klause.solver.factor.linear
+package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.factor.ReifiedFactor
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.factor.arithmetic.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.bool.CoalescedTerms
 import com.eignex.klause.solver.factor.bool.coalesceLinearTerms
 import com.eignex.klause.solver.factor.bool.reifiedDegree
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.collectHoleAndBoundAntecedents
-import com.eignex.klause.solver.factor.linear.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink

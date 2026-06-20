@@ -1,7 +1,7 @@
-package com.eignex.klause.solver.factor.global
+package com.eignex.klause.solver.factor.global.internals
 
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.factor.linear.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.factor.arithmetic.collectHoleAndBoundAntecedents
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevInt
 import com.eignex.klause.solver.propagation.RevIntArray
@@ -11,7 +11,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
 
 /**
- * Shared Régin domain-consistency filtering for the alldifferent family — [AllDifferent]
+ * Shared Régin domain-consistency filtering for the alldifferent family — `AllDifferent`
  * routes its matching pass through
  * here, so the bipartite matching / reverse-graph free-value reachability / Tarjan SCC / Hall
  * pruning machinery lives once rather than being copy-pasted (and drifting) per variant.
@@ -389,7 +389,7 @@ internal fun reginTryAugment(
 
 /** Iterative Tarjan SCC over [adj] (adjacency lists on `0 until total`). Returns per-vertex
  *  component id. Iterative to avoid recursion-depth blowup on large graphs. SCC membership is
- *  reversal-invariant, so the forward orientation is used here. Shared with [GlobalCardinality],
+ *  reversal-invariant, so the forward orientation is used here. Shared with `GlobalCardinality`,
  *  which materialises its residual graph and delegates here (#99). */
 internal fun reginTarjanScc(adj: Array<IntArrayList>, total: Int): IntArray {
     val sccId = IntArray(total) { -1 }

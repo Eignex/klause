@@ -9,9 +9,9 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.bool.Cardinality
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.ReifiedLinear
 import com.eignex.klause.solver.propagation.AtomKind
 import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test

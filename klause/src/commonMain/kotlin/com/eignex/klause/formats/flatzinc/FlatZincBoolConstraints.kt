@@ -1,12 +1,12 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.Xor
 import com.eignex.klause.solver.factor.global.LexLess
-import com.eignex.klause.solver.factor.linear.Linear
-import com.eignex.klause.solver.factor.linear.LinearOp
-import com.eignex.klause.solver.factor.linear.ReifiedLinear
 import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.factor.table.Table
 
