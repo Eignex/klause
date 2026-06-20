@@ -63,6 +63,16 @@ data class LpPlan(
      */
     val cuts: Boolean = false,
     /**
+     * During-search cut separation depth (#41): when [cuts] holds, the structural separators also run
+     * at search nodes whose decision level is at most this, not only at the root. Each such node, after
+     * its LP solve, separates the violated cuts from its LP point and re-solves for a tighter bound;
+     * globally-valid cuts join the persistent pool so descendants inherit them, while node-local cuts
+     * tighten only that node's solve (they never leak to siblings, so the bound stays sound). The depth
+     * gate keeps the effort root-dominant — the relaxation is loosest and the cuts most valuable near
+     * the root. `0` runs the root harvest only (the prior behaviour). Requires [cuts].
+     */
+    val cutSearchMaxDepth: Int = 16,
+    /**
      * Include Gomory integrality cuts among the [cuts] separators. These come from the simplex
      * tableau and strengthen any fractional LP regardless of problem structure; the exact integer
      * tableau makes them numerically clean. On by default when [cuts] is set.

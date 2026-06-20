@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.CUT_POOL_ROUNDS
 import com.eignex.klause.solver.backtrack.GOMORY_CUTS_PER_ROUND
+import com.eignex.klause.solver.backtrack.SEARCH_CUT_ROUNDS
 import com.eignex.klause.solver.backtrack.snapshotAssignment
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.ExactBasisCertifier
@@ -180,14 +181,44 @@ internal fun LpEngine.sparseSafePrune(
     // toward the LP point. Purely advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal)
     // The optimal basis is cached by the caller and reused to warm-start this node's children (#705).
+    // It is the basis of the un-tightened persistent relaxation, which the children re-solve.
     val optimalBasis = result.basis
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
     if (!canPrune && !canPropagate) {
         return LpNodeOutcome(false, optimalBasis) // feasible, nothing more to deduce
     }
-    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return LpNodeOutcome(false, optimalBasis)
-    val full = safe + relaxation.objectiveConstant.toDouble()
+    // During-search separation (#41): at a gated shallow node, tighten this node's relaxation with the
+    // cuts its LP point violates. Global cuts are persisted into the pool (descendants inherit them via
+    // the rebuilt base); node-local cuts tighten only this solve, so they never leak to a sibling and
+    // the bound stays sound. The bound, certificate and reduced-cost fixing below read the tightened
+    // relaxation; the cached warm-start basis stays the un-tightened one for the children.
+    var boundRel = relaxation
+    var boundRes = result
+    if (params.lpPlan.cuts && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
+        lpSeparators.isNotEmpty()
+    ) {
+        val localCuts = ArrayList<Cut>()
+        var rounds = 0
+        while (rounds++ < SEARCH_CUT_ROUNDS && !cancellation()) {
+            val ctx = CutContext(problem, boundRel, boundRes.primal, session)
+            val fresh = lpSeparators.flatMap { it.separate(ctx) }
+            if (fresh.isEmpty()) break
+            recordSearchCuts(fresh, boundRes.primal) // persist the global cuts; invalidate the base
+            for (c in fresh) if (!c.global) localCuts.add(c)
+            val tightened = try {
+                relaxer.build(session, lpGlobalCuts + localCuts)
+            } catch (_: LpOverflowException) {
+                break // overflow in the cut-augmented build: keep the prior (sound) relaxation
+            }
+            val r = RevisedSimplex(tightened.model, cancellation).solve() ?: break
+            sink.observeLpSolve()
+            boundRel = tightened
+            boundRes = r
+        }
+    }
+    val safe = safeObjectiveLowerBound(boundRel.model, boundRes.duals) ?: return LpNodeOutcome(false, optimalBasis)
+    val full = safe + boundRel.objectiveConstant.toDouble()
     if (canPrune && full >= bound) {
         sink.observeLpPrune()
         return LpNodeOutcome(true, null)
@@ -196,7 +227,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when either needs it; a singular/unbounded certify yields
     // null and both fall back to the cheap reason-less paths, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
-        ExactBasisCertifier.certify(relaxation.model, result.basis)
+        ExactBasisCertifier.certify(boundRel.model, boundRes.basis)
     } else {
         null
     }
@@ -207,7 +238,7 @@ internal fun LpEngine.sparseSafePrune(
     // so either floor ≤ the true optimum.
     if (canPropagate && full.isFinite()) {
         val exactFloor = if (learn && cert != null) {
-            (cert.objective + BigRational.of(relaxation.objectiveConstant)).ceil().toLongOrNull()
+            (cert.objective + BigRational.of(boundRel.objectiveConstant)).ceil().toLongOrNull()
         } else {
             null
         }
@@ -215,7 +246,7 @@ internal fun LpEngine.sparseSafePrune(
             ?.toLong()
         if (lpFloor != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
             val reason = if (learn && cert != null) {
-                LpExplanation.objectiveBoundReason(relaxation, cert, session)
+                LpExplanation.objectiveBoundReason(boundRel, cert, session)
             } else {
                 null
             }
@@ -234,7 +265,7 @@ internal fun LpEngine.sparseSafePrune(
     // the improving gap, so it runs only when pruning is possible.
     if (canPrune && cert != null &&
         applySparseReducedCostFixing(
-            relaxation, cert, result.basis, session, bound, sink, objectiveVar, objectiveAscending, learn,
+            boundRel, cert, boundRes.basis, session, bound, sink, objectiveVar, objectiveAscending, learn,
         )
     ) {
         return LpNodeOutcome(true, null)

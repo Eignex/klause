@@ -12,6 +12,7 @@ import com.eignex.klause.solver.lp.cut.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.cut.CircuitSeparator
 import com.eignex.klause.solver.lp.cut.CliqueCutSeparator
 import com.eignex.klause.solver.lp.cut.Cut
+import com.eignex.klause.solver.lp.cut.CutPool
 import com.eignex.klause.solver.lp.cut.CutSeparator
 import com.eignex.klause.solver.lp.cut.GccSeparator
 import com.eignex.klause.solver.lp.cut.KnapsackCoverSeparator
@@ -88,9 +89,26 @@ internal class LpEngine(
         emptyList()
     }
 
-    // Persistent pool of global cuts harvested from the root relaxation (#22); filled in
-    // [initRootLp] where the cancellation token is live. Global, so sound at every node.
-    var lpGlobalCuts: List<Cut> = emptyList()
+    // Persistent pool of global cuts (#22/#40): seeded from the root harvest in [initRootLp] and grown
+    // by during-search separation (#41). Every cut is global, so the pool is sound at every node.
+    val cutPool = CutPool()
+
+    /** The global cuts folded into every node's relaxation — the live contents of [cutPool]. */
+    val lpGlobalCuts: List<Cut> get() = cutPool.cuts()
+
+    /**
+     * Persist the globally-valid members of [cuts] into the [cutPool] (#41); node-local cuts are
+     * ignored here (the caller uses them transiently). When the pool grows, the persistent base is
+     * invalidated so the next node rebuilds it with the new cuts, and the pool is trimmed to its cap by
+     * activity at [primal]. Sound: every persisted cut is global, valid at every solution.
+     */
+    fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray) {
+        var added = 0
+        for (c in cuts) if (c.global && cutPool.add(c)) added++
+        if (added == 0) return
+        if (cutPool.size > cutPool.maxCuts) cutPool.retainMostActive(primal)
+        persistentResolved = false // rebuild the persistent base with the enlarged pool
+    }
     private val lagBound = if (params.lpPlan.lagrangian) {
         LagrangianBound(problem, objective).takeIf { it.applicable }
     } else {
