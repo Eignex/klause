@@ -54,7 +54,8 @@ import com.eignex.klause.solver.localsearch.strategy.WalkSat
  *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
  *    `var-selector` (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind])
  *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
- *    | `bare`) plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
+ *    | `bare`), or `arm=<catalog-label>` to run one curated arm in isolation (the fair-tester sweep),
+ *    plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
  *    `+`/`-` add/remove), `scoring` (`weighted|raw|break`), `acceptance`
  *    (`greedy|walksat|probsat|skew|sa`), `restart` (`fixed|luby|perturb`); any token may carry an
  *    arm-family selector (`cbls.break`). Axis numerics `noise`/`cb`/`skew-alpha`/`initial-temp`/
@@ -330,7 +331,15 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
     val acceptance = scalarTokens(p.string("acceptance"), "acceptance")
     val restart = scalarTokens(p.string("restart"), "restart")
     val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
-    val strategyName = p.string("strategy")?.lowercase() ?: if (sourcesSpec != null) "bare" else "auto"
+    val strategyRaw = p.string("strategy")?.lowercase()
+    val armLabel = p.string("arm")
+    if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
+        usageError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
+    }
+    if (armLabel != null && armLabel !in LsCatalog.labels()) {
+        usageError("ls: arm=`$armLabel` is not a catalog arm (have ${LsCatalog.labels().joinToString()})")
+    }
+    val strategyName = strategyRaw ?: if (sourcesSpec != null) "bare" else "auto"
 
     rejectIneffectiveNumerics(
         canonicalBase(strategyName),
@@ -360,6 +369,8 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
     ) { Geometric(initTemp, coolRate, minTemp) }
 
     val pool: List<() -> LsRecipe>? = when {
+        armLabel != null -> listOf({ edit(LsCatalog.byLabel(armLabel)) })
+
         strategyName == "auto" && !hasEdits -> null
 
         strategyName == "auto" -> LsCatalog.factories().map { factory -> { edit(factory()) } }

@@ -3,15 +3,21 @@ package com.eignex.klause.bench.target
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.metric.ArmCalibration
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.SolveMetric
+import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
+import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
+import com.eignex.klause.solver.localsearch.strategy.LsCatalog
+import kotlinx.serialization.decodeFromString
+import java.io.File
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -31,6 +37,8 @@ import com.eignex.klause.bench.tools.ProfileScope
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
+ *  - `calibrate [filters…]` — the fair arm tester: run every LS arm in isolation over the selection
+ *    and recalibrate a diverse palette scored by Borda anytime (see [calibrate]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
@@ -42,7 +50,8 @@ object BenchCli {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
             "solve" -> run(args.drop(1), preview = false)
             "preview" -> run(args.drop(1), preview = true)
-            else -> error("unknown command '$cmd' (commands: solve, preview, list)")
+            "calibrate" -> calibrate(args.drop(1))
+            else -> error("unknown command '$cmd' (commands: solve, preview, calibrate, list)")
         }
     }
 
@@ -78,6 +87,86 @@ object BenchCli {
             search ?: KlauseSearch(),
             profile,
             label = f["label"],
+        )
+    }
+
+    /** The fair arm tester: run every candidate LS arm **in isolation** (one subprocess each, full
+     *  budget, single core — no shared incumbent) over the selection, then score the arms by Borda
+     *  anytime and recalibrate a diverse palette (see [ArmCalibration]). Only optimize instances are
+     *  scored (the primal integral needs an objective), so pass `kind=cop`. `arms=a,b` restricts the
+     *  candidate set; default is the whole [LsCatalog]. */
+    private fun calibrate(filterArgs: List<String>) {
+        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val refs = select(f)
+        if (refs.isEmpty()) {
+            println("(no problems matched the selection)")
+            return
+        }
+        val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
+        val arms = f["arms"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: LsCatalog.labels()
+        val entries = BenchLoad.resolveRefs(refs)
+        println(
+            "=== calibrate: ${arms.size} arm(s) × ${refs.size} instance(s), " +
+                "${budget.timeoutMillis}ms each (isolated) ===",
+        )
+        val armDirs = arms.mapNotNull { arm ->
+            val dir = SolveMetric.run(
+                entries,
+                budget,
+                SolverInvocation.KLAUSE,
+                KlauseSearch(engine = "ls", processors = 1, params = listOf("arm=$arm")),
+            )
+            dir?.let { arm to it }
+        }.toMap()
+        val instances = loadCalibration(armDirs)
+        if (instances.isEmpty()) {
+            println("\n(no optimize instances scored — pass kind=cop)")
+            return
+        }
+        println()
+        println(ArmCalibration.render(ArmCalibration.score(instances)))
+    }
+
+    /** Read each arm's isolated `solve` output dir back into per-instance [ArmCalibration.Instance]s,
+     *  grouping by problem. Each arm's anytime stream is its `%%%klause-arm:` attribution; an arm that
+     *  found a feasible solution but emitted no stream collapses to a single incumbent at its best. */
+    private fun loadCalibration(armDirs: Map<String, File>): List<ArmCalibration.Instance> {
+        val byProblem = LinkedHashMap<String, MutableList<Pair<String, SolveRecord>>>()
+        for ((arm, dir) in armDirs) {
+            dir.listFiles { file -> file.extension == "json" }?.sortedBy { it.name }?.forEach { jsonFile ->
+                val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
+                if (rec != null && rec.kind == "optimize") {
+                    byProblem.getOrPut(rec.problem) { mutableListOf() }.add(arm to rec)
+                }
+            }
+        }
+        return byProblem.map { (problem, runs) ->
+            val sample = runs.first().second
+            ArmCalibration.Instance(
+                problem = problem,
+                maximize = sample.maximize,
+                budgetMs = sample.budgetMs,
+                runs = runs.map { (arm, rec) -> toArmRun(arm, rec) },
+            )
+        }
+    }
+
+    private fun toArmRun(arm: String, rec: SolveRecord): ArmCalibration.ArmRun {
+        val incumbents = rec.attribution
+            .mapNotNull { a -> a.objective?.let { ArmCalibration.Incumbent(a.elapsedMs, it) } }
+            .ifEmpty {
+                if (rec.feasible == true && rec.objective != null) {
+                    listOf(ArmCalibration.Incumbent(rec.timeToBestMs ?: 0L, rec.objective))
+                } else {
+                    emptyList()
+                }
+            }
+        return ArmCalibration.ArmRun(
+            arm = arm,
+            feasible = rec.feasible == true,
+            finalObjective = rec.objective,
+            timeToFeasibleMs = incumbents.firstOrNull()?.ms ?: rec.timeToBestMs,
+            incumbents = incumbents,
         )
     }
 
@@ -197,6 +286,7 @@ object BenchCli {
             |
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
+            |  bench calibrate [filters…]            fair-test LS arms in isolation; Borda-anytime diverse palette (kind=cop)
             |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |

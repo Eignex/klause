@@ -280,6 +280,10 @@ object LsCatalog {
     /** A fresh recipe for the arm named [label] (the single string boundary). */
     fun byLabel(label: String): LsRecipe = make(fromLabel(label))
 
+    /** Every catalog arm label, in credit order — for enumerating the pool by name (the fair-tester
+     *  sweep, the CLI `arm=` selector). */
+    fun labels(): List<String> = ranked.map { it.label }
+
     /** One fresh recipe for every arm, in credit order. */
     fun auto(): List<LsRecipe> = ranked.map { make(it) }
 
