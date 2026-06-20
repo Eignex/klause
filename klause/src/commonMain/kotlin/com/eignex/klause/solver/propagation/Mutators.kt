@@ -157,77 +157,72 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: IntRange, 
     return out?.toIntArray() ?: base
 }
 
-internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Int, antecedents: IntArray?): Boolean {
+internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Int, antecedents: IntArray?): Boolean =
+    tightenBoundImpl(v, lo, antecedents, isMin = true)
+
+internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: IntArray?): Boolean =
+    tightenBoundImpl(v, hi, antecedents, isMin = false)
+
+/**
+ * Shared core for the two one-sided bound tightenings: raise `v.min` to `bound` (`isMin`) or lower
+ * `v.max` to `bound`. `inline` so each caller expands a side-specialised copy with the `isMin`
+ * branches folded away — the propagation hot loop pays no extra dispatch or allocation.
+ */
+private inline fun PropagationState.tightenBoundImpl(
+    v: Int,
+    bound: Int,
+    antecedents: IntArray?,
+    isMin: Boolean,
+): Boolean {
     val d = intDomains[v]
-    if (lo <= d.min) return true
-    if (lo > d.max) {
-        // Two-sided narrowing emptied the domain: the existing upper bound came from
-        // `intMaxReason[v]`, and `currentFactor` is the one trying to push the lower
-        // past it. Both go into the core seed.
+    if (if (isMin) bound <= d.min else bound >= d.max) return true
+    if (if (isMin) bound > d.max else bound < d.min) {
+        // Two-sided narrowing emptied the domain: the existing opposite bound came from
+        // `intMaxReason[v]` / `intMinReason[v]`, and `currentFactor` is the one trying to push
+        // this side past it. Both go into the core seed.
         recordConflictLevels(intLevel[v], currentLevel)
-        seedConflictFactor(intMaxReason[v])
+        seedConflictFactor(if (isMin) intMaxReason[v] else intMinReason[v])
         seedConflictFactor(currentFactor)
         return false
     }
     if (undoLogging) logIntChange(v)
     if (currentFactor >= 0) propagations++
     // Preserve interior holes via the sparse-aware constructor path. For contiguous
-    // domains this is functionally identical to `IntDomain(lo, d.max)`.
-    val newDomain = d.withMinAtLeast(lo)
-    // A landing value inside a hole snaps the min further. The snapped bound rests on the requested
+    // domains this is functionally identical to `IntDomain(bound, d.max)` / `IntDomain(d.min, bound)`.
+    val newDomain = if (isMin) d.withMinAtLeast(bound) else d.withMaxAtMost(bound)
+    // A landing value inside a hole snaps the bound further. The snapped bound rests on the requested
     // bound plus the crossed holes. The requested-bound atom is cited only for a *decision* move
-    // (`antecedents == null`): a decision to set `v ≥ lo` has no factor reason, so its sole
+    // (`antecedents == null`): a decision to set `v ≥ bound` has no factor reason, so its sole
     // representation in conflict analysis is that atom. A *propagation* supplies `antecedents` that
-    // already imply `v ≥ lo`, so citing the atom too is redundant — and since the atom resolves
+    // already imply the bound, so citing the atom too is redundant — and since the atom resolves
     // back to this very bound it would be a same-var cycle 1UIP cannot collapse (#671).
-    val ant = if (newDomain.min > lo) {
-        appendPriorBound(
-            Lit.make(atomVarGe(v, lo), false),
-            lo > problem.intDomains[v].min && antecedents == null,
-            antecedentsAcrossHoles(v, lo until newDomain.min, antecedents),
-        )
+    val snapped = if (isMin) newDomain.min > bound else newDomain.max < bound
+    val ant = if (snapped) {
+        val priorLit = Lit.make(if (isMin) atomVarGe(v, bound) else atomVarLe(v, bound), false)
+        val root = problem.intDomains[v]
+        val cite = (if (isMin) bound > root.min else bound < root.max) && antecedents == null
+        val crossed = if (isMin) bound until newDomain.min else (newDomain.max + 1)..bound
+        appendPriorBound(priorLit, cite, antecedentsAcrossHoles(v, crossed, antecedents))
     } else {
         antecedents
     }
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
-    intMinLevel[v] = currentLevel
-    intMinReason[v] = currentFactor
-    intMinAntecedents[v] = ant
-    markIntDirty(v, IntEvent.LB_RAISED_BIT)
-    propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMin = lo, oldMin = d.min, oldMax = d.max)
-    return true
-}
-
-internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: IntArray?): Boolean {
-    val d = intDomains[v]
-    if (hi >= d.max) return true
-    if (hi < d.min) {
-        recordConflictLevels(intLevel[v], currentLevel)
-        seedConflictFactor(intMinReason[v])
-        seedConflictFactor(currentFactor)
-        return false
-    }
-    if (undoLogging) logIntChange(v)
-    if (currentFactor >= 0) propagations++
-    val newDomain = d.withMaxAtMost(hi)
-    // Snap chaining mirrors [tightenIntMinImpl]: requested-bound atom + crossed holes.
-    val ant = if (newDomain.max < hi) {
-        appendPriorBound(
-            Lit.make(atomVarLe(v, hi), false),
-            hi < problem.intDomains[v].max && antecedents == null,
-            antecedentsAcrossHoles(v, (newDomain.max + 1)..hi, antecedents),
-        )
+    if (isMin) {
+        intMinLevel[v] = currentLevel
+        intMinReason[v] = currentFactor
+        intMinAntecedents[v] = ant
     } else {
-        antecedents
+        intMaxLevel[v] = currentLevel
+        intMaxReason[v] = currentFactor
+        intMaxAntecedents[v] = ant
     }
-    intDomains[v] = newDomain
-    intLevel[v] = maxOf(intLevel[v], currentLevel)
-    intMaxLevel[v] = currentLevel
-    intMaxReason[v] = currentFactor
-    intMaxAntecedents[v] = ant
-    markIntDirty(v, IntEvent.UB_LOWERED_BIT)
-    propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMax = hi, oldMin = d.min, oldMax = d.max)
+    markIntDirty(v, if (isMin) IntEvent.LB_RAISED_BIT else IntEvent.UB_LOWERED_BIT)
+    if (isMin) {
+        propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMin = bound, oldMin = d.min, oldMax = d.max)
+    } else {
+        propagateAtomsForVar(v, antNear = antecedents, antFar = ant, reqMax = bound, oldMin = d.min, oldMax = d.max)
+    }
     return true
 }
 
