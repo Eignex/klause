@@ -13,6 +13,9 @@ import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.solver.localsearch.schedule.StallSchedule
 import com.eignex.klause.solver.localsearch.scoring.MoveScoring
 
+/** Temperature a Metropolis acceptance falls back to when the schedule axis supplies none. */
+private const val DEFAULT_METROPOLIS_TEMPERATURE = 1.0
+
 /**
  * The shared local-search driver, expressed as *policy over move sources*. It collects candidates
  * from a configured set of [com.eignex.klause.solver.localsearch.movesource.MoveSource]s, then scores
@@ -119,8 +122,9 @@ class SourceDrivenStrategy(
             acceptance
         }
         // The acceptance rule only reads the temperature (Metropolis); the driver advances the schedule
-        // once per pick that sampled the noise pool, so acceptance stays pure.
-        val temperature = schedule.temperature?.temperature ?: Double.POSITIVE_INFINITY
+        // once per pick that sampled the noise pool, so acceptance stays pure. A Metropolis rule with
+        // no temperature schedule falls back to a fixed conservative temperature rather than degenerating.
+        val temperature = schedule.temperature?.temperature ?: DEFAULT_METROPOLIS_TEMPERATURE
         val move = effectiveAcceptance.choose(state.rng, noiseMoves, scoreMoves, temperature) { score(state, it) }
         if (effectiveAcceptance is AcceptanceRule.Metropolis && noiseMoves.isNotEmpty()) schedule.temperature?.step()
         return move

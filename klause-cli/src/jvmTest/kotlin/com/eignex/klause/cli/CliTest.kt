@@ -170,6 +170,30 @@ class CliTest {
     }
 
     @Test
+    fun `ls-single strategy base plus per-axis overrides are all valid`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        // A named base strategy, and overriding a single axis on a base (incl. sa acceptance whose
+        // temperature schedule is auto-attached). Every combination is a valid runnable strategy.
+        for (args in listOf(
+            arrayOf("--param", "strategy=cbls"),
+            arrayOf("--param", "strategy=feasibilityjump"),
+            arrayOf("--param", "strategy=walksat"),
+            arrayOf("--param", "strategy=probsat"),
+            arrayOf("--param", "strategy=sa"),
+            arrayOf("--param", "strategy=cbls", "--param", "acceptance=probsat"),
+            arrayOf("--param", "strategy=cbls", "--param", "acceptance=sa"),
+            arrayOf("--param", "strategy=walksat", "--param", "scoring=raw", "--param", "noise=0.3"),
+        )) {
+            val out = capture { main(arrayOf("-e", "ls-single", "-t", "5000") + args + fzn.absolutePath) }
+            assertTrue("x = " in out, "$args -> $out")
+            assertTrue("----------" in out, "$args -> $out")
+        }
+    }
+
+    @Test
     fun `portfolio engine solves with explicit worker counts`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
