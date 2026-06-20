@@ -13,14 +13,35 @@ class ArmCalibrationTest {
 
     @Test
     fun `a sole win scores one and a shared win splits`() {
-        // p1: A alone has the best objective. p2: A and B tie for the best objective.
-        val p1 = Instance("p1", maximize = false, runs = listOf(arm("A", 1.0, 100), arm("B", 5.0, 100)))
-        val p2 = Instance("p2", maximize = false, runs = listOf(arm("A", 2.0, 100), arm("B", 2.0, 100)))
+        // p1: A alone has the best objective. p2: A and B share the best, beating C (a discriminating tie).
+        val p1 = Instance(
+            "p1",
+            maximize = false,
+            runs = listOf(arm("A", 1.0, 50), arm("B", 5.0, 99), arm("C", 9.0, 99)),
+        )
+        val p2 = Instance(
+            "p2",
+            maximize = false,
+            runs = listOf(arm("A", 2.0, 99), arm("B", 2.0, 99), arm("C", 8.0, 99)),
+        )
         val report = ArmCalibration.score(listOf(p1, p2))
         val a = report.scores.first { it.arm == "A" }
-        // A: sole quality win on p1 (1.0) + shared quality win on p2 (0.5); speed ties everywhere (0.5 each).
-        assertEquals(2, a.qualityWins, "A wins quality on p1 and ties on p2")
-        assertTrue(a.winShare > report.scores.first { it.arm == "B" }.winShare, "A's unique win outscores B")
+        // A: sole quality win on p1 (1.0) + shared quality win on p2 (0.5) + sole speed win on p1 (1.0).
+        assertEquals(2, a.qualityWins, "A wins quality on p1 and shares it on p2")
+        assertTrue(a.winShare > report.scores.first { it.arm == "B" }.winShare, "A's unique wins outscore B")
+    }
+
+    @Test
+    fun `a problem every arm ties on is dropped as non-discriminating`() {
+        // All three arms reach the same objective at the same time — tells us nothing; no winners.
+        val tied = Instance(
+            "p",
+            maximize = false,
+            runs = listOf(arm("A", 4.0, 50), arm("B", 4.0, 50), arm("C", 4.0, 50)),
+        )
+        val report = ArmCalibration.score(listOf(tied))
+        assertEquals(0, report.totalUnits, "an all-tie problem yields no scoring units")
+        assertTrue(report.scores.all { it.winShare == 0.0 }, "nobody scores on a non-discriminating problem")
     }
 
     @Test

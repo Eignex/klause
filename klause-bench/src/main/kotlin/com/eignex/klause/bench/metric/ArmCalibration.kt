@@ -61,7 +61,9 @@ internal object ArmCalibration {
         val values = inst.runs.associate { it.arm to value(inst, it, lens) }
         val best = values.values.min()
         if (best == Double.MAX_VALUE) return emptySet() // no feasible arm — non-discriminating
-        return values.filterValues { it <= best + EPS }.keys
+        val winners = values.filterValues { it <= best + EPS }.keys
+        // A problem-lens every arm ties on says nothing about complementarity; drop it like a no-solve.
+        return if (winners.size == inst.runs.size) emptySet() else winners
     }
 
     /** Score and recalibrate [instances] (optimize instances only). */
