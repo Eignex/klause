@@ -6,6 +6,7 @@ import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms (#705: from
@@ -91,7 +92,7 @@ internal object LpExplanation {
         session: PropagationSession,
     ): IntArray? {
         val lits = IntArrayList()
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session)) return null
         for (col in relaxation.colVarId.indices) {
             val sign = cert.reducedCost[col].signum()
@@ -122,7 +123,7 @@ internal object LpExplanation {
     ): IntArray? {
         val model = relaxation.model
         val lits = IntArrayList()
-        val seen = HashSet<Int>()
+        val seen = IntHashSet()
         val rows = (0 until model.m).filter { ray[it].signum() != 0 }.toIntArray()
         if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
         for (col in relaxation.colVarId.indices) {
@@ -148,7 +149,7 @@ internal object LpExplanation {
      */
     fun addRowPremiseLits(
         lits: IntArrayList,
-        seen: MutableSet<Int>,
+        seen: IntHashSet,
         relaxation: LpRelaxation,
         rows: IntArray,
         session: PropagationSession,
@@ -172,7 +173,7 @@ internal object LpExplanation {
     /** [addRowPremiseLits] over the rows carrying nonzero dual weight in an optimal [cert]. */
     fun addDualRowPremiseLits(
         lits: IntArrayList,
-        seen: MutableSet<Int>,
+        seen: IntHashSet,
         relaxation: LpRelaxation,
         cert: ExactBasisCertifier.Certificate,
         session: PropagationSession,
