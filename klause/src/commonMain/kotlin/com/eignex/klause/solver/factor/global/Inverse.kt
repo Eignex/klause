@@ -84,6 +84,6 @@ class Inverse(
      *      bijections (`f[i1]=f[i2]=j ⇒ g[j]=i1=i2`), so each side is all-different; the channel AC
      *      alone reaches a mutual non-GAC fixpoint (e.g. it keeps `f2=0` because `g0=2` is unpruned
      *      and vice versa). Régin matching on f and on g punches the Hall-set values the channel
-     *      misses, reusing the shared [reginFilter].
+     *      misses, reusing the shared `reginFilter`.
      */
 }

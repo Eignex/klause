@@ -50,7 +50,7 @@ internal fun linearHolds(sum: Long, op: LinearOp, bound: Int): Boolean = when (o
 /**
  * Graded residual magnitude — the [com.eignex.klause.solver.factor.compressViolation]-compressed
  * distance the sum must move to satisfy the comparison. Defined for any [sum]; callers gate it
- * behind [linearHolds] (a satisfied relation has degree 0). `NE` has no natural magnitude, so it
+ * behind `linearHolds` (a satisfied relation has degree 0). `NE` has no natural magnitude, so it
  * is the unit residual (sum is pinned to `bound`).
  */
 internal fun linearResidual(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int = when (op) {
@@ -67,9 +67,9 @@ internal fun linearResidual(sum: Long, op: LinearOp, bound: Int, softCap: Int): 
 }
 
 /**
- * Graded violation degree: `0` when satisfied, otherwise the [compressViolation]-compressed
+ * Graded violation degree: `0` when satisfied, otherwise the `compressViolation`-compressed
  * distance. Computes the signed gap `sum − bound` once and branches on its sign, fusing what would
- * otherwise be a separate [linearHolds] test followed by a [linearResidual] re-derivation.
+ * otherwise be a separate `linearHolds` test followed by a `linearResidual` re-derivation.
  */
 internal fun linearDegree(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int {
     val d = sum - bound
