@@ -31,6 +31,12 @@ object MoveSourceCatalog {
         (factories[label] ?: error("unknown move source '$label' (have ${labels.joinToString()})")).invoke(),
     )
 
+    /** The stable [MoveSourceId] the source [label] resolves to — for matching a configured source
+     *  back to its catalog token (e.g. removing `violated`, whose source id is `violated-repairs`).
+     *  Tokens that share a generator share an id (`structured` and `elected` both map to
+     *  `satisfied-structured`), so a removal by either drops that source. */
+    fun idOf(label: String): MoveSourceId = configured(label).source.id
+
     /** Resolve a comma-separated `sources=` spec into configured sources, order preserved and blanks
      *  skipped (e.g. `"violated, frontier, argmin"`). An empty spec yields an empty list. */
     fun parse(spec: String): List<ConfiguredSource> =

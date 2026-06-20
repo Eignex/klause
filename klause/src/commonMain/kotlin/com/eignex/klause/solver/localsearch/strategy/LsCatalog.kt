@@ -9,6 +9,8 @@ import com.eignex.klause.solver.localsearch.LubyRestart
 import com.eignex.klause.solver.localsearch.PerturbationKind
 import com.eignex.klause.solver.localsearch.RestartPolicy
 import com.eignex.klause.solver.localsearch.TabuFilter
+import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.schedule.Geometric
 import com.eignex.klause.solver.localsearch.schedule.LoopSchedule
 import com.eignex.klause.solver.localsearch.schedule.Reheating
@@ -36,7 +38,26 @@ class LsRecipe(
     /** Per-arm switch for implicit-solving feasible init on every restart (paired with a CBLS whose
      *  `implicitStructuredCap > 0` on permutation/assignment-shaped models). */
     val seedImplicitOnRestart: Boolean = false,
-)
+) {
+    /** A copy with [transform] applied to the satisfy strategy and the optimize strategy (if any), so
+     *  one axis edit rewrites both halves of the recipe consistently. */
+    private inline fun mapStrategies(transform: (SourceDrivenStrategy) -> SourceDrivenStrategy): LsRecipe =
+        LsRecipe(label, transform(strategy), optimizeStrategy?.let(transform), perMoveInvariants, seedImplicitOnRestart)
+
+    /** A copy whose sources axis is [transform]ed (the editable list of configured move sources). */
+    fun withSources(transform: (List<ConfiguredSource>) -> List<ConfiguredSource>): LsRecipe =
+        mapStrategies { it.copy(sources = transform(it.sources)) }
+
+    /** A copy whose scoring axis is replaced. */
+    fun withScoring(scoring: MoveScoring): LsRecipe = mapStrategies { it.copy(scoring = scoring) }
+
+    /** A copy whose acceptance axis is replaced. */
+    fun withAcceptance(acceptance: AcceptanceRule): LsRecipe = mapStrategies { it.copy(acceptance = acceptance) }
+
+    /** A copy whose restart cadence (the schedule axis's restart member) is replaced. */
+    fun withRestart(restart: RestartPolicy): LsRecipe =
+        mapStrategies { it.copy(schedule = it.schedule.copy(restart = restart)) }
+}
 
 /**
  * The curated catalog of local-search arms — the recipes the `ls` portfolio races and the named base
