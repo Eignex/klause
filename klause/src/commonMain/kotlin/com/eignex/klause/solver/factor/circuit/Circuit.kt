@@ -46,7 +46,9 @@ import kotlin.math.abs
 class Circuit(
     /** Successor variable id per node; the assignment must form one Hamiltonian cycle. */
     succ: IntArray,
-) : SuccessorCycleFactor(succ) {
+) : SuccessorCycleFactor(succ),
+    CircuitPropagator,
+    CircuitInvariant {
 
     init {
         require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }

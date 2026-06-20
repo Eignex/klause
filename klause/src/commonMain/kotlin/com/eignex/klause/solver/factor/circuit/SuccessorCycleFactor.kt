@@ -2,7 +2,7 @@ package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.factor.arithmetic.collectLinearTightenAntecedents
+import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntIntMap

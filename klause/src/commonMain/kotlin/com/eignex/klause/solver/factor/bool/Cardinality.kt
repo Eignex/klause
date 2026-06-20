@@ -2,20 +2,17 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.localsearch.MoveSink
-import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.propagation.moveBoolWatcher
 
 /**
  * `min ≤ (#true literals) ≤ max`. Payload at `longPayload(factorId)` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
 class Cardinality(literals: IntArray, min: Int, max: Int) :
-    CardinalitySumFactor(literals, min, max, excludedVar = -1) {
+    CardinalitySumFactor(literals, min, max, excludedVar = -1),
+    CardinalityPropagator,
+    CardinalityInvariant {
 
     override fun structuralKey(): String = "card:$min:$max:" + literals.sorted().joinToString(",")
 
@@ -23,16 +20,17 @@ class Cardinality(literals: IntArray, min: Int, max: Int) :
 
     override val boolVars: IntArray = literals.litVars()
 
-    /**
-     * Number of literals to watch on the at-least-min side (0 if min == 0, else min+1).
+    override fun signedForVar(v: Int): Int = signedByVar[v]
+
+    /** Number of literals to watch on the at-least-min side (0 if min == 0, else min+1).
      * Capped to [literals].size; oversize means "all literals must be true" which the
      * watched scheme can't represent, in which case [initialBoolWatchers] returns null
      * and the general scanner handles it. */
-    private val atLeastWatchSize: Int =
+    override val atLeastWatchSize: Int =
         if (min == 0) 0 else (min + 1).let { if (it > literals.size) -1 else it }
 
     /** Mirror of [atLeastWatchSize] for the at-most-max side. */
-    private val atMostWatchSize: Int =
+    override val atMostWatchSize: Int =
         if (max == literals.size) {
             0
         } else {
@@ -40,31 +38,6 @@ class Cardinality(literals: IntArray, min: Int, max: Int) :
                 if (it > literals.size) -1 else it
             }
         }
-
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !holds(state.longPayload[factorId])
-
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
-        degree(state.longPayload[factorId], state.violationSoftCap)
-
-    // Compressed Δ violation-degree if `u` (currently `uVal`) were flipped at true-count `n` —
-    // exactly what deltaIfBoolFlipped returns. Shared by the break/make updater.
-    private fun signedDelta(n: Long, u: Int, uVal: Boolean, softCap: Int): Int {
-        val signedU = signedByVar[u]
-        if (signedU == 0) return 0
-        val changeU = if (uVal) -signedU else signedU
-        return degree(n + changeU, softCap) - degree(n, softCap)
-    }
-
-    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
-        signedDelta(state.longPayload[factorId], boolVar, state.assignment.boolValue(boolVar), state.violationSoftCap)
-
-    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val change = signedFlipDelta(state, signedByVar, boolVar, current = false)
-        val oldN = state.longPayload[factorId]
-        val newN = oldN + change
-        state.longPayload[factorId] = newN
-        return degree(newN, state.violationSoftCap) - degree(oldN, state.violationSoftCap)
-    }
 
     /**
      * Watched-literal opt-in. Generalises clause's two-watch scheme to cardinality:
@@ -92,383 +65,11 @@ class Cardinality(literals: IntArray, min: Int, max: Int) :
         out
     }
 
-    override fun propagate(state: PropagationState, factorId: Int): Boolean = if (initialBoolWatchers != null) {
-        propagateWatched(state, factorId)
-    } else {
-        propagateScanning(state)
-    }
-
-    /**
-     * Clause-form nogood when [propagate] returns false. Two failure modes:
-     *  - min-side: `trueCount + unassigned < min` — too many literals are forced false to
-     *    ever reach `min` true. The disjunction of currently-false literals must contain
-     *    at least one truth.
-     *  - max-side: `trueCount > max` — too many literals are forced true. Their negations
-     *    form the violated disjunction (at least one must actually be false).
-     */
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        var trueCount = 0
-        var falseCount = 0
-        for (lit in literals) {
-            val b = state.boolValues[Lit.variable(lit)] ?: continue
-            if (Lit.evaluate(lit, b)) trueCount++ else falseCount++
-        }
-        if (literals.size - falseCount < min) {
-            val out = IntArray(falseCount)
-            var w = 0
-            for (lit in literals) {
-                val b = state.boolValues[Lit.variable(lit)] ?: continue
-                if (!Lit.evaluate(lit, b)) out[w++] = lit
-            }
-            return out
-        }
-        if (trueCount > max) {
-            val out = IntArray(trueCount)
-            var w = 0
-            for (lit in literals) {
-                val b = state.boolValues[Lit.variable(lit)] ?: continue
-                if (Lit.evaluate(lit, b)) out[w++] = Lit.negate(lit)
-            }
-            return out
-        }
-        return null
-    }
-
-    /** Collect every currently-false literal in [literals] whose variable differs from
-     *  [excludeVar]. Returned as the antecedents array for a pin: their collectively being
-     *  false is exactly what forced the pin. Returns `null` if nothing to record (only the
-     *  unit lit itself was undetermined). */
-    private fun antecedentsForTruePin(state: PropagationState, excludeVar: Int): IntArray? {
-        var n = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == excludeVar) continue
-            val b = state.boolValues[v] ?: continue
-            if (!Lit.evaluate(lit, b)) n++
-        }
-        if (n == 0) return null
-        val out = IntArray(n)
-        var w = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == excludeVar) continue
-            val b = state.boolValues[v] ?: continue
-            if (!Lit.evaluate(lit, b)) out[w++] = lit
-        }
-        return out
-    }
-
-    /** Mirror of [antecedentsForTruePin] for at-most pins: antecedents are the negations
-     *  of currently-true literals, since their being true forced this pin to false. */
-    private fun antecedentsForFalsePin(state: PropagationState, excludeVar: Int): IntArray? {
-        var n = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == excludeVar) continue
-            val b = state.boolValues[v] ?: continue
-            if (Lit.evaluate(lit, b)) n++
-        }
-        if (n == 0) return null
-        val out = IntArray(n)
-        var w = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == excludeVar) continue
-            val b = state.boolValues[v] ?: continue
-            if (Lit.evaluate(lit, b)) out[w++] = Lit.negate(lit)
-        }
-        return out
-    }
-
-    /**
-     * Watched-literal propagation. The watches array packed into [PropagationState.refPayload]
-     * stores the at-least watch indices in `[0, atLeastWatchSize)` and the at-most watch
-     * indices in `[atLeastWatchSize, atLeastWatchSize + atMostWatchSize)`. Each side runs
-     * a scan-and-replace pass; failures unit-propagate the remaining watched literals.
-     */
-    private fun propagateWatched(state: PropagationState, factorId: Int): Boolean {
-        val watches = (state.refPayload[factorId] as IntArray?) ?: run {
-            // Initial placement mirrors `initialBoolWatchers` exactly so the state's wakeup
-            // index and the cached watches agree from the start.
-            val w = IntArray(atLeastWatchSize + atMostWatchSize) { i ->
-                if (i < atLeastWatchSize) i else i - atLeastWatchSize
-            }
-            state.refPayload[factorId] = w
-            w
-        }
-        if (atLeastWatchSize > 0 &&
-            !propagateAtLeastSide(state, factorId, watches, 0, atLeastWatchSize)
-        ) {
-            return false
-        }
-        if (atMostWatchSize > 0 &&
-            !propagateAtMostSide(
-                state,
-                factorId,
-                watches,
-                atLeastWatchSize,
-                atLeastWatchSize + atMostWatchSize,
-            )
-        ) {
-            return false
-        }
-        return true
-    }
-
-    private fun propagateAtLeastSide(
-        state: PropagationState,
-        factorId: Int,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-    ): Boolean {
-        for (i in start until end) {
-            if (!litFalseAt(state, watches[i])) continue
-            val rep = findNonFalseOutside(state, watches, start, end)
-            if (rep < 0) {
-                // No replacement → non-watched literals are all false. Other watched
-                // literals (excluding the failing one) must all be true to meet `min`.
-                return unitPinWatchedToTrue(state, watches, start, end, i)
-            }
-            state.moveBoolWatcher(factorId, literals[watches[i]], literals[rep])
-            watches[i] = rep
-        }
-        return true
-    }
-
-    private fun propagateAtMostSide(
-        state: PropagationState,
-        factorId: Int,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-    ): Boolean {
-        for (i in start until end) {
-            if (!litTrueAt(state, watches[i])) continue
-            val rep = findNonTrueOutside(state, watches, start, end)
-            if (rep < 0) {
-                // No replacement → non-watched literals are all true. Other watched
-                // literals must all stay non-true (i.e., be forced false) to meet `max`.
-                return unitPinWatchedToFalse(state, watches, start, end, i)
-            }
-            // Watcher index is keyed on the *negation* — that's the lit that transitions
-            // to false when the underlying literal becomes true.
-            state.moveBoolWatcher(
-                factorId,
-                Lit.negate(literals[watches[i]]),
-                Lit.negate(literals[rep]),
-            )
-            watches[i] = rep
-        }
-        return true
-    }
-
-    private fun findNonFalseOutside(state: PropagationState, watches: IntArray, start: Int, end: Int): Int {
-        outer@ for (i in literals.indices) {
-            for (w in start until end) if (watches[w] == i) continue@outer
-            if (!litFalseAt(state, i)) return i
-        }
-        return -1
-    }
-
-    private fun findNonTrueOutside(state: PropagationState, watches: IntArray, start: Int, end: Int): Int {
-        outer@ for (i in literals.indices) {
-            for (w in start until end) if (watches[w] == i) continue@outer
-            if (!litTrueAt(state, i)) return i
-        }
-        return -1
-    }
-
-    private fun unitPinWatchedToTrue(
-        state: PropagationState,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-        skipIdx: Int,
-    ): Boolean {
-        for (i in start until end) {
-            if (i == skipIdx) continue
-            val lit = literals[watches[i]]
-            val v = Lit.variable(lit)
-            val b = state.boolValues[v]
-            if (b == null) {
-                val ant = antecedentsForTruePin(state, v)
-                if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
-            } else if (!Lit.evaluate(lit, b)) {
-                return false // already false → conflict; can't make it true
-            }
-        }
-        return true
-    }
-
-    private fun unitPinWatchedToFalse(
-        state: PropagationState,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-        skipIdx: Int,
-    ): Boolean {
-        for (i in start until end) {
-            if (i == skipIdx) continue
-            val lit = literals[watches[i]]
-            val v = Lit.variable(lit)
-            val b = state.boolValues[v]
-            if (b == null) {
-                val ant = antecedentsForFalsePin(state, v)
-                if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
-            } else if (Lit.evaluate(lit, b)) {
-                return false // already true → conflict
-            }
-        }
-        return true
-    }
-
-    private fun litTrueAt(state: PropagationState, idx: Int): Boolean {
-        val lit = literals[idx]
-        val b = state.boolValues[Lit.variable(lit)] ?: return false
-        return Lit.evaluate(lit, b)
-    }
-
-    private fun litFalseAt(state: PropagationState, idx: Int): Boolean {
-        val lit = literals[idx]
-        val b = state.boolValues[Lit.variable(lit)] ?: return false
-        return !Lit.evaluate(lit, b)
-    }
-
-    /**
-     * Fallback scanner — O(n) per fire, used when the constraint shape can't be watched
-     * (`min == n` "all must be true", `max == 0` "none can be true", or the trivial
-     * `min == 0 && max == n`). Kept verbatim from the pre-watched-literal implementation
-     * since these shapes typically have small or degenerate `literals`.
-     */
-    private fun propagateScanning(state: PropagationState): Boolean {
-        var trueCount = 0
-        var falseCount = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            val b = state.boolValues[v] ?: continue
-            if (Lit.evaluate(lit, b)) trueCount++ else falseCount++
-        }
-        val unassigned = literals.size - trueCount - falseCount
-        if (trueCount > max) return false
-        if (trueCount + unassigned < min) return false
-        if (trueCount == max && unassigned > 0) {
-            // At-most saturated: pin every remaining unassigned literal to false.
-            // Antecedent: negations of all currently-true literals.
-            val ant = antecedentsForFalsePin(state, excludeVar = -1)
-            for (lit in literals) {
-                val v = Lit.variable(lit)
-                if (state.boolValues[v] != null) continue
-                if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
-            }
-            return true
-        }
-        if (trueCount + unassigned == min && unassigned > 0) {
-            // At-least tight: pin every remaining unassigned literal to true.
-            // Antecedent: all currently-false literals.
-            val ant = antecedentsForTruePin(state, excludeVar = -1)
-            for (lit in literals) {
-                val v = Lit.variable(lit)
-                if (state.boolValues[v] != null) continue
-                if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
-            }
-        }
-        return true
-    }
-
-    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        val n = state.longPayload[factorId]
-        if (holds(n)) return
-        val wantIncrease = n < min
-        if (boolVars.size == literals.size) {
-            // Each var appears in exactly one literal — flip helps iff the lit is currently false.
-            for (lit in literals) {
-                val v = Lit.variable(lit)
-                val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
-                val helpsIncrease = !isTrue
-                if (wantIncrease == helpsIncrease) sink.addBoolFlip(v)
-            }
-            return
-        }
-        // Repeated-var fallback — aggregate the per-variable net change.
-        for (v in boolVars) {
-            var netChange = 0
-            for (lit in literals) {
-                if (Lit.variable(lit) != v) continue
-                netChange += if (Lit.evaluate(lit, state.assignment.boolValue(v))) -1 else +1
-            }
-            if (wantIncrease && netChange > 0) {
-                sink.addBoolFlip(v)
-            } else if (!wantIncrease && netChange < 0) {
-                sink.addBoolFlip(v)
-            }
-        }
-    }
-
-    /** Self-preserving moves during objective descent. Cardinality's count `n ∈ [min, max]`
-     *  is invariant under any "swap one currently-true lit with one currently-false lit"
-     *  — both edges sit in distinct vars (when each var appears once), so flipping both
-     *  yields net 0 change to `n`. We push a Compound for each (true-lit, false-lit) pair,
-     *  capped at [PAIR_PROPOSAL_CAP] to bound the per-step cost.
-     *
-     *  For min == max (the exactly-K case, e.g. `Cardinality.exactlyOne`) this is the
-     *  *only* feasibility-preserving 2-flip available and is the dominant structured move
-     *  on decomposed CP problems where MiniZinc lowers `exactly_one` to Cardinality. For
-     *  min < max we still propose swaps; the engine scores by objective delta. */
-    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (boolVars.size < 2 || literals.size < 2) return
-        // Repeated-var literal sets break the "flip one true, flip one false → Δn = 0"
-        // invariant because the same var can satisfy multiple lits; fall back to no
-        // proposals there (rare; main models use one-var-per-lit form).
-        if (boolVars.size != literals.size) return
-        val trueLits = IntArray(literals.size)
-        val falseLits = IntArray(literals.size)
-        var nT = 0
-        var nF = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (Lit.evaluate(lit, state.assignment.boolValue(v))) {
-                trueLits[nT++] = v
-            } else {
-                falseLits[nF++] = v
-            }
-        }
-        if (nT == 0 || nF == 0) return
-        // Cap pairings: pick min(nT, nF) × pair-stride samples, biased toward fresh
-        // combinations. Exhaustive enumeration is Θ(nT·nF) which can be O(n²) on wide
-        // cardinality constraints; clip to a budget.
-        val total = nT * nF
-        if (total <= PAIR_PROPOSAL_CAP) {
-            for (i in 0 until nT) {
-                for (j in 0 until nF) {
-                    sink.addCompound(
-                        listOf(
-                            BoolFlip(trueLits[i]),
-                            BoolFlip(falseLits[j]),
-                        ),
-                    )
-                }
-            }
-        } else {
-            val rng = state.rng
-            repeat(PAIR_PROPOSAL_CAP) {
-                val a = trueLits[rng.nextInt(nT)]
-                val b = falseLits[rng.nextInt(nF)]
-                sink.addCompound(
-                    listOf(
-                        BoolFlip(a),
-                        BoolFlip(b),
-                    ),
-                )
-            }
-        }
-    }
-
     /** Cached max |`signedByVar[v]`| across `boolVars`. Bounds the change `n` can
      *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out: when both
      *  the pre- and post-flip `n` are far enough from the [min] / [max] boundaries that no
      *  single subsequent flip could cross either side, no break/make state needs to change. */
-    private val maxAbsSigned: Int = run {
+    override val maxAbsSigned: Int = run {
         var m = 0
         for (v in boolVars) {
             val s = signedByVar[v]
@@ -478,52 +79,7 @@ class Cardinality(literals: IntArray, min: Int, max: Int) :
         m
     }
 
-    override val maintainsBreakMakeIncrementally: Boolean get() = true
-
-    /** Adjust break/make counts after [flippedVar] has been flipped. Fast-path early-out
-     *  when both pre- and post-flip counts sit strictly inside the `[min + maxAbsSigned,
-     *  max - maxAbsSigned]` interior — in that region no further flip can move `n` outside
-     *  `[min, max]`, so every var's contribution is 0 in both pre and post states. */
-    override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val signedFlipped = signedByVar[flippedVar]
-        if (signedFlipped == 0) return
-        val newN = state.longPayload[factorId]
-        val flippedPost = state.assignment.boolValue(flippedVar)
-        val changeV = if (flippedPost) signedFlipped else -signedFlipped
-        val oldN = newN - changeV
-        val oldViolated = oldN < min || oldN > max
-        val newViolated = newN < min || newN > max
-        // Interior fast-path: both n values are deep enough inside [min, max] that no
-        // flip could move them out. Every var's break/make contribution is 0 in both.
-        if (!oldViolated && !newViolated &&
-            oldN - maxAbsSigned >= min && oldN + maxAbsSigned <= max &&
-            newN - maxAbsSigned >= min && newN + maxAbsSigned <= max
-        ) {
-            return
-        }
-        for (u in boolVars) {
-            val signedU = signedByVar[u]
-            if (signedU == 0) continue
-            val uPost = state.assignment.boolValue(u)
-            val uPre = if (u == flippedVar) !uPost else uPost
-            // Break/make track the sign of the graded Δ each var's flip would produce — the same
-            // value brute-force reads from deltaIfBoolFlipped — evaluated pre- and post-flip.
-            val preDelta = signedDelta(oldN, u, uPre, state.violationSoftCap)
-            val postDelta = signedDelta(newN, u, uPost, state.violationSoftCap)
-            val preBreak = preDelta > 0
-            val preMake = preDelta < 0
-            val postBreak = postDelta > 0
-            val postMake = postDelta < 0
-            if (preBreak != postBreak) {
-                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
-            }
-            if (preMake != postMake) {
-                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
-            }
-        }
-    }
-
-    /** Factory and shared constants for this factor. */
+    /** Factory methods for this factor. */
     companion object {
         /** At-most-one: at most one of [literals] is true. */
         fun atMostOne(literals: IntArray): Cardinality = Cardinality(literals, min = 0, max = 1)
@@ -533,10 +89,5 @@ class Cardinality(literals: IntArray, min: Int, max: Int) :
 
         /** Exactly-one: exactly one of [literals] is true. */
         fun exactlyOne(literals: IntArray): Cardinality = Cardinality(literals, min = 1, max = 1)
-
-        /** Cap on (true-lit, false-lit) swap-pair proposals in [proposeStructuredMoves].
-         *  Bounds per-step cost; structured moves are scored by objective delta in the
-         *  engine which costs a state.apply + revert per candidate. */
-        private const val PAIR_PROPOSAL_CAP: Int = 32
     }
 }
