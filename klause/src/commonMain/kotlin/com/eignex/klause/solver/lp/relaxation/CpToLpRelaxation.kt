@@ -999,7 +999,9 @@ internal class CpToLpRelaxation(
             fun yOf(v: Int): Int {
                 val existing = yByValue.getOrDefault(v, -1) // columns are non-negative, so -1 marks absent
                 if (existing >= 0) return existing
-                val col = auxColumn(0L, 1L)
+                // The "used" indicator is free in [0,1] regardless of the live domains — an empty
+                // requirement keeps it present so the relaxation stays persistent (#43).
+                val col = auxColumn(0L, 1L, presence = IntArray(0))
                 yCols.add(col)
                 yByValue.put(v, col)
                 return col
@@ -1010,7 +1012,8 @@ internal class CpToLpRelaxation(
                 val sel = IntArrayList()
                 val selVal = IntArrayList()
                 declared.forEach { v ->
-                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L)
+                    // The selector z_xv is present while value v stays in x's live domain.
+                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v))
                     sel.add(z)
                     selVal.add(v)
                     builder.addRow(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), Relation.LE, 0L) // y_v ≥ z
@@ -1074,7 +1077,8 @@ internal class CpToLpRelaxation(
                 val sel = IntArrayList()
                 val selVal = IntArrayList()
                 declared.forEach { v ->
-                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L)
+                    // The selector z_xv is present while value v stays in x's live domain.
+                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v))
                     sel.add(z)
                     selVal.add(v)
                     selByCover[v]?.add(z) // only cover values carry a count row
@@ -1167,7 +1171,8 @@ internal class CpToLpRelaxation(
                         if (sym !in 1..s) return@forEach
                         val nxt = delta(state, sym)
                         if (nxt == 0) return@forEach
-                        val col = auxColumn(0L, if (live.contains(sym)) 1L else 0L)
+                        // The arc is present while symbol sym stays in seq[t]'s live domain.
+                        val col = auxColumn(0L, if (live.contains(sym)) 1L else 0L, presence = intArrayOf(seq[t], sym))
                         (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
                         (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)
                         chanCols[t].add(col)
@@ -1278,7 +1283,12 @@ internal class CpToLpRelaxation(
                     val value = trans[p + 1]
                     val dst = trans[p + 2]
                     if (src in reach[layer] && value in declared) {
-                        val col = auxColumn(0L, if (live.contains(value)) 1L else 0L)
+                        // The arc is present while its value stays in seq[layer]'s live domain.
+                        val col = auxColumn(
+                            0L,
+                            if (live.contains(value)) 1L else 0L,
+                            presence = intArrayOf(seq[layer], value),
+                        )
                         (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
                         (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)
                         chanCols[layer].add(col)
@@ -1365,7 +1375,8 @@ internal class CpToLpRelaxation(
             for (p in 0 until len) {
                 val idxVal = p + off
                 if (idxVal !in declared) continue
-                selCols.add(auxColumn(0L, if (idxVal in live) 1L else 0L))
+                // The selector y_p is present while index value p+off stays in idx's live domain.
+                selCols.add(auxColumn(0L, if (idxVal in live) 1L else 0L, presence = intArrayOf(factor.idx, idxVal)))
                 positions.add(p)
             }
             val k = selCols.size

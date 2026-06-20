@@ -7,7 +7,10 @@ import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.circuit.Circuit
+import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.factor.global.NValue
+import com.eignex.klause.solver.factor.scheduling.Cumulative
+import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.factor.table.Table
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.objective.LinearObjective
@@ -155,8 +158,8 @@ class CpToLpRelaxationReboundTest {
     }
 
     @Test
-    fun `an un-wired hull relaxation is not persistent-eligible`() {
-        // The NValue hull's selectors carry no presence rule yet, so it stays on the per-node rebuild.
+    fun `rebound reproduces an nvalue hull when a value is pruned`() {
+        // var n = |distinct(x0,x1,x2)| over [0,3]; pruning value 3 from x0 drops its z selector.
         val problem = Problem(
             0,
             4,
@@ -165,9 +168,72 @@ class CpToLpRelaxationReboundTest {
         )
         val relaxer =
             CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), nValueHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "an nvalue hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 2)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `rebound reproduces a gcc count hull when a value is pruned`() {
+        // counts of cover values 1,2 over x0,x1; count vars are 2,3. Pruning value 2 from x0 drops a z.
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
+            arrayOf<Factor>(
+                GlobalCardinality(xs = intArrayOf(0, 1), cover = intArrayOf(1, 2), countVars = intArrayOf(2, 3)),
+            ),
+        )
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)), gccCountHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a gcc count hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 1)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `rebound reproduces an element hull when an index value is pruned`() {
+        // result = arr[idx], arr = [7,3,9,5]; pruning index 3 drops the p=3 selector.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 9)),
+            arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = intArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
+            ),
+        )
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 1)), elementHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "an element hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 2)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `a cumulative energetic relaxation is not persistent-eligible`() {
+        // The energetic makespan row's right-hand side is recomputed from the live starts, so its
+        // coefficients/rhs vary per node — not re-bindable, it stays on the per-node rebuild.
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.GE, 3),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.GE, 3),
+            Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1),
+        )
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 20) }, factors)
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), cumulative = true)
         assertFalse(
             relaxer.build(PropagationSession(problem)).persistentEligible,
-            "an auxiliary column with no presence rule keeps a hull off the persistent path",
+            "a live-coefficient energetic row varies per node and must not be persisted",
         )
     }
 }
