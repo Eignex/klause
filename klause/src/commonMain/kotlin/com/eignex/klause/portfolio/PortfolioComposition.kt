@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.lp.LpConfig
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
+import com.eignex.klause.solver.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -62,6 +63,10 @@ data class PortfolioScenario(
      *  `LpConfig.AGGRESSIVE` (default, no overrides) leaves the arms uncapped — the pool spreads the
      *  LP-intensity itself; an `OFF` emphasis disables LP, and overrides force individual techniques. */
     val lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
+    /** Optional override of the local-search arm pool — per-arm factories (a fresh recipe per slot).
+     *  `null` uses the curated `LsCatalog` pool unchanged; a non-null pool is the CLI's resolved
+     *  recipes (a named base, or the curated pool with axis edits applied). */
+    val lsPool: List<() -> LsRecipe>? = null,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
@@ -140,24 +145,35 @@ internal object PortfolioComposition {
     fun compose(scenario: PortfolioScenario): List<WorkerConfig> {
         val count = scenario.arms
         return when (scenario.engine) {
-            EngineMix.LOCAL_SEARCH -> lsArms(count)
+            EngineMix.LOCAL_SEARCH -> lsArms(count, scenario.lsPool)
             EngineMix.BACKTRACK -> btArms(scenario.kind, count, scenario.lpCeiling)
-            EngineMix.MIXED -> mixedArms(scenario.kind, count, scenario.lpCeiling)
+            EngineMix.MIXED -> mixedArms(scenario.kind, count, scenario.lpCeiling, scenario.lsPool)
         }
     }
 
-    private fun lsArms(count: Int): List<WorkerConfig> = LocalSearchWorkerConfig.diverse(count)
+    /** The [count] LS arms — the curated pool ([pool] == null), else the CLI's resolved pool, each
+     *  slot a fresh recipe (wrapping past the pool size). */
+    private fun lsArms(count: Int, pool: List<() -> LsRecipe>?): List<WorkerConfig> = if (pool == null) {
+        LocalSearchWorkerConfig.diverse(count)
+    } else {
+        List(count) { LocalSearchWorkerConfig(pool[it % pool.size]()) }
+    }
 
     private fun btArms(kind: Kind, count: Int, lpCeiling: LpConfig): List<WorkerConfig> =
         BacktrackWorkerConfig.diverse(kind, count, lpCeiling)
 
-    private fun mixedArms(kind: Kind, count: Int, lpCeiling: LpConfig): List<WorkerConfig> {
+    private fun mixedArms(
+        kind: Kind,
+        count: Int,
+        lpCeiling: LpConfig,
+        pool: List<() -> LsRecipe>?,
+    ): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
         // fast first-incumbent engine).
         val lsCount = (count * lsShare(kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
-        arms += lsArms(lsCount)
+        arms += lsArms(lsCount, pool)
         if (btCount > 0) arms += btArms(kind, btCount, lpCeiling)
         return arms
     }

@@ -16,9 +16,8 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.backtrack.BacktrackPresets
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.lp.LpConfig
-import com.eignex.klause.solver.localsearch.CostShaping
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.localsearch.strategy.LsCatalog
+import com.eignex.klause.solver.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.result.MinimizeResult
@@ -84,14 +83,9 @@ internal object SolveCore {
                 runBacktrack(solvable, common, output, cancel, deadline, useAnnotation = false, allowSelectors = true)
             }
 
-            // Naked single local search — the only engine that takes the ls strategy --params: a
-            // `strategy=` base recipe plus the four-axis overrides (sources/scoring/acceptance/schedule).
-            Engine.LS_SINGLE -> {
-                rejectParallel(engine, cores, alt = Engine.LS)
-                runLocalSearch(solvable, common, output, cancel, deadline)
-            }
-
-            // The parallel-capable portfolio engines: their mix is carried on the enum.
+            // The parallel-capable portfolio engines: their mix is carried on the enum. `ls` resolves
+            // a four-axis arm pool from its --params (a `strategy=` base plus per-axis edits); a single
+            // resolved arm runs as a one-arm pool, subsuming the former naked single local search.
             Engine.CP, Engine.LS, Engine.MIXED ->
                 runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel)
         }
@@ -152,42 +146,19 @@ internal object SolveCore {
         runGeneric(BacktrackSolver(solvable.problem), params, solvable, common, output, complete = true, deadline)
     }
 
-    /** Naked single local search (the `ls-single` engine), configured by the ls strategy --params
-     *  (tabu-tenure, pair-swap-budget, lambda, noise, max-flips). */
-    private fun runLocalSearch(
-        solvable: Solvable,
-        common: CommonOptions,
-        output: OutputProtocol,
-        cancel: Cancellation,
-        deadline: Long?,
-    ) {
-        val (params, setup) = applyLsParams(
-            LocalSearchParams(randomSeed = common.randomSeed),
-            EngineParams(common.engineParams),
-        )
-        val strategy = setup.strategy
-        val solver = LocalSearchSolver(
-            solvable.problem,
-            strategy = strategy,
-            optimizeStrategy = strategy,
-            pairSwapBudget = setup.pairSwapBudget,
-            definitionalSweep = solvable.definitionalSweep,
-            perMoveInvariants = true,
-        )
-        val cblsParams = params.copy(
-            costShaping = CostShaping.Linear(lambda = setup.lambda),
-            cancellation = cancel,
-            lsObjective = solvable.lsObjective,
-            onEvent = verboseListener(common.verbose),
-            // Match the portfolio: keep an over-populated constraint kind from steering the descent.
-            normalizeWeightsByClass = true,
-        )
-        cliLogger(common.verbose).v {
-            val s = setup.strategy
-            "engine ls-single: seed=${cblsParams.randomSeed} sources=${s.sources.size} scoring=${s.scoring} " +
-                "acceptance=${s.acceptance}"
+    /** Print the resolved LS arm pool (`dry-run`), one line per arm, to stderr so the solution
+     *  protocol on stdout stays clean. A null pool prints the curated catalog. */
+    private fun printLsPool(pool: List<() -> LsRecipe>?) {
+        val recipes = pool?.map { it() } ?: LsCatalog.auto()
+        errPrintln("ls dry-run: ${recipes.size} arm(s)")
+        for (r in recipes) {
+            val sources = r.strategy.sources.joinToString(",") { it.source.id.label }
+            val restart = r.strategy.schedule.restart?.let { it::class.simpleName } ?: "default"
+            errPrintln(
+                "  ${r.label}: sources=[$sources] scoring=${r.strategy.scoring} " +
+                    "acceptance=${r.strategy.acceptance} restart=$restart",
+            )
         }
-        runGeneric(solver, cblsParams, solvable, common, output, complete = false, deadline)
     }
 
     private fun runPortfolio(
@@ -205,14 +176,24 @@ internal object SolveCore {
         val lpCeiling = common.lp?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: LpConfig.AGGRESSIVE
+        // For an LS-bearing pool, resolve the four-axis arm overrides (a `strategy=` base + per-axis
+        // edits) before consuming the portfolio knobs from the same params. A null pool keeps the
+        // curated catalog. `dry-run` lists the resolved pool and exits without solving.
+        val params = EngineParams(common.engineParams)
+        val lsResolution = if (mix != EngineMix.BACKTRACK) resolveLsRecipes(params) else LsResolution(null, false)
+        if (lsResolution.dryRun) {
+            printLsPool(lsResolution.pool)
+            return
+        }
         val scenario = buildPortfolioScenario(
-            EngineParams(common.engineParams),
+            params,
             common.randomSeed,
             cores = cores,
             kind = if (solvable.optimize) Kind.COP else Kind.CSP,
             defaultEngine = mix,
             defaultArms = defaultArms,
             lpCeiling = lpCeiling,
+            lsPool = lsResolution.pool,
         )
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
