@@ -7,6 +7,7 @@ import com.eignex.klause.solver.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.bound.CumulativeFlowBound
 import com.eignex.klause.solver.lp.bound.KnapsackLagrangianBound
 import com.eignex.klause.solver.lp.bound.LagrangianBound
+import com.eignex.klause.solver.lp.cut.AggregationMirSeparator
 import com.eignex.klause.solver.lp.cut.AllDifferentSeparator
 import com.eignex.klause.solver.lp.cut.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.cut.CircuitSeparator
@@ -80,6 +81,7 @@ internal class LpEngine(
                 add(GccSeparator())
                 add(KnapsackCoverSeparator())
                 add(CliqueCutSeparator())
+                add(AggregationMirSeparator())
                 val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
                 add(AssignmentObjectiveCut(coef))
             }
