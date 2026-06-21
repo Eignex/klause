@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  * *exactly* — every test enumerates the whole assignment space and compares the count before and
  * after, and asserts the expected drop (or no-op).
  */
-class SubsumptionTest {
+class RedundantConstraintsTest {
 
     private fun isFeasible(problem: Problem, ints: IntArray): Boolean {
         var a = Assumptions.None

@@ -30,8 +30,7 @@ interface ReifiedCardinalityInvariant : ReifiedFactor {
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
-        reifHolds(state.longPayload[factorId])
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = reifHolds(state.longPayload[factorId])
 
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         compressViolation(reifDistance(state.longPayload[factorId]), softCap)

@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * rewritten constraint accepts *exactly* the same assignments as the original, checked by
  * enumerating the whole assignment space.
  */
-class PresolveTest {
+class CoefficientStrengtheningTest {
 
     @Test
     fun `coefficient lifting is probing-informed - SAC-tightened bounds give a tighter lift`() {
