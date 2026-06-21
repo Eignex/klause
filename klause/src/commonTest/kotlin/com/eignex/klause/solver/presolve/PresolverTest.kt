@@ -417,7 +417,6 @@ class PresolverTest {
         )
         val ctx = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)))
         val pre = Presolver.run(problem, PresolveConfig.parse("affine"), ctx)
-        // Nothing eliminated -> identity problem, identity reconstruct.
         assertSame(problem, pre.problem)
     }
 }
