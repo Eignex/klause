@@ -9,8 +9,17 @@ import com.eignex.klause.solver.objective.LinearObjective
  * Result of running a presolve pipeline: the transformed [problem] plus the [reconstruct]
  * function that maps a solution of [problem] back to a solution of the original problem. For an
  * all-identity pipeline [reconstruct] is the identity (no per-sample cost).
+ *
+ * [components] is the connected-component partition of [problem] — its independent subproblems by
+ * variable↔factor incidence. It is purely structural (computed on the final, transformed problem)
+ * and a consumer that does not decompose can ignore it; [ProblemComponents.isConnected] reports the
+ * common single-block case where there is nothing to split.
  */
-class Presolved(val problem: Problem, val reconstruct: (Sample) -> Sample)
+class Presolved(
+    val problem: Problem,
+    val reconstruct: (Sample) -> Sample,
+    val components: ProblemComponents = ComponentDecomposition.decompose(problem),
+)
 
 /**
  * Information a pass needs to stay sound. [objectiveIntVars] / [objectiveBoolVars] are the

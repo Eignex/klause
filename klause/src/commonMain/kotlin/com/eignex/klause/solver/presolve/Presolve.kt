@@ -25,6 +25,9 @@ object Presolve {
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): Problem = RedundantConstraints.removeRedundantConstraints(problem)
 
+    /** Connected-component decomposition over the variable↔factor incidence. See [ComponentDecomposition]. */
+    fun decomposeComponents(problem: Problem): ProblemComponents = ComponentDecomposition.decompose(problem)
+
     /** Symmetry breaking by detecting interchangeable variables. See [SymmetryBreaking]. */
     fun breakSymmetries(
         problem: Problem,
