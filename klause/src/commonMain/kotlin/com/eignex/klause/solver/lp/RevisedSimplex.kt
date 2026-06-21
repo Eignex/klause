@@ -314,8 +314,142 @@ internal class RevisedSimplex(
         }
     }
 
+    /** All slacks basic, every structural variable at its (shifted) lower bound. Primal-feasible
+     *  whenever every row's slack value `rhs_i` is within the slack's bounds — the common `≤`/`rhs ≥ 0`
+     *  case — which is the starting point [solvePrimal] needs. */
+    private fun lowerStart() {
+        for (i in 0 until m) {
+            basicVar[i] = model.slackCol(i)
+            status[model.slackCol(i)] = VarStatus.BASIC
+        }
+        for (j in 0 until n) status[j] = VarStatus.AT_LOWER
+    }
+
+    /** Current basic values `β = B⁻¹(b − Σ_{j nonbasic at upper} A_j·u_j)`. */
+    private fun basicValues(factor: EtaBasis): DoubleArray {
+        val rhsAdj = DoubleArray(m) { model.rhs[it].toDouble() }
+        for (j in 0 until numVars) {
+            if (status[j] != VarStatus.AT_UPPER) continue
+            val u = model.upper[j].toDouble()
+            if (j >= n) {
+                rhsAdj[j - n] -= u
+            } else {
+                val rs = colRows[j]
+                val vs = colVals[j]
+                for (k in rs.indices) rhsAdj[rs[k]] -= vs[k] * u
+            }
+        }
+        return factor.ftran(rhsAdj)
+    }
+
+    private fun primalFeasible(beta: DoubleArray): Boolean {
+        for (i in 0 until m) {
+            if (beta[i] < -FEAS_TOL) return false
+            val v = basicVar[i]
+            if (model.hasUpper[v] && beta[i] > model.upper[v].toDouble() + FEAS_TOL) return false
+        }
+        return true
+    }
+
+    /**
+     * Bounded-variable **primal** phase-2 simplex (the dual [solve] is the workhorse; this is the
+     * complementary engine the feasibility pump optimizes a feasible point with). It starts from a
+     * primal-feasible basis — [warm] if it is feasible, else the all-lower start — and pivots toward
+     * the optimum by the textbook Dantzig rule with a **bound-flipping** ratio test: an entering
+     * variable that reaches its own opposite bound before any basic variable blocks simply flips
+     * bounds, taking a long step with no basis change. Returns null on an infeasible start (no phase-1
+     * yet), an unbounded objective, a singular pivot, cancellation, or the iteration budget — so the
+     * caller falls back to the dual path. Like [solve], the float basis it returns is certified exactly
+     * downstream, so this never affects soundness, only which vertex is reached.
+     */
+    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
+    fun solvePrimal(warm: Basis? = null): FloatLpResult? {
+        if (warm == null || !tryWarmStart(warm)) lowerStart()
+        var factor: EtaBasis = refactor() ?: run {
+            lowerStart()
+            refactor() ?: return null
+        }
+        var beta = basicValues(factor)
+        if (!primalFeasible(beta)) return null // phase-1 (feasibility recovery) is a follow-up
+        val maxIter = 50 * (m + numVars) + 200
+        val aq = DoubleArray(m)
+        var iter = 0
+        while (iter++ < maxIter) {
+            if (iter % CANCEL_POLL == 0 && cancellation()) return null
+            val y = duals(factor)
+            // Entering: the nonbasic variable whose move most improves the objective (Dantzig).
+            var q = -1
+            var qAtLower = true
+            var best = TOL
+            for (j in 0 until numVars) {
+                if (status[j] == VarStatus.BASIC) continue
+                val dj = model.cost[j].toDouble() - dotColumn(y, j)
+                val atLower = status[j] == VarStatus.AT_LOWER
+                // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
+                val gain = if (atLower) -dj else dj
+                if (gain > best) {
+                    best = gain
+                    q = j
+                    qAtLower = atLower
+                }
+            }
+            if (q == -1) return optimal(beta, factor) // no improving column ⇒ optimal
+
+            denseColumn(q, aq)
+            val alpha = factor.ftran(aq) // α = B⁻¹ A_q
+            val dir = if (qAtLower) 1.0 else -1.0 // x_q moves by dir·t, t ≥ 0
+            // Ratio test with the entering variable's own bound flip as a candidate blocker.
+            var tMax = if (model.hasUpper[q]) model.upper[q].toDouble() else Double.MAX_VALUE
+            var leaving = -1
+            var leavingToUpper = false
+            for (i in 0 until m) {
+                val rate = -alpha[i] * dir // dβ_i/dt
+                if (rate < -TOL) {
+                    val t = beta[i] / -rate // β_i falls to its lower bound 0
+                    if (t < tMax - TOL) {
+                        tMax = t
+                        leaving = i
+                        leavingToUpper = false
+                    }
+                } else if (rate > TOL) {
+                    val v = basicVar[i]
+                    if (model.hasUpper[v]) {
+                        val t = (model.upper[v].toDouble() - beta[i]) / rate // β_i rises to its upper bound
+                        if (t < tMax - TOL) {
+                            tMax = t
+                            leaving = i
+                            leavingToUpper = true
+                        }
+                    }
+                }
+            }
+            if (tMax >= Double.MAX_VALUE) return null // unbounded objective
+            if (leaving == -1) {
+                // The entering variable reaches its opposite bound first: flip it, no basis change.
+                status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+                beta = basicValues(factor)
+                continue
+            }
+            if (abs(alpha[leaving]) < TOL) return null // numerically singular pivot
+            status[basicVar[leaving]] = if (leavingToUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+            basicVar[leaving] = q
+            status[q] = VarStatus.BASIC
+            pivots++
+            if (factor.etaCount + 1 >= refactorEtaLimit) {
+                factor = refactor() ?: return null
+            } else {
+                factor.update(leaving, alpha)
+            }
+            beta = basicValues(factor)
+        }
+        return null // budget exhausted
+    }
+
     private companion object {
         const val TOL: Double = 1e-7
+
+        /** Slack tolerance on the initial primal-feasibility check ([solvePrimal]). */
+        const val FEAS_TOL: Double = 1e-6
 
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
