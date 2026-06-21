@@ -98,6 +98,12 @@ private const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
 private const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
 private const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
 
+/** Free-Boolean candidate cap for the [PresolvePass.PROBE] fixpoint pass per invocation. Each
+ *  candidate costs up to two `propagate` calls, so this bounds the pass's work on a Boolean-heavy
+ *  model; the round engine re-enters the pass after other passes fire, picking up more candidates
+ *  across rounds. */
+private const val PROBE_PASS_MAX_CANDIDATES = 2_048
+
 /** Diminishing-returns abort threshold (SCIP `abortfac`): a round that reduces the problem by less
  *  than this fraction ends the loop. Tiny, so it only trips on marginal spinning, never real work. */
 private const val PRESOLVE_ABORT_FRACTION = 0.001
@@ -233,6 +239,14 @@ enum class PresolvePass(
     /** Construction-time interior-hole SAC; implies [PROBE_INT_BOUNDS]. */
     PROBE_INT_HOLES("probe-int-holes", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(problem)
+    },
+
+    /** Probing to fixpoint: tentatively pin each free Boolean, propagate, and keep only the
+     *  deductions that hold in every solution — failed literals (emitted as unit clauses) and
+     *  common-bound tightenings. Solution-preserving, so it needs no objective-variable exclusion. */
+    PROBE("probe", Stage.PROBLEM, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            PassResult(Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never))
     },
     ;
 
