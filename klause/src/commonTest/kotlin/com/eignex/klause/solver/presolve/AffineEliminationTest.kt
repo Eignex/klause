@@ -126,7 +126,7 @@ class AffineEliminationTest {
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 3)),
             factors = listOf(
                 Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 8), // x used here too — now folded
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 8),
             ),
         )
         checkRoundTrip("fold-into-linear", problem, expectEliminated = true, expectSat = true)
