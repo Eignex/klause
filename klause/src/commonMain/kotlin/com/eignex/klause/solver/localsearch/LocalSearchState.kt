@@ -2,7 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
@@ -49,7 +49,7 @@ class LocalSearchState(
     /** Per-invariant graded violation degree (0 = satisfied), the source of truth for both
      *  [violated]-set membership (`degree > 0`) and [cost] (`Σ factorDegree`). Maintained
      *  incrementally from each invariant's `deltaIf*`/`apply*` and recomputed from
-     *  [Factor.violationDegree] at [recompute]. The graded sum gives CBLS a descent gradient on
+     *  [Invariant.violationDegree] at [recompute]. The graded sum gives CBLS a descent gradient on
      *  tight arithmetic/global constraints rather than a flat count of violated invariants. */
     val factorDegree: IntArray = IntArray(problem.numFactors)
     val intPayload: IntArray = IntArray(problem.numFactors)
@@ -64,21 +64,19 @@ class LocalSearchState(
     /** Buffer that strategies push candidate moves into. */
     val moveSink: MoveSink = MoveSink(assumptions)
 
-    /** The problem's factors, aliased so the hot LS loops read `factors` directly. Every [Factor]
-     *  is also an [com.eignex.klause.solver.Invariant] (violation scoring, move deltas, move
-     *  proposal), with sound no-op defaults, so no capability check is needed. */
-    val factors: Array<Factor> = problem.factors
+    /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */
+    val factors: Array<out Invariant> = problem.invariants
 
     /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals whose
-     *  [Factor.proposeStructuredMoves] preserves their own feasibility (see
-     *  [Factor.providesImplicitNeighbourhood]). The engine draws their feasibility-preserving moves
+     *  [Invariant.proposeStructuredMoves] preserves their own feasibility (see
+     *  [Invariant.providesImplicitNeighbourhood]). The engine draws their feasibility-preserving moves
      *  even during infeasibility, and seeds them feasible at search start. Built once on first
      *  access. */
     val electedImplicit: IntArray by lazy { electImplicitFactors() }
 
     /** Scope-disjoint subset of [electedImplicit] for feasible-init seeding: greedily chosen
      *  largest-scope-first so no two seed factors share an int variable. Disjointness guarantees one
-     *  factor's [Factor.seedFeasible] never overwrites another's seeded vars, so the post-seed
+     *  factor's [Invariant.seedFeasible] never overwrites another's seeded vars, so the post-seed
      *  assignment satisfies every seeded global simultaneously. */
     val implicitSeedFactors: IntArray by lazy { electImplicitSeedSet() }
 
@@ -889,7 +887,7 @@ class LocalSearchState(
 
     private data class CompoundEval(val breakScore: Int, val netDelta: Long, val weightedNetDelta: Double)
 
-    /** Re-read the factor's [Factor.violationDegree] from its just-updated payload and reconcile the
+    /** Re-read the factor's [Invariant.violationDegree] from its just-updated payload and reconcile the
      *  maintained [factorDegree], [cost] (`Σ degree`), and [violated]-set membership. Using the
      *  recomputed degree rather than `apply*`'s returned delta makes cost tracking exact even for
      *  globals whose returned status delta is approximate. */

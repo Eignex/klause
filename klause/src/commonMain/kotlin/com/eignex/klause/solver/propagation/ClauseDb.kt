@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.propagation
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -31,7 +31,7 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
 
 /** Unified factor accessor; routes static factor ids to [Problem.factors] and learned
  *  factor ids (≥ `problem.numFactors`) to [PropagationState.learnedClauses]. */
-internal fun PropagationState.factorAt(fid: Int): Factor = if (fid < baseFactorCount) {
+internal fun PropagationState.factorAt(fid: Int): Propagator = if (fid < baseFactorCount) {
     baseFactors[fid]
 } else {
     learnedClauseStore[fid - baseFactorCount]

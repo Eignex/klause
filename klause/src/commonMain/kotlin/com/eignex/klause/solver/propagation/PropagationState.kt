@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayDeque
@@ -334,7 +335,7 @@ class PropagationState(
     // Cached base factor table — `problem.factors` is immutable after construction, so hoist
     // the array reference and its size out of the per-call `problem.factors` / `.size` getters
     // that [factorAt] (a top BCP-loop method) pays on every watcher fire.
-    internal val baseFactors: Array<Factor> = problem.factors
+    internal val baseFactors: Array<out Propagator> = problem.propagators
     internal val baseFactorCount: Int = problem.factors.size
 
     /** Clauses learned during conflict analysis. */
