@@ -20,8 +20,10 @@ internal object AffineSingletons {
      * Two-term equalities are the common case (an alias or a one-partner definition); the `n`-term
      * generalisation (#445) projects out an *implied-free* variable defined by a longer sum (e.g. an
      * auxiliary `x = y1 + y2 − y3` used nowhere a global needs it). The unit-pivot restriction keeps
-     * every folded coefficient integral; a non-unit pivot would need residue-class reasoning and is a
-     * follow-up.
+     * every folded coefficient integral unconditionally; a **non-unit** pivot is admitted only for an
+     * implied-free (contained) `x` and only when `c_x` divides every other coefficient and the bound
+     * (#601), so `x = b/c_x + Σ_j (−c_j/c_x)·y_j` stays integral for *all* partner assignments. A
+     * non-unit pivot that fails the divisibility test is left to the residue-class doubleton below.
      *
      * For the **alias** case `x = y` (`n = 2`, `A = 1`, `B = 0`) the substitution `x → y` is a plain
      * variable rename, applied to *every* factor via [Factor.remap] regardless of type (#364).
@@ -162,8 +164,18 @@ internal object AffineSingletons {
             for (xi in f.vars.indices) {
                 val x = f.vars[xi]
                 val cx = f.coeffs[xi]
-                if ((cx != 1 && cx != -1) || eliminated[x] || x in objectiveIntVars) continue
-                // x = B + Σ A_j·y_j, with B = c_x·bound and A_j = −c_x·c_j for the other terms y_j.
+                if (eliminated[x] || x in objectiveIntVars) continue
+                // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
+                // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
+                // unit pivot trivially, and for a non-unit pivot exactly when `x` is implied-free
+                // (contained in this equality alone) and `c_x | gcd(c_j, bound)` (#445/#601). A
+                // non-unit pivot that fails the divisibility test would fold non-integral coefficients,
+                // so it is left for the residue-class doubleton pass or for propagation.
+                val isUnit = cx == 1 || cx == -1
+                if (!isUnit && !dividesAllPartnersAndBound(f, xi)) continue
+                if (!isUnit && !isContained(factors, di, x)) continue
+                // x = B + Σ A_j·y_j, with B = bound / c_x and A_j = −c_j / c_x for the other terms y_j;
+                // for a unit pivot the divisions are exact by definition.
                 val termVars = IntArray(f.vars.size - 1)
                 val termCoeffs = IntArray(f.vars.size - 1)
                 var w = 0
@@ -172,13 +184,14 @@ internal object AffineSingletons {
                     if (j == xi) continue
                     if (eliminated[f.vars[j]]) partnerEliminated = true
                     termVars[w] = f.vars[j]
-                    termCoeffs[w] = -cx * f.coeffs[j]
+                    termCoeffs[w] = -f.coeffs[j] / cx
                     w++
                 }
                 if (partnerEliminated) continue
-                val constTerm = cx * f.bound
+                val constTerm = f.bound / cx
                 // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
-                // remap; otherwise x must occur only in foldable Linear factors.
+                // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
+                // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
                 val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
                 if (isAlias || otherOccurrencesAllLinear(factors, di, x)) {
                     return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
@@ -186,6 +199,16 @@ internal object AffineSingletons {
             }
         }
         return null
+    }
+
+    /** Whether the pivot coefficient `f.coeffs(xi)` divides every other coefficient and the bound of
+     *  [f], so substituting out the pivot variable keeps all folded coefficients and the constant term
+     *  integral. */
+    private fun dividesAllPartnersAndBound(f: Linear, xi: Int): Boolean {
+        val cx = f.coeffs[xi]
+        if (f.bound % cx != 0) return false
+        for (j in f.vars.indices) if (j != xi && f.coeffs[j] % cx != 0) return false
+        return true
     }
 
     /** Whether every factor other than [defIdx] that mentions [x] is a [Linear] (foldable). */
