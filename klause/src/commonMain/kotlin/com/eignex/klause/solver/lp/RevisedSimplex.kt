@@ -352,15 +352,130 @@ internal class RevisedSimplex(
     }
 
     /**
-     * Bounded-variable **primal** phase-2 simplex (the dual [solve] is the workhorse; this is the
-     * complementary engine the feasibility pump optimizes a feasible point with). It starts from a
-     * primal-feasible basis — [warm] if it is feasible, else the all-lower start — and pivots toward
-     * the optimum by the textbook Dantzig rule with a **bound-flipping** ratio test: an entering
-     * variable that reaches its own opposite bound before any basic variable blocks simply flips
-     * bounds, taking a long step with no basis change. Returns null on an infeasible start (no phase-1
-     * yet), an unbounded objective, a singular pivot, cancellation, or the iteration budget — so the
-     * caller falls back to the dual path. Like [solve], the float basis it returns is certified exactly
-     * downstream, so this never affects soundness, only which vertex is reached.
+     * Primal **phase-1**: drive an infeasible basis to primal feasibility by minimizing the total bound
+     * infeasibility `w = Σ max(0,−β_i) + max(0,β_i−u_i)` over the same primal pivot machinery. The
+     * phase-1 gradient `γ` (−1 for a basic below its lower bound, +1 above its upper, 0 feasible) gives
+     * the phase-1 duals `π = Bᵀ⁻¹γ`; entering by the column that most reduces `w`, leaving by the first
+     * basic to reach a bound (an infeasible basic crossing into feasibility is a valid leave). Returns
+     * the feasible factorization, or null when no improving column remains while `w > 0` (genuinely
+     * infeasible) or on a singular pivot / cancellation / budget. Mutates [basicVar] / [status].
+     */
+    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
+    private fun primalPhase1(start: EtaBasis): EtaBasis? {
+        var factor = start
+        var beta = basicValues(factor)
+        val gamma = DoubleArray(m)
+        val aq = DoubleArray(m)
+        val maxIter = 50 * (m + numVars) + 200
+        var iter = 0
+        while (iter++ < maxIter) {
+            if (iter % CANCEL_POLL == 0 && cancellation()) return null
+            var w = 0.0
+            for (i in 0 until m) {
+                val v = basicVar[i]
+                val hi = if (model.hasUpper[v]) model.upper[v].toDouble() else Double.MAX_VALUE
+                gamma[i] = when {
+                    beta[i] < -FEAS_TOL -> {
+                        w -= beta[i];
+                        -1.0
+                    }
+                    beta[i] > hi + FEAS_TOL -> {
+                        w += beta[i] - hi;
+                        1.0
+                    }
+                    else -> 0.0
+                }
+            }
+            if (w <= FEAS_TOL) return factor // feasible
+
+            val pi = factor.btran(gamma)
+            // Entering reduces w: from lower if π·A_j > 0, from upper if π·A_j < 0; pick the steepest.
+            var q = -1
+            var qAtLower = true
+            var best = TOL
+            for (j in 0 until numVars) {
+                if (status[j] == VarStatus.BASIC) continue
+                val pj = dotColumn(pi, j)
+                val atLower = status[j] == VarStatus.AT_LOWER
+                val gain = if (atLower) pj else -pj
+                if (gain > best) {
+                    best = gain
+                    q = j
+                    qAtLower = atLower
+                }
+            }
+            if (q == -1) return null // w > 0 with no improving column ⇒ primal infeasible
+
+            denseColumn(q, aq)
+            val alpha = factor.ftran(aq)
+            val dir = if (qAtLower) 1.0 else -1.0
+            var tMax = if (model.hasUpper[q]) model.upper[q].toDouble() else Double.MAX_VALUE
+            var leaving = -1
+            var leavingToUpper = false
+            for (i in 0 until m) {
+                val rate = -alpha[i] * dir // dβ_i/dt
+                if (abs(rate) < TOL) continue
+                val v = basicVar[i]
+                val hi = if (model.hasUpper[v]) model.upper[v].toDouble() else Double.MAX_VALUE
+                var t = Double.MAX_VALUE
+                var toUpper = false
+                when {
+                    // Below its lower bound: a rising β_i reaches feasibility at 0 and may leave.
+                    gamma[i] < 0 -> if (rate > 0) t = -beta[i] / rate
+
+                    // Above its upper bound: a falling β_i reaches feasibility at u_i and may leave.
+                    gamma[i] > 0 -> if (rate < 0) {
+                        t = (beta[i] - hi) / -rate;
+                        toUpper = true
+                    }
+
+                    // Feasible: blocks at whichever bound it heads toward.
+                    rate < 0 -> t = beta[i] / -rate
+
+                    hi < Double.MAX_VALUE -> {
+                        t = (hi - beta[i]) / rate;
+                        toUpper = true
+                    }
+                }
+                if (t < tMax - TOL) {
+                    tMax = t
+                    leaving = i
+                    leavingToUpper = toUpper
+                }
+            }
+            if (tMax >= Double.MAX_VALUE) return null // no blocker (degenerate/unbounded direction)
+            if (leaving == -1) {
+                status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+                beta = basicValues(factor)
+                continue
+            }
+            if (abs(alpha[leaving]) < TOL) return null
+            status[basicVar[leaving]] = if (leavingToUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+            basicVar[leaving] = q
+            status[q] = VarStatus.BASIC
+            pivots++
+            factor = if (factor.etaCount + 1 >= refactorEtaLimit) {
+                refactor() ?: return null
+            } else {
+                factor.also {
+                it.update(leaving, alpha)
+            }
+            }
+            beta = basicValues(factor)
+        }
+        return null // budget exhausted
+    }
+
+    /**
+     * Bounded-variable **primal** simplex (the dual [solve] is the workhorse; this is the complementary
+     * engine the feasibility pump optimizes a feasible point with). [primalPhase1] drives an infeasible
+     * start to feasibility, then phase-2 pivots toward the optimum by the textbook Dantzig rule with a
+     * **bound-flipping** ratio test: an entering variable that reaches its own opposite bound before any
+     * basic variable blocks simply flips bounds, taking a long step with no basis change. Returns null on
+     * a genuinely infeasible model, an unbounded objective, a singular pivot, cancellation, or the
+     * iteration budget — so the caller falls back to the dual path. Like [solve], the float basis it
+     * returns is certified exactly downstream, so this never affects soundness, only which vertex is
+     * reached.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
     fun solvePrimal(warm: Basis? = null): FloatLpResult? {
@@ -370,7 +485,11 @@ internal class RevisedSimplex(
             refactor() ?: return null
         }
         var beta = basicValues(factor)
-        if (!primalFeasible(beta)) return null // phase-1 (feasibility recovery) is a follow-up
+        if (!primalFeasible(beta)) {
+            factor = primalPhase1(factor) ?: return null
+            beta = basicValues(factor)
+            if (!primalFeasible(beta)) return null // phase-1 could not reach feasibility
+        }
         val maxIter = 50 * (m + numVars) + 200
         val aq = DoubleArray(m)
         var iter = 0
