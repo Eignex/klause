@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  * test enumerates the whole assignment space, computes the minimum objective before and after, and
  * asserts they match (and that the expected variables were pinned).
  */
-class DualFixTest {
+class DominatedVariablesTest {
 
     private fun isFeasible(problem: Problem, ints: IntArray): Boolean {
         var a = Assumptions.None
