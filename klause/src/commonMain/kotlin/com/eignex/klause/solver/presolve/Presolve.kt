@@ -54,6 +54,15 @@ object Presolve {
     fun probe(problem: Problem, maxCandidates: Int, cancellation: Cancellation = Cancellation.Never): Problem =
         Probing.probe(problem, maxCandidates, cancellation)
 
+    /** Binary implication graph: equivalent-literal substitution and transitive reduction. See
+     *  [ImplicationGraph]. */
+    fun reduceImplicationGraph(
+        problem: Problem,
+        maxCandidates: Int,
+        cancellation: Cancellation = Cancellation.Never,
+        objectiveBoolVars: Set<Int> = emptySet(),
+    ): ImplicationReduction = ImplicationGraph.reduce(problem, maxCandidates, cancellation, objectiveBoolVars)
+
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         SymmetryBreaking.refineColoursForTest(problem)
 }
