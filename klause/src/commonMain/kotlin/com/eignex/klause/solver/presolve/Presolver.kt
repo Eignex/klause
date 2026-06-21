@@ -16,12 +16,11 @@ class Presolved(val problem: Problem, val reconstruct: (Sample) -> Sample)
  * Information a pass needs to stay sound. [objectiveIntVars] / [objectiveBoolVars] are the
  * variables an objective reads (so passes that eliminate variables or add ordering constraints
  * must leave them alone — eliminating an objective variable, or breaking symmetry over one, would
- * change the optimum). [solutionSetSensitive] is set when the caller needs every solution
- * (enumeration / counting / sampling), which turns off solution-set-altering passes.
+ * change the optimum); they are exactly the keys of [objectiveIntCoeffs] / [objectiveBoolCoeffs].
+ * [solutionSetSensitive] is set when the caller needs every solution (enumeration / counting /
+ * sampling), which turns off solution-set-altering passes.
  */
 class PresolveContext(
-    val objectiveIntVars: Set<Int> = emptySet(),
-    val objectiveBoolVars: Set<Int> = emptySet(),
     val solutionSetSensitive: Boolean = false,
     /** Minimize-sense integer objective coefficients (var → nonzero coefficient), used by dual fixing
      *  to decide which bound a dominated variable can be pinned to. */
@@ -34,6 +33,12 @@ class PresolveContext(
      *  hand-written one is redundant and the two can interact. An explicit override still forces it on. */
     val modelBreaksSymmetry: Boolean = false,
 ) {
+    /** Integer variables the objective reads — the nonzero-coefficient indices. */
+    val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
+
+    /** Boolean variables the objective reads — the nonzero-weight indices. */
+    val objectiveBoolVars: Set<Int> get() = objectiveBoolCoeffs.keys
+
     /** Factories for the common contexts. */
     companion object {
         /** Protects no variable — pure feasibility, or when there is no objective. */
@@ -51,25 +56,17 @@ class PresolveContext(
                     modelBreaksSymmetry = modelBreaksSymmetry,
                 )
             }
-            val ints = HashSet<Int>()
             val intCoeffs = HashMap<Int, Long>()
             for (i in objective.intCoefficients.indices) {
                 val c = objective.intCoefficients[i]
-                if (c != 0L) {
-                    ints.add(i)
-                    intCoeffs[i] = c
-                }
+                if (c != 0L) intCoeffs[i] = c
             }
-            val bools = HashSet<Int>()
             val boolCoeffs = HashMap<Int, Long>()
             for (b in objective.boolWeights.indices) {
                 val w = objective.boolWeights[b]
-                if (w != 0L) {
-                    bools.add(b)
-                    boolCoeffs[b] = w
-                }
+                if (w != 0L) boolCoeffs[b] = w
             }
-            return PresolveContext(ints, bools, solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry)
+            return PresolveContext(solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry)
         }
     }
 }
