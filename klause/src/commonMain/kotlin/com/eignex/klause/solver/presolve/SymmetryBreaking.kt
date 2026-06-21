@@ -115,13 +115,39 @@ internal object SymmetryBreaking {
      * auxiliary variables and a var-growing reconstruction, and is a follow-up.
      */
     private fun breakValueSymmetry(problem: Problem, objectiveIntVars: Set<Int>): List<Factor> {
-        if (problem.numIntVars == 0) return emptyList()
+        val orbits = verifiedValueOrbits(problem) ?: return emptyList()
+        val extra = ArrayList<Factor>()
+        for (orbit in orbits) {
+            val orbitSet = orbit.toHashSet()
+            val minValue = orbit.min()
+            for (x in 0 until problem.numIntVars) {
+                if (x in objectiveIntVars) continue
+                if (domainWithin(problem.intDomains[x], orbitSet)) {
+                    extra.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.EQ, minValue))
+                    break
+                }
+            }
+        }
+        return extra
+    }
+
+    /**
+     * The verified-interchangeable value orbits shared by [breakValueSymmetry] and
+     * [breakValuePrecedence]: values grouped by domain-incidence, then refined against the factors
+     * ([verifyValueOrbits]) unless every factor is value-anonymous (the #366 fast path skips
+     * verification). Returns the orbits of size ≥ 2, or `null` when nothing is eligible (no int
+     * variables, an unkeyed factor on the verified path, or an empty value range) — each caller maps
+     * `null` to its own "post nothing" result. Objective-variable exclusion happens at each caller's
+     * per-orbit action, not here.
+     */
+    private fun verifiedValueOrbits(problem: Problem): List<List<Int>>? {
+        if (problem.numIntVars == 0) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
         // Verified path needs every factor keyed; build the base multiset (bail if any is unkeyed).
         val base: Map<String, Int>? = if (allAnonymous) {
             null
         } else {
-            PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
+            PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return null
         }
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
@@ -129,7 +155,7 @@ internal object SymmetryBreaking {
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
         }
-        if (lo > hi) return emptyList()
+        if (lo > hi) return null
         // Group values by domain-incidence signature: same set of containing variables ⇒ a candidate
         // orbit (a swap within it maps every domain to itself).
         val incidence = HashMap<String, MutableList<Int>>()
@@ -138,26 +164,15 @@ internal object SymmetryBreaking {
             for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.append(x).append(',')
             if (sig.isNotEmpty()) incidence.getOrPut(sig.toString()) { ArrayList() }.add(value)
         }
-        val extra = ArrayList<Factor>()
+        val orbits = ArrayList<List<Int>>()
         for (candidate in incidence.values) {
             if (candidate.size < 2) continue
             // Anonymous: the whole group is one orbit. Otherwise refine into verified-equal orbits.
-            val orbits =
+            val refined =
                 if (allAnonymous) listOf(candidate) else verifyValueOrbits(problem, requireNotNull(base), candidate)
-            for (orbit in orbits) {
-                if (orbit.size < 2) continue
-                val orbitSet = orbit.toHashSet()
-                val minValue = orbit.min()
-                for (x in 0 until problem.numIntVars) {
-                    if (x in objectiveIntVars) continue
-                    if (domainWithin(problem.intDomains[x], orbitSet)) {
-                        extra.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.EQ, minValue))
-                        break
-                    }
-                }
-            }
+            for (orbit in refined) if (orbit.size >= 2) orbits.add(orbit)
         }
-        return extra
+        return orbits
     }
 
     /**
@@ -183,50 +198,22 @@ internal object SymmetryBreaking {
      */
     fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): Problem {
         val n = problem.numIntVars
-        if (n == 0) return problem
-        // Value-anonymous fast path: every value relabeling is a symmetry, so each domain-incidence
-        // group is one fully-interchangeable orbit. Otherwise verify the orbits against the
-        // value-relabelable factors (#442) — needs every factor keyed, else bail.
-        val allAnonymous = problem.factors.all { it.isValueAnonymous() }
-        val base: Map<String, Int>? = if (allAnonymous) {
-            null
-        } else {
-            PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return problem
-        }
-        var lo = Int.MAX_VALUE
-        var hi = Int.MIN_VALUE
-        for (d in problem.intDomains) {
-            if (d.min < lo) lo = d.min
-            if (d.max > hi) hi = d.max
-        }
-        if (lo > hi) return problem
-        val incidence = HashMap<String, MutableList<Int>>()
-        for (value in lo..hi) {
-            val sig = StringBuilder()
-            for (x in 0 until n) if (value in problem.intDomains[x]) sig.append(x).append(',')
-            if (sig.isNotEmpty()) incidence.getOrPut(sig.toString()) { ArrayList() }.add(value)
-        }
+        // A verified orbit is interchangeable; ordering its first occurrences is sound. A
+        // fully-internal variable (domain ⊆ orbit) exists only when the orbit equals the whole
+        // incidence group, so a split orbit simply posts nothing — never unsound.
+        val orbits = verifiedValueOrbits(problem) ?: return problem
         val extra = ArrayList<Factor>()
-        for (candidate in incidence.values) {
-            if (candidate.size < 2) continue
-            // A verified orbit is interchangeable; ordering its first occurrences is sound. A
-            // fully-internal variable (domain ⊆ orbit) exists only when the orbit equals the whole
-            // incidence group, so a split orbit simply posts nothing — never unsound.
-            val orbits =
-                if (allAnonymous) listOf(candidate) else verifyValueOrbits(problem, requireNotNull(base), candidate)
-            for (orbit in orbits) {
-                if (orbit.size < 2) continue
-                val orbitSet = orbit.toHashSet()
-                val seq = ArrayList<Int>()
-                for (x in 0 until n) {
-                    if (x !in objectiveIntVars && domainWithin(problem.intDomains[x], orbitSet)) seq.add(x)
-                }
-                if (seq.size < 2) continue
-                val sortedValues = orbit.sorted()
-                val seqArray = seq.toIntArray()
-                for (i in 0 until sortedValues.size - 1) {
-                    extra.add(ValuePrecede(sortedValues[i], sortedValues[i + 1], seqArray))
-                }
+        for (orbit in orbits) {
+            val orbitSet = orbit.toHashSet()
+            val seq = ArrayList<Int>()
+            for (x in 0 until n) {
+                if (x !in objectiveIntVars && domainWithin(problem.intDomains[x], orbitSet)) seq.add(x)
+            }
+            if (seq.size < 2) continue
+            val sortedValues = orbit.sorted()
+            val seqArray = seq.toIntArray()
+            for (i in 0 until sortedValues.size - 1) {
+                extra.add(ValuePrecede(sortedValues[i], sortedValues[i + 1], seqArray))
             }
         }
         if (extra.isEmpty()) return problem
