@@ -45,6 +45,9 @@ internal class RevisedSimplex(
     private val model: LpModel,
     private val cancellation: Cancellation = Cancellation.Never,
     private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
+    /** Use the long-step bound-flipping ratio test in the dual entering selection; false reproduces the
+     *  plain minimum-ratio test (the parity baseline). */
+    private val boundFlip: Boolean = true,
 ) {
     private val m = model.m
     private val n = model.n
@@ -164,6 +167,9 @@ internal class RevisedSimplex(
         val rhsAdj = DoubleArray(m)
         val unit = DoubleArray(m)
         val aq = DoubleArray(m)
+        val pivotRowEntry = DoubleArray(numVars) // ρ·A_j per nonbasic, reused by the bound-flip ratio test
+        val ratioBuf = DoubleArray(numVars) // |d_j / a_j| per eligible nonbasic
+        val elig = ArrayList<Int>()
         var iter = 0
         while (iter++ < maxIter) {
             // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
@@ -210,8 +216,9 @@ internal class RevisedSimplex(
             // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r; entering column by dual ratio test.
             for (i in 0 until m) unit[i] = if (i == r) 1.0 else 0.0
             val rho = factor.btran(unit)
-            var q = -1
-            var bestRatio = Double.MAX_VALUE
+            // Collect the dual-feasible entering candidates and their ratios; eligibility is the sign
+            // rule that keeps reduced costs feasible as the leaving variable moves to its bound.
+            elig.clear()
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC) continue
                 val a = dotColumn(rho, j)
@@ -223,20 +230,18 @@ internal class RevisedSimplex(
                     (atLower && a > 0) || (!atLower && a < 0)
                 }
                 if (!eligible) continue
-                val dj = model.cost[j].toDouble() - dotColumn(y, j)
-                val ratio = abs(dj / a)
-                if (ratio < bestRatio) {
-                    bestRatio = ratio
-                    q = j
-                }
+                pivotRowEntry[j] = a
+                ratioBuf[j] = abs((model.cost[j].toDouble() - dotColumn(y, j)) / a)
+                elig.add(j)
             }
-            if (q == -1) {
+            if (elig.isEmpty()) {
                 // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
                 // certify infeasibility exactly (the float ray alone is not sound to prune on).
                 infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf())
                 infeasibleRow = r
                 return null
             }
+            val q = chooseEntering(elig, ratioBuf, pivotRowEntry, worst)
 
             denseColumn(q, aq)
             val alpha = factor.ftran(aq) // spike η = B⁻¹ A_q in the pre-pivot factorization
@@ -254,6 +259,47 @@ internal class RevisedSimplex(
             }
         }
         return null // budget exhausted
+    }
+
+    /**
+     * Pick the dual entering variable from the eligible set [elig] (ratios in [ratioBuf], pivot-row
+     * coefficients in [pivotRowEntry]). The plain rule takes the minimum ratio. The bound-flipping long
+     * step ([boundFlip]) instead walks the eligible breakpoints in ratio order, flipping each bounded
+     * nonbasic whose breakpoint is passed — accumulating `|a_j|·u_j` toward the leaving variable's
+     * violation [delta] — until that capacity covers the violation or an unbounded column is reached;
+     * that column enters. It tends to pick a larger pivot magnitude and clears more infeasibility per
+     * iteration. Mutates [status] for the flips; sound regardless, since the basis is certified downstream.
+     */
+    @Suppress("CyclomaticComplexMethod")
+    private fun chooseEntering(
+        elig: ArrayList<Int>,
+        ratioBuf: DoubleArray,
+        pivotRowEntry: DoubleArray,
+        delta: Double,
+    ): Int {
+        if (!boundFlip) {
+            var q = elig[0]
+            for (idx in 1 until elig.size) {
+                val j = elig[idx]
+                if (ratioBuf[j] < ratioBuf[q]) q = j
+            }
+            return q
+        }
+        elig.sortBy { ratioBuf[it] }
+        var acc = 0.0
+        for (idx in elig.indices) {
+            val j = elig[idx]
+            val range = if (model.hasUpper[j]) model.upper[j].toDouble() else Double.MAX_VALUE
+            val cap = abs(pivotRowEntry[j]) * range
+            val last = idx == elig.size - 1
+            if (!last && range < Double.MAX_VALUE && acc + cap < delta - TOL) {
+                status[j] = if (status[j] == VarStatus.AT_LOWER) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+                acc += cap
+            } else {
+                return j
+            }
+        }
+        return elig[elig.size - 1] // defensive: the loop returns on the last element
     }
 
     private fun optimal(beta: DoubleArray, factor: EtaBasis): FloatLpResult {
