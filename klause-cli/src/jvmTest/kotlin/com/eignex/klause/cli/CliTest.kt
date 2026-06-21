@@ -53,7 +53,10 @@ class CliTest {
             appendLine("constraint int_lin_eq([$coeffs], [$vars], 0);")
             appendLine("solve minimize obj;")
         }
-        val file = File.createTempFile("cliopt", ".fzn").apply { writeText(fzn); deleteOnExit() }
+        val file = File.createTempFile("cliopt", ".fzn").apply {
+            writeText(fzn)
+            deleteOnExit()
+        }
         val out = capture { main(arrayOf("-e", "ls", "-a", "-s", "-t", "2000", file.absolutePath)) }
         val separators = out.lines().count { it == "----------" }
         val solutionsStat = Regex("solutions=(\\d+)").find(out)?.groupValues?.get(1)?.toInt()
