@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor.arithmetic
 
-import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
+import com.eignex.klause.solver.factor.ReifiedFactor
 import com.eignex.klause.solver.factor.bool.reifiedDegree
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -11,10 +11,10 @@ import com.eignex.klause.solver.localsearch.MoveSink
 /**
  * LS contract for [ReifiedCardinality]: reified cardinality violation tracking and repair.
  */
-interface ReifiedCardinalityInvariant : Invariant {
+interface ReifiedCardinalityInvariant : ReifiedFactor {
 
     /** The reifying Boolean variable id. */
-    val auxBoolVar: Int
+    override val auxBoolVar: Int
 
     /** The Boolean literals. */
     val literals: IntArray
@@ -29,6 +29,12 @@ interface ReifiedCardinalityInvariant : Invariant {
     fun reifSignedFor(v: Int): Int
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
+        reifHolds(state.longPayload[factorId])
+
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
+        compressViolation(reifDistance(state.longPayload[factorId]), softCap)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
