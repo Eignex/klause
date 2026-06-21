@@ -13,8 +13,6 @@ import kotlin.test.assertTrue
 
 class SessionTest {
 
-    /** Sessions on a stateless backend behave like calling the solver directly when
-     *  the assumption stack is empty. */
     @Test
     fun `empty session forwards to solver unchanged`() {
         val problem = exactlyOneOver(3)
@@ -24,7 +22,6 @@ class SessionTest {
         assertTrue(r is SolveResult.Sat)
     }
 
-    /** Pushing an assumption pins a variable for the duration of the scope. */
     @Test
     fun `push pins a variable and pop reverts`() {
         val problem = exactlyOneOver(3)
@@ -38,10 +35,8 @@ class SessionTest {
 
         session.pop()
         assertEquals(0, session.depth)
-        // After pop, the pin is gone — any of the three vars could be true.
     }
 
-    /** Stacked pushes merge; later pushes win on conflicts. */
     @Test
     fun `nested pushes merge with last-write semantics`() {
         val problem = exactlyOneOver(3)
@@ -49,24 +44,21 @@ class SessionTest {
 
         session.push(Assumptions(bools = mapOf(0 to true, 1 to false, 2 to false)))
         session.push(Assumptions(bools = mapOf(1 to true))) // overrides 1 = false
-        // Now 0 = true and 1 = true both pinned → infeasible for exactly-one.
         val r = session.solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
 
-        session.pop() // back to just 0 = true, 1 = false, 2 = false → feasible
+        session.pop()
         val r2 = session.solve(BacktrackParams(randomSeed = 0L))
         assertTrue(r2 is SolveResult.Sat)
         assertTrue(r2.assignment.bools[0])
     }
 
-    /** Pop on empty stack fails clearly. */
     @Test
     fun `pop on empty stack throws`() {
         val session = BacktrackSolver(exactlyOneOver(2)).session()
         assertFails { session.pop() }
     }
 
-    /** Session works on LocalSearchSolver too. */
     @Test
     fun `local search session honors pushed assumptions`() {
         val problem = exactlyOneOver(4)

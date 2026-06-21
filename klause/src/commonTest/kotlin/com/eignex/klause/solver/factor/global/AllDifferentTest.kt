@@ -25,18 +25,8 @@ import kotlin.test.assertTrue
 
 class AllDifferentTest {
 
-    /**
-     * Soundness gate for the Hall-set conflict/prune explanations. The complete CDCL
-     * backtracker (VSIDS + LBD clause forgetting, so the Hall-set antecedents are exercised
-     * by clause learning) must enumerate EXACTLY the brute-force solution set on a battery
-     * of small, Hall-prone AllDifferent instances. An unsound explanation would prune a
-     * feasible subtree → a missing solution → a smaller set; an over-broad one only slows
-     * search. Range domains (per the [AllDifferent] common-domain contract) suffice to force
-     * tight Hall structure (e.g. two vars confined to {0,1} force the rest off those values).
-     */
     @Test
     fun `backtrack learning enumerates exactly the brute-force solution set`() {
-        // Each instance: per-var inclusive [min,max] ranges over a shared value space.
         val instances = listOf(
             listOf(0 to 3, 0 to 3, 0 to 3, 0 to 3), // permutations of 0..3
             listOf(0 to 1, 0 to 1, 0 to 3, 2 to 3), // Hall {v0,v1}⊆{0,1}
@@ -52,7 +42,6 @@ class AllDifferentTest {
             val k = ranges.size
             val lo = ranges.minOf { it.first }
             val hi = ranges.maxOf { it.second }
-            // Brute-force reference: every per-var value combination that is all-different.
             val brute = HashSet<List<Int>>()
             fun rec(i: Int, acc: IntArray) {
                 if (i == k) {
@@ -152,8 +141,6 @@ class AllDifferentTest {
 
     @Test
     fun `repair emits value-swap candidates when domain is fully saturated`() {
-        // 4 vars over [0..2] saturates the domain so there is no unused target; the
-        // swap pass kicks in. (Pigeonhole-infeasible, but we're testing move generation.)
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 3)
         val problem = Problem(
             numBoolVars = 0,
@@ -189,8 +176,6 @@ class AllDifferentTest {
 
     @Test
     fun `hall interval prunes other vars' bounds via propagation`() {
-        // Three vars on [1, 3] form a Hall set; v3's [2, 5] intrudes on the min side
-        // and should be bumped to 4.
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 6)
         val problem = Problem(
             numBoolVars = 0,
@@ -258,8 +243,6 @@ class AllDifferentTest {
 
     @Test
     fun `singleton-taken value punched out of interior of other domains`() {
-        // Sparse-domain pruning removes the taken value even when it lands in the
-        // interior of another var's domain (here value 3 in v1's [1, 5]).
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 6)
         val problem = Problem(
             numBoolVars = 0,
@@ -278,8 +261,6 @@ class AllDifferentTest {
 
     @Test
     fun `hall interval with spanning intruder punches every interior value`() {
-        // Hall set [3, 5]; intruder v3 has [1, 7] so sparse-domain pruning must
-        // punch interior values out (min/max can't move past the holes).
         val factor = AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 8)
         val problem = Problem(
             numBoolVars = 0,
