@@ -29,6 +29,7 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.round
 
@@ -520,6 +521,13 @@ internal fun LpEngine.harvestRootCuts(
  * complete assignment when rounding-then-propagation reaches a fixpoint without a wipeout, else null.
  * Sound by construction — the result is a candidate that the caller re-evaluates against the objective
  * and only keeps if feasible-and-improving; a bad rounding just yields null or a worse incumbent.
+ *
+ * Two refinements over rounding each variable once in declaration order. Variables are pinned in order
+ * of the LP's confidence — least-fractional integers and most-decisive Booleans first — so the values
+ * the relaxation is surest about propagate first and steer the rest. And when a rounding conflicts the
+ * other side of the LP value is tried before giving up, recovering assignments a one-shot round drops.
+ * Every variable still ends pinned to a single value, so a returned snapshot is a complete feasible
+ * point (the caller does not re-check feasibility); a variable that conflicts both ways yields null.
  */
 internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: Cancellation): Sample? {
     val session = PropagationSession(problem)
@@ -532,22 +540,36 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
         return null
     } ?: return null
     val primal = result.primal
-    for (v in 0 until problem.numIntVars) {
+    fun lpValue(col: Int): Double? = if (col in 0 until primal.size) primal[col] else null
+
+    val intOrder = (0 until problem.numIntVars).sortedBy { v ->
+        lpValue(relaxation.intColOf[v])?.let { abs(it - round(it)) } ?: Double.MAX_VALUE
+    }
+    for (v in intOrder) {
         val d = session.intDomain(v)
         if (d.min == d.max) continue // already fixed by propagation
-        val col = relaxation.intColOf[v]
-        val target = if (col >= 0 && col < primal.size) {
-            round(primal[col]).toInt().coerceIn(d.min, d.max)
-        } else {
-            d.min
-        }
-        if (session.pinInt(v, target) is PropagationResult.Unsat) return null
+        if (!pinIntTowardLp(session, v, lpValue(relaxation.intColOf[v]), d.min, d.max)) return null
     }
-    for (b in 0 until problem.numBoolVars) {
+    val boolOrder = (0 until problem.numBoolVars).sortedByDescending { b ->
+        lpValue(relaxation.boolColOf[b])?.let { abs(it - 0.5) } ?: -1.0
+    }
+    for (b in boolOrder) {
         if (session.boolValue(b) != null) continue
-        val col = relaxation.boolColOf[b]
-        val target = col >= 0 && col < primal.size && primal[col] >= 0.5
-        if (session.pinBool(b, target) is PropagationResult.Unsat) return null
+        val first = (lpValue(relaxation.boolColOf[b]) ?: 0.0) >= 0.5
+        if (session.pinBool(b, first) !is PropagationResult.Unsat) continue
+        if (session.pinBool(b, !first) is PropagationResult.Unsat) return null
     }
     return snapshotAssignment(session)
+}
+
+/** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
+ *  of the LP value on a conflict. False only when both candidates wipe out — a conflicting pin reverts
+ *  the session to its pre-pin state, so the fallback resumes cleanly. */
+private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo: Int, hi: Int): Boolean {
+    if (lp == null) return session.pinInt(v, lo) !is PropagationResult.Unsat
+    val first = round(lp).toInt().coerceIn(lo, hi)
+    if (session.pinInt(v, first) !is PropagationResult.Unsat) return true
+    val second = (if (lp >= first) first + 1 else first - 1).coerceIn(lo, hi)
+    if (second == first) return false
+    return session.pinInt(v, second) !is PropagationResult.Unsat
 }
