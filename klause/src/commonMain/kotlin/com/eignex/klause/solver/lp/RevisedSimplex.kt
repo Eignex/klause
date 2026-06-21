@@ -36,13 +36,15 @@ internal class FloatLpResult(
  * singular basis); its [FloatLpResult.basis] is then certified exactly downstream, so float rounding is never
  * safety-critical.
  *
- * NOTE: the basis is refactorized from scratch each iteration (correct and sparse; fine for the
- * warm-started few-pivot search). Forrest–Tomlin / eta updates between refactorizations are the
- * remaining speed step.
+ * Between refactorizations the basis is maintained incrementally as an [EtaBasis] (product-form of the
+ * inverse): each pivot appends one `O(m)` eta rather than refactorizing the whole basis, and the chain
+ * is rebuilt from scratch once it reaches [refactorEtaLimit] (bounding fill and numerical drift). The
+ * limit is a constructor knob only so tests can force a refactorization per pivot and compare.
  */
 internal class RevisedSimplex(
     private val model: LpModel,
     private val cancellation: Cancellation = Cancellation.Never,
+    private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
 ) {
     private val m = model.m
     private val n = model.n
@@ -110,8 +112,9 @@ internal class RevisedSimplex(
         return acc
     }
 
-    /** Sparse LU of the current basis `B` (`B[i][t] = A_full[i][basicVar[t]]`); null if singular. */
-    private fun factorizeBasis(): SparseLu? {
+    /** Refactorize the current basis `B` (`B[i][t] = A_full[i][basicVar[t]]`) into a fresh, empty
+     *  [EtaBasis]; null if singular. */
+    private fun refactor(): EtaBasis? {
         val rows = Array(m) { HashMap<Int, Double>() }
         var nnzB = 0
         for (t in 0 until m) {
@@ -135,11 +138,12 @@ internal class RevisedSimplex(
             val density = lu.nnz.toDouble() / (m.toDouble() * m.toDouble())
             if (density > maxLuDensity) maxLuDensity = density
         }
-        return lu
+        return EtaBasis.of(lu, m)
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
-    private fun duals(lu: SparseLu): DoubleArray = lu.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
+    private fun duals(factor: EtaBasis): DoubleArray =
+        factor.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
 
     /**
      * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
@@ -151,19 +155,21 @@ internal class RevisedSimplex(
      */
     fun solve(warm: Basis? = null): FloatLpResult? {
         if (warm == null || !tryWarmStart(warm)) coldStart()
+        // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
+        var factor: EtaBasis = refactor() ?: run {
+            coldStart()
+            refactor() ?: return null
+        }
         val maxIter = 50 * (m + numVars) + 200
         val rhsAdj = DoubleArray(m)
         val unit = DoubleArray(m)
         val aq = DoubleArray(m)
         var iter = 0
         while (iter++ < maxIter) {
-            // Cooperative deadline: each iteration refactorizes (heavier than a single pivot), so an
-            // unbounded loop on a large model would otherwise blow the wall-clock limit (#574). On
-            // cancellation give up (null) — the basis is only a heuristic, so this is sound.
+            // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
+            // loop on a large model would still blow the wall-clock limit (#574). On cancellation give
+            // up (null) — the basis is only a heuristic, so this is sound.
             if (iter % CANCEL_POLL == 0 && cancellation()) return null
-            // Refactorize the basis each iteration (sparse, warm-started search ⇒ few iterations);
-            // Forrest–Tomlin / eta updates between refactorizations are the remaining speed step.
-            val lu = factorizeBasis() ?: return null
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
             for (i in 0 until m) rhsAdj[i] = model.rhs[i].toDouble()
             for (j in 0 until numVars) {
@@ -178,7 +184,7 @@ internal class RevisedSimplex(
                     }
                 }
             }
-            val beta = lu.ftran(rhsAdj)
+            val beta = factor.ftran(rhsAdj)
             // Leaving: most-violated basic bound (Dantzig).
             var r = -1
             var worst = TOL
@@ -198,12 +204,12 @@ internal class RevisedSimplex(
                     belowLower = false
                 }
             }
-            if (r == -1) return optimal(beta, lu) // primal feasible ⇒ optimal
+            if (r == -1) return optimal(beta, factor) // primal feasible ⇒ optimal
 
-            val y = duals(lu)
+            val y = duals(factor)
             // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r; entering column by dual ratio test.
             for (i in 0 until m) unit[i] = if (i == r) 1.0 else 0.0
-            val rho = lu.btran(unit)
+            val rho = factor.btran(unit)
             var q = -1
             var bestRatio = Double.MAX_VALUE
             for (j in 0 until numVars) {
@@ -233,17 +239,24 @@ internal class RevisedSimplex(
             }
 
             denseColumn(q, aq)
-            val alpha = lu.ftran(aq)
+            val alpha = factor.ftran(aq) // spike η = B⁻¹ A_q in the pre-pivot factorization
             if (abs(alpha[r]) < TOL) return null // numerically singular pivot
             status[basicVar[r]] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
             basicVar[r] = q
             status[q] = VarStatus.BASIC
             pivots++
+            // Fold the pivot into the factorization as one eta; refactorize once the chain is full so
+            // fill and rounding drift stay bounded. A refactorize failure (singular) gives up soundly.
+            if (factor.etaCount + 1 >= refactorEtaLimit) {
+                factor = refactor() ?: return null
+            } else {
+                factor.update(r, alpha)
+            }
         }
         return null // budget exhausted
     }
 
-    private fun optimal(beta: DoubleArray, lu: SparseLu): FloatLpResult {
+    private fun optimal(beta: DoubleArray, factor: EtaBasis): FloatLpResult {
         // Re-add the lower-bound shift the model folded out (c·lo), so [FloatLpResult.objective] is the
         // objective in original coordinates — matching the exact certify.
         var obj = model.objConstant.toDouble()
@@ -266,7 +279,7 @@ internal class RevisedSimplex(
         }
         val basis = Basis(basicVar.copyOf(), status.copyOf())
         optimalBasis = basis
-        return FloatLpResult(basis, obj, duals(lu), primal, pivots, maxLuFill, maxLuDensity)
+        return FloatLpResult(basis, obj, duals(factor), primal, pivots, maxLuFill, maxLuDensity)
     }
 
     /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
@@ -281,14 +294,14 @@ internal class RevisedSimplex(
     fun mirCuts(maxCuts: Int): List<Cut> =
         optimalBasis?.let { ExactBasisCertifier.tableauCuts(model, it, maxCuts, mir = true) }.orEmpty()
 
-    /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch, an
-     *  out-of-range column, or a singular factorization. */
+    /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch or an
+     *  out-of-range column. A singular warm factorization is caught by [solve]'s refactor fallback. */
     private fun tryWarmStart(warm: Basis): Boolean {
         if (warm.basicVars.size != m || warm.status.size != numVars) return false
         for (t in 0 until m) if (warm.basicVars[t] !in 0 until numVars) return false
         warm.basicVars.copyInto(basicVar)
         warm.status.copyInto(status)
-        return factorizeBasis() != null
+        return true
     }
 
     private fun coldStart() {
@@ -304,7 +317,10 @@ internal class RevisedSimplex(
     private companion object {
         const val TOL: Double = 1e-7
 
-        /** Iterations between cooperative cancellation polls (each iteration refactorizes). */
+        /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32
+
+        /** Pivots folded into the eta chain before a refactorization; bounds fill and rounding drift. */
+        const val DEFAULT_REFACTOR_ETA_LIMIT: Int = 50
     }
 }
