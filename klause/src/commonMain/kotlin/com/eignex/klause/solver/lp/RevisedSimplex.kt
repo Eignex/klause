@@ -376,13 +376,15 @@ internal class RevisedSimplex(
                 val hi = if (model.hasUpper[v]) model.upper[v].toDouble() else Double.MAX_VALUE
                 gamma[i] = when {
                     beta[i] < -FEAS_TOL -> {
-                        w -= beta[i];
+                        w -= beta[i]
                         -1.0
                     }
+
                     beta[i] > hi + FEAS_TOL -> {
-                        w += beta[i] - hi;
+                        w += beta[i] - hi
                         1.0
                     }
+
                     else -> 0.0
                 }
             }
@@ -425,7 +427,7 @@ internal class RevisedSimplex(
 
                     // Above its upper bound: a falling β_i reaches feasibility at u_i and may leave.
                     gamma[i] > 0 -> if (rate < 0) {
-                        t = (beta[i] - hi) / -rate;
+                        t = (beta[i] - hi) / -rate
                         toUpper = true
                     }
 
@@ -433,7 +435,7 @@ internal class RevisedSimplex(
                     rate < 0 -> t = beta[i] / -rate
 
                     hi < Double.MAX_VALUE -> {
-                        t = (hi - beta[i]) / rate;
+                        t = (hi - beta[i]) / rate
                         toUpper = true
                     }
                 }
@@ -458,8 +460,8 @@ internal class RevisedSimplex(
                 refactor() ?: return null
             } else {
                 factor.also {
-                it.update(leaving, alpha)
-            }
+                    it.update(leaving, alpha)
+                }
             }
             beta = basicValues(factor)
         }
@@ -491,12 +493,16 @@ internal class RevisedSimplex(
             if (!primalFeasible(beta)) return null // phase-1 could not reach feasibility
         }
         val maxIter = 50 * (m + numVars) + 200
+        val blandStall = 2 * (m + numVars) + BLAND_STALL_BASE
         val aq = DoubleArray(m)
         var iter = 0
+        var degenerate = 0 // consecutive zero-length pivots; past [blandStall] switch to Bland's rule
         while (iter++ < maxIter) {
             if (iter % CANCEL_POLL == 0 && cancellation()) return null
+            // Bland's rule once degenerate pivots pile up: lowest-index entering, lowest-variable leaving
+            // tie-break. Guarantees termination on a degenerate LP that the Dantzig rule could cycle on.
+            val bland = degenerate >= blandStall
             val y = duals(factor)
-            // Entering: the nonbasic variable whose move most improves the objective (Dantzig).
             var q = -1
             var qAtLower = true
             var best = TOL
@@ -506,6 +512,12 @@ internal class RevisedSimplex(
                 val atLower = status[j] == VarStatus.AT_LOWER
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
                 val gain = if (atLower) -dj else dj
+                if (gain <= TOL) continue
+                if (bland) {
+                    q = j // first (lowest-index) improving column
+                    qAtLower = atLower
+                    break
+                }
                 if (gain > best) {
                     best = gain
                     q = j
@@ -521,25 +533,25 @@ internal class RevisedSimplex(
             var tMax = if (model.hasUpper[q]) model.upper[q].toDouble() else Double.MAX_VALUE
             var leaving = -1
             var leavingToUpper = false
+            var leavingVar = Int.MAX_VALUE
             for (i in 0 until m) {
                 val rate = -alpha[i] * dir // dβ_i/dt
+                var t = Double.MAX_VALUE
+                var toUpper = false
                 if (rate < -TOL) {
-                    val t = beta[i] / -rate // β_i falls to its lower bound 0
-                    if (t < tMax - TOL) {
-                        tMax = t
-                        leaving = i
-                        leavingToUpper = false
-                    }
-                } else if (rate > TOL) {
-                    val v = basicVar[i]
-                    if (model.hasUpper[v]) {
-                        val t = (model.upper[v].toDouble() - beta[i]) / rate // β_i rises to its upper bound
-                        if (t < tMax - TOL) {
-                            tMax = t
-                            leaving = i
-                            leavingToUpper = true
-                        }
-                    }
+                    t = beta[i] / -rate // β_i falls to its lower bound 0
+                } else if (rate > TOL && model.hasUpper[basicVar[i]]) {
+                    t = (model.upper[basicVar[i]].toDouble() - beta[i]) / rate // β_i rises to its upper bound
+                    toUpper = true
+                }
+                if (t == Double.MAX_VALUE) continue
+                // Strictly shorter step, or — under Bland's — an equal step leaving a lower-indexed variable.
+                val accept = t < tMax - TOL || (bland && leaving != -1 && t <= tMax + TOL && basicVar[i] < leavingVar)
+                if (accept) {
+                    if (t < tMax) tMax = t
+                    leaving = i
+                    leavingToUpper = toUpper
+                    leavingVar = basicVar[i]
                 }
             }
             if (tMax >= Double.MAX_VALUE) return null // unbounded objective
@@ -550,6 +562,7 @@ internal class RevisedSimplex(
                 continue
             }
             if (abs(alpha[leaving]) < TOL) return null // numerically singular pivot
+            degenerate = if (tMax <= TOL) degenerate + 1 else 0
             status[basicVar[leaving]] = if (leavingToUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
@@ -569,6 +582,10 @@ internal class RevisedSimplex(
 
         /** Slack tolerance on the initial primal-feasibility check ([solvePrimal]). */
         const val FEAS_TOL: Double = 1e-6
+
+        /** Degenerate-pivot count (beyond `2·(m+numVars)`) after which [solvePrimal] switches to Bland's
+         *  rule — well before the iteration budget, so a cycling LP terminates rather than bailing. */
+        const val BLAND_STALL_BASE: Int = 50
 
         /** Iterations between cooperative cancellation polls. */
         const val CANCEL_POLL: Int = 32

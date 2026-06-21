@@ -93,4 +93,27 @@ class PrimalSimplexTest {
         assertTrue(result != null, "primal should solve the loose box")
         assertTrue(abs(result.objective - (-2.0)) <= 1e-9, "optimum ${result.objective} should be -2")
     }
+
+    @Test
+    fun `primal solves a degenerate LP to the dual optimum`() {
+        // Overlapping/redundant constraints create degenerate vertices (several basics at zero), the
+        // setting where the Dantzig rule could cycle and Bland's rule keeps termination. maximize the
+        // sum (minimize its negation): optimum 3, e.g. (1,1,1,0).
+        val b = LpBuilder()
+        repeat(4) { b.addVar(0L, 3L, cost = -1L) }
+        val all = intArrayOf(0, 1, 2, 3)
+        b.addRow(all, longArrayOf(1L, 1L, 1L, 1L), Relation.LE, 3L)
+        b.addRow(all, longArrayOf(1L, 1L, 1L, 1L), Relation.LE, 3L) // redundant ⇒ degeneracy
+        b.addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 2L)
+        b.addRow(intArrayOf(2, 3), longArrayOf(1L, 1L), Relation.LE, 2L)
+        val model = b.build(Sense.MINIMIZE)
+        val primal = RevisedSimplex(model).solvePrimal()
+        val dual = RevisedSimplex(model).solve()
+        assertTrue(primal != null && dual != null, "both engines should solve the degenerate LP")
+        assertTrue(
+            abs(primal.objective - dual.objective) <= 1e-6 * maxOf(1.0, abs(dual.objective)),
+            "primal ${primal.objective} vs dual ${dual.objective}",
+        )
+        assertTrue(abs(primal.objective - (-3.0)) <= 1e-9, "optimum ${primal.objective} should be -3")
+    }
 }
