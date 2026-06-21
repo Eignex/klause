@@ -43,6 +43,33 @@ internal object PresolveShared {
 
     fun divAll(xs: IntArray, g: Int): IntArray = IntArray(xs.size) { xs[it] / g }
 
+    /**
+     * Minimal and maximal activity of `Σ coeffs(i)·xⱼ` over the variable bounds in [domains], as a
+     * [LongArray] `[minActivity, maxActivity]`. A term `aⱼ·xⱼ` ranges over `[aⱼ·lⱼ, aⱼ·uⱼ]` when
+     * `aⱼ ≥ 0` and `[aⱼ·uⱼ, aⱼ·lⱼ]` when `aⱼ < 0`; the activities are the term-wise sums of those
+     * endpoints. Accumulated in [Long] because a span over `Int`-wide bounds can overflow `Int`; the
+     * activity-based bound tightening in [BoundTightening] keeps the arithmetic in [Long] throughout
+     * and only narrows back to `Int` at the clamped bound.
+     */
+    fun activityRange(coeffs: IntArray, vars: IntArray, domains: Array<IntDomain>): LongArray {
+        var lo = 0L
+        var hi = 0L
+        for (i in vars.indices) {
+            val c = coeffs[i].toLong()
+            val d = domains[vars[i]]
+            val a = c * d.min
+            val b = c * d.max
+            if (a <= b) {
+                lo += a
+                hi += b
+            } else {
+                lo += b
+                hi += a
+            }
+        }
+        return longArrayOf(lo, hi)
+    }
+
     /** Multiset of [Factor.structuralKey] over [factors], or `null` if any factor is unkeyed. A
      *  `null` return means symmetry detection can't proceed (every factor must be keyed to compare
      *  the constraint set against a transform of it); callers translate it into their own early
