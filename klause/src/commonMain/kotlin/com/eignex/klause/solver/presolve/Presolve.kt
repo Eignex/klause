@@ -32,6 +32,10 @@ object Presolve {
     /** Connected-component decomposition over the variable↔factor incidence. See [ComponentDecomposition]. */
     fun decomposeComponents(problem: Problem): ProblemComponents = ComponentDecomposition.decompose(problem)
 
+    /** Duplicate / parallel integer-column aggregation. See [DuplicateColumns]. */
+    fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): DuplicateColumnMerge =
+        DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars)
+
     /** Symmetry breaking by detecting interchangeable variables. See [SymmetryBreaking]. */
     fun breakSymmetries(
         problem: Problem,

@@ -201,6 +201,24 @@ enum class PresolvePass(
             PassResult(Presolve.removeRedundantConstraints(problem))
     },
 
+    /** Duplicate / parallel column aggregation — the column-side mirror of [REMOVE_REDUNDANT]. Folds
+     *  two integer variables with coinciding columns into one aggregate, reconstructing the dropped
+     *  variable from the aggregate's value. Like [ELIMINATE_AFFINE_SINGLETONS] the dropped variable is
+     *  left unconstrained in the presolved problem, so a complete enumerator would mis-count; hence
+     *  solution-set-sensitive (`preservesSolutionSet = false`), gated off under `-a` / `-n N>1`. */
+    MERGE_DUPLICATE_COLUMNS(
+        "dup-columns",
+        Stage.PROBLEM,
+        PresolveTiming.FAST,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
+            val merge = Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars)
+            return PassResult(merge.problem, merge::reconstruct)
+        }
+    },
+
     /** Interchangeable-variable / block / value symmetry breaking (#317 / #367 / #373 / #366). */
     BREAK_SYMMETRIES(
         "symmetry",
