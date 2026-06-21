@@ -42,6 +42,7 @@ class PresolverTest {
             PresolvePass.TIGHTEN_BOUNDS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.REMOVE_REDUNDANT,
+            PresolvePass.MERGE_DUPLICATE_COLUMNS,
             PresolvePass.BREAK_SYMMETRIES,
             PresolvePass.DUAL_FIX,
         )
@@ -140,8 +141,8 @@ class PresolverTest {
         val ctx = PresolveContext.EMPTY
         // off → nothing.
         assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
-        // conservative → FAST tier only (strengthen + xor-units + bound-tighten + affine + subsume),
-        // no symmetry.
+        // conservative → FAST tier only (strengthen + xor-units + bound-tighten + affine + subsume +
+        // dup-columns), no symmetry.
         assertEquals(
             listOf(
                 PresolvePass.STRENGTHEN_COEFFICIENTS,
@@ -149,6 +150,7 @@ class PresolverTest {
                 PresolvePass.TIGHTEN_BOUNDS,
                 PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
                 PresolvePass.REMOVE_REDUNDANT,
+                PresolvePass.MERGE_DUPLICATE_COLUMNS,
             ),
             PresolveConfig.parse("conservative").problemPasses(ctx),
         )
