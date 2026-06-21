@@ -3,8 +3,6 @@ package com.eignex.klause.solver.factor.table
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.factor.table.internals.TableLsState
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.util.IntIntMap
 
@@ -62,8 +60,9 @@ class Table(
     // Var id → its tuple column, for the LS Hamming-distance maintenance. A var occupying exactly
     // one column maps to it here (the common case, unboxed); vars repeated across columns fall to
     // [multiColumnsByVar]. Together they cover every var in [xs].
-    private val singleColumnByVar: IntIntMap
-    private val multiColumnsByVar: Map<Int, IntArray>
+    @Suppress("EXPOSED_PROPERTY_TYPE")
+    override val singleColumnByVar: IntIntMap
+    override val multiColumnsByVar: Map<Int, IntArray>
 
     init {
         val (single, multi) = tableColumnMaps(xs, arity)
@@ -89,25 +88,4 @@ class Table(
     }
 
     override val consumesIntEventDelta: Boolean = true
-
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val s = state.refPayload[factorId] as TableLsState
-        val old = state.assignment.intValue(intVar)
-        if (old == newValue) return 0
-        return tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, old, newValue, commit = false,
-        ) - s.minDist
-    }
-
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        val s = state.refPayload[factorId] as TableLsState
-        val newVal = state.assignment.intValue(intVar)
-        if (newVal == oldValue) return 0
-        val before = s.minDist
-        val minD = tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, oldValue, newVal, commit = true,
-        )
-        s.minDist = minD
-        return minD - before
-    }
 }
