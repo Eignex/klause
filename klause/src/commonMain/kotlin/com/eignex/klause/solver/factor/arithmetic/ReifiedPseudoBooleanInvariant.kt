@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
+import com.eignex.klause.solver.factor.ReifiedFactor
 import com.eignex.klause.solver.factor.bool.pbDistance
 import com.eignex.klause.solver.factor.bool.pbHolds
 import com.eignex.klause.solver.factor.bool.reifiedDegree
@@ -14,10 +14,10 @@ import com.eignex.klause.solver.localsearch.MoveSink
 /**
  * LS contract for [ReifiedPseudoBoolean]: reified pseudo-Boolean violation tracking and repair.
  */
-interface ReifiedPseudoBooleanInvariant : Invariant {
+interface ReifiedPseudoBooleanInvariant : ReifiedFactor {
 
     /** The reifying Boolean variable id. */
-    val auxBoolVar: Int
+    override val auxBoolVar: Int
 
     /** Literal weights parallel to [literals]. */
     val weights: IntArray
@@ -35,6 +35,12 @@ interface ReifiedPseudoBooleanInvariant : Invariant {
     fun reifSignedFor(v: Int): Int
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
+
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
+        pbHolds(state.longPayload[factorId], op, bound)
+
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
+        compressViolation(pbDistance(state.longPayload[factorId], op, bound), softCap)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)

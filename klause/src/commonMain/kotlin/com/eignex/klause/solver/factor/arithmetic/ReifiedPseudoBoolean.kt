@@ -6,7 +6,6 @@ import com.eignex.klause.solver.factor.ReifiedFactor
 import com.eignex.klause.solver.factor.bool.PseudoBooleanSumFactor
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
@@ -27,11 +26,6 @@ class ReifiedPseudoBoolean(override val auxBoolVar: Int, weights: IntArray, lite
         literals.indices.sortedBy { literals[it] }.joinToString(",") { "${literals[it]}=${weights[it]}" }
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
-
-    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
-
-    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
-        residual(state.longPayload[factorId], softCap)
 
     override fun reifSignedFor(v: Int): Int = signedByVar[v]
 }
