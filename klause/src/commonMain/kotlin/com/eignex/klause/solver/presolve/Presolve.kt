@@ -23,14 +23,8 @@ object Presolve {
     fun eliminateAffineSingletons(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): AffineElimination =
         AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars)
 
-    /** Iterated activity-based bound tightening (FME bound propagation). See [BoundTightening]. */
-    fun tightenBounds(problem: Problem): Problem = BoundTightening.tightenBounds(problem)
-
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): Problem = RedundantConstraints.removeRedundantConstraints(problem)
-
-    /** Connected-component decomposition over the variable↔factor incidence. See [ComponentDecomposition]. */
-    fun decomposeComponents(problem: Problem): ProblemComponents = ComponentDecomposition.decompose(problem)
 
     /** Duplicate / parallel integer-column aggregation. See [DuplicateColumns]. */
     fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): DuplicateColumnMerge =
