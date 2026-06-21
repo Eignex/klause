@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.backtrack.lp.LpAutoConfig
 import com.eignex.klause.solver.backtrack.lp.LpEngine
 import com.eignex.klause.solver.backtrack.lp.harvestRootCuts
+import com.eignex.klause.solver.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.solver.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.solver.backtrack.lp.rootLpRelaxationBound
 import com.eignex.klause.solver.backtrack.selector.VarRef
@@ -531,7 +532,9 @@ class BacktrackSolver(override val problem: Problem) :
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
                 if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
+                    // Single-shot rounding first; if it can't land a feasible point, pump toward one.
                     val seed = lpEngine.lpRoundingProbe(objective, rootToken)
+                        ?: lpEngine.lpFeasibilityPump(objective, rootToken)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }
             }
