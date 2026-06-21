@@ -117,6 +117,12 @@ class Problem(
      */
     val intDomains: Array<IntDomain> = intDomains.copyOf()
 
+    /** Typed view of [factors] for the CP engine. */
+    val propagators: Array<out Propagator> get() = factors
+
+    /** Typed view of [factors] for the LS engine. */
+    val invariants: Array<out Invariant> get() = factors
+
     init {
         require(intDomains.size == numIntVars) {
             "intDomains size ${intDomains.size} != numIntVars $numIntVars"
