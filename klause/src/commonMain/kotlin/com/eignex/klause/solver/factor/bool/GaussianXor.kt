@@ -3,7 +3,6 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.propagation.PropagationState
 
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over
@@ -41,10 +40,10 @@ class GaussianXor(override val constraints: List<Xor>) :
     override val boolVars: IntArray
     override val intVars: IntArray = EmptyIntArray
 
-    private val colOfVar: HashMap<Int, Int>
-    private val words: Int
-    private val rowMask: Array<LongArray>
-    private val rowRhs: IntArray
+    override val colOfVar: HashMap<Int, Int>
+    override val words: Int
+    override val rowMask: Array<LongArray>
+    override val rowRhs: IntArray
 
     init {
         require(constraints.isNotEmpty()) { "GaussianXor needs at least one constraint" }
@@ -59,8 +58,6 @@ class GaussianXor(override val constraints: List<Xor>) :
         rowRhs = IntArray(constraints.size)
         for (r in constraints.indices) {
             val c = constraints[r]
-            // Normalize literals to a GF(2) row: a variable is present iff it occurs an odd
-            // number of times; each negative literal flips the right-hand side.
             val occ = HashMap<Int, Int>()
             var negParity = 0
             for (lit in c.literals) {
@@ -69,306 +66,12 @@ class GaussianXor(override val constraints: List<Xor>) :
                 if (!Lit.isPositive(lit)) negParity = negParity xor 1
             }
             for ((v, count) in occ) {
-                if (count and 1 == 1) setBit(rowMask[r], colOfVar.getValue(v))
+                if (count and 1 == 1) {
+                    val col = colOfVar.getValue(v)
+                    rowMask[r][col ushr 6] = rowMask[r][col ushr 6] or (1L shl (col and 63))
+                }
             }
             rowRhs[r] = c.targetParity xor negParity
         }
-    }
-
-    override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val cache = (state.refPayload[factorId] as? GaussianXorPropagator.IncrState)
-            ?: GaussianXorPropagator.IncrState(
-                state,
-                rowMask.size,
-                boolVars.size,
-                words,
-            ).also { state.refPayload[factorId] = it }
-        cache.conflictVars = null
-        return if (cache.valid.value == 0) rebuildReduce(state, cache) else incrementalStep(state, cache)
-    }
-
-    /** Full Gauss-Jordan reduction over the current partial assignment, written into the reversible
-     *  matrix and basis maps. Used on the first fire and after a backtrack invalidated the state.
-     *  Pins forced variables / reports conflicts identically to the pre-incremental version. */
-    private fun rebuildReduce(state: PropagationState, cache: GaussianXorPropagator.IncrState): Boolean {
-        val n = rowMask.size
-        val mask = Array(n) { LongArray(words) }
-        val reason = Array(n) { LongArray(words) }
-        val rhs = IntArray(n)
-        rowRhs.copyInto(rhs)
-        for (r in 0 until n) {
-            // Substitute current assignments (sparse over each row's set bits); track the assigned
-            // support per row in `reason` for sharp explanations.
-            val rm = rowMask[r]
-            for (wi in rm.indices) {
-                var w = rm[wi]
-                while (w != 0L) {
-                    val i = (wi shl 6) + w.countTrailingZeroBits()
-                    w = w and (w - 1L)
-                    val v = boolVars[i]
-                    if (!state.boolAssignedAt(v)) {
-                        setBit(mask[r], i)
-                    } else {
-                        setBit(reason[r], i)
-                        if (state.boolValueAt(v)) rhs[r] = rhs[r] xor 1
-                    }
-                }
-            }
-        }
-
-        // Gauss-Jordan to reduced row-echelon form over GF(2); record each row's pivot column.
-        val pivotColOfRow = IntArray(n) { -1 }
-        var pivotRow = 0
-        for (col in boolVars.indices) {
-            var sel = -1
-            for (r in pivotRow until n) {
-                if (getBit(mask[r], col)) {
-                    sel = r
-                    break
-                }
-            }
-            if (sel < 0) continue
-            swap(mask, reason, rhs, pivotRow, sel)
-            for (r in 0 until n) {
-                if (r != pivotRow && getBit(mask[r], col)) {
-                    xorInto(mask[r], mask[pivotRow])
-                    xorInto(reason[r], reason[pivotRow])
-                    rhs[r] = rhs[r] xor rhs[pivotRow]
-                }
-            }
-            pivotColOfRow[pivotRow] = col
-            pivotRow++
-        }
-
-        // Seed the reversible state: matrix + reason + rhs + basis maps + substituted-value record.
-        for (r in 0 until n) {
-            for (w in 0 until words) {
-                cache.mask[r * words + w] = mask[r][w]
-                cache.reason[r * words + w] = reason[r][w]
-            }
-            cache.rhs[r] = rhs[r]
-            cache.basicCol[r] = pivotColOfRow[r]
-        }
-        for (col in boolVars.indices) cache.pivotRow[col] = -1
-        for (r in 0 until n) if (pivotColOfRow[r] >= 0) cache.pivotRow[pivotColOfRow[r]] = r
-        for (col in boolVars.indices) {
-            val v = boolVars[col]
-            cache.seenVal[col] = if (state.boolAssignedAt(v)) (if (state.boolValueAt(v)) 1 else 0) else -1
-        }
-        cache.valid.set(1)
-
-        // Inspect reduced rows: empty row with rhs=1 is a conflict; single-variable rows force.
-        for (r in 0 until n) {
-            val pop = popcount(mask[r])
-            if (pop == 0) {
-                if (rhs[r] == 1) {
-                    cache.conflictVars = reasonLiterals(state, reason[r], excludeCol = -1)
-                    return false
-                }
-                continue
-            }
-            if (pop == 1) {
-                val col = firstSetBit(mask[r])
-                val v = boolVars[col]
-                if (!state.boolAssignedAt(v)) {
-                    if (!state.pinBool(v, rhs[r] == 1, reasonLiterals(state, reason[r], excludeCol = col))) {
-                        return false
-                    }
-                }
-            }
-        }
-        return true
-    }
-
-    /** Incremental fire: substitute the variables assigned since the last fire into the reduced
-     *  matrix (a basis re-pivot + one elimination pass per assigned *basic* variable; a cheap
-     *  column drop per assigned non-basic variable), then pin newly-forced variables / report
-     *  conflicts. The reduced-row-echelon-over-free-variables invariant is preserved throughout, so
-     *  this detects exactly the same forced pins and conflicts as a full re-reduction. */
-    private fun incrementalStep(state: PropagationState, cache: GaussianXorPropagator.IncrState): Boolean {
-        val n = rowMask.size
-        val cols = boolVars.size
-        var progress = true
-        while (progress) {
-            progress = false
-            // 1. Substitute every variable assigned (or pinned) since it was last in the matrix.
-            for (col in 0 until cols) {
-                if (cache.seenVal[col] != -1) continue
-                val v = boolVars[col]
-                if (!state.boolAssignedAt(v)) continue
-                val bit = if (state.boolValueAt(v)) 1 else 0
-                cache.seenVal[col] = bit
-                progress = true
-                applyAssignment(cache, col, bit, n)
-            }
-            // 2. Inspect rows for conflicts / forced units.
-            for (r in 0 until n) {
-                val pop = rowPopCount(cache, r)
-                if (pop == 0) {
-                    if (cache.rhs[r] == 1) {
-                        cache.conflictVars = rowReasonLiterals(state, cache, r, excludeCol = -1)
-                        return false
-                    }
-                    continue
-                }
-                if (pop == 1) {
-                    val col = rowFirstCol(cache, r)
-                    val v = boolVars[col]
-                    if (!state.boolAssignedAt(v)) {
-                        if (!state.pinBool(v, cache.rhs[r] == 1, rowReasonLiterals(state, cache, r, col))) {
-                            return false
-                        }
-                        progress = true // a pin is a new assignment to substitute next round
-                    }
-                }
-            }
-        }
-        return true
-    }
-
-    /** Fold the assignment `boolVars[col] = bit` into the reduced matrix, preserving RREF over the
-     *  free variables: a non-basic column is dropped from every row it occurs in; a basic column is
-     *  dropped from its own row, which then re-pivots on another free variable (eliminated from the
-     *  other rows) — or, if none remains, becomes an assigned-only row caught by the unit/conflict
-     *  scan. */
-    private fun applyAssignment(cache: GaussianXorPropagator.IncrState, col: Int, bit: Int, n: Int) {
-        val owner = cache.pivotRow[col]
-        if (owner >= 0) {
-            cache.pivotRow[col] = -1
-            cache.basicCol[owner] = -1
-            substituteOut(cache, owner, col, bit)
-            val newBasic = rowFirstCol(cache, owner)
-            if (newBasic >= 0) {
-                cache.basicCol[owner] = newBasic
-                cache.pivotRow[newBasic] = owner
-                for (r in 0 until n) {
-                    if (r != owner && rowGetBit(cache, r, newBasic)) xorRowInto(cache, r, owner)
-                }
-            }
-        } else {
-            for (r in 0 until n) if (rowGetBit(cache, r, col)) substituteOut(cache, r, col, bit)
-        }
-    }
-
-    /**
-     * Clause-form reason for a forced pin or conflict: one currently-false literal per assigned
-     * variable flagged in [reasonBits] (the variables whose values determine the reduced row),
-     * skipping [excludeCol] (the variable being pinned). All flagged variables are assigned.
-     */
-    private fun reasonLiterals(state: PropagationState, reasonBits: LongArray, excludeCol: Int): IntArray? {
-        var count = 0
-        for (i in boolVars.indices) if (i != excludeCol && getBit(reasonBits, i)) count++
-        if (count == 0) return null
-        val out = IntArray(count)
-        var w = 0
-        for (i in boolVars.indices) {
-            if (i == excludeCol || !getBit(reasonBits, i)) continue
-            val v = boolVars[i]
-            // reasonBits only flags assigned variables, so the value bit is always meaningful.
-            out[w++] = Lit.make(v, !state.boolValueAt(v))
-        }
-        return out
-    }
-
-    // ---- Reversible flattened-row helpers (row r occupies `mask`/`reason` words [r·words, +words)). ----
-
-    private fun rowPopCount(cache: GaussianXorPropagator.IncrState, r: Int): Int {
-        var c = 0
-        val base = r * words
-        for (w in 0 until words) c += cache.mask[base + w].countOneBits()
-        return c
-    }
-
-    private fun rowFirstCol(cache: GaussianXorPropagator.IncrState, r: Int): Int {
-        val base = r * words
-        for (w in 0 until words) {
-            val word = cache.mask[base + w]
-            if (word != 0L) return (w shl 6) + word.countTrailingZeroBits()
-        }
-        return -1
-    }
-
-    private fun rowGetBit(cache: GaussianXorPropagator.IncrState, r: Int, col: Int): Boolean =
-        (cache.mask[r * words + (col ushr 6)] ushr (col and 63)) and 1L == 1L
-
-    /** Substitute the assigned variable [col]=[bit] out of row [r]: drop its mask bit, flip the rhs
-     *  if it was 1, and record it in the row's reason support. */
-    private fun substituteOut(cache: GaussianXorPropagator.IncrState, r: Int, col: Int, bit: Int) {
-        val mIdx = r * words + (col ushr 6)
-        cache.mask[mIdx] = cache.mask[mIdx] and (1L shl (col and 63)).inv()
-        if (bit == 1) cache.rhs[r] = cache.rhs[r] xor 1
-        val rIdx = r * words + (col ushr 6)
-        cache.reason[rIdx] = cache.reason[rIdx] or (1L shl (col and 63))
-    }
-
-    /** XOR row [src] into row [dst] (mask, reason and rhs) — one GF(2) elimination step. */
-    private fun xorRowInto(cache: GaussianXorPropagator.IncrState, dst: Int, src: Int) {
-        val db = dst * words
-        val sb = src * words
-        for (w in 0 until words) {
-            cache.mask[db + w] = cache.mask[db + w] xor cache.mask[sb + w]
-            cache.reason[db + w] = cache.reason[db + w] xor cache.reason[sb + w]
-        }
-        cache.rhs[dst] = cache.rhs[dst] xor cache.rhs[src]
-    }
-
-    /** Clause-form reason for a pin/conflict read from the reversible reason row [r] (see
-     *  [reasonLiterals]); [excludeCol] is the variable being pinned. */
-    private fun rowReasonLiterals(
-        state: PropagationState,
-        cache: GaussianXorPropagator.IncrState,
-        r: Int,
-        excludeCol: Int,
-    ): IntArray? {
-        val base = r * words
-        var count = 0
-        for (i in boolVars.indices) {
-            if (i != excludeCol && (cache.reason[base + (i ushr 6)] ushr (i and 63)) and 1L == 1L) count++
-        }
-        if (count == 0) return null
-        val out = IntArray(count)
-        var w = 0
-        for (i in boolVars.indices) {
-            if (i == excludeCol || (cache.reason[base + (i ushr 6)] ushr (i and 63)) and 1L != 1L) continue
-            val v = boolVars[i]
-            out[w++] = Lit.make(v, !state.boolValueAt(v))
-        }
-        return out
-    }
-
-    private fun setBit(row: LongArray, bit: Int) {
-        row[bit ushr 6] = row[bit ushr 6] or (1L shl (bit and 63))
-    }
-
-    private fun getBit(row: LongArray, bit: Int): Boolean = (row[bit ushr 6] ushr (bit and 63)) and 1L == 1L
-
-    private fun xorInto(dst: LongArray, src: LongArray) {
-        for (w in dst.indices) dst[w] = dst[w] xor src[w]
-    }
-
-    private fun popcount(row: LongArray): Int {
-        var c = 0
-        for (w in row) c += w.countOneBits()
-        return c
-    }
-
-    private fun firstSetBit(row: LongArray): Int {
-        for (w in row.indices) {
-            if (row[w] != 0L) return (w shl 6) + row[w].countTrailingZeroBits()
-        }
-        return -1
-    }
-
-    private fun swap(mask: Array<LongArray>, reason: Array<LongArray>, rhs: IntArray, a: Int, b: Int) {
-        if (a == b) return
-        val tmpMask = mask[a]
-        mask[a] = mask[b]
-        mask[b] = tmpMask
-        val tmpReason = reason[a]
-        reason[a] = reason[b]
-        reason[b] = tmpReason
-        val tmpRhs = rhs[a]
-        rhs[a] = rhs[b]
-        rhs[b] = tmpRhs
     }
 }

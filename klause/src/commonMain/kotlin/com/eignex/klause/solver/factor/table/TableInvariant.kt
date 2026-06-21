@@ -15,6 +15,8 @@ internal interface TableInvariant : Invariant {
     val tuples: IntArray
     val arity: Int
     val numTuples: Int
+    val singleColumnByVar: IntIntMap
+    val multiColumnsByVar: Map<Int, IntArray>
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         (state.refPayload[factorId] as TableLsState).minDist > 0
@@ -122,6 +124,27 @@ internal interface TableInvariant : Invariant {
             return true
         }
         return false
+    }
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val s = state.refPayload[factorId] as TableLsState
+        val old = state.assignment.intValue(intVar)
+        if (old == newValue) return 0
+        return tableRescanForChange(
+            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, old, newValue, commit = false,
+        ) - s.minDist
+    }
+
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        val s = state.refPayload[factorId] as TableLsState
+        val newVal = state.assignment.intValue(intVar)
+        if (newVal == oldValue) return 0
+        val before = s.minDist
+        val minD = tableRescanForChange(
+            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, oldValue, newVal, commit = true,
+        )
+        s.minDist = minD
+        return minD - before
     }
 }
 
