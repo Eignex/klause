@@ -163,4 +163,48 @@ class ImplicationGraphTest {
         )
         assertSame(problem, Presolve.reduceImplicationGraph(problem, cap).problem, "no reduction is the no-op signal")
     }
+
+    @Test
+    fun the_builder_records_the_forward_implication_edge_of_a_binary_clause() {
+        // (!b0 | b1) is the implication b0 -> b1: pinning b0 = true propagates b1 = true, so the
+        // literal-indexed adjacency carries the edge from b0+ to b1+.
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+        )
+        val graph = Presolve.implicationGraph(problem, cap)
+        assertTrue(Lit.make(1, true) in graph[Lit.make(0, true)].toList(), "b0 = true must force b1 = true")
+    }
+
+    @Test
+    fun the_builder_records_the_contrapositive_implication_edge_of_a_binary_clause() {
+        // The same (!b0 | b1) is also b1 -> b0 contrapositively: pinning b1 = false propagates
+        // b0 = false, so the adjacency carries the edge from b1- to b0-.
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+        )
+        val graph = Presolve.implicationGraph(problem, cap)
+        assertTrue(Lit.make(0, false) in graph[Lit.make(1, false)].toList(), "b1 = false must force b0 = false")
+    }
+
+    @Test
+    fun the_builder_yields_all_empty_lists_when_no_binary_implication_exists() {
+        // A single ternary disjunction: pinning either polarity of any variable leaves a non-unit
+        // clause, so propagation forces nothing and every adjacency list is empty over the
+        // 2*numBoolVars nodes.
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
+        )
+        val graph = Presolve.implicationGraph(problem, cap)
+        assertEquals(2 * problem.numBoolVars, graph.size, "one node per literal")
+        assertTrue(graph.all { it.isEmpty() }, "no implication means every adjacency list is empty")
+    }
 }
