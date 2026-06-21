@@ -16,20 +16,21 @@ import com.eignex.klause.solver.lp.relaxation.LpRelaxation
  *
  * Only globally-valid cuts are ever shared (the [CutPool] holds only [Cut.global] cuts), so an imported
  * cut is valid for every solution of the Problem regardless of the node it was derived at — importing it
- * can only tighten the relaxation, never remove a feasible point. The [key] is an order-independent
- * content hash for de-duplication across workers; a collision merely drops one share (loses strength,
- * never soundness).
+ * can only tighten the relaxation, never remove a feasible point. The content key is an order-independent
+ * hash for de-duplication across workers; a collision merely drops one share (loses strength,
+ * never soundness). Constructed internally ([fromCut] or the portfolio pool); the type is public only so
+ * it can appear in the public [CutSharing] / [CutExchange] surface, mirroring `SharedClause`.
  */
-internal class SharedCut(
-    val vars: IntArray,
-    val isBool: BooleanArray,
-    val coeffs: LongArray,
-    val rel: Relation,
-    val rhs: Long,
+class SharedCut internal constructor(
+    internal val vars: IntArray,
+    internal val isBool: BooleanArray,
+    internal val coeffs: LongArray,
+    internal val rel: Relation,
+    internal val rhs: Long,
 ) {
     /** Worker-independent content key: terms folded in `(varId, isBool)`-sorted order so the same
      *  inequality hashes equally no matter which worker or relaxation produced it. */
-    val key: Long = run {
+    internal val key: Long = run {
         val order = vars.indices.sortedWith(compareBy({ vars[it] }, { isBool[it] }))
         var h = SEED
         for (i in order) {
@@ -44,7 +45,7 @@ internal class SharedCut(
 
     /** Re-map this cut onto [relaxation]'s structural columns, or null if any term's variable has no
      *  column there (that worker's relaxation cannot express it). The result is flagged [Cut.global]. */
-    fun toCut(relaxation: LpRelaxation): Cut? {
+    internal fun toCut(relaxation: LpRelaxation): Cut? {
         val cols = IntArray(vars.size)
         for (i in vars.indices) {
             val v = vars[i]
@@ -81,12 +82,29 @@ internal class SharedCut(
 }
 
 /**
- * Exchanges globally-valid cuts between a worker's [CutPool] and a cross-worker store: import the cuts
- * other workers published (re-mapped onto this worker's relaxation) and export this worker's own. The
- * pooled implementation is [com.eignex.klause.portfolio.PoolCutExchange]; the portfolio wiring (#809
- * phase 2) decides when [exchange] fires. Importing only ever adds globally-valid cuts, so it is sound
- * regardless of the worker's current search node.
+ * A worker's cut-sharing surface for a [CutExchange] — the cut analogue of the public
+ * [com.eignex.klause.solver.propagation.PropagationSession] methods a
+ * [com.eignex.klause.solver.propagation.ClauseExchange] uses. The engine owning the local cut pool and
+ * relaxation implements it; the exchange only ever sees portable [SharedCut]s, never the internal pool
+ * or relaxation.
  */
-internal interface CutExchange {
-    fun exchange(local: CutPool, relaxation: LpRelaxation)
+interface CutSharing {
+    /** This worker's globally-valid cuts, in portable form. */
+    fun exportGlobalCuts(): List<SharedCut>
+
+    /** Fold [cuts] published by other workers into this worker's local pool (skipping any whose
+     *  variables it has no column for). */
+    fun importCuts(cuts: List<SharedCut>)
+}
+
+/**
+ * Exchanges globally-valid cuts between a worker and a cross-worker store via the worker's [CutSharing]
+ * view: import the cuts other workers published and export this worker's own. The pooled implementation
+ * is [com.eignex.klause.portfolio.PoolCutExchange]; the portfolio wiring (#809) decides when [exchange]
+ * fires (the restart boundary). Importing only ever adds globally-valid cuts, so it is sound regardless
+ * of the worker's current search node.
+ */
+interface CutExchange {
+    /** Import the peers' cuts into [sharing] and publish [sharing]'s exported cuts to the store. */
+    fun exchange(sharing: CutSharing)
 }

@@ -13,10 +13,13 @@ import com.eignex.klause.solver.lp.cut.AssignmentObjectiveCut
 import com.eignex.klause.solver.lp.cut.CircuitSeparator
 import com.eignex.klause.solver.lp.cut.CliqueCutSeparator
 import com.eignex.klause.solver.lp.cut.Cut
+import com.eignex.klause.solver.lp.cut.CutExchange
 import com.eignex.klause.solver.lp.cut.CutPool
 import com.eignex.klause.solver.lp.cut.CutSeparator
+import com.eignex.klause.solver.lp.cut.CutSharing
 import com.eignex.klause.solver.lp.cut.GccSeparator
 import com.eignex.klause.solver.lp.cut.KnapsackCoverSeparator
+import com.eignex.klause.solver.lp.cut.SharedCut
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.LpRelaxation
 import com.eignex.klause.solver.lp.relaxation.rebound
@@ -97,6 +100,30 @@ internal class LpEngine(
 
     /** The global cuts folded into every node's relaxation — the live contents of [cutPool]. */
     val lpGlobalCuts: List<Cut> get() = cutPool.cuts()
+
+    /**
+     * Exchange this engine's global cuts with a portfolio peer via [exchange] (#809): import the cuts
+     * other arms published — re-mapped onto this engine's stable column layout — and export this
+     * engine's own. A no-op until a persistent relaxation exists, since cut sharing rides its
+     * fixed column→variable maps; a non-persistent relaxation has no single layout to map through.
+     * Importing only adds globally-valid cuts, so it is sound at any node; new imports invalidate the
+     * persistent base so the next node folds them in (mirroring [recordSearchCuts]).
+     */
+    internal fun exchangeCuts(exchange: CutExchange) {
+        val relaxation = persistentRelaxation ?: return
+        val before = cutPool.size
+        exchange.exchange(
+            object : CutSharing {
+                override fun exportGlobalCuts(): List<SharedCut> =
+                    cutPool.cuts().mapNotNull { if (it.global) SharedCut.fromCut(it, relaxation) else null }
+
+                override fun importCuts(cuts: List<SharedCut>) {
+                    for (c in cuts) c.toCut(relaxation)?.let { cutPool.add(it) }
+                }
+            },
+        )
+        if (cutPool.size != before) persistentResolved = false
+    }
 
     /**
      * Persist the globally-valid members of [cuts] into the [cutPool] (#41); node-local cuts are

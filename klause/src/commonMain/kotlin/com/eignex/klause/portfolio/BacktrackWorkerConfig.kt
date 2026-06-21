@@ -41,10 +41,11 @@ internal data class BacktrackWorkerConfig(
 ) : WorkerConfig {
 
     /** Build a backtrack worker: fresh [BacktrackSolver] session + params from [build], bound-pruning
-     *  on the shared incumbent when an objective is present, and a per-arm [PoolClauseExchange] when
-     *  [clausePool] is supplied (cross-arm learned-clause sharing — the lp arm's globally valid
-     *  Farkas nogoods travel through it like any other glue clause). LS-only knobs ([lsLambda],
-     *  [lsObjective], [definitionalSweep]) are ignored. The label is `backtrack#<index>`. */
+     *  on the shared incumbent when an objective is present, and per-arm [PoolClauseExchange] /
+     *  [PoolCutExchange] when [pools] supplies them (cross-arm learned-clause sharing — the lp arm's
+     *  globally valid Farkas nogoods travel through it like any other glue clause — and global-cut
+     *  sharing). LS-only knobs ([lsLambda], [lsObjective], [definitionalSweep]) are ignored. The label
+     *  is `backtrack#<index>`. */
     override fun materialize(
         problem: Problem,
         index: Int,
@@ -54,12 +55,13 @@ internal data class BacktrackWorkerConfig(
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
-        clausePool: SharedClausePool?,
+        pools: SharedPools?,
     ): PortfolioWorker {
         val workerLabel = "backtrack#$index"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = build(seed + 1000L + index, workerEvent)
-        if (clausePool != null) params = params.copy(clauseExchange = PoolClauseExchange(clausePool))
+        pools?.clauses?.let { params = params.copy(clauseExchange = PoolClauseExchange(it)) }
+        pools?.cuts?.let { params = params.copy(cutExchange = PoolCutExchange(it)) }
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
             if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null

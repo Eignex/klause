@@ -1,9 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.lp.cut.CutExchange
-import com.eignex.klause.solver.lp.cut.CutPool
+import com.eignex.klause.solver.lp.cut.CutSharing
 import com.eignex.klause.solver.lp.cut.SharedCut
-import com.eignex.klause.solver.lp.relaxation.LpRelaxation
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
@@ -50,27 +49,20 @@ internal class SharedCutPool(private val lock: Mutex = Concurrency.None.lock(), 
 
 /**
  * A per-arm [CutExchange] over a [SharedCutPool]: on each [exchange] it imports the cuts published since
- * this arm last looked (re-mapped onto the arm's current [LpRelaxation], skipping any whose variables it
- * has no column for) and exports the arm's own global cuts. A `seen` key-set holds every key this arm has
- * already imported or exported, so it never re-imports a cut it published nor re-exports one twice; the
- * pool de-dups globally on top.
+ * this arm last looked and exports the arm's own, both through the arm's [CutSharing] (which re-maps each
+ * cut onto the arm's relaxation, dropping any whose variables it has no column for). A `seen` key-set
+ * holds every key this arm has already imported or exported, so it never re-imports a cut it published
+ * nor re-exports one twice; the pool de-dups globally on top.
  */
 internal class PoolCutExchange(private val pool: SharedCutPool) : CutExchange {
     private var cursor = 0
     private val seen = HashSet<Long>()
 
-    override fun exchange(local: CutPool, relaxation: LpRelaxation) {
+    override fun exchange(sharing: CutSharing) {
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
-        for (sc in drained.cuts) {
-            if (seen.add(sc.key)) sc.toCut(relaxation)?.let { local.add(it) }
-        }
-        val fresh = ArrayList<SharedCut>()
-        for (c in local.cuts()) {
-            if (!c.global) continue
-            val sc = SharedCut.fromCut(c, relaxation) ?: continue
-            if (seen.add(sc.key)) fresh.add(sc)
-        }
+        sharing.importCuts(drained.cuts.filter { seen.add(it.key) })
+        val fresh = sharing.exportGlobalCuts().filter { seen.add(it.key) }
         pool.publish(fresh)
     }
 }

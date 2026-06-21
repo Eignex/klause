@@ -67,6 +67,10 @@ data class PortfolioScenario(
      *  `null` uses the curated `LsCatalog` pool unchanged; a non-null pool is the CLI's resolved
      *  recipes (a named base, or the curated pool with axis edits applied). */
     val lsPool: List<() -> LsRecipe>? = null,
+    /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool] (#809), the
+     *  cut analogue of the always-on learned-clause pool. Off by default until #809 phase 3 measures
+     *  whether it pays off on the corpus; sound either way (only global cuts cross arms). */
+    val shareCuts: Boolean = false,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
@@ -106,8 +110,8 @@ internal sealed interface WorkerConfig {
      * optimising worker minimises; [lsObjective] is the optional LS gradient view of the same
      * objective (backtrack ignores it). [lsLambda]/[definitionalSweep] are LS-only (backtrack
      * ignores them). [onEvent] is the shared [SearchEvent] sink, tagged here with the worker's
-     * label. [clausePool], when non-null, wires a cross-arm clause exchange (backtrack arms only;
-     * LS ignores it).
+     * label. [pools], when non-null, wires the cross-arm clause and cut exchanges (backtrack arms
+     * only; LS ignores it).
      */
     fun materialize(
         problem: Problem,
@@ -118,7 +122,7 @@ internal sealed interface WorkerConfig {
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
-        clausePool: SharedClausePool?,
+        pools: SharedPools?,
     ): PortfolioWorker
 }
 
