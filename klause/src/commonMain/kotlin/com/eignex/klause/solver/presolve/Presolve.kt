@@ -65,6 +65,14 @@ object Presolve {
         objectiveBoolVars: Set<Int> = emptySet(),
     ): ImplicationReduction = ImplicationGraph.reduce(problem, maxCandidates, cancellation, objectiveBoolVars)
 
+    /** Binary-implication graph (literal-indexed adjacency `lit -> forced lits`) for implication-aware
+     *  consumers such as local search. See [ImplicationGraph]. */
+    fun implicationGraph(
+        problem: Problem,
+        maxCandidates: Int,
+        cancellation: Cancellation = Cancellation.Never,
+    ): Array<IntArray> = ImplicationGraph.implicationGraph(problem, maxCandidates, cancellation)
+
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         SymmetryBreaking.refineColoursForTest(problem)
 }

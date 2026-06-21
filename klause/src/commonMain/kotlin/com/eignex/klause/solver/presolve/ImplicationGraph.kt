@@ -77,6 +77,16 @@ internal object ImplicationGraph {
         return adj
     }
 
+    /** The binary-implication graph of [problem] as a literal-indexed adjacency: `result[lit]` lists
+     *  every literal that pinning `lit` forces (edge `lit -> forced`), discovered by sound
+     *  probing-style pinning. Bounded to [maxCandidates] pinned Booleans. Consumers index by [Lit.make]. */
+    @Suppress("MemberNameEqualsClassName") // the graph this object builds is the natural name for the builder
+    fun implicationGraph(
+        problem: Problem,
+        maxCandidates: Int,
+        cancellation: Cancellation = Cancellation.Never,
+    ): Array<IntArray> = harvestImplications(problem, maxCandidates, cancellation).toArrays()
+
     /** Pin `v = [value]`, propagate, and record `pinned -> forced` for every other Boolean the
      *  propagation forces. A self-edge (the pin itself) is never emitted. */
     private fun recordPolarity(problem: Problem, v: Int, value: Boolean, adj: Adjacency, cancellation: Cancellation) {
@@ -309,6 +319,8 @@ internal object ImplicationGraph {
         }
 
         fun neighbours(node: Int): IntArray = out[node].toIntArray()
+
+        fun toArrays(): Array<IntArray> = Array(nodeCount) { neighbours(it) }
 
         inline fun forEachNeighbor(node: Int, action: (Int) -> Unit) {
             for (next in out[node]) action(next)
