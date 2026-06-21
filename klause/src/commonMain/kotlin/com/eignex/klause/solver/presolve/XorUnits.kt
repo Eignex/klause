@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.Xor
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.MutableIntIntMap
 
 internal object XorUnits {
 
@@ -25,8 +26,8 @@ internal object XorUnits {
         for (x in xors) for (lit in x.literals) varOrder.add(Lit.variable(lit))
         if (varOrder.isEmpty()) return problem
         val vars = varOrder.toIntArray()
-        val colOfVar = HashMap<Int, Int>(vars.size * 2)
-        for (i in vars.indices) colOfVar[vars[i]] = i
+        val colOfVar = MutableIntIntMap(vars.size * 2)
+        for (i in vars.indices) colOfVar.put(vars[i], i)
         val words = (vars.size + 63) ushr 6
         val rows = Array(xors.size) { LongArray(words) }
         val rhs = IntArray(xors.size)
@@ -34,14 +35,14 @@ internal object XorUnits {
         for (r in xors.indices) {
             val x = xors[r]
             val row = rows[r]
-            val occParity = HashMap<Int, Int>()
+            val occParity = MutableIntIntMap()
             var negParity = 0
             for (lit in x.literals) {
                 val v = Lit.variable(lit)
-                occParity[v] = (occParity[v] ?: 0) xor 1
+                occParity.put(v, occParity.getOrDefault(v, 0) xor 1)
                 if (!Lit.isPositive(lit)) negParity = negParity xor 1
             }
-            for ((v, parity) in occParity) if (parity == 1) Bits.set(row, colOfVar.getValue(v))
+            occParity.forEach { v, parity -> if (parity == 1) Bits.set(row, colOfVar.getOrDefault(v, 0)) }
             rhs[r] = x.targetParity xor negParity
         }
 
