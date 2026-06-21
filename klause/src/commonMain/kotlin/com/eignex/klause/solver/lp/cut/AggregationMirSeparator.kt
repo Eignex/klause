@@ -1,7 +1,11 @@
 package com.eignex.klause.solver.lp.cut
 
+import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.addExact
@@ -22,9 +26,10 @@ import com.eignex.klause.util.LongArrayList
  *
  * Separation enumerates single rows and pairs, emitting a combination only when the LP point violates
  * the resulting cut (an even combination reproduces a scaled original row and never separates). Rows
- * and emitted cuts are capped so the root harvest stays bounded; only [Linear] rows are mined here —
- * Boolean pseudo-Boolean rows are a later extension. Flow-cover cuts are intentionally absent: they
- * need variable-upper-bound / continuous structure that this pure-integer relaxation does not expose.
+ * and emitted cuts are capped so the root harvest stays bounded. [Linear] rows over integers and
+ * [PseudoBoolean] / [Cardinality] rows over 0/1 literals are both mined (a negated literal `¬x` enters
+ * as `1 − x`, its constant folded into the rhs), and a pair may mix the two. Flow-cover cuts are
+ * intentionally absent: they need variable-upper-bound / continuous structure this relaxation lacks.
  */
 internal class AggregationMirSeparator : CutSeparator {
     private val tol = 1e-6
@@ -50,27 +55,97 @@ internal class AggregationMirSeparator : CutSeparator {
         return cuts
     }
 
-    /** Normalize every [Linear] factor to `≤`-rows over shifted nonnegative variables, recording each
-     *  column's declared lower bound in [loOf]. GE flips sign; EQ contributes both directions. */
+    /** Normalize each [Linear] / [PseudoBoolean] / [Cardinality] factor to `≤`-rows over shifted
+     *  nonnegative variables, recording each column's declared lower bound in [loOf]. GE flips sign;
+     *  EQ / a cardinality range contributes both directions. */
     private fun collectRows(ctx: CutContext, loOf: HashMap<Int, Long>): List<Row> {
         val rows = ArrayList<Row>()
         for (factor in ctx.problem.factors) {
-            if (factor !is Linear) continue
-            when (factor.op) {
-                LinearOp.LE -> addRow(ctx, factor, flip = false, loOf, rows)
+            when (factor) {
+                is Linear -> when (factor.op) {
+                    LinearOp.LE -> addRow(ctx, factor, flip = false, loOf, rows)
 
-                LinearOp.GE -> addRow(ctx, factor, flip = true, loOf, rows)
+                    LinearOp.GE -> addRow(ctx, factor, flip = true, loOf, rows)
 
-                LinearOp.EQ -> {
-                    addRow(ctx, factor, flip = false, loOf, rows)
-                    addRow(ctx, factor, flip = true, loOf, rows)
+                    LinearOp.EQ -> {
+                        addRow(ctx, factor, flip = false, loOf, rows)
+                        addRow(ctx, factor, flip = true, loOf, rows)
+                    }
+
+                    else -> Unit // NE has no valid linear relaxation row
                 }
 
-                else -> Unit // NE has no valid linear relaxation row
+                is PseudoBoolean -> {
+                    val lits = factor.literals
+                    val w = { k: Int -> factor.weights[k].toLong() }
+                    val b = factor.bound.toLong()
+                    when (factor.op) {
+                        PbOp.LE -> addBoolRow(ctx, lits, w, b, flip = false, loOf, rows)
+
+                        PbOp.GE -> addBoolRow(ctx, lits, w, b, flip = true, loOf, rows)
+
+                        PbOp.EQ -> {
+                            addBoolRow(ctx, lits, w, b, flip = false, loOf, rows)
+                            addBoolRow(ctx, lits, w, b, flip = true, loOf, rows)
+                        }
+                    }
+                }
+
+                is Cardinality -> {
+                    val ones = { _: Int -> 1L }
+                    // min ≤ Σ literals ≤ max: the `≤ max` row and (flipped) the `≥ min` row.
+                    addBoolRow(ctx, factor.literals, ones, factor.max.toLong(), flip = false, loOf, rows)
+                    addBoolRow(ctx, factor.literals, ones, factor.min.toLong(), flip = true, loOf, rows)
+                }
+
+                else -> Unit
             }
             if (rows.size >= MAX_ROWS) break
         }
         return rows
+    }
+
+    /** Normalize a 0/1 literal-weighted `≤`-row `Σ wₖ·Lₖ ≤ bound` (after [flip] for a `≥` row) into a
+     *  [Row] over Boolean columns: a positive literal contributes `+w·x`, a negative `¬x` contributes
+     *  `w·(1−x) = −w·x + w`, folding the constant into the rhs. Skips the row if any literal's variable
+     *  has no LP column. Boolean columns shift by lower bound 0. */
+    private fun addBoolRow(
+        ctx: CutContext,
+        lits: IntArray,
+        weightOf: (Int) -> Long,
+        bound: Long,
+        flip: Boolean,
+        loOf: HashMap<Int, Long>,
+        out: MutableList<Row>,
+    ) {
+        try {
+            val coef = LinkedHashMap<Int, Long>()
+            var b = if (flip) -bound else bound
+            for (k in lits.indices) {
+                val col = ctx.relaxation.boolColOf[Lit.variable(lits[k])]
+                if (col < 0) return
+                val w = if (flip) -weightOf(k) else weightOf(k)
+                if (Lit.isPositive(lits[k])) {
+                    coef[col] = addExact(coef[col] ?: 0L, w)
+                } else {
+                    coef[col] = addExact(coef[col] ?: 0L, -w)
+                    b = addExact(b, -w)
+                }
+                loOf[col] = 0L
+            }
+            if (coef.isEmpty()) return
+            val cols = IntArray(coef.size)
+            val a = LongArray(coef.size)
+            var i = 0
+            for ((c, cw) in coef) {
+                cols[i] = c
+                a[i] = cw
+                i++
+            }
+            out.add(Row(cols, a, b))
+        } catch (_: LpOverflowException) {
+            return // an overflowing accumulation is dropped, not approximated
+        }
     }
 
     private fun addRow(
