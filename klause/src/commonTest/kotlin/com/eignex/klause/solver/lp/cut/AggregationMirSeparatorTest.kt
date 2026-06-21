@@ -1,10 +1,14 @@
 package com.eignex.klause.solver.lp.cut
 
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.LpRelaxation
@@ -113,5 +117,102 @@ class AggregationMirSeparatorTest {
             assertCutsValid(p, cuts, rel)
         }
         assertTrue(produced > 0, "the separator never fired across 400 random instances")
+    }
+
+    private fun litValue(lit: Int, bools: BooleanArray): Int = if (Lit.isPositive(
+            lit,
+        ) == bools[Lit.variable(lit)]
+    ) {
+        1
+    } else {
+        0
+    }
+
+    private fun satisfiesPb(f: PseudoBoolean, bools: BooleanArray): Boolean {
+        var s = 0L
+        for (k in f.literals.indices) s += f.weights[k].toLong() * litValue(f.literals[k], bools)
+        return when (f.op) {
+            PbOp.LE -> s <= f.bound
+            PbOp.GE -> s >= f.bound
+            PbOp.EQ -> s == f.bound.toLong()
+        }
+    }
+
+    private fun satisfiesCard(f: Cardinality, bools: BooleanArray): Boolean {
+        var c = 0
+        for (lit in f.literals) c += litValue(lit, bools)
+        return c in f.min..f.max
+    }
+
+    private fun cutHoldsBool(cut: Cut, rel: LpRelaxation, bools: BooleanArray): Boolean {
+        var s = 0L
+        for (k in cut.cols.indices) {
+            val col = cut.cols[k]
+            if (rel.colIsBool[col] && bools[rel.colVarId[col]]) s += cut.coeffs[k]
+        }
+        return s <= cut.rhs
+    }
+
+    @Test
+    fun `bool aggregation cuts are always valid`() {
+        val rng = Random(20260623)
+        var produced = 0
+        repeat(400) {
+            val n = rng.nextInt(2, 7)
+            val factors = ArrayList<Factor>()
+            repeat(rng.nextInt(1, 4)) {
+                val k = rng.nextInt(2, n + 1)
+                val vars = (0 until n).shuffled(rng).take(k)
+                val lits = IntArray(k) { j -> Lit.make(vars[j], rng.nextBoolean()) }
+                when (rng.nextInt(3)) {
+                    0 -> factors.add(
+                        PseudoBoolean(IntArray(k) { rng.nextInt(1, 4) }, lits, PbOp.LE, rng.nextInt(0, 2 * k)),
+                    )
+
+                    1 -> factors.add(
+                        PseudoBoolean(IntArray(k) { rng.nextInt(1, 4) }, lits, PbOp.GE, rng.nextInt(0, 2 * k)),
+                    )
+
+                    else -> {
+                        val a = rng.nextInt(0, k + 1)
+                        val b = rng.nextInt(0, k + 1)
+                        factors.add(Cardinality(lits, min = minOf(a, b), max = maxOf(a, b)))
+                    }
+                }
+            }
+            val p = Problem(
+                numBoolVars = n,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = factors.toTypedArray(),
+            )
+            val obj = LinearObjective(boolWeights = LongArray(n) { rng.nextLong(-3, 4) })
+            val (cuts, rel) = separate(p, obj) ?: return@repeat
+            produced += cuts.size
+            val bools = BooleanArray(n)
+            fun recurse(i: Int) {
+                if (i == n) {
+                    val feasible = p.factors.all { f ->
+                        when (f) {
+                            is PseudoBoolean -> satisfiesPb(f, bools)
+                            is Cardinality -> satisfiesCard(f, bools)
+                            else -> true
+                        }
+                    }
+                    if (feasible) {
+                        for (cut in cuts) {
+                            assertTrue(cutHoldsBool(cut, rel, bools), "bool cut cuts off feasible ${bools.toList()}")
+                        }
+                    }
+                    return
+                }
+                bools[i] = false
+                recurse(i + 1)
+                bools[i] = true
+                recurse(i + 1)
+            }
+            recurse(0)
+        }
+        assertTrue(produced > 0, "the bool separator never fired across 400 random instances")
     }
 }
