@@ -69,6 +69,10 @@ internal data class SolveRecord(
     val objective: Double?,
     /** ms to the best incumbent (optimize) or to the first solution (satisfy); null when none. */
     val timeToBestMs: Long?,
+    /** ms to the first feasible solution; null when never feasible. Drives the feasibility-speed
+     *  calibration lens (a fast-feasible specialist scores here even when another arm holds a better
+     *  final objective). */
+    val timeToFirstFeasibleMs: Long? = null,
     /** optimum proved (optimize) or search closed UNSAT/exhausted. */
     val proven: Boolean,
     val stats: Map<String, String> = emptyMap(),
@@ -187,26 +191,48 @@ internal object SolveMetric {
         timestamp: String,
         sha: String?,
         r: SolverInvocation.Result,
-    ): SolveRecord = SolveRecord(
-        problem = entry.name,
-        solver = solverId,
-        engine = s.engine,
-        processors = s.processors ?: 1,
-        search = if (s.free) "free" else "fixed",
-        seed = s.seed,
-        budgetMs = budget.timeoutMillis,
-        kind = kind,
-        maximize = entry.maximize,
-        feasible = r.feasible,
-        objective = r.objective,
-        timeToBestMs = r.timeToBestMs,
-        proven = r.proven,
-        stats = r.stats,
-        attribution = r.attribution,
-        gitSha = sha,
-        timestamp = timestamp,
-        command = r.command,
-    )
+    ): SolveRecord {
+        val (firstFeasibleMs, bestMs) = timings(r, entry.maximize)
+        return SolveRecord(
+            problem = entry.name,
+            solver = solverId,
+            engine = s.engine,
+            processors = s.processors ?: 1,
+            search = if (s.free) "free" else "fixed",
+            seed = s.seed,
+            budgetMs = budget.timeoutMillis,
+            kind = kind,
+            maximize = entry.maximize,
+            feasible = r.feasible,
+            objective = r.objective,
+            timeToBestMs = bestMs,
+            timeToFirstFeasibleMs = firstFeasibleMs,
+            proven = r.proven,
+            stats = r.stats,
+            attribution = r.attribution,
+            gitSha = sha,
+            timestamp = timestamp,
+            command = r.command,
+        )
+    }
+
+    /**
+     * Real (first-feasible, best) timings. klause emits its anytime trajectory as `%%%klause-arm:`
+     * lines (parsed into [SolverInvocation.Result.attribution]), but the MiniZinc `----------` stream
+     * is flushed once at termination — so the separator-based timings collapse to ~budget. When the
+     * attribution stream is present, recover the truth from it: the first incumbent is the first
+     * feasible solution, and the earliest best-objective incumbent is the time-to-best. Reference
+     * solvers carry no attribution, so fall back to their (correctly streamed) separator timings.
+     */
+    private fun timings(r: SolverInvocation.Result, maximize: Boolean): Pair<Long?, Long?> {
+        if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs
+        val firstFeasibleMs = r.attribution.first().elapsedMs
+        val objectives = r.attribution.mapNotNull { it.objective }
+        val best = objectives.maxByOrNull { if (maximize) it else -it }
+        val bestMs = best?.let { b -> r.attribution.first { it.objective == b }.elapsedMs }
+            ?: r.attribution.last().elapsedMs
+        return firstFeasibleMs to bestMs
+    }
 
     private fun errorRecord(
         entry: ResolvedProblem,

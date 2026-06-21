@@ -216,22 +216,27 @@ internal object SolveCore {
             if (scenario.cores == 1) SequentialPortfolio.exp3(workers) else parallelPortfolio(workers)
         executor.use {
             if (solvable.optimize) {
-                // Under `-s`, attribute each strict global improvement to its arm (a `%%%klause-arm:`
-                // comment). Null otherwise, so the executor skips the serialising lock entirely.
-                val onImprovement = if (common.statistics) attributionSink(solvable, output) else null
-                emitMinimize(it.minimize(cancel, onImprovement), solvable, common, output, complete, t0)
+                // Stream every improving incumbent live (the MiniZinc `-i` contract): emit its solution
+                // block the moment it is found, so a competition judge timestamps time-to-best from the
+                // stream instead of seeing the best only at the terminating flush. Under `-s` also
+                // attribute the improvement to its arm (`%%%klause-arm:`). The executor serialises this
+                // callback, so the interleaved output stays ordered.
+                var streamed = 0
+                val onImprovement: (AttributedImprovement) -> Unit = { imp ->
+                    val r = imp.result as MinimizeResult.WithSample
+                    emit(output, solvable, r.sample)
+                    streamed++
+                    if (common.statistics) {
+                        val obj = solvable.objectiveValue?.invoke(r.sample) ?: r.objectiveValue.toLong()
+                        output.onImprovement(imp.workerLabel, obj, imp.elapsed.inWholeMilliseconds)
+                    }
+                }
+                val result = it.minimize(cancel, onImprovement)
+                emitMinimize(result, solvable, common, output, complete, t0, streamedCount = streamed)
             } else {
                 emitSolve(it.solve(cancel), solvable, common, output, t0)
             }
         }
-    }
-
-    /** Build the `onImprovement` callback that renders one attribution line per incumbent, in the
-     *  model's objective orientation. */
-    private fun attributionSink(solvable: Solvable, output: OutputProtocol): (AttributedImprovement) -> Unit = { imp ->
-        val r = imp.result as MinimizeResult.WithSample
-        val obj = solvable.objectiveValue?.invoke(r.sample) ?: r.objectiveValue.toLong()
-        output.onImprovement(imp.workerLabel, obj, imp.elapsed.inWholeMilliseconds)
     }
 
     /** Emit a satisfaction verdict + the sole model (if any) + stats. */
@@ -260,21 +265,27 @@ internal object SolveCore {
         output: OutputProtocol,
         complete: Boolean,
         t0: Long,
+        streamedCount: Int,
     ) {
+        val alreadyStreamed = streamedCount > 0
         var produced = 0L
         var best: Sample? = null
+        // Improving incumbents were streamed live (see the optimize branch above), so the best is
+        // already on the stream; re-emit it only if nothing streamed (a defensive guard — the first
+        // feasible solution is itself an improvement, so this should not happen when a sample exists).
+        // [produced] carries the true streamed count into the `solutions=` statistic.
         when (r) {
             is MinimizeResult.Optimal -> {
-                emit(output, solvable, r.sample)
+                if (!alreadyStreamed) emit(output, solvable, r.sample)
                 best = r.sample
-                produced = 1L
+                produced = maxOf(streamedCount.toLong(), 1L)
                 output.onComplete(Verdict.OPTIMAL)
             }
 
             is MinimizeResult.BestFound -> {
-                emit(output, solvable, r.sample)
+                if (!alreadyStreamed) emit(output, solvable, r.sample)
                 best = r.sample
-                produced = 1L
+                produced = maxOf(streamedCount.toLong(), 1L)
                 output.onComplete(Verdict.BEST_FOUND)
             }
 

@@ -38,6 +38,31 @@ class CliTest {
     }
 
     @Test
+    fun `ls optimize streams improving incumbents live rather than only the final best`() {
+        // A small alldifferent COP with a weighted objective: LS reaches a feasible permutation, then
+        // improves it several times. Each strict improvement must hit the stream as its own
+        // `----------` block (the MiniZinc time-to-best contract) — not be withheld until termination.
+        val n = 8
+        val fzn = buildString {
+            // FlatZinc requires every var declaration before the constraints.
+            for (i in 1..n) appendLine("var 1..$n: x$i;")
+            appendLine("var 0..100000: obj;")
+            for (i in 1..n) for (j in i + 1..n) appendLine("constraint int_ne(x$i, x$j);")
+            val coeffs = (1..n).joinToString(",") { (n - it + 1).toString() } + ",-1"
+            val vars = (1..n).joinToString(",") { "x$it" } + ",obj"
+            appendLine("constraint int_lin_eq([$coeffs], [$vars], 0);")
+            appendLine("solve minimize obj;")
+        }
+        val file = File.createTempFile("cliopt", ".fzn").apply { writeText(fzn); deleteOnExit() }
+        val out = capture { main(arrayOf("-e", "ls", "-a", "-s", "-t", "2000", file.absolutePath)) }
+        val separators = out.lines().count { it == "----------" }
+        val solutionsStat = Regex("solutions=(\\d+)").find(out)?.groupValues?.get(1)?.toInt()
+        assertTrue(separators >= 2, "expected multiple streamed incumbents, got $separators:\n$out")
+        assertEquals(separators, solutionsStat, "the solutions= statistic must match the streamed blocks")
+        assertTrue("==========" !in out, "local search must not claim proven optimality:\n$out")
+    }
+
+    @Test
     fun `cp-single accepts every var- and val-selector value the enums expose`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
