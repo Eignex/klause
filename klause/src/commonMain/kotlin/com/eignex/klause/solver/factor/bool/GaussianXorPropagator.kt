@@ -18,10 +18,9 @@ import com.eignex.klause.solver.propagation.RevLongArray
  * forces them. Reason bitsets are xor-combined through each elimination step so even-occurrence
  * variables cancel and the derived reason is the minimal assigned support.
  */
-internal class GaussianXorPropagator(private val constraints: List<Xor>, override val boolVars: IntArray) :
-    Propagator {
+internal class GaussianXorPropagator(private val constraints: List<Xor>, val boolVars: IntArray) : Propagator {
 
-    override val intVars: IntArray = EmptyIntArray
+    val intVars: IntArray = EmptyIntArray
 
     private val colOfVar: HashMap<Int, Int>
     private val words: Int

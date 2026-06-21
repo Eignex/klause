@@ -5,6 +5,25 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
+/** Boolean vars for factor [fid]: regular factors read from `problem.factors`; learned clauses
+ *  (fid ≥ baseFactorCount) read from the ClausePropagator in `learnedClauseStore`. */
+private fun PropagationState.factorBoolVars(fid: Int): IntArray = if (fid < baseFactorCount) {
+    problem.factors[fid].boolVars
+} else {
+    learnedClauseStore[fid - baseFactorCount].boolVars
+}
+
+/** Integer vars for factor [fid]: same routing as [factorBoolVars]. */
+private fun PropagationState.factorIntVars(fid: Int): IntArray = if (fid < baseFactorCount) {
+    problem.factors[fid].intVars
+} else {
+    learnedClauseStore[fid - baseFactorCount].intVars
+}
+
+/** Fallback conflict-levels collection for a failing propagator, routed through [factorBoolVars]/[factorIntVars]. */
+internal fun PropagationState.factorVarsConflictLevels(fid: Int): IntArray =
+    collectLevelsForVars(factorBoolVars(fid), factorIntVars(fid))
+
 /** Max decision level of any variable in `boolVars` / `intVars`. Used by the driver to
  *  set `currentLevel` before each factor invocation.
  *
@@ -134,15 +153,15 @@ internal fun PropagationState.extractConflictFactors(): IntArray {
     while (head < frontier.size) {
         // factorAt routes learned-clause ids (≥ problem.numFactors) to the session's clause
         // registry — conflicts can name a learned clause as their failing factor.
-        val f = factorAt(frontier.get(head++))
-        for (v in f.boolVars) {
+        val fid = frontier.get(head++)
+        for (v in factorBoolVars(fid)) {
             // Skip atom-encoded literal ids (≥ numBoolVars) — their causation is captured
             // through intMinReason / intMaxReason on the underlying int var, expanded below.
             if (v >= problem.numBoolVars) continue
             val r = boolReason[v]
             if (r >= 0 && out.add(r)) frontier.add(r)
         }
-        for (v in f.intVars) {
+        for (v in factorIntVars(fid)) {
             val rMin = intMinReason[v]
             if (rMin >= 0 && out.add(rMin)) frontier.add(rMin)
             val rMax = intMaxReason[v]

@@ -8,8 +8,8 @@ import com.eignex.klause.util.IntHashSet
 
 /** CP propagator for [Xor]: parity propagation over a list of Boolean literals. */
 internal class XorPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val literals: IntArray,
     private val targetParity: Int,
 ) : Propagator {

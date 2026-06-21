@@ -4,19 +4,12 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /**
  * The deductive contract of a constraint: propagation, watcher subscriptions, and conflict
- * explanation. Implemented by every factor in [Problem.factors] (via [Factor]), and the type
- * the CP engine ([com.eignex.klause.solver.backtrack.BacktrackSolver]) uses when dispatching
- * to factors.
+ * explanation. Constructed by [Factor.asPropagator] and used by the CP engine
+ * ([com.eignex.klause.solver.backtrack.BacktrackSolver]) when dispatching to factors.
  *
- * See [Factor] for the full constraint contract (deductive + local-search + presolve).
+ * See [Factor] for the full constraint contract (structural + deductive + local-search).
  */
 interface Propagator {
-    /** Boolean variables this factor constrains, as raw variable ids (0-based). */
-    val boolVars: IntArray
-
-    /** Integer variables this factor constrains, as raw variable ids (0-based). */
-    val intVars: IntArray
-
     /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
      * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
@@ -26,11 +19,11 @@ interface Propagator {
 
     /**
      * Boolean literals this factor wants per-literal wakeup on, or `null` for the default
-     * occurrence-list wakeup (fire on *any* change to a variable in [boolVars]). When
-     * non-null, the propagation engine routes bool wakeups through a per-literal index
-     * (`boolWatchersByLit[lit]`) instead of through [boolVars]: the factor fires only when
-     * the literal that just became *false* is in this set. The factor is responsible for
-     * keeping the index in sync as watches drift, via
+     * occurrence-list wakeup (fire on *any* change to a variable in the corresponding
+     * [Factor.boolVars]). When non-null, the propagation engine routes bool wakeups through
+     * a per-literal index (`boolWatchersByLit[lit]`) instead of through the factor's bool vars:
+     * the factor fires only when the literal that just became *false* is in this set. The
+     * factor is responsible for keeping the index in sync as watches drift, via
      * [com.eignex.klause.solver.propagation.moveBoolWatcher].
      *
      * Used by [com.eignex.klause.solver.factor.bool.Clause] to implement two-watched-literal
@@ -62,13 +55,13 @@ interface Propagator {
 
     /**
      * Typed integer-domain events this factor wants advisor-style wakeup on, or `null` (the
-     * default) for the occurrence-list wakeup — fire on *any* change to a variable in [intVars].
-     * Each entry encodes a `(intVar, kind)` pair via
+     * default) for the occurrence-list wakeup — fire on *any* change to a variable in the
+     * corresponding [Factor.intVars]. Each entry encodes a `(intVar, kind)` pair via
      * [com.eignex.klause.solver.propagation.IntEvent.pack], where `kind` is one of
      * `IntEvent.LB_RAISED` / `UB_LOWERED` / `VALUE_REMOVED` / `FIXED`. When non-null, the engine
      * routes wakeup for the subscribed variables through the per-`(var, kind)` index
-     * (`PropagationState.intEventWatchersBySlot`) instead of through [intVars]: the factor fires
-     * only when a kind it subscribed to actually occurs on that variable.
+     * (`PropagationState.intEventWatchersBySlot`) instead of through the factor's int vars: the
+     * factor fires only when a kind it subscribed to actually occurs on that variable.
      *
      * This is the int-side analog of [initialBoolWatchers] and the scheduling substrate for
      * incremental propagators (epic #619): a bounds-consistent factor can subscribe to only
@@ -77,8 +70,8 @@ interface Propagator {
      * subscribe to `FIXED` alone. A variable named here is removed from this factor's
      * occurrence-list wakeup (see [com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences])
      * — so the subscription must cover every kind the factor needs to stay correct; an under-broad
-     * subscription silently drops a wake. A variable in [intVars] but *not* named here keeps its
-     * normal occurrence-list wakeup.
+     * subscription silently drops a wake. A variable in [Factor.intVars] but *not* named here keeps
+     * its normal occurrence-list wakeup.
      *
      * Default is `null` — preserves the current "wake on any intVars change" semantics for every
      * factor that hasn't opted in (and the engine pays nothing when no factor in the problem does).
@@ -90,7 +83,7 @@ interface Propagator {
      * its subscribed variables that changed since it last drained, retrieved on a fire via
      * [com.eignex.klause.solver.propagation.PropagationState.drainIntEventDirtyVars]. A
      * domain-sensitive incremental propagator (Régin/GCC/Table/…) sets this `true` so it can scope
-     * its per-fire work to the changed variables instead of scanning all of [intVars].
+     * its per-fire work to the changed variables instead of scanning all of [Factor.intVars].
      *
      * **Contract:** a consumer must also subscribe via [initialIntEventWatches] to *every* kind on
      * *every* variable it depends on — the engine only accumulates a variable into the delta when an

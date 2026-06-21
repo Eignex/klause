@@ -3,7 +3,7 @@ package com.eignex.klause.solver.propagation
 /**
  * Typed integer-domain change events — the int-side analog of the Boolean two-watched-literal
  * scheme ([PropagationState.boolWatchersByLit]). A factor subscribes to specific `(intVar, kind)`
- * pairs via [com.eignex.klause.solver.Factor.initialIntEventWatches] and is then woken *only* when
+ * pairs via [com.eignex.klause.solver.Propagator.initialIntEventWatches] and is then woken *only* when
  * that kind of change happens to that variable, instead of on every change to any of its
  * [com.eignex.klause.solver.Factor.intVars] (the default occurrence-list wakeup). This is the
  * scheduling substrate for advisor-style incremental propagation (Gecode advisors / OR-Tools
@@ -58,7 +58,7 @@ internal object IntEvent {
      * and [UB_LOWERED] on every distinct variable in [vars], and nothing else. A factor whose
      * `propagate` reads only each variable's `min`/`max` (Linear, Product, ArrayMinMax, bounds
      * `AllDifferent`, …) returns this from
-     * [com.eignex.klause.solver.Factor.initialIntEventWatches] so it wakes on bound moves but not on
+     * [com.eignex.klause.solver.Propagator.initialIntEventWatches] so it wakes on bound moves but not on
      * interior [VALUE_REMOVED] carves it could not act on. Duplicate ids in [vars] are subscribed
      * once (bound subscriptions are idempotent), so aliased operands are handled cleanly.
      */

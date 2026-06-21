@@ -8,8 +8,8 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /** CP propagator for [Table]. Constructed by [Table.asPropagator]. */
 internal class TablePropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val xs: IntArray,
     private val tuples: IntArray,
     private val arity: Int,

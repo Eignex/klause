@@ -8,8 +8,8 @@ import com.eignex.klause.solver.propagation.RevInt
 
 /** CP propagation logic for `value_precede`. */
 internal class ValuePrecedePropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val s: Int,
     private val t: Int,
     private val xs: IntArray,

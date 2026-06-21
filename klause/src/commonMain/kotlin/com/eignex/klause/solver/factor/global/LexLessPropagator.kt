@@ -7,8 +7,8 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /** CP propagation logic for `lex_less` / `lex_lesseq`. */
 internal class LexLessPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val xs: IntArray,
     private val ys: IntArray,
     private val strict: Boolean,

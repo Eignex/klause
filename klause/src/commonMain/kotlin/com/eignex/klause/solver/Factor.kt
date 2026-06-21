@@ -12,20 +12,21 @@ internal val EmptyIntArray: IntArray = IntArray(0)
 internal val EmptyLongArray: LongArray = LongArray(0)
 
 /**
- * Full constraint contract for [Problem]: the deductive half ([Propagator]), the local-search
- * half ([Invariant]), and the presolve/symmetry concern below.
+ * Structural contract for a constraint in [Problem]: variable membership, remapping, and
+ * structural identity. The deductive half is [Propagator] (returned by [asPropagator]) and
+ * the local-search half is [Invariant] (returned by [asInvariant]); each is a separate object
+ * whose allocation is deferred to when the corresponding engine is initialised.
  *
  * Variables touched by a factor split into two id spaces: Boolean vars in [boolVars] and
  * integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty; pure-integer factors
  * leave [boolVars] empty; reified or mixed factors populate both.
- *
- * Both halves default to a sound no-op, so a factor that only propagates (no LS support) just
- * inherits the LS defaults — it reports always-satisfied with zero deltas — and a pure-LS
- * factor leaves [propagate] at its no-op.
  */
-interface Factor :
-    Propagator,
-    Invariant {
+interface Factor {
+    /** Boolean variables this factor constrains, as raw variable ids (0-based). */
+    val boolVars: IntArray
+
+    /** Integer variables this factor constrains, as raw variable ids (0-based). */
+    val intVars: IntArray
 
     /**
      * A copy of this factor with every Boolean variable id rewritten through [boolMap] and every
@@ -79,18 +80,9 @@ interface Factor :
      */
     fun remapValues(valueMap: (Int) -> Int): Factor? = null
 
-    /**
-     * The [Propagator] object the CP engine uses for this constraint. Default returns `this`
-     * — factors that haven't been structurally split carry their own propagation data.
-     * Override to construct a separate propagator object with CP-specific data structures,
-     * deferring that allocation to when a CP engine is actually initialised.
-     */
-    fun asPropagator(): Propagator = this
+    /** The [Propagator] the CP engine uses for this constraint. */
+    fun asPropagator(): Propagator
 
-    /**
-     * The [Invariant] object the LS engine uses for this constraint. Default returns `this`.
-     * Override to construct a separate invariant object with LS-specific data structures,
-     * deferring that allocation to when an LS engine is actually initialised.
-     */
-    fun asInvariant(): Invariant = this
+    /** The [Invariant] the LS engine uses for this constraint. */
+    fun asInvariant(): Invariant
 }

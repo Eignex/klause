@@ -69,7 +69,7 @@ class LocalSearchStateRecomputeTest {
                         state.longPayload[fid],
                         "${case.name} seed=$seed: longPayload[$fid] drifted",
                     )
-                    val fa = case.problem.factors[fid]
+                    val fa = case.problem.invariants[fid]
                     assertEquals(
                         fa.isViolated(sibling, fid),
                         fa.isViolated(state, fid),

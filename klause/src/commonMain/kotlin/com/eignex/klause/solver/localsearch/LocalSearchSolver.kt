@@ -76,7 +76,7 @@ class LocalSearchSolver(
     val perMoveInvariants: Boolean = false,
     /** Implicit-solving feasible init (opt-in): after each restart's randomization the engine seeds
      *  elected structural globals (see [LocalSearchState.electedImplicit]) into a feasible
-     *  configuration via [com.eignex.klause.solver.Factor.seedFeasible] — an all-different becomes a
+     *  configuration via [com.eignex.klause.solver.Invariant.seedFeasible] — an all-different becomes a
      *  partial permutation, a circuit a single tour — so the search starts inside those constraints'
      *  feasible region and their structure-preserving moves are productive from the first step. */
     val seedImplicitOnRestart: Boolean = false,
@@ -738,7 +738,7 @@ class LocalSearchSolver(
     private fun greedyRepairPass(state: LocalSearchState) = greedyInit.run(state)
 
     /**
-     * Factor-aware structured descent step. Collects [com.eignex.klause.solver.Factor.proposeStructuredMoves]
+     * Factor-aware structured descent step. Collects [com.eignex.klause.solver.Invariant.proposeStructuredMoves]
      * from every factor — each factor pushes moves it knows preserve its own satisfaction
      * (e.g. `Linear EQ` pair-shifts that keep the sum, `Cardinality.exactlyOne` swaps that
      * keep the count). The engine scores each by objective delta on a temporary apply,

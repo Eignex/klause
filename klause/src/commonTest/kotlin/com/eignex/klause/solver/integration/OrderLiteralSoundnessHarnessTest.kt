@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.solver.*
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
@@ -31,7 +33,9 @@ class OrderLiteralSoundnessHarnessTest {
      * src's singleton bounds), so it obeys the analyzer's contract instead of silently
      * under-explaining.
      */
-    private class NotEqualOnFix(val a: Int, val b: Int) : Factor {
+    private class NotEqualOnFix(val a: Int, val b: Int) :
+        Factor,
+        Propagator {
         override val boolVars: IntArray = IntArray(0)
         override val intVars: IntArray = intArrayOf(a, b)
 
@@ -60,6 +64,11 @@ class OrderLiteralSoundnessHarnessTest {
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = NotEqualOnFix(intMap[a], intMap[b])
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+        override fun asPropagator(): Propagator = this
+        override fun asInvariant(): Invariant = object : Invariant {
+            override val boolVars get() = this@NotEqualOnFix.boolVars
+            override val intVars get() = this@NotEqualOnFix.intVars
+        }
     }
 
     /** Recursive brute-force solution set: every full assignment over [domains] satisfying [ok]. */

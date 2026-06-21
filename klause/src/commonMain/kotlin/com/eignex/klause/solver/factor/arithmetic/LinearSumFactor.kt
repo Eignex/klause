@@ -8,7 +8,6 @@ import com.eignex.klause.solver.factor.bool.linearDegree
 import com.eignex.klause.solver.factor.bool.linearHolds
 import com.eignex.klause.solver.factor.bool.linearResidual
 import com.eignex.klause.solver.factor.bool.snapLinearTarget
-import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /** Body abstraction for the integer weighted-sum factors [Linear] and [ReifiedLinear]:
  *  `Σ coeffs(i) · vars(i) ⟨op⟩ bound`. */
@@ -41,12 +40,6 @@ abstract class LinearSumFactor internal constructor(
     // Fused holds+residual in a single signed-gap pass; the hot degree() path (violationDegree and
     // every deltaIf*/apply* probe) avoids the separate virtual holds()/residual() calls.
     final override fun degree(sum: Long, softCap: Int): Int = linearDegree(sum, op, bound, softCap)
-
-    final override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0L
-        for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
-        state.longPayload[factorId] = sum
-    }
 
     protected fun coeffOf(intVar: Int): Int = coeffLookup.coeffOf(intVar)
 

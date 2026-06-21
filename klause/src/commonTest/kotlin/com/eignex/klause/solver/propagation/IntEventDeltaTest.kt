@@ -2,7 +2,9 @@ package com.eignex.klause.solver.propagation
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
@@ -26,7 +28,9 @@ class IntEventDeltaTest {
      * full-propagation fire) and, for any that is now a singleton, removes its value from the others.
      * Subscribes to every kind on every variable, so the delta is a sound superset of its changes.
      */
-    private class DeltaAllDifferent(override val intVars: IntArray) : Factor {
+    private class DeltaAllDifferent(override val intVars: IntArray) :
+        Factor,
+        Propagator {
         override val boolVars: IntArray = IntArray(0)
         override val consumesIntEventDelta: Boolean = true
         override val initialIntEventWatches: IntArray = IntArray(intVars.size * IntEvent.COUNT).also { out ->
@@ -61,11 +65,18 @@ class IntEventDeltaTest {
             DeltaAllDifferent(IntArray(intVars.size) { intMap[intVars[it]] })
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+        override fun asPropagator(): Propagator = this
+        override fun asInvariant(): Invariant = object : Invariant {
+            override val boolVars get() = this@DeltaAllDifferent.boolVars
+            override val intVars get() = this@DeltaAllDifferent.intVars
+        }
     }
 
     /** Carves [src]'s fixed value out of [dst] when [src] is fixed — punches interior holes that
      *  show up as extra `VALUE_REMOVED` entries in the consumer's delta (which it must tolerate). */
-    private class ExcludeOnFix(val src: Int, val dst: Int) : Factor {
+    private class ExcludeOnFix(val src: Int, val dst: Int) :
+        Factor,
+        Propagator {
         override val boolVars: IntArray = IntArray(0)
         override val intVars: IntArray = intArrayOf(src, dst)
 
@@ -77,6 +88,11 @@ class IntEventDeltaTest {
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ExcludeOnFix(intMap[src], intMap[dst])
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+        override fun asPropagator(): Propagator = this
+        override fun asInvariant(): Invariant = object : Invariant {
+            override val boolVars get() = this@ExcludeOnFix.boolVars
+            override val intVars get() = this@ExcludeOnFix.intVars
+        }
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =

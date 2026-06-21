@@ -16,8 +16,8 @@ import kotlin.math.max
  * time-tabling, detectable precedences, and Vilím Θ-tree edge-finding for the unary case.
  */
 internal class DisjunctivePropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val starts: IntArray,
     private val durations: IntArray,
     private val presents: IntArray,

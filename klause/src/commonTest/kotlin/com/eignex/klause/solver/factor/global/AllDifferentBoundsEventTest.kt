@@ -2,7 +2,9 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
@@ -30,7 +32,9 @@ class AllDifferentBoundsEventTest {
     /** When [src] is fixed, carve its value out of [dst] — used to punch interior holes into the
      *  bounds-AllDifferent's variables mid-search. Plain occurrence-list wakeup (no event
      *  subscription), so it always fires and the holes really do appear. */
-    private class ExcludeOnFix(val src: Int, val dst: Int) : Factor {
+    private class ExcludeOnFix(val src: Int, val dst: Int) :
+        Factor,
+        Propagator {
         override val boolVars: IntArray = IntArray(0)
         override val intVars: IntArray = intArrayOf(src, dst)
 
@@ -42,6 +46,11 @@ class AllDifferentBoundsEventTest {
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ExcludeOnFix(intMap[src], intMap[dst])
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+        override fun asPropagator(): Propagator = this
+        override fun asInvariant(): Invariant = object : Invariant {
+            override val boolVars get() = this@ExcludeOnFix.boolVars
+            override val intVars get() = this@ExcludeOnFix.intVars
+        }
     }
 
     @Test

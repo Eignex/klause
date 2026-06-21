@@ -10,8 +10,8 @@ import com.eignex.klause.util.IntArrayList
 
 /** CP implementation for [Subcircuit]: propagation of the optional-cycle constraint over successor vars. */
 internal class SubcircuitPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val succ: IntArray,
     private val n: Int,
 ) : Propagator {

@@ -7,7 +7,7 @@ package com.eignex.klause.solver.factor
 internal const val DEFAULT_VIOLATION_SOFT_CAP: Int = 16
 
 /**
- * Compress a raw violation residual into the graded [com.eignex.klause.solver.Factor.violationDegree]
+ * Compress a raw violation residual into the graded [com.eignex.klause.solver.Invariant.violationDegree]
  * the LS cost sums. [softCap] (per-solve, from
  * [com.eignex.klause.solver.localsearch.LocalSearchParams.violationSoftCap] via
  * [com.eignex.klause.solver.localsearch.LocalSearchState.violationSoftCap]) splits two regimes:

@@ -15,8 +15,8 @@ internal class ReifiedPseudoBooleanPropagator(
     private val literals: IntArray,
     private val op: PbOp,
     private val bound: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
 ) : Propagator {
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {

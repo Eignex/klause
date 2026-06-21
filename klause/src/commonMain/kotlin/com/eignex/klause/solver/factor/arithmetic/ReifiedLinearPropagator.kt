@@ -12,8 +12,8 @@ import com.eignex.klause.solver.propagation.PropagationState
 /** CP propagator for [ReifiedLinear]: reification propagation and conflict reasons. */
 internal class ReifiedLinearPropagator(
     private val auxBoolVar: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val coeffs: IntArray,
     private val vars: IntArray,
     private val op: LinearOp,

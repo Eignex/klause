@@ -7,8 +7,8 @@ import com.eignex.klause.solver.propagation.moveBoolWatcher
 
 /** CP propagator for [Cardinality]: generalised watched-literal propagation for `min ≤ count ≤ max`. */
 internal class CardinalityPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val literals: IntArray,
     private val min: Int,
     private val max: Int,

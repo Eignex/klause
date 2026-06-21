@@ -3,7 +3,6 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.compressViolation
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.util.IntIntMap
 
 /** Body abstraction for the cardinality factors [Cardinality] and `ReifiedCardinality`: the
@@ -40,12 +39,4 @@ abstract class CardinalitySumFactor(
     final override fun holds(sum: Long): Boolean = sum >= min && sum <= max
 
     final override fun residual(sum: Long, softCap: Int): Int = compressViolation(countDistance(sum), softCap)
-
-    final override fun initialize(state: LocalSearchState, factorId: Int) {
-        var count = 0L
-        for (lit in literals) {
-            if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
-        }
-        state.longPayload[factorId] = count
-    }
 }

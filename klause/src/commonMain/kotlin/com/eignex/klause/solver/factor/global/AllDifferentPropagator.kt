@@ -12,8 +12,8 @@ import com.eignex.klause.util.IntHashSet
 
 /** CP propagation logic for `all_different`. */
 internal class AllDifferentPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val vars: IntArray,
     private val presents: IntArray,
     private val exceptSet: IntArray,
