@@ -113,6 +113,11 @@ private const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
  *  across rounds. */
 private const val PROBE_PASS_MAX_CANDIDATES = 2_048
 
+/** Free-Boolean candidate cap for the [PresolvePass.IMPLICATION_GRAPH] harvest, mirroring
+ *  [PROBE_PASS_MAX_CANDIDATES]: each candidate costs up to two `propagate` calls to discover its
+ *  outgoing implications, so this bounds the pass on a Boolean-heavy model. */
+private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
+
 /** Diminishing-returns abort threshold (SCIP `abortfac`): a round that reduces the problem by less
  *  than this fraction ends the loop. Tiny, so it only trips on marginal spinning, never real work. */
 private const val PRESOLVE_ABORT_FRACTION = 0.001
@@ -263,6 +268,29 @@ enum class PresolvePass(
     PROBE("probe", Stage.PROBLEM, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
             PassResult(Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never))
+    },
+
+    /** Binary implication graph: harvest `lit -> lit` implications by probing-style pinning, collapse
+     *  same-polarity equivalent literals (mutual-implication cycles) to one representative, and drop
+     *  transitively-redundant binary clauses. Substitution leaves a merged variable unconstrained and
+     *  rebuilds it on reconstruct, so — like affine elimination — it inflates a complete enumerator's
+     *  count (#507) and is marked solution-set-sensitive. */
+    IMPLICATION_GRAPH(
+        "impl-graph",
+        Stage.PROBLEM,
+        PresolveTiming.EXHAUSTIVE,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
+            val reduction = Presolve.reduceImplicationGraph(
+                problem,
+                IMPLICATION_GRAPH_MAX_CANDIDATES,
+                Cancellation.Never,
+                ctx.objectiveBoolVars,
+            )
+            return PassResult(reduction.problem, reduction::reconstruct)
+        }
     },
     ;
 
