@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 
 /**
@@ -48,6 +49,10 @@ object Presolve {
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
     ): Problem = DominatedVariables.fixDominatedVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs)
+
+    /** Failed-literal and common-bound probing to fixpoint. See [Probing]. */
+    fun probe(problem: Problem, maxCandidates: Int, cancellation: Cancellation = Cancellation.Never): Problem =
+        Probing.probe(problem, maxCandidates, cancellation)
 
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         SymmetryBreaking.refineColoursForTest(problem)
