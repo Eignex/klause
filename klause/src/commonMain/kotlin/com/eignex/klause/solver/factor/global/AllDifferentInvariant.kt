@@ -11,13 +11,17 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
 /** LS invariant logic for `all_different`. */
-internal interface AllDifferentInvariant : Invariant {
-    val vars: IntArray
-    val domainMin: Int
-    val domainSize: Int
-    val presents: IntArray
-    val exceptValues: IntHashSet
-    val occurrencesByVar: IntIntMap
+internal class AllDifferentInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val vars: IntArray,
+    private val domainMin: Int,
+    private val domainSize: Int,
+    private val presents: IntArray,
+    private val exceptValues: IntHashSet,
+    private val occurrencesByVar: IntIntMap,
+    private val presentInvFn: (LocalSearchState, Int) -> Boolean,
+) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         for (v in vars) {
@@ -30,7 +34,7 @@ internal interface AllDifferentInvariant : Invariant {
         val counts = IntArray(domainSize)
         var excess = 0
         for (i in vars.indices) {
-            if (!presentInv(state, i)) continue
+            if (!presentInvFn(state, i)) continue
             val value = state.assignment.intValue(vars[i])
             if (value in exceptValues) continue
             val idx = value - domainMin
@@ -100,7 +104,7 @@ internal interface AllDifferentInvariant : Invariant {
             if (Lit.variable(presents[i]) != boolVar) continue
             val value = state.assignment.intValue(vars[i])
             if (value in exceptValues) continue
-            val wasP = presentInv(state, i)
+            val wasP = presentInvFn(state, i)
             val delta = if (wasP) -1 else +1
             touchedIdx.add(value - domainMin)
             touchedDelta.add(delta)
@@ -121,7 +125,7 @@ internal interface AllDifferentInvariant : Invariant {
             if (Lit.variable(presents[i]) != boolVar) continue
             val value = state.assignment.intValue(vars[i])
             if (value in exceptValues) continue
-            val nowP = presentInv(state, i)
+            val nowP = presentInvFn(state, i)
             val delta = if (nowP) +1 else -1
             s.excess += adjustExcess(s.counts, value - domainMin, delta)
         }
@@ -134,7 +138,7 @@ internal interface AllDifferentInvariant : Invariant {
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         val used = IntHashSet(vars.size)
         for (i in vars.indices) {
-            if (!presentInv(state, i)) continue
+            if (!presentInvFn(state, i)) continue
             val v = vars[i]
             if (!state.assumptions.isFrozenInt(v)) continue
             val value = state.assignment.intValue(v)
@@ -142,7 +146,7 @@ internal interface AllDifferentInvariant : Invariant {
         }
         var allDistinct = true
         for (i in vars.indices) {
-            if (!presentInv(state, i)) continue
+            if (!presentInvFn(state, i)) continue
             val v = vars[i]
             if (state.assumptions.isFrozenInt(v)) continue
             val d = state.problem.intDomains[v]
@@ -177,7 +181,7 @@ internal interface AllDifferentInvariant : Invariant {
         for (i in vars.indices) {
             val v = vars[i]
             if (state.assignment.intValue(v) != value) continue
-            if (!presentInv(state, i)) continue
+            if (!presentInvFn(state, i)) continue
             seenOccupants++
             if (state.rng.nextInt(seenOccupants) == 0) occupant = v
         }
@@ -242,7 +246,7 @@ internal interface AllDifferentInvariant : Invariant {
             val a = vars[ai]
             val b = vars[bi]
             if (a == b) continue
-            if (!presentInv(state, ai) || !presentInv(state, bi)) continue
+            if (!presentInvFn(state, ai) || !presentInvFn(state, bi)) continue
             val va = state.assignment.intValue(a)
             val vb = state.assignment.intValue(b)
             if (va == vb) continue
@@ -253,14 +257,12 @@ internal interface AllDifferentInvariant : Invariant {
         }
     }
 
-    fun presentInv(state: LocalSearchState, idx: Int): Boolean
-
     private fun excessOf(count: Int): Int = if (count > 1) count - 1 else 0
 
     private fun presentOccurrences(state: LocalSearchState, intVar: Int): Int {
         if (presents.isEmpty()) return occurrencesByVar[intVar]
         var c = 0
-        for (i in vars.indices) if (vars[i] == intVar && presentInv(state, i)) c++
+        for (i in vars.indices) if (vars[i] == intVar && presentInvFn(state, i)) c++
         return c
     }
 

@@ -11,22 +11,24 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 
 /** LS invariant logic for `global_cardinality`. */
-internal interface GlobalCardinalityInvariant : Invariant {
-    val xs: IntArray
-    val cover: IntArray
-    val countVars: IntArray?
-    val countLow: IntArray?
-    val countHigh: IntArray?
-    val closed: Boolean
-    val presents: IntArray
-    val coverIndexByValue: IntIntMap
-
-    fun presentGccInv(state: LocalSearchState, idx: Int): Boolean
+internal class GlobalCardinalityInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val cover: IntArray,
+    private val countVars: IntArray?,
+    private val countLow: IntArray?,
+    private val countHigh: IntArray?,
+    private val closed: Boolean,
+    private val presents: IntArray,
+    private val coverIndexByValue: IntIntMap,
+    private val presentGccInvFn: (LocalSearchState, Int) -> Boolean,
+) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val counts = IntArray(cover.size)
         for (i in xs.indices) {
-            if (!presentGccInv(state, i)) continue
+            if (!presentGccInvFn(state, i)) continue
             val value = state.assignment.intValue(xs[i])
             val idx = coverIndexByValue[value]
             if (idx < 0) continue
@@ -49,7 +51,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         val s = state.refPayload[factorId] as GccState
         val sim = s.counts.copyOf()
         var occurrencesInXs = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentGccInv(state, i)) occurrencesInXs++
+        for (i in xs.indices) if (xs[i] == intVar && presentGccInvFn(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
             val old = state.assignment.intValue(intVar)
             val oldIdx = coverIndexByValue[old]
@@ -67,7 +69,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         if (cur == oldValue) return 0
         val beforeDeg = state.factorDegree[factorId]
         var occurrencesInXs = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentGccInv(state, i)) occurrencesInXs++
+        for (i in xs.indices) if (xs[i] == intVar && presentGccInvFn(state, i)) occurrencesInXs++
         if (occurrencesInXs > 0) {
             val oldIdx = coverIndexByValue[oldValue]
             if (oldIdx >= 0) s.counts[oldIdx] -= occurrencesInXs
@@ -84,7 +86,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         val sim = s.counts.copyOf()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val wasP = presentGccInv(state, i)
+            val wasP = presentGccInvFn(state, i)
             val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])]
             if (coverIdx < 0) continue
             sim[coverIdx] += if (wasP) -1 else +1
@@ -100,7 +102,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         val beforeDeg = state.factorDegree[factorId]
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val nowP = presentGccInv(state, i)
+            val nowP = presentGccInvFn(state, i)
             val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i])]
             if (coverIdx < 0) continue
             s.counts[coverIdx] += if (nowP) +1 else -1
@@ -144,7 +146,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
             }
             if (needIncrease) {
                 for (i in xs.indices) {
-                    if (!presentGccInv(state, i)) continue
+                    if (!presentGccInvFn(state, i)) continue
                     val cur = state.assignment.intValue(xs[i])
                     if (cur != coverVal && coverVal in state.problem.intDomains[xs[i]]) {
                         sink.addChannelingIntSet(state, xs[i], coverVal)
@@ -152,7 +154,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
                 }
             } else {
                 for (i in xs.indices) {
-                    if (!presentGccInv(state, i)) continue
+                    if (!presentGccInvFn(state, i)) continue
                     val cur = state.assignment.intValue(xs[i])
                     if (cur != coverVal) continue
                     val d = state.problem.intDomains[xs[i]]
@@ -164,7 +166,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         }
         if (closed) {
             for (i in xs.indices) {
-                if (!presentGccInv(state, i)) continue
+                if (!presentGccInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
                 if (coverIndexByValue.contains(cur)) continue
                 val d = state.problem.intDomains[xs[i]]
@@ -189,7 +191,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
             val a = xs[ai]
             val b = xs[bi]
             if (a == b) continue
-            if (!presentGccInv(state, ai) || !presentGccInv(state, bi)) continue
+            if (!presentGccInvFn(state, ai) || !presentGccInvFn(state, bi)) continue
             val va = state.assignment.intValue(a)
             val vb = state.assignment.intValue(b)
             if (va == vb) continue
@@ -203,7 +205,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         val counts = IntArray(cover.size)
         val free = IntArrayList()
         for (i in xs.indices) {
-            if (!presentGccInv(state, i)) continue
+            if (!presentGccInvFn(state, i)) continue
             if (state.assumptions.isFrozenInt(xs[i])) {
                 val idx = coverIndexByValue[state.assignment.intValue(xs[i])]
                 if (idx >= 0) {
@@ -311,7 +313,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         var deg = 0L
         for (i in xs.indices) {
             val controlled = flipVar >= 0 && presents.isNotEmpty() && Lit.variable(presents[i]) == flipVar
-            val p = if (controlled) !presentGccInv(state, i) else presentGccInv(state, i)
+            val p = if (controlled) !presentGccInvFn(state, i) else presentGccInvFn(state, i)
             if (!p) continue
             val v = if (xs[i] == ovVar) ovVal else state.assignment.intValue(xs[i])
             if (!coverIndexByValue.contains(v)) deg++
@@ -319,7 +321,7 @@ internal interface GlobalCardinalityInvariant : Invariant {
         return deg
     }
 
-    fun rawDegree(state: LocalSearchState, simCounts: IntArray, ovVar: Int, ovVal: Int): Long =
+    private fun rawDegree(state: LocalSearchState, simCounts: IntArray, ovVar: Int, ovVal: Int): Long =
         countsDegree(state, simCounts, ovVar, ovVal) + closedDegree(state, ovVar, ovVal)
 
     companion object {

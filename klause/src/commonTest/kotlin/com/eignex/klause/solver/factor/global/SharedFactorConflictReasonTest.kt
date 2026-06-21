@@ -32,7 +32,7 @@ class SharedFactorConflictReasonTest {
         state.currentLevel = 1
         check(state.tightenIntMin(a, value) && state.tightenIntMax(a, value)) { "pin $a failed" }
         check(state.tightenIntMin(b, value) && state.tightenIntMax(b, value)) { "pin $b failed" }
-        return state.problem.factors[0].propagate(state, 0)
+        return state.problem.propagators[0].propagate(state, 0)
     }
 
     @Test
@@ -43,7 +43,7 @@ class SharedFactorConflictReasonTest {
         // Control: session A alone — pin vars 0 and 1 to the same value and capture the reason.
         val control = PropagationState(problem, Assumptions.None)
         assertFalse(failPinnedPair(control, a = 0, b = 1, value = 3), "pinned pair must conflict")
-        val controlReason = factor.conflictReason(control, 0)
+        val controlReason = problem.propagators[0].conflictReason(control, 0)
 
         // Interleaved: session A fails as above, then session B (same factor object) fails on a
         // DIFFERENT pair, then A's reason is read. With factor-level scratch B's failure
@@ -52,7 +52,7 @@ class SharedFactorConflictReasonTest {
         assertFalse(failPinnedPair(a, a = 0, b = 1, value = 3))
         val b = PropagationState(problem, Assumptions.None)
         assertFalse(failPinnedPair(b, a = 1, b = 2, value = 7))
-        val interleavedReason = factor.conflictReason(a, 0)
+        val interleavedReason = problem.propagators[0].conflictReason(a, 0)
 
         assertContentEquals(
             controlReason,

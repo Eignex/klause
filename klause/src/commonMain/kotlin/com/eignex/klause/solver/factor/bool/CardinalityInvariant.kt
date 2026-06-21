@@ -6,21 +6,48 @@ import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.util.IntIntMap
 
-/** LS contract for [Cardinality]: violation scoring and break/make maintenance for `min ≤ count ≤ max`. */
-interface CardinalityInvariant : Invariant {
+/** LS invariant for [Cardinality]: violation scoring and break/make maintenance for `min ≤ count ≤ max`. */
+internal class CardinalityInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val literals: IntArray,
+    private val min: Int,
+    private val max: Int,
+) : Invariant {
 
-    /** The literals being counted. */
-    val literals: IntArray
+    /** Signed contribution of each variable to the count, built from [literals]. */
+    private val signedByVar: IntIntMap = run {
+        val signs = HashMap<Int, Int>()
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            signs[v] = (signs[v] ?: 0) + if (Lit.isPositive(lit)) 1 else -1
+        }
+        IntIntMap.build(keys = signs.keys.toIntArray(), values = signs.values.toIntArray(), absent = 0)
+    }
 
-    /** Inclusive lower bound on the true count. */
-    val min: Int
+    private fun signedForVar(v: Int): Int = signedByVar[v]
 
-    /** Inclusive upper bound on the true count. */
-    val max: Int
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        var count = 0L
+        for (lit in literals) {
+            if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
+        }
+        state.longPayload[factorId] = count
+    }
 
-    /** Signed contribution of [v] to the count (`+1`, `-1`, `0`, or larger for multi-occurrence). */
-    fun signedForVar(v: Int): Int
+    /** Cached max |`signedByVar[v]`| across `boolVars`. Bounds the change `n` can
+     *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out. */
+    private val maxAbsSigned: Int = run {
+        var m = 0
+        for (v in boolVars) {
+            val s = signedByVar[v]
+            val a = if (s < 0) -s else s
+            if (a > m) m = a
+        }
+        m
+    }
 
     private fun cardHolds(n: Long): Boolean = n >= min && n <= max
 
@@ -36,7 +63,7 @@ interface CardinalityInvariant : Invariant {
         cardDegree(state.longPayload[factorId], state.violationSoftCap)
 
     /** Compressed Δ violation-degree if `u` (currently `uVal`) were flipped at true-count `n`. */
-    fun signedDelta(n: Long, u: Int, uVal: Boolean, softCap: Int): Int {
+    private fun signedDelta(n: Long, u: Int, uVal: Boolean, softCap: Int): Int {
         val signedU = signedForVar(u)
         if (signedU == 0) return 0
         val changeU = if (uVal) -signedU else signedU
@@ -128,10 +155,6 @@ interface CardinalityInvariant : Invariant {
         }
     }
 
-    /** Maximum |`signedByVar[v]`| across `boolVars`. Bounds the change `n` can
-     *  see from a single flip. */
-    val maxAbsSigned: Int
-
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
     /** Adjust break/make counts after [flippedVar] has been flipped. Fast-path early-out
@@ -171,7 +194,6 @@ interface CardinalityInvariant : Invariant {
         }
     }
 
-    /** Constants shared across [CardinalityInvariant] implementations. */
     companion object {
         /** Cap on (true-lit, false-lit) swap-pair proposals in [proposeStructuredMoves]. */
         const val PAIR_PROPOSAL_CAP: Int = 32

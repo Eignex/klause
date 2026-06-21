@@ -28,16 +28,16 @@ class IntFactorTest {
         val state = stateFor(1, arrayOf(IntDomain(0, 100)), factor)
         state.assignment.setInt(0, 50)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         assertEquals(1, sink.list.size)
         val move = sink.list[0] as Move.IntSet
         assertEquals(0, move.varId)
         assertEquals(10, move.newValue)
 
         state.apply(move)
-        assertFalse(factor.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
         assertEquals(0, state.cost)
     }
 
@@ -47,12 +47,12 @@ class IntFactorTest {
         val state = stateFor(1, arrayOf(IntDomain(0, 20)), eq)
         state.assignment.setInt(0, 7)
         state.recompute()
-        assertFalse(eq.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
 
-        val deltaPred = eq.deltaIfIntSet(state, 0, 0, 8)
+        val deltaPred = state.factors[0].deltaIfIntSet(state, 0, 0, 8)
         state.apply(Move.IntSet(0, 8))
         assertEquals(1, deltaPred)
-        assertTrue(eq.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test
@@ -67,17 +67,17 @@ class IntFactorTest {
         state.assignment.setInt(0, 8)
         state.assignment.setInt(1, 8)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         assertEquals(16L, state.longPayload[0])
 
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         assertTrue(sink.list.isNotEmpty())
 
         val move = sink.list.first() as Move.IntSet
         assertEquals(2, move.newValue)
         state.apply(move)
-        assertFalse(factor.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
     }
 
     @Test
@@ -88,12 +88,12 @@ class IntFactorTest {
         state.assignment.setBool(0, true)
         state.assignment.setInt(0, 3)
         state.recompute()
-        assertFalse(rfc.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
 
-        val deltaPred = rfc.deltaIfBoolFlipped(state, 0, 0)
+        val deltaPred = state.factors[0].deltaIfBoolFlipped(state, 0, 0)
         state.apply(Move.BoolFlip(0))
         assertEquals(1, deltaPred)
-        assertTrue(rfc.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test
@@ -102,11 +102,11 @@ class IntFactorTest {
         val state = stateFor(1, arrayOf(IntDomain(0, 10)), factor)
         state.assignment.setInt(0, 2)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
 
         // Graded: GE residual drops from (5-2)=3 to 0, so the degree delta is -3 (not the
         // old binary -1). This is the gradient CBLS descends on.
-        val delta = factor.deltaIfIntSet(state, 0, 0, 5)
+        val delta = state.factors[0].deltaIfIntSet(state, 0, 0, 5)
         assertEquals(-3, delta)
     }
 
@@ -116,9 +116,9 @@ class IntFactorTest {
         val state = stateFor(1, arrayOf(IntDomain(0, 20)), factor)
         state.assignment.setInt(0, 7)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         val targets = sink.list.filterIsInstance<Move.IntSet>().map { it.newValue }.toSet()
         assertEquals(setOf(6, 8), targets)
     }

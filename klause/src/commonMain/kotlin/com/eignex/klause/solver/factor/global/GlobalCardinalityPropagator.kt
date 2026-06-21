@@ -11,18 +11,20 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 
 /** CP propagation logic for `global_cardinality`. */
-internal interface GlobalCardinalityPropagator : Propagator {
-    val xs: IntArray
-    val cover: IntArray
-    val countVars: IntArray?
-    val countLow: IntArray?
-    val countHigh: IntArray?
-    val closed: Boolean
-    val presents: IntArray
-    val coverIndexByValue: IntIntMap
-
-    fun definitelyPresentGcc(idx: Int, state: PropagationState): Boolean
-    fun definitelyAbsentGcc(idx: Int, state: PropagationState): Boolean
+internal class GlobalCardinalityPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val cover: IntArray,
+    private val countVars: IntArray?,
+    private val countLow: IntArray?,
+    private val countHigh: IntArray?,
+    private val closed: Boolean,
+    private val presents: IntArray,
+    private val coverIndexByValue: IntIntMap,
+    private val definitelyPresentGccFn: (Int, PropagationState) -> Boolean,
+    private val definitelyAbsentGccFn: (Int, PropagationState) -> Boolean,
+) : Propagator {
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = withPresencePremises(
         state,
@@ -43,14 +45,14 @@ internal interface GlobalCardinalityPropagator : Propagator {
         val out = IntArrayList()
         for (i in presents.indices) {
             when {
-                definitelyPresentGcc(i, state) -> out.add(Lit.negate(presents[i]))
-                definitelyAbsentGcc(i, state) -> out.add(presents[i])
+                definitelyPresentGccFn(i, state) -> out.add(Lit.negate(presents[i]))
+                definitelyAbsentGccFn(i, state) -> out.add(presents[i])
             }
         }
         return out.toIntArray()
     }
 
-    fun withPresencePremises(state: PropagationState, base: IntArray?): IntArray? {
+    private fun withPresencePremises(state: PropagationState, base: IntArray?): IntArray? {
         val pres = presencePremiseLits(state)
         if (pres.isEmpty()) return base
         if (base == null) return pres
@@ -81,7 +83,7 @@ internal interface GlobalCardinalityPropagator : Propagator {
             IntArray(xs.size) { it }
         } else {
             val acc = IntArrayList()
-            for (i in xs.indices) if (definitelyPresentGcc(i, state)) acc.add(i)
+            for (i in xs.indices) if (definitelyPresentGccFn(i, state)) acc.add(i)
             IntArray(acc.size) { acc[it] }
         }
         val effectiveXs: IntArray = if (presents.isEmpty()) {
@@ -96,7 +98,7 @@ internal interface GlobalCardinalityPropagator : Propagator {
         } else {
             val acc = IntArrayList()
             for (i in xs.indices) {
-                if (!definitelyPresentGcc(i, state) && !definitelyAbsentGcc(i, state)) {
+                if (!definitelyPresentGccFn(i, state) && !definitelyAbsentGccFn(i, state)) {
                     acc.add(xs[i])
                 }
             }

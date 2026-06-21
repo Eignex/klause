@@ -8,27 +8,27 @@ import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.max
 
 /**
- * LS invariant interface for the Disjunctive constraint. Default implementations delegate
- * all cost / delta / repair logic to an internal [Cumulative] backing at capacity = 1,
- * unit resources. Concrete classes supply the abstract properties.
+ * LS invariant for [Disjunctive]. Constructed by [Disjunctive.asInvariant] and delegates
+ * all cost / delta / repair logic to an internal [CumulativeInvariant] backing at capacity = 1,
+ * unit resources.
  */
-internal interface DisjunctiveInvariant : Invariant {
-
-    val starts: IntArray
-    val durations: IntArray
-    val presents: IntArray
-    val durationVars: IntArray
-    val n: Int
-
-    /** Unit-capacity Cumulative backing for LS cost and repair moves. */
-    val cumulativeBacking: Cumulative
+internal class DisjunctiveInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val starts: IntArray,
+    private val durations: IntArray,
+    private val presents: IntArray,
+    private val durationVars: IntArray,
+    /** Unit-capacity CumulativeInvariant backing for LS cost and repair moves. */
+    private val cumulativeBacking: CumulativeInvariant,
+) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) = cumulativeBacking.initialize(state, factorId)
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         cumulativeBacking.isViolated(state, factorId)
 
-    /** Graded violation: delegates to the unit-capacity [Cumulative] backing, so the degree is
+    /** Graded violation: delegates to the unit-capacity [CumulativeInvariant] backing, so the degree is
      *  the total time-overlap energy `Σ_t max(0, concurrency_t − 1)` — a real gradient. */
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         cumulativeBacking.violationDegree(state, factorId)
@@ -102,11 +102,11 @@ internal interface DisjunctiveInvariant : Invariant {
     }
 
     /** Current duration of task [i]: the constant, or the duration variable's value. */
-    fun durationOf(state: LocalSearchState, i: Int): Int =
+    private fun durationOf(state: LocalSearchState, i: Int): Int =
         if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
 
     /** Smallest value in [varId]'s domain that is ≥ [lo], or null if none. */
-    fun firstInDomainAtLeast(state: LocalSearchState, varId: Int, lo: Int): Int? {
+    private fun firstInDomainAtLeast(state: LocalSearchState, varId: Int, lo: Int): Int? {
         val d = state.problem.intDomains[varId]
         if (lo > d.max) return null
         var pick = -1

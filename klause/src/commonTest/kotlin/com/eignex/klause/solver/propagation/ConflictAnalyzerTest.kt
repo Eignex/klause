@@ -12,7 +12,9 @@ import com.eignex.klause.solver.backtrack.selector.InputOrder
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.ClausePropagator
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -288,9 +290,9 @@ class ConflictAnalyzerTest {
         )
         val state = PropagationState(problem, Assumptions.None)
         val baseFid = problem.numFactors
-        val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true)))
-        val c2 = Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true)))
+        val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))).asPropagator() as ClausePropagator
+        val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))).asPropagator() as ClausePropagator
+        val c2 = Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))).asPropagator() as ClausePropagator
         val fid0 = state.addLearnedClause(c0, lbd = 1)
         val fid1 = state.addLearnedClause(c1, lbd = 5)
         val fid2 = state.addLearnedClause(c2, lbd = 1)
@@ -309,8 +311,8 @@ class ConflictAnalyzerTest {
             state.learnedClauses.size,
             "expected 2 clauses kept after dropping the high-LBD one",
         )
-        assertEquals(c0, state.learnedClauses[0])
-        assertEquals(c2, state.learnedClauses[1])
+        assertContentEquals(c0.literals, state.learnedClauses[0].literals)
+        assertContentEquals(c2.literals, state.learnedClauses[1].literals)
         assertTrue(
             !state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
             "watcher entry for the dropped clause should be removed",

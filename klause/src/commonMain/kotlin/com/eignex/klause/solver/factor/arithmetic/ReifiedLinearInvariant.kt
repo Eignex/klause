@@ -11,26 +11,34 @@ import com.eignex.klause.solver.factor.bool.snapLinearTarget
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
-/** LS interface for [ReifiedLinear]: reified violation tracking and repair. */
-interface ReifiedLinearInvariant : Invariant {
+/** LS invariant for [ReifiedLinear]: reified violation tracking and repair. */
+internal class ReifiedLinearInvariant(
+    private val auxBoolVar: Int,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val coeffs: IntArray,
+    private val vars: IntArray,
+    private val op: LinearOp,
+    private val bound: Int,
+) : Invariant {
 
-    /** The reifying Boolean variable id. */
-    val auxBoolVar: Int
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        var sum = 0L
+        for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
+        state.longPayload[factorId] = sum
+    }
 
-    /** Coefficients parallel to [vars]. */
-    val coeffs: IntArray
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+        state.assignment.boolValue(auxBoolVar) != linearHolds(state.longPayload[factorId], op, bound)
 
-    /** Integer variable ids. */
-    val vars: IntArray
-
-    /** Comparison operator. */
-    val op: LinearOp
-
-    /** Right-hand-side bound. */
-    val bound: Int
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val aux = state.assignment.boolValue(auxBoolVar)
+        val sum = state.longPayload[factorId]
+        return reifiedDegreeFor(sum, aux, state.violationSoftCap)
+    }
 
     /** Violation degree for the reified linear given [sum], reification value [aux], and [softCap]. */
-    fun reifiedDegreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
+    private fun reifiedDegreeFor(sum: Long, aux: Boolean, softCap: Int): Int =
         reifiedDegree(aux, linearHolds(sum, op, bound)) { linearDegree(sum, op, bound, softCap) }
 
     // The pre-move degree `degreeFor(sum, aux)` is the factor's current violation degree, already

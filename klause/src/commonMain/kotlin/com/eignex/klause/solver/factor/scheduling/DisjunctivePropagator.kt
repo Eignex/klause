@@ -5,27 +5,31 @@ import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.scheduling.internals.CumulativeThetaTree
 import com.eignex.klause.solver.factor.scheduling.internals.MandatoryProfile
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.max
 
 /**
- * CP propagation interface for the Disjunctive constraint. Default implementations provide
+ * CP propagator for [Disjunctive]. Constructed by [Disjunctive.asPropagator] and provides
  * time-tabling, detectable precedences, and Vilím Θ-tree edge-finding for the unary case.
- * Concrete classes supply the abstract properties.
  */
-internal interface DisjunctivePropagator : Propagator {
+internal class DisjunctivePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val starts: IntArray,
+    private val durations: IntArray,
+    private val presents: IntArray,
+    private val durationVars: IntArray,
+    private val n: Int,
+) : Propagator {
 
-    val starts: IntArray
-    val durations: IntArray
-    val presents: IntArray
-    val durationVars: IntArray
-    val n: Int
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     /** Snapshot effective per-task durations. Returns null if any duration var is not
      *  fixed at this fixpoint pass — propagation defers in that case (sound). */
-    fun effDurOrNull(state: PropagationState): IntArray? {
+    private fun effDurOrNull(state: PropagationState): IntArray? {
         if (durationVars.isEmpty()) return durations
         val out = IntArray(n)
         for (i in 0 until n) {
@@ -51,7 +55,7 @@ internal interface DisjunctivePropagator : Propagator {
     /** Build the mandatory profile from each task's `[lst, ect)` compulsory part; fail on
      *  level > 1; shave any non-fixed task's start endpoints if placement would create
      *  an additional unit-overlap with the mandatory profile. */
-    fun timeTable(state: PropagationState, effDur: IntArray): Boolean {
+    private fun timeTable(state: PropagationState, effDur: IntArray): Boolean {
         val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
@@ -98,7 +102,7 @@ internal interface DisjunctivePropagator : Propagator {
 
     /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
      *  i must come strictly after j. Tighten `start_i.min ≥ est_j + dur_j`. */
-    fun detectablePrecedences(state: PropagationState, effDur: IntArray): Boolean {
+    private fun detectablePrecedences(state: PropagationState, effDur: IntArray): Boolean {
         val ant = state.composeIntVarAtomAntecedents(intVars)
         for (i in 0 until n) {
             if (effDur[i] == 0) continue
@@ -124,13 +128,13 @@ internal interface DisjunctivePropagator : Propagator {
         return true
     }
 
-    fun edgeFinding(state: PropagationState, effDur: IntArray): Boolean {
+    private fun edgeFinding(state: PropagationState, effDur: IntArray): Boolean {
         if (n < 2) return true
         return forwardPass(state, effDur, reversed = false) && forwardPass(state, effDur, reversed = true)
     }
 
     @Suppress("ReturnCount")
-    fun forwardPass(state: PropagationState, effDur: IntArray, reversed: Boolean): Boolean {
+    private fun forwardPass(state: PropagationState, effDur: IntArray, reversed: Boolean): Boolean {
         val active = IntArrayList()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue

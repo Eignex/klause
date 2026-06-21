@@ -21,7 +21,7 @@ class CardinalityTest {
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, true)
         state.recompute()
-        assertTrue(amo.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         assertEquals(2L, state.longPayload[0])
     }
 
@@ -32,11 +32,11 @@ class CardinalityTest {
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, true)
         state.recompute()
-        assertFalse(one.isViolated(state, 0))
-        val deltaPredicted = one.deltaIfBoolFlipped(state, 0, 1)
+        assertFalse(state.factors[0].isViolated(state, 0))
+        val deltaPredicted = state.factors[0].deltaIfBoolFlipped(state, 0, 1)
         assertEquals(1, deltaPredicted)
         state.apply(Move.BoolFlip(1))
-        assertTrue(one.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         assertEquals(1, state.cost)
     }
 }

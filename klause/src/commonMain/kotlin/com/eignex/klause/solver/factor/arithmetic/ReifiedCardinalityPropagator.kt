@@ -5,20 +5,15 @@ import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.bool.internals.pbFalseFormAntecedents
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP contract for [ReifiedCardinality]: reified cardinality propagation. */
-interface ReifiedCardinalityPropagator : Propagator {
-
-    /** The reifying Boolean variable id. */
-    val auxBoolVar: Int
-
-    /** The Boolean literals. */
-    val literals: IntArray
-
-    /** Inclusive lower bound. */
-    val min: Int
-
-    /** Inclusive upper bound (also used as `true` for max-mode in `ArrayMinMax`). */
-    val max: Int
+/** CP propagator for [ReifiedCardinality]: reified cardinality propagation. */
+internal class ReifiedCardinalityPropagator(
+    private val auxBoolVar: Int,
+    private val literals: IntArray,
+    private val min: Int,
+    private val max: Int,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+) : Propagator {
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0

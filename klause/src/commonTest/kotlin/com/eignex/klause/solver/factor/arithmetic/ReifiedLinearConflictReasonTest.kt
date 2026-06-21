@@ -51,9 +51,12 @@ class ReifiedLinearConflictReasonTest {
         state.currentLevel = 1
         state.pinBoolAsDecision(0, true)
         assertTrue(state.tightenIntMax(0, 4), "squeeze v0 ≤ 4")
-        assertFalse(factor.propagate(state, 0), "body GE 5 must be infeasible under v0 ≤ 4 with aux true")
+        assertFalse(
+            problem.propagators[0].propagate(state, 0),
+            "body GE 5 must be infeasible under v0 ≤ 4 with aux true",
+        )
 
-        val reason = factor.conflictReason(state, 0)
+        val reason = problem.propagators[0].conflictReason(state, 0)
         assertTrue(reason != null && reason.isNotEmpty(), "must yield a non-empty clause-form reason")
         for (lit in reason) {
             assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")

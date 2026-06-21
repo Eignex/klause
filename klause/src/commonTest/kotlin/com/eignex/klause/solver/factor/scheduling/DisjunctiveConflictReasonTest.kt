@@ -42,9 +42,9 @@ class DisjunctiveConflictReasonTest {
         state.undoLogging = true
         state.currentLevel = 1
         assertTrue(state.tightenIntMax(0, 2) && state.tightenIntMax(1, 2), "squeeze starts to [0, 2]")
-        assertTrue(!factor.propagate(state, 0), "the squeezed window must overload (energy 6 > 5)")
+        assertTrue(!problem.propagators[0].propagate(state, 0), "the squeezed window must overload (energy 6 > 5)")
 
-        val reason = factor.conflictReason(state, 0)
+        val reason = problem.propagators[0].conflictReason(state, 0)
         assertTrue(reason != null && reason.isNotEmpty(), "overload must yield a non-empty clause-form reason")
         for (lit in reason) {
             assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")

@@ -10,15 +10,23 @@ import com.eignex.klause.solver.factor.bool.internals.litTrueInLsState
 import com.eignex.klause.solver.factor.bool.internals.wasLitTrueInLsState
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.util.IntIntMap
 
-/** LS contract for [Clause]: watched-literal violation tracking and break/make maintenance. */
-interface ClauseInvariant : Invariant {
+/** LS invariant for [Clause]: watched-literal violation tracking and break/make maintenance. */
+internal class ClauseInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val literals: IntArray,
+) : Invariant {
 
-    /** The literals whose disjunction this clause asserts. */
-    val literals: IntArray
+    /** `boolVar → literal index` lookup; sentinel -1 for absent. Built from [literals] in init. */
+    private val litIndexByVar: IntIntMap = IntIntMap.build(
+        keys = IntArray(literals.size) { Lit.variable(literals[it]) },
+        values = IntArray(literals.size) { it },
+        absent = -1,
+    )
 
-    /** `boolVar → literal index` lookup; sentinel -1 for absent. */
-    fun litIndexForVar(v: Int): Int
+    private fun litIndexForVar(v: Int): Int = litIndexByVar[v]
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val w = state.refPayload[factorId] as? ClauseWatches

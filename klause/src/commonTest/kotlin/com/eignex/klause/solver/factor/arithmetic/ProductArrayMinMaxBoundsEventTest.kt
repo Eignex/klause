@@ -63,9 +63,9 @@ class ProductArrayMinMaxBoundsEventTest {
 
     @Test
     fun `product and array-minmax subscribe to only bound events`() {
-        assertBoundOnly(Product(a = 0, b = 1, result = 2).initialIntEventWatches, intArrayOf(0, 1, 2))
+        assertBoundOnly(Product(a = 0, b = 1, result = 2).asPropagator().initialIntEventWatches, intArrayOf(0, 1, 2))
         assertBoundOnly(
-            ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true).initialIntEventWatches,
+            ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true).asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
     }

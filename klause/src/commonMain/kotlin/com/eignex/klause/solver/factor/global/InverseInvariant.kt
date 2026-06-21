@@ -7,14 +7,17 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /** LS invariant logic for `inverse`. */
-internal interface InverseInvariant : Invariant {
-    val f: IntArray
-    val g: IntArray
-    val fOffset: Int
-    val gOffset: Int
+internal class InverseInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val f: IntArray,
+    private val g: IntArray,
+    private val fOffset: Int,
+    private val gOffset: Int,
+) : Invariant {
 
-    fun fValueToGIndex(j: Int): Int = j - gOffset
-    fun gValueToFIndex(i: Int): Int = i - fOffset
+    private fun fValueToGIndex(j: Int): Int = j - gOffset
+    private fun gValueToFIndex(i: Int): Int = i - fOffset
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var bad = 0

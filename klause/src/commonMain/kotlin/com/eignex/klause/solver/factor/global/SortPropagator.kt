@@ -2,12 +2,34 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /** CP propagation logic for `sort`. */
-internal interface SortPropagator : Propagator {
-    val xs: IntArray
-    val ys: IntArray
+internal class SortPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val ys: IntArray,
+) : Propagator {
+
+    /**
+     * Advisor subscription (#623): the sort propagator reads only each variable's `min`/`max` — the
+     * non-decreasing chain on `ys`, the first/last `ys` bounds from the `xs` extremes, the `xs`
+     * clamp to the `ys` range, and the all-fixed sanity check. None of it inspects interior holes,
+     * so the factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
+     * interior `VALUE_REMOVED` wakes.
+     */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * 2)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+        }
+        out
+    }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)

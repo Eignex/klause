@@ -2,27 +2,29 @@ package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /**
- * CP propagation interface for the Diffn constraint. Default implementations provide
- * pairwise compulsory-parts / disjunctive propagation for the constant-size case, plus a
- * sound-only infeasibility check for the variable-size case. Concrete classes supply the
- * abstract properties.
+ * CP propagator for [Diffn]. Constructed by [Diffn.asPropagator] and holds pairwise
+ * compulsory-parts / disjunctive propagation for the constant-size case, plus a
+ * sound-only infeasibility check for the variable-size case.
  */
-internal interface DiffnPropagator : Propagator {
+internal class DiffnPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val ys: IntArray,
+    private val widths: IntArray,
+    private val heights: IntArray,
+    private val widthVars: IntArray?,
+    private val heightVars: IntArray?,
+    private val nonStrict: Boolean,
+    private val n: Int,
+    private val varSize: Boolean,
+) : Propagator {
 
-    val xs: IntArray
-    val ys: IntArray
-    val widths: IntArray
-    val heights: IntArray
-    val widthVars: IntArray?
-    val heightVars: IntArray?
-    val nonStrict: Boolean
-    val n: Int
-
-    /** Whether the search can resize rectangles (var dimensions present). */
-    val varSize: Boolean
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
@@ -89,7 +91,7 @@ internal interface DiffnPropagator : Propagator {
 
     /** Sound-only infeasibility check for the variable-size case: a pair is unconditionally
      *  infeasible iff it must overlap on both axes even at the *smallest* sizes each var allows. */
-    fun propagateVarSizeSoundOnly(state: PropagationState): Boolean {
+    private fun propagateVarSizeSoundOnly(state: PropagationState): Boolean {
         val wvars = widthVars
         val hvars = heightVars
         fun wMin(i: Int) = if (wvars == null) widths[i] else state.intDomains[wvars[i]].min

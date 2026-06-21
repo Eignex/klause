@@ -3,15 +3,37 @@ package com.eignex.klause.solver.factor.table
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.solver.factor.table.internals.TableStr2State
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP propagation contract for the table constraint. */
-internal interface TablePropagator : Propagator {
+/** CP propagator for [Table]. Constructed by [Table.asPropagator]. */
+internal class TablePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val tuples: IntArray,
+    private val arity: Int,
+    private val numTuples: Int,
+) : Propagator {
 
-    val xs: IntArray
-    val tuples: IntArray
-    val arity: Int
-    val numTuples: Int
+    /** Advisor subscription (#623): STR2 is hole-aware GAC (tuple feasibility tests membership, the
+     *  prune drops interior values), so subscribe to every kind on every column variable and consume
+     *  the dirty-variable delta (#624) — a fire re-sweeps only when a column actually changed, instead
+     *  of the per-fire O(arity) domain-ref scan. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = xs.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, xs)

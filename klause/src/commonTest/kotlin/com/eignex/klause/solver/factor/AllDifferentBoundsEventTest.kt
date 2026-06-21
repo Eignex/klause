@@ -47,7 +47,7 @@ class AllDifferentBoundsEventTest {
     @Test
     fun `bounds-consistent alldifferent subscribes to exactly the bound events`() {
         val ad = AllDifferent(intArrayOf(5, 7), domainMin = 0, domainSize = 10, boundsConsistent = true)
-        val watches = ad.initialIntEventWatches
+        val watches = ad.asPropagator().initialIntEventWatches
         assertTrue(watches != null, "bounds-consistent alldifferent must opt into typed events")
         val pairs = watches.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()
         assertEquals(
@@ -68,7 +68,9 @@ class AllDifferentBoundsEventTest {
     @Test
     fun `full-gac alldifferent keeps occurrence-list wakeup`() {
         // Default (full GAC) needs every value removal, so it must not opt into the bound-only path.
-        assertNull(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4).initialIntEventWatches)
+        assertNull(
+            AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4).asPropagator().initialIntEventWatches,
+        )
     }
 
     @Test

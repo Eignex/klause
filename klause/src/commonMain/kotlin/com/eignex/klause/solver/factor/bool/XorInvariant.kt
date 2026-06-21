@@ -2,20 +2,30 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.factor.CoeffLookup
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
-/** LS contract for [Xor]: parity violation tracking and break/make maintenance. */
-interface XorInvariant : Invariant {
+/** LS invariant for [Xor]: parity violation tracking and break/make maintenance. */
+internal class XorInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val literals: IntArray,
+    private val targetParity: Int,
+) : Invariant {
 
-    /** The literals whose parity is constrained. */
-    val literals: IntArray
+    /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`. */
+    private val parityByVar: CoeffLookup = run {
+        val parities = IntArray(boolVars.size)
+        for (i in boolVars.indices) {
+            var n = 0
+            for (lit in literals) if (Lit.variable(lit) == boolVars[i]) n++
+            parities[i] = n and 1
+        }
+        CoeffLookup.build(boolVars, parities)
+    }
 
-    /** Required parity (0 = even, 1 = odd). */
-    val targetParity: Int
-
-    /** Parity contribution of [v]: `(occurrences mod 2)`. Returns 0 if [v] is not in [literals]. */
-    fun parityOf(v: Int): Int
+    private fun parityOf(v: Int): Int = parityByVar.coeffOf(v)
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var parity = 0

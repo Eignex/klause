@@ -4,30 +4,39 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
+import com.eignex.klause.solver.factor.bool.internals.buildSignedWeightByVar
 import com.eignex.klause.solver.factor.bool.internals.pbDegree
 import com.eignex.klause.solver.factor.bool.internals.pbDistance
 import com.eignex.klause.solver.factor.bool.internals.pbHolds
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
-/** LS contract for [PseudoBoolean]: violation scoring and break/make maintenance. */
-interface PseudoBooleanInvariant : Invariant {
+/** LS invariant for [PseudoBoolean]: violation scoring and break/make maintenance. */
+internal class PseudoBooleanInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val weights: IntArray,
+    private val literals: IntArray,
+    private val op: PbOp,
+    private val bound: Int,
+) : Invariant {
 
-    /** Weights, parallel to [literals]. */
-    val weights: IntArray
+    /** Signed contribution of each variable to the weighted sum. */
+    private val signedByVar: IntIntMap = buildSignedWeightByVar(weights, literals, exclude = -1)
 
-    /** Boolean literals contributing their weight when true. */
-    val literals: IntArray
+    private fun signedForVar(v: Int): Int = signedByVar[v]
 
-    /** Relation between the weighted sum and [bound]. */
-    val op: PbOp
-
-    /** Right-hand-side bound. */
-    val bound: Int
-
-    /** Signed contribution of [v] to the weighted sum. */
-    fun signedForVar(v: Int): Int
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        var sum = 0L
+        for (i in literals.indices) {
+            if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
+                sum += weights[i].toLong()
+            }
+        }
+        state.longPayload[factorId] = sum
+    }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         !pbHolds(state.longPayload[factorId], op, bound)
@@ -157,7 +166,6 @@ interface PseudoBooleanInvariant : Invariant {
         }
     }
 
-    /** Constants shared across [PseudoBooleanInvariant] implementations. */
     companion object {
         private const val PAIR_PROPOSAL_CAP: Int = 32
     }

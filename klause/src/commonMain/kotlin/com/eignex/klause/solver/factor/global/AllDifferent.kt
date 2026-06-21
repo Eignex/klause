@@ -2,12 +2,12 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
@@ -23,11 +23,11 @@ import com.eignex.klause.util.IntIntMap
  */
 class AllDifferent(
     /** Integer variable ids required to be pairwise distinct. */
-    override val vars: IntArray,
+    val vars: IntArray,
     /** Minimum value across the shared value domain. */
-    override val domainMin: Int,
+    val domainMin: Int,
     /** Number of values in the shared value domain. */
-    override val domainSize: Int,
+    val domainSize: Int,
     /** Per-position presence literals; empty for the non-opt fast path. When non-empty,
      *  only present positions are required pairwise-different, and Régin filtering treats
      *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
@@ -38,16 +38,14 @@ class AllDifferent(
      *  Empty for plain all-different — then this factor behaves exactly as before. Excepted
      *  values are modelled inside `reginFilter` as capacity-n value copies, so the exact
      *  Hall/matching machinery applies unchanged. */
-    override val exceptSet: IntArray = EmptyIntArray,
+    val exceptSet: IntArray = EmptyIntArray,
     /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller
      *  asked for bounds-consistency rather than full GAC (e.g. ghoulomb's `distinct ::bounds`,
      *  Régin's matching/SCC/Hall machinery is then skipped in favour of a much cheaper
      *  filter, trading pruning strength for per-node throughput as the model intends. */
-    override val boundsConsistent: Boolean = false,
+    val boundsConsistent: Boolean = false,
 ) : Factor,
-    OptionalFactor,
-    AllDifferentPropagator,
-    AllDifferentInvariant {
+    OptionalFactor {
 
     init {
         require(vars.size >= 2) { "AllDifferent needs at least two variables" }
@@ -63,7 +61,7 @@ class AllDifferent(
 
     /** Membership view of [exceptSet] for the hot value checks; the shared empty set when none. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    override val exceptValues: IntHashSet =
+    val exceptValues: IntHashSet =
         if (exceptSet.isEmpty()) {
             AllDifferentInvariant.NO_EXCEPT
         } else {
@@ -120,7 +118,7 @@ class AllDifferent(
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
      *  common case where each var appears exactly once this is always 1. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    override val occurrencesByVar: IntIntMap = run {
+    val occurrencesByVar: IntIntMap = run {
         val counts = HashMap<Int, Int>()
         for (v in vars) counts[v] = (counts[v] ?: 0) + 1
         IntIntMap.build(
@@ -130,7 +128,26 @@ class AllDifferent(
         )
     }
 
-    override fun presentInv(state: LocalSearchState, idx: Int): Boolean = present(state, idx)
+    override fun asPropagator(): Propagator = AllDifferentPropagator(
+        boolVars,
+        intVars,
+        vars,
+        presents,
+        exceptSet,
+        boundsConsistent,
+        exceptValues,
+        { idx, state -> definitelyPresent(idx, state) },
+    )
 
-    override fun definitelyPresentProp(idx: Int, state: PropagationState): Boolean = definitelyPresent(idx, state)
+    override fun asInvariant(): Invariant = AllDifferentInvariant(
+        boolVars,
+        intVars,
+        vars,
+        domainMin,
+        domainSize,
+        presents,
+        exceptValues,
+        occurrencesByVar,
+        { state, idx -> present(state, idx) },
+    )
 }

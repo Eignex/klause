@@ -1,10 +1,11 @@
 package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.circuit.internals.cycleScan
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.propagation.IntEvent
 import kotlin.math.abs
 
 /**
@@ -43,9 +44,7 @@ import kotlin.math.abs
 class Circuit(
     /** Successor variable id per node; the assignment must form one Hamiltonian cycle. */
     succ: IntArray,
-) : SuccessorCycleFactor(succ),
-    CircuitPropagator,
-    CircuitInvariant {
+) : SuccessorCycleFactor(succ) {
 
     init {
         require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }
@@ -56,25 +55,6 @@ class Circuit(
     /** Position-faithful: `succ(i)` is node i's successor, so the array order is meaningful — the key
      *  keeps the variables in order rather than sorting them (#443). */
     override fun structuralKey(): String = "circuit:" + succ.joinToString(",")
-
-    /** Advisor subscription (#623): the Hamiltonian-cycle reasoning reacts to bound moves, fixings and
-     *  the membership of a forced chain-start (`start in d`), so subscribe to every kind on every
-     *  successor variable and consume the dirty-variable delta (#624) — a fire that drains an empty
-     *  delta has nothing to re-derive and returns immediately. */
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = succ.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
-
-    override val consumesIntEventDelta: Boolean = true
 
     /**
      * Graded cost: `|numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`.
@@ -104,4 +84,8 @@ class Circuit(
         val scan = cycleScan(next, n)
         return abs(scan.numCycles - 1) + (n - scan.nodesInCycles) + numSelfLoops + numOob
     }
+
+    override fun asPropagator(): Propagator = CircuitPropagator(boolVars, intVars, succ, n)
+
+    override fun asInvariant(): Invariant = CircuitInvariant(boolVars, intVars, succ, n, ::computeCost)
 }

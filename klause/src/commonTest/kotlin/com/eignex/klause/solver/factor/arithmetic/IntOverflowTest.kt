@@ -46,8 +46,8 @@ class IntOverflowTest {
         state.assignment.setInt(0, WIDE)
         state.recompute()
         assertEquals(PRODUCT, state.longPayload[0])
-        assertTrue(factor.isViolated(state, 0), "2^32 > 1000 must be violated")
-        assertTrue(factor.violationDegree(state, 0) > 0)
+        assertTrue(state.factors[0].isViolated(state, 0), "2^32 > 1000 must be violated")
+        assertTrue(state.factors[0].violationDegree(state, 0) > 0)
     }
 
     @Test
@@ -57,11 +57,11 @@ class IntOverflowTest {
         val state = stateFor(0, arrayOf(IntDomain(0, WIDE)), factor)
         state.assignment.setInt(0, 0)
         state.recompute()
-        assertFalse(factor.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
 
-        val predicted = factor.deltaIfIntSet(state, 0, 0, WIDE)
+        val predicted = state.factors[0].deltaIfIntSet(state, 0, 0, WIDE)
         state.apply(Move.IntSet(0, WIDE))
-        val observed = factor.violationDegree(state, 0)
+        val observed = state.factors[0].violationDegree(state, 0)
         assertTrue(observed > 0, "sum 2^32 != 0 must be violated")
         assertEquals(observed, predicted, "delta must predict the true Long degree, not a wrapped one")
     }
@@ -81,7 +81,7 @@ class IntOverflowTest {
         state.assignment.setInt(0, WIDE)
         state.recompute()
         assertEquals(PRODUCT, state.longPayload[0])
-        assertTrue(factor.isViolated(state, 0), "aux=true but body 2^32 > 1000 does not hold")
+        assertTrue(state.factors[0].isViolated(state, 0), "aux=true but body 2^32 > 1000 does not hold")
     }
 
     @Test
@@ -94,7 +94,7 @@ class IntOverflowTest {
         for (v in 0 until WIDE) state.assignment.setBool(v, true)
         state.recompute()
         assertEquals(PRODUCT, state.longPayload[0])
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test
@@ -115,7 +115,7 @@ class IntOverflowTest {
         for (v in 1..n) state.assignment.setBool(v, true)
         state.recompute()
         assertEquals(PRODUCT, state.longPayload[0])
-        assertTrue(factor.isViolated(state, 0), "aux=true but Σ 2^32 > 1000 does not hold")
+        assertTrue(state.factors[0].isViolated(state, 0), "aux=true but Σ 2^32 > 1000 does not hold")
     }
 
     @Test
@@ -128,6 +128,6 @@ class IntOverflowTest {
         state.assignment.setInt(2, 0)
         state.recompute()
         assertEquals(0, BIG * BIG, "2^40 wraps to 0 in Int") // documents the hazard
-        assertTrue(factor.isViolated(state, 0), "true product 2^40 != 0 must be violated")
+        assertTrue(state.factors[0].isViolated(state, 0), "true product 2^40 != 0 must be violated")
     }
 }

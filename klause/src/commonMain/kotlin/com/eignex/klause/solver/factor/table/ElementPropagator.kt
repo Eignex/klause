@@ -5,18 +5,38 @@ import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.solver.factor.table.internals.ElementCache
 import com.eignex.klause.solver.factor.table.internals.ElementConstState
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 
-/** CP propagation contract for the element constraint `result = arr(idx)`. */
-internal interface ElementPropagator : Propagator {
+/** CP propagator for [Element]. Constructed by [Element.asPropagator]. */
+internal class ElementPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val idx: Int,
+    private val result: Int,
+    private val arr: IntArray,
+    private val arrIsVars: Boolean,
+    private val indexOffset: Int,
+) : Propagator {
 
-    val idx: Int
-    val result: Int
-    val arr: IntArray
-    val arrIsVars: Boolean
-    val indexOffset: Int
+    override val initialIntEventWatches: IntArray? = if (!arrIsVars) {
+        null
+    } else {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = arrIsVars
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, intVars)

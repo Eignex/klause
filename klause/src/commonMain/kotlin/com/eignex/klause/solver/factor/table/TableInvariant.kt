@@ -8,15 +8,17 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 
-/** LS invariant contract for the table constraint. */
-internal interface TableInvariant : Invariant {
-
-    val xs: IntArray
-    val tuples: IntArray
-    val arity: Int
-    val numTuples: Int
-    val singleColumnByVar: IntIntMap
-    val multiColumnsByVar: Map<Int, IntArray>
+/** LS invariant for [Table]. Constructed by [Table.asInvariant]. */
+internal class TableInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val tuples: IntArray,
+    private val arity: Int,
+    private val numTuples: Int,
+    private val singleColumnByVar: IntIntMap,
+    private val multiColumnsByVar: Map<Int, IntArray>,
+) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         (state.refPayload[factorId] as TableLsState).minDist > 0

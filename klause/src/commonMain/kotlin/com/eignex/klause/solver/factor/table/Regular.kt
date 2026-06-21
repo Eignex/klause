@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 
 /**
  * `regular(seq, Q, S, d, q0, F)` — the sequence `seq` is accepted by the DFA with
@@ -17,20 +18,18 @@ import com.eignex.klause.solver.propagation.IntEvent
  */
 class Regular(
     /** Input symbol sequence variable ids. */
-    override val seq: IntArray,
+    val seq: IntArray,
     /** Number of DFA states. */
-    override val numStates: Int,
+    val numStates: Int,
     /** Number of input symbols. */
-    override val alphabetSize: Int,
+    val alphabetSize: Int,
     /** `numStates × alphabetSize` row-major transition table; 0 means no transition. */
-    override val transitions: IntArray,
+    val transitions: IntArray,
     /** Initial state. */
-    override val q0: Int,
+    val q0: Int,
     /** Accepting states. */
-    override val accepting: IntArray,
-) : Factor,
-    RegularPropagator,
-    RegularInvariant {
+    val accepting: IntArray,
+) : Factor {
 
     init {
         require(seq.isNotEmpty()) { "regular: empty seq" }
@@ -77,23 +76,11 @@ class Regular(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = seq
 
-    /** Advisor subscription (#623): GAC over interior domains, so subscribe to every kind on every
-     *  (distinct) sequence variable and consume the dirty-variable delta (#624) — the incremental
-     *  propagator (`RegularIncrementalState`) recomputes only the layers a changed position reaches. */
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = seq.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
+    override fun asPropagator(): Propagator =
+        RegularPropagator(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)
 
-    override val consumesIntEventDelta: Boolean = true
+    override fun asInvariant(): Invariant =
+        RegularInvariant(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)
 
     /*
      * Pesant's layered-DAG GAC, now reversible and delta-driven (see `RegularIncrementalState`):

@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -18,16 +19,14 @@ import com.eignex.klause.util.IntIntMap
  */
 class Inverse(
     /** Forward mapping variable ids: `f(i)` is the image of `i`. */
-    override val f: IntArray,
+    val f: IntArray,
     /** Inverse mapping variable ids: `g(j)` is the preimage of `j`. */
-    override val g: IntArray,
+    val g: IntArray,
     /** Index offset for the [f] domain. */
-    override val fOffset: Int = 0,
+    val fOffset: Int = 0,
     /** Index offset for the [g] domain. */
-    override val gOffset: Int = 0,
-) : Factor,
-    InversePropagator,
-    InverseInvariant {
+    val gOffset: Int = 0,
+) : Factor {
 
     init {
         require(f.size == g.size) { "inverse: f and g must have equal length" }
@@ -47,31 +46,14 @@ class Inverse(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = f + g
 
-    /** Advisor subscription (#623): channel GAC over interior domains, so subscribe to every kind on
-     *  every (distinct) channel variable and consume the dirty-variable delta (#624) — the propagator
-     *  scopes its O(n²) channel sweep to the rows/columns whose domain actually changed. */
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = intVars.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
-
-    override val consumesIntEventDelta: Boolean = true
-
-    /** var id → its index in [f] / [g] (`-1` when absent), so the dirty-variable delta (var ids)
-     *  maps to changed channel rows / columns without an O(n) domain-ref scan. */
+    /** var id → its 0-based index in [f], or `-1` when absent. Maps dirty-variable ids to
+     *  channel rows during propagation and LS delta computation without an O(n) scan. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    override val fIndexOf: IntIntMap = IntIntMap.build(f, IntArray(f.size) { it }, absent = -1)
+    val fIndexOf: IntIntMap = IntIntMap.build(f, IntArray(f.size) { it }, absent = -1)
 
+    /** var id → its 0-based index in [g], or `-1` when absent. Symmetric to [fIndexOf]. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    override val gIndexOf: IntIntMap = IntIntMap.build(g, IntArray(g.size) { it }, absent = -1)
+    val gIndexOf: IntIntMap = IntIntMap.build(g, IntArray(g.size) { it }, absent = -1)
 
     /*
      * GAC for the inverse channel. Three layers:
@@ -86,4 +68,17 @@ class Inverse(
      *      and vice versa). Régin matching on f and on g punches the Hall-set values the channel
      *      misses, reusing the shared `reginFilter`.
      */
+
+    override fun asPropagator(): Propagator = InversePropagator(
+        boolVars,
+        intVars,
+        f,
+        g,
+        fOffset,
+        gOffset,
+        fIndexOf,
+        gIndexOf,
+    )
+
+    override fun asInvariant(): Invariant = InverseInvariant(boolVars, intVars, f, g, fOffset, gOffset)
 }

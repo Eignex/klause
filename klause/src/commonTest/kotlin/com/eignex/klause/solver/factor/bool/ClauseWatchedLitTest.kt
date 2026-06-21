@@ -27,7 +27,7 @@ class ClauseWatchedLitTest {
             for (i in 0..4) state.assignment.setBool(i, (mask shr i) and 1 == 1)
             state.recompute()
             val expected = naiveIsViolated(literals, state)
-            assertEquals(expected, clause.isViolated(state, 0), "mask=$mask")
+            assertEquals(expected, state.factors[0].isViolated(state, 0), "mask=$mask")
         }
     }
 
@@ -52,7 +52,7 @@ class ClauseWatchedLitTest {
         for (v in seq) {
             state.apply(Move.BoolFlip(v))
             val expected = naiveIsViolated(literals, state)
-            assertEquals(expected, clause.isViolated(state, 0), "after flip of $v")
+            assertEquals(expected, state.factors[0].isViolated(state, 0), "after flip of $v")
         }
     }
 

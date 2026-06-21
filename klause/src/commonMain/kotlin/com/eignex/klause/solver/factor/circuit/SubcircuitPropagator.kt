@@ -1,19 +1,37 @@
 package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.circuit.internals.shaveClaimedFromEndpoints
 import com.eignex.klause.solver.factor.circuit.internals.tightenSuccToRange
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
-/** CP contract for [Subcircuit]: propagation of the optional-cycle constraint over successor vars. */
-interface SubcircuitPropagator : Propagator {
+/** CP implementation for [Subcircuit]: propagation of the optional-cycle constraint over successor vars. */
+internal class SubcircuitPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val succ: IntArray,
+    private val n: Int,
+) : Propagator {
 
-    /** Successor variable id per node. */
-    val succ: IntArray
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = succ.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+    override val consumesIntEventDelta: Boolean = true
 
-    /** Number of nodes. */
-    val n: Int
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
+        collectLinearTightenAntecedents(state, succ, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val gate = (state.refPayload[factorId] as? CpGate) ?: run {

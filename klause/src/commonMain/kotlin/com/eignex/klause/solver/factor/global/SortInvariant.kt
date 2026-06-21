@@ -9,9 +9,12 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
 /** LS invariant logic for `sort`. */
-internal interface SortInvariant : Invariant {
-    val xs: IntArray
-    val ys: IntArray
+internal class SortInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val ys: IntArray,
+) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = mismatches(state, ov = -1, nv = 0) > 0
 

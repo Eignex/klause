@@ -47,9 +47,12 @@ class CumulativeConflictReasonTest {
         state.undoLogging = true
         state.currentLevel = 1
         assertTrue(state.setInt(0, 0) && state.setInt(1, 0) && state.setInt(2, 8), "pin the three starts")
-        assertFalse(factor.propagate(state, 0), "tasks 0 and 1 double-book capacity at t=0 → infeasible")
+        assertFalse(
+            problem.propagators[0].propagate(state, 0),
+            "tasks 0 and 1 double-book capacity at t=0 → infeasible",
+        )
 
-        val reason = factor.conflictReason(state, 0)
+        val reason = problem.propagators[0].conflictReason(state, 0)
         assertTrue(reason != null && reason.isNotEmpty(), "must yield a non-empty clause-form reason")
         for (lit in reason) {
             assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")

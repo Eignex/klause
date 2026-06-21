@@ -2,12 +2,12 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -32,20 +32,18 @@ import com.eignex.klause.util.IntIntMap
  */
 class GlobalCardinality(
     /** Variable ids the constraint ranges over. */
-    override val xs: IntArray,
+    val xs: IntArray,
     /** Values whose occurrence counts are bounded. */
-    override val cover: IntArray,
-    override val countVars: IntArray? = null,
-    override val countLow: IntArray? = null,
-    override val countHigh: IntArray? = null,
-    override val closed: Boolean = false,
+    val cover: IntArray,
+    val countVars: IntArray? = null,
+    val countLow: IntArray? = null,
+    val countHigh: IntArray? = null,
+    val closed: Boolean = false,
     /** Per-xs presence literals; empty for the non-opt fast path. Absent positions
      *  contribute nothing to any cover-value count and don't trip the closed check. */
     override val presents: IntArray = EmptyIntArray,
 ) : Factor,
-    OptionalFactor,
-    GlobalCardinalityPropagator,
-    GlobalCardinalityInvariant {
+    OptionalFactor {
 
     init {
         require(xs.isNotEmpty()) { "gcc: empty xs" }
@@ -112,15 +110,38 @@ class GlobalCardinality(
         if (cv != null) xs + cv else xs
     }
 
-    // Cover value → its index. IntIntMap keeps the per-probe lookup unboxed; indices are ≥ 0 so
-    // -1 is a safe absent sentinel (a value not in the cover).
+    /** Cover value → its 0-based index in [cover]. Used for O(1) per-probe lookup during
+     *  propagation and LS delta computation; `-1` for values outside the cover. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    override val coverIndexByValue: IntIntMap =
+    val coverIndexByValue: IntIntMap =
         IntIntMap.build(cover, IntArray(cover.size) { it }, absent = -1)
 
-    override fun definitelyPresentGcc(idx: Int, state: PropagationState): Boolean = definitelyPresent(idx, state)
+    override fun asPropagator(): Propagator = GlobalCardinalityPropagator(
+        boolVars,
+        intVars,
+        xs,
+        cover,
+        countVars,
+        countLow,
+        countHigh,
+        closed,
+        presents,
+        coverIndexByValue,
+        { idx, state -> definitelyPresent(idx, state) },
+        { idx, state -> definitelyAbsent(idx, state) },
+    )
 
-    override fun definitelyAbsentGcc(idx: Int, state: PropagationState): Boolean = definitelyAbsent(idx, state)
-
-    override fun presentGccInv(state: LocalSearchState, idx: Int): Boolean = present(state, idx)
+    override fun asInvariant(): Invariant = GlobalCardinalityInvariant(
+        boolVars,
+        intVars,
+        xs,
+        cover,
+        countVars,
+        countLow,
+        countHigh,
+        closed,
+        presents,
+        coverIndexByValue,
+        { state, idx -> present(state, idx) },
+    )
 }

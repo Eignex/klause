@@ -2,19 +2,26 @@ package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP contract for [ArrayMinMax]: bounds propagation for `result = max/min(xs)`. */
-interface ArrayMinMaxPropagator : Propagator {
+/** CP propagator for [ArrayMinMax]: bounds propagation for `result = max/min(xs)`. */
+internal class ArrayMinMaxPropagator(
+    private val result: Int,
+    private val xs: IntArray,
+    private val max: Boolean,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+) : Propagator {
 
-    /** Result variable id. */
-    val result: Int
-
-    /** Operand variable ids. */
-    val xs: IntArray
-
-    /** `true` for max, `false` for min. */
-    val max: Boolean
+    /**
+     * Advisor subscription (#623): `propagate` tightens `result` against the operands' bounds and
+     * pushes `result`'s bound back onto every operand — reading only `min`/`max`. An interior hole
+     * never moves a `min`/`max`, so the factor subscribes to [IntEvent.LB_RAISED] /
+     * [IntEvent.UB_LOWERED] on each variable and skips interior `VALUE_REMOVED` wakes. A repeated
+     * operand is subscribed once.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)

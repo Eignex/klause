@@ -61,16 +61,19 @@ class SchedulingBoundsEventTest {
                 resources = intArrayOf(1, 1),
                 capacity = 1,
             )
-                .initialIntEventWatches,
+                .asPropagator().initialIntEventWatches,
             intArrayOf(0, 1),
         )
         assertBoundOnly(
             Diffn(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), widths = intArrayOf(1, 1), heights = intArrayOf(1, 1))
-                .initialIntEventWatches,
+                .asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
-            Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(2, 1, 1)).initialIntEventWatches,
+            Disjunctive(
+                starts = intArrayOf(0, 1, 2),
+                durations = intArrayOf(2, 1, 1),
+            ).asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2),
         )
         // Reified linear's int reasoning is interval-based (linearSumRange + propagateLinearBounds);
@@ -82,7 +85,7 @@ class SchedulingBoundsEventTest {
             op = LinearOp.LE,
             bound = 3,
         )
-        assertBoundOnly(reified.initialIntEventWatches, intArrayOf(1, 2))
+        assertBoundOnly(reified.asPropagator().initialIntEventWatches, intArrayOf(1, 2))
     }
 
     @Test

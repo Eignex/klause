@@ -1,39 +1,62 @@
 package com.eignex.klause.solver.factor.arithmetic
 
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
-import com.eignex.klause.solver.factor.ReifiedFactor
 import com.eignex.klause.solver.factor.bool.reifiedDegree
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.util.IntIntMap
 
 /**
- * LS contract for [ReifiedCardinality]: reified cardinality violation tracking and repair.
+ * LS invariant for [ReifiedCardinality]: reified cardinality violation tracking and repair.
  */
-interface ReifiedCardinalityInvariant : ReifiedFactor {
+internal class ReifiedCardinalityInvariant(
+    private val auxBoolVar: Int,
+    private val literals: IntArray,
+    private val min: Int,
+    private val max: Int,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+) : Invariant {
 
-    /** The reifying Boolean variable id. */
-    override val auxBoolVar: Int
+    private val signedByVar: IntIntMap
 
-    /** The Boolean literals. */
-    val literals: IntArray
+    init {
+        val signs = HashMap<Int, Int>()
+        for (lit in literals) {
+            val v = Lit.variable(lit)
+            if (v == auxBoolVar) continue
+            signs[v] = (signs[v] ?: 0) + if (Lit.isPositive(lit)) 1 else -1
+        }
+        signedByVar = IntIntMap.build(keys = signs.keys.toIntArray(), values = signs.values.toIntArray(), absent = 0)
+    }
 
-    /** Inclusive lower bound. */
-    val min: Int
-
-    /** Inclusive upper bound (also used as `true` for max-mode in `ArrayMinMax`). */
-    val max: Int
-
-    /** Signed contribution of [v] to the true count. */
-    fun reifSignedFor(v: Int): Int
+    private fun reifSignedFor(v: Int): Int = signedByVar[v]
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = reifHolds(state.longPayload[factorId])
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+        state.assignment.boolValue(auxBoolVar) != reifHolds(state.longPayload[factorId])
 
-    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
-        compressViolation(reifDistance(state.longPayload[factorId]), softCap)
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val aux = state.assignment.boolValue(auxBoolVar)
+        val n = state.longPayload[factorId]
+        return when {
+            aux == reifHolds(n) -> 0
+            aux -> compressViolation(reifDistance(n), state.violationSoftCap)
+            else -> 1
+        }
+    }
+
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        var count = 0L
+        for (lit in literals) {
+            if (Lit.evaluate(lit, state.assignment.boolValue(Lit.variable(lit)))) count++
+        }
+        state.longPayload[factorId] = count
+    }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)

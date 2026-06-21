@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 
 /**
  * `value_precede(s, t, xs)` (#432): value [t] may appear in [xs] only at a position after value [s]
@@ -26,10 +27,7 @@ import com.eignex.klause.solver.propagation.IntEvent
  * never forbidden and other values are never touched, which is exactly GAC for this constraint.
  * Value precedence is pure symmetry breaking, so there is no LP relaxation — propagation only.
  */
-class ValuePrecede(override val s: Int, override val t: Int, override val xs: IntArray) :
-    Factor,
-    ValuePrecedePropagator,
-    ValuePrecedeInvariant {
+class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ValuePrecede(s, t, xs.remapVars(intMap))
 
@@ -44,22 +42,7 @@ class ValuePrecede(override val s: Int, override val t: Int, override val xs: In
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
-    /** Advisor subscription (#623): membership-sensitive (the prefix scan tests `s ∈ dom` and
-     *  forced-`t`), so subscribe to every kind on every sequence variable and consume the dirty-
-     *  variable delta (#624). The reversible `α`/`prunedUpTo` state ([VpState]) advances only over the
-     *  changed prefix instead of rescanning the whole sequence each fire. */
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = xs.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
+    override fun asPropagator(): Propagator = ValuePrecedePropagator(boolVars, intVars, s, t, xs)
 
-    override val consumesIntEventDelta: Boolean = true
+    override fun asInvariant(): Invariant = ValuePrecedeInvariant(boolVars, intVars, s, t, xs)
 }

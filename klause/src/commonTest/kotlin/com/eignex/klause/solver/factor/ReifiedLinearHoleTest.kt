@@ -125,7 +125,7 @@ class ReifiedLinearHoleTest {
             op = LinearOp.EQ,
             bound = 2,
         )
-        val reason = reif.conflictReason(state, 0) ?: error("expected a conflict reason")
+        val reason = reif.asPropagator().conflictReason(state, 0) ?: error("expected a conflict reason")
         // The feasible witness aux = true, x = 2 must satisfy the reason clause (≥ 1 literal true).
         val nbv = problem.numBoolVars
         fun satUnderWitness(lit: Int): Boolean {

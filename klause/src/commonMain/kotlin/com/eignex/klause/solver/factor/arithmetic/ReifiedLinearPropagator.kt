@@ -6,25 +6,26 @@ import com.eignex.klause.solver.factor.arithmetic.internals.collectHoleAndBoundA
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.solver.factor.arithmetic.internals.propagateLinearBounds
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP interface for [ReifiedLinear]: reification propagation and conflict reasons. */
-interface ReifiedLinearPropagator : Propagator {
+/** CP propagator for [ReifiedLinear]: reification propagation and conflict reasons. */
+internal class ReifiedLinearPropagator(
+    private val auxBoolVar: Int,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val coeffs: IntArray,
+    private val vars: IntArray,
+    private val op: LinearOp,
+    private val bound: Int,
+) : Propagator {
 
-    /** The reifying Boolean variable id. */
-    val auxBoolVar: Int
-
-    /** Coefficients parallel to [vars]. */
-    val coeffs: IntArray
-
-    /** Integer variable ids. */
-    val vars: IntArray
-
-    /** Comparison operator. */
-    val op: LinearOp
-
-    /** Right-hand-side bound. */
-    val bound: Int
+    /**
+     * Advisor subscription (#623): like [Linear], the integer reasoning is purely interval-based.
+     * Subscribe term variables to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED]; the indicator
+     * [auxBoolVar] keeps its separate Boolean wakeup.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val auxValue = state.boolValues[auxBoolVar]
@@ -145,7 +146,7 @@ interface ReifiedLinearPropagator : Propagator {
     /** For a single-term `c·x = bound`, true when `bound/c` is not an integer in `x`'s current
      *  domain — i.e. the equality is unsatisfiable even though `bound` lies within `x`'s bounds
      *  (an interior hole) or `bound` is not divisible by `c`. */
-    fun eqTargetUnreachable(state: PropagationState): Boolean {
+    private fun eqTargetUnreachable(state: PropagationState): Boolean {
         val c = coeffs[0].toLong()
         val b = bound.toLong()
         if (c == 0L) return b != 0L

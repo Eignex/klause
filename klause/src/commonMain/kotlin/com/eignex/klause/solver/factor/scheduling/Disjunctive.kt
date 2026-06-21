@@ -2,10 +2,11 @@ package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 
 /**
  * Disjunctive (one-machine / unary-resource) constraint: tasks must not overlap in time.
@@ -42,18 +43,16 @@ import com.eignex.klause.solver.propagation.IntEvent
  */
 class Disjunctive(
     /** Task start-time variable ids. */
-    override val starts: IntArray,
+    val starts: IntArray,
     /** Constant per-task durations. */
-    override val durations: IntArray,
+    val durations: IntArray,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks impose
      *  no no-overlap obligation. The cost / propagation passes route through the
      *  Cumulative LS-cost delegate and reuse its opt machinery. */
-    override val presents: IntArray = EmptyIntArray,
+    val presents: IntArray = EmptyIntArray,
     /** Per-task duration variables; empty = use [durations] as constants. */
-    override val durationVars: IntArray = EmptyIntArray,
-) : Factor,
-    DisjunctivePropagator,
-    DisjunctiveInvariant {
+    val durationVars: IntArray = EmptyIntArray,
+) : Factor {
 
     init {
         require(starts.size == durations.size) {
@@ -81,22 +80,35 @@ class Disjunctive(
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = if (durationVars.isEmpty()) starts else starts + durationVars
 
-    /**
-     * Advisor subscription (#623): disjunctive scheduling (mandatory profile + Θ-tree edge-finding /
-     * not-first/not-last) reads only each start/duration variable's `min`/`max`, with duration vars
-     * consulted once fixed. It never inspects interior holes, so it subscribes to [IntEvent.LB_RAISED]
-     * / [IntEvent.UB_LOWERED] per variable and skips interior `VALUE_REMOVED` wakes.
-     */
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+    /** Number of tasks. */
+    val n: Int = starts.size
 
-    override val n: Int = starts.size
-
-    override val cumulativeBacking: Cumulative = Cumulative(
+    private val cumulativeBacking: Cumulative = Cumulative(
         starts = starts,
         durations = durations,
         resources = IntArray(n) { 1 },
         capacity = 1,
         presents = presents,
         durationVars = durationVars,
+    )
+
+    override fun asPropagator(): Propagator = DisjunctivePropagator(
+        boolVars = boolVars,
+        intVars = intVars,
+        starts = starts,
+        durations = durations,
+        presents = presents,
+        durationVars = durationVars,
+        n = n,
+    )
+
+    override fun asInvariant(): Invariant = DisjunctiveInvariant(
+        boolVars = boolVars,
+        intVars = intVars,
+        starts = starts,
+        durations = durations,
+        presents = presents,
+        durationVars = durationVars,
+        cumulativeBacking = cumulativeBacking.asInvariant() as CumulativeInvariant,
     )
 }

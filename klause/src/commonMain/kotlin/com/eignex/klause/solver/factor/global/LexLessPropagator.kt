@@ -2,13 +2,35 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
 /** CP propagation logic for `lex_less` / `lex_lesseq`. */
-internal interface LexLessPropagator : Propagator {
-    val xs: IntArray
-    val ys: IntArray
-    val strict: Boolean
+internal class LexLessPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val ys: IntArray,
+    private val strict: Boolean,
+) : Propagator {
+
+    /**
+     * Advisor subscription (#623): lexicographic propagation is bound-only (see [propagate], which
+     * compares `min`/`max` at the deciding position and tightens bounds — its own comment notes it
+     * "can't propagate further with bound-only reasoning"). An interior hole moves no bound, so the
+     * factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
+     * interior `VALUE_REMOVED` wakes.
+     */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * 2)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+        }
+        out
+    }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val combined = IntArray(xs.size + ys.size).also {

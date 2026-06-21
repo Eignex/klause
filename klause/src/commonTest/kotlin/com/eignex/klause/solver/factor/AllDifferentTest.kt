@@ -133,7 +133,7 @@ class AllDifferentTest {
         state.assignment.setInt(2, 0)
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, factorId = 0, sink = sink)
+        state.factors[0].proposeRepairMoves(state, factorId = 0, sink = sink)
         // MAX_REPAIR_TARGETS caps proposals at 4.
         val intSets = sink.list.filterIsInstance<IntSet>()
         assertTrue(intSets.size in 2..4, "expected 2-4 candidates (cap 4), got ${intSets.size}: $intSets")
@@ -167,7 +167,7 @@ class AllDifferentTest {
         state.assignment.setInt(3, 0)
         state.recompute()
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, factorId = 0, sink = sink)
+        state.factors[0].proposeRepairMoves(state, factorId = 0, sink = sink)
         val compounds = sink.list.filterIsInstance<Compound>()
         assertTrue(compounds.isNotEmpty(), "expected swap candidates with saturated domain; got ${sink.list}")
         for (c in compounds) {

@@ -5,17 +5,20 @@ import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
-/** LS contract for [ArrayMinMax]: violation tracking and repair for `result = max/min(xs)`. */
-interface ArrayMinMaxInvariant : Invariant {
+/** Mutable state object for the current best extremum across `xs`. */
+class ArrayMinMaxState(
+    /** The current min or max value across the operand variables. */
+    var bestValue: Int,
+)
 
-    /** Result variable id. */
-    val result: Int
-
-    /** Operand variable ids. */
-    val xs: IntArray
-
-    /** `true` for max, `false` for min. */
-    val max: Boolean
+/** LS invariant for [ArrayMinMax]: violation tracking and repair for `result = max/min(xs)`. */
+internal class ArrayMinMaxInvariant(
+    private val result: Int,
+    private val xs: IntArray,
+    private val max: Boolean,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+) : Invariant {
 
     private fun cmp(a: Int, b: Int): Boolean = if (max) a > b else a < b
 
@@ -96,9 +99,3 @@ interface ArrayMinMaxInvariant : Invariant {
         }
     }
 }
-
-/** Mutable state object for the current best extremum across `xs`. */
-class ArrayMinMaxState(
-    /** The current min or max value across the operand variables. */
-    var bestValue: Int,
-)

@@ -10,19 +10,21 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
 
 /** LS invariant logic for `nvalue`. */
-internal interface NValueInvariant : Invariant {
-    val n: Int
-    val xs: IntArray
-    val mode: NValue.Mode
-    val presents: IntArray
-
-    fun presentNvInv(state: LocalSearchState, idx: Int): Boolean
+internal class NValueInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val n: Int,
+    private val xs: IntArray,
+    private val mode: NValue.Mode,
+    private val presents: IntArray,
+    private val presentNvInvFn: (LocalSearchState, Int) -> Boolean,
+) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val counts = MutableIntIntMap()
         var distinct = 0
         for (i in xs.indices) {
-            if (!presentNvInv(state, i)) continue
+            if (!presentNvInvFn(state, i)) continue
             val value = state.assignment.intValue(xs[i])
             val prev = counts.getOrDefault(value, 0)
             counts.put(value, prev + 1)
@@ -58,7 +60,7 @@ internal interface NValueInvariant : Invariant {
         val nBefore = if (intVar == n) oldValue else state.assignment.intValue(n)
         val beforeDeg = nvDegree(s.distinctCount, nBefore)
         var occurrences = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentNvInv(state, i)) occurrences++
+        for (i in xs.indices) if (xs[i] == intVar && presentNvInvFn(state, i)) occurrences++
         if (occurrences > 0) {
             val oldCount = s.counts.getOrDefault(oldValue, 0)
             val after = oldCount - occurrences
@@ -86,7 +88,7 @@ internal interface NValueInvariant : Invariant {
         val touched = MutableIntIntMap()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val wasP = presentNvInv(state, i)
+            val wasP = presentNvInvFn(state, i)
             val value = state.assignment.intValue(xs[i])
             touched.addTo(value, if (wasP) -1 else 1)
         }
@@ -107,7 +109,7 @@ internal interface NValueInvariant : Invariant {
         val beforeDeg = nvDegree(s.distinctCount, nVal)
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val nowP = presentNvInv(state, i)
+            val nowP = presentNvInvFn(state, i)
             val value = state.assignment.intValue(xs[i])
             if (nowP) {
                 val before = s.counts.getOrDefault(value, 0)
@@ -150,7 +152,7 @@ internal interface NValueInvariant : Invariant {
         if (!needIncrease && !needDecrease) return
         if (needIncrease) {
             for (i in xs.indices) {
-                if (!presentNvInv(state, i)) continue
+                if (!presentNvInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
                 if (s.counts.getOrDefault(cur, 0) <= 1) continue
                 val d = state.problem.intDomains[xs[i]]
@@ -161,7 +163,7 @@ internal interface NValueInvariant : Invariant {
         }
         if (needDecrease) {
             for (i in xs.indices) {
-                if (!presentNvInv(state, i)) continue
+                if (!presentNvInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
                 if (s.counts.getOrDefault(cur, 0) > 1) continue
                 val d = state.problem.intDomains[xs[i]]
@@ -179,10 +181,10 @@ internal interface NValueInvariant : Invariant {
         while (emitted < STRUCTURED_MOVE_CAP && attempts < STRUCTURED_MOVE_CAP * MOVE_ATTEMPT_STRIDE) {
             attempts++
             val i = state.rng.nextInt(xs.size)
-            if (!presentNvInv(state, i)) continue
+            if (!presentNvInvFn(state, i)) continue
             val v = state.assignment.intValue(xs[i])
             var occ = 0
-            for (j in xs.indices) if (xs[j] == xs[i] && presentNvInv(state, j)) occ++
+            for (j in xs.indices) if (xs[j] == xs[i] && presentNvInvFn(state, j)) occ++
             val cv = s.counts.getOrDefault(v, 0)
             val vDies = cv - occ == 0
             val d = state.problem.intDomains[xs[i]]
@@ -205,12 +207,12 @@ internal interface NValueInvariant : Invariant {
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         for (i in xs.indices) {
-            if (!presentNvInv(state, i)) continue
+            if (!presentNvInvFn(state, i)) continue
             if (state.assumptions.isFrozenInt(xs[i])) continue
             state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
         }
         val seen = IntHashSet()
-        for (i in xs.indices) if (presentNvInv(state, i)) seen.add(state.assignment.intValue(xs[i]))
+        for (i in xs.indices) if (presentNvInvFn(state, i)) seen.add(state.assignment.intValue(xs[i]))
         val distinct = seen.size
         val nDom = state.problem.intDomains[n]
         val target = when (mode) {
@@ -232,7 +234,7 @@ internal interface NValueInvariant : Invariant {
 
     private fun simulateDistinct(state: LocalSearchState, s: NValueState, intVar: Int, newValue: Int): Int {
         var occurrences = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentNvInv(state, i)) occurrences++
+        for (i in xs.indices) if (xs[i] == intVar && presentNvInvFn(state, i)) occurrences++
         if (occurrences == 0) return s.distinctCount
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return s.distinctCount

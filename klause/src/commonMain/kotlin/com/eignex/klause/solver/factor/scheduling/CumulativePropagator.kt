@@ -7,42 +7,33 @@ import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTighten
 import com.eignex.klause.solver.factor.scheduling.internals.CumulativeEff
 import com.eignex.klause.solver.factor.scheduling.internals.CumulativeThetaTree
 import com.eignex.klause.solver.factor.scheduling.internals.MandatoryProfile
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortByIntKey
 
 /**
- * CP propagation interface for the Cumulative constraint. Default implementations provide
- * time-tabling and Vilím Θ-tree edge-finding; concrete classes supply the abstract properties.
+ * CP propagator for [Cumulative]. Constructed by [Cumulative.asPropagator] and holds the
+ * time-tabling and Vilím Θ-tree edge-finding logic so those data structures are only allocated
+ * when a CP engine is initialised.
  */
-internal interface CumulativePropagator : Propagator {
+internal class CumulativePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val starts: IntArray,
+    private val durations: IntArray,
+    private val resources: IntArray,
+    private val capacity: Int,
+    private val presents: IntArray,
+    private val durationVars: IntArray,
+    private val resourceVars: IntArray,
+    private val capacityVar: Int,
+    private val n: Int,
+    private val sharpReasonEligible: Boolean,
+    private val constantEnergyAndCap: Boolean,
+) : Propagator {
 
-    val starts: IntArray
-    val durations: IntArray
-    val resources: IntArray
-    val capacity: Int
-    val presents: IntArray
-    val durationVars: IntArray
-    val resourceVars: IntArray
-    val capacityVar: Int
-
-    /** Number of tasks. */
-    val n: Int
-
-    /** Whether the sharp pointwise explanation is eligible (no optional tasks). */
-    val sharpReasonEligible: Boolean
-
-    /** Whether task energy and capacity are all compile-time constants. */
-    val constantEnergyAndCap: Boolean
-
-    /** Returns the start-array position for the given var id, -1 if absent. */
-    fun startPosOf(varId: Int): Int
-
-    /** Returns the durationVars-array position for the given var id, -1 if absent. */
-    fun durPosOf(varId: Int): Int
-
-    /** Returns the resourceVars-array position for the given var id, -1 if absent. */
-    fun resPosOf(varId: Int): Int
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val fallback = collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
@@ -60,7 +51,7 @@ internal interface CumulativePropagator : Propagator {
         return pointwiseOverloadReason(state, profile.overloadTime, eff, blamed = -1, blamedStart = 0) ?: fallback
     }
 
-    fun effectiveSnapshot(state: PropagationState): CumulativeEff? {
+    private fun effectiveSnapshot(state: PropagationState): CumulativeEff? {
         val dur = IntArray(n)
         val res = IntArray(n)
         for (i in 0 until n) {
@@ -89,7 +80,7 @@ internal interface CumulativePropagator : Propagator {
         return CumulativeEff(dur, res, cap)
     }
 
-    fun pointwiseOverloadReason(
+    private fun pointwiseOverloadReason(
         state: PropagationState,
         t: Int,
         eff: CumulativeEff,
@@ -120,7 +111,7 @@ internal interface CumulativePropagator : Propagator {
         return out.toIntArray()
     }
 
-    fun citeEnergyBounds(out: IntArrayList, state: PropagationState, k: Int, eff: CumulativeEff) {
+    private fun citeEnergyBounds(out: IntArrayList, state: PropagationState, k: Int, eff: CumulativeEff) {
         if (durationVars.isNotEmpty()) {
             val dv = durationVars[k]
             if (eff.dur[k] > state.problem.intDomains[dv].min) out.add(Lit.make(state.atomVarGe(dv, eff.dur[k]), false))
@@ -131,7 +122,7 @@ internal interface CumulativePropagator : Propagator {
         }
     }
 
-    fun minTightenReason(
+    private fun minTightenReason(
         state: PropagationState,
         i: Int,
         d: Int,
@@ -147,7 +138,7 @@ internal interface CumulativePropagator : Propagator {
         return pointwiseOverloadReason(state, newMin - 1, eff, blamed = i, blamedStart = extra)
     }
 
-    fun maxTightenReason(
+    private fun maxTightenReason(
         state: PropagationState,
         i: Int,
         d: Int,
@@ -163,7 +154,7 @@ internal interface CumulativePropagator : Propagator {
         return pointwiseOverloadReason(state, newMax + d, eff, blamed = i, blamedStart = extra)
     }
 
-    fun windowOverloadReason(
+    private fun windowOverloadReason(
         state: PropagationState,
         i: Int,
         winLo: Int,
@@ -286,7 +277,7 @@ internal interface CumulativePropagator : Propagator {
         return true
     }
 
-    fun edgeFindingPass(state: PropagationState, effDur: IntArray, effRes: IntArray, effCap: Int): Boolean {
+    private fun edgeFindingPass(state: PropagationState, effDur: IntArray, effRes: IntArray, effCap: Int): Boolean {
         if (n < 2 || effCap == 0) return true
         val active = IntArrayList()
         for (i in 0 until n) {

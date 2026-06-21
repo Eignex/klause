@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 
 /**
  * Layered multi-valued decision diagram acceptance. The diagram has `n+1` state layers
@@ -25,24 +26,22 @@ import com.eignex.klause.solver.propagation.IntEvent
  */
 class Mdd(
     /** Sequence variable ids, one per layer. */
-    override val seq: IntArray,
+    val seq: IntArray,
     /** Number of states in each layer (length `seq.size + 1`). */
-    override val numStatesPerLayer: IntArray,
+    val numStatesPerLayer: IntArray,
     /** Prefix-sum index into [transitions] per layer. */
-    override val layerStarts: IntArray,
+    val layerStarts: IntArray,
     /** Flat transition records; stride [recordStride]. */
-    override val transitions: IntArray,
+    val transitions: IntArray,
     /** Start state. */
-    override val initial: Int,
+    val initial: Int,
     /** Accepting states at the final layer. */
-    override val accepting: IntArray,
+    val accepting: IntArray,
     /** Ints per transition record: 3 for plain MDD, 4 for cost MDD. */
-    override val recordStride: Int,
+    val recordStride: Int,
     /** Cost variable id, or -1 for a plain (non-cost) MDD. */
-    override val cost: Int = -1,
-) : Factor,
-    MddPropagator,
-    MddInvariant {
+    val cost: Int = -1,
+) : Factor {
 
     init {
         require(seq.isNotEmpty()) { "Mdd: empty seq" }
@@ -89,12 +88,11 @@ class Mdd(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
 
-    /** Advisor subscription (#623): the layered reachability sweep reads each sequence variable's
-     *  bounds (`sym in min..max`), not interior holes, so it wakes on bound moves only — interior
-     *  [IntEvent.VALUE_REMOVED] carves cannot change the reachability bitsets. Consumes the dirty-
-     *  variable delta (#624); the incremental propagator (`MddIncrementalState`) recomputes only the
-     *  layers a changed position reaches. */
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+    override fun asPropagator(): Propagator = MddPropagator(
+        boolVars, intVars, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
+    )
 
-    override val consumesIntEventDelta: Boolean = true
+    override fun asInvariant(): Invariant = MddInvariant(
+        boolVars, intVars, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
+    )
 }

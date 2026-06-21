@@ -4,18 +4,40 @@ import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.solver.factor.global.internals.InverseCache
 import com.eignex.klause.solver.factor.global.internals.reginFilter
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 
 /** CP propagation logic for `inverse`. */
-internal interface InversePropagator : Propagator {
-    val f: IntArray
-    val g: IntArray
-    val fOffset: Int
-    val gOffset: Int
-    val fIndexOf: IntIntMap
-    val gIndexOf: IntIntMap
+internal class InversePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val f: IntArray,
+    private val g: IntArray,
+    private val fOffset: Int,
+    private val gOffset: Int,
+    private val fIndexOf: IntIntMap,
+    private val gIndexOf: IntIntMap,
+) : Propagator {
+
+    /** Advisor subscription (#623): channel GAC over interior domains, so subscribe to every kind on
+     *  every (distinct) channel variable and consume the dirty-variable delta (#624) — the propagator
+     *  scopes its O(n²) channel sweep to the rows/columns whose domain actually changed. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = intVars.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars)

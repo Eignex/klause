@@ -27,10 +27,10 @@ class CardinalityRepairTest {
         val state = LocalSearchState(problem, Random(0))
         for (v in intArrayOf(a, b, c, d)) state.assignment.setBool(v, true)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
 
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         val proposed = sink.list.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
 
         assertEquals(setOf(a, b, c, d), proposed)
@@ -50,10 +50,10 @@ class CardinalityRepairTest {
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(a, true)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
 
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         val proposed = sink.list.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
 
         assertEquals(setOf(b, c), proposed)
@@ -73,10 +73,10 @@ class CardinalityRepairTest {
         state.assignment.setBool(a, true)
         state.assignment.setBool(b, true)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
 
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         val proposed = sink.list.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
         assertEquals(setOf(b), proposed)
     }
@@ -94,9 +94,9 @@ class CardinalityRepairTest {
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(a, true)
         state.recompute()
-        assertTrue(!factor.isViolated(state, 0))
+        assertTrue(!state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         assertTrue(sink.list.isEmpty())
     }
 }

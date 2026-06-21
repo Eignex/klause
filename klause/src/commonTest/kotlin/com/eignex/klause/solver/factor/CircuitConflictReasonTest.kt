@@ -43,9 +43,9 @@ class CircuitConflictReasonTest {
         state.currentLevel = 1
         assertTrue(state.tightenIntMin(0, 1) && state.tightenIntMax(0, 1), "succ[0] = 1")
         assertTrue(state.tightenIntMax(1, 0), "succ[1] = 0")
-        assertFalse(factor.propagate(state, 0), "the 2-cycle over {0,1} leaves node 2 unplaceable")
+        assertFalse(problem.propagators[0].propagate(state, 0), "the 2-cycle over {0,1} leaves node 2 unplaceable")
 
-        val reason = factor.conflictReason(state, 0)
+        val reason = problem.propagators[0].conflictReason(state, 0)
         assertTrue(reason != null && reason.isNotEmpty(), "must yield a non-empty clause-form reason")
         for (lit in reason) {
             assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")
