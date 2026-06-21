@@ -121,12 +121,7 @@ internal object SymmetryBreaking {
         val base: Map<String, Int>? = if (allAnonymous) {
             null
         } else {
-            val m = HashMap<String, Int>()
-            for (f in problem.factors) {
-                val k = f.structuralKey() ?: return emptyList()
-                m[k] = (m[k] ?: 0) + 1
-            }
-            m
+            PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
         }
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
@@ -196,12 +191,7 @@ internal object SymmetryBreaking {
         val base: Map<String, Int>? = if (allAnonymous) {
             null
         } else {
-            val m = HashMap<String, Int>()
-            for (f in problem.factors) {
-                val k = f.structuralKey() ?: return problem
-                m[k] = (m[k] ?: 0) + 1
-            }
-            m
+            PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return problem
         }
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
@@ -273,14 +263,7 @@ internal object SymmetryBreaking {
                 x
             }
         }
-        val counts = HashMap<String, Int>(base.size)
-        for (f in problem.factors) {
-            val key = (f.remapValues(swap) ?: return false).structuralKey() ?: return false
-            val next = (counts[key] ?: 0) + 1
-            if (next > (base[key] ?: 0)) return false
-            counts[key] = next
-        }
-        return counts == base
+        return PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remapValues(swap) }
     }
 
     /** Whether every value in [d] lies in [values]. */
@@ -309,11 +292,7 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
     ): Pair<List<IntArray>, List<IntArray>>? {
-        val base = HashMap<String, Int>()
-        for (f in problem.factors) {
-            val key = f.structuralKey() ?: return null
-            base[key] = (base[key] ?: 0) + 1
-        }
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return null
         val intMap = IntArray(problem.numIntVars) { it }
         val boolMap = IntArray(problem.numBoolVars) { it }
 
@@ -453,16 +432,8 @@ internal object SymmetryBreaking {
 
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
      *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
-    private fun isAutomorphism(problem: Problem, base: Map<String, Int>, boolMap: IntArray, intMap: IntArray): Boolean {
-        val counts = HashMap<String, Int>(base.size)
-        for (f in problem.factors) {
-            val key = f.remap(boolMap, intMap).structuralKey() ?: return false
-            val next = (counts[key] ?: 0) + 1
-            if (next > (base[key] ?: 0)) return false // already can't match the multiset
-            counts[key] = next
-        }
-        return counts == base
-    }
+    private fun isAutomorphism(problem: Problem, base: Map<String, Int>, boolMap: IntArray, intMap: IntArray): Boolean =
+        PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(boolMap, intMap) }
 
     /**
      * Verified block / row symmetry (#367): groups of int variables defined by *isomorphic* factors
@@ -474,11 +445,7 @@ internal object SymmetryBreaking {
      * row and cell breaking don't interact unsoundly.
      */
     private fun verifiedBlockLex(problem: Problem, objectiveIntVars: Set<Int>, alreadyBroken: Set<Int>): List<Factor> {
-        val base = HashMap<String, Int>()
-        for (f in problem.factors) {
-            val k = f.structuralKey() ?: return emptyList()
-            base[k] = (base[k] ?: 0) + 1
-        }
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
         val byShape = HashMap<String, MutableList<IntArray>>()
         for (f in problem.factors) {
             if (f.boolVars.isNotEmpty() || f.intVars.isEmpty()) continue
@@ -559,11 +526,7 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int>,
         alreadyBroken: Set<Int>,
     ): List<Factor> {
-        val base = HashMap<String, Int>()
-        for (f in problem.factors) {
-            val k = f.structuralKey() ?: return emptyList()
-            base[k] = (base[k] ?: 0) + 1
-        }
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
         val byShape = HashMap<String, MutableList<IntArray>>()
         for (f in problem.factors) {
             if (f.intVars.isNotEmpty() || f.boolVars.isEmpty()) continue
