@@ -83,6 +83,34 @@ internal class SparseLu private constructor(
         return x
     }
 
+    /**
+     * `det(B)` in floating point: `sign(P)·sign(Q)·∏ uDiag` (since `P B Q = L U`, `det L = 1`). For an
+     * integer basis the true determinant is an integer; this float value is only a *guess* of it — the
+     * exact dual solve (#34) scales by `round(det)` and verifies the result exactly, so any float error
+     * here merely costs a sound failed verification, never a wrong answer.
+     */
+    fun determinant(): Double {
+        var d = permutationSign(perm) * permutationSign(colPerm)
+        for (k in 0 until m) d *= uDiag[k]
+        return d
+    }
+
+    /** Sign of the permutation [p] (`p[k]` = original index at position `k`): `(-1)^(m − cycles)`. */
+    private fun permutationSign(p: IntArray): Double {
+        val seen = BooleanArray(p.size)
+        var cycles = 0
+        for (s in p.indices) {
+            if (seen[s]) continue
+            cycles++
+            var i = s
+            while (!seen[i]) {
+                seen[i] = true
+                i = p[i]
+            }
+        }
+        return if ((p.size - cycles) % 2 == 0) 1.0 else -1.0
+    }
+
     companion object {
         private const val TOL = 1e-9
 

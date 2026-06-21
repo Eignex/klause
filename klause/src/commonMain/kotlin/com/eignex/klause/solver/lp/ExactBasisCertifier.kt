@@ -6,6 +6,8 @@ import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import kotlin.math.abs
+import kotlin.math.roundToLong
 
 /**
  * Exact lower bound on the minimized objective `cᵀz`, certified from a (float-found) [Basis] using
@@ -36,7 +38,7 @@ internal object ExactBasisCertifier {
     fun certify(model: LpModel, basis: Basis): Certificate? {
         val m = model.m
         val basic = basis.basicVars
-        val y = solveDual(model, basic) ?: return null
+        val y = dualSolver(model, basic)?.solve { t -> model.cost[basic[t]] } ?: return null
         var l = BigRational.ZERO
         for (i in 0 until m) l += y[i] * BigRational.of(model.rhs[i])
         val nonBasic = BooleanArray(model.numVars) { true }
@@ -70,7 +72,7 @@ internal object ExactBasisCertifier {
     private fun lagrangian(model: LpModel, basis: Basis): BigRational? {
         val m = model.m
         val basic = basis.basicVars
-        val y = solveDual(model, basic) ?: return null
+        val y = dualSolver(model, basic)?.solve { t -> model.cost[basic[t]] } ?: return null
 
         var l = BigRational.ZERO
         for (i in 0 until m) l += y[i] * BigRational.of(model.rhs[i])
@@ -111,7 +113,7 @@ internal object ExactBasisCertifier {
      */
     fun farkasRay(model: LpModel, basis: Basis, leavingRow: Int): Array<BigRational>? {
         if (leavingRow !in 0 until model.m) return null
-        val rho = solveDualSystem(model, basis.basicVars) { t -> if (t == leavingRow) BigInt.ONE else BigInt.ZERO }
+        val rho = dualSolver(model, basis.basicVars)?.solve { t -> if (t == leavingRow) 1L else 0L }
             ?: return null
         if (farkasCertifies(model, rho)) return rho
         val neg = Array(rho.size) { BigRational.ZERO - rho[it] }
@@ -173,10 +175,11 @@ internal object ExactBasisCertifier {
         // the touched columns are visited and reset, so a sparse cut never scans all `n` columns.
         val coef = arrayOfNulls<BigRational>(n)
         val touched = IntArrayList()
+        val solver = dualSolver(model, basic) ?: return cuts // singular / over-range basis: no cuts
         for (i in 0 until m) {
             if (cuts.size >= maxCuts) break
             if (basic[i] >= n) continue // cut on fractional structural variables only
-            val rho = solveDualSystem(model, basic) { t -> if (t == i) BigInt.ONE else BigInt.ZERO } ?: continue
+            val rho = solver.solve { t -> if (t == i) 1L else 0L } ?: continue
             var bbar = BigRational.ZERO
             for (r in 0 until m) bbar += rho[r] * rhsAdj[r]
             val f0 = bbar - BigRational.of(bbar.floor())
@@ -311,56 +314,71 @@ internal object ExactBasisCertifier {
         return a.divExact(a.gcd(b)) * b
     }
 
-    /** Exact solve of `Bᵀ y = rhs` with `Bᵀ`'s row `t` the basic column `basic[t]`: fraction-free
-     *  Bareiss forward elimination (integer, no gcd) then rational back-substitution. */
-    private fun solveDual(model: LpModel, basic: IntArray): Array<BigRational>? =
-        solveDualSystem(model, basic) { t -> BigInt.of(model.cost[basic[t]]) }
-
-    private fun solveDualSystem(model: LpModel, basic: IntArray, rhs: (Int) -> BigInt): Array<BigRational>? {
+    /**
+     * Build the exact dual solver for the basis `B` whose column `t` is the basic column `basic[t]`
+     * (#34): factor `B` with the sparse float [SparseLu] (no dense `m × m` matrix) and round its
+     * determinant. Null on a singular basis or a determinant beyond float-exact range; every caller
+     * then keeps the node soundly. This is the only LP exact-linear-algebra path — the former dense
+     * fraction-free Bareiss elimination is gone.
+     */
+    private fun dualSolver(model: LpModel, basic: IntArray): BasisDualSolver? {
         val m = model.m
-        // Augmented [Bᵀ | rhs] in BigInt; the O(m³) elimination below is fraction-free (Bareiss):
-        // pure-integer, no per-op gcd, with magnitudes bounded by a single determinant.
-        val a = Array(m) { t ->
-            val col = basic[t]
-            // Basic column `col` over rows 0 until m (scatter the nonzeros), with rhs(t) at column m.
-            val rowArr = Array(m + 1) { BigInt.ZERO }
-            rowArr[m] = rhs(t)
-            forEachFullColumn(model, col) { i, v -> rowArr[i] = BigInt.of(v) }
-            rowArr
-        }
-        var prev = BigInt.ONE
-        for (k in 0 until m) {
-            if (a[k][k].signum() == 0) {
-                var p = -1
-                for (i in k + 1 until m) {
-                    if (a[i][k].signum() != 0) {
-                        p = i
-                        break
-                    }
-                }
-                if (p == -1) return null // singular basis
-                val tr = a[k]
-                a[k] = a[p]
-                a[p] = tr // swap equations; the solution is unchanged
-            }
-            val pivot = a[k][k]
-            for (i in k + 1 until m) {
-                val aik = a[i][k]
-                for (j in k + 1..m) a[i][j] = (pivot * a[i][j] - aik * a[k][j]).divExact(prev)
-                a[i][k] = BigInt.ZERO
-            }
-            prev = pivot
-        }
-        // Cheap O(m²) rational back-substitution on the (equivalent) upper-triangular system; x[j]
-        // for j > i is already final when row i is processed (we go bottom-up), so ZERO-init is safe.
-        val x = Array(m) { BigRational.ZERO }
-        for (i in m - 1 downTo 0) {
-            var acc = BigRational.of(a[i][m])
-            for (j in i + 1 until m) acc -= BigRational.of(a[i][j]) * x[j]
-            x[i] = acc / BigRational.of(a[i][i])
-        }
-        return x
+        val rows = Array(m) { HashMap<Int, Double>() }
+        for (t in 0 until m) forEachFullColumn(model, basic[t]) { i, v -> rows[i][t] = v.toDouble() }
+        val lu = SparseLu.factorize(rows, m) ?: return null
+        val detF = lu.determinant()
+        if (!detF.isFinite() || abs(detF) >= MAX_EXACT_INT) return null
+        val d = detF.roundToLong()
+        if (d == 0L) return null
+        return BasisDualSolver(model, basic, lu, d)
     }
+
+    /**
+     * Exact solver for the dual systems `Bᵀ y = rhs` over a fixed basis, sparse and dense-free (#34).
+     * The float [SparseLu] gives a candidate, det-scaling lifts it to a rational `z / d`, and an exact
+     * BigInt check `Bᵀ z == rhs·d` confirms it — so a returned solution is exact *by construction*
+     * (`Bᵀ(z/d) = rhs`), independent of how accurately the float factorization guessed `z` and `d`.
+     * [solve] returns null when no candidate verifies (near-singular / ill-conditioned basis, or a
+     * solution beyond the float-exact integer range); callers treat null soundly by keeping the node.
+     */
+    private class BasisDualSolver(
+        private val model: LpModel,
+        private val basic: IntArray,
+        private val lu: SparseLu,
+        d: Long,
+    ) {
+        private val dBig = BigInt.of(d)
+        private val dDouble = d.toDouble()
+
+        /** Exact `y` with `Bᵀ y = rhs` (`rhs[t] = rhsAt(t)`), or null if no candidate verifies. */
+        fun solve(rhsAt: (Int) -> Long): Array<BigRational>? {
+            val m = model.m
+            val yf = lu.btran(DoubleArray(m) { rhsAt(it).toDouble() }) // float Bᵀ y = rhs
+            val z = Array(m) { BigInt.ZERO } // integer numerators z = round(y · d), filled below
+            for (i in 0 until m) {
+                val scaled = yf[i] * dDouble
+                if (!scaled.isFinite() || abs(scaled) >= MAX_EXACT_INT) return null
+                z[i] = BigInt.of(scaled.roundToLong())
+            }
+            // Verify Bᵀ z == rhs·d exactly: row t is the basic column basic[t], so the equation is
+            // Σ_i B[i][basic[t]]·z[i] == rhs[t]·d. Any mismatch ⇒ the float guess was inexact ⇒ null.
+            for (t in 0 until m) {
+                var acc = BigInt.ZERO
+                forEachFullColumn(model, basic[t]) { i, v -> acc += BigInt.of(v) * z[i] }
+                if (acc != BigInt.of(rhsAt(t)) * dBig) return null
+            }
+            return Array(m) { BigRational.of(z[it]) / BigRational.of(dBig) }
+        }
+    }
+
+    /** Integers with magnitude below this are exactly representable as `Double`; a det-scaled value at
+     *  or above it cannot be trusted to round to the true integer, so the solve bails (sound). */
+    private const val MAX_EXACT_INT: Double = 9.007199254740992E15 // 2^53
+
+    /** Test seam (#34): the exact dual `Bᵀ y = rhs` over [basic] (row `t` = basic column `basic[t]`),
+     *  or null if no candidate verifies — for parity-checking against an independent oracle. */
+    internal fun exactDualForTest(model: LpModel, basic: IntArray, rhs: LongArray): Array<BigRational>? =
+        dualSolver(model, basic)?.solve { rhs[it] }
 
     /** Iterate the nonzero rows of full column [col] as `(row, value)`: a structural column through the
      *  model's CSC accessor, a slack column `n+s` as the unit vector `e_s`. */
