@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Propagator
 
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over
@@ -28,50 +29,25 @@ import com.eignex.klause.solver.Lit
  * factors posted alongside it, which carry the same parity semantics *with* real LS support,
  * so LS enforces each parity row via those siblings.
  */
-class GaussianXor(override val constraints: List<Xor>) :
-    Factor,
-    GaussianXorPropagator,
+class GaussianXor(
+    /** The individual parity constraints forming this Gaussian system. */
+    val constraints: List<Xor>,
+) : Factor,
     GaussianXorInvariant {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         GaussianXor(constraints.map { it.remap(boolMap, intMap) as Xor })
 
-    /** Union of all variables across the constraints, in stable order; column index = position. */
+    /** Union of all variables across the constraints, in stable order. */
     override val boolVars: IntArray
     override val intVars: IntArray = EmptyIntArray
-
-    override val colOfVar: HashMap<Int, Int>
-    override val words: Int
-    override val rowMask: Array<LongArray>
-    override val rowRhs: IntArray
 
     init {
         require(constraints.isNotEmpty()) { "GaussianXor needs at least one constraint" }
         val order = LinkedHashSet<Int>()
         for (c in constraints) for (lit in c.literals) order.add(Lit.variable(lit))
         boolVars = order.toIntArray()
-        colOfVar = HashMap(boolVars.size * 2)
-        for (i in boolVars.indices) colOfVar[boolVars[i]] = i
-        words = (boolVars.size + 63) ushr 6
-
-        rowMask = Array(constraints.size) { LongArray(words) }
-        rowRhs = IntArray(constraints.size)
-        for (r in constraints.indices) {
-            val c = constraints[r]
-            val occ = HashMap<Int, Int>()
-            var negParity = 0
-            for (lit in c.literals) {
-                val v = Lit.variable(lit)
-                occ[v] = (occ[v] ?: 0) + 1
-                if (!Lit.isPositive(lit)) negParity = negParity xor 1
-            }
-            for ((v, count) in occ) {
-                if (count and 1 == 1) {
-                    val col = colOfVar.getValue(v)
-                    rowMask[r][col ushr 6] = rowMask[r][col ushr 6] or (1L shl (col and 63))
-                }
-            }
-            rowRhs[r] = c.targetParity xor negParity
-        }
     }
+
+    override fun asPropagator(): Propagator = GaussianXorPropagator(constraints, boolVars)
 }

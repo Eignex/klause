@@ -117,11 +117,15 @@ class Problem(
      */
     val intDomains: Array<IntDomain> = intDomains.copyOf()
 
-    /** Typed view of [factors] for the CP engine. */
-    val propagators: Array<out Propagator> get() = factors
+    /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
+     *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
+     *  return themselves. Computed once at construction. */
+    val propagators: Array<out Propagator> = Array(factors.size) { factors[it].asPropagator() }
 
-    /** Typed view of [factors] for the LS engine. */
-    val invariants: Array<out Invariant> get() = factors
+    /** Invariant objects for the LS engine, one per factor. Factors that have been structurally
+     *  split return a dedicated invariant instance from [Factor.asInvariant]; unsplit factors
+     *  return themselves. Computed once at construction. */
+    val invariants: Array<out Invariant> = Array(factors.size) { factors[it].asInvariant() }
 
     init {
         require(intDomains.size == numIntVars) {

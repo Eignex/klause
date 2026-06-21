@@ -78,4 +78,19 @@ interface Factor :
      * names a value).
      */
     fun remapValues(valueMap: (Int) -> Int): Factor? = null
+
+    /**
+     * The [Propagator] object the CP engine uses for this constraint. Default returns `this`
+     * — factors that haven't been structurally split carry their own propagation data.
+     * Override to construct a separate propagator object with CP-specific data structures,
+     * deferring that allocation to when a CP engine is actually initialised.
+     */
+    fun asPropagator(): Propagator = this
+
+    /**
+     * The [Invariant] object the LS engine uses for this constraint. Default returns `this`.
+     * Override to construct a separate invariant object with LS-specific data structures,
+     * deferring that allocation to when an LS engine is actually initialised.
+     */
+    fun asInvariant(): Invariant = this
 }

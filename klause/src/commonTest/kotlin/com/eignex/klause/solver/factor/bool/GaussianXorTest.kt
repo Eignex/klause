@@ -11,6 +11,8 @@ import com.eignex.klause.solver.factor.bool.Xor
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
 
 class GaussianXorTest {
 
@@ -98,5 +100,18 @@ class GaussianXorTest {
                 .map { it.bools.toList() }.toHashSet()
             assertEquals(brute, found, "seed $seed: incremental GaussianXor enumeration must equal brute force")
         }
+    }
+
+    @Test
+    fun `asPropagator returns a separate object distinct from the factor`() {
+        val factor = GaussianXor(listOf(Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 0)))
+        val propagator = factor.asPropagator()
+        assertNotSame(factor, propagator, "asPropagator should return a new GaussianXorPropagator, not the factor")
+    }
+
+    @Test
+    fun `asInvariant returns the factor itself since GaussianXor has no ls state`() {
+        val factor = GaussianXor(listOf(Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 0)))
+        assertSame(factor, factor.asInvariant(), "asInvariant should return this for a propagation-only factor")
     }
 }
