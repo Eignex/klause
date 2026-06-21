@@ -46,6 +46,39 @@ class PrimalSimplexTest {
         assertTrue(converged > 200, "primal converged on only $converged instances")
     }
 
+    /** `≥`-rows with positive rhs (covering): the all-lower start is primal-infeasible (every slack
+     *  starts negative), so [RevisedSimplex.solvePrimal] must run phase-1 to recover feasibility. */
+    private fun randomCoveringModel(m: Int, n: Int, rng: Random): LpModel {
+        val b = LpBuilder()
+        repeat(n) { b.addVar(0L, rng.nextLong(2, 6), cost = rng.nextLong(0, 7)) }
+        val cols = IntArray(n) { it }
+        repeat(m) { b.addRow(cols, LongArray(n) { rng.nextLong(1, 4) }, Relation.GE, rng.nextLong(1, 9)) }
+        return b.build(Sense.MINIMIZE)
+    }
+
+    @Test
+    fun `primal phase-1 recovers feasibility on covering models`() {
+        val rng = Random(20260622)
+        var converged = 0
+        repeat(500) {
+            val model = randomCoveringModel(rng.nextInt(2, 6), rng.nextInt(3, 7), rng)
+            val primal = RevisedSimplex(model).solvePrimal() ?: return@repeat // infeasible models skip
+            val dual = RevisedSimplex(model).solve() ?: return@repeat
+            converged++
+            assertTrue(
+                abs(primal.objective - dual.objective) <= 1e-6 * maxOf(1.0, abs(dual.objective)),
+                "primal obj ${primal.objective} vs dual ${dual.objective}",
+            )
+            val cert = ExactBasisCertifier.certify(model, primal.basis) ?: return@repeat
+            val exact = cert.objective.num.toDouble() / cert.objective.den.toDouble()
+            assertTrue(
+                abs(primal.objective - exact) <= 1e-6 * maxOf(1.0, abs(exact)),
+                "primal float obj ${primal.objective} vs exact certify $exact",
+            )
+        }
+        assertTrue(converged > 100, "primal phase-1 converged on only $converged covering instances")
+    }
+
     @Test
     fun `the bound-flipping ratio test flips entering variables to their upper bound`() {
         // maximize x0 + x1 (minimize the negation) with x0, x1 ∈ [0,1] under the loose x0 + x1 ≤ 5.
