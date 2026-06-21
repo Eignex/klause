@@ -153,6 +153,13 @@ enum class PresolvePass(
         override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.deriveXorUnits(problem))
     },
 
+    /** Iterated activity-based bound tightening (FME bound propagation). Tightens each variable's
+     *  domain from the min/max activity of the linear rows it appears in, to a local fixpoint; only
+     *  ever narrows by a valid implication, so it preserves the solution set. */
+    TIGHTEN_BOUNDS("bound-tighten", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.tightenBounds(problem))
+    },
+
     /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated
      *  variable is left unconstrained in the presolved problem (its value is rebuilt from its partner
      *  on the way back), so a complete enumerator would branch over its domain and over-count each
