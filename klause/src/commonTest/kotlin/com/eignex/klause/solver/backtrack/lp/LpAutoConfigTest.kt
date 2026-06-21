@@ -240,6 +240,41 @@ class LpAutoConfigTest {
     }
 
     @Test
+    fun `default emphasis admits a small hull but not a large one`() {
+        // NValue hull dimension is 3·(Σ domain sizes) + 2·|xs| + 1. Three vars over [0,5] ⇒ 61 ≤ 128,
+        // so the middle tier admits it at DEFAULT; eight vars ⇒ 161 > 128, so it stays AGGRESSIVE-only.
+        val small = Problem(0, 4, Array(4) { IntDomain(0, 5) }, arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))))
+        assertTrue(
+            LpAutoConfig.resolve(small, LpConfig(LpEmphasis.DEFAULT)).lpPlan.nValue,
+            "a small hull is admitted at DEFAULT (the middle tier)",
+        )
+
+        val large = Problem(0, 9, Array(9) { IntDomain(0, 5) }, arrayOf<Factor>(NValue(8, IntArray(8) { it })))
+        assertFalse(
+            LpAutoConfig.resolve(large, LpConfig(LpEmphasis.DEFAULT)).lpPlan.nValue,
+            "a large hull stays gated to AGGRESSIVE at DEFAULT",
+        )
+        assertTrue(
+            LpAutoConfig.resolve(large, LpConfig(LpEmphasis.AGGRESSIVE)).lpPlan.nValue,
+            "AGGRESSIVE still enables the large hull",
+        )
+    }
+
+    @Test
+    fun `an override beats the middle-tier size gate`() {
+        val small = Problem(0, 4, Array(4) { IntDomain(0, 5) }, arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))))
+        assertFalse(
+            LpAutoConfig.resolve(small, LpConfig(LpEmphasis.DEFAULT, mapOf(LpTechnique.NVALUE to false))).lpPlan.nValue,
+            "an explicit -nvalue override keeps the small hull off at DEFAULT",
+        )
+        val large = Problem(0, 9, Array(9) { IntDomain(0, 5) }, arrayOf<Factor>(NValue(8, IntArray(8) { it })))
+        assertTrue(
+            LpAutoConfig.resolve(large, LpConfig(LpEmphasis.DEFAULT, mapOf(LpTechnique.NVALUE to true))).lpPlan.nValue,
+            "an explicit +nvalue override enables even the large hull at DEFAULT",
+        )
+    }
+
+    @Test
     fun `auto-enabled energetic reasoning derives a size-aware cadence`() {
         fun cumulative(tasks: Int) = Problem(
             0,

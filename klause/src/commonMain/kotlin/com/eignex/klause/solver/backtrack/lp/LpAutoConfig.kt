@@ -81,6 +81,16 @@ object LpAutoConfig {
      */
     const val ENERGETIC_OPS_PER_CHECK: Long = 1L shl 17
 
+    /**
+     * Middle-tier size threshold: at [LpEmphasis.DEFAULT] a convex-hull technique (normally an
+     * [LpTiming.EXHAUSTIVE] add-on, so off until `AGGRESSIVE`) is still admitted when its estimated
+     * added dimensions `cols + rows` stay under this, since per-node simplex bounding is already paying
+     * for an LP there and a small hull only tightens it. The expensive hulls (a large Table / Regular /
+     * Mdd / time-indexed expansion) stay gated to `AGGRESSIVE`. Hulls are sound relaxations, so this only
+     * trades a little build cost for a tighter bound; the #484 budget still caps the admitted stack.
+     */
+    const val SMALL_HULL_DIM: Long = 128L
+
     /** `base` with every structurally-applicable LP technique enabled — i.e. [resolve] at the
      *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). The historical structural auto-config. */
     fun recommend(problem: Problem, base: BacktrackParams = BacktrackParams()): BacktrackParams =
@@ -225,23 +235,23 @@ object LpAutoConfig {
         val diffnLp = lpActive && diffnPlans > 0
         val hullCap = if (baseFits) baseCap else ceilingCap
 
-        // Only structurally-present hulls the emphasis permits compete for the budget (a forbidden
-        // hull is never built, so it costs nothing). Each estimate sums over its factors and honours
-        // that hull's own MAX_* cap, exactly as the builder does.
+        // Structurally-present hulls compete for the budget once admitted (a non-admitted hull is never
+        // built, so it costs nothing). Each estimate sums over its factors and honours that hull's own
+        // MAX_* cap, exactly as the builder does. [hullAdmitted] gates by emphasis: AGGRESSIVE admits
+        // every hull, DEFAULT admits only the small ones (the middle tier), and an override wins either
+        // way — the global budget still caps whatever is admitted.
         val candidates = if (!lpActive) {
             emptyList()
         } else {
             buildList {
-                if (circuit && config.resolved(LpTechnique.CIRCUIT)) circuitEstimate(problem)?.let(::add)
-                if (constArrayElement && config.resolved(LpTechnique.ELEMENT)) elementEstimate(problem)?.let(::add)
-                if (table && config.resolved(LpTechnique.TABLE)) tableEstimate(problem)?.let(::add)
-                if (nValue && config.resolved(LpTechnique.NVALUE)) nValueEstimate(problem)?.let(::add)
-                if (regular && config.resolved(LpTechnique.REGULAR)) regularEstimate(problem)?.let(::add)
-                if (mdd && config.resolved(LpTechnique.MDD)) mddEstimate(problem)?.let(::add)
-                if (gccCount && config.resolved(LpTechnique.GCC_COUNT)) gccCountEstimate(problem)?.let(::add)
-                if (scheduling && config.resolved(LpTechnique.CUMULATIVE_TIME_INDEXED)) {
-                    timeIndexedEstimate(problem)?.let(::add)
-                }
+                if (circuit) circuitEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                if (constArrayElement) elementEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                if (table) tableEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                if (nValue) nValueEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                if (regular) regularEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                if (mdd) mddEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                if (gccCount) gccCountEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                if (scheduling) timeIndexedEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
             }
         }
         val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
@@ -292,6 +302,16 @@ object LpAutoConfig {
 
     /** A gated hull's estimated added columns and rows, summed over its factors of one kind. */
     private class HullEstimate(val key: LpTechnique, val cols: Long, val rows: Long)
+
+    /** Whether [h]'s hull may compete for the size budget under [config]: an explicit override wins;
+     *  else the technique's cost tier must be permitted by the emphasis (`AGGRESSIVE`), or — the middle
+     *  tier — the per-node simplex is on ([LpTiming.MEDIUM] permitted) and the hull is small enough
+     *  ([SMALL_HULL_DIM]). */
+    private fun hullAdmitted(config: LpConfig, h: HullEstimate): Boolean {
+        config.overrides[h.key]?.let { return it }
+        if (h.key.timing in config.emphasis.timings) return true
+        return LpTiming.MEDIUM in config.emphasis.timings && h.cols + h.rows <= SMALL_HULL_DIM
+    }
 
     /** Accept hulls smallest-first while the combined `base + accepted` size stays under [maxCells]
      *  (the configurable [KlauseConfig.lpMaxTableauCells]); the rest are shed (their flag stays off),
