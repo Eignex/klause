@@ -187,8 +187,8 @@ class Problem(
     val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
         val watcherFid = BooleanArray(factors.size)
         var any = false
-        for (i in factors.indices) {
-            if (factors[i].initialBoolWatchers != null) {
+        for (i in propagators.indices) {
+            if (propagators[i].initialBoolWatchers != null) {
                 watcherFid[i] = true
                 any = true
             }
@@ -205,11 +205,11 @@ class Problem(
     /** True iff some factor opts into typed int-domain event wakeup
      *  ([Factor.initialIntEventWatches]). When false, the engine skips all int-event bookkeeping
      *  and [nonIntEventWatcherIntOccurrences] aliases [intOccurrences]. */
-    val usesIntEventWatchers: Boolean = factors.any { it.initialIntEventWatches != null }
+    val usesIntEventWatchers: Boolean = propagators.any { it.initialIntEventWatches != null }
 
     /** True iff some factor consumes the per-factor dirty-variable delta ([Factor.consumesIntEventDelta]).
      *  When false the engine allocates no delta accumulators and the dirty-var bookkeeping is skipped. */
-    val usesIntEventDeltaConsumers: Boolean = factors.any { it.consumesIntEventDelta }
+    val usesIntEventDeltaConsumers: Boolean = propagators.any { it.consumesIntEventDelta }
 
     /**
      * [intOccurrences] minus, per variable, the factors that subscribe to a typed int-event on
@@ -228,7 +228,7 @@ class Problem(
     } else {
         Array(numIntVars) { v ->
             intOccurrences[v].filter { fid ->
-                val watches = factors[fid].initialIntEventWatches
+                val watches = propagators[fid].initialIntEventWatches
                 watches == null || watches.none { IntEvent.intVarOf(it) == v }
             }.toIntArray()
         }

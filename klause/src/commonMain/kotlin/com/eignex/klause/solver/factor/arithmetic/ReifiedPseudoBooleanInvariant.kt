@@ -1,46 +1,59 @@
 package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
-import com.eignex.klause.solver.factor.ReifiedFactor
+import com.eignex.klause.solver.factor.bool.buildSignedWeightByVar
 import com.eignex.klause.solver.factor.bool.pbDistance
 import com.eignex.klause.solver.factor.bool.pbHolds
 import com.eignex.klause.solver.factor.bool.reifiedDegree
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.util.IntIntMap
 
 /**
- * LS contract for [ReifiedPseudoBoolean]: reified pseudo-Boolean violation tracking and repair.
+ * LS invariant for [ReifiedPseudoBoolean]: reified pseudo-Boolean violation tracking and repair.
  */
-interface ReifiedPseudoBooleanInvariant : ReifiedFactor {
+internal class ReifiedPseudoBooleanInvariant(
+    private val auxBoolVar: Int,
+    private val weights: IntArray,
+    private val literals: IntArray,
+    private val op: PbOp,
+    private val bound: Int,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+) : Invariant {
 
-    /** The reifying Boolean variable id. */
-    override val auxBoolVar: Int
+    private val signedByVar: IntIntMap = buildSignedWeightByVar(weights, literals, exclude = auxBoolVar)
 
-    /** Literal weights parallel to [literals]. */
-    val weights: IntArray
+    private fun reifSignedFor(v: Int): Int = signedByVar[v]
 
-    /** The Boolean literals. */
-    val literals: IntArray
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        var sum = 0L
+        for (i in literals.indices) {
+            if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
+                sum += weights[i].toLong()
+            }
+        }
+        state.longPayload[factorId] = sum
+    }
 
-    /** Comparison operator. */
-    val op: PbOp
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+        state.assignment.boolValue(auxBoolVar) != pbHolds(state.longPayload[factorId], op, bound)
 
-    /** Right-hand-side bound. */
-    val bound: Int
-
-    /** Signed contribution of [v] to the weighted sum. */
-    fun reifSignedFor(v: Int): Int
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val aux = state.assignment.boolValue(auxBoolVar)
+        val sum = state.longPayload[factorId]
+        return when {
+            aux == pbHolds(sum, op, bound) -> 0
+            aux -> compressViolation(pbDistance(sum, op, bound), state.violationSoftCap)
+            else -> 1
+        }
+    }
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
-
-    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
-        pbHolds(state.longPayload[factorId], op, bound)
-
-    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
-        compressViolation(pbDistance(state.longPayload[factorId], op, bound), softCap)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         val aux = state.assignment.boolValue(auxBoolVar)

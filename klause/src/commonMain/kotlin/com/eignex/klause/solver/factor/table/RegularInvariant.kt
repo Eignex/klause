@@ -6,15 +6,17 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntHashSet
 
-/** LS invariant contract for the regular DFA constraint. */
-internal interface RegularInvariant : Invariant {
-
-    val seq: IntArray
-    val numStates: Int
-    val alphabetSize: Int
-    val transitions: IntArray
-    val q0: Int
-    val accepting: IntArray
+/** LS invariant for [Regular]. Constructed by [Regular.asInvariant]. */
+internal class RegularInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val seq: IntArray,
+    private val numStates: Int,
+    private val alphabetSize: Int,
+    private val transitions: IntArray,
+    private val q0: Int,
+    private val accepting: IntArray,
+) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val aset = buildAcceptingSet(accepting)

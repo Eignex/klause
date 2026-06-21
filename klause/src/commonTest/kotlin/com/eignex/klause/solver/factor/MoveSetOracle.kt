@@ -43,16 +43,16 @@ object MoveSetOracle {
             val state = LocalSearchState(problem, Random(seed + iter))
             randomizeAssignment(state, problem, rng)
             state.recompute()
-            if (!factor.isViolated(state, 0)) return@repeat
+            if (!state.factors[0].isViolated(state, 0)) return@repeat
 
             val improvingNeighbors = bruteImproving(problem, state, factor)
             val sink = MoveSink()
-            factor.proposeRepairMoves(state, 0, sink)
+            state.factors[0].proposeRepairMoves(state, 0, sink)
             val proposed = sink.list
 
             for (move in proposed) {
                 assertLegal(move, problem, state, factor, label)
-                val delta = applyAndReport(problem, state, factor, move)
+                val delta = applyAndReport(problem, state, move)
                 if (requireImprovement) {
                     assertTrue(
                         delta <= 0,
@@ -63,7 +63,7 @@ object MoveSetOracle {
 
             if (improvingNeighbors.isNotEmpty()) {
                 val proposedImproves = proposed.any { move ->
-                    applyAndReport(problem, state, factor, move) < 0
+                    applyAndReport(problem, state, move) < 0
                 }
                 assertTrue(
                     proposedImproves,
@@ -101,7 +101,7 @@ object MoveSetOracle {
             while (tries < FEASIBLE_SEARCH_BUDGET) {
                 randomizeAssignment(state, problem, rng)
                 state.recompute()
-                if (!factor.isViolated(state, 0)) {
+                if (!state.factors[0].isViolated(state, 0)) {
                     feasible = true
                     break
                 }
@@ -109,17 +109,17 @@ object MoveSetOracle {
             }
             if (!feasible) {
                 randomizeAssignment(state, problem, rng)
-                factor.seedFeasible(state, 0)
+                state.factors[0].seedFeasible(state, 0)
                 state.recompute()
-                feasible = !factor.isViolated(state, 0)
+                feasible = !state.factors[0].isViolated(state, 0)
             }
             if (!feasible) return@repeat
 
             val sink = MoveSink()
-            factor.proposeStructuredMoves(state, 0, sink)
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
             for (move in sink.list) {
                 assertLegal(move, problem, state, factor, label)
-                val delta = applyAndReport(problem, state, factor, move)
+                val delta = applyAndReport(problem, state, move)
                 assertTrue(
                     delta <= 0,
                     "$label: structured move $move broke feasibility (delta=$delta) on iter=$iter, " +
@@ -164,13 +164,13 @@ object MoveSetOracle {
 
     /** Returns the delta in this factor's violation status when [move] is applied to a fresh
      *  copy of [state]. Does not mutate [state]. */
-    private fun applyAndReport(problem: Problem, state: LocalSearchState, factor: Factor, move: Move): Int {
-        val before = if (factor.isViolated(state, 0)) 1 else 0
+    private fun applyAndReport(problem: Problem, state: LocalSearchState, move: Move): Int {
+        val before = if (state.factors[0].isViolated(state, 0)) 1 else 0
         val sibling = LocalSearchState(problem, Random(0))
         copyAssignment(state, sibling)
         sibling.recompute()
         sibling.apply(move)
-        val after = if (factor.isViolated(sibling, 0)) 1 else 0
+        val after = if (sibling.factors[0].isViolated(sibling, 0)) 1 else 0
         return after - before
     }
 
@@ -178,7 +178,7 @@ object MoveSetOracle {
         val out = ArrayList<Move>()
         for (b in factor.boolVars) {
             val move = Move.BoolFlip(b)
-            if (applyAndReport(problem, state, factor, move) < 0) out.add(move)
+            if (applyAndReport(problem, state, move) < 0) out.add(move)
         }
         for (v in factor.intVars) {
             val d = problem.intDomains[v]
@@ -187,7 +187,7 @@ object MoveSetOracle {
                 if (k !in d) continue
                 if (k == cur) continue
                 val move = Move.IntSet(v, k)
-                if (applyAndReport(problem, state, factor, move) < 0) out.add(move)
+                if (applyAndReport(problem, state, move) < 0) out.add(move)
             }
         }
         return out

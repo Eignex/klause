@@ -37,12 +37,12 @@ class ReginIncrementalTest {
             factors = arrayOf<Factor>(factor),
         )
         val state = PropagationState(problem, Assumptions.None)
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(problem.propagators[0].propagate(state, factorId = 0))
         val afterFirst = state.intDomains[2]
         assertEquals(2, afterFirst.min)
         assertEquals(2, afterFirst.max)
         // Re-fire: identical domains → fast-path hit → same refs, no further change.
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(problem.propagators[0].propagate(state, factorId = 0))
         assertTrue(afterFirst === state.intDomains[2], "fast-path re-fire must not rewrite the domain")
     }
 

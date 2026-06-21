@@ -43,7 +43,7 @@ class LinearBoundsEventTest {
     @Test
     fun `linear subscribes to only bound events on every term`() {
         val lin = Linear(intArrayOf(1, 2, -1), intArrayOf(0, 1, 2), LinearOp.LE, 5)
-        val watches = lin.initialIntEventWatches
+        val watches = lin.asPropagator().initialIntEventWatches!!
         val pairs = watches.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()
         assertEquals(
             setOf(

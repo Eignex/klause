@@ -8,9 +8,12 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
 
 /** LS invariant logic for `symmetric_all_different`. */
-internal interface SymmetricAllDifferentInvariant : Invariant {
-    val xs: IntArray
-    val indexOffset: Int
+internal class SymmetricAllDifferentInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val indexOffset: Int,
+) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         brokenPositions(state, ov = -1, nv = 0) > 0

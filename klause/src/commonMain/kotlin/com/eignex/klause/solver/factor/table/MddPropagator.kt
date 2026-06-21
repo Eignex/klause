@@ -2,19 +2,31 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.table.internals.MddIncrementalState
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP propagation contract for the layered MDD constraint. */
-internal interface MddPropagator : Propagator {
+/** CP propagator for [Mdd]. Constructed by [Mdd.asPropagator]. */
+internal class MddPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val seq: IntArray,
+    private val numStatesPerLayer: IntArray,
+    private val layerStarts: IntArray,
+    private val transitions: IntArray,
+    private val initial: Int,
+    private val accepting: IntArray,
+    private val recordStride: Int,
+    private val cost: Int,
+) : Propagator {
 
-    val seq: IntArray
-    val numStatesPerLayer: IntArray
-    val layerStarts: IntArray
-    val transitions: IntArray
-    val initial: Int
-    val accepting: IntArray
-    val recordStride: Int
-    val cost: Int
+    /** Advisor subscription (#623): the layered reachability sweep reads each sequence variable's
+     *  bounds (`sym in min..max`), not interior holes, so it wakes on bound moves only — interior
+     *  [IntEvent.VALUE_REMOVED] carves cannot change the reachability bitsets. Consumes the dirty-
+     *  variable delta (#624); the incremental propagator (`MddIncrementalState`) recomputes only the
+     *  layers a changed position reaches. */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+
+    override val consumesIntEventDelta: Boolean = true
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.composeIntVarAtomAntecedents(intVars)

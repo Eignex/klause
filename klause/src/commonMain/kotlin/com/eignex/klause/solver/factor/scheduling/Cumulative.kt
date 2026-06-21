@@ -2,11 +2,12 @@ package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -51,14 +52,14 @@ import com.eignex.klause.util.IntIntMap
  */
 class Cumulative(
     /** Task start-time variable ids. */
-    override val starts: IntArray,
+    val starts: IntArray,
     /** Per-task duration: constant fallback / upper bound (when [durationVars] is set this
      *  holds the var's domain ub, used for horizon sizing). */
-    override val durations: IntArray,
+    val durations: IntArray,
     /** Per-task resource demand: same dual role as [durations]. */
-    override val resources: IntArray,
+    val resources: IntArray,
     /** Capacity: constant fallback / upper bound (when [capacityVar] ≥ 0 holds the var's ub). */
-    override val capacity: Int,
+    val capacity: Int,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks contribute
      *  zero energy / zero compulsory part. Theta-tree leaves stay inactive for
      *  definitely-absent tasks; unpinned-presence tasks are excluded from edge-finding too
@@ -67,16 +68,14 @@ class Cumulative(
     /** Per-task duration variables; empty = use [durations] as constants. When set, the
      *  factor reads the current duration from `state.assignment.intValue(durationVars(i))`
      *  and propagation pulls bounds from `state.intDomains(durationVars(i))`. */
-    override val durationVars: IntArray = EmptyIntArray,
+    val durationVars: IntArray = EmptyIntArray,
     /** Per-task resource variables; empty = use [resources] as constants. Same pattern as
      *  [durationVars]. */
-    override val resourceVars: IntArray = EmptyIntArray,
+    val resourceVars: IntArray = EmptyIntArray,
     /** Capacity variable id; -1 = use [capacity] as a constant. */
-    override val capacityVar: Int = -1,
+    val capacityVar: Int = -1,
 ) : Factor,
-    OptionalFactor,
-    CumulativePropagator,
-    CumulativeInvariant {
+    OptionalFactor {
 
     init {
         require(starts.size == durations.size && starts.size == resources.size) {
@@ -136,24 +135,15 @@ class Cumulative(
         }
     }
 
-    /**
-     * Advisor subscription (#623): cumulative propagation (mandatory profile + Θ-tree edge-finding)
-     * reads only each variable's `min`/`max` — start bounds drive the profile/edge-finding, and
-     * duration/resource/capacity vars are consulted only once fixed (`d.min == d.max`). It never
-     * inspects interior holes, so it subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on
-     * every integer variable and skips interior `VALUE_REMOVED` wakes. Presence is carried by Boolean
-     * variables, which keep their separate two-watched-literal wakeup.
-     */
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+    /** Number of tasks. */
+    val n: Int = starts.size
 
-    override val n: Int = starts.size
-
-    /** The sharp pointwise time-tabling explanation ([pointwiseOverloadReason]) covers every task as
-     *  mandatory. Variable durations / resources / capacity are handled by additionally citing their
-     *  (fixed-at-propagation) bounds, but separate presence literals are not, so optional tasks fall
-     *  back to the sound constraint-wide reason. RCPSP / mspsp-style instances (mandatory tasks, the
-     *  multi-skill "presence" carried by a 0/1 resource var rather than a presence literal) are sharp. */
-    override val sharpReasonEligible: Boolean = presents.isEmpty()
+    /** The sharp pointwise time-tabling explanation covers every task as mandatory. Variable durations /
+     *  resources / capacity are handled by additionally citing their (fixed-at-propagation) bounds, but
+     *  separate presence literals are not, so optional tasks fall back to the sound constraint-wide
+     *  reason. RCPSP / mspsp-style instances (mandatory tasks, the multi-skill "presence" carried by a
+     *  0/1 resource var rather than a presence literal) are sharp. */
+    val sharpReasonEligible: Boolean = presents.isEmpty()
 
     /** Whether every task's energy (`duration · resource`) and the capacity are compile-time
      *  constants, i.e. the only citable variables this factor reads are the start times. Lets
@@ -161,7 +151,7 @@ class Cumulative(
      *  explanation, which depends only on the in-window tasks' start bounds) instead of the
      *  constraint-wide all-starts reason; the energy / capacity premises a variable-arg instance
      *  would also need are vacuous here. The common RCPSP shape (`cumulative(starts, d, r, C)`). */
-    override val constantEnergyAndCap: Boolean =
+    val constantEnergyAndCap: Boolean =
         durationVars.isEmpty() && resourceVars.isEmpty() && capacityVar < 0
 
     // Var id → its position in the corresponding array (-1 when the var is not in that role).
@@ -170,7 +160,45 @@ class Cumulative(
     private val durPos: IntIntMap = IntIntMap.build(durationVars, IntArray(durationVars.size) { it }, absent = -1)
     private val resPos: IntIntMap = IntIntMap.build(resourceVars, IntArray(resourceVars.size) { it }, absent = -1)
 
-    override fun startPosOf(varId: Int): Int = startPos[varId]
-    override fun durPosOf(varId: Int): Int = durPos[varId]
-    override fun resPosOf(varId: Int): Int = resPos[varId]
+    /** Index of [varId] in [starts], or `-1` if it is not a start variable. */
+    fun startPosOf(varId: Int): Int = startPos[varId]
+
+    /** Index of [varId] in `durationVars`, or `-1` if it is not a duration variable. */
+    fun durPosOf(varId: Int): Int = durPos[varId]
+
+    /** Index of [varId] in `resourceVars`, or `-1` if it is not a resource variable. */
+    fun resPosOf(varId: Int): Int = resPos[varId]
+
+    override fun asPropagator(): Propagator = CumulativePropagator(
+        boolVars = boolVars,
+        intVars = intVars,
+        starts = starts,
+        durations = durations,
+        resources = resources,
+        capacity = capacity,
+        presents = presents,
+        durationVars = durationVars,
+        resourceVars = resourceVars,
+        capacityVar = capacityVar,
+        n = n,
+        sharpReasonEligible = sharpReasonEligible,
+        constantEnergyAndCap = constantEnergyAndCap,
+    )
+
+    override fun asInvariant(): Invariant = CumulativeInvariant(
+        boolVars = boolVars,
+        intVars = intVars,
+        starts = starts,
+        durations = durations,
+        resources = resources,
+        capacity = capacity,
+        presents = presents,
+        durationVars = durationVars,
+        resourceVars = resourceVars,
+        capacityVar = capacityVar,
+        n = n,
+        startPosOf = ::startPosOf,
+        durPosOf = ::durPosOf,
+        resPosOf = ::resPosOf,
+    )
 }

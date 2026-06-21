@@ -5,21 +5,45 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 
-/** LS contract for [Circuit]: violation scoring and move proposal for the Hamiltonian-cycle
+/** LS implementation for [Circuit]: violation scoring and move proposal for the Hamiltonian-cycle
  *  constraint. */
-interface CircuitInvariant : Invariant {
+internal class CircuitInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val succ: IntArray,
+    private val n: Int,
+    private val computeCost: (LocalSearchState, Int, Int) -> Int,
+) : Invariant {
 
-    /** Successor variable id per node. */
-    val succ: IntArray
-
-    /** Number of nodes. */
-    val n: Int
-
-    /** Cost function: 0 iff the assignment (with optional override) is one Hamiltonian cycle. */
-    fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int
+    private val positionOfVar: IntIntMap = IntIntMap.build(succ, IntArray(n) { it }, absent = -1)
 
     override val providesImplicitNeighbourhood: Boolean get() = true
+
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        state.intPayload[factorId] = computeCost(state, -1, 0)
+    }
+
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
+
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = state.intPayload[factorId]
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val pos = positionOfVar[intVar]
+        if (pos < 0) return 0
+        val oldCost = state.intPayload[factorId]
+        val newCost = computeCost(state, pos, newValue)
+        return newCost - oldCost
+    }
+
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        if (positionOfVar[intVar] < 0) return 0
+        val oldCost = state.intPayload[factorId]
+        val newCost = computeCost(state, -1, 0)
+        state.intPayload[factorId] = newCost
+        return newCost - oldCost
+    }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (state.intPayload[factorId] == 0) return

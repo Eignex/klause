@@ -334,9 +334,9 @@ class FactorPropertyTest {
             val state = LocalSearchState(problem, Random(iter.toLong()))
             randomizeAssignment(state, env, rng)
             state.recompute()
-            if (!factor.isViolated(state, 0)) return@repeat
+            if (!state.factors[0].isViolated(state, 0)) return@repeat
             sink.clear()
-            factor.proposeRepairMoves(state, 0, sink)
+            state.factors[0].proposeRepairMoves(state, 0, sink)
             for (move in sink.list) {
                 when (move) {
                     is Move.BoolFlip -> {
@@ -397,18 +397,18 @@ class FactorPropertyTest {
         repeat(iters) { i ->
             val move = pickRandomMove(factor, state, intDomains, rng) ?: return@repeat
             val predicted = when (move) {
-                is Move.BoolFlip -> factor.deltaIfBoolFlipped(state, 0, move.varId)
-                is Move.IntSet -> factor.deltaIfIntSet(state, 0, move.varId, move.newValue)
+                is Move.BoolFlip -> state.factors[0].deltaIfBoolFlipped(state, 0, move.varId)
+                is Move.IntSet -> state.factors[0].deltaIfIntSet(state, 0, move.varId, move.newValue)
                 is Move.Compound -> error("pickRandomMove never returns Compound")
             }
-            val degreeBefore = factor.violationDegree(state, 0)
+            val degreeBefore = state.factors[0].violationDegree(state, 0)
             val costBefore = state.cost
             state.apply(move)
-            val violatedAfter = factor.isViolated(state, 0)
+            val violatedAfter = state.factors[0].isViolated(state, 0)
             // Graded contract: deltaIf* predicts the change in violationDegree (which equals
             // the binary isViolated change for binary factors and the magnitude change for
             // graded ones like Linear).
-            val observedDelta = factor.violationDegree(state, 0) - degreeBefore
+            val observedDelta = state.factors[0].violationDegree(state, 0) - degreeBefore
             assertEquals(
                 predicted,
                 observedDelta,

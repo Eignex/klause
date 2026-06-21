@@ -86,9 +86,9 @@ class LexLessTest {
         state.assignment.setInt(2, 2)
         state.assignment.setInt(3, 4)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         // Expect a move lowering xs[0] to ≤ 1 (strict ≤ b-1 = 1) and/or raising ys[0] to ≥ 4.
         val intSets = sink.list.filterIsInstance<IntSet>()
         assertTrue(
@@ -117,9 +117,9 @@ class LexLessTest {
         state.assignment.setInt(0, 4)
         state.assignment.setInt(1, 2)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         val compounds = sink.list.filterIsInstance<Compound>()
         assertTrue(
             compounds.any { c ->
@@ -151,9 +151,9 @@ class LexLessTest {
         state.assignment.setInt(2, 2)
         state.assignment.setInt(3, 3)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         val intSets = sink.list.filterIsInstance<IntSet>()
         // Must propose lowering xs[0] or raising ys[0] (the earliest position with room).
         assertTrue(
@@ -207,7 +207,7 @@ class LexLessTest {
         // Run the lex propagator attributed to factor 0; it walks the equal x0=y0 prefix and
         // tightens x1.max ≤ y1.max = 1, recording the prefix-aware antecedent on `[x1 ≤ 1]`.
         state.currentFactor = 0
-        check(lex.propagate(state, 0)) { "lex propagate should narrow, not fail" }
+        check(problem.propagators[0].propagate(state, 0)) { "lex propagate should narrow, not fail" }
         state.currentFactor = -1
         check(state.intDomains[1].max == 1) { "lex should have tightened x1.max to 1" }
 

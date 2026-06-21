@@ -5,14 +5,16 @@ import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
-/** LS invariant contract for the element constraint `result = arr(idx)`. */
-internal interface ElementInvariant : Invariant {
-
-    val idx: Int
-    val result: Int
-    val arr: IntArray
-    val arrIsVars: Boolean
-    val indexOffset: Int
+/** LS invariant for [Element]. Constructed by [Element.asInvariant]. */
+internal class ElementInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val idx: Int,
+    private val result: Int,
+    private val arr: IntArray,
+    private val arrIsVars: Boolean,
+    private val indexOffset: Int,
+) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         // Stateless — re-derived per query.

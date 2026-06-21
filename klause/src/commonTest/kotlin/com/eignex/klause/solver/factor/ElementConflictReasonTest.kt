@@ -43,9 +43,9 @@ class ElementConflictReasonTest {
         state.currentLevel = 1
         assertTrue(state.tightenIntMin(1, 10), "result ≥ 10")
         assertTrue(state.tightenIntMax(2, 5) && state.tightenIntMax(3, 5), "both elements ≤ 5")
-        assertFalse(factor.propagate(state, 0), "no position can supply result=10 → infeasible")
+        assertFalse(problem.propagators[0].propagate(state, 0), "no position can supply result=10 → infeasible")
 
-        val reason = factor.conflictReason(state, 0)
+        val reason = problem.propagators[0].conflictReason(state, 0)
         assertTrue(reason != null && reason.isNotEmpty(), "must yield a non-empty clause-form reason")
         for (lit in reason) {
             assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")

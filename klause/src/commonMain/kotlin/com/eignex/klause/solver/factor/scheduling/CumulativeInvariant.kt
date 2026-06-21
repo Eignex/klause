@@ -22,32 +22,39 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * LS invariant interface for the Cumulative constraint. Default implementations maintain the
- * usage timeline and compute graded overage deltas; concrete classes supply the abstract
- * properties.
+ * LS invariant for [Cumulative]. Constructed by [Cumulative.asInvariant] and maintains the
+ * usage timeline and computes graded overage deltas.
  */
-internal interface CumulativeInvariant : Invariant {
+internal class CumulativeInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val starts: IntArray,
+    private val durations: IntArray,
+    private val resources: IntArray,
+    private val capacity: Int,
+    private val presents: IntArray,
+    private val durationVars: IntArray,
+    private val resourceVars: IntArray,
+    private val capacityVar: Int,
+    private val n: Int,
+    private val startPosOf: (Int) -> Int,
+    private val durPosOf: (Int) -> Int,
+    private val resPosOf: (Int) -> Int,
+) : Invariant {
 
-    val starts: IntArray
-    val durations: IntArray
-    val resources: IntArray
-    val capacity: Int
-    val presents: IntArray
-    val durationVars: IntArray
-    val resourceVars: IntArray
-    val capacityVar: Int
-    val n: Int
-    fun startPosOf(varId: Int): Int
-    fun durPosOf(varId: Int): Int
-    fun resPosOf(varId: Int): Int
-
-    fun curDur(state: LocalSearchState, i: Int): Int =
+    private fun curDur(state: LocalSearchState, i: Int): Int =
         if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
 
-    fun curRes(state: LocalSearchState, i: Int): Int =
+    private fun curRes(state: LocalSearchState, i: Int): Int =
         if (resourceVars.isEmpty()) resources[i] else state.assignment.intValue(resourceVars[i])
 
-    fun curCap(state: LocalSearchState): Int = if (capacityVar < 0) capacity else state.assignment.intValue(capacityVar)
+    private fun curCap(state: LocalSearchState): Int = if (capacityVar < 0) {
+        capacity
+    } else {
+        state.assignment.intValue(
+            capacityVar,
+        )
+    }
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val tLow = computeTLow(state)
@@ -278,7 +285,7 @@ internal interface CumulativeInvariant : Invariant {
         if (peakTasks.isNotEmpty()) emitFeasibleSwaps(state, ls, peakTasks, sink)
     }
 
-    fun collectPeakTasks(state: LocalSearchState, absT: Int): IntArray {
+    private fun collectPeakTasks(state: LocalSearchState, absT: Int): IntArray {
         val out = IntArrayList()
         for (i in 0 until n) {
             val r = curRes(state, i)
@@ -291,7 +298,7 @@ internal interface CumulativeInvariant : Invariant {
         return out.toIntArray()
     }
 
-    fun emitFeasibleSwaps(state: LocalSearchState, ls: CumulativeLsState, peakTasks: IntArray, sink: MoveSink) {
+    private fun emitFeasibleSwaps(state: LocalSearchState, ls: CumulativeLsState, peakTasks: IntArray, sink: MoveSink) {
         var swapsAdded = 0
         for (i in peakTasks) {
             if (swapsAdded >= CUMULATIVE_MAX_SWAPS) break
@@ -383,7 +390,7 @@ internal interface CumulativeInvariant : Invariant {
         return true
     }
 
-    fun computeTLow(state: LocalSearchState): Int {
+    private fun computeTLow(state: LocalSearchState): Int {
         var lo = Int.MAX_VALUE
         for (i in 0 until n) {
             lo = min(lo, min(state.problem.intDomains[starts[i]].min, state.assignment.intValue(starts[i])))
@@ -391,7 +398,7 @@ internal interface CumulativeInvariant : Invariant {
         return if (lo == Int.MAX_VALUE) 0 else lo
     }
 
-    fun computeTHigh(state: LocalSearchState): Int {
+    private fun computeTHigh(state: LocalSearchState): Int {
         var hi = Int.MIN_VALUE
         for (i in 0 until n) {
             val dUb = if (durationVars.isEmpty()) {

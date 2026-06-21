@@ -2,10 +2,11 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
-import com.eignex.klause.util.IntIntMap
 
 /**
  * Disjunction of Boolean literals.
@@ -19,10 +20,7 @@ import com.eignex.klause.util.IntIntMap
  * Tautologies (a variable appearing as both `+v` and `-v`) are detected at construction; we
  * pick those two indices as the watches and the clause is permanently satisfied.
  */
-class Clause(override val literals: IntArray) :
-    Factor,
-    ClausePropagator,
-    ClauseInvariant {
+class Clause(val literals: IntArray) : Factor {
 
     init {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
@@ -34,37 +32,6 @@ class Clause(override val literals: IntArray) :
 
     override val boolVars: IntArray = literals.litVars()
     override val intVars: IntArray = EmptyIntArray
-
-    /** Initial two-watched-literal wakeup positions. Unit clauses watch their single
-     *  literal so they fire when it becomes false; longer clauses watch literals[0] and
-     *  literals[1] to start. The CP engine routes per-literal wakeups through this set
-     *  via [com.eignex.klause.solver.propagation.PropagationState.boolWatchersByLit]; as
-     *  watches drift during propagation, [propagate] keeps the index in sync by calling
-     *  `state.moveBoolWatcher`. */
-    override val initialBoolWatchers: IntArray =
-        if (literals.size == 1) {
-            intArrayOf(literals[0])
-        } else {
-            intArrayOf(literals[0], literals[1])
-        }
-
-    /** Blocking literal for each initial watch (#200): the *other* watched literal. A clause
-     *  is satisfied by any single true literal, so if the partner watch is true the engine
-     *  can skip waking this clause when the watched literal goes false. A unit clause has no
-     *  partner, so no blockers. Kept in sync as watches drift via the `blocker` argument to
-     *  `moveBoolWatcher`. */
-    override val initialBoolWatcherBlockers: IntArray? =
-        if (literals.size == 1) null else intArrayOf(literals[1], literals[0])
-
-    /** Pre-computed `boolVar → literal index` lookup. Cheap to materialise once at
-     *  construction; turns the per-flip "find my literal" loop into a hash lookup. The
-     *  compile path doesn't generate clauses where a var appears multiple times (`v` and
-     *  `¬v` together would be a tautology and gets dropped). Sentinel `-1` for absent. */
-    private val litIndexByVar: IntIntMap = IntIntMap.build(
-        keys = IntArray(literals.size) { Lit.variable(literals[it]) },
-        values = IntArray(literals.size) { it },
-        absent = -1,
-    )
 
     /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
      *  tri-state (−1 unknown / 0 no / 1 yes) rather than a boxed `Boolean?`, since this is read
@@ -92,5 +59,7 @@ class Clause(override val literals: IntArray) :
         return allBool
     }
 
-    override fun litIndexForVar(v: Int): Int = litIndexByVar[v]
+    override fun asPropagator(): Propagator = ClausePropagator(boolVars, intVars, literals)
+
+    override fun asInvariant(): Invariant = ClauseInvariant(boolVars, intVars, literals)
 }

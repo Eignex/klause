@@ -36,10 +36,10 @@ class DiffnTest {
         repeat(600) { step ->
             val v = probeVars[rng.nextInt(probeVars.size)]
             val nv = rng.nextInt(valueRange.first, valueRange.last + 1)
-            val before = factor.violationDegree(state, 0)
-            val predicted = factor.deltaIfIntSet(state, 0, v, nv)
+            val before = state.factors[0].violationDegree(state, 0)
+            val predicted = state.factors[0].deltaIfIntSet(state, 0, v, nv)
             state.apply(Move.IntSet(v, nv))
-            val after = factor.violationDegree(state, 0)
+            val after = state.factors[0].violationDegree(state, 0)
             assertEquals(after - before, predicted, "step $step: set v=$v to $nv")
         }
     }

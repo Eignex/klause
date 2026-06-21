@@ -2,8 +2,8 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.CoeffLookup
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
 
@@ -15,12 +15,10 @@ import com.eignex.klause.solver.factor.remapLits
  */
 class Xor(
     /** The literals whose parity is constrained. */
-    override val literals: IntArray,
+    val literals: IntArray,
     /** Required parity (0 = even number of true literals, 1 = odd). */
-    override val targetParity: Int,
-) : Factor,
-    XorPropagator,
-    XorInvariant {
+    val targetParity: Int,
+) : Factor {
 
     init {
         require(literals.isNotEmpty()) { "Xor needs at least one literal" }
@@ -34,17 +32,7 @@ class Xor(
     override val boolVars: IntArray = literals.litVars()
     override val intVars: IntArray = EmptyIntArray
 
-    /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`.
-     *  Flipping a var toggles factor parity by exactly this amount. */
-    private val parityByVar: CoeffLookup = run {
-        val parities = IntArray(boolVars.size)
-        for (i in boolVars.indices) {
-            var n = 0
-            for (lit in literals) if (Lit.variable(lit) == boolVars[i]) n++
-            parities[i] = n and 1
-        }
-        CoeffLookup.build(boolVars, parities)
-    }
+    override fun asPropagator(): Propagator = XorPropagator(boolVars, intVars, literals, targetParity)
 
-    override fun parityOf(v: Int): Int = parityByVar.coeffOf(v)
+    override fun asInvariant(): Invariant = XorInvariant(boolVars, intVars, literals, targetParity)
 }

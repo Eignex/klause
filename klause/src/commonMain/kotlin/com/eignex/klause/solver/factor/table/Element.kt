@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 
 /**
  * `result = arr(idx)` — the element constraint, native to local search rather than a
@@ -24,18 +25,16 @@ import com.eignex.klause.solver.propagation.IntEvent
  */
 class Element(
     /** Index variable id. */
-    override val idx: Int,
+    val idx: Int,
     /** Result variable id (`result = arr(idx - indexOffset)`). */
-    override val result: Int,
+    val result: Int,
     /** The indexed array: variable ids when [arrIsVars], else constant values. */
-    override val arr: IntArray,
+    val arr: IntArray,
     /** Whether [arr] holds variable ids (true) or constants (false). */
-    override val arrIsVars: Boolean,
+    val arrIsVars: Boolean,
     /** Integer representing index 0 of [arr]. */
-    override val indexOffset: Int = 1,
-) : Factor,
-    ElementPropagator,
-    ElementInvariant {
+    val indexOffset: Int = 1,
+) : Factor {
 
     init {
         require(arr.isNotEmpty()) { "element: empty array" }
@@ -62,29 +61,23 @@ class Element(
     override val intVars: IntArray =
         if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)
 
-    /**
-     * Advisor subscription (#623): the **variable-array** path is full GAC over interior domains, so
-     * it subscribes to *every* kind on every variable and consumes the dirty-variable delta (#624)
-     * to scope its unchanged-domains gate to the variables that actually changed, instead of the
-     * O(`intVars.size`) ref-scan on every (often redundant fixpoint) re-fire. The **constant-array**
-     * path keeps occurrence wakeup and its own reversible `domRef` fast path in `ElementConstState`
-     * (two variables — `idx`/`result` — so a delta would buy nothing). Subscriptions cover all kinds
-     * because the var array's consistency is hole-aware membership, not just bounds.
-     */
-    override val initialIntEventWatches: IntArray? = if (!arrIsVars) {
-        null
-    } else {
-        val distinct = intVars.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
+    override fun asPropagator(): Propagator = ElementPropagator(
+        boolVars,
+        intVars,
+        idx,
+        result,
+        arr,
+        arrIsVars,
+        indexOffset,
+    )
 
-    override val consumesIntEventDelta: Boolean = arrIsVars
+    override fun asInvariant(): Invariant = ElementInvariant(
+        boolVars,
+        intVars,
+        idx,
+        result,
+        arr,
+        arrIsVars,
+        indexOffset,
+    )
 }

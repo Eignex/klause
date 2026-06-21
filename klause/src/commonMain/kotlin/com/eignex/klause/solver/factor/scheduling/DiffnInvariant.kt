@@ -9,40 +9,51 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /**
- * LS invariant interface for the Diffn constraint. Default implementations maintain an
- * overlapping-pair count and compute deltas using the affected-pair trick. Concrete classes
- * supply the abstract properties.
+ * LS invariant for [Diffn]. Constructed by [Diffn.asInvariant] and maintains an
+ * overlapping-pair count, computing deltas using the affected-pair trick.
  */
-internal interface DiffnInvariant : Invariant {
-
-    val xs: IntArray
-    val ys: IntArray
-    val widths: IntArray
-    val heights: IntArray
-    val widthVars: IntArray?
-    val heightVars: IntArray?
-    val nonStrict: Boolean
-    val n: Int
-
-    /** Returns the rectangle index for the given var id, -1 when shared across rectangles. */
-    fun varToRectOf(varId: Int): Int
+internal class DiffnInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val xs: IntArray,
+    private val ys: IntArray,
+    private val widths: IntArray,
+    private val heights: IntArray,
+    private val widthVars: IntArray?,
+    private val heightVars: IntArray?,
+    private val nonStrict: Boolean,
+    private val n: Int,
+    private val varToRectOf: (Int) -> Int,
+) : Invariant {
 
     // Effective rectangle components applying an optional (overrideVar → overrideVal).
-    fun rx(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int = if (xs[i] == ov) nv else s.assignment.intValue(xs[i])
+    private fun rx(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int = if (xs[i] == ov) {
+        nv
+    } else {
+        s.assignment.intValue(
+            xs[i],
+        )
+    }
 
-    fun ry(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int = if (ys[i] == ov) nv else s.assignment.intValue(ys[i])
+    private fun ry(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int = if (ys[i] == ov) {
+        nv
+    } else {
+        s.assignment.intValue(
+            ys[i],
+        )
+    }
 
-    fun rw(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int {
+    private fun rw(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int {
         val wv = widthVars ?: return widths[i]
         return if (wv[i] == ov) nv else s.assignment.intValue(wv[i])
     }
 
-    fun rh(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int {
+    private fun rh(s: LocalSearchState, i: Int, ov: Int, nv: Int): Int {
         val hv = heightVars ?: return heights[i]
         return if (hv[i] == ov) nv else s.assignment.intValue(hv[i])
     }
 
-    fun overlaps(x1: Int, y1: Int, w1: Int, h1: Int, x2: Int, y2: Int, w2: Int, h2: Int): Boolean {
+    private fun overlaps(x1: Int, y1: Int, w1: Int, h1: Int, x2: Int, y2: Int, w2: Int, h2: Int): Boolean {
         if (nonStrict && (w1 == 0 || h1 == 0 || w2 == 0 || h2 == 0)) return false
         val xOverlap = !(x1 + w1 <= x2 || x2 + w2 <= x1)
         val yOverlap = !(y1 + h1 <= y2 || y2 + h2 <= y1)
@@ -50,7 +61,7 @@ internal interface DiffnInvariant : Invariant {
     }
 
     /** Overlapping-pair count with an optional single-variable override (`ov < 0` = none). */
-    fun countOverlaps(state: LocalSearchState, ov: Int, nv: Int): Int {
+    private fun countOverlaps(state: LocalSearchState, ov: Int, nv: Int): Int {
         var bad = 0
         for (i in 0 until n) {
             val xi = rx(state, i, ov, nv)
@@ -78,7 +89,7 @@ internal interface DiffnInvariant : Invariant {
 
     /** Number of overlapping pairs that include rectangle [r], under an optional single-var
      *  override (`ov < 0` = none). */
-    fun pairsInvolvingRect(state: LocalSearchState, r: Int, ov: Int, nv: Int): Int {
+    private fun pairsInvolvingRect(state: LocalSearchState, r: Int, ov: Int, nv: Int): Int {
         val xr = rx(state, r, ov, nv)
         val yr = ry(state, r, ov, nv)
         val wr = rw(state, r, ov, nv)

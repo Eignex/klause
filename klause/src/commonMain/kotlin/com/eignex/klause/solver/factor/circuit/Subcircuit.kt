@@ -1,10 +1,11 @@
 package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.circuit.internals.cycleScan
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.propagation.IntEvent
 import kotlin.math.abs
 
 /**
@@ -35,9 +36,7 @@ import kotlin.math.abs
 class Subcircuit(
     /** Successor variable id per node; `succ(i) = i` excludes node i, the rest form one cycle. */
     succ: IntArray,
-) : SuccessorCycleFactor(succ),
-    SubcircuitPropagator,
-    SubcircuitInvariant {
+) : SuccessorCycleFactor(succ) {
 
     init {
         require(succ.isNotEmpty()) { "Subcircuit needs at least one var, got ${succ.size}" }
@@ -48,24 +47,6 @@ class Subcircuit(
     /** Position-faithful: `succ(i)` is node i's successor (`succ(i) = i` excludes node i), so the
      *  array order is meaningful — the key keeps the variables in order, not sorted (#443). */
     override fun structuralKey(): String = "subcircuit:" + succ.joinToString(",")
-
-    /** Advisor subscription (#623): the included-cycle reasoning reacts to bound moves, fixings and
-     *  forced chain-start membership, so subscribe to every kind on every successor variable and
-     *  consume the dirty-variable delta (#624) — a fire that drains an empty delta returns at once. */
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = succ.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
-
-    override val consumesIntEventDelta: Boolean = true
 
     /**
      * Graded cost for the subcircuit. 0 iff included set forms a single cycle (or is empty).
@@ -109,4 +90,8 @@ class Subcircuit(
         val scan = cycleScan(next, n)
         return abs(scan.numCycles - 1) + (numIncluded - scan.nodesInCycles) + numPointToExcluded + numOob
     }
+
+    override fun asPropagator(): Propagator = SubcircuitPropagator(boolVars, intVars, succ, n)
+
+    override fun asInvariant(): Invariant = SubcircuitInvariant(boolVars, intVars, succ, n, ::computeCost)
 }

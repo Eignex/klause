@@ -2,7 +2,9 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.propagation.PropagationState
@@ -13,9 +15,7 @@ import com.eignex.klause.util.IntHashSet
  * true, 0 when false). Payload at `intPayload[factorId]` is the current weighted sum.
  */
 class PseudoBoolean(weights: IntArray, literals: IntArray, op: PbOp, bound: Int) :
-    PseudoBooleanSumFactor(weights, literals, op, bound, excludedVar = -1),
-    PseudoBooleanPropagator,
-    PseudoBooleanInvariant {
+    PseudoBooleanSumFactor(weights, literals, op, bound, excludedVar = -1) {
 
     override fun structuralKey(): String = "pb:$op:$bound:" + literals.indices.sortedBy { literals[it] }.joinToString(
         ",",
@@ -26,7 +26,9 @@ class PseudoBoolean(weights: IntArray, literals: IntArray, op: PbOp, bound: Int)
 
     override val boolVars: IntArray = literals.litVars()
 
-    override fun signedForVar(v: Int): Int = signedByVar[v]
+    override fun asPropagator(): Propagator = PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
+
+    override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, intVars, weights, literals, op, bound)
 }
 
 /**

@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.factor
 
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
@@ -43,7 +42,6 @@ object DegreeConsistencyOracle {
         softCap: Int? = null,
     ) {
         require(problem.factors.size == 1) { "DegreeConsistencyOracle expects a single-factor Problem" }
-        val factor = problem.factors[0]
         val rng = Random(seed)
         val state = LocalSearchState(problem, rng)
         val fresh = LocalSearchState(problem, Random(seed xor 0x5A5AL))
@@ -57,7 +55,7 @@ object DegreeConsistencyOracle {
 
         randomize(state, problem, rng)
         state.recompute()
-        assertDegreeInvariants(state, factor, label, "initial")
+        assertDegreeInvariants(state, label, "initial")
         assertMatchesFreshRecompute(state, fresh, problem, label, "initial")
 
         repeat(iters) { iter ->
@@ -67,7 +65,7 @@ object DegreeConsistencyOracle {
             state.apply(move)
             // Cost-tracking correctness (universal): apply* must keep the maintained cost in
             // lockstep with a fresh recompute of the same assignment.
-            assertDegreeInvariants(state, factor, label, "iter=$iter after $move")
+            assertDegreeInvariants(state, label, "iter=$iter after $move")
             assertMatchesFreshRecompute(state, fresh, problem, label, "iter=$iter after $move")
             // Probe exactness (graded factors only).
             if (exactProbe) {
@@ -82,13 +80,16 @@ object DegreeConsistencyOracle {
         }
     }
 
-    private fun assertDegreeInvariants(state: LocalSearchState, factor: Factor, label: String, where: String) {
-        val deg = factor.violationDegree(state, 0)
+    private fun assertDegreeInvariants(state: LocalSearchState, label: String, where: String) {
+        val deg = state.factors[0].violationDegree(state, 0)
         assertTrue(deg >= 0, "$label: violationDegree=$deg is negative ($where)")
         assertEquals(
             deg > 0,
-            factor.isViolated(state, 0),
-            "$label: (violationDegree>0)=${deg > 0} disagrees with isViolated=${factor.isViolated(state, 0)} ($where)",
+            state.factors[0].isViolated(state, 0),
+            "$label: (violationDegree>0)=${deg > 0} disagrees with isViolated=${state.factors[0].isViolated(
+                state,
+                0,
+            )} ($where)",
         )
     }
 

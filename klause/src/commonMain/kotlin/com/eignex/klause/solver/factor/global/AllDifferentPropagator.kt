@@ -11,14 +11,16 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /** CP propagation logic for `all_different`. */
-internal interface AllDifferentPropagator : Propagator {
-    val vars: IntArray
-    val domainSize: Int
-    val domainMin: Int
-    val presents: IntArray
-    val exceptSet: IntArray
-    val boundsConsistent: Boolean
-    val exceptValues: IntHashSet
+internal class AllDifferentPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val vars: IntArray,
+    private val presents: IntArray,
+    private val exceptSet: IntArray,
+    private val boundsConsistent: Boolean,
+    private val exceptValues: IntHashSet,
+    private val definitelyPresentPropFn: (Int, PropagationState) -> Boolean,
+) : Propagator {
 
     override val initialIntEventWatches: IntArray?
         get() = if (boundsConsistent && presents.isEmpty() && exceptSet.isEmpty()) {
@@ -53,7 +55,7 @@ internal interface AllDifferentPropagator : Propagator {
         } else {
             val acc = IntArrayList()
             for (i in vars.indices) {
-                if (definitelyPresentProp(i, state)) acc.add(i)
+                if (definitelyPresentPropFn(i, state)) acc.add(i)
             }
             IntArray(acc.size) { acc[it] }
         }
@@ -70,6 +72,4 @@ internal interface AllDifferentPropagator : Propagator {
         }
         return true
     }
-
-    fun definitelyPresentProp(idx: Int, state: PropagationState): Boolean
 }

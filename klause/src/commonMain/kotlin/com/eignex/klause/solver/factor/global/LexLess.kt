@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 
 /**
  * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on equal-length int
@@ -20,14 +21,12 @@ import com.eignex.klause.solver.propagation.IntEvent
  */
 class LexLess(
     /** Left vector variable ids. */
-    override val xs: IntArray,
+    val xs: IntArray,
     /** Right vector variable ids, parallel to [xs]. */
-    override val ys: IntArray,
+    val ys: IntArray,
     /** When true the relation is strict (`xs < ys`); otherwise `xs ≤ ys`. */
-    override val strict: Boolean,
-) : Factor,
-    LexLessPropagator,
-    LexLessInvariant {
+    val strict: Boolean,
+) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         LexLess(xs.remapVars(intMap), ys.remapVars(intMap), strict)
@@ -35,21 +34,7 @@ class LexLess(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys
 
-    /**
-     * Advisor subscription (#623): lexicographic propagation is bound-only (see [propagate], which
-     * compares `min`/`max` at the deciding position and tightens bounds — its own comment notes it
-     * "can't propagate further with bound-only reasoning"). An interior hole moves no bound, so the
-     * factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
-     * interior `VALUE_REMOVED` wakes.
-     */
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = intVars.toHashSet()
-        val out = IntArray(distinct.size * 2)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-        }
-        out
-    }
+    override fun asPropagator(): Propagator = LexLessPropagator(boolVars, intVars, xs, ys, strict)
+
+    override fun asInvariant(): Invariant = LexLessInvariant(boolVars, intVars, xs, ys, strict)
 }

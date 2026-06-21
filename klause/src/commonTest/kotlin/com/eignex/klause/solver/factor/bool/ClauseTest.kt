@@ -28,7 +28,7 @@ class ClauseTest {
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, true)
         state.recompute()
-        assertTrue(clause.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test
@@ -39,12 +39,12 @@ class ClauseTest {
         state.assignment.setBool(1, true)
         state.assignment.setBool(2, false)
         state.recompute()
-        assertTrue(clause.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
 
-        val predictedDelta = clause.deltaIfBoolFlipped(state, 0, 0)
+        val predictedDelta = state.factors[0].deltaIfBoolFlipped(state, 0, 0)
         state.apply(Move.BoolFlip(0))
         assertEquals(-1, predictedDelta)
-        assertFalse(clause.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
     }
 
     @Test
@@ -55,10 +55,10 @@ class ClauseTest {
         state.assignment.setBool(1, true)
         state.assignment.setBool(2, false)
         state.recompute()
-        assertFalse(clause.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
         state.apply(Move.BoolFlip(0))
-        assertFalse(clause.isViolated(state, 0))
+        assertFalse(state.factors[0].isViolated(state, 0))
         state.apply(Move.BoolFlip(1))
-        assertTrue(clause.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
     }
 }

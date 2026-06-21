@@ -2,20 +2,30 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.factor.CoeffLookup
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntHashSet
 
-/** CP contract for [Xor]: parity propagation over a list of Boolean literals. */
-interface XorPropagator : Propagator {
+/** CP propagator for [Xor]: parity propagation over a list of Boolean literals. */
+internal class XorPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val literals: IntArray,
+    private val targetParity: Int,
+) : Propagator {
 
-    /** The literals whose parity is constrained. */
-    val literals: IntArray
+    /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`. */
+    private val parityByVar: CoeffLookup = run {
+        val parities = IntArray(boolVars.size)
+        for (i in boolVars.indices) {
+            var n = 0
+            for (lit in literals) if (Lit.variable(lit) == boolVars[i]) n++
+            parities[i] = n and 1
+        }
+        CoeffLookup.build(boolVars, parities)
+    }
 
-    /** Required parity (0 = even, 1 = odd). */
-    val targetParity: Int
-
-    /** Parity contribution of [v]: `(occurrences mod 2)`. Returns 0 if [v] is not in [literals]. */
-    fun parityOf(v: Int): Int
+    private fun parityOf(v: Int): Int = parityByVar.coeffOf(v)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         var pinnedParity = 0
@@ -76,7 +86,7 @@ interface XorPropagator : Propagator {
      *  Each entry is the literal whose value is false under the current assignment for
      *  that variable; together they describe "the partial assignment that forced this
      *  pin / drove parity to violation". */
-    fun parityAntecedents(state: PropagationState, excludeVar: Int): IntArray? {
+    private fun parityAntecedents(state: PropagationState, excludeVar: Int): IntArray? {
         var n = 0
         for (v in boolVars) {
             if (v == excludeVar) continue

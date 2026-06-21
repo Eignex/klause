@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -18,18 +19,16 @@ import com.eignex.klause.util.IntIntMap
  */
 class Table(
     /** The variable ids forming each candidate tuple. */
-    override val xs: IntArray,
+    val xs: IntArray,
     /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
-    override val tuples: IntArray,
-) : Factor,
-    TablePropagator,
-    TableInvariant {
+    val tuples: IntArray,
+) : Factor {
 
     /** Number of variables per tuple. */
-    override val arity: Int = xs.size
+    val arity: Int = xs.size
 
     /** Number of tuples. */
-    override val numTuples: Int = tuples.size / arity
+    val numTuples: Int = tuples.size / arity
 
     init {
         require(xs.isNotEmpty()) { "table: empty xs" }
@@ -57,12 +56,13 @@ class Table(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
-    // Var id → its tuple column, for the LS Hamming-distance maintenance. A var occupying exactly
-    // one column maps to it here (the common case, unboxed); vars repeated across columns fall to
-    // [multiColumnsByVar]. Together they cover every var in [xs].
+    /** Var id → the single tuple column it occupies (the common case). Vars that appear in more than
+     *  one column are absent here and listed in [multiColumnsByVar] instead. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    override val singleColumnByVar: IntIntMap
-    override val multiColumnsByVar: Map<Int, IntArray>
+    val singleColumnByVar: IntIntMap
+
+    /** Var id → all tuple columns it occupies, for vars that appear more than once in [xs]. */
+    val multiColumnsByVar: Map<Int, IntArray>
 
     init {
         val (single, multi) = tableColumnMaps(xs, arity)
@@ -70,22 +70,8 @@ class Table(
         multiColumnsByVar = multi
     }
 
-    /** Advisor subscription (#623): STR2 is hole-aware GAC (tuple feasibility tests membership, the
-     *  prune drops interior values), so subscribe to every kind on every column variable and consume
-     *  the dirty-variable delta (#624) — a fire re-sweeps only when a column actually changed, instead
-     *  of the per-fire O(arity) domain-ref scan. */
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = xs.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
+    override fun asPropagator(): Propagator = TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples)
 
-    override val consumesIntEventDelta: Boolean = true
+    override fun asInvariant(): Invariant =
+        TableInvariant(boolVars, intVars, xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar)
 }

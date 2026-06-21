@@ -5,19 +5,27 @@ import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.arithmetic.internals.floorDivLong
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP contract for [Product]: bounds propagation for `a * b = result`. */
-interface ProductPropagator : Propagator {
+/** CP propagator for [Product]: bounds propagation for `a * b = result`. */
+internal class ProductPropagator(
+    private val a: Int,
+    private val b: Int,
+    private val result: Int,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+) : Propagator {
 
-    /** First operand variable id. */
-    val a: Int
-
-    /** Second operand variable id. */
-    val b: Int
-
-    /** Result variable id. */
-    val result: Int
+    /**
+     * Advisor subscription (#623): `propagate` derives everything from the corner products and
+     * corner divisions of the `[min, max]` intervals of `a`, `b`, and `result` — it reads only
+     * `min`/`max`. An interior hole can change none of those, so the propagator subscribes to
+     * [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on each variable and skips interior
+     * `VALUE_REMOVED` wakes. Deduplicated so an aliased operand (e.g. `a == b` for a square) is
+     * subscribed once.
+     */
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)

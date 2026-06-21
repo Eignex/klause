@@ -8,23 +8,16 @@ import com.eignex.klause.solver.factor.bool.internals.pbSumRange
 import com.eignex.klause.solver.factor.bool.internals.propagatePbBounds
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP contract for [ReifiedPseudoBoolean]: reified pseudo-Boolean propagation. */
-interface ReifiedPseudoBooleanPropagator : Propagator {
-
-    /** The reifying Boolean variable id. */
-    val auxBoolVar: Int
-
-    /** Literal weights parallel to [literals]. */
-    val weights: IntArray
-
-    /** The Boolean literals. */
-    val literals: IntArray
-
-    /** Comparison operator. */
-    val op: PbOp
-
-    /** Right-hand-side bound. */
-    val bound: Int
+/** CP propagator for [ReifiedPseudoBoolean]: reified pseudo-Boolean propagation. */
+internal class ReifiedPseudoBooleanPropagator(
+    private val auxBoolVar: Int,
+    private val weights: IntArray,
+    private val literals: IntArray,
+    private val op: PbOp,
+    private val bound: Int,
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+) : Propagator {
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0

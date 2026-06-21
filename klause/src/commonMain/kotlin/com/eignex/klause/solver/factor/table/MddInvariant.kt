@@ -5,17 +5,19 @@ import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
-/** LS invariant contract for the layered MDD constraint. */
-internal interface MddInvariant : Invariant {
-
-    val seq: IntArray
-    val numStatesPerLayer: IntArray
-    val layerStarts: IntArray
-    val transitions: IntArray
-    val initial: Int
-    val accepting: IntArray
-    val recordStride: Int
-    val cost: Int
+/** LS invariant for [Mdd]. Constructed by [Mdd.asInvariant]. */
+internal class MddInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val seq: IntArray,
+    private val numStatesPerLayer: IntArray,
+    private val layerStarts: IntArray,
+    private val transitions: IntArray,
+    private val initial: Int,
+    private val accepting: IntArray,
+    private val recordStride: Int,
+    private val cost: Int,
+) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         !mddPathExists(state, seq, layerStarts, transitions, recordStride, initial, accepting, -1, 0)

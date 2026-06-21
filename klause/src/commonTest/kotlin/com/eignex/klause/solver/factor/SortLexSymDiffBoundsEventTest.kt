@@ -62,15 +62,15 @@ class SortLexSymDiffBoundsEventTest {
     @Test
     fun `all three subscribe to only bound events`() {
         assertBoundOnly(
-            Sort(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3)).initialIntEventWatches,
+            Sort(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3)).asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
-            LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true).initialIntEventWatches,
+            LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true).asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
-            SymmetricAllDifferent(xs = intArrayOf(0, 1, 2), indexOffset = 0).initialIntEventWatches,
+            SymmetricAllDifferent(xs = intArrayOf(0, 1, 2), indexOffset = 0).asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2),
         )
     }

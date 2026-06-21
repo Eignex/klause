@@ -376,13 +376,15 @@ internal class RevisedSimplex(
                 val hi = if (model.hasUpper[v]) model.upper[v].toDouble() else Double.MAX_VALUE
                 gamma[i] = when {
                     beta[i] < -FEAS_TOL -> {
-                        w -= beta[i];
+                        w -= beta[i]
                         -1.0
                     }
+
                     beta[i] > hi + FEAS_TOL -> {
-                        w += beta[i] - hi;
+                        w += beta[i] - hi
                         1.0
                     }
+
                     else -> 0.0
                 }
             }
@@ -425,7 +427,7 @@ internal class RevisedSimplex(
 
                     // Above its upper bound: a falling β_i reaches feasibility at u_i and may leave.
                     gamma[i] > 0 -> if (rate < 0) {
-                        t = (beta[i] - hi) / -rate;
+                        t = (beta[i] - hi) / -rate
                         toUpper = true
                     }
 
@@ -433,7 +435,7 @@ internal class RevisedSimplex(
                     rate < 0 -> t = beta[i] / -rate
 
                     hi < Double.MAX_VALUE -> {
-                        t = (hi - beta[i]) / rate;
+                        t = (hi - beta[i]) / rate
                         toUpper = true
                     }
                 }
@@ -458,8 +460,8 @@ internal class RevisedSimplex(
                 refactor() ?: return null
             } else {
                 factor.also {
-                it.update(leaving, alpha)
-            }
+                    it.update(leaving, alpha)
+                }
             }
             beta = basicValues(factor)
         }

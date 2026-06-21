@@ -6,6 +6,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.ClausePropagator
 import com.eignex.klause.util.IntArrayList
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
@@ -337,7 +338,7 @@ class PropagationSession(
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
     /** The learned clause at [learnedIndex]. Read by the engine's vivification pass (#203). */
-    fun learnedClauseAt(learnedIndex: Int): Clause = state.learnedClauses[learnedIndex]
+    internal fun learnedClauseAt(learnedIndex: Int): ClausePropagator = state.learnedClauses[learnedIndex]
 
     /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)

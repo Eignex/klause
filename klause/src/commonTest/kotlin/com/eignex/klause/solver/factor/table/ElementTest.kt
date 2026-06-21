@@ -42,7 +42,7 @@ class ElementTest {
         state.undoLogging = true
         state.currentLevel = 1
         check(state.tightenIntMin(1, 1)) { "tighten result min failed" }
-        check(problem.factors[0].propagate(state, 0)) { "element propagate failed" }
+        check(problem.propagators[0].propagate(state, 0)) { "element propagate failed" }
         check(state.intDomains[2].min == 1) { "channel must lift the element's min to 1" }
 
         val ant = state.intMinAntecedents[2]

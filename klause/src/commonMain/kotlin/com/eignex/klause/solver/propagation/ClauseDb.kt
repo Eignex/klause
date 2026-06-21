@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.ClausePropagator
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
@@ -18,7 +19,7 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
     val list = boolWatchersByLit[lit]
     for (i in 0 until list.size) {
         val f = factorAt(list[i])
-        if (f is Clause && f.literals.size == 2) {
+        if (f is ClausePropagator && f.literals.size == 2) {
             val a = f.literals[0]
             val b = f.literals[1]
             when (lit) {
@@ -49,7 +50,7 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = if (fid < baseFac
  * Does NOT eagerly propagate — that's the session-level
  * [PropagationSession.addLearnedClause]'s job. Returns the new factor id.
  */
-internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): Int {
+internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: Int, permanent: Boolean = false): Int {
     val newFid = totalFactorCount
     learnedClauseStore.add(clause)
     learnedLbds.add(lbd)
@@ -63,6 +64,10 @@ internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permane
     for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
     return newFid
 }
+
+/** Convenience overload that converts a structural [Clause] to its [ClausePropagator] before registering. */
+internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): Int =
+    addLearnedClause(clause.asPropagator() as ClausePropagator, lbd, permanent)
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
 internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int = learnedLbds[learnedIndex]

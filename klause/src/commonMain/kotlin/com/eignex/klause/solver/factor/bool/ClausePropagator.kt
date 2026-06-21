@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor.bool
 
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.bool.internals.findNonFalseLitExcept
 import com.eignex.klause.solver.factor.bool.internals.litFalseInPropState
@@ -8,11 +9,39 @@ import com.eignex.klause.solver.factor.bool.internals.pinUnitLit
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.moveBoolWatcher
 
-/** CP contract for [Clause]: two-watched-literal propagation over a disjunction of literals. */
-interface ClausePropagator : Propagator {
+/** CP propagator for [Clause]: two-watched-literal propagation over a disjunction of literals. */
+internal class ClausePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    internal val literals: IntArray,
+) : Propagator {
 
-    /** The literals whose disjunction this clause asserts. */
-    val literals: IntArray
+    private var pureBoolMemo: Int = -1
+
+    /** True iff every literal is a plain bool var (variable id `< numBoolVars`), memoised. */
+    internal fun allLiteralsBool(numBoolVars: Int): Boolean {
+        val m = pureBoolMemo
+        if (m >= 0) return m == 1
+        var allBool = true
+        for (lit in literals) {
+            if (Lit.variable(lit) >= numBoolVars) {
+                allBool = false
+                break
+            }
+        }
+        pureBoolMemo = if (allBool) 1 else 0
+        return allBool
+    }
+
+    override val initialBoolWatchers: IntArray =
+        if (literals.size == 1) {
+            intArrayOf(literals[0])
+        } else {
+            intArrayOf(literals[0], literals[1])
+        }
+
+    override val initialBoolWatcherBlockers: IntArray? =
+        if (literals.size == 1) null else intArrayOf(literals[1], literals[0])
 
     /**
      * Two-watched-literal propagation (Zhang–Stickel / MiniSAT). Caches a pair of literal

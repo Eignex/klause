@@ -9,20 +9,21 @@ import com.eignex.klause.solver.factor.bool.snapLinearTarget
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
-/** LS interface for [Linear]: violation tracking, repair, and structured moves. */
-interface LinearInvariant : Invariant {
+/** LS invariant for [Linear]: violation tracking, repair, and structured moves. */
+internal class LinearInvariant(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val coeffs: IntArray,
+    private val vars: IntArray,
+    private val op: LinearOp,
+    private val bound: Int,
+) : Invariant {
 
-    /** Coefficients parallel to [vars]. */
-    val coeffs: IntArray
-
-    /** Integer variable ids. */
-    val vars: IntArray
-
-    /** Comparison operator. */
-    val op: LinearOp
-
-    /** Right-hand-side bound. */
-    val bound: Int
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        var sum = 0L
+        for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
+        state.longPayload[factorId] = sum
+    }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         !linearHolds(state.longPayload[factorId], op, bound)
@@ -104,7 +105,7 @@ interface LinearInvariant : Invariant {
      *  the smallest integer Δ such that `coeffs[a]·Δ = -coeffs[b]·Δ'` for some integer
      *  Δ' that fits both vars' domains. Equal-coefficient case (e.g. exactly-one decomp
      *  with all c=1) collapses to a 0/1 value swap. */
-    fun proposeEqPairShifts(state: LocalSearchState, sink: MoveSink) {
+    private fun proposeEqPairShifts(state: LocalSearchState, sink: MoveSink) {
         val n = vars.size
         val tryPair = { a: Int, b: Int ->
             val ca = coeffs[a]
@@ -155,7 +156,7 @@ interface LinearInvariant : Invariant {
      *  we can increase any var with positive coefficient or decrease any with negative
      *  coefficient by up to floor(slack / |c|). For GE: symmetric. Single-var moves —
      *  not pairs — since the inequality direction lets us absorb the delta in slack. */
-    fun proposeBoundedSlackShifts(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+    private fun proposeBoundedSlackShifts(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val curSum = state.longPayload[factorId]
         val slack = when (op) {
             LinearOp.LE -> bound - curSum

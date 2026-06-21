@@ -7,6 +7,7 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
 import com.eignex.klause.solver.factor.table.Element
+import com.eignex.klause.solver.factor.table.ElementPropagator
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
@@ -49,8 +50,9 @@ class ElementDeltaTest {
     @Test
     fun `variable-array element subscribes to all kinds and consumes the delta`() {
         val varArr = Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
-        assertTrue(varArr.consumesIntEventDelta, "var-array element must consume the dirty-var delta")
-        val watches = varArr.initialIntEventWatches
+        val varArrProp = varArr.asPropagator() as ElementPropagator
+        assertTrue(varArrProp.consumesIntEventDelta, "var-array element must consume the dirty-var delta")
+        val watches = varArrProp.initialIntEventWatches
         assertTrue(watches != null)
         // every distinct variable subscribed to all four kinds
         val byVar = watches.groupBy { IntEvent.intVarOf(it) }
@@ -64,8 +66,9 @@ class ElementDeltaTest {
 
         // The constant-array path keeps occurrence wakeup (its own reversible domRef fast path).
         val constArr = Element(idx = 0, result = 1, arr = intArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 0)
-        assertNull(constArr.initialIntEventWatches)
-        assertFalse(constArr.consumesIntEventDelta)
+        val constArrProp = constArr.asPropagator() as ElementPropagator
+        assertNull(constArrProp.initialIntEventWatches)
+        assertFalse(constArrProp.consumesIntEventDelta)
     }
 
     @Test

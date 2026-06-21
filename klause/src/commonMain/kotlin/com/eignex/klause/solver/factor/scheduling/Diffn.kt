@@ -2,8 +2,9 @@ package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.remapVars
-import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -22,19 +23,18 @@ import com.eignex.klause.util.IntIntMap
  */
 class Diffn(
     /** Variable ids the constraint ranges over. */
-    override val xs: IntArray,
+    val xs: IntArray,
     /** Second-vector variable ids. */
-    override val ys: IntArray,
-    override val widths: IntArray,
-    override val heights: IntArray,
-    override val widthVars: IntArray? = null,
-    override val heightVars: IntArray? = null,
-    override val nonStrict: Boolean = false,
-) : Factor,
-    DiffnPropagator,
-    DiffnInvariant {
+    val ys: IntArray,
+    val widths: IntArray,
+    val heights: IntArray,
+    val widthVars: IntArray? = null,
+    val heightVars: IntArray? = null,
+    val nonStrict: Boolean = false,
+) : Factor {
 
-    override val n: Int = xs.size
+    /** Number of rectangles. */
+    val n: Int = xs.size
 
     init {
         require(xs.size == ys.size) { "diffn: xs/ys size mismatch" }
@@ -67,16 +67,8 @@ class Diffn(
     override val intVars: IntArray =
         xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray)
 
-    /**
-     * Advisor subscription (#623): non-overlap propagation reads only each coordinate/size variable's
-     * `min`/`max` (the "must-overlap on one axis ⇒ separate on the other" reasoning is pure interval
-     * arithmetic). An interior hole moves no bound, so it subscribes to [IntEvent.LB_RAISED] /
-     * [IntEvent.UB_LOWERED] per variable and skips interior `VALUE_REMOVED` wakes.
-     */
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
-
     /** Whether the search can resize rectangles (var dimensions present). */
-    override val varSize: Boolean = widthVars != null || heightVars != null
+    val varSize: Boolean = widthVars != null || heightVars != null
 
     /** var id → the single rectangle index it belongs to, or `-1` when the same id is shared
      *  by ≥2 distinct rectangles (a degenerate model). The affected-pair delta only touches
@@ -101,5 +93,34 @@ class Diffn(
         IntIntMap.build(keys, IntArray(keys.size) { m.getValue(keys[it]) }, absent = -1)
     }
 
-    override fun varToRectOf(varId: Int): Int = varToRect[varId]
+    /** Index of the rectangle that owns [varId] (as an x, y, width, or height variable), or `-1`. */
+    fun varToRectOf(varId: Int): Int = varToRect[varId]
+
+    override fun asPropagator(): Propagator = DiffnPropagator(
+        boolVars = boolVars,
+        intVars = intVars,
+        xs = xs,
+        ys = ys,
+        widths = widths,
+        heights = heights,
+        widthVars = widthVars,
+        heightVars = heightVars,
+        nonStrict = nonStrict,
+        n = n,
+        varSize = varSize,
+    )
+
+    override fun asInvariant(): Invariant = DiffnInvariant(
+        boolVars = boolVars,
+        intVars = intVars,
+        xs = xs,
+        ys = ys,
+        widths = widths,
+        heights = heights,
+        widthVars = widthVars,
+        heightVars = heightVars,
+        nonStrict = nonStrict,
+        n = n,
+        varToRectOf = ::varToRectOf,
+    )
 }

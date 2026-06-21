@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.bool.ClausePropagator
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -330,7 +331,7 @@ class PropagationState(
      *  they participate in propagation through [boolWatchersByLit] just like static
      *  clauses. Survives `restore` (clauses are facts about the original problem, not
      *  trail state); pruned by [forgetLearnedClauses]. */
-    internal val learnedClauseStore: ArrayList<Clause> = ArrayList()
+    internal val learnedClauseStore: ArrayList<ClausePropagator> = ArrayList()
 
     // Cached base factor table — `problem.factors` is immutable after construction, so hoist
     // the array reference and its size out of the per-call `problem.factors` / `.size` getters
@@ -339,7 +340,7 @@ class PropagationState(
     internal val baseFactorCount: Int = problem.factors.size
 
     /** Clauses learned during conflict analysis. */
-    val learnedClauses: List<Clause> get() = learnedClauseStore
+    internal val learnedClauses: List<ClausePropagator> get() = learnedClauseStore
 
     /** Count of binary (2-literal) clauses known — original problem clauses plus learned
      *  ones. Gates the #202 binary-resolution minimization, which is a no-op without binary
@@ -760,9 +761,9 @@ class PropagationState(
 
     init {
         for (fid in 0 until problem.numFactors) {
-            val factor = problem.factors[fid]
-            val watchers = factor.initialBoolWatchers ?: continue
-            val blockers = factor.initialBoolWatcherBlockers
+            val propagator = problem.propagators[fid]
+            val watchers = propagator.initialBoolWatchers ?: continue
+            val blockers = propagator.initialBoolWatcherBlockers
             for (i in watchers.indices) {
                 installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
             }
@@ -772,7 +773,7 @@ class PropagationState(
     init {
         if (problem.usesIntEventWatchers) {
             for (fid in 0 until problem.numFactors) {
-                val watches = problem.factors[fid].initialIntEventWatches ?: continue
+                val watches = problem.propagators[fid].initialIntEventWatches ?: continue
                 for (packed in watches) intEventWatchersBySlot[packed].add(fid)
             }
         }
@@ -781,7 +782,7 @@ class PropagationState(
     init {
         if (problem.usesIntEventDeltaConsumers) {
             for (fid in 0 until problem.numFactors) {
-                if (problem.factors[fid].consumesIntEventDelta) {
+                if (problem.propagators[fid].consumesIntEventDelta) {
                     eventDirtyVars[fid] = IntArrayList()
                     eventDirtyMark[fid] = IntHashSet()
                 }
@@ -940,7 +941,7 @@ class PropagationState(
             // at the current level), so its effective level is exactly the current decision
             // level — no scan at all. Atom-lit clauses can fire on an atom that flipped at a
             // sub-decision level, so they keep the literal scan.
-            currentLevel = if (f is Clause) {
+            currentLevel = if (f is ClausePropagator) {
                 if (f.allLiteralsBool(problem.numBoolVars)) {
                     levelToDecisionVar.size
                 } else {

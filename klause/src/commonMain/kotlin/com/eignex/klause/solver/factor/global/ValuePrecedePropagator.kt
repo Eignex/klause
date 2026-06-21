@@ -2,14 +2,37 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.RevInt
 
 /** CP propagation logic for `value_precede`. */
-internal interface ValuePrecedePropagator : Propagator {
-    val s: Int
-    val t: Int
-    val xs: IntArray
+internal class ValuePrecedePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val s: Int,
+    private val t: Int,
+    private val xs: IntArray,
+) : Propagator {
+
+    /** Advisor subscription (#623): membership-sensitive (the prefix scan tests `s ∈ dom` and
+     *  forced-`t`), so subscribe to every kind on every sequence variable and consume the dirty-
+     *  variable delta (#624). The reversible `α`/`prunedUpTo` state ([VpState]) advances only over the
+     *  changed prefix instead of rescanning the whole sequence each fire. */
+    override val initialIntEventWatches: IntArray = run {
+        val distinct = xs.toHashSet()
+        val out = IntArray(distinct.size * IntEvent.COUNT)
+        var w = 0
+        for (v in distinct) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
+            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
+        }
+        out
+    }
+
+    override val consumesIntEventDelta: Boolean = true
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, xs)

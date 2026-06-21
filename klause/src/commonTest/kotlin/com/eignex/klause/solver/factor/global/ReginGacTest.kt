@@ -47,7 +47,7 @@ class ReginGacTest {
         val d01 = IntDomain(1, 3).excludeValue(2) // sparse {1, 3}
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 3)
         val state = stateWith(factor, arrayOf(d01, d01, IntDomain(1, 3)))
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(state.problem.propagators[0].propagate(state, factorId = 0))
         val d2 = state.intDomains[2]
         assertEquals(2, d2.min)
         assertEquals(2, d2.max)
@@ -62,7 +62,7 @@ class ReginGacTest {
             factor,
             arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 5)),
         )
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(state.problem.propagators[0].propagate(state, factorId = 0))
         val d2 = state.intDomains[2]
         assertEquals(3, d2.min)
         assertEquals(5, d2.max)
@@ -78,14 +78,14 @@ class ReginGacTest {
             factor,
             arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 2)),
         )
-        assertFalse(factor.propagate(state, factorId = 0))
+        assertFalse(state.problem.propagators[0].propagate(state, factorId = 0))
     }
 
     @Test
     fun `AllDifferent singleton conflict detected`() {
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 1, domainSize = 5)
         val state = stateWith(factor, arrayOf(IntDomain(3, 3), IntDomain(3, 3)))
-        assertFalse(factor.propagate(state, factorId = 0))
+        assertFalse(state.problem.propagators[0].propagate(state, factorId = 0))
     }
 
     @Test
@@ -103,7 +103,7 @@ class ReginGacTest {
             factor,
             arrayOf(IntDomain(4, 6), IntDomain(4, 6), IntDomain(4, 6)),
         )
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(state.problem.propagators[0].propagate(state, factorId = 0))
         for (i in 0..2) {
             val d = state.intDomains[i]
             assertEquals(5, d.min, "var $i min")
@@ -126,7 +126,7 @@ class ReginGacTest {
             factor,
             arrayOf(IntDomain(7, 7), IntDomain(6, 8), IntDomain(6, 8)),
         )
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(state.problem.propagators[0].propagate(state, factorId = 0))
         assertFalse(7 in state.intDomains[1])
         assertFalse(7 in state.intDomains[2])
     }
@@ -143,7 +143,7 @@ class ReginGacTest {
             closed = true,
         )
         val state = stateWith(factor, arrayOf(IntDomain(1, 4), IntDomain(2, 3)))
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(state.problem.propagators[0].propagate(state, factorId = 0))
         val d0 = state.intDomains[0]
         assertFalse(1 in d0)
         assertFalse(4 in d0)
@@ -165,7 +165,7 @@ class ReginGacTest {
             factor,
             arrayOf(IntDomain(8, 10), IntDomain(0, 1), IntDomain(0, 1)),
         )
-        assertFalse(factor.propagate(state, factorId = 0))
+        assertFalse(state.problem.propagators[0].propagate(state, factorId = 0))
     }
 
     @Test
@@ -194,7 +194,7 @@ class ReginGacTest {
             factors = arrayOf<Factor>(factor),
         )
         val state = PropagationState(problem, Assumptions.None)
-        assertTrue(factor.propagate(state, factorId = 0))
+        assertTrue(state.problem.propagators[0].propagate(state, factorId = 0))
         assertEquals(1, state.intDomains[3].min)
         assertEquals(3, state.intDomains[3].max)
         assertEquals(0, state.intDomains[4].min)

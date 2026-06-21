@@ -24,10 +24,10 @@ class ClauseRepairTest {
         state.assignment.setBool(b, true)
         state.assignment.setBool(c, false)
         state.recompute()
-        assertTrue(factor.isViolated(state, 0))
+        assertTrue(state.factors[0].isViolated(state, 0))
 
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         val proposed = sink.list.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
         assertEquals(setOf(a, b, c), proposed)
     }
@@ -42,9 +42,9 @@ class ClauseRepairTest {
         state.assignment.setBool(a, true)
         state.assignment.setBool(b, false)
         state.recompute()
-        assertTrue(!factor.isViolated(state, 0))
+        assertTrue(!state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        factor.proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeRepairMoves(state, 0, sink)
         assertTrue(sink.list.isEmpty())
     }
 }

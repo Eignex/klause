@@ -5,22 +5,32 @@ import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearDirAnte
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.solver.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.solver.factor.arithmetic.internals.propagateLinearBounds
+import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationState
 
-/** CP interface for [Linear]: bounds propagation and conflict reasons. */
-interface LinearPropagator : Propagator {
+/** CP propagator for [Linear]: bounds propagation and conflict reasons. */
+internal class LinearPropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val coeffs: IntArray,
+    private val vars: IntArray,
+    private val op: LinearOp,
+    private val bound: Int,
+) : Propagator {
 
-    /** Coefficients parallel to [vars]. */
-    val coeffs: IntArray
-
-    /** Integer variable ids. */
-    val vars: IntArray
-
-    /** Comparison operator. */
-    val op: LinearOp
-
-    /** Right-hand-side bound. */
-    val bound: Int
+    /**
+     * Advisor subscription (#623): `propagateLinearBounds` derives everything from the interval
+     * `[c·min, c·max]` of each term — it reads only `min`/`max` and never inspects interior holes.
+     * So the propagator subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on each variable
+     * and is not woken by interior `VALUE_REMOVED`. Terms are coalesced, so [vars] is duplicate-free.
+     */
+    override val initialIntEventWatches: IntArray = IntArray(vars.size * 2).also { out ->
+        var w = 0
+        for (v in vars) {
+            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
+            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
+        }
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         propagateLinearBounds(state, coeffs, vars, op, bound.toLong())
@@ -40,12 +50,6 @@ interface LinearPropagator : Propagator {
             LinearOp.GE -> false
             else -> range[0] > bound.toLong() // EQ: lo side (mins too big) vs hi side
         }
-        // Conflict: the driving extreme breaches `bound`; slack = how far it can fall back and
-        // still breach (sumLo > bound ⇒ sumLo-bound-1; sumHi < bound ⇒ bound-sumHi-1).
-        // Cite the *current* driving bounds (the trail-resident order literals), not a
-        // history-derived weakest relaxation: the canonical LCG ladder stores levels/reasons
-        // on the literals themselves, so the looser-bound relaxation (which needed the bound
-        // histories) is gone. Current bounds are a sound, stronger reason for the breach.
         return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
     }
 }

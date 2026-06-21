@@ -280,9 +280,8 @@ class GlobalCardinalityTest {
         state.currentLevel = 3
         check(state.tightenIntMax(1, 0)) { "x1 restriction failed" }
 
-        val gcc = problem.factors[0]
-        assertFalse(gcc.propagate(state, 0), "demand 2 vs supply 1 must conflict")
-        val reason = gcc.conflictReason(state, 0)
+        assertFalse(problem.propagators[0].propagate(state, 0), "demand 2 vs supply 1 must conflict")
+        val reason = problem.propagators[0].conflictReason(state, 0)
         assertNotNull(reason, "flow-deficiency conflict must carry a reason")
         val citedInts = buildSet {
             for (lit in reason) {

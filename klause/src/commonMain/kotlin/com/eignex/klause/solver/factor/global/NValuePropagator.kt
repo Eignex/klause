@@ -7,14 +7,22 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /** CP propagation logic for `nvalue`. */
-internal interface NValuePropagator : Propagator {
-    val n: Int
-    val xs: IntArray
-    val mode: NValue.Mode
-    val presents: IntArray
+internal class NValuePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    private val n: Int,
+    private val xs: IntArray,
+    private val mode: NValue.Mode,
+    private val presents: IntArray,
+    private val initialIntEventWatchesVal: IntArray?,
+    private val consumesIntEventDeltaVal: Boolean,
+    private val definitelyAbsentNvFn: (Int, PropagationState) -> Boolean,
+    private val definitelyPresentNvFn: (Int, PropagationState) -> Boolean,
+) : Propagator {
 
-    fun definitelyAbsentNv(idx: Int, state: PropagationState): Boolean
-    fun definitelyPresentNv(idx: Int, state: PropagationState): Boolean
+    override val initialIntEventWatches: IntArray? get() = initialIntEventWatchesVal
+
+    override val consumesIntEventDelta: Boolean get() = consumesIntEventDeltaVal
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectHoleAndBoundAntecedents(state, intVars)
@@ -32,12 +40,12 @@ internal interface NValuePropagator : Propagator {
         }
         val unionValues = IntHashSet()
         for (i in xs.indices) {
-            if (definitelyAbsentNv(i, state)) continue
+            if (definitelyAbsentNvFn(i, state)) continue
             state.intDomains[xs[i]].forEach { unionValues.add(it) }
         }
         val maxDistinct = unionValues.size
         val present = IntArrayList(xs.size)
-        for (i in xs.indices) if (definitelyPresentNv(i, state)) present.add(xs[i])
+        for (i in xs.indices) if (definitelyPresentNvFn(i, state)) present.add(xs[i])
         present.sortByIntKey { state.intDomains[it].size }
         val covered = IntHashSet()
         var minDistinct = 0

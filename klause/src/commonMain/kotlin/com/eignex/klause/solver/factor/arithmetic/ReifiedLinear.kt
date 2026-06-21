@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.ReifiedFactor
-import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.CoalescedTerms
 import com.eignex.klause.solver.factor.bool.coalesceLinearTerms
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
-import com.eignex.klause.solver.propagation.IntEvent
 
 /**
  * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
@@ -21,9 +21,7 @@ class ReifiedLinear private constructor(
     op: LinearOp,
     bound: Int,
 ) : LinearSumFactor(terms, op, bound),
-    ReifiedFactor,
-    ReifiedLinearPropagator,
-    ReifiedLinearInvariant {
+    ReifiedFactor {
 
     /**
      * `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced
@@ -45,17 +43,14 @@ class ReifiedLinear private constructor(
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
 
-    /**
-     * Advisor subscription (#623): like [Linear], the integer reasoning is purely interval-based —
-     * `propagate` reads `linearSumRange` (the `[c·min, c·max]` envelope) to decide whether the body
-     * is forced and then delegates to `propagateLinearBounds`, never inspecting interior holes. So it
-     * subscribes its term variables to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] and skips interior
-     * `VALUE_REMOVED` wakes. The indicator [auxBoolVar] keeps its separate Boolean wakeup.
-     */
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
-
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
 
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         residual(state.longPayload[factorId], softCap)
+
+    override fun asPropagator(): Propagator =
+        ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, coeffs, vars, op, bound)
+
+    override fun asInvariant(): Invariant =
+        ReifiedLinearInvariant(auxBoolVar, boolVars, intVars, coeffs, vars, op, bound)
 }
