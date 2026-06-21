@@ -234,6 +234,97 @@ class AffineEliminationTest {
     }
 
     @Test
+    fun `eliminates a contained non-unit pivot whose coefficient divides all partners and the bound`() {
+        // 2x0 - 4x1 - 6x2 = 8  ⇒  x0 = 2x1 + 3x2 + 4, integral for every partner assignment since 2
+        // divides each coefficient and the bound; x0 is contained, so it is projected out (#601).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(2, -4, -6), intArrayOf(0, 1, 2), LinearOp.EQ, 8)),
+        )
+        checkRoundTrip("nonunit-divides-all", problem, expectEliminated = true, expectSat = true)
+        checkFeasibleSetPreserved("nonunit-divides-all", problem)
+    }
+
+    @Test
+    fun `does not eliminate a contained non-unit pivot that does not divide a partner`() {
+        // 2x0 + 4x1 + 3x2 = 8: the pivot 2 divides the bound and x1's coefficient but not x2's, so the
+        // fold would be non-integral. x0 is contained but stays — only the residue doubleton path could
+        // act, and it needs a two-term equality, so nothing is eliminated.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 6), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(2, 4, 3), intArrayOf(0, 1, 2), LinearOp.EQ, 8)),
+        )
+        checkRoundTrip("nonunit-partner-indivisible", problem, expectEliminated = false, expectSat = true)
+    }
+
+    @Test
+    fun `does not eliminate a contained non-unit pivot that does not divide the bound`() {
+        // 2x0 - 4x1 - 6x2 = 7: 2 divides every partner coefficient but not the odd bound, so no integer
+        // x0 exists for any partner assignment — the projection would be unsound, so x0 is left in place
+        // (the equality is correctly unsatisfiable and the verdict is preserved).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(2, -4, -6), intArrayOf(0, 1, 2), LinearOp.EQ, 7)),
+        )
+        checkRoundTrip("nonunit-bound-indivisible", problem, expectEliminated = false, expectSat = false)
+    }
+
+    @Test
+    fun `does not eliminate a non-unit pivot when neither equation var is contained`() {
+        // 2x0 - 4x1 = 8 with BOTH x0 and x1 pinned into a global: the divisibility holds, but a non-unit
+        // fold needs a contained pivot it can absorb, and neither var is contained, so neither the
+        // non-unit unit-loop case nor the residue doubleton can act — nothing is eliminated.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 12), IntDomain(0, 3), IntDomain(0, 12)),
+            factors = listOf(
+                Linear(intArrayOf(2, -4), intArrayOf(0, 1), LinearOp.EQ, 8),
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 13),
+            ),
+        )
+        checkRoundTrip("nonunit-not-contained", problem, expectEliminated = false, expectSat = true)
+    }
+
+    @Test
+    fun `does not eliminate a non-unit pivot whose objective variable is protected`() {
+        // 2x0 - 4x1 - 6x2 = 8 with x0 in the objective: even though x0 is contained and the divisibility
+        // holds, an objective variable is never eliminated, so the equality survives untouched.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(2, -4, -6), intArrayOf(0, 1, 2), LinearOp.EQ, 8)),
+        )
+        val elim = Presolve.eliminateAffineSingletons(problem, objectiveIntVars = setOf(0))
+        assertTrue(elim.problem === problem, "objective-protected: must not eliminate x0")
+    }
+
+    @Test
+    fun `aggregates a chain of equalities to a single representative`() {
+        // x0 = x1, x1 = x2, x2 = x3: every link is an alias, so the whole chain collapses onto x3 and a
+        // reconstructed solution restores x0..x2 from it.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 0),
+            ),
+        )
+        checkRoundTrip("alias-chain", problem, expectEliminated = true, expectSat = true)
+        checkFeasibleSetPreserved("alias-chain", problem)
+    }
+
+    @Test
     fun `eliminates a non-unit doubleton via residue-class restriction`() {
         // 2x + 3y = 12 has no unit pivot, but x is contained, so x = (12 - 3y)/2 — an integer only for
         // even y. Eliminate x, restrict y to {0,2,4} (the residue class keeping x in [0,6]), and
