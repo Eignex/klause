@@ -22,10 +22,6 @@ import kotlin.test.assertTrue
 
 class CumulativeTest {
 
-    /**
-     * 3 tasks, each duration 2, resource 1; capacity 1; start domain [0, 4]. Only
-     * non-overlapping schedules are feasible — three tasks back-to-back occupy [0, 6).
-     */
     private fun threeTasksUnary(): Problem {
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
@@ -43,11 +39,6 @@ class CumulativeTest {
 
     @Test
     fun `overload check detects energy infeasibility that time-tabling misses`() {
-        // 3 tasks, each duration 3, resource 1; capacity 1; start domains all [0, 3].
-        // No task has a compulsory part on its own (each window is 6 wide with duration 3),
-        // so time-tabling alone observes no mandatory overlap and accepts the state.
-        // Total energy = 3 × 3 = 9, available capacity × span = 1 × (3+3 − 0) = 6. The
-        // overload check fires.
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
             durations = intArrayOf(3, 3, 3),
@@ -91,8 +82,6 @@ class CumulativeTest {
 
     @Test
     fun `graded cost equals the summed overage`() {
-        // 2 tasks duration 3 resource 2, capacity 3. Tasks at start 0 and 1:
-        // usage over t in {0, 1, 2, 3} is {2, 4, 4, 2} → overage at t=1,2 is 1 each → total 2.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(3, 3),
@@ -136,7 +125,6 @@ class CumulativeTest {
 
     @Test
     fun `propagator fails when forced overlap exceeds capacity`() {
-        // 2 tasks duration 2 resource 2, capacity 2; both pinned to start at 0 → usage 4 > 2.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(2, 2),
@@ -155,10 +143,6 @@ class CumulativeTest {
 
     @Test
     fun `propagator shaves a start that would overlap a mandatory part`() {
-        // Task 0: duration 4, resource 1, start domain [0, 0] (fixed) → mandatory [0, 4).
-        // Task 1: duration 2, resource 1, start domain [0, 4]. Capacity 1.
-        // Time-tabling shaves any start s < 4 (would coincide with the mandatory part), so
-        // task 1's domain collapses to the singleton {4}, surfacing as Implied.ints[1] == 4.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(4, 2),
@@ -285,9 +269,6 @@ class CumulativeTest {
 
     @Test
     fun `var resources flip overage as the resource var changes`() {
-        // 2 tasks duration 2; cap 1. Var resources r0 (0..1), r1 (0..1). Start at 0 and 1
-        // (overlap at t=1). Both r=1 → usage 2 over t=1 → overage 1. Set r1 = 0 → no
-        // overage. The factor must track these via the resource vars.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(2, 2),
@@ -308,7 +289,6 @@ class CumulativeTest {
         state.assignment.setInt(3, 1)
         state.recompute()
         assertTrue(state.cost > 0, "both resources at 1 should overload capacity 1")
-        // Drop r1 to 0 — overlap is now between a unit-demand and a zero-demand task.
         state.assignment.setInt(3, 0)
         state.recompute()
         assertEquals(0, state.cost, "zero resource on one task should remove the overage")
@@ -316,7 +296,6 @@ class CumulativeTest {
 
     @Test
     fun `var capacity flips overage as the capacity var changes`() {
-        // 2 tasks duration 2 unit resources overlapping at t=1. Cap=1 → overage; cap=2 → ok.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(2, 2),
@@ -343,8 +322,6 @@ class CumulativeTest {
 
     @Test
     fun `var durations rescale task footprint`() {
-        // 2 tasks unit resource, cap 1, var durations. Starts 0 and 2. With d0=d1=2,
-        // no overlap. With d0=3, task 0 ends at 3 and overlaps task 1 at t=2.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
             durations = intArrayOf(3, 3), // ubs
@@ -372,7 +349,6 @@ class CumulativeTest {
 
     @Test
     fun `single task never overloads`() {
-        // One task, dur 2 res 1, capacity 1 — always fits, no false failure or tightening.
         val factor = Cumulative(
             starts = intArrayOf(0),
             durations = intArrayOf(2),
@@ -410,7 +386,6 @@ class CumulativeTest {
 
     @Test
     fun `zero capacity with a positive task is infeasible`() {
-        // dur 1, res 1 task cannot run on a capacity-0 resource: per-task feasibility fails.
         val factor = Cumulative(
             starts = intArrayOf(0),
             durations = intArrayOf(1),
@@ -470,7 +445,6 @@ class CumulativeTest {
         )
         for ((idx, inst) in instances.withIndex()) {
             val k = inst.durs.size
-            // Brute-force reference: every start combination whose summed usage never exceeds capacity.
             val brute = HashSet<List<Int>>()
             fun feasible(starts: IntArray): Boolean {
                 val occ = HashMap<Int, Int>()

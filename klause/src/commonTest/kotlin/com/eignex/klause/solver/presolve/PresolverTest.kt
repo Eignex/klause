@@ -35,7 +35,6 @@ class PresolverTest {
     @Test
     fun `parse handles aliases and comma-lists`() {
         val ctx = PresolveContext.EMPTY
-        // null / default / auto → all auto passes run for a non-sensitive query.
         val autoProblem = listOf(
             PresolvePass.STRENGTHEN_COEFFICIENTS,
             PresolvePass.DERIVE_XOR_UNITS,
@@ -49,9 +48,7 @@ class PresolverTest {
         assertEquals(autoProblem, PresolveConfig.parse(null).problemPasses(ctx))
         assertEquals(autoProblem, PresolveConfig.parse("default").problemPasses(ctx))
         assertEquals(autoProblem, PresolveConfig.parse("auto").problemPasses(ctx))
-        // none → nothing runs.
         assertEquals(emptyList(), PresolveConfig.parse("none").problemPasses(ctx))
-        // comma-list forces exactly those on, everything else off (application = enum order).
         assertEquals(
             listOf(PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.ELIMINATE_AFFINE_SINGLETONS),
             PresolveConfig.parse("affine, strengthen").problemPasses(ctx),
@@ -62,17 +59,14 @@ class PresolverTest {
     @Test
     fun `parse emphasis plus deltas toggles a single pass`() {
         val ctx = PresolveContext.EMPTY
-        // default but symmetry breaking off — the rest of the default passes stay on.
         val noSymmetry = PresolveConfig.parse("default,-symmetry")
         assertEquals(PresolveEmphasis.DEFAULT, noSymmetry.emphasis)
         assertEquals(false, noSymmetry.resolved(PresolvePass.BREAK_SYMMETRIES, ctx))
         assertTrue(noSymmetry.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, ctx))
-        // off but symmetry breaking forced on — nothing else runs.
         val justSymmetry = PresolveConfig.parse("off,+symmetry")
         assertEquals(PresolveEmphasis.OFF, justSymmetry.emphasis)
         assertEquals(true, justSymmetry.resolved(PresolvePass.BREAK_SYMMETRIES, ctx))
         assertEquals(false, justSymmetry.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, ctx))
-        // A non-delta token after an emphasis, and an unknown pass, are both rejected.
         assertFailsWith<IllegalStateException> { PresolveConfig.parse("default,symmetry") }
         assertFailsWith<IllegalStateException> { PresolveConfig.parse("default,+bogus") }
     }
@@ -139,7 +133,6 @@ class PresolverTest {
     @Test
     fun `emphasis levels select cost tiers`() {
         val ctx = PresolveContext.EMPTY
-        // off → nothing.
         assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
         // conservative → FAST tier only (strengthen + xor-units + bound-tighten + affine + subsume +
         // dup-columns), no symmetry.
@@ -181,7 +174,6 @@ class PresolverTest {
         // so the EXHAUSTIVE work can't dominate.
         val overridden = PresolveConfig.parse("default,+probe-int-holes")
         assertEquals(capped.probeTotalBudget(), overridden.probeTotalBudget())
-        // An explicit config-level budget override wins over the emphasis tier.
         val custom = PresolveConfig(
             PresolveEmphasis.AGGRESSIVE,
             probeTotalBudgetOverride = 7,
@@ -189,7 +181,6 @@ class PresolverTest {
         )
         assertEquals(7, custom.probeTotalBudget())
         assertEquals(3, custom.probeBudgetPerVar())
-        // forLocalSearch preserves the budget override.
         assertEquals(7, custom.forLocalSearch().probeTotalBudget())
     }
 

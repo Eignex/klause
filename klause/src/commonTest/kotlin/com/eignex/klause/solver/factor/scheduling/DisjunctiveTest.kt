@@ -20,7 +20,6 @@ import kotlin.test.assertTrue
 
 class DisjunctiveTest {
 
-    /** Three unit-duration tasks on a single machine, start domain [0, 2]. */
     private fun threeUnitTasks(): Problem {
         val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(1, 1, 1))
         return Problem(
@@ -55,9 +54,6 @@ class DisjunctiveTest {
 
     @Test
     fun `pairwise detectable precedence pushes the earliest start`() {
-        // Task 0 duration 3 dom [0, 0] — fully fixed at time 0, mandatory part [0, 3).
-        // Task 1 duration 1 dom [0, 5]. Time-tabling alone (mandatory part) pushes
-        // start_1.min to 3, so this trivially holds.
         val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(3, 1))
         val problem = Problem(
             numBoolVars = 0,
@@ -67,10 +63,8 @@ class DisjunctiveTest {
         )
         val result = problem.propagate(Assumptions.None)
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
-        // dom[1] becomes [3, 5] — not pinned. Verify by checking that pinning t=2 fails.
         val unsatPin = problem.propagate(Assumptions(ints = mapOf(1 to 2)))
         assertTrue(unsatPin is PropagationResult.Unsat, "pinning task 1 at t=2 must fail; got $unsatPin")
-        // And pinning at t=3 should succeed.
         val okPin = problem.propagate(Assumptions(ints = mapOf(1 to 3)))
         assertTrue(okPin is PropagationResult.Implied, "pinning task 1 at t=3 should succeed; got $okPin")
     }
@@ -139,9 +133,7 @@ class DisjunctiveTest {
         val problem = threeUnitTasks()
         val solver = BacktrackSolver(problem)
         val samples = solver.enumerate(BacktrackParams()).toList()
-        // 3 unit tasks, machine of length 3 (slots {0, 1, 2}) → 3! = 6 permutations.
         assertEquals(6, samples.size, "expected 6 disjunctive schedules, got ${samples.size}")
-        // Each is a valid permutation.
         for (s in samples) {
             val occ = BooleanArray(3)
             for (i in 0 until 3) {
@@ -173,9 +165,6 @@ class DisjunctiveTest {
 
     @Test
     fun `pure pairwise infeasibility is caught`() {
-        // Two tasks both must be first: each has lst < other's est + dur.
-        // Task 0: dom [5, 5] duration 1 (must run at t=5, finishes t=6).
-        // Task 1: dom [5, 5] duration 1 — same! Clearly infeasible.
         val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(1, 1))
         val problem = Problem(
             numBoolVars = 0,
