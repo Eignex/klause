@@ -2,10 +2,29 @@ package com.eignex.klause.solver.presolve
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
 
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
+
+    /** At-most-one cliques (each a set of Lit-encoded literals, at most one satisfied) recognised
+     *  soundly: a [Cardinality] `0 ≤ Σ lit ≤ 1`, and any binary [Clause] `(l1 ∨ l2)` ⟺ at most one of
+     *  `{¬l1, ¬l2}`. */
+    fun amoCliques(factors: List<Factor>): List<Set<Int>> {
+        val cliques = ArrayList<Set<Int>>()
+        for (f in factors) {
+            when {
+                f is Cardinality && f.min == 0 && f.max == 1 -> cliques.add(f.literals.toHashSet())
+
+                f is Clause && f.literals.size == 2 ->
+                    cliques.add(hashSetOf(Lit.negate(f.literals[0]), Lit.negate(f.literals[1])))
+            }
+        }
+        return cliques
+    }
 
     fun rebuildProblem(
         problem: Problem,

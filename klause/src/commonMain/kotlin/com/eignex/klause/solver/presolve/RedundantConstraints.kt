@@ -3,12 +3,9 @@ package com.eignex.klause.solver.presolve
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.bool.Cardinality
-import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.util.IntHashSet
@@ -219,7 +216,7 @@ internal object RedundantConstraints {
      * the naive clamp to the clique-reduced slack is unsound — and is left to a follow-up.
      */
     private fun dropCliqueImpliedKnapsacks(factors: List<Factor>): List<Factor> {
-        val cliques = extractAmoCliques(factors)
+        val cliques = PresolveShared.amoCliques(factors)
         if (cliques.isEmpty()) return factors
         val out = ArrayList<Factor>(factors.size)
         for (f in factors) {
@@ -227,22 +224,6 @@ internal object RedundantConstraints {
             out.add(f)
         }
         return out
-    }
-
-    /** At-most-one cliques (each a set of Lit-encoded literals, at most one satisfied) recognised
-     *  soundly: a [Cardinality] `0 ≤ Σ lit ≤ 1`, and any binary [Clause] `(l1 ∨ l2)` ⟺ at most one of
-     *  `{¬l1, ¬l2}`. */
-    private fun extractAmoCliques(factors: List<Factor>): List<Set<Int>> {
-        val cliques = ArrayList<Set<Int>>()
-        for (f in factors) {
-            when {
-                f is Cardinality && f.min == 0 && f.max == 1 -> cliques.add(f.literals.toHashSet())
-
-                f is Clause && f.literals.size == 2 ->
-                    cliques.add(hashSetOf(Lit.negate(f.literals[0]), Lit.negate(f.literals[1])))
-            }
-        }
-        return cliques
     }
 
     /** Whether the AMO [cliques] force `Σ wⱼ·lⱼ ≤ bound` (all weights > 0): greedily cover the

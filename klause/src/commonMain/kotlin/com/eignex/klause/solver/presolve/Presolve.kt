@@ -26,6 +26,10 @@ object Presolve {
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): Problem = RedundantConstraints.removeRedundantConstraints(problem)
 
+    /** At-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s factors,
+     *  for clique-aware consumers such as local search. See [PresolveShared]. */
+    fun amoCliques(problem: Problem): List<Set<Int>> = PresolveShared.amoCliques(problem.factors.asList())
+
     /** Duplicate / parallel integer-column aggregation. See [DuplicateColumns]. */
     fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): DuplicateColumnMerge =
         DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars)
