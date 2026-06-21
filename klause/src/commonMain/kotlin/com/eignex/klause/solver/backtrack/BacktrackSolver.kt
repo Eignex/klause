@@ -784,6 +784,7 @@ class BacktrackSolver(override val problem: Problem) :
                 }
             }
             params.clauseExchange?.onRestart(session)
+            params.cutExchange?.let { lpEngine.exchangeCuts(it) }
             if (assertObjectiveBoundAtRoot()) return terminalExhausted()
             params.variableSelector.onRestart()
             params.valueSelector.onRestart()

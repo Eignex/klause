@@ -18,6 +18,7 @@ import com.eignex.klause.solver.backtrack.selector.SmallestDomain
 import com.eignex.klause.solver.backtrack.selector.ValueSelector
 import com.eignex.klause.solver.backtrack.selector.VariableSelector
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.lp.cut.CutExchange
 import com.eignex.klause.solver.propagation.ClauseExchange
 import com.eignex.klause.solver.result.SearchEvent
 
@@ -194,6 +195,14 @@ data class BacktrackParams(
      * unaffected. All arms must be built from the same problem for the shared clauses to be valid.
      */
     val clauseExchange: ClauseExchange? = null,
+    /**
+     * Optional cross-arm global-cut exchange; see [com.eignex.klause.solver.lp.cut.CutExchange].
+     * Invoked at each restart boundary so a portfolio can import the globally-valid LP cuts other arms
+     * harvested and export this arm's own. `null` (default) means no cut sharing. Like [clauseExchange]
+     * it requires every arm to be built from the same problem; only [com.eignex.klause.solver.lp.cut
+     * .Cut.global] cuts cross arms, so importing one only tightens a relaxation.
+     */
+    val cutExchange: CutExchange? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

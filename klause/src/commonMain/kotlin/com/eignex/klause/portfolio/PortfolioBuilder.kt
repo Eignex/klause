@@ -49,7 +49,7 @@ object PortfolioBuilder {
         lsObjective,
         definitionalSweep,
         onEvent,
-        clausePool = clausePoolFor(scenario),
+        pools = poolsFor(scenario),
     )
 
     /**
@@ -80,17 +80,17 @@ object PortfolioBuilder {
             addAll(lsConfigs)
             if (backtrackWorkers > 0) addAll(BacktrackWorkerConfig.diverse(kind, backtrackWorkers))
         }
-        // The credit campaign measures per-worker attribution, which cross-arm clause sharing would
-        // confound, so the explicit path never shares.
+        // The credit campaign measures per-worker attribution, which cross-arm sharing would confound,
+        // so the explicit path never shares.
         return materialize(
             problem, arms, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent,
-            clausePool = null,
+            pools = null,
         )
     }
 
     /** Materialise each composed arm via its own [WorkerConfig.materialize] — the shared body of
      *  [build] and [buildExplicit]. The arm index offsets the seed (and numbers backtrack labels);
-     *  [clausePool], when non-null, is shared by every backtrack arm for learned-clause exchange. */
+     *  [pools], when non-null, is shared by every backtrack arm for clause and cut exchange. */
     private fun materialize(
         problem: Problem,
         arms: List<WorkerConfig>,
@@ -100,11 +100,11 @@ object PortfolioBuilder {
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
-        clausePool: SharedClausePool?,
+        pools: SharedPools?,
     ): List<PortfolioWorker> {
         val workers = arms.mapIndexed { i, config ->
             config.materialize(
-                problem, i, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, clausePool,
+                problem, i, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
             )
         }
         check(workers.isNotEmpty()) { "portfolio produced no workers" }
@@ -112,15 +112,17 @@ object PortfolioBuilder {
     }
 
     /**
-     * The shared clause pool for [scenario], or null when sharing doesn't apply (an LS-only pool is
-     * pointless — LS ignores clauses). Created once per build and handed to every backtrack arm.
-     * The lock is derived from the executor's concurrency: a no-op under the single-threaded
-     * [SequentialPortfolio] (`Concurrency.None`, zero overhead — the pool is just cross-segment
-     * memory there) and a platform mutex under the parallel `Portfolio`'s concurrent writers.
+     * The shared pools for [scenario], or null when sharing doesn't apply (an LS-only portfolio
+     * ignores both). Created once per build and handed to every backtrack arm. The lock is derived
+     * from the executor's concurrency: a no-op under the single-threaded [SequentialPortfolio]
+     * (`Concurrency.None`, zero overhead — the clause pool is just cross-segment memory there) and a
+     * platform mutex under the parallel `Portfolio`'s concurrent writers. The clause pool is always
+     * present; the cut pool only when [PortfolioScenario.shareCuts] opts in (#809).
      */
-    private fun clausePoolFor(scenario: PortfolioScenario): SharedClausePool? {
+    private fun poolsFor(scenario: PortfolioScenario): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
-        return SharedClausePool(concurrency.lock())
+        val cuts = if (scenario.shareCuts) SharedCutPool(concurrency.lock()) else null
+        return SharedPools(SharedClausePool(concurrency.lock()), cuts)
     }
 }

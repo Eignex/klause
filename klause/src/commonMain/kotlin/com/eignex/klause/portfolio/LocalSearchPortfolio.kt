@@ -47,7 +47,7 @@ internal class LocalSearchWorkerConfig(val recipe: LsRecipe) : WorkerConfig {
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
-        clausePool: SharedClausePool?, // ignored: local search neither learns nor consumes clauses
+        pools: SharedPools?, // ignored: local search neither learns nor consumes clauses or cuts
     ): PortfolioWorker {
         val session = LocalSearchSolver(
             problem,

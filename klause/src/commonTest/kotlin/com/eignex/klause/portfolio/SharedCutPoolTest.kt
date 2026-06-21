@@ -8,6 +8,7 @@ import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.cut.Cut
 import com.eignex.klause.solver.lp.cut.CutPool
+import com.eignex.klause.solver.lp.cut.CutSharing
 import com.eignex.klause.solver.lp.cut.SharedCut
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.LpRelaxation
@@ -31,6 +32,17 @@ class SharedCutPoolTest {
     private fun relax(obj: LinearObjective): LpRelaxation =
         CpToLpRelaxation(problem, obj).build(PropagationSession(problem))
 
+    /** A worker's [CutSharing] view over a local pool + relaxation — what [LpEngine] provides in
+     *  production, inlined here so the test drives [PoolCutExchange] without a full engine. */
+    private fun sharing(local: CutPool, rel: LpRelaxation) = object : CutSharing {
+        override fun exportGlobalCuts(): List<SharedCut> =
+            local.cuts().mapNotNull { if (it.global) SharedCut.fromCut(it, rel) else null }
+
+        override fun importCuts(cuts: List<SharedCut>) {
+            for (c in cuts) c.toCut(rel)?.let { local.add(it) }
+        }
+    }
+
     @Test
     fun `a global cut published by one arm reaches another arm`() {
         val rA = relax(LinearObjective(intCoefficients = longArrayOf(1, 0, 0)))
@@ -40,10 +52,10 @@ class SharedCutPoolTest {
         val localA = CutPool().apply {
             add(Cut(intArrayOf(rA.intColOf[0], rA.intColOf[1]), longArrayOf(1, 1), Relation.LE, 1, global = true))
         }
-        PoolCutExchange(pool).exchange(localA, rA) // arm A publishes
+        PoolCutExchange(pool).exchange(sharing(localA, rA)) // arm A publishes
 
         val localB = CutPool()
-        PoolCutExchange(pool).exchange(localB, rB) // arm B imports
+        PoolCutExchange(pool).exchange(sharing(localB, rB)) // arm B imports
 
         assertEquals(1, localB.size, "arm B should receive arm A's cut")
         val imported = localB.cuts().single()
@@ -61,14 +73,14 @@ class SharedCutPoolTest {
             add(Cut(intArrayOf(r.intColOf[0], r.intColOf[1]), longArrayOf(1, 1), Relation.LE, 1, global = true))
         }
         val exA = PoolCutExchange(pool)
-        exA.exchange(localA, r)
-        exA.exchange(localA, r) // second pass must not re-publish (seen-set + pool key de-dup)
+        exA.exchange(sharing(localA, r))
+        exA.exchange(sharing(localA, r)) // second pass must not re-publish (seen-set + pool key de-dup)
 
         val localB = CutPool()
         val exB = PoolCutExchange(pool)
-        exB.exchange(localB, r)
+        exB.exchange(sharing(localB, r))
         val afterFirst = localB.size
-        exB.exchange(localB, r) // cursor advanced ⇒ nothing new
+        exB.exchange(sharing(localB, r)) // cursor advanced ⇒ nothing new
         assertEquals(afterFirst, localB.size, "a second exchange imports nothing new")
         assertEquals(1, afterFirst)
     }
