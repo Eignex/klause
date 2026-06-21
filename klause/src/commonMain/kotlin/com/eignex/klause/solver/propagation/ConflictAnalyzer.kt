@@ -17,7 +17,7 @@ import com.eignex.klause.util.MutableIntIntMap
  * The implication graph spans **bool vars and int order literals** uniformly: bool antecedents
  * come from [PropagationState.boolAntecedents], order-literal antecedents from each atom's
  * trail-resident reason ([PropagationState.atomAnt], with the [atomAntecedentsDerived] fallback
- * for atoms materialised mid-analysis). Factors emit per-factor [com.eignex.klause.solver.Factor.conflictReason]s
+ * for atoms materialised mid-analysis). Factors emit per-factor [com.eignex.klause.solver.Propagator.conflictReason]s
  * (the #651 explanation pillar) and record antecedents on every force, so the analyzer resolves
  * over the full reason graph rather than treating non-clause forces as leaves. A variable with
  * `null` antecedents is a genuine leaf (decision / assumption / root fact).

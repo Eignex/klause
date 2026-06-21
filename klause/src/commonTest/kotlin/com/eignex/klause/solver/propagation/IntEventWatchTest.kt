@@ -3,7 +3,9 @@ package com.eignex.klause.solver.propagation
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
@@ -26,7 +28,9 @@ class IntEventWatchTest {
      *  two events that can enable propagation — `x`'s lower bound rising (pushes `y.min`) and `y`'s
      *  upper bound falling (pushes `x.max`) — and ignores interior holes, which a bounds-consistent
      *  `<` cannot act on. This complete-but-minimal subscription is what the enumeration validates. */
-    private class StrictLessThan(val x: Int, val y: Int) : Factor {
+    private class StrictLessThan(val x: Int, val y: Int) :
+        Factor,
+        Propagator {
         override val boolVars: IntArray = IntArray(0)
         override val intVars: IntArray = intArrayOf(x, y)
         override val initialIntEventWatches: IntArray =
@@ -40,12 +44,19 @@ class IntEventWatchTest {
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = StrictLessThan(intMap[x], intMap[y])
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+        override fun asPropagator(): Propagator = this
+        override fun asInvariant(): Invariant = object : Invariant {
+            override val boolVars get() = this@StrictLessThan.boolVars
+            override val intVars get() = this@StrictLessThan.intVars
+        }
     }
 
     /** `x ≠ y`, propagating only on assignment: when one side is fixed, carve its value from the
      *  other. Subscribes to [IntEvent.FIXED] on both variables — exercising the FIXED path and the
      *  value-removal it triggers downstream. */
-    private class Disequal(val x: Int, val y: Int) : Factor {
+    private class Disequal(val x: Int, val y: Int) :
+        Factor,
+        Propagator {
         override val boolVars: IntArray = IntArray(0)
         override val intVars: IntArray = intArrayOf(x, y)
         override val initialIntEventWatches: IntArray =
@@ -62,6 +73,11 @@ class IntEventWatchTest {
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Disequal(intMap[x], intMap[y])
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+        override fun asPropagator(): Propagator = this
+        override fun asInvariant(): Invariant = object : Invariant {
+            override val boolVars get() = this@Disequal.boolVars
+            override val intVars get() = this@Disequal.intVars
+        }
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
@@ -128,7 +144,9 @@ class IntEventWatchTest {
     }
 
     /** Counts how often [propagate] runs; otherwise a no-op so a wake never cascades. */
-    private class WakeCounter(val v: Int, val kind: Int) : Factor {
+    private class WakeCounter(val v: Int, val kind: Int) :
+        Factor,
+        Propagator {
         var fires: Int = 0
         override val boolVars: IntArray = IntArray(0)
         override val intVars: IntArray = intArrayOf(v)
@@ -142,6 +160,11 @@ class IntEventWatchTest {
         override fun remap(boolMap: IntArray, intMap: IntArray): Factor = WakeCounter(intMap[v], kind)
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+        override fun asPropagator(): Propagator = this
+        override fun asInvariant(): Invariant = object : Invariant {
+            override val boolVars get() = this@WakeCounter.boolVars
+            override val intVars get() = this@WakeCounter.intVars
+        }
     }
 
     @Test

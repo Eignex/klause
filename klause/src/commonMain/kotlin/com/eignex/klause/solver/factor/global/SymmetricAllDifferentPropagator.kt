@@ -8,8 +8,8 @@ import com.eignex.klause.util.IntHashSet
 
 /** CP propagation logic for `symmetric_all_different`. */
 internal class SymmetricAllDifferentPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val xs: IntArray,
     private val indexOffset: Int,
 ) : Propagator {

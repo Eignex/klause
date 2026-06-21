@@ -8,8 +8,8 @@ import com.eignex.klause.util.IntHashSet
 
 /** CP propagation logic for `nvalue`. */
 internal class NValuePropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val n: Int,
     private val xs: IntArray,
     private val mode: NValue.Mode,

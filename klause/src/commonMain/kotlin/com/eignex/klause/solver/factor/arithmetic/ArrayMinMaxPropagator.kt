@@ -10,8 +10,8 @@ internal class ArrayMinMaxPropagator(
     private val result: Int,
     private val xs: IntArray,
     private val max: Boolean,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
 ) : Propagator {
 
     /**

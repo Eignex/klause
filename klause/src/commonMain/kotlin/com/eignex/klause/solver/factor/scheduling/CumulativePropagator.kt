@@ -18,8 +18,8 @@ import com.eignex.klause.util.argsortByIntKey
  * when a CP engine is initialised.
  */
 internal class CumulativePropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val starts: IntArray,
     private val durations: IntArray,
     private val resources: IntArray,

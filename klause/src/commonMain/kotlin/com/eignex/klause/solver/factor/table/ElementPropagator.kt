@@ -12,8 +12,8 @@ import com.eignex.klause.util.IntIntMap
 
 /** CP propagator for [Element]. Constructed by [Element.asPropagator]. */
 internal class ElementPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val idx: Int,
     private val result: Int,
     private val arr: IntArray,

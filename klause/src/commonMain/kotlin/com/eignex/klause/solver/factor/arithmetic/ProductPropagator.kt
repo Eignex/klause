@@ -13,8 +13,8 @@ internal class ProductPropagator(
     private val a: Int,
     private val b: Int,
     private val result: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
 ) : Propagator {
 
     /**

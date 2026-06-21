@@ -8,8 +8,8 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /** CP propagator for [Regular]. Constructed by [Regular.asPropagator]. */
 internal class RegularPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val seq: IntArray,
     private val numStates: Int,
     private val alphabetSize: Int,

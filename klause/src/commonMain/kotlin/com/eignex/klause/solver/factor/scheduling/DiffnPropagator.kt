@@ -11,8 +11,8 @@ import com.eignex.klause.solver.propagation.PropagationState
  * sound-only infeasibility check for the variable-size case.
  */
 internal class DiffnPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val xs: IntArray,
     private val ys: IntArray,
     private val widths: IntArray,

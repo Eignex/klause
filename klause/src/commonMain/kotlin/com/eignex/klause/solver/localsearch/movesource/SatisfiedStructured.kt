@@ -7,14 +7,14 @@ import com.eignex.klause.solver.localsearch.MoveSink
  * Feasibility-preserving structured moves drawn from currently-satisfied factors. Each satisfied
  * factor pushes moves it knows preserve its own satisfaction (e.g. a `Linear EQ` pair-shift that
  * keeps the sum, a `Cardinality.exactlyOne` swap that keeps the count) via
- * [com.eignex.klause.solver.Factor.proposeStructuredMoves].
+ * [com.eignex.klause.solver.Invariant.proposeStructuredMoves].
  *
  * [scope] selects which satisfied factors are consulted:
  *  - [Scope.Sampled]: draw [sampleCount] uniformly-random factors and keep the ones not in the
  *    maintained violated set. Cheaper than enumerating when the satisfied/violated split is not
  *    materialised.
  *  - [Scope.All]: walk every factor and consult the ones not violated (queried directly via
- *    [com.eignex.klause.solver.Factor.isViolated]).
+ *    [com.eignex.klause.solver.Invariant.isViolated]).
  *  - [Scope.Elected]: draw [sampleCount] random factors from the state's elected implicit set
  *    ([com.eignex.klause.solver.localsearch.LocalSearchState.electedImplicit]) and keep the ones not
  *    in the maintained violated set. Iterates only the small elected set, so it stays cheap while

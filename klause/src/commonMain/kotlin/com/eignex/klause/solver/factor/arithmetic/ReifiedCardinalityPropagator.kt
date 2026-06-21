@@ -11,8 +11,8 @@ internal class ReifiedCardinalityPropagator(
     private val literals: IntArray,
     private val min: Int,
     private val max: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
 ) : Propagator {
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {

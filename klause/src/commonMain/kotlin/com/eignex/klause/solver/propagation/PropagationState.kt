@@ -29,7 +29,7 @@ internal const val NO_BLOCKER: Int = -1
 private const val CANCEL_POLL_MASK: Int = 1023
 
 /**
- * Mutable working state passed to [Factor.propagate]. Tracks the currently-known pinned bool
+ * Mutable working state passed to [Propagator.propagate]. Tracks the currently-known pinned bool
  * values and the (tightened) int domains, plus a **decision level** per pinned variable for
  * conflict-driven backjumping.
  *
@@ -256,7 +256,7 @@ class PropagationState(
     /** Mirror of [intMinReason] for the upper bound. */
     val intMaxReason: IntArray = IntArray(problem.numIntVars) { -1 }
 
-    /** Factor whose [Factor.propagate] is currently running. Read by the impl methods so
+    /** Factor whose [Propagator.propagate] is currently running. Read by the impl methods so
      *  state changes can be attributed back to a factor. `-1` between factor invocations
      *  (decisions, assumption seeding) — those pins/tightenings record `reason = -1`. */
     internal var currentFactor: Int = -1
@@ -381,7 +381,7 @@ class PropagationState(
     val totalFactorCount: Int get() = problem.numFactors + learnedClauseStore.size
 
     /**
-     * Per-literal wakeup index for factors opting into [Factor.initialBoolWatchers].
+     * Per-literal wakeup index for factors opting into [Propagator.initialBoolWatchers].
      * Slot `boolWatchersByLit[lit]` lists factor ids that should fire when literal `lit`
      * transitions to false. Sized `2 * problem.numBoolVars`; lit ids are the standard
      * [Lit.make] encoding. Populated at construction from each
@@ -402,7 +402,7 @@ class PropagationState(
      * already satisfied — so [enqueueForBoolChange] can skip waking that factor entirely,
      * removing a large fraction of clause touches in the hot BCP loop on dense instances.
      * [NO_BLOCKER] means "no blocker, always fire", which is the default for every factor
-     * that doesn't supply [com.eignex.klause.solver.Factor.initialBoolWatcherBlockers]
+     * that doesn't supply [com.eignex.klause.solver.Propagator.initialBoolWatcherBlockers]
      * (e.g. cardinality), so behaviour for those is unchanged.
      *
      * Held in lockstep with [boolWatchersByLit] through every mutation ([installLitWatch],
@@ -434,7 +434,7 @@ class PropagationState(
     /**
      * Per-`(intVar, kind)` advisor index, the int-side analog of [boolWatchersByLit]: slot
      * `[IntEvent.pack(v, kind)]` lists the factor ids that subscribed to that event via
-     * [com.eignex.klause.solver.Factor.initialIntEventWatches], so [enqueueForIntChange] can wake
+     * [com.eignex.klause.solver.Propagator.initialIntEventWatches], so [enqueueForIntChange] can wake
      * only the factors that care about the kind of change that just happened. Sized
      * `numIntVars * IntEvent.COUNT` and populated once at construction; empty when no factor opts in
      * (the subscriptions are static — a propagator that loses interest in a variable simply ignores
@@ -449,7 +449,7 @@ class PropagationState(
 
     /**
      * Per-factor dirty-variable delta accumulator (#624): for each [com.eignex.klause.solver.Factor]
-     * with [com.eignex.klause.solver.Factor.consumesIntEventDelta], the subscribed variables that
+     * with [com.eignex.klause.solver.Propagator.consumesIntEventDelta], the subscribed variables that
      * fired since the consumer last drained. [enqueueForIntChange] appends a variable when it wakes
      * the consumer via the advisor index ([eventDirtyMark] deduplicates), and
      * [drainIntEventDirtyVars] returns and clears the set on a fire.
@@ -948,7 +948,8 @@ class PropagationState(
                     maxLevelForClause(f.literals)
                 }
             } else {
-                maxLevelForVars(f.boolVars, f.intVars)
+                val factor = problem.factors[fid]
+                maxLevelForVars(factor.boolVars, factor.intVars)
             }
             currentFactor = fid
             conflictLevels = null
@@ -958,7 +959,7 @@ class PropagationState(
                 // without calling pin/tighten — they just detected infeasibility from
                 // the current state).
                 seedConflictFactor(fid)
-                return conflictLevels ?: collectLevelsForVars(f.boolVars, f.intVars)
+                return conflictLevels ?: factorVarsConflictLevels(fid)
             }
             while (true) {
                 val v = pollDirtyBool()
@@ -1060,7 +1061,7 @@ class PropagationState(
     /**
      * Drain and return the dirty-variable delta accumulated for [factorId] since it last drained —
      * the subscribed variables that fired, a superset of those actually changed since the consumer's
-     * last fire (see [eventDirtyVars]). A consumer ([com.eignex.klause.solver.Factor.consumesIntEventDelta])
+     * last fire (see [eventDirtyVars]). A consumer ([com.eignex.klause.solver.Propagator.consumesIntEventDelta])
      * calls this on a fire and recovers the exact removed values by diffing its own reversible
      * baseline for these variables. Clears the accumulator (keeping it in lockstep with the
      * consumer's baseline update), so call it exactly when the baseline is advanced. Returns an empty

@@ -106,7 +106,11 @@ class GaussianXorTest {
     fun `asPropagator returns a separate object distinct from the factor`() {
         val factor = GaussianXor(listOf(Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 0)))
         val propagator = factor.asPropagator()
-        assertNotSame(factor, propagator, "asPropagator should return a new GaussianXorPropagator, not the factor")
+        assertNotSame(
+            factor as Any,
+            propagator,
+            "asPropagator should return a new GaussianXorPropagator, not the factor",
+        )
     }
 
     @Test

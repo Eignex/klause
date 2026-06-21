@@ -8,8 +8,8 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /** CP propagator for [PseudoBoolean]: bounds propagation for `Σ weights_i * lit_i ⟨op⟩ bound`. */
 internal class PseudoBooleanPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val weights: IntArray,
     private val literals: IntArray,
     private val op: PbOp,

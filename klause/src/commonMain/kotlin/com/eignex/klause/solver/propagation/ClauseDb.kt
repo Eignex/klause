@@ -42,7 +42,7 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = if (fid < baseFac
  * Register a learned clause and return its assigned factor id. Performs four things:
  *   - append to [PropagationState.learnedClauseStore];
  *   - record the clause's [lbd] in [PropagationState.learnedLbds] (parallel array);
- *   - grow [PropagationState.refPayloadStore] by one slot so [Clause.propagate]'s
+ *   - grow [PropagationState.refPayloadStore] by one slot so [ClausePropagator.propagate]'s
  *     `state.refPayload[factorId]` access stays in-bounds;
  *   - install the clause's initial watch literals in [PropagationState.boolWatchersByLit] so it
  *     participates in the wakeup index.

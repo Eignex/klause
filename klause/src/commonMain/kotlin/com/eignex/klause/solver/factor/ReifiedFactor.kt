@@ -15,16 +15,4 @@ interface ReifiedFactor : Factor {
 
     /** Compressed body residual at the current payload — graded distance to satisfying the body. */
     fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int
-
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        state.assignment.boolValue(auxBoolVar) != holdsNow(state, factorId)
-
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
-        val aux = state.assignment.boolValue(auxBoolVar)
-        return when {
-            aux == holdsNow(state, factorId) -> 0
-            aux -> residualNow(state, factorId, state.violationSoftCap)
-            else -> 1
-        }
-    }
 }

@@ -12,8 +12,8 @@ import com.eignex.klause.util.IntIntMap
 
 /** CP propagation logic for `global_cardinality`. */
 internal class GlobalCardinalityPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val xs: IntArray,
     private val cover: IntArray,
     private val countVars: IntArray?,

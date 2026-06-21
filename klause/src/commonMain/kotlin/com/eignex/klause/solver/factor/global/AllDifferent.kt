@@ -19,7 +19,7 @@ import com.eignex.klause.util.IntIntMap
  * `counts` is indexed by `value - domainMin` and tracks how many vars currently hold each
  * value across the union domain `[domainMin, domainMin + domainSize)`. `excess` is the graded
  * violation `Σ max(0, count - 1)` — the number of vars that must move to clear every clash; the
- * factor is violated iff that's positive, and it is the [violationDegree] CBLS descends.
+ * factor is violated iff that's positive, and it is the [Invariant.violationDegree] CBLS descends.
  */
 class AllDifferent(
     /** Integer variable ids required to be pairwise distinct. */

@@ -179,7 +179,7 @@ class Problem(
 
     /**
      * [boolOccurrences] minus factors that use per-literal wakeup (see
-     * [Factor.initialBoolWatchers]). The propagation engine walks this list for
+     * [Propagator.initialBoolWatchers]). The propagation engine walks this list for
      * occurrence-driven wakeup, while watcher-using factors are woken via the
      * per-state [com.eignex.klause.solver.propagation.PropagationState.boolWatchersByLit]
      * index instead. Identical to [boolOccurrences] when no factor opts in.
@@ -203,17 +203,17 @@ class Problem(
     }
 
     /** True iff some factor opts into typed int-domain event wakeup
-     *  ([Factor.initialIntEventWatches]). When false, the engine skips all int-event bookkeeping
+     *  ([Propagator.initialIntEventWatches]). When false, the engine skips all int-event bookkeeping
      *  and [nonIntEventWatcherIntOccurrences] aliases [intOccurrences]. */
     val usesIntEventWatchers: Boolean = propagators.any { it.initialIntEventWatches != null }
 
-    /** True iff some factor consumes the per-factor dirty-variable delta ([Factor.consumesIntEventDelta]).
+    /** True iff some factor consumes the per-factor dirty-variable delta ([Propagator.consumesIntEventDelta]).
      *  When false the engine allocates no delta accumulators and the dirty-var bookkeeping is skipped. */
     val usesIntEventDeltaConsumers: Boolean = propagators.any { it.consumesIntEventDelta }
 
     /**
      * [intOccurrences] minus, per variable, the factors that subscribe to a typed int-event on
-     * *that* variable (see [Factor.initialIntEventWatches]). The propagation engine walks this list
+     * *that* variable (see [Propagator.initialIntEventWatches]). The propagation engine walks this list
      * for occurrence-driven int wakeup; a subscribing factor is woken for its subscribed variables
      * via the per-`(var, kind)`
      * [com.eignex.klause.solver.propagation.PropagationState.intEventWatchersBySlot] index instead.
@@ -612,7 +612,7 @@ class Problem(
 
     /**
      * Run sound-but-incomplete deductive propagation against [assumptions]. Each factor's
-     * [Factor.propagate] is invoked to fixed point; pins / domain tightenings cascade through
+     * [Propagator.propagate] is invoked to fixed point; pins / domain tightenings cascade through
      * the occurrence lists. Returns the literals/values forced *beyond* [assumptions] (disjoint
      * from the input), or [PropagationResult.Unsat] if a contradiction is derived.
      *

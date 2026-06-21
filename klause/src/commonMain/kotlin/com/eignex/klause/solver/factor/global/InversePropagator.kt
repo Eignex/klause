@@ -11,8 +11,8 @@ import com.eignex.klause.util.IntIntMap
 
 /** CP propagation logic for `inverse`. */
 internal class InversePropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val f: IntArray,
     private val g: IntArray,
     private val fOffset: Int,

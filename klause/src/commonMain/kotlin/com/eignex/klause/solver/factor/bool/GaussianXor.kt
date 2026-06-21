@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
 
@@ -17,7 +18,7 @@ import com.eignex.klause.solver.Propagator
  * clausal Gaussian reasoning otherwise). With it, enumerating a hashed cell visits essentially
  * only its real solutions.
  *
- * Each [propagate] substitutes the current partial assignment, reduces the residual system to
+ * Each [Propagator.propagate] substitutes the current partial assignment, reduces the residual system to
  * row-echelon form, and pins every variable the system forces (rows that collapse to a single
  * variable). Conflicts and forced pins are explained sharply: every row carries a reason
  * bitset of the assigned variables feeding it, xor-combined through each elimination step,
@@ -50,4 +51,6 @@ class GaussianXor(
     }
 
     override fun asPropagator(): Propagator = GaussianXorPropagator(constraints, boolVars)
+
+    override fun asInvariant(): Invariant = this
 }

@@ -7,8 +7,8 @@ import com.eignex.klause.solver.propagation.PropagationState
 
 /** CP propagation logic for `sort`. */
 internal class SortPropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    val boolVars: IntArray,
+    val intVars: IntArray,
     private val xs: IntArray,
     private val ys: IntArray,
 ) : Propagator {

@@ -10,11 +10,8 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.moveBoolWatcher
 
 /** CP propagator for [Clause]: two-watched-literal propagation over a disjunction of literals. */
-internal class ClausePropagator(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
-    internal val literals: IntArray,
-) : Propagator {
+internal class ClausePropagator(val boolVars: IntArray, val intVars: IntArray, internal val literals: IntArray) :
+    Propagator {
 
     private var pureBoolMemo: Int = -1
 

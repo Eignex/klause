@@ -10,7 +10,7 @@ import com.eignex.klause.solver.factor.remapVars
 
 /**
  * `Σ coeffs(i) * intVars(i) ⟨op⟩ bound`. Payload at `intPayload(factorId)` is the current
- * weighted sum, kept in sync incrementally by [applyIntSet]. Repair moves propose, for each
+ * weighted sum, kept in sync incrementally by [Invariant.applyIntSet]. Repair moves propose, for each
  * variable, the integer value that on its own would put the sum on the right side of `bound`,
  * clamped to the variable's domain.
  */
