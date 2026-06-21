@@ -540,22 +540,34 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
         return null
     } ?: return null
     val primal = result.primal
-    fun lpValue(col: Int): Double? = if (col in 0 until primal.size) primal[col] else null
+    return pinToward(session, relaxation) { col -> if (col in 0 until primal.size) primal[col] else null }
+}
 
+/**
+ * Pin every variable toward the value [targetOf] gives its LP column — the LP point for the rounding
+ * probe, the rounded target for the feasibility pump — most-confident first and with the two-sided
+ * fallback of [pinIntTowardLp], then snapshot. Every variable ends pinned to a single value, so a
+ * non-null result is a complete feasible assignment; null when a variable conflicts both ways.
+ */
+private fun LpEngine.pinToward(
+    session: PropagationSession,
+    relaxation: LpRelaxation,
+    targetOf: (col: Int) -> Double?,
+): Sample? {
     val intOrder = (0 until problem.numIntVars).sortedBy { v ->
-        lpValue(relaxation.intColOf[v])?.let { abs(it - round(it)) } ?: Double.MAX_VALUE
+        targetOf(relaxation.intColOf[v])?.let { abs(it - round(it)) } ?: Double.MAX_VALUE
     }
     for (v in intOrder) {
         val d = session.intDomain(v)
         if (d.min == d.max) continue // already fixed by propagation
-        if (!pinIntTowardLp(session, v, lpValue(relaxation.intColOf[v]), d.min, d.max)) return null
+        if (!pinIntTowardLp(session, v, targetOf(relaxation.intColOf[v]), d.min, d.max)) return null
     }
     val boolOrder = (0 until problem.numBoolVars).sortedByDescending { b ->
-        lpValue(relaxation.boolColOf[b])?.let { abs(it - 0.5) } ?: -1.0
+        targetOf(relaxation.boolColOf[b])?.let { abs(it - 0.5) } ?: -1.0
     }
     for (b in boolOrder) {
         if (session.boolValue(b) != null) continue
-        val first = (lpValue(relaxation.boolColOf[b]) ?: 0.0) >= 0.5
+        val first = (targetOf(relaxation.boolColOf[b]) ?: 0.0) >= 0.5
         if (session.pinBool(b, first) !is PropagationResult.Unsat) continue
         if (session.pinBool(b, !first) is PropagationResult.Unsat) return null
     }
@@ -573,3 +585,120 @@ private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo:
     if (second == first) return false
     return session.pinInt(v, second) !is PropagationResult.Unsat
 }
+
+/**
+ * Feasibility pump (#52) on the primal pass: when single-shot rounding ([lpRoundingProbe]) fails to
+ * land a feasible point, alternate between an LP solution and its integer rounding, each round
+ * re-solving the relaxation under an L1-distance objective that pulls the LP toward the current
+ * rounding, then retrying the rounding. The distance objective is exact (linear) over variables whose
+ * rounded target sits at a declared bound — every Boolean and any integer rounded to its bound — and
+ * omits interior integer targets, whose `|x − t|` is not linear; this only steers the search, never
+ * affects soundness (a returned [Sample] is a fully-pinned, propagation-feasible assignment the caller
+ * still re-evaluates). Stops at the first feasible rounding, a repeated rounding (cycle), or the round
+ * cap. Re-solves prefer the primal pass ([RevisedSimplex.solvePrimal], phase-1 included) and fall back
+ * to the dual [RevisedSimplex.solve].
+ */
+internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation: Cancellation): Sample? {
+    var solved = solveRelaxation(objective, cancellation) ?: return null
+    val seen = HashSet<String>()
+    repeat(PUMP_ROUNDS) {
+        if (cancellation()) return null
+        val (relaxation, primal) = solved
+        val intTarget = IntArray(problem.numIntVars) { v ->
+            val col = relaxation.intColOf[v]
+            val d = problem.intDomains[v]
+            if (col in 0 until primal.size) round(primal[col]).toInt().coerceIn(d.min, d.max) else d.min
+        }
+        val boolTarget = BooleanArray(problem.numBoolVars) { b ->
+            val col = relaxation.boolColOf[b]
+            col in 0 until primal.size && primal[col] >= 0.5
+        }
+        if (!seen.add(intTarget.joinToString(",") + "|" + boolTarget.joinToString(","))) {
+            return null // repeated rounding ⇒ cycle; perturbation/restart is a follow-up
+        }
+        val session = PropagationSession(problem)
+        if (!session.isUnsatAtRoot) {
+            val sample = pinToward(session, relaxation) { col -> targetOfCol(relaxation, intTarget, boolTarget, col) }
+            if (sample != null) return sample // rounding realized into a feasible incumbent
+        }
+        val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null // nothing to pump
+        solved = solveRelaxation(distance, cancellation) ?: return null
+    }
+    return null
+}
+
+/** Build [obj]'s relaxation at the root and solve it, preferring the primal pass (phase-1 included) and
+ *  falling back to the dual solve; null on a trivial/overflowing/failed relaxation. */
+private fun LpEngine.solveRelaxation(
+    obj: LinearObjective,
+    cancellation: Cancellation,
+): Pair<LpRelaxation, DoubleArray>? {
+    val session = PropagationSession(problem)
+    if (session.isUnsatAtRoot) return null
+    val relaxation = CpToLpRelaxation(problem, obj).build(session)
+    if (relaxation.model.n == 0) return null
+    val result = try {
+        RevisedSimplex(relaxation.model, cancellation).solvePrimal()
+            ?: RevisedSimplex(relaxation.model, cancellation).solve()
+    } catch (_: LpOverflowException) {
+        return null
+    } ?: return null
+    return relaxation to result.primal
+}
+
+/** The rounded target of structural column [col] as a double, or null when it backs no live variable. */
+private fun LpEngine.targetOfCol(
+    relaxation: LpRelaxation,
+    intTarget: IntArray,
+    boolTarget: BooleanArray,
+    col: Int,
+): Double? {
+    if (col < 0 || col >= relaxation.colVarId.size) return null
+    val v = relaxation.colVarId[col]
+    return if (relaxation.colIsBool[col]) {
+        if (boolTarget[v]) 1.0 else 0.0
+    } else {
+        intTarget[v].toDouble()
+    }
+}
+
+/** L1-distance objective pulling the LP toward the rounding: `+1·x` for a target at the lower bound
+ *  (minimize the gap above it), `−1·x` for one at the upper bound, and 0 for an interior integer target
+ *  (whose `|x − t|` is not linear). Null when no coordinate contributes — nothing left to pump. */
+private fun LpEngine.distanceObjective(
+    relaxation: LpRelaxation,
+    intTarget: IntArray,
+    boolTarget: BooleanArray,
+): LinearObjective? {
+    var any = false
+    val intCoef = LongArray(problem.numIntVars) { v ->
+        val d = problem.intDomains[v]
+        when {
+            relaxation.intColOf[v] < 0 -> 0L
+
+            intTarget[v] <= d.min -> {
+                any = true
+                1L
+            }
+
+            intTarget[v] >= d.max -> {
+                any = true
+                -1L
+            }
+
+            else -> 0L
+        }
+    }
+    val boolCoef = LongArray(problem.numBoolVars) { b ->
+        if (relaxation.boolColOf[b] < 0) {
+            0L
+        } else {
+            any = true
+            if (boolTarget[b]) -1L else 1L
+        }
+    }
+    return if (any) LinearObjective(boolWeights = boolCoef, intCoefficients = intCoef) else null
+}
+
+/** Round cap for the feasibility pump before it gives up to search. */
+private const val PUMP_ROUNDS = 20
