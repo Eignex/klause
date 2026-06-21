@@ -14,6 +14,7 @@ import com.eignex.klause.solver.factor.bool.Xor
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.global.ValuePrecede
+import com.eignex.klause.util.IntDisjointSet
 
 internal object SymmetryBreaking {
 
@@ -249,25 +250,13 @@ internal object SymmetryBreaking {
     private fun verifyValueOrbits(problem: Problem, base: Map<String, Int>, values: List<Int>): List<List<Int>> {
         val n = values.size
         if (n > MAX_VERIFIED_GROUP) return emptyList()
-        val parent = IntArray(n) { it }
-        fun find(x: Int): Int {
-            var r = x
-            while (parent[r] != r) r = parent[r]
-            return r
-        }
+        val ds = IntDisjointSet(n)
         for (i in 0 until n) {
             for (j in i + 1 until n) {
-                if (find(
-                        i,
-                    ) != find(j) && verifyValueSwap(problem, base, values[i], values[j])
-                ) {
-                    parent[find(i)] = find(j)
-                }
+                if (!ds.connected(i, j) && verifyValueSwap(problem, base, values[i], values[j])) ds.union(i, j)
             }
         }
-        val byRoot = HashMap<Int, MutableList<Int>>()
-        for (i in 0 until n) byRoot.getOrPut(find(i)) { ArrayList() }.add(values[i])
-        return byRoot.values.toList()
+        return ds.groups().map { group -> group.map { values[it] } }
     }
 
     /** Whether the value transposition `(v w)` maps the factor multiset to itself — relabel every
@@ -502,23 +491,16 @@ internal object SymmetryBreaking {
         val extra = ArrayList<Factor>()
         for ((_, blocks) in byShape) {
             if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
-            val parent = IntArray(blocks.size) { it }
-            fun find(x: Int): Int {
-                var r = x
-                while (parent[r] != r) r = parent[r]
-                return r
-            }
+            val ds = IntDisjointSet(blocks.size)
             for (i in blocks.indices) {
                 for (j in i + 1 until blocks.size) {
-                    if (find(i) != find(j) && blocksSwapVerified(problem, base, intMap, blocks[i], blocks[j])) {
-                        parent[find(i)] = find(j)
+                    if (!ds.connected(i, j) && blocksSwapVerified(problem, base, intMap, blocks[i], blocks[j])) {
+                        ds.union(i, j)
                     }
                 }
             }
-            val byRoot = HashMap<Int, MutableList<IntArray>>()
-            for (i in blocks.indices) byRoot.getOrPut(find(i)) { ArrayList() }.add(blocks[i])
-            for (cls in byRoot.values) {
-                val ordered = cls.sortedBy { it[0] }
+            for (cls in ds.groups()) {
+                val ordered = cls.map { blocks[it] }.sortedBy { it[0] }
                 for (k in 0 until ordered.size - 1) extra.add(LexLess(ordered[k], ordered[k + 1], strict = false))
             }
         }
@@ -595,23 +577,16 @@ internal object SymmetryBreaking {
         val extra = ArrayList<Factor>()
         for ((_, blocks) in byShape) {
             if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
-            val parent = IntArray(blocks.size) { it }
-            fun find(x: Int): Int {
-                var r = x
-                while (parent[r] != r) r = parent[r]
-                return r
-            }
+            val ds = IntDisjointSet(blocks.size)
             for (i in blocks.indices) {
                 for (j in i + 1 until blocks.size) {
-                    if (find(i) != find(j) && boolBlocksSwapVerified(problem, base, boolMap, blocks[i], blocks[j])) {
-                        parent[find(i)] = find(j)
+                    if (!ds.connected(i, j) && boolBlocksSwapVerified(problem, base, boolMap, blocks[i], blocks[j])) {
+                        ds.union(i, j)
                     }
                 }
             }
-            val byRoot = HashMap<Int, MutableList<IntArray>>()
-            for (i in blocks.indices) byRoot.getOrPut(find(i)) { ArrayList() }.add(blocks[i])
-            for (cls in byRoot.values) {
-                val ordered = cls.sortedBy { it[0] }
+            for (cls in ds.groups()) {
+                val ordered = cls.map { blocks[it] }.sortedBy { it[0] }
                 for (k in 0 until ordered.size - 1) extra.add(boolLexLeader(ordered[k], ordered[k + 1]))
             }
         }
@@ -676,18 +651,7 @@ internal object SymmetryBreaking {
         candidateGroups: List<List<Int>>,
         verify: (Int, Int) -> Boolean,
     ): List<IntArray> {
-        val parent = IntArray(numVars) { it }
-        fun find(x: Int): Int {
-            var root = x
-            while (parent[root] != root) root = parent[root]
-            var cur = x
-            while (parent[cur] != cur) {
-                val next = parent[cur]
-                parent[cur] = root
-                cur = next
-            }
-            return root
-        }
+        val ds = IntDisjointSet(numVars)
         for (group in candidateGroups) {
             // Size guard (#367): each group costs O(size² × factors) verifications. Skip groups
             // beyond the cap — fewer symmetries broken, never unsound.
@@ -696,12 +660,12 @@ internal object SymmetryBreaking {
                 for (j in i + 1 until group.size) {
                     val u = group[i]
                     val v = group[j]
-                    if (find(u) != find(v) && verify(u, v)) parent[find(u)] = find(v)
+                    if (!ds.connected(u, v) && verify(u, v)) ds.union(u, v)
                 }
             }
         }
         val byRoot = HashMap<Int, MutableList<Int>>()
-        for (group in candidateGroups) for (v in group) byRoot.getOrPut(find(v)) { ArrayList() }.add(v)
+        for (group in candidateGroups) for (v in group) byRoot.getOrPut(ds.find(v)) { ArrayList() }.add(v)
         return byRoot.values.filter { it.size >= 2 }.map { it.sorted().toIntArray() }
     }
 
