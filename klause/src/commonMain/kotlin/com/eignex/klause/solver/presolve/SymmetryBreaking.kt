@@ -432,30 +432,61 @@ internal object SymmetryBreaking {
      * row and cell breaking don't interact unsoundly.
      */
     private fun verifiedBlockLex(problem: Problem, objectiveIntVars: Set<Int>, alreadyBroken: Set<Int>): List<Factor> {
+        val intMap = IntArray(problem.numIntVars) { it }
+        return verifiedBlockLexShared(
+            problem = problem,
+            objectiveVars = objectiveIntVars,
+            alreadyBroken = alreadyBroken,
+            varsOf = { it.intVars },
+            wrongKind = { it.boolVars.isNotEmpty() || it.intVars.isEmpty() },
+            blockEligible = { true },
+            shapeOf = { f, block -> canonicalShape(problem, f, block) },
+            swapVerified = { base, a, b -> blocksSwapVerified(problem, base, intMap, a, b) },
+            emit = { a, b -> LexLess(a, b, strict = false) },
+        )
+    }
+
+    /** Shared skeleton for verified block / row symmetry over either variable kind: bucket the
+     *  candidate blocks by canonical shape, union the verified-swap pairs, and order each resulting
+     *  class by a lex-leader chain. The kind-specific bits — which variables a factor contributes,
+     *  which factors to skip, the per-row width guard, the shape key, the swap verifier (which folds
+     *  in the int-only domain check), and the lex-leader factor — are supplied by the callers. */
+    @Suppress("LongParameterList")
+    private inline fun verifiedBlockLexShared(
+        problem: Problem,
+        objectiveVars: Set<Int>,
+        alreadyBroken: Set<Int>,
+        varsOf: (Factor) -> IntArray,
+        wrongKind: (Factor) -> Boolean,
+        blockEligible: (IntArray) -> Boolean,
+        shapeOf: (Factor, IntArray) -> String?,
+        swapVerified: (Map<String, Int>, IntArray, IntArray) -> Boolean,
+        emit: (IntArray, IntArray) -> Factor,
+    ): List<Factor> {
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
         val byShape = HashMap<String, MutableList<IntArray>>()
         for (f in problem.factors) {
-            if (f.boolVars.isNotEmpty() || f.intVars.isEmpty()) continue
-            val block = f.intVars.distinct().sorted().toIntArray()
-            if (block.any { it in objectiveIntVars || it in alreadyBroken }) continue
-            val shape = canonicalShape(problem, f, block) ?: continue
+            if (wrongKind(f)) continue
+            val block = varsOf(f).distinct().sorted().toIntArray()
+            if (!blockEligible(block)) continue
+            if (block.any { it in objectiveVars || it in alreadyBroken }) continue
+            val shape = shapeOf(f, block) ?: continue
             byShape.getOrPut(shape) { ArrayList() }.add(block)
         }
-        val intMap = IntArray(problem.numIntVars) { it }
         val extra = ArrayList<Factor>()
         for ((_, blocks) in byShape) {
             if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
             val ds = IntDisjointSet(blocks.size)
             for (i in blocks.indices) {
                 for (j in i + 1 until blocks.size) {
-                    if (!ds.connected(i, j) && blocksSwapVerified(problem, base, intMap, blocks[i], blocks[j])) {
+                    if (!ds.connected(i, j) && swapVerified(base, blocks[i], blocks[j])) {
                         ds.union(i, j)
                     }
                 }
             }
             for (cls in ds.groups()) {
                 val ordered = cls.map { blocks[it] }.sortedBy { it[0] }
-                for (k in 0 until ordered.size - 1) extra.add(LexLess(ordered[k], ordered[k + 1], strict = false))
+                for (k in 0 until ordered.size - 1) extra.add(emit(ordered[k], ordered[k + 1]))
             }
         }
         return extra
@@ -513,34 +544,18 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int>,
         alreadyBroken: Set<Int>,
     ): List<Factor> {
-        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
-        val byShape = HashMap<String, MutableList<IntArray>>()
-        for (f in problem.factors) {
-            if (f.intVars.isNotEmpty() || f.boolVars.isEmpty()) continue
-            val block = f.boolVars.distinct().sorted().toIntArray()
-            if (block.size > MAX_BOOL_LEX_WIDTH) continue
-            if (block.any { it in objectiveBoolVars || it in alreadyBroken }) continue
-            val shape = canonicalBoolShape(problem, f, block) ?: continue
-            byShape.getOrPut(shape) { ArrayList() }.add(block)
-        }
         val boolMap = IntArray(problem.numBoolVars) { it }
-        val extra = ArrayList<Factor>()
-        for ((_, blocks) in byShape) {
-            if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
-            val ds = IntDisjointSet(blocks.size)
-            for (i in blocks.indices) {
-                for (j in i + 1 until blocks.size) {
-                    if (!ds.connected(i, j) && boolBlocksSwapVerified(problem, base, boolMap, blocks[i], blocks[j])) {
-                        ds.union(i, j)
-                    }
-                }
-            }
-            for (cls in ds.groups()) {
-                val ordered = cls.map { blocks[it] }.sortedBy { it[0] }
-                for (k in 0 until ordered.size - 1) extra.add(boolLexLeader(ordered[k], ordered[k + 1]))
-            }
-        }
-        return extra
+        return verifiedBlockLexShared(
+            problem = problem,
+            objectiveVars = objectiveBoolVars,
+            alreadyBroken = alreadyBroken,
+            varsOf = { it.boolVars },
+            wrongKind = { it.intVars.isNotEmpty() || it.boolVars.isEmpty() },
+            blockEligible = { it.size <= MAX_BOOL_LEX_WIDTH },
+            shapeOf = { f, block -> canonicalBoolShape(problem, f, block) },
+            swapVerified = { base, a, b -> boolBlocksSwapVerified(problem, base, boolMap, a, b) },
+            emit = { a, b -> boolLexLeader(a, b) },
+        )
     }
 
     /** Canonical structure key for a bool block: remap its (sorted) variables to `0..k-1`, so two
@@ -627,52 +642,73 @@ internal object SymmetryBreaking {
         return sb.toString()
     }
 
-    private fun interchangeableIntGroups(problem: Problem, objectiveVars: Set<Int>): List<IntArray> {
-        val n = problem.numIntVars
-        if (n == 0) return emptyList()
-        val eligible = BooleanArray(n) { true }
-        val roles = Array(n) { ArrayList<String>() }
-        for (fi in problem.factors.indices) {
-            when (val f = problem.factors[fi]) {
-                is Linear -> for (i in f.vars.indices) roles[f.vars[i]].add("$fi:lin:${f.coeffs[i]}")
-                is AllDifferent -> for (v in f.vars) roles[v].add("$fi:ad")
-                else -> for (v in f.intVars) eligible[v] = false // unsupported factor type
-            }
+    private fun interchangeableIntGroups(problem: Problem, objectiveVars: Set<Int>): List<IntArray> =
+        interchangeableGroups(
+            problem = problem,
+            numVars = problem.numIntVars,
+            objectiveVars = objectiveVars,
+            fillRoles = ::fillIntRoles,
+            groupKey = { v, role -> "${domainKey(problem.intDomains[v])}|$role" },
+        )
+
+    private fun interchangeableBoolGroups(problem: Problem, objectiveVars: Set<Int>): List<IntArray> =
+        interchangeableGroups(
+            problem = problem,
+            numVars = problem.numBoolVars,
+            objectiveVars = objectiveVars,
+            fillRoles = ::fillBoolRoles,
+            groupKey = { _, role -> role },
+        )
+
+    /** Append factor [fi]'s int-variable roles (equal coefficient in a [Linear], membership in an
+     *  [AllDifferent]); clear [eligible] for variables touched by any unsupported factor type. */
+    private fun fillIntRoles(fi: Int, f: Factor, roles: Array<ArrayList<String>>, eligible: BooleanArray) {
+        when (f) {
+            is Linear -> for (i in f.vars.indices) roles[f.vars[i]].add("$fi:lin:${f.coeffs[i]}")
+            is AllDifferent -> for (v in f.vars) roles[v].add("$fi:ad")
+            else -> for (v in f.intVars) eligible[v] = false // unsupported factor type
         }
-        val groups = HashMap<String, MutableList<Int>>()
-        for (v in 0 until n) {
-            if (!eligible[v] || v in objectiveVars) continue
-            roles[v].sort()
-            groups.getOrPut("${domainKey(problem.intDomains[v])}|${roles[v].joinToString(",")}") { ArrayList() }.add(v)
-        }
-        return groups.values.filter { it.size >= 2 }.map { it.toIntArray() }
     }
 
-    private fun interchangeableBoolGroups(problem: Problem, objectiveVars: Set<Int>): List<IntArray> {
-        val n = problem.numBoolVars
-        if (n == 0) return emptyList()
-        val eligible = BooleanArray(n) { true }
-        val roles = Array(n) { ArrayList<String>() }
-        for (fi in problem.factors.indices) {
-            when (val f = problem.factors[fi]) {
-                is Clause -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:cl:${Lit.isPositive(l)}")
+    /** Append factor [fi]'s bool-variable roles (same-polarity / same-weight literals in a [Clause],
+     *  [Cardinality], [Xor], or [PseudoBoolean]); clear [eligible] for any unsupported factor type. */
+    private fun fillBoolRoles(fi: Int, f: Factor, roles: Array<ArrayList<String>>, eligible: BooleanArray) {
+        when (f) {
+            is Clause -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:cl:${Lit.isPositive(l)}")
 
-                is Cardinality -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:card:${Lit.isPositive(l)}")
+            is Cardinality -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:card:${Lit.isPositive(l)}")
 
-                is Xor -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:xor:${Lit.isPositive(l)}")
+            is Xor -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:xor:${Lit.isPositive(l)}")
 
-                is PseudoBoolean -> for (i in f.literals.indices) {
-                    roles[Lit.variable(f.literals[i])].add("$fi:pb:${f.weights[i]}:${Lit.isPositive(f.literals[i])}")
-                }
-
-                else -> for (v in f.boolVars) eligible[v] = false // unsupported factor type
+            is PseudoBoolean -> for (i in f.literals.indices) {
+                roles[Lit.variable(f.literals[i])].add("$fi:pb:${f.weights[i]}:${Lit.isPositive(f.literals[i])}")
             }
+
+            else -> for (v in f.boolVars) eligible[v] = false // unsupported factor type
         }
+    }
+
+    /** Shared skeleton for interchangeable-variable detection over either variable kind: fill each
+     *  variable's per-factor role strings (clearing eligibility for unsupported factor types), then
+     *  group eligible non-objective variables by their grouping key. The kind-specific bits — the
+     *  per-factor role extraction and the grouping key (the int side prefixes the domain key) — are
+     *  supplied by the callers. */
+    private inline fun interchangeableGroups(
+        problem: Problem,
+        numVars: Int,
+        objectiveVars: Set<Int>,
+        fillRoles: (Int, Factor, Array<ArrayList<String>>, BooleanArray) -> Unit,
+        groupKey: (Int, String) -> String,
+    ): List<IntArray> {
+        if (numVars == 0) return emptyList()
+        val eligible = BooleanArray(numVars) { true }
+        val roles = Array(numVars) { ArrayList<String>() }
+        for (fi in problem.factors.indices) fillRoles(fi, problem.factors[fi], roles, eligible)
         val groups = HashMap<String, MutableList<Int>>()
-        for (v in 0 until n) {
+        for (v in 0 until numVars) {
             if (!eligible[v] || v in objectiveVars) continue
             roles[v].sort()
-            groups.getOrPut(roles[v].joinToString(",")) { ArrayList() }.add(v)
+            groups.getOrPut(groupKey(v, roles[v].joinToString(","))) { ArrayList() }.add(v)
         }
         return groups.values.filter { it.size >= 2 }.map { it.toIntArray() }
     }
