@@ -55,6 +55,10 @@ internal object SolverInvocation {
         val feasible: Boolean?,
         val objective: Double?,
         val timeToBestMs: Long?,
+        /** Wall-clock ms to the *first* feasible solution (the first `----------`), distinct from
+         *  [timeToBestMs] (the last/best). Null when never feasible. Defaulted for backward-compatible
+         *  decode of pre-existing cache blobs. */
+        val timeToFirstFeasibleMs: Long? = null,
         val proven: Boolean,
         val stats: Map<String, String>,
         val attribution: List<Attribution> = emptyList(),
@@ -189,6 +193,7 @@ internal object SolverInvocation {
         val attribution = ArrayList<Attribution>()
         var objective: Double? = null
         var timeToBestMs: Long? = null
+        var timeToFirstFeasibleMs: Long? = null
         var proven = false
         var unsat = false
         var anySolution = false
@@ -198,7 +203,9 @@ internal object SolverInvocation {
             when (val line = rawLine.trim()) {
                 SOLUTION_SEPARATOR -> {
                     anySolution = true
-                    timeToBestMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
+                    val elapsed = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
+                    timeToBestMs = elapsed
+                    if (timeToFirstFeasibleMs == null) timeToFirstFeasibleMs = elapsed
                 }
 
                 SEARCH_COMPLETE -> proven = true
@@ -234,6 +241,7 @@ internal object SolverInvocation {
             },
             objective = objective.takeIf { anySolution },
             timeToBestMs = timeToBestMs,
+            timeToFirstFeasibleMs = timeToFirstFeasibleMs,
             proven = proven,
             stats = stats,
             attribution = attribution,
