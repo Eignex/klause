@@ -9,17 +9,8 @@ import com.eignex.klause.solver.objective.LinearObjective
  * Result of running a presolve pipeline: the transformed [problem] plus the [reconstruct]
  * function that maps a solution of [problem] back to a solution of the original problem. For an
  * all-identity pipeline [reconstruct] is the identity (no per-sample cost).
- *
- * [components] is the connected-component partition of [problem] — its independent subproblems by
- * variable↔factor incidence. It is purely structural (computed on the final, transformed problem)
- * and a consumer that does not decompose can ignore it; [ProblemComponents.isConnected] reports the
- * common single-block case where there is nothing to split.
  */
-class Presolved(
-    val problem: Problem,
-    val reconstruct: (Sample) -> Sample,
-    val components: ProblemComponents = ComponentDecomposition.decompose(problem),
-)
+class Presolved(val problem: Problem, val reconstruct: (Sample) -> Sample)
 
 /**
  * Information a pass needs to stay sound. [objectiveIntVars] / [objectiveBoolVars] are the
@@ -171,13 +162,6 @@ enum class PresolvePass(
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
     DERIVE_XOR_UNITS("xor-units", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.deriveXorUnits(problem))
-    },
-
-    /** Iterated activity-based bound tightening (FME bound propagation). Tightens each variable's
-     *  domain from the min/max activity of the linear rows it appears in, to a local fixpoint; only
-     *  ever narrows by a valid implication, so it preserves the solution set. */
-    TIGHTEN_BOUNDS("bound-tighten", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.tightenBounds(problem))
     },
 
     /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated

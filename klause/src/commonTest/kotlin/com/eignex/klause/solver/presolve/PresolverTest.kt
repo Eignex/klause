@@ -39,7 +39,6 @@ class PresolverTest {
         val autoProblem = listOf(
             PresolvePass.STRENGTHEN_COEFFICIENTS,
             PresolvePass.DERIVE_XOR_UNITS,
-            PresolvePass.TIGHTEN_BOUNDS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.REMOVE_REDUNDANT,
             PresolvePass.MERGE_DUPLICATE_COLUMNS,
@@ -141,13 +140,12 @@ class PresolverTest {
         val ctx = PresolveContext.EMPTY
         // off → nothing.
         assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
-        // conservative → FAST tier only (strengthen + xor-units + bound-tighten + affine + subsume +
-        // dup-columns), no symmetry.
+        // conservative → FAST tier only (strengthen + xor-units + affine + subsume + dup-columns),
+        // no symmetry.
         assertEquals(
             listOf(
                 PresolvePass.STRENGTHEN_COEFFICIENTS,
                 PresolvePass.DERIVE_XOR_UNITS,
-                PresolvePass.TIGHTEN_BOUNDS,
                 PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
                 PresolvePass.REMOVE_REDUNDANT,
                 PresolvePass.MERGE_DUPLICATE_COLUMNS,
