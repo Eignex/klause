@@ -236,7 +236,7 @@ class DominatedVariablesTest {
     }
 
     @Test
-    fun `boolean in a pseudo-boolean LE is fixed false and GE is fixed true`() {
+    fun `boolean in a pseudo-boolean LE is fixed false`() {
         // LE: rising sum violates ⇒ positive-weight literals are true-unsafe ⇒ pin false.
         val le = Problem(
             2,
@@ -247,6 +247,10 @@ class DominatedVariablesTest {
         val outLe = Presolve.fixDominatedVariables(le, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(le, emptyMap()), minObjectiveBools(outLe, emptyMap()), "LE optimum changed")
         assertTrue(hasUnit(outLe, Lit.make(0, false)) && hasUnit(outLe, Lit.make(1, false)), "LE bools pinned false")
+    }
+
+    @Test
+    fun `boolean in a pseudo-boolean GE is fixed true`() {
         // GE: falling sum violates ⇒ positive-weight literals are false-unsafe ⇒ pin true.
         val ge = Problem(
             2,
