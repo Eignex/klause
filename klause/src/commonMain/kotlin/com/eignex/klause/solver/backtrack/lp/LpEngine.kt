@@ -74,6 +74,7 @@ internal class LpEngine(
             objectiveCone = params.lpPlan.objectiveCone,
             linMaxTightFace = params.lpPlan.linMaxTightFace,
             productMcCormick = params.lpPlan.productMcCormick,
+            booleanRlt = params.lpPlan.booleanRlt,
         )
     } else {
         null

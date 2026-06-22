@@ -224,6 +224,10 @@ internal class CpToLpRelaxation(
      *  inequalities). For `a = b` (a square) the envelope degenerates to the secant/tangent relaxation.
      *  Adds four rows per product over the existing columns, so it is gated; off by default. */
     private val productMcCormick: Boolean = false,
+    /** When true, add Boolean RLT rows (#D4): multiply each small 0/1 knapsack row by its binaries and
+     *  linearize the products with the McCormick envelope. Adds product columns + rows (capped), so it
+     *  is gated; off by default. Sound — the relaxation excludes no integer-feasible point. */
+    private val booleanRlt: Boolean = false,
     /** When true, add the **tight face** of each [ArrayMinMax] (#C3, Anderson big-M form) on top of the
      *  always-emitted envelope: one-hot selectors `z_i` (`Σ z_i = 1`) and per-operand rows forcing
      *  `result = xs[i]` when `z_i = 1`, so the extremum is bounded from the tight side too (`result ≤
@@ -341,6 +345,12 @@ internal class CpToLpRelaxation(
 
         /** Above this array length the O(len)-column Element selector model is skipped. */
         const val MAX_ELEM: Int = 256
+
+        /** Boolean RLT (#D4) skips knapsack rows wider than this (each adds O(width) product columns). */
+        const val MAX_RLT_ROW: Int = 8
+
+        /** Cap on the total Boolean-RLT product columns added, bounding the dense-tableau cost. */
+        const val MAX_RLT_COLUMNS: Int = 256
 
         /** Above this tuple count the O(numTuples)-column Table hull is skipped. */
         const val MAX_TUPLES: Int = 1024
@@ -903,6 +913,8 @@ internal class CpToLpRelaxation(
                 }
             }
 
+            if (booleanRlt) buildBooleanRlt()
+
             // Separator-produced cuts, over already-created columns. A cut referencing an absent
             // column is dropped (defensive — separators should only emit over existing columns).
             for (cut in extraCuts) {
@@ -1443,6 +1455,52 @@ internal class CpToLpRelaxation(
             mcCormickRow(resCol, aCol, bCol, -bH, -aH, Relation.GE, -(aH * bH)) // (a−aH)(b−bH) ≥ 0
             mcCormickRow(resCol, aCol, bCol, -bL, -aH, Relation.LE, -(aH * bL)) // (aH−a)(b−bL) ≥ 0
             mcCormickRow(resCol, aCol, bCol, -bH, -aL, Relation.LE, -(aL * bH)) // (a−aL)(bH−b) ≥ 0
+        }
+
+        /**
+         * Boolean Reformulation-Linearization-Technique cuts (#D4, CP-SAT's `_RLT`). For a 0/1 knapsack
+         * row `Σₖ aₖ·xₖ ≤ b` (`aₖ > 0`, every `xₖ ∈ {0,1}`) and a multiplier `xᵢ` from it, multiplying by
+         * `xᵢ ≥ 0` gives the valid `Σₖ aₖ·(xₖxᵢ) ≤ b·xᵢ`. Each product `wₖᵢ = xₖ·xᵢ` becomes an auxiliary
+         * column with the binary McCormick envelope `wₖᵢ ≤ xₖ`, `wₖᵢ ≤ xᵢ`, `wₖᵢ ≥ xₖ + xᵢ − 1`
+         * (`wₖᵢ ≥ 0` by domain); `wᵢᵢ = xᵢ` (idempotent). At any integer solution `wₖᵢ = xₖxᵢ` satisfies
+         * every added row, so the relaxation excludes no feasible point — it only tightens the LP. Bounded
+         * by [MAX_RLT_ROW] (row width) and [MAX_RLT_COLUMNS] (total product columns).
+         */
+        private fun buildBooleanRlt() {
+            var rltColumns = 0
+            for (f in problem.factors) {
+                if (rltColumns >= MAX_RLT_COLUMNS) break
+                if (f !is Linear || f.op != LinearOp.LE) continue
+                if (f.vars.size < 2 || f.vars.size > MAX_RLT_ROW) continue
+                if (f.bound < 0 || f.coeffs.any { it <= 0 }) continue
+                if (f.vars.any { problem.intDomains[it].min != 0 || problem.intDomains[it].max != 1 }) continue
+                val b = f.bound.toLong()
+                for (iIdx in f.vars.indices) {
+                    if (rltColumns >= MAX_RLT_COLUMNS) break
+                    val xi = f.vars[iIdx]
+                    val xiCol = intColumn(xi)
+                    val rltRow = HashMap<Int, Long>() // coalesces the wᵢᵢ = xᵢ term with the −b·xᵢ term
+                    for (kIdx in f.vars.indices) {
+                        val xk = f.vars[kIdx]
+                        val a = f.coeffs[kIdx].toLong()
+                        val wCol = if (kIdx == iIdx) {
+                            xiCol // wᵢᵢ = xᵢ²= xᵢ
+                        } else {
+                            val xkCol = intColumn(xk)
+                            val w = auxColumn(0L, 1L, presence = intArrayOf(xk, xi))
+                            rltColumns++
+                            builder.addRow(intArrayOf(w, xkCol), longArrayOf(1L, -1L), Relation.LE, 0L) // w ≤ xₖ
+                            builder.addRow(intArrayOf(w, xiCol), longArrayOf(1L, -1L), Relation.LE, 0L) // w ≤ xᵢ
+                            builder.addRow(intArrayOf(w, xkCol, xiCol), longArrayOf(1L, -1L, -1L), Relation.GE, -1L)
+                            w
+                        }
+                        rltRow[wCol] = (rltRow[wCol] ?: 0L) + a
+                    }
+                    rltRow[xiCol] = (rltRow[xiCol] ?: 0L) - b // Σ aₖwₖᵢ ≤ b·xᵢ
+                    val cols = rltRow.keys.toIntArray()
+                    builder.addRow(cols, LongArray(cols.size) { rltRow.getValue(cols[it]) }, Relation.LE, 0L)
+                }
+            }
         }
 
         /** Emit `result + ca·a + cb·b rel rhs`, summing coefficients over shared columns (so a square

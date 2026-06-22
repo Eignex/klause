@@ -306,4 +306,11 @@ data class LpPlan(
      * flow-cover inequality. Sound (valid at every integer solution); requires [cuts]. Off by default.
      */
     val flowCoverCuts: Boolean = false,
+    /**
+     * Boolean RLT relaxation (#D4): multiply each small 0/1 knapsack row by its binaries and linearize
+     * the products `xₖ·xᵢ` with their McCormick envelope (product columns + rows). Sound — the
+     * relaxation excludes no integer solution; adds capped product columns, so it is gated. Requires
+     * [bounding]; off by default.
+     */
+    val booleanRlt: Boolean = false,
 )
