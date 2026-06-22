@@ -262,4 +262,13 @@ data class LpPlan(
      * clause and is withheld — the prune itself still happens. Off by default.
      */
     val learn: Boolean = false,
+    /**
+     * Use the integer-multiplier 128-bit certification ([com.eignex.klause.solver.lp.integerDualLowerBoundCeil])
+     * for the exact objective lower bound instead of the rational [com.eignex.klause.solver.lp.ExactBasisCertifier]
+     * dual solve (#B0). Rounds the float duals to integer multipliers at a power-of-two scale and evaluates the
+     * Lagrangian in a 128-bit accumulator — far cheaper than the BigRational solve, sound by construction (a valid
+     * bound for any multipliers), and falling back to the rational certifier when the rounded multipliers yield no
+     * finite bound. Off by default pending corpus validation (#634 / G1).
+     */
+    val integerCertify: Boolean = false,
 )
