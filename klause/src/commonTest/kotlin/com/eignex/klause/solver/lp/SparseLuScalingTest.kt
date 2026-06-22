@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
  * Row equilibration in [SparseLu] must be **transparent**: `ftran`, `btran`, and `determinant` return
  * the same mathematical result with equilibration on as off (only the conditioning differs). Any error
  * in the scale/unscale bookkeeping is caught here rather than shipped. End-to-end, [RevisedSimplex]
- * with `scaling = true` must reach the same optimum.
+ * (which always equilibrates) must reach the same optimum on badly-scaled models.
  */
 class SparseLuScalingTest {
 
@@ -59,7 +59,7 @@ class SparseLuScalingTest {
     }
 
     @Test
-    fun `revised simplex with scaling reaches the same optimum`() {
+    fun `revised simplex always-scaled reaches the same optimum`() {
         val rng = Random(7)
         var compared = 0
         repeat(1500) { _ ->
@@ -74,7 +74,7 @@ class SparseLuScalingTest {
             val model = b.build(Sense.MINIMIZE)
             val opt = exactLpOptimum(model)
             if (opt.isNaN()) return@repeat
-            val scaled = RevisedSimplex(model, scaling = true).solve() ?: return@repeat
+            val scaled = RevisedSimplex(model).solve() ?: return@repeat
             compared++
             assertTrue(abs(scaled.objective - opt) < 1e-6, "scaled ${scaled.objective} != opt $opt")
         }
