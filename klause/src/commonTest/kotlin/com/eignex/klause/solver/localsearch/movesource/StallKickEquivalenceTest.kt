@@ -10,6 +10,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntHashSet
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * Move-set equivalence gate for [StallKick]. The reference closure holds `Cbls.buildStallKick`
@@ -109,6 +110,41 @@ class StallKickEquivalenceTest {
             assertSourceMatchesGenerator(::ringProblem, seed, StallKick(kickVars)) { state, sink ->
                 oldBuildStallKick(state, sink)
             }
+        }
+    }
+
+    /** Infeasible problem whose int vars carry an interior hole (value 3 removed), so a kick that
+     *  sampled over the raw min..max span could propose the proven-infeasible value. */
+    private fun holedProblem(): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 2,
+        intDomains = arrayOf(
+            IntDomain(0, 5).excludeValue(3),
+            IntDomain(0, 5).excludeValue(3),
+        ),
+        factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, -1)),
+    )
+
+    @Test
+    fun `StallKick never kicks an int var onto a hole`() {
+        for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L, 271828L, 161803L)) {
+            val problem = holedProblem()
+            val state = freshState(problem, seed)
+            val sink = MoveSink(state.assumptions).also { it.setInvariants(state.invariants) }
+            StallKick(kickVars).generate(state, sink)
+            for (move in sink.list) {
+                collectIntSets(move) { v, value ->
+                    assertTrue(value in problem.intDomains[v], "kick set var $v to hole value $value (seed=$seed)")
+                }
+            }
+        }
+    }
+
+    private fun collectIntSets(move: Move, onSet: (Int, Int) -> Unit) {
+        when (move) {
+            is Move.IntSet -> onSet(move.varId, move.newValue)
+            is Move.Compound -> for (p in move.parts) collectIntSets(p, onSet)
+            is Move.BoolFlip -> {}
         }
     }
 }

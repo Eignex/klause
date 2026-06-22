@@ -109,9 +109,8 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
             val v = f.intVars[pick]
             if (state.assumptions.isFrozenInt(v)) return null
             val d = state.problem.intDomains[v]
-            val span = (d.max.toLong() - d.min.toLong()).toInt()
-            if (span <= 0) return null
-            val nv = d.min + state.rng.nextInt(span + 1)
+            if (d.size <= 1) return null
+            val nv = d.valueAt(state.rng.nextInt(d.size)) // sparse-aware: never lands on a hole
             if (nv == state.assignment.intValue(v)) return null
             return state.synthesizeChannelingMove(v, nv)
         }
