@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.backtrack.lp.LpAutoConfig
 import com.eignex.klause.solver.backtrack.lp.LpEngine
 import com.eignex.klause.solver.backtrack.lp.harvestRootCuts
+import com.eignex.klause.solver.backtrack.lp.lbTreeSearch
 import com.eignex.klause.solver.backtrack.lp.lpBranchPick
 import com.eignex.klause.solver.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.solver.backtrack.lp.lpRoundingProbe
@@ -558,6 +559,13 @@ class BacktrackSolver(override val problem: Problem) :
                     val seed = lpEngine.lpRoundingProbe(objective, rootToken)
                         ?: lpEngine.lpFeasibilityPump(objective, rootToken)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+                }
+                // Best-bound tree-search primal subsolver (#E2): dive best-first for an incumbent. Pure
+                // heuristic — the returned assignment is propagation-feasible and re-evaluated here.
+                if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
+                    lpEngine.lbTreeSearch(objective, rootToken)?.let { seed ->
+                        recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+                    }
                 }
             }
             outer@ while (true) {
