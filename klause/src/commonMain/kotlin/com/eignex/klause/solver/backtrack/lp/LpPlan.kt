@@ -271,4 +271,11 @@ data class LpPlan(
      * finite bound. Off by default pending corpus validation (#634 / G1).
      */
     val integerCertify: Boolean = false,
+    /**
+     * Use Devex reference-weight pricing for the dual simplex leaving variable instead of the default
+     * Dantzig most-violated rule (#B1, approximate dual steepest edge). Pricing is correctness-neutral —
+     * it only changes the pivot path, never the certified optimum — so this is a pure throughput knob.
+     * Off by default pending corpus benchmarking (#634 / G1).
+     */
+    val devexPricing: Boolean = false,
 )

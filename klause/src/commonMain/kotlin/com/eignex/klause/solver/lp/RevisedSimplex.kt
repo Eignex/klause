@@ -4,6 +4,15 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.lp.cut.Cut
 import kotlin.math.abs
 
+/** Dual-simplex leaving-variable pricing rule (correctness-neutral; affects pivot count only). */
+internal enum class SimplexPricing {
+    /** Most-violated basic bound (Dantzig). */
+    DANTZIG,
+
+    /** Devex reference-weight pricing (approximate dual steepest edge). */
+    DEVEX,
+}
+
 /**
  * Result of a [RevisedSimplex] solve: the optimal [basis] (to warm-start or exactly certify), the
  * float objective, and the dual vector `y` (one per row) used by the Neumaier–Shcherbina safe
@@ -53,10 +62,19 @@ internal class RevisedSimplex(
      *  strict minimum-ratio column. Correctness-neutral — the chosen column is still dual-eligible and
      *  the basis is certified downstream — so it only changes the pivot path. Off by default (parity). */
     private val harris: Boolean = false,
+    /** Leaving-variable pricing rule. [SimplexPricing.DANTZIG] (default) picks the most-violated basic
+     *  bound; [SimplexPricing.DEVEX] weights each violation by a Devex reference norm (approximate dual
+     *  steepest edge), which usually cuts the pivot count. Pricing is correctness-neutral — any rule
+     *  yields the same certified optimum — so this only affects the search path, never the result. */
+    private val pricing: SimplexPricing = SimplexPricing.DANTZIG,
 ) {
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
+
+    /** Devex reference weights γ_i per basic row position (approximate ‖B⁻ᵀeᵢ‖²); all 1 at a fresh
+     *  reference frame, reset on every refactorization. Only read/written under [SimplexPricing.DEVEX]. */
+    private val gamma = DoubleArray(m) { 1.0 }
 
     // Sparse CSC of the structural columns; slack column n+i is the unit vector e_i (implicit).
     private val colRows: Array<IntArray>
@@ -153,6 +171,30 @@ internal class RevisedSimplex(
     private fun duals(factor: EtaBasis): DoubleArray =
         factor.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
 
+    /** Reset the Devex reference weights to 1 (a no-op under [SimplexPricing.DANTZIG]). */
+    private fun resetGamma() {
+        if (pricing == SimplexPricing.DEVEX) for (i in 0 until m) gamma[i] = 1.0
+    }
+
+    /**
+     * Devex reference-weight update after a pivot on row [r] with spike [alpha] (`= B⁻¹A_q`, pivot
+     * element `alpha[r]`). Each row's weight grows toward `(αᵢ/αᵣ)²·γᵣ` (the reference-frame estimate
+     * of the new row norm), and the pivot row takes `max(γᵣ/αᵣ², 1)`. `O(m)` over the already-computed
+     * spike. Indexed by row position, so it is applied before the basis-column reassignment.
+     */
+    private fun updateGamma(alpha: DoubleArray, r: Int) {
+        val pivot = alpha[r]
+        val tau = gamma[r]
+        val pivotSq = pivot * pivot
+        for (i in 0 until m) {
+            if (i == r) continue
+            val ratio = alpha[i] / pivot
+            val cand = ratio * ratio * tau
+            if (cand > gamma[i]) gamma[i] = cand
+        }
+        gamma[r] = maxOf(tau / pivotSq, 1.0)
+    }
+
     /**
      * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
      * model structure (cross-node basis reuse, #705). Tightening a child's variable bounds leaves the
@@ -168,6 +210,7 @@ internal class RevisedSimplex(
             coldStart()
             refactor() ?: return null
         }
+        resetGamma() // fresh Devex reference frame for this solve
         val maxIter = 50 * (m + numVars) + 200
         val rhsAdj = DoubleArray(m)
         val unit = DoubleArray(m)
@@ -196,23 +239,26 @@ internal class RevisedSimplex(
                 }
             }
             val beta = factor.ftran(rhsAdj)
-            // Leaving: most-violated basic bound (Dantzig).
+            // Leaving: the most infeasible basic bound, scored by the pricing rule. Dantzig maximises the
+            // raw violation; Devex maximises violation² / γ_i (approximate dual steepest edge). `worst`
+            // keeps the *raw* violation of the chosen row for the bound-flipping ratio test.
             var r = -1
-            var worst = TOL
+            var bestScore = 0.0
+            var worst = 0.0
             var belowLower = false
             for (i in 0 until m) {
                 val v = basicVar[i]
                 val below = -beta[i]
                 val above = if (model.hasUpper[v]) beta[i] - model.upper[v].toDouble() else Double.NEGATIVE_INFINITY
-                if (below > worst) {
-                    worst = below
+                val isBelow = below >= above
+                val viol = if (isBelow) below else above
+                if (viol <= TOL) continue
+                val score = if (pricing == SimplexPricing.DEVEX) viol * viol / gamma[i] else viol
+                if (score > bestScore) {
+                    bestScore = score
                     r = i
-                    belowLower = true
-                }
-                if (above > worst) {
-                    worst = above
-                    r = i
-                    belowLower = false
+                    worst = viol
+                    belowLower = isBelow
                 }
             }
             if (r == -1) return optimal(beta, factor) // primal feasible ⇒ optimal
@@ -251,6 +297,7 @@ internal class RevisedSimplex(
             denseColumn(q, aq)
             val alpha = factor.ftran(aq) // spike η = B⁻¹ A_q in the pre-pivot factorization
             if (abs(alpha[r]) < TOL) return null // numerically singular pivot
+            if (pricing == SimplexPricing.DEVEX) updateGamma(alpha, r)
             status[basicVar[r]] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
             basicVar[r] = q
             status[q] = VarStatus.BASIC
@@ -259,6 +306,7 @@ internal class RevisedSimplex(
             // fill and rounding drift stay bounded. A refactorize failure (singular) gives up soundly.
             if (factor.etaCount + 1 >= refactorEtaLimit) {
                 factor = refactor() ?: return null
+                resetGamma() // refactorization opens a fresh Devex reference frame
             } else {
                 factor.update(r, alpha)
             }
