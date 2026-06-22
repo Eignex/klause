@@ -16,6 +16,7 @@ import com.eignex.klause.solver.lp.cut.Cut
 import com.eignex.klause.solver.lp.cut.CutContext
 import com.eignex.klause.solver.lp.cut.CutPool
 import com.eignex.klause.solver.lp.cut.CutSeparator
+import com.eignex.klause.solver.lp.integerDualLowerBoundCeil
 import com.eignex.klause.solver.lp.mulExact
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.LpExplanation
@@ -428,7 +429,12 @@ internal fun LpEngine.sparseCertifiedPrune(
     sink.observeLpSolve()
     val result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
-    val lb = ExactBasisCertifier.lowerBoundCeil(relaxation.model, result.basis) ?: return LpNodeOutcome(false, null)
+    // #B0: when enabled, take the cheap integer-multiplier 128-bit bound first (sound: ≤ the rational
+    // certified ceil), falling back to the BigRational dual solve only when the rounded multipliers
+    // yield no finite bound. Both include the model's lo-shift constant, so the result is interchangeable.
+    val lb = (if (params.lpPlan.integerCertify) integerDualLowerBoundCeil(relaxation.model, result.duals) else null)
+        ?: ExactBasisCertifier.lowerBoundCeil(relaxation.model, result.basis)
+        ?: return LpNodeOutcome(false, null)
     val full = try {
         addExact(lb, relaxation.objectiveConstant)
     } catch (_: LpOverflowException) {
