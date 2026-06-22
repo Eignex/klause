@@ -8,6 +8,7 @@ import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.solver.localsearch.movesource.CliqueSwap
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.EjectionChains
+import com.eignex.klause.solver.localsearch.movesource.FlipAndPropagate
 import com.eignex.klause.solver.localsearch.movesource.Frontier
 import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.solver.localsearch.movesource.Phase
@@ -27,8 +28,8 @@ import com.eignex.klause.solver.localsearch.scoring.MoveScoring
  *
  *  - **sources**: violated-factor repairs always; satisfied-factor structured moves + objective-seed
  *    moves at feasibility; elected implicit globals during the infeasibility fight; and, gated on the
- *    stall signal, frontier (neighbour) moves plus the score-only stall swaps / ejection chains that
- *    the reification plateaus need.
+ *    stall signal, frontier (neighbour) moves plus the score-only stall swaps / ejection chains /
+ *    flip-and-propagate compounds that the reification plateaus need.
  *  - **scoring**: [MoveScoring.Weighted] — the learned per-factor gradient (or [MoveScoring.Raw]).
  *  - **acceptance**: [AcceptanceRule.WalkSatNoise] — greedy on the gradient with a noise draw whose
  *    level the stall signal raises from [noiseProbability] to [stallNoise] while stalled.
@@ -71,6 +72,13 @@ fun Cbls(
     /** **Clique swaps** (opt-in, `0` = off): cap on stall-gated, score-only at-most-one clique-swap
      *  compounds per pick — the categorical relocation packing/assignment cliques need. */
     stallCliqueSwapCap: Int = 0,
+    /** **Flip-and-propagate** (opt-in, `0` = off): cap on stall-gated, score-only implication-aware
+     *  flip compounds per pick — a seed flip bundled with the literals it forces through the
+     *  binary-implication graph. */
+    flipPropagateCap: Int = 0,
+    /** Maximum implication-following depth per flip-and-propagate move (only consulted when
+     *  [flipPropagateCap] > 0). */
+    flipPropagateDepth: Int = 16,
     /** **Targeted kick** (opt-in, `0` = off): steps without a strict cost drop before a bounded
      *  LNS-style [StallKick] perturbation fires. Should be ≫ [frontierAfterStall]. */
     stallKickAfter: Int = 0,
@@ -98,6 +106,9 @@ fun Cbls(
             add(ConfiguredSource(EjectionChains(stallChainCap, stallChainDepth), stallGated = true))
         }
         if (stallCliqueSwapCap > 0) add(ConfiguredSource(CliqueSwap(stallCliqueSwapCap), stallGated = true))
+        if (flipPropagateCap > 0) {
+            add(ConfiguredSource(FlipAndPropagate(flipPropagateCap, flipPropagateDepth), stallGated = true))
+        }
     }
     return SourceDrivenStrategy(
         sources = sources,
