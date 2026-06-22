@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
@@ -643,6 +644,17 @@ class SymmetryBreakingTest {
             ),
             "cost stride",
         )
+
+        // ArrayMinMax: mode and the output var are positional; the operand set is order-insensitive.
+        val amm = ArrayMinMax(0, intArrayOf(1, 2), max = true)
+        assertEquals(
+            amm.structuralKey(),
+            ArrayMinMax(0, intArrayOf(2, 1), max = true).structuralKey(),
+            "operand order must not change the key",
+        )
+        distinct(amm, ArrayMinMax(0, intArrayOf(1, 2), max = false), "min vs max")
+        distinct(amm, ArrayMinMax(3, intArrayOf(1, 2), max = true), "result var")
+        distinct(amm, ArrayMinMax(0, intArrayOf(1, 3), max = true), "operand set")
     }
 
     @Test

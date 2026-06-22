@@ -65,6 +65,7 @@ internal enum class FactorKind {
     CUMULATIVE,
     DIFFN,
     DISJUNCTIVE,
+    ARRAY_MIN_MAX,
 }
 
 /** Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments. */
