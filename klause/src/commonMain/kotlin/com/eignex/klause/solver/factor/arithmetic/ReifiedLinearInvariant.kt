@@ -8,6 +8,7 @@ import com.eignex.klause.solver.factor.bool.internals.linearDegree
 import com.eignex.klause.solver.factor.bool.internals.linearHolds
 import com.eignex.klause.solver.factor.bool.internals.reifiedDegree
 import com.eignex.klause.solver.factor.bool.internals.snapLinearTarget
+import com.eignex.klause.solver.localsearch.ChannelingSink
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
@@ -103,6 +104,22 @@ internal class ReifiedLinearInvariant(
                 }
             }
         }
+    }
+
+    /** Single-var EQ indicator channeling: when the body var is set to a new value, flip the aux iff
+     *  that changes the truth of `coeff·v == bound`, so the indicator tracks the value in one move. */
+    override fun contributeChanneling(
+        state: LocalSearchState,
+        factorId: Int,
+        intVar: Int,
+        oldValue: Int,
+        newValue: Int,
+        sink: ChannelingSink,
+    ) {
+        if (vars.size != 1 || op != LinearOp.EQ) return
+        if (state.assumptions.isFrozenBool(auxBoolVar)) return
+        val shouldHold = coeffs[0].toLong() * newValue == bound.toLong()
+        if (state.assignment.boolValue(auxBoolVar) != shouldHold) sink.add(BoolFlip(auxBoolVar))
     }
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true

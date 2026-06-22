@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.localsearch.ChannelingSink
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
@@ -102,6 +103,27 @@ interface Invariant {
      */
     fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
     }
+
+    /**
+     * Append the sibling updates that keep this factor consistent when [intVar] moves from [oldValue]
+     * to [newValue], for value-driven channeling ([LocalSearchState.synthesizeChannelingMove]). The
+     * engine calls this on every factor mentioning [intVar] so each rolls its own indicator flip or
+     * counter-shift into one atomic [Move.Compound] instead of the engine chasing the cascade a move
+     * at a time.
+     *
+     * Contributors must respect [ChannelingSink.isPinned] (never re-shift a claimed var) and
+     * [LocalSearchState.assumptions] (skip frozen vars). Default: no contribution — only factors with
+     * a deterministic "which sibling moves" answer (single-var EQ reified indicators, satisfied
+     * `Linear EQ` sums) override.
+     */
+    fun contributeChanneling(
+        state: LocalSearchState,
+        factorId: Int,
+        intVar: Int,
+        oldValue: Int,
+        newValue: Int,
+        sink: ChannelingSink,
+    ) {}
 
     /**
      * True iff this factor's [proposeStructuredMoves] generates a *feasibility-preserving*

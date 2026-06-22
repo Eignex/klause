@@ -8,7 +8,6 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.solver.factor.arithmetic.Linear
-import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -16,7 +15,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.presolve.Presolve
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
 import kotlin.reflect.KClass
@@ -514,95 +512,14 @@ class LocalSearchState(
     fun synthesizeChannelingMove(intVar: Int, newValue: Int): Move {
         val cur = assignment.intValue(intVar)
         if (cur == newValue) return Move.IntSet(intVar, newValue)
-        val parts = ArrayList<Move>(4)
-        // Vars whose update is already committed, so a sibling factor doesn't override the choice —
-        // two Linear EQs sharing a compensation target would otherwise clobber each other.
-        val pinned = IntHashSet()
-        pinned.add(intVar)
-        parts += Move.IntSet(intVar, newValue)
+        // Each sibling factor mentioning intVar contributes its own consistency-preserving update
+        // (indicator flip / sum counter-shift) via Invariant.contributeChanneling; the sink folds them
+        // into one Compound and pins claimed vars so two siblings can't clobber the same target.
+        val sink = ChannelingSink(intVar, newValue)
         for (fid in problem.intOccurrences[intVar]) {
-            // The original factor carries the linear structure (coeffs/op/bound); the parallel
-            // `factors` invariants no longer expose it after the propagator/invariant split, so
-            // channeling reads the shape from `problem.factors`.
-            val f = problem.factors[fid]
-            // Indicator channeling: single-var EQ reified-linear. Flip the aux bool iff the new
-            // value changes the truth of `coeff·v == bound`.
-            if (f is ReifiedLinear) {
-                if (f.vars.size == 1 && f.op == LinearOp.EQ) {
-                    val coeff = f.coeffs[0]
-                    val auxVar = f.auxBoolVar
-                    if (assumptions.isFrozenBool(auxVar)) continue
-                    val shouldHold = coeff.toLong() * newValue == f.bound.toLong()
-                    val auxCurrent = assignment.boolValue(auxVar)
-                    if (auxCurrent != shouldHold) parts += Move.BoolFlip(auxVar)
-                }
-                continue
-            }
-            // Sum channeling: Linear EQ `Σ c(i)·x(i) = bound`. When v changes by delta the sum
-            // drifts by `c_v · delta`, so shift another participant u by the inverse amount to keep
-            // the equality balanced, preferring a target whose coefficient divides the drift evenly
-            // so the new value lands on an integer.
-            //
-            // Only for currently-satisfied Linear EQs: a violated one is the constraint the caller
-            // is repairing via the IntSet, so a counter-shift would undo the repair.
-            if (f is Linear &&
-                f.op == LinearOp.EQ &&
-                !violated.contains(fid)
-            ) {
-                propagateLinearEqShift(f, intVar, cur, newValue, parts, pinned)
-            }
+            factors[fid].contributeChanneling(this, fid, intVar, cur, newValue, sink)
         }
-        return if (parts.size == 1) parts[0] else Move.Compound(parts)
-    }
-
-    /** Helper for [synthesizeChannelingMove]: find a compensation target in a Linear EQ
-     *  factor and append an IntSet that restores the sum invariant after [intVar] shifts
-     *  from [oldV] to [newV]. Skips when no clean integer compensation exists, when the
-     *  candidate target is frozen / pinned / would exit its domain. */
-    private fun propagateLinearEqShift(
-        f: Linear,
-        intVar: Int,
-        oldV: Int,
-        newV: Int,
-        parts: ArrayList<Move>,
-        pinned: IntHashSet,
-    ) {
-        var coeffV = 0
-        for (i in f.vars.indices) {
-            if (f.vars[i] == intVar) {
-                coeffV = f.coeffs[i]
-                break
-            }
-        }
-        if (coeffV == 0) return
-        val drift = coeffV.toLong() * (newV - oldV)
-        // Lowest-|coeff| participant other than intVar absorbs the drift; coeff = ±1 guarantees
-        // integer landing.
-        var bestIdx = -1
-        var bestAbs = Int.MAX_VALUE
-        for (i in f.vars.indices) {
-            val u = f.vars[i]
-            if (u == intVar || u in pinned) continue
-            val cu = f.coeffs[i]
-            if (cu == 0) continue
-            val absC = if (cu < 0) -cu else cu
-            if (absC < bestAbs && drift % cu == 0L) {
-                bestAbs = absC
-                bestIdx = i
-            }
-        }
-        if (bestIdx < 0) return
-        val u = f.vars[bestIdx]
-        if (assumptions.isFrozenInt(u)) return
-        val cu = f.coeffs[bestIdx]
-        val uShift = -drift / cu // (uShift * cu) cancels the drift
-        val curU = assignment.intValue(u)
-        val newU = curU + uShift.toInt()
-        if (newU == curU) return
-        val dom = problem.intDomains[u]
-        if (newU < dom.min || newU > dom.max) return
-        parts += Move.IntSet(u, newU)
-        pinned.add(u)
+        return sink.toMove()
     }
 
     /** Net cost change if [move] were applied, without mutating state. */

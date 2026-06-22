@@ -6,6 +6,7 @@ import com.eignex.klause.solver.factor.arithmetic.internals.findCoeff
 import com.eignex.klause.solver.factor.bool.internals.linearDegree
 import com.eignex.klause.solver.factor.bool.internals.linearHolds
 import com.eignex.klause.solver.factor.bool.internals.snapLinearTarget
+import com.eignex.klause.solver.localsearch.ChannelingSink
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
@@ -76,6 +77,49 @@ internal class LinearInvariant(
             val clamped = state.problem.intDomains[v].clampLong(target)
             if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
+    }
+
+    /** Sum channeling for a currently-satisfied EQ: when [intVar] drifts by `c·Δ`, shift the
+     *  lowest-|coeff| other participant by the inverse so `Σ c·x = bound` stays balanced, preferring a
+     *  coefficient that divides the drift evenly so the target lands on an integer. A violated EQ is
+     *  the constraint the caller is repairing via the int set, so a counter-shift would undo it. */
+    override fun contributeChanneling(
+        state: LocalSearchState,
+        factorId: Int,
+        intVar: Int,
+        oldValue: Int,
+        newValue: Int,
+        sink: ChannelingSink,
+    ) {
+        if (op != LinearOp.EQ || state.violated.contains(factorId)) return
+        val coeffV = findCoeff(coeffs, vars, intVar)
+        if (coeffV == 0) return
+        val drift = coeffV.toLong() * (newValue - oldValue)
+        var bestIdx = -1
+        var bestAbs = Int.MAX_VALUE
+        for (i in vars.indices) {
+            val u = vars[i]
+            if (u == intVar || sink.isPinned(u)) continue
+            val cu = coeffs[i]
+            if (cu == 0) continue
+            val absC = if (cu < 0) -cu else cu
+            if (absC < bestAbs && drift % cu == 0L) {
+                bestAbs = absC
+                bestIdx = i
+            }
+        }
+        if (bestIdx < 0) return
+        val u = vars[bestIdx]
+        if (state.assumptions.isFrozenInt(u)) return
+        val cu = coeffs[bestIdx]
+        val uShift = -drift / cu // (uShift * cu) cancels the drift
+        val curU = state.assignment.intValue(u)
+        val newU = curU + uShift.toInt()
+        if (newU == curU) return
+        val dom = state.problem.intDomains[u]
+        if (newU < dom.min || newU > dom.max) return
+        sink.add(IntSet(u, newU))
+        sink.pin(u)
     }
 
     /** Self-preserving move suggestions during objective descent. For [LinearOp.EQ] the
