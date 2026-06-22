@@ -222,6 +222,12 @@ object LsCatalog {
             Cbls(implicitStructuredCap = 8, tabu = cblsTabu())
         }
 
+        // Clique-swap arm: stall-gated at-most-one clique swaps for packing/assignment cliques whose
+        // categorical "which member is on" choice a single flip can only relocate by passing through
+        // the doubly-on violating state. Kept last pending its cross-seed credit pass.
+        LsArm.CblsCliqueFixed ->
+            cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(stallCliqueSwapCap = 8, tabu = cblsTabu()) }
+
         // Feasibility-Jump arm: a weighted-violation argmin-jump strategy, orthogonal to the
         // step-based CBLS/WalkSAT/SA arms. It drives the feasibility fight and returns null at
         // feasibility, so the engine's built-in objective descent owns the optimize phase.
@@ -268,6 +274,8 @@ object LsCatalog {
         LsArm.CblsIlsBandit, LsArm.ProbsatBanditFixed,
         // Implicit-solving niche; kept last pending a cross-seed credit pass.
         LsArm.CblsImplicitFixed,
+        // Clique-swap niche; kept last pending a cross-seed credit pass.
+        LsArm.CblsCliqueFixed,
         // Feasibility-Jump arm; kept last pending its cross-seed credit pass.
         LsArm.FeasibilityJumpFixed,
         // Schedule-diversity SA arms; kept last pending their cross-seed credit pass.
@@ -327,6 +335,7 @@ internal enum class LsArm(val label: String) {
     CblsIlsBandit("cbls/ils-bandit"),
     ProbsatBanditFixed("probsat-bandit/fixed"),
     CblsImplicitFixed("cbls-implicit/fixed"),
+    CblsCliqueFixed("cbls-clique/fixed"),
     FeasibilityJumpFixed("fjump/fixed"),
     SaReheatFixed("sa-reheat/fixed"),
     SaPhasedFixed("sa-phased/fixed"),

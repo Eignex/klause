@@ -21,6 +21,7 @@ object MoveSourceCatalog {
         "ejection-chains" to { EjectionChains(DEFAULT_CHAIN_CAP, DEFAULT_CHAIN_DEPTH) },
         "stall-kick" to { StallKick(DEFAULT_KICK_VARS) },
         "pair-swap" to { PairSwap(DEFAULT_PAIR_SWAP_CAP) },
+        "clique-swap" to { CliqueSwap(DEFAULT_CLIQUE_SWAP_CAP) },
     )
 
     /** Every known source label, in catalog order. */
@@ -52,4 +53,5 @@ object MoveSourceCatalog {
     private const val DEFAULT_CHAIN_DEPTH = 16
     private const val DEFAULT_KICK_VARS = 8
     private const val DEFAULT_PAIR_SWAP_CAP = 8
+    private const val DEFAULT_CLIQUE_SWAP_CAP = 8
 }
