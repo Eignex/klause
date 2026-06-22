@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.lp.cut
 
+import com.eignex.klause.solver.lp.Relation
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * An activity-managed pool of globally-valid cuts (#40). Cuts are added with deduplication by
@@ -64,6 +66,81 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
         return abs(cut.rhs - lhs)
     }
 
+    /**
+     * Select up to [max] pooled cuts to add to the LP at the current point [primal], CP-SAT
+     * `LinearConstraintManager::ChangeLp`-style: rank by **efficacy** (the normalised violation
+     * `violation / ‖coeffs‖₂` — how deeply the point cuts past the inequality) and add greedily,
+     * skipping a candidate that is near-parallel to one already chosen (an **orthogonality** filter on
+     * the cosine of their coefficient vectors). A cut the point already satisfies (efficacy below
+     * [minEfficacy]) is dropped — adding it would not move the bound. The returned cuts are a subset of
+     * the pool, so the relaxation stays valid: selecting fewer cuts only loosens the bound, never
+     * removes a feasible point. Insertion order breaks ties (the efficacy sort is stable).
+     *
+     * @param minEfficacy reject cuts whose normalised violation is below this (CP-SAT's `1e-4`).
+     * @param minOrthogonality require each added cut's cosine-to-nearest-selected `≤ 1 − this`.
+     */
+    fun select(
+        primal: DoubleArray,
+        max: Int,
+        minEfficacy: Double = MIN_EFFICACY,
+        minOrthogonality: Double = MIN_ORTHOGONALITY,
+    ): List<Cut> {
+        if (max <= 0) return emptyList()
+        val scored = entries
+            .map { it to efficacy(it, primal) }
+            .filter { it.second >= minEfficacy }
+            .sortedByDescending { it.second }
+        val selected = ArrayList<Cut>()
+        val maxCos = 1.0 - minOrthogonality
+        for ((cut, _) in scored) {
+            if (selected.size >= max) break
+            if (selected.none { cosine(it, cut) > maxCos }) selected.add(cut)
+        }
+        return selected
+    }
+
+    /** Normalised violation of [cut] at [primal] — `violation / ‖coeffs‖₂`, `0` when satisfied. The
+     *  violation is how far the point sits on the infeasible side of the inequality. */
+    private fun efficacy(cut: Cut, primal: DoubleArray): Double {
+        var lhs = 0.0
+        for (k in cut.cols.indices) {
+            val col = cut.cols[k]
+            if (col in primal.indices) lhs += cut.coeffs[k] * primal[col]
+        }
+        val violation = when (cut.rel) {
+            Relation.GE -> cut.rhs - lhs // `Σ ≥ rhs` violated when below
+            Relation.LE -> lhs - cut.rhs // `Σ ≤ rhs` violated when above
+            Relation.EQ -> abs(lhs - cut.rhs)
+        }
+        if (violation <= 0.0) return 0.0
+        val norm = l2(cut)
+        return if (norm > 0.0) violation / norm else 0.0
+    }
+
+    /** Euclidean norm of [cut]'s coefficient vector. */
+    private fun l2(cut: Cut): Double {
+        var s = 0.0
+        for (c in cut.coeffs) s += c.toDouble() * c.toDouble()
+        return sqrt(s)
+    }
+
+    /** Cosine similarity of two cuts' coefficient vectors over their shared columns (`0` when disjoint,
+     *  `1` when parallel). Used to keep the selected set near-orthogonal. */
+    private fun cosine(a: Cut, b: Cut): Double {
+        val na = l2(a)
+        val nb = l2(b)
+        if (na == 0.0 || nb == 0.0) return 0.0
+        // Map b's columns for an O(|a|) shared-support dot product.
+        val bIndex = HashMap<Int, Long>(b.cols.size * 2)
+        for (k in b.cols.indices) bIndex[b.cols[k]] = b.coeffs[k]
+        var dot = 0.0
+        for (k in a.cols.indices) {
+            val bc = bIndex[a.cols[k]] ?: continue
+            dot += a.coeffs[k].toDouble() * bc.toDouble()
+        }
+        return abs(dot) / (na * nb)
+    }
+
     internal companion object {
         /**
          * Default cap on the pooled cuts. Bounds the per-node LP solve a large root harvest would
@@ -71,5 +148,12 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
          * pathological over-harvest. The reported cut count ([size]) reflects any eviction.
          */
         const val DEFAULT_MAX_CUTS: Int = 2048
+
+        /** Minimum normalised violation for [select] to add a cut (CP-SAT's efficacy floor). */
+        const val MIN_EFFICACY: Double = 1e-4
+
+        /** Minimum orthogonality for [select]: an added cut's cosine to any already-selected cut must
+         *  be at most `1 − this`, so near-duplicate faces are not piled onto the LP. */
+        const val MIN_ORTHOGONALITY: Double = 0.05
     }
 }
