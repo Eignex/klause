@@ -162,7 +162,10 @@ private fun bestRoundedCut(
             if (w[r] == 0L || !isLeRow[r]) continue
             val wr = Int128()
             wr.addLong(w[r])
-            val f = superAdditive(wr, d, f0, mir) ?: run { fwOk = false; 0L }
+            val f = superAdditive(wr, d, f0, mir) ?: run {
+                fwOk = false
+                0L
+            }
             if (!fwOk) break
             fw[r] = f
         }
@@ -180,12 +183,18 @@ private fun bestRoundedCut(
         var ok = true
         var dot = 0.0
         for (k in 0 until n) {
-            val fg = superAdditive(colG[k], d, f0, mir) ?: run { ok = false; 0L }
+            val fg = superAdditive(colG[k], d, f0, mir) ?: run {
+                ok = false
+                0L
+            }
             if (!ok) break
             val cAcc = Int128()
             cAcc.addLong(fg)
             model.forEachInColumn(k) { r, a -> if (fw[r] != 0L) cAcc.addProduct(-fw[r], a) }
-            if (!cAcc.fitsLong()) { ok = false; break }
+            if (!cAcc.fitsLong()) {
+                ok = false
+                break
+            }
             val ck = cAcc.toLong()
             if (ck == 0L) continue
             cutCols.add(k)
@@ -212,13 +221,7 @@ private fun bestRoundedCut(
 
 /** Turn the `≤` cut `Σ vals_k·z_k ≤ rhsLe` (shifted columns) into klause's `Σ a_k·x_k ≥ b` form,
  *  unshifting `z_k = x_k − lo_k` and gcd-reducing; null if a coefficient or the rhs overflows `Long`. */
-private fun emitGeCut(
-    model: LpModel,
-    cols: IntArrayList,
-    leVals: LongArrayList,
-    rhsLe: Long,
-    global: Boolean,
-): Cut? {
+private fun emitGeCut(model: LpModel, cols: IntArrayList, leVals: LongArrayList, rhsLe: Long, global: Boolean): Cut? {
     // Σ vals_k z_k ≤ rhsLe ⇔ Σ (−vals_k) x_k ≥ −rhsLe − Σ vals_k·lo_k.
     val rhsAcc = Int128()
     rhsAcc.addLong(rhsLe)

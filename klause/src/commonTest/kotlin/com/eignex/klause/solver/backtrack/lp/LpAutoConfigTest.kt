@@ -374,7 +374,6 @@ class LpAutoConfigTest {
         val mm = LpAutoConfig.recommend(problem(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
         assertTrue(mm.lpPlan.bounding)
         assertTrue(mm.lpPlan.linMaxTightFace)
-        assertTrue(mm.lpPlan.integerCertify)
         assertTrue(mm.lpPlan.devexPricing)
         assertTrue(mm.lpPlan.harris)
         assertTrue(mm.lpPlan.scaling)

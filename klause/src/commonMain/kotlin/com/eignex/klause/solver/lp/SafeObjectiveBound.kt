@@ -15,8 +15,8 @@ import kotlin.math.abs
  * when the relaxation is unbounded below (a strictly negative reduced cost on a variable with no
  * finite upper bound) or when [y] is non-finite.
  *
- * This is the cheap pruning bound; the exact [ExactBasisCertifier] gives the tight authoritative one.
- * A loose result here only costs a missed prune, never correctness.
+ * This is the cheap pruning bound; the integer-multiplier [integerCertify] gives the tight
+ * authoritative one. A loose result here only costs a missed prune, never correctness.
  */
 internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
     val m = model.m

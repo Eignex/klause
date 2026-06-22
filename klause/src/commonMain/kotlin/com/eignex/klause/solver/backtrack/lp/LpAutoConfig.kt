@@ -302,9 +302,8 @@ object LpAutoConfig {
                 // Implied-bound cuts (#D3): a cut family, so requires cuts active + Boolean structure.
                 impliedBoundCuts = base.lpPlan.impliedBoundCuts ||
                     (cuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
-                // Correctness-neutral engine knobs (#B0/#B1/#B2/#B3): on whenever LP bounding runs — they
-                // change the pivot path / certificate / conditioning, never the certified optimum.
-                integerCertify = base.lpPlan.integerCertify || lpActive,
+                // Correctness-neutral engine knobs: on whenever LP bounding runs — they change the pivot
+                // path / conditioning, never the certified optimum.
                 devexPricing = base.lpPlan.devexPricing || lpActive,
                 harris = base.lpPlan.harris || lpActive,
                 scaling = base.lpPlan.scaling || lpActive,

@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 /**
  * Per-component LP decomposition must produce the SAME bound as the monolithic solve — the blocks are
  * independent, so the objective separates and the per-block optima sum exactly. Validated against both
- * the monolithic [ExactBasisCertifier] ceil and the exact LP optimum, over block-structured models
+ * the monolithic [integerDualLowerBoundCeil] and the LP optimum, over block-structured models
  * (multiple components + isolated columns) so the decomposition path is genuinely exercised.
  */
 class ComponentBoundTest {
@@ -39,7 +39,7 @@ class ComponentBoundTest {
 
     private fun monolithicCeil(model: LpModel): Long? {
         val r = RevisedSimplex(model).solve() ?: return null
-        return ExactBasisCertifier.lowerBoundCeil(model, r.basis)
+        return integerDualLowerBoundCeil(model, r.duals)
     }
 
     @Test

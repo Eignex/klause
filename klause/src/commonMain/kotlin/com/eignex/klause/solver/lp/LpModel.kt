@@ -23,7 +23,7 @@ internal enum class Sense { MINIMIZE, MAXIMIZE }
 /**
  * A bounded-variable LP in the normalized form the revised simplex consumes. All input coefficients,
  * bounds and right-hand sides are integers — this is the "integer based" core: it exploits that every
- * klause datum is integral (the float [RevisedSimplex] solves, the exact [ExactBasisCertifier]
+ * klause datum is integral (the float [RevisedSimplex] solves, the integer-multiplier [integerCertify]
  * certifies) rather than carrying a general-purpose floating LP.
  *
  * Build instances with [LpBuilder], which performs three normalizations so the engine sees a
@@ -133,7 +133,7 @@ internal class LpModel(
     /**
      * Iterate the nonzero structural entries of column [j] as `(row, value)`, rows ascending, over the
      * CSC core — the column-oriented readers ([RevisedSimplex], [safeObjectiveLowerBound],
-     * [ExactBasisCertifier]) consume this. [j] must be a structural column (`< n`); slack columns are
+     * [integerCertify]) consume this. [j] must be a structural column (`< n`); slack columns are
      * the implicit unit vectors the callers handle separately.
      */
     inline fun forEachInColumn(j: Int, action: (row: Int, value: Long) -> Unit) {

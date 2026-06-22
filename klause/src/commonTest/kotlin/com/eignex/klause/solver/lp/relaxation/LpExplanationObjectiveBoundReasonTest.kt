@@ -1,18 +1,18 @@
 package com.eignex.klause.solver.lp.relaxation
 
-import com.eignex.klause.solver.lp.ExactBasisCertifier
 import com.eignex.klause.solver.lp.LpBuilder
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.Sense
+import com.eignex.klause.solver.lp.integerCertify
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
  * #281/#705: the objective lower-bound reason must be sound on the sparse path. For an OPTIMAL LP with
- * exact optimum `L` ([ExactBasisCertifier.Certificate.objective]), the columns with a nonzero exact
- * reduced cost are the load-bearing support; given the constraints and those seated bounds alone, every
+ * integer-multiplier bound `L` (from [integerCertify]), the columns with a nonzero reduced
+ * cost are the load-bearing support; given the constraints and those seated bounds alone, every
  * point has objective ≥ L — independent of the other variables' bounds. The seated side follows the
  * reduced cost's sign (`d > 0` ⇒ lower bound, `d < 0` ⇒ upper), exactly as [LpExplanation.premiseLit]
  * cites it. The implied clause `(objective ≥ ⌈L⌉) ∨ ⋁ ¬(seated bound of a support column)` must exclude
@@ -51,14 +51,14 @@ class LpExplanationObjectiveBoundReasonTest {
             }
             val model = b.build(Sense.MINIMIZE)
             val sol = RevisedSimplex(model).solve() ?: return@repeat
-            val cert = ExactBasisCertifier.certify(model, sol.basis) ?: return@repeat
+            val cert = integerCertify(model, sol.duals) ?: return@repeat
             optimalInstances++
 
-            // Support: structural columns with a nonzero exact reduced cost — the seated bounds the
-            // reason cites. (Columns 0 until n are the structural vars; slacks are >= n.)
-            val support = (0 until n).filter { c -> cert.reducedCost[c].signum() != 0 }
+            // Support: structural columns with a nonzero reduced cost — the seated bounds the reason
+            // cites. (Columns 0 until n are the structural vars; slacks are >= n.)
+            val support = (0 until n).filter { c -> cert.reducedCostSign(c) != 0 }
             if (support.isNotEmpty()) withSupport++
-            val bound = cert.objective.ceil().toLongOrNull() ?: return@repeat
+            val bound = cert.objectiveBoundCeil(0L) ?: return@repeat
 
             val point = IntArray(n)
             fun rec(idx: Int) {
@@ -77,7 +77,7 @@ class LpExplanationObjectiveBoundReasonTest {
                     // sign)? If so, the reason clause requires objective >= bound, so the point must meet it.
                     var seated = true
                     for (col in support) {
-                        val ok = if (cert.reducedCost[col].signum() < 0) {
+                        val ok = if (cert.reducedCostSign(col) < 0) {
                             point[col] <= model.loShift[col] + model.upper[col]
                         } else {
                             point[col] >= model.loShift[col]

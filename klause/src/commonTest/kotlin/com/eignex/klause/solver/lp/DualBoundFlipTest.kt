@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.lp
 
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -42,12 +43,11 @@ class DualBoundFlipTest {
                 abs(flip.objective - plain.objective) <= 1e-6 * maxOf(1.0, abs(plain.objective)),
                 "bound-flip obj ${flip.objective} vs plain ${plain.objective}",
             )
-            // The bound-flip basis must certify to its float optimum, like every other solve path.
-            val cert = ExactBasisCertifier.certify(model, flip.basis) ?: return@repeat
-            val exact = cert.objective.num.toDouble() / cert.objective.den.toDouble()
+            // The bound-flip basis must certify to a sound integer bound, like every other solve path.
+            val bound = integerDualLowerBoundCeil(model, flip.duals) ?: return@repeat
             assertTrue(
-                abs(flip.objective - exact) <= 1e-6 * maxOf(1.0, abs(exact)),
-                "bound-flip float obj ${flip.objective} vs exact certify $exact",
+                bound.toDouble() <= ceil(flip.objective) + 1e-6,
+                "bound-flip certified bound $bound > ceil(obj ${flip.objective})",
             )
         }
         assertTrue(compared > 200, "compared on only $compared instances")

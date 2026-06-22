@@ -1,19 +1,18 @@
 package com.eignex.klause.solver.lp.relaxation
 
-import com.eignex.klause.solver.lp.ExactBasisCertifier
 import com.eignex.klause.solver.lp.LpBuilder
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.Sense
 import com.eignex.klause.solver.lp.VarStatus
-import com.eignex.klause.util.BigRational
+import com.eignex.klause.solver.lp.integerCertify
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
  * #282/#705: the reason for a reduced-cost domain fixing must be sound on the sparse path. Fixing a
- * nonbasic column `col` (exact reduced cost `d` from [ExactBasisCertifier.Certificate]) to its
+ * nonbasic column `col` (reduced cost `d` from the integer-multiplier [integerCertify]) to its
  * tightened bound is justified by `objective ≥ L + d·(x_col − seated_col)` — which holds given the
  * OTHER support columns' seated bounds — plus the incumbent `objective ≤ M`. So the reason for
  * `x_col ≤ b` (at lower) is the support bounds excluding `col` together with `objective ≤ M`; this
@@ -50,28 +49,27 @@ class LpExplanationReducedCostReasonTest {
             }
             val model = b.build(Sense.MINIMIZE)
             val sol = RevisedSimplex(model).solve() ?: return@repeat
-            val cert = ExactBasisCertifier.certify(model, sol.basis) ?: return@repeat
+            val cert = integerCertify(model, sol.duals) ?: return@repeat
             // Incumbent target: an integer bound on the objective at or above ⌈L⌉ (some slack).
-            val m = (cert.objective.ceil().toLongOrNull() ?: return@repeat) + rng.nextInt(0, 3)
-            val slack = BigRational.of(m) - cert.objective
-            if (slack.signum() < 0) return@repeat
+            val m = (cert.objectiveBoundCeil(0L) ?: return@repeat) + rng.nextInt(0, 3)
+            if (!cert.improvingGapNonNegative(m)) return@repeat
 
-            // Support: nonbasic structural columns with a nonzero exact reduced cost.
-            val support = (0 until n).filter { c -> cert.reducedCost[c].signum() != 0 }
+            // Support: nonbasic structural columns with a nonzero reduced cost.
+            val support = (0 until n).filter { c -> cert.reducedCostSign(c) != 0 }
             for (col in support) {
-                val dj = cert.reducedCost[col]
+                val djSign = cert.reducedCostSign(col)
                 val seatLo = model.loShift[col]
                 val seatHi = model.loShift[col] + model.upper[col]
                 val atLower = sol.basis.status[col] == VarStatus.AT_LOWER
                 // Mirror applySparseReducedCostFixing's step bound; only the side dual feasibility allows.
                 val fixUpper: Long
                 val fixLower: Long
-                if (atLower && dj.signum() > 0) {
-                    val dMax = (slack / dj).floor().toLongOrNull() ?: continue
+                if (atLower && djSign > 0) {
+                    val dMax = cert.fixSteps(col, m) ?: continue
                     fixUpper = seatLo + dMax
                     fixLower = Long.MIN_VALUE
-                } else if (!atLower && dj.signum() < 0) {
-                    val dMax = (slack / (BigRational.ZERO - dj)).floor().toLongOrNull() ?: continue
+                } else if (!atLower && djSign < 0) {
+                    val dMax = cert.fixSteps(col, m) ?: continue
                     fixLower = seatHi - dMax
                     fixUpper = Long.MAX_VALUE
                 } else {

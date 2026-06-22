@@ -7,6 +7,7 @@ import com.eignex.klause.solver.backtrack.GOMORY_CUTS_PER_ROUND
 import com.eignex.klause.solver.backtrack.SEARCH_CUT_ROUNDS
 import com.eignex.klause.solver.backtrack.snapshotAssignment
 import com.eignex.klause.solver.lp.Basis
+import com.eignex.klause.solver.lp.IntegerCertificate
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.RevisedSimplex
@@ -17,7 +18,6 @@ import com.eignex.klause.solver.lp.cut.Cut
 import com.eignex.klause.solver.lp.cut.CutContext
 import com.eignex.klause.solver.lp.cut.CutPool
 import com.eignex.klause.solver.lp.cut.CutSeparator
-import com.eignex.klause.solver.lp.IntegerCertificate
 import com.eignex.klause.solver.lp.integerCertify
 import com.eignex.klause.solver.lp.integerDualLowerBoundCeil
 import com.eignex.klause.solver.lp.integerFarkasRay
@@ -253,7 +253,7 @@ internal fun LpEngine.sparseSafePrune(
     // so either floor ≤ the true optimum.
     if (canPropagate && full.isFinite()) {
         val exactFloor = if (learn && cert != null) {
-            cert.objectiveBoundCeil(boundRel.objectiveConstant.toLong())
+            cert.objectiveBoundCeil(boundRel.objectiveConstant)
         } else {
             null
         }
