@@ -263,6 +263,13 @@ data class LpPlan(
      */
     val learn: Boolean = false,
     /**
+     * Objective shaving (#E3): before search, probe whether the objective can be proven to exceed its
+     * current lower bound — assume `objVar ≤ v` and, if the LP relaxation + propagation prove that
+     * infeasible, raise the root lower bound to `v + 1`. Sound (every raise is a proof that lower values
+     * are infeasible). Requires [bounding] and a single ascending objective variable. Off by default.
+     */
+    val objectiveShaving: Boolean = false,
+    /**
      * Add the Anderson big-M tight face of each [com.eignex.klause.solver.factor.arithmetic.ArrayMinMax]
      * on top of the envelope (#C3), bounding the extremum from the tight side. Sound relaxation; gated.
      * Off by default.
