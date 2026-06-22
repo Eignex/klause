@@ -7,8 +7,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.solver.factor.arithmetic.Product
+import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.bool.Cardinality
