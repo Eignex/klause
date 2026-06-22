@@ -369,6 +369,20 @@ class AffineEliminationTest {
     }
 
     @Test
+    fun `does not divide by a zero pivot coefficient`() {
+        // 0*x0 - 2*x1 = 1: a term with a zero coefficient is non-unit, so the pivot loop reaches the
+        // divisibility test for x0; the zero coefficient can never be a pivot and must not be used as a
+        // modulus (#872). The equality (-2*x1 = 1) is unsatisfiable, and that verdict is preserved.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 3)),
+            factors = listOf(Linear(intArrayOf(0, -2), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
+        checkRoundTrip("zero-pivot", problem, expectEliminated = false, expectSat = false)
+    }
+
+    @Test
     fun `preserves an unsat verdict`() {
         // x = 2y + 1 with x's domain forcing x even-only via tight bounds that y can't meet.
         val problem = Problem(
