@@ -336,17 +336,7 @@ class LocalSearchState(
             }
         }
         // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
-        for (id in 0 until problem.numFactors) {
-            val f = factors[id]
-            for (w in problem.factors[id].boolVars) {
-                val d = f.deltaIfBoolFlipped(this, id, w)
-                if (d > 0) {
-                    boolBreakCount[w]++
-                } else if (d < 0) {
-                    boolMakeCount[w]++
-                }
-            }
-        }
+        for (id in 0 until problem.numFactors) adjustBoolBreakMake(id, +1)
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 
@@ -664,107 +654,92 @@ class LocalSearchState(
         }
     }
 
-    private fun applyBoolFlip(boolVar: Int) {
-        val touchedFactors = problem.boolOccurrences[boolVar]
-        // Phase 1: brute-force factors subtract pre-flip break/make contributions; incremental
-        // factors handle the whole delta in updateBoolBreakMakeForFlip below.
-        for (factorId in touchedFactors) {
-            val f = factors[factorId]
-            if (f.maintainsBreakMakeIncrementally) continue
-            for (w in problem.factors[factorId].boolVars) {
-                val d = f.deltaIfBoolFlipped(this, factorId, w)
-                if (d > 0) {
-                    boolBreakCount[w]--
-                } else if (d < 0) {
-                    boolMakeCount[w]--
-                }
+    /** Shift [boolBreakCount]/[boolMakeCount] for every bool var of [factorId] by [sign]: a var whose
+     *  flip would break the factor (`deltaIfBoolFlipped > 0`) moves the break count, one whose flip
+     *  would make it (`< 0`) moves the make count. `sign = -1` retracts the factor's pre-move
+     *  contribution, `+1` re-adds it post-move. Inline so the hot apply path stays allocation-free. */
+    private inline fun adjustBoolBreakMake(factorId: Int, sign: Int) {
+        val f = factors[factorId]
+        for (w in problem.factors[factorId].boolVars) {
+            val d = f.deltaIfBoolFlipped(this, factorId, w)
+            if (d > 0) {
+                boolBreakCount[w] += sign
+            } else if (d < 0) {
+                boolMakeCount[w] += sign
             }
         }
-        // Phase 2: commit the flip and let each factor update its own payload. Re-read
+    }
+
+    /**
+     * Shared apply skeleton for the primitive moves: retract brute-force break/make over
+     * [touchedFactors], [commit] the assignment change, refresh each factor's payload and violation,
+     * then re-add brute-force / apply incremental break/make. Closes with the conf-change and
+     * tabu/activity bookkeeping for [slot]. Inline so the per-move-type lambdas fold away and the two
+     * callers keep their original allocation-free, single-pass shape.
+     */
+    private inline fun applyMove(
+        touchedFactors: IntArray,
+        slot: Int,
+        maintainsIncrementally: (Invariant) -> Boolean,
+        commit: () -> Unit,
+        applyToFactor: (factorId: Int) -> Unit,
+        updateIncremental: (factorId: Int) -> Unit,
+        markMovedVar: () -> Unit,
+    ) {
+        // Phase 1: brute-force factors subtract pre-move break/make contributions; incremental factors
+        // fold the whole delta into their own update in phase 3.
+        for (factorId in touchedFactors) {
+            if (!maintainsIncrementally(factors[factorId])) adjustBoolBreakMake(factorId, -1)
+        }
+        // Phase 2: commit the change and let each factor update its own payload. Re-read
         // violationDegree from the payload for the exact cost delta rather than the returned status
         // delta, which is sometimes approximate.
-        assignment.flipBool(boolVar)
+        commit()
         for (factorId in touchedFactors) {
-            factors[factorId].applyBoolFlip(this, factorId, boolVar)
+            applyToFactor(factorId)
             updateViolation(factorId)
         }
-        // Phase 3: brute-force factors add post-flip contributions; incremental factors apply their
-        // O(1) / O(arity) update.
+        // Phase 3: incremental factors apply their O(1) / O(arity) update; brute-force factors add
+        // post-move contributions.
         for (factorId in touchedFactors) {
-            val f = factors[factorId]
-            if (f.maintainsBreakMakeIncrementally) {
-                f.updateBoolBreakMakeForFlip(this, factorId, boolVar)
+            if (maintainsIncrementally(factors[factorId])) {
+                updateIncremental(factorId)
             } else {
-                for (w in problem.factors[factorId].boolVars) {
-                    val d = f.deltaIfBoolFlipped(this, factorId, w)
-                    if (d > 0) {
-                        boolBreakCount[w]++
-                    } else if (d < 0) {
-                        boolMakeCount[w]++
-                    }
-                }
+                adjustBoolBreakMake(factorId, +1)
             }
         }
         if (!probeActive) {
             markNeighborConfChange(touchedFactors)
-            boolConfChange[boolVar] = false
+            markMovedVar()
         }
         step++
-        lastTouched[boolVar] = step
-        if (touchCount[boolVar] < Int.MAX_VALUE) touchCount[boolVar]++
+        lastTouched[slot] = step
+        if (touchCount[slot] < Int.MAX_VALUE) touchCount[slot]++
         if (cost < bestCostSeen) bestCostSeen = cost
     }
+
+    private fun applyBoolFlip(boolVar: Int) = applyMove(
+        touchedFactors = problem.boolOccurrences[boolVar],
+        slot = boolVar,
+        maintainsIncrementally = { it.maintainsBreakMakeIncrementally },
+        commit = { assignment.flipBool(boolVar) },
+        applyToFactor = { factors[it].applyBoolFlip(this, it, boolVar) },
+        updateIncremental = { factors[it].updateBoolBreakMakeForFlip(this, it, boolVar) },
+        markMovedVar = { boolConfChange[boolVar] = false },
+    )
 
     private fun applyIntSet(intVar: Int, newValue: Int) {
         val old = assignment.intValue(intVar)
         if (old == newValue) return
-        val touchedFactors = problem.intOccurrences[intVar]
-        // Phase 1: subtract bool break/make contributions for every bool var in every touched factor
-        // (the int change shifts their per-var deltas); incremental factors apply a single diff in
-        // phase 3 instead.
-        for (factorId in touchedFactors) {
-            val f = factors[factorId]
-            if (f.maintainsIntBreakMakeIncrementallyForIntSet) continue
-            for (w in problem.factors[factorId].boolVars) {
-                val d = f.deltaIfBoolFlipped(this, factorId, w)
-                if (d > 0) {
-                    boolBreakCount[w]--
-                } else if (d < 0) {
-                    boolMakeCount[w]--
-                }
-            }
-        }
-        assignment.setInt(intVar, newValue)
-        for (factorId in touchedFactors) {
-            // See applyBoolFlip: re-read violationDegree from the maintained payload for the exact
-            // graded cost delta.
-            factors[factorId].applyIntSet(this, factorId, intVar, old)
-            updateViolation(factorId)
-        }
-        for (factorId in touchedFactors) {
-            val f = factors[factorId]
-            if (f.maintainsIntBreakMakeIncrementallyForIntSet) {
-                f.updateIntBreakMakeForIntSet(this, factorId, intVar, old)
-            } else {
-                for (w in problem.factors[factorId].boolVars) {
-                    val d = f.deltaIfBoolFlipped(this, factorId, w)
-                    if (d > 0) {
-                        boolBreakCount[w]++
-                    } else if (d < 0) {
-                        boolMakeCount[w]++
-                    }
-                }
-            }
-        }
-        if (!probeActive) {
-            markNeighborConfChange(touchedFactors)
-            intConfChange[intVar] = false
-        }
-        step++
-        val slot = problem.numBoolVars + intVar
-        lastTouched[slot] = step
-        if (touchCount[slot] < Int.MAX_VALUE) touchCount[slot]++
-        if (cost < bestCostSeen) bestCostSeen = cost
+        applyMove(
+            touchedFactors = problem.intOccurrences[intVar],
+            slot = problem.numBoolVars + intVar,
+            maintainsIncrementally = { it.maintainsIntBreakMakeIncrementallyForIntSet },
+            commit = { assignment.setInt(intVar, newValue) },
+            applyToFactor = { factors[it].applyIntSet(this, it, intVar, old) },
+            updateIncremental = { factors[it].updateIntBreakMakeForIntSet(this, it, intVar, old) },
+            markMovedVar = { intConfChange[intVar] = false },
+        )
     }
 
     private fun markNeighborConfChange(factorIds: IntArray) {
