@@ -88,6 +88,9 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Product `result = a·b` McCormick envelope (square ⇒ secant/tangent) (#C4). */
     PRODUCT_MCCORMICK("product-mccormick", LpTiming.EXHAUSTIVE),
 
+    /** Boolean RLT: knapsack-row × binary products with McCormick (#D4). */
+    BOOLEAN_RLT("boolean-rlt", LpTiming.EXHAUSTIVE),
+
     /** Implied-bound cuts from the probing implication graph (#D3); a cut family. */
     IMPLIED_BOUND("implied-bound", LpTiming.EXHAUSTIVE),
 
