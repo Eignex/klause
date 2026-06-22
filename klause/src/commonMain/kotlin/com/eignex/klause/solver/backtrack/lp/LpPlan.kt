@@ -277,6 +277,13 @@ data class LpPlan(
      */
     val variableShaving: Boolean = false,
     /**
+     * Best-bound tree-search primal subsolver (#E2): before search, explore the branch-and-bound tree
+     * best-first (lowest LP bound first) to dive for good incumbents fast. Pure heuristic — returns only
+     * propagation-feasible incumbents (re-checked), so it never changes the optimum. Requires [bounding];
+     * off by default.
+     */
+    val lbTreeSearch: Boolean = false,
+    /**
      * Add the Anderson big-M tight face of each [com.eignex.klause.solver.factor.arithmetic.ArrayMinMax]
      * on top of the envelope (#C3), bounding the extremum from the tight side. Sound relaxation; gated.
      * Off by default.
