@@ -2,9 +2,11 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over
@@ -38,6 +40,16 @@ class GaussianXor(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         GaussianXor(constraints.map { it.remap(boolMap, intMap) as Xor })
+
+    /** A system of parity equations is order-insensitive, so the constraints are encoded as a sorted
+     *  multiset — each as its target parity and its literal set. */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GAUSSIAN_XOR) {
+        int(constraints.size)
+        for (c in constraints.sortedBy { it.structuralKey() }) {
+            int(c.targetParity)
+            sortedInts(c.literals)
+        }
+    }
 
     /** Union of all variables across the constraints, in stable order. */
     override val boolVars: IntArray

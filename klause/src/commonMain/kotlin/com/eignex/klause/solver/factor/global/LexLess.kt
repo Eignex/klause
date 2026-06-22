@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -30,6 +32,14 @@ class LexLess(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         LexLess(xs.remapVars(intMap), ys.remapVars(intMap), strict)
+
+    /** Lexicographic order is position-faithful and asymmetric, so [xs] and [ys] are both positional
+     *  and kept in their roles; [strict] distinguishes `<` from `≤`. */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LEX_LESS) {
+        bool(strict)
+        ints(xs)
+        ints(ys)
+    }
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys

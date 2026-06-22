@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -30,6 +32,13 @@ class SymmetricAllDifferent(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         SymmetricAllDifferent(xs.remapVars(intMap), indexOffset)
+
+    /** A self-inverse permutation references positions (`xs(xs(i)) = i`), so [xs] is positional;
+     *  [indexOffset] names the value of index 0. */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SYMMETRIC_ALL_DIFFERENT) {
+        int(indexOffset)
+        ints(xs)
+    }
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
