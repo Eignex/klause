@@ -519,7 +519,10 @@ class LocalSearchState(
         pinned.add(intVar)
         parts += Move.IntSet(intVar, newValue)
         for (fid in problem.intOccurrences[intVar]) {
-            val f = factors[fid]
+            // The original factor carries the linear structure (coeffs/op/bound); the parallel
+            // `factors` invariants no longer expose it after the propagator/invariant split, so
+            // channeling reads the shape from `problem.factors`.
+            val f = problem.factors[fid]
             // Indicator channeling: single-var EQ reified-linear. Flip the aux bool iff the new
             // value changes the truth of `coeff·v == bound`.
             if (f is ReifiedLinear) {
