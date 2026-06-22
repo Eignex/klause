@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -22,6 +24,12 @@ class Product(
 ) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Product(intMap[a], intMap[b], intMap[result])
+
+    /** Multiplication is commutative, so the operands [a] and [b] are a set; [result] is positional. */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.PRODUCT) {
+        int(result)
+        sortedInts(intArrayOf(a, b))
+    }
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = intArrayOf(a, b, result)

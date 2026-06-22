@@ -45,10 +45,9 @@ interface Factor {
      * type, same constants (coefficients, bounds, polarities), and the same multiset of variables — in
      * a representation that does not depend on internal ordering — produce equal keys. Used by symmetry
      * detection to check whether permuting variables maps the factor set to itself (an automorphism).
-     * `null` (the default) means "not keyed"; verification falls back to the conservative
-     * same-factor-set heuristic when any factor in the problem is unkeyed.
+     * Every factor type supplies one.
      */
-    fun structuralKey(): StructuralKey? = null
+    fun structuralKey(): StructuralKey
 
     /**
      * Whether this factor's meaning is invariant under *any* relabeling of domain values — i.e. it

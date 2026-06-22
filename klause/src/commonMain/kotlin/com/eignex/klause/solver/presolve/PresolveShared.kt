@@ -63,14 +63,12 @@ internal object PresolveShared {
 
     fun divAll(xs: IntArray, g: Int): IntArray = IntArray(xs.size) { xs[it] / g }
 
-    /** Multiset of [Factor.structuralKey] over [factors], or `null` if any factor is unkeyed. A
-     *  `null` return means symmetry detection can't proceed (every factor must be keyed to compare
-     *  the constraint set against a transform of it); callers translate it into their own early
-     *  return. */
-    fun structuralKeyMultiset(factors: List<Factor>): Map<StructuralKey, Int>? {
+    /** Multiset of [Factor.structuralKey] over [factors] — the constraint set keyed for comparison
+     *  against a transform of itself. */
+    fun structuralKeyMultiset(factors: List<Factor>): Map<StructuralKey, Int> {
         val base = HashMap<StructuralKey, Int>()
         for (f in factors) {
-            val key = f.structuralKey() ?: return null
+            val key = f.structuralKey()
             base[key] = (base[key] ?: 0) + 1
         }
         return base
@@ -84,7 +82,7 @@ internal object PresolveShared {
     fun matchesMultiset(factors: List<Factor>, base: Map<StructuralKey, Int>, transform: (Factor) -> Factor?): Boolean {
         val counts = HashMap<StructuralKey, Int>(base.size)
         for (f in factors) {
-            val key = (transform(f) ?: return false).structuralKey() ?: return false
+            val key = (transform(f) ?: return false).structuralKey()
             val next = (counts[key] ?: 0) + 1
             if (next > (base[key] ?: 0)) return false // already can't match the multiset
             counts[key] = next

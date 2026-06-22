@@ -8,11 +8,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
-import com.eignex.klause.solver.factor.bool.Xor
-import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.global.ValuePrecede
 import com.eignex.klause.util.IntDisjointSet
@@ -27,51 +24,35 @@ internal object SymmetryBreaking {
     private const val MAX_BOOL_LEX_WIDTH = 31
 
     /**
-     * Symmetry breaking by detecting interchangeable variables (#317). Two variables are
-     * *provably* interchangeable when they occur in exactly the same set of factors and play a
-     * symmetric role in each — equal coefficient in a [Linear], both arguments of an
-     * [AllDifferent], or same-polarity / same-weight literals in a [Clause] / [Cardinality] /
-     * [Xor] / [PseudoBoolean]. These factor types are all order-insensitive (sum / set / parity),
-     * so any permutation of such a group is a genuine automorphism, and ordering the group
-     * (`x₀ ≤ x₁ ≤ …` for ints, `¬gⱼ ∨ gⱼ₊₁` for bools) keeps exactly one representative per orbit
-     * — sound (never removes the last solution of an orbit).
+     * Symmetry breaking by detecting interchangeable variables (#317, #334). A variable transposition
+     * is broken only when swapping the two variables maps the factor multiset onto itself — verified by
+     * remapping every factor and comparing [Factor.structuralKey] counts, so it is sound by
+     * construction. Candidate groups come from Weisfeiler–Leman colour refinement (only same-colour
+     * variables can be interchangeable); each candidate swap is then checked. Ordering a verified orbit
+     * (`x₀ ≤ x₁ ≤ …` for ints, `¬gⱼ ∨ gⱼ₊₁` for bools) keeps exactly one representative per orbit —
+     * sound (never removes the last solution of an orbit).
      *
-     * The "same factor set" requirement is what makes this sound: a variable appearing in a
-     * factor its candidate-partner does not is *not* interchangeable. Variables touched by any
-     * other factor type are conservatively excluded. Variables in [objectiveIntVars] /
-     * [objectiveBoolVars] are excluded so an asymmetric objective can't be cut — keep those sets
-     * empty for pure feasibility. (Per the issue policy this runs by default except in a pure
-     * local-search portfolio.)
+     * Variables in [objectiveIntVars] / [objectiveBoolVars] are excluded so an asymmetric objective
+     * can't be cut — keep those sets empty for pure feasibility. (Per the issue policy this runs by
+     * default except in a pure local-search portfolio.)
      *
-     * Scope: this catches interchangeable *variables*; matrix-row/column and value symmetries and
-     * full graph-automorphism detection remain follow-ups.
+     * Also breaks verified block/row symmetry ([verifiedBlockLex] / [verifiedBoolBlockLex]) and value
+     * symmetry ([breakValueSymmetry]). Full graph-automorphism detection remains a follow-up.
      */
     fun breakSymmetries(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
     ): Problem {
-        // Prefer verified detection (any factor swap proven an automorphism); fall back to the
-        // sufficient same-factor-set heuristic when a factor type isn't structurally keyed.
-        val verified = verifiedSymmetryOrbits(problem, objectiveIntVars, objectiveBoolVars)
-        val intGroups = verified?.first ?: interchangeableIntGroups(problem, objectiveIntVars)
-        val boolGroups = verified?.second ?: interchangeableBoolGroups(problem, objectiveBoolVars)
-        // Block/row symmetry (#367): interchangeable blocks of int vars (e.g. matrix rows defined by
-        // isomorphic factors), ordered by lex-leader. Only when verified detection is available.
+        // Verified detection: each candidate swap is proven an automorphism (every factor is keyed).
+        val (intGroups, boolGroups) = verifiedSymmetryOrbits(problem, objectiveIntVars, objectiveBoolVars)
+        // Block/row symmetry (#367): interchangeable blocks of int vars (matrix rows defined by
+        // isomorphic factors), ordered by lex-leader.
         val brokenInts = intGroups.flatMap { it.toList() }.toHashSet()
-        val blockLex = if (verified == null) emptyList() else verifiedBlockLex(problem, objectiveIntVars, brokenInts)
-        // Bool block/row symmetry (#373): the boolean analogue — rows of bool vars defined by
-        // isomorphic bool-only factors, ordered by a binary-number lex-leader.
+        val blockLex = verifiedBlockLex(problem, objectiveIntVars, brokenInts)
+        // Bool block/row symmetry (#373): the boolean analogue, ordered by a binary-number lex-leader.
         val brokenBools = boolGroups.flatMap { it.toList() }.toHashSet()
-        val boolBlockLex = if (verified == null) {
-            emptyList()
-        } else {
-            verifiedBoolBlockLex(
-                problem,
-                objectiveBoolVars,
-                brokenBools,
-            )
-        }
+        val boolBlockLex = verifiedBoolBlockLex(problem, objectiveBoolVars, brokenBools)
         val valuePins = breakValueSymmetry(problem, objectiveIntVars)
         if (intGroups.isEmpty() && boolGroups.isEmpty() && blockLex.isEmpty() &&
             boolBlockLex.isEmpty() && valuePins.isEmpty()
@@ -144,11 +125,11 @@ internal object SymmetryBreaking {
     private fun verifiedValueOrbits(problem: Problem): List<List<Int>>? {
         if (problem.numIntVars == 0) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
-        // Verified path needs every factor keyed; build the base multiset (bail if any is unkeyed).
+        // The anonymous fast path skips the multiset entirely; otherwise key every factor.
         val base: Map<StructuralKey, Int>? = if (allAnonymous) {
             null
         } else {
-            PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return null
+            PresolveShared.structuralKeyMultiset(problem.factors.asList())
         }
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
@@ -275,8 +256,8 @@ internal object SymmetryBreaking {
         problem: Problem,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
-    ): Pair<List<IntArray>, List<IntArray>>? {
-        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return null
+    ): Pair<List<IntArray>, List<IntArray>> {
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val intMap = identityIntMap(problem)
         val boolMap = identityBoolMap(problem)
 
@@ -378,7 +359,7 @@ internal object SymmetryBreaking {
                 saved = intMap[v]
                 intMap[v] = WL_FOCAL
             }
-            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey()?.toString() ?: "?")
+            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey().toString())
             if (isBool) boolMap[v] = saved else intMap[v] = saved
         }
         ports.sort()
@@ -504,18 +485,18 @@ internal object SymmetryBreaking {
         varsOf: (Factor) -> IntArray,
         wrongKind: (Factor) -> Boolean,
         blockEligible: (IntArray) -> Boolean,
-        shapeOf: (Factor, IntArray) -> StructuralKey?,
+        shapeOf: (Factor, IntArray) -> StructuralKey,
         swapVerified: (Map<StructuralKey, Int>, IntArray, IntArray) -> Boolean,
         emit: (IntArray, IntArray) -> Factor,
     ): List<Factor> {
-        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val byShape = HashMap<StructuralKey, MutableList<IntArray>>()
         for (f in problem.factors) {
             if (wrongKind(f)) continue
             val block = varsOf(f).distinct().sorted().toIntArray()
             if (!blockEligible(block)) continue
             if (block.any { it in objectiveVars || it in alreadyBroken }) continue
-            val shape = shapeOf(f, block) ?: continue
+            val shape = shapeOf(f, block)
             byShape.getOrPut(shape) { ArrayList() }.add(block)
         }
         val extra = ArrayList<Factor>()
@@ -533,8 +514,8 @@ internal object SymmetryBreaking {
 
     /** Canonical structure key for a block of variables (bool when [isBool], else int): remap its
      *  (sorted) variables to `0..k-1` with the other kind left identity, so two isomorphic factors
-     *  over disjoint variables share a key. `null` if the factor isn't keyed. */
-    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray, isBool: Boolean): StructuralKey? {
+     *  over disjoint variables share a key. */
+    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray, isBool: Boolean): StructuralKey {
         val boolMap = identityBoolMap(problem)
         val intMap = identityIntMap(problem)
         val target = if (isBool) boolMap else intMap
@@ -643,76 +624,5 @@ internal object SymmetryBreaking {
         sb.append(d.min).append(':').append(d.max).append(':')
         d.forEachHole { sb.append(it).append('-') }
         return sb.toString()
-    }
-
-    private fun interchangeableIntGroups(problem: Problem, objectiveVars: Set<Int>): List<IntArray> =
-        interchangeableGroups(
-            problem = problem,
-            numVars = problem.numIntVars,
-            objectiveVars = objectiveVars,
-            fillRoles = ::fillIntRoles,
-            groupKey = { v, role -> "${domainKey(problem.intDomains[v])}|$role" },
-        )
-
-    private fun interchangeableBoolGroups(problem: Problem, objectiveVars: Set<Int>): List<IntArray> =
-        interchangeableGroups(
-            problem = problem,
-            numVars = problem.numBoolVars,
-            objectiveVars = objectiveVars,
-            fillRoles = ::fillBoolRoles,
-            groupKey = { _, role -> role },
-        )
-
-    /** Append factor [fi]'s int-variable roles (equal coefficient in a [Linear], membership in an
-     *  [AllDifferent]); clear [eligible] for variables touched by any unsupported factor type. */
-    private fun fillIntRoles(fi: Int, f: Factor, roles: Array<ArrayList<String>>, eligible: BooleanArray) {
-        when (f) {
-            is Linear -> for (i in f.vars.indices) roles[f.vars[i]].add("$fi:lin:${f.coeffs[i]}")
-            is AllDifferent -> for (v in f.vars) roles[v].add("$fi:ad")
-            else -> for (v in f.intVars) eligible[v] = false // unsupported factor type
-        }
-    }
-
-    /** Append factor [fi]'s bool-variable roles (same-polarity / same-weight literals in a [Clause],
-     *  [Cardinality], [Xor], or [PseudoBoolean]); clear [eligible] for any unsupported factor type. */
-    private fun fillBoolRoles(fi: Int, f: Factor, roles: Array<ArrayList<String>>, eligible: BooleanArray) {
-        when (f) {
-            is Clause -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:cl:${Lit.isPositive(l)}")
-
-            is Cardinality -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:card:${Lit.isPositive(l)}")
-
-            is Xor -> for (l in f.literals) roles[Lit.variable(l)].add("$fi:xor:${Lit.isPositive(l)}")
-
-            is PseudoBoolean -> for (i in f.literals.indices) {
-                roles[Lit.variable(f.literals[i])].add("$fi:pb:${f.weights[i]}:${Lit.isPositive(f.literals[i])}")
-            }
-
-            else -> for (v in f.boolVars) eligible[v] = false // unsupported factor type
-        }
-    }
-
-    /** Shared skeleton for interchangeable-variable detection over either variable kind: fill each
-     *  variable's per-factor role strings (clearing eligibility for unsupported factor types), then
-     *  group eligible non-objective variables by their grouping key. The kind-specific bits — the
-     *  per-factor role extraction and the grouping key (the int side prefixes the domain key) — are
-     *  supplied by the callers. */
-    private inline fun interchangeableGroups(
-        problem: Problem,
-        numVars: Int,
-        objectiveVars: Set<Int>,
-        fillRoles: (Int, Factor, Array<ArrayList<String>>, BooleanArray) -> Unit,
-        groupKey: (Int, String) -> String,
-    ): List<IntArray> {
-        if (numVars == 0) return emptyList()
-        val eligible = BooleanArray(numVars) { true }
-        val roles = Array(numVars) { ArrayList<String>() }
-        for (fi in problem.factors.indices) fillRoles(fi, problem.factors[fi], roles, eligible)
-        val groups = HashMap<String, MutableList<Int>>()
-        for (v in 0 until numVars) {
-            if (!eligible[v] || v in objectiveVars) continue
-            roles[v].sort()
-            groups.getOrPut(groupKey(v, roles[v].joinToString(","))) { ArrayList() }.add(v)
-        }
-        return groups.values.filter { it.size >= 2 }.map { it.toIntArray() }
     }
 }
