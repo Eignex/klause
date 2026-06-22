@@ -278,4 +278,32 @@ data class LpPlan(
      * Off by default pending corpus benchmarking (#634 / G1).
      */
     val devexPricing: Boolean = false,
+    /**
+     * Use the Harris two-pass ratio test in the dual entering selection (#B2): among candidates within a
+     * ratio tolerance of the minimum, pick the largest pivot magnitude (numerical stability). Pricing is
+     * correctness-neutral — only the pivot path changes, never the optimum. Off by default.
+     */
+    val harris: Boolean = false,
+    /**
+     * Equilibrate each basis (power-of-two row scaling) before factorization (#B3) for better-conditioned
+     * pivoting. Transparent — the solve returns the same result — so correctness-neutral. Off by default.
+     */
+    val scaling: Boolean = false,
+    /**
+     * Add the Anderson big-M tight face of each [com.eignex.klause.solver.factor.arithmetic.ArrayMinMax]
+     * on top of the envelope (#C3), bounding the extremum from the tight side. Sound relaxation; gated.
+     * Off by default.
+     */
+    val linMaxTightFace: Boolean = false,
+    /**
+     * Relax each [com.eignex.klause.solver.factor.arithmetic.Product] `result = a·b` with its McCormick
+     * envelope (#C4; the square case degenerates to secant/tangent). Sound relaxation; gated. Off by default.
+     */
+    val productMcCormick: Boolean = false,
+    /**
+     * Separate implied-bound cuts from the probing implication graph (#D3): `litVal(A) ≤ litVal(B)` for
+     * each violated probing implication not already an explicit binary clause. Sound (valid at every
+     * solution); requires [cuts]. Off by default.
+     */
+    val impliedBoundCuts: Boolean = false,
 )
