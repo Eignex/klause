@@ -87,5 +87,5 @@ class Circuit(
 
     override fun asPropagator(): Propagator = CircuitPropagator(boolVars, intVars, succ, n)
 
-    override fun asInvariant(): Invariant = CircuitInvariant(boolVars, intVars, succ, n, ::computeCost)
+    override fun asInvariant(): Invariant = CircuitInvariant(succ, n, ::computeCost)
 }

@@ -8,8 +8,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 
 /** LS invariant for [Xor]: parity violation tracking and break/make maintenance. */
 internal class XorInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    private val boolVars: IntArray,
     private val literals: IntArray,
     private val targetParity: Int,
 ) : Invariant {

@@ -34,5 +34,5 @@ class Xor(
 
     override fun asPropagator(): Propagator = XorPropagator(boolVars, intVars, literals, targetParity)
 
-    override fun asInvariant(): Invariant = XorInvariant(boolVars, intVars, literals, targetParity)
+    override fun asInvariant(): Invariant = XorInvariant(boolVars, literals, targetParity)
 }

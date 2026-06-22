@@ -12,8 +12,6 @@ import com.eignex.klause.util.IntIntMap
 
 /** LS invariant logic for `global_cardinality`. */
 internal class GlobalCardinalityInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val xs: IntArray,
     private val cover: IntArray,
     private val countVars: IntArray?,

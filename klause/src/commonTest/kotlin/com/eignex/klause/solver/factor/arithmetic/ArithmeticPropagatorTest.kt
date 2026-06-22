@@ -103,10 +103,7 @@ class ArithmeticPropagatorTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@ExcludeOnFix.boolVars
-            override val intVars get() = this@ExcludeOnFix.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test
@@ -345,10 +342,7 @@ class ArithmeticPropagatorTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@ExcludeOnFixWithReason.boolVars
-            override val intVars get() = this@ExcludeOnFixWithReason.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =

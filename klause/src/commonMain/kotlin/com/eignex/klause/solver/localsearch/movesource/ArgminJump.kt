@@ -39,15 +39,16 @@ class ArgminJump(
         if (state.violated.isEmpty()) return
         val weights = state.factorWeights
         repeat(candidateVars) {
-            val f = state.factors[state.violated.random(state.rng)]
-            val nInt = f.intVars.size
-            val nBool = f.boolVars.size
+            val fid = state.violated.random(state.rng)
+            val scope = state.problem.factors[fid]
+            val nInt = scope.intVars.size
+            val nBool = scope.boolVars.size
             if (nInt + nBool == 0) return@repeat
             val pick = state.rng.nextInt(nInt + nBool)
             if (pick < nInt) {
-                emitBestIntJump(state, weights, f.intVars[pick], sink)
+                emitBestIntJump(state, weights, scope.intVars[pick], sink)
             } else {
-                val v = f.boolVars[pick - nInt]
+                val v = scope.boolVars[pick - nInt]
                 if (weightedBoolFlipDelta(state, weights, v) < 0.0) sink.addBoolFlip(v)
             }
         }

@@ -80,7 +80,7 @@ internal fun LocalSearchState.sampleChainFirsts(
 /** Emit ±1 int steps and bool flips on every variable of every factor adjacent to [fid]
  *  (sharing a variable) — the ejection-step vocabulary for chain firsts. */
 internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
-    val f = factors[fid]
+    val f = problem.factors[fid]
     val seenFactors = IntHashSet()
     for (v in f.intVars) for (nf in problem.intOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
     for (v in f.boolVars) for (nf in problem.boolOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
@@ -92,7 +92,7 @@ internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
  *  successor fragment backwards — ±1 alone cannot express that jump. */
 internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFactors: IntHashSet, sink: MoveSink) {
     if (nf == seed || !seenFactors.add(nf)) return
-    val nfac = factors[nf]
+    val nfac = problem.factors[nf]
     for (u in nfac.intVars) {
         val cur = assignment.intValue(u)
         val d = problem.intDomains[u]

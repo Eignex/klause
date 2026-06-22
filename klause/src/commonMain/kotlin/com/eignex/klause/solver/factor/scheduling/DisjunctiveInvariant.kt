@@ -13,8 +13,6 @@ import kotlin.math.max
  * unit resources.
  */
 internal class DisjunctiveInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val starts: IntArray,
     private val durations: IntArray,
     private val presents: IntArray,

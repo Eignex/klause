@@ -10,8 +10,6 @@ import com.eignex.klause.util.IntIntMap
 
 /** LS invariant for [Table]. Constructed by [Table.asInvariant]. */
 internal class TableInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val xs: IntArray,
     private val tuples: IntArray,
     private val arity: Int,

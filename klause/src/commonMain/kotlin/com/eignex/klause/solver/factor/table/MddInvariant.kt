@@ -7,8 +7,6 @@ import com.eignex.klause.solver.localsearch.MoveSink
 
 /** LS invariant for [Mdd]. Constructed by [Mdd.asInvariant]. */
 internal class MddInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val seq: IntArray,
     private val numStatesPerLayer: IntArray,
     private val layerStarts: IntArray,

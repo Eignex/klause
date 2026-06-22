@@ -10,8 +10,6 @@ import com.eignex.klause.util.IntIntMap
 /** LS implementation for [Circuit]: violation scoring and move proposal for the Hamiltonian-cycle
  *  constraint. */
 internal class CircuitInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val succ: IntArray,
     private val n: Int,
     private val computeCost: (LocalSearchState, Int, Int) -> Int,

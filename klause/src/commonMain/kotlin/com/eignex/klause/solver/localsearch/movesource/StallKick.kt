@@ -34,7 +34,7 @@ class StallKick(
     override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         val problem = state.problem
-        var factor = state.factors[state.violated.random(state.rng)]
+        var factorId = state.violated.random(state.rng)
         // Private scratch so frozen/defined filtering applies during the walk; channeling keeps
         // indicator bools consistent with kicked int values.
         scratch.clear()
@@ -44,13 +44,14 @@ class StallKick(
         var attempts = kickVars * ATTEMPTS_PER_KICK
         while (budget > 0 && attempts-- > 0) {
             // Step 1: a random variable of the current factor.
-            val nInts = factor.intVars.size
-            val nBools = factor.boolVars.size
+            val scope = state.problem.factors[factorId]
+            val nInts = scope.intVars.size
+            val nBools = scope.boolVars.size
             if (nInts + nBools == 0) break
             val pick = state.rng.nextInt(nInts + nBools)
             val occ: IntArray
             if (pick < nInts) {
-                val v = factor.intVars[pick]
+                val v = scope.intVars[pick]
                 val d = problem.intDomains[v]
                 if (d.size > 1) {
                     val nv = d.valueAt(state.rng.nextInt(d.size)) // sparse-aware: never lands on a hole
@@ -61,14 +62,14 @@ class StallKick(
                 }
                 occ = problem.intOccurrences[v]
             } else {
-                val v = factor.boolVars[pick - nInts]
+                val v = scope.boolVars[pick - nInts]
                 scratch.addBoolFlip(v)
                 budget--
                 occ = problem.boolOccurrences[v]
             }
             // Step 2: hop to a random factor sharing that variable and continue the walk.
             if (occ.isEmpty()) break
-            factor = state.factors[occ[state.rng.nextInt(occ.size)]]
+            factorId = occ[state.rng.nextInt(occ.size)]
         }
         // Flatten everything queued into one atomic perturbation, first-write-wins per slot.
         val parts = ArrayList<Move>()

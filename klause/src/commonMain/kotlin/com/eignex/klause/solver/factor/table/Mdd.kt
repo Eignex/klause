@@ -93,6 +93,13 @@ class Mdd(
     )
 
     override fun asInvariant(): Invariant = MddInvariant(
-        boolVars, intVars, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
+        seq,
+        numStatesPerLayer,
+        layerStarts,
+        transitions,
+        initial,
+        accepting,
+        recordStride,
+        cost,
     )
 }

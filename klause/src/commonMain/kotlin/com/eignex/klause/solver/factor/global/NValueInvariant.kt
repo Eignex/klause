@@ -11,8 +11,6 @@ import com.eignex.klause.util.MutableIntIntMap
 
 /** LS invariant logic for `nvalue`. */
 internal class NValueInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val n: Int,
     private val xs: IntArray,
     private val mode: NValue.Mode,

@@ -18,12 +18,6 @@ import com.eignex.klause.solver.localsearch.MoveSink
  * See [Factor] for the full constraint contract (deductive + local-search + presolve).
  */
 interface Invariant {
-    /** Boolean variables this factor constrains, as raw variable ids (0-based). */
-    val boolVars: IntArray
-
-    /** Integer variables this factor constrains, as raw variable ids (0-based). */
-    val intVars: IntArray
-
     /** Build this factor's payload from the current assignment. Called once per restart.
      *  Default no-op for stateless factors that maintain no payload. */
     fun initialize(state: LocalSearchState, factorId: Int) {}
@@ -79,12 +73,12 @@ interface Invariant {
 
     /**
      * Suggest moves that would (or might) repair this factor when violated. The default lists
-     * a Boolean flip per [boolVars] member plus an `IntSet(±1)` per [intVars] member. Factors
+     * a Boolean flip per boolVars member plus an `IntSet(±1)` per intVars member. Factors
      * with structural insight (e.g. a comparator can snap to its bound) override this.
      */
     fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        for (b in boolVars) sink.addBoolFlip(b)
-        for (i in intVars) {
+        for (b in state.problem.factors[factorId].boolVars) sink.addBoolFlip(b)
+        for (i in state.problem.factors[factorId].intVars) {
             val cur = state.assignment.intValue(i)
             val d = state.problem.intDomains[i]
             if (cur < d.max) sink.addChannelingIntSet(state, i, cur + 1)
@@ -128,7 +122,7 @@ interface Invariant {
      * satisfies the factor, used by the engine's implicit-solving feasible-init pass on a
      * scope-disjoint set of elected globals (so seeds never clobber one another). Must leave
      * variables frozen by [LocalSearchState.assumptions] untouched and may only write the
-     * factor's own [intVars] / [boolVars]. Returns true if it produced a fully satisfying
+     * factor's own intVars / boolVars. Returns true if it produced a fully satisfying
      * configuration, false if the factor could not be seeded feasibly (over-constrained or
      * frozen out) — the engine then falls back to the random assignment for those vars.
      *
@@ -157,10 +151,10 @@ interface Invariant {
     fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {}
 
     /** Mirror of [maintainsBreakMakeIncrementally] for the int-set path. When `true`, the
-     *  LS engine skips its brute-force [boolVars] walk after an `intVar` is set and calls
+     *  LS engine skips its brute-force boolVars walk after an `intVar` is set and calls
      *  [updateIntBreakMakeForIntSet] instead. Factors whose [deltaIfBoolFlipped] doesn't
-     *  depend on int values (e.g. pure Boolean constraints with no [intVars]) get no
-     *  benefit from setting this flag — the engine already short-circuits when [intVars]
+     *  depend on int values (e.g. pure Boolean constraints with no intVars) get no
+     *  benefit from setting this flag — the engine already short-circuits when intVars
      *  is empty via [Problem.intOccurrences]. */
     val maintainsIntBreakMakeIncrementallyForIntSet: Boolean get() = false
 

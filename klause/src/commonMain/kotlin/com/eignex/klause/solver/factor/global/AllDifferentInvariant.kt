@@ -12,8 +12,6 @@ import com.eignex.klause.util.IntIntMap
 
 /** LS invariant logic for `all_different`. */
 internal class AllDifferentInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val vars: IntArray,
     private val domainMin: Int,
     private val domainSize: Int,

@@ -8,13 +8,8 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntHashSet
 
 /** LS invariant logic for `lex_less` / `lex_lesseq`. */
-internal class LexLessInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
-    private val xs: IntArray,
-    private val ys: IntArray,
-    private val strict: Boolean,
-) : Invariant {
+internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArray, private val strict: Boolean) :
+    Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = !satisfied(state)
 

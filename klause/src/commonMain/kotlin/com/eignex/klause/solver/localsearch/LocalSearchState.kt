@@ -104,12 +104,12 @@ class LocalSearchState(
         // Largest scope first to seed the most variables; ties broken by factor id for determinism
         // (election must be reproducible, so the RNG never enters it).
         val candidates = electedImplicit.sortedWith(
-            compareByDescending<Int> { factors[it].intVars.size }.thenBy { it },
+            compareByDescending<Int> { problem.factors[it].intVars.size }.thenBy { it },
         )
         val owned = BooleanArray(problem.numIntVars)
         val seeds = IntArrayList()
         for (id in candidates) {
-            val scope = factors[id].intVars
+            val scope = problem.factors[id].intVars
             var disjoint = true
             for (v in scope) {
                 if (owned[v]) {
@@ -338,7 +338,7 @@ class LocalSearchState(
         // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
         for (id in 0 until problem.numFactors) {
             val f = factors[id]
-            for (w in f.boolVars) {
+            for (w in problem.factors[id].boolVars) {
                 val d = f.deltaIfBoolFlipped(this, id, w)
                 if (d > 0) {
                     boolBreakCount[w]++
@@ -671,7 +671,7 @@ class LocalSearchState(
         for (factorId in touchedFactors) {
             val f = factors[factorId]
             if (f.maintainsBreakMakeIncrementally) continue
-            for (w in f.boolVars) {
+            for (w in problem.factors[factorId].boolVars) {
                 val d = f.deltaIfBoolFlipped(this, factorId, w)
                 if (d > 0) {
                     boolBreakCount[w]--
@@ -695,7 +695,7 @@ class LocalSearchState(
             if (f.maintainsBreakMakeIncrementally) {
                 f.updateBoolBreakMakeForFlip(this, factorId, boolVar)
             } else {
-                for (w in f.boolVars) {
+                for (w in problem.factors[factorId].boolVars) {
                     val d = f.deltaIfBoolFlipped(this, factorId, w)
                     if (d > 0) {
                         boolBreakCount[w]++
@@ -725,7 +725,7 @@ class LocalSearchState(
         for (factorId in touchedFactors) {
             val f = factors[factorId]
             if (f.maintainsIntBreakMakeIncrementallyForIntSet) continue
-            for (w in f.boolVars) {
+            for (w in problem.factors[factorId].boolVars) {
                 val d = f.deltaIfBoolFlipped(this, factorId, w)
                 if (d > 0) {
                     boolBreakCount[w]--
@@ -746,7 +746,7 @@ class LocalSearchState(
             if (f.maintainsIntBreakMakeIncrementallyForIntSet) {
                 f.updateIntBreakMakeForIntSet(this, factorId, intVar, old)
             } else {
-                for (w in f.boolVars) {
+                for (w in problem.factors[factorId].boolVars) {
                     val d = f.deltaIfBoolFlipped(this, factorId, w)
                     if (d > 0) {
                         boolBreakCount[w]++
@@ -769,9 +769,8 @@ class LocalSearchState(
 
     private fun markNeighborConfChange(factorIds: IntArray) {
         for (factorId in factorIds) {
-            val f = factors[factorId]
-            for (v in f.boolVars) boolConfChange[v] = true
-            for (v in f.intVars) intConfChange[v] = true
+            for (v in problem.factors[factorId].boolVars) boolConfChange[v] = true
+            for (v in problem.factors[factorId].intVars) intConfChange[v] = true
         }
     }
 

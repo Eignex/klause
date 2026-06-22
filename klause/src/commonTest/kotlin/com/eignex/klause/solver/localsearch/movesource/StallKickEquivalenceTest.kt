@@ -41,20 +41,21 @@ class StallKickEquivalenceTest {
         val move = run {
             if (state.violated.isEmpty()) return@run null
             val problem = state.problem
-            var factor = state.factors[state.violated.random(state.rng)]
+            var factorId = state.violated.random(state.rng)
             kickSink.clear()
             kickSink.setAssumptions(state.assumptions)
             kickSink.setInvariants(state.invariants)
             var budget = kickVars
             var attempts = kickVars * 4
             while (budget > 0 && attempts-- > 0) {
-                val nInts = factor.intVars.size
-                val nBools = factor.boolVars.size
+                val scope = state.problem.factors[factorId]
+                val nInts = scope.intVars.size
+                val nBools = scope.boolVars.size
                 if (nInts + nBools == 0) break
                 val pick = state.rng.nextInt(nInts + nBools)
                 val occ: IntArray
                 if (pick < nInts) {
-                    val v = factor.intVars[pick]
+                    val v = scope.intVars[pick]
                     val d = problem.intDomains[v]
                     val span = (d.max.toLong() - d.min.toLong()).toInt()
                     if (span > 0) {
@@ -66,13 +67,13 @@ class StallKickEquivalenceTest {
                     }
                     occ = problem.intOccurrences[v]
                 } else {
-                    val v = factor.boolVars[pick - nInts]
+                    val v = scope.boolVars[pick - nInts]
                     kickSink.addBoolFlip(v)
                     budget--
                     occ = problem.boolOccurrences[v]
                 }
                 if (occ.isEmpty()) break
-                factor = state.factors[occ[state.rng.nextInt(occ.size)]]
+                factorId = occ[state.rng.nextInt(occ.size)]
             }
             val parts = ArrayList<Move>()
             val seenSlots = IntHashSet()

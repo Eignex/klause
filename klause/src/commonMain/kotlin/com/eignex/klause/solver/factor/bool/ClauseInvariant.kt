@@ -13,11 +13,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntIntMap
 
 /** LS invariant for [Clause]: watched-literal violation tracking and break/make maintenance. */
-internal class ClauseInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
-    private val literals: IntArray,
-) : Invariant {
+internal class ClauseInvariant(private val boolVars: IntArray, private val literals: IntArray) : Invariant {
 
     /** `boolVar → literal index` lookup; sentinel -1 for absent. Built from [literals] in init. */
     private val litIndexByVar: IntIntMap = IntIntMap.build(

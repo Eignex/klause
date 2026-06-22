@@ -44,5 +44,5 @@ class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
 
     override fun asPropagator(): Propagator = ValuePrecedePropagator(boolVars, intVars, s, t, xs)
 
-    override fun asInvariant(): Invariant = ValuePrecedeInvariant(boolVars, intVars, s, t, xs)
+    override fun asInvariant(): Invariant = ValuePrecedeInvariant(s, t, xs)
 }

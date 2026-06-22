@@ -140,8 +140,6 @@ class AllDifferent(
     )
 
     override fun asInvariant(): Invariant = AllDifferentInvariant(
-        boolVars,
-        intVars,
         vars,
         domainMin,
         domainSize,

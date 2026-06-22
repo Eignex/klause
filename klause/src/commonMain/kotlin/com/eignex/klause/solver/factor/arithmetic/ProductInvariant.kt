@@ -7,13 +7,7 @@ import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.math.abs
 
 /** LS invariant for [Product]: violation tracking and repair for `a * b = result`. */
-internal class ProductInvariant(
-    private val a: Int,
-    private val b: Int,
-    private val result: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
-) : Invariant {
+internal class ProductInvariant(private val a: Int, private val b: Int, private val result: Int) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val av = state.assignment.intValue(a)

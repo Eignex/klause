@@ -6,13 +6,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 
 /** LS invariant logic for `value_precede`. */
-internal class ValuePrecedeInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
-    private val s: Int,
-    private val t: Int,
-    private val xs: IntArray,
-) : Invariant {
+internal class ValuePrecedeInvariant(private val s: Int, private val t: Int, private val xs: IntArray) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val i = firstStOccurrence(state)

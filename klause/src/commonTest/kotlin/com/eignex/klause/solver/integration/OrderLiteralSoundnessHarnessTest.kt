@@ -65,10 +65,7 @@ class OrderLiteralSoundnessHarnessTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@NotEqualOnFix.boolVars
-            override val intVars get() = this@NotEqualOnFix.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     /** Recursive brute-force solution set: every full assignment over [domains] satisfying [ok]. */

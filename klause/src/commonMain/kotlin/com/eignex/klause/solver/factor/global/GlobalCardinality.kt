@@ -132,8 +132,6 @@ class GlobalCardinality(
     )
 
     override fun asInvariant(): Invariant = GlobalCardinalityInvariant(
-        boolVars,
-        intVars,
         xs,
         cover,
         countVars,

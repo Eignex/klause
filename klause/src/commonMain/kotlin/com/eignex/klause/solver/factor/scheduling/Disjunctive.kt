@@ -103,8 +103,6 @@ class Disjunctive(
     )
 
     override fun asInvariant(): Invariant = DisjunctiveInvariant(
-        boolVars = boolVars,
-        intVars = intVars,
         starts = starts,
         durations = durations,
         presents = presents,

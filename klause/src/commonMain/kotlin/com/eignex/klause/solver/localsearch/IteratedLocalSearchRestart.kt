@@ -219,16 +219,17 @@ class IteratedLocalSearchRestart(
         val ints = IntArray(a.ints.size)
         val boolSet = BooleanArray(a.bools.size)
         val intSet = BooleanArray(a.ints.size)
-        for (f in state.factors) {
+        for ((fid, _) in state.factors.withIndex()) {
             val pickA = rng.nextDouble() < probA
             val source = if (pickA) a else b
-            for (v in f.boolVars) {
+            val scope = state.problem.factors[fid]
+            for (v in scope.boolVars) {
                 if (v in source.bools.indices) {
                     bools[v] = source.bools[v]
                     boolSet[v] = true
                 }
             }
-            for (v in f.intVars) {
+            for (v in scope.intVars) {
                 if (v in source.ints.indices) {
                     ints[v] = source.ints[v]
                     intSet[v] = true

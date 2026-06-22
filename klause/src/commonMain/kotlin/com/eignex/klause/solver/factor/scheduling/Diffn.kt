@@ -111,8 +111,6 @@ class Diffn(
     )
 
     override fun asInvariant(): Invariant = DiffnInvariant(
-        boolVars = boolVars,
-        intVars = intVars,
         xs = xs,
         ys = ys,
         widths = widths,
