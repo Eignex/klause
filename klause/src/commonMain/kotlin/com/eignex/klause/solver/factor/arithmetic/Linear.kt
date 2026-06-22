@@ -12,7 +12,8 @@ import com.eignex.klause.solver.factor.remapVars
  * `Σ coeffs(i) * intVars(i) ⟨op⟩ bound`. Payload at `intPayload(factorId)` is the current
  * weighted sum, kept in sync incrementally by [Invariant.applyIntSet]. Repair moves propose, for each
  * variable, the integer value that on its own would put the sum on the right side of `bound`,
- * clamped to the variable's domain.
+ * clamped to the variable's domain. Terms pair [coeffs] with [vars]; the sum is compared by [op]
+ * against [bound].
  */
 class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bound: Int) : Factor {
 
