@@ -4,6 +4,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
@@ -39,7 +40,7 @@ internal object RedundantConstraints {
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key.
         val deduped = ArrayList<Factor>(factors.size)
-        val seenKeys = HashSet<String>()
+        val seenKeys = HashSet<StructuralKey>()
         for (f in factors) {
             val k = f.structuralKey()
             if (k != null && !seenKeys.add(k)) continue
@@ -47,9 +48,9 @@ internal object RedundantConstraints {
         }
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
         // tightest bound (and whether an `=` provides it) decides which inequalities are implied.
-        val bucketMin = HashMap<String, Long>()
-        val bucketEqAtMin = HashMap<String, Boolean>()
-        fun offer(key: String, bound: Long, fromEq: Boolean) {
+        val bucketMin = HashMap<TermKey, Long>()
+        val bucketEqAtMin = HashMap<TermKey, Boolean>()
+        fun offer(key: TermKey, bound: Long, fromEq: Boolean) {
             val cur = bucketMin[key]
             if (cur == null || bound < cur) {
                 bucketMin[key] = bound
@@ -64,7 +65,7 @@ internal object RedundantConstraints {
             // An `=` contributes its bound to both directions, so it can dominate either inequality.
             if (n.opposite != null) offer(n.opposite.key, n.opposite.bound, fromEq = true)
         }
-        val keptRep = HashSet<String>()
+        val keptRep = HashSet<TermKey>()
         val out = ArrayList<Factor>(deduped.size)
         for (f in deduped) {
             val n = ineqNormalForm(f)
@@ -258,7 +259,7 @@ internal object RedundantConstraints {
      *  coefficient vector (a `≥` folds to `≤` by negating), [bound] the `≤` right-hand side. [fromEq]
      *  marks an equality (it also contributes its [opposite] direction and is never itself dropped).
      *  `null` for `≠` and non-(Linear/PseudoBoolean) factors, which take no part in domination. */
-    private class IneqForm(val key: String, val bound: Long, val fromEq: Boolean, val opposite: IneqForm? = null) {
+    private class IneqForm(val key: TermKey, val bound: Long, val fromEq: Boolean, val opposite: IneqForm? = null) {
         fun copyWithOpposite(opp: IneqForm) = IneqForm(key, bound, fromEq, opp)
     }
 
@@ -299,7 +300,7 @@ internal object RedundantConstraints {
         terms: IntArray,
         coeffs: IntArray,
         bound: Long,
-        keyOf: (IntArray, IntArray, Boolean) -> String,
+        keyOf: (IntArray, IntArray, Boolean) -> TermKey,
         fromEq: Boolean,
     ): IneqForm {
         val g = PresolveShared.gcdOf(coeffs)
@@ -310,19 +311,26 @@ internal object RedundantConstraints {
         }
     }
 
-    /** Canonical key for a linear inequality's `≤`-normal-form coefficient vector: the `(var, coeff)`
-     *  pairs sorted by variable, with every coefficient negated when [negate] (folding `≥` into `≤`).
-     *  Prefixed so it never shares a bucket with a [pbKey]. */
-    private fun leKey(vars: IntArray, coeffs: IntArray, negate: Boolean): String {
+    /** A `≤`-normal-form coefficient-vector bucket key: the `(term, coeff)` pairs sorted by term, with
+     *  an [isPb] linear / pseudo-Boolean discriminator so the two kinds never share a bucket. */
+    private data class TermKey(val isPb: Boolean, val terms: List<Long>)
+
+    /** Build a [TermKey] over `(ids, coeffs)`: pairs sorted by id, each coefficient negated when [negate]
+     *  (folding `≥` into `≤`). For pseudo-Boolean keys distinct literal ids for opposite polarities keep
+     *  `x` and `¬x` apart (#465). */
+    private fun termKey(isPb: Boolean, ids: IntArray, coeffs: IntArray, negate: Boolean): TermKey {
         val sign = if (negate) -1 else 1
-        return "L:" + vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${sign * coeffs[it]}" }
+        val terms = ArrayList<Long>(ids.size * 2)
+        for (i in ids.indices.sortedBy { ids[it] }) {
+            terms.add(ids[i].toLong())
+            terms.add((sign * coeffs[i]).toLong())
+        }
+        return TermKey(isPb, terms)
     }
 
-    /** The pseudo-Boolean analogue of [leKey] over `(literal, weight)` pairs (#465). Distinct literal
-     *  ids for opposite polarities keep `x` and `¬x` apart; prefixed disjoint from [leKey]. */
-    private fun pbKey(literals: IntArray, weights: IntArray, negate: Boolean): String {
-        val sign = if (negate) -1 else 1
-        return "P:" + literals.indices.sortedBy { literals[it] }
-            .joinToString(",") { "${literals[it]}=${sign * weights[it]}" }
-    }
+    private fun leKey(vars: IntArray, coeffs: IntArray, negate: Boolean): TermKey =
+        termKey(isPb = false, ids = vars, coeffs = coeffs, negate = negate)
+
+    private fun pbKey(literals: IntArray, weights: IntArray, negate: Boolean): TermKey =
+        termKey(isPb = true, ids = literals, coeffs = weights, negate = negate)
 }

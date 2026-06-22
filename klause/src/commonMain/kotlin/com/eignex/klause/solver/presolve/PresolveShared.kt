@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.bool.Clause
 
@@ -66,8 +67,8 @@ internal object PresolveShared {
      *  `null` return means symmetry detection can't proceed (every factor must be keyed to compare
      *  the constraint set against a transform of it); callers translate it into their own early
      *  return. */
-    fun structuralKeyMultiset(factors: List<Factor>): Map<String, Int>? {
-        val base = HashMap<String, Int>()
+    fun structuralKeyMultiset(factors: List<Factor>): Map<StructuralKey, Int>? {
+        val base = HashMap<StructuralKey, Int>()
         for (f in factors) {
             val key = f.structuralKey() ?: return null
             base[key] = (base[key] ?: 0) + 1
@@ -80,8 +81,8 @@ internal object PresolveShared {
      *  returns `null` for a factor it cannot map (unkeyable / un-remappable), which fails the match.
      *  The `next > base[key]` short-circuit bails as soon as any key over-counts, before reading the
      *  whole factor list. */
-    fun matchesMultiset(factors: List<Factor>, base: Map<String, Int>, transform: (Factor) -> Factor?): Boolean {
-        val counts = HashMap<String, Int>(base.size)
+    fun matchesMultiset(factors: List<Factor>, base: Map<StructuralKey, Int>, transform: (Factor) -> Factor?): Boolean {
+        val counts = HashMap<StructuralKey, Int>(base.size)
         for (f in factors) {
             val key = (transform(f) ?: return false).structuralKey() ?: return false
             val next = (counts[key] ?: 0) + 1

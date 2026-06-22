@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -25,7 +27,10 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     /** `ys` is the sorted permutation of `xs`: the input multiset ignores order (so `xs` is sorted in
      *  the key), while `ys` is position-faithful (`ys(0) <= ys(1) <= ...`) and kept in order (#443). */
-    override fun structuralKey(): String = "sort:" + xs.sorted().joinToString(",") + ":" + ys.joinToString(",")
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SORT) {
+        sortedInts(xs)
+        ints(ys)
+    }
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + ys

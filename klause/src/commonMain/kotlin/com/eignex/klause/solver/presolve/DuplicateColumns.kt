@@ -51,7 +51,7 @@ internal object DuplicateColumns {
         val signatures = columnSignatures(problem, eligible)
         // Group eligible variables by column signature; equal signatures are duplicate columns. Fold
         // at most one duplicate into each representative this pass (a third re-signs next round).
-        val repBySignature = HashMap<String, Int>()
+        val repBySignature = HashMap<List<Long>, Int>()
         val repConsumed = HashSet<Int>()
         val merges = ArrayList<ColumnMerge>()
         for (v in 0 until problem.numIntVars) {
@@ -122,15 +122,20 @@ internal object DuplicateColumns {
      *  with its coefficient there, sorted by factor id. Two eligible variables share a signature iff
      *  they occur in exactly the same factors with the same coefficient in each — duplicate columns.
      *  Ineligible variables, and variables in no factor, get a `null` signature and never match. */
-    private fun columnSignatures(problem: Problem, eligible: BooleanArray): Array<String?> {
-        val entries = Array(problem.numIntVars) { if (eligible[it]) ArrayList<String>() else null }
+    private fun columnSignatures(problem: Problem, eligible: BooleanArray): Array<List<Long>?> {
+        val entries = Array(problem.numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
         problem.factors.forEachIndexed { fid, f ->
             if (f !is Linear) return@forEachIndexed
             val coeffByVar = MutableIntIntMap(f.vars.size)
             for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i])
-            for (v in f.intVars) entries[v]?.add("$fid=${coeffByVar.getOrDefault(v, 0)}")
+            for (v in f.intVars) {
+                entries[v]?.apply {
+                    add(fid.toLong())
+                    add(coeffByVar.getOrDefault(v, 0).toLong())
+                }
+            }
         }
-        return Array(problem.numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() }?.joinToString(",") }
+        return Array(problem.numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
     }
 
     private fun IntDomain.isContiguous(): Boolean = size == max - min + 1

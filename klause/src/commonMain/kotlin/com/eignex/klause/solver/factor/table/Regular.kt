@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -47,8 +49,14 @@ class Regular(
     /** Position-faithful (seq position i matters): keeps the sequence vars in order and folds in the
      *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting states
      *  (#531). */
-    override fun structuralKey(): String = "regular:$numStates:$alphabetSize:$q0:${transitions.joinToString(",")}:" +
-        "${accepting.joinToString(",")}:${seq.joinToString(",")}"
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REGULAR) {
+        int(numStates)
+        int(alphabetSize)
+        int(q0)
+        ints(transitions)
+        ints(accepting)
+        ints(seq)
+    }
 
     /** Symbol-alphabet relabeling (#536): the `seq` values *are* the symbols, so a value permutation
      *  permutes the transition table's symbol axis — `δ'(q, valueMap(s)) = δ(q, s)`. Sound because

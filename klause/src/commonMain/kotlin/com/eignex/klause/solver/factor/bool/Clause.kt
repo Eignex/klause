@@ -2,9 +2,11 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
 
@@ -26,7 +28,7 @@ class Clause(val literals: IntArray) : Factor {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
     }
 
-    override fun structuralKey(): String = "clause:" + literals.sorted().joinToString(",")
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CLAUSE) { sortedInts(literals) }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
 

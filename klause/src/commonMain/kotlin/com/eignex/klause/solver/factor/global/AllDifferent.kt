@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
@@ -76,11 +78,13 @@ class AllDifferent(
     // positions are skipped entirely; unpinned-presence positions are skipped too, so any
     // filtering remains sound under "this position might still go absent".
 
-    override fun structuralKey(): String {
-        val exceptKey = if (exceptSorted.isEmpty()) "" else ":except=" + exceptSorted.joinToString(",")
-        val bcKey = if (boundsConsistent) ":bc" else ""
-        return "alldiff:$domainMin:$domainSize:" +
-            vars.sorted().joinToString(",") + ":" + presents.sorted().joinToString(",") + exceptKey + bcKey
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ALL_DIFFERENT) {
+        int(domainMin)
+        int(domainSize)
+        sortedInts(vars)
+        sortedInts(presents)
+        sortedInts(exceptSorted)
+        bool(boundsConsistent)
     }
 
     /** Plain distinctness ignores which values are used — invariant under any value relabeling

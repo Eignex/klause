@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.circuit.internals.cycleScan
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -46,7 +48,7 @@ class Subcircuit(
 
     /** Position-faithful: `succ(i)` is node i's successor (`succ(i) = i` excludes node i), so the
      *  array order is meaningful — the key keeps the variables in order, not sorted (#443). */
-    override fun structuralKey(): String = "subcircuit:" + succ.joinToString(",")
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SUBCIRCUIT) { ints(succ) }
 
     /**
      * Graded cost for the subcircuit. 0 iff included set forms a single cycle (or is empty).

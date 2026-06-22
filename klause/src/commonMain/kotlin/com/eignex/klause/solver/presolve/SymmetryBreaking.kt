@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.Cardinality
@@ -144,7 +145,7 @@ internal object SymmetryBreaking {
         if (problem.numIntVars == 0) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
         // Verified path needs every factor keyed; build the base multiset (bail if any is unkeyed).
-        val base: Map<String, Int>? = if (allAnonymous) {
+        val base: Map<StructuralKey, Int>? = if (allAnonymous) {
             null
         } else {
             PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return null
@@ -224,7 +225,7 @@ internal object SymmetryBreaking {
      *  the value pairs whose transposition is verified a symmetry ([verifyValueSwap]). Transpositions
      *  generate the full symmetric group on each resulting orbit. Groups beyond [MAX_VERIFIED_GROUP]
      *  are skipped (the O(n²·factors) guard, as for variables). */
-    private fun verifyValueOrbits(problem: Problem, base: Map<String, Int>, values: List<Int>): List<List<Int>> {
+    private fun verifyValueOrbits(problem: Problem, base: Map<StructuralKey, Int>, values: List<Int>): List<List<Int>> {
         val n = values.size
         if (n > MAX_VERIFIED_GROUP) return emptyList()
         val ds = IntDisjointSet(n)
@@ -236,7 +237,7 @@ internal object SymmetryBreaking {
      *  factor via [Factor.remapValues] and compare [Factor.structuralKey] counts against [base].
      *  `false` if any factor is not value-relabelable (returns `null`). The value analog of
      *  [isAutomorphism]. */
-    private fun verifyValueSwap(problem: Problem, base: Map<String, Int>, v: Int, w: Int): Boolean {
+    private fun verifyValueSwap(problem: Problem, base: Map<StructuralKey, Int>, v: Int, w: Int): Boolean {
         val swap = { x: Int ->
             if (x == v) {
                 w
@@ -377,7 +378,7 @@ internal object SymmetryBreaking {
                 saved = intMap[v]
                 intMap[v] = WL_FOCAL
             }
-            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey() ?: "?")
+            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey()?.toString() ?: "?")
             if (isBool) boolMap[v] = saved else intMap[v] = saved
         }
         ports.sort()
@@ -405,8 +406,12 @@ internal object SymmetryBreaking {
 
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
      *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
-    private fun isAutomorphism(problem: Problem, base: Map<String, Int>, boolMap: IntArray, intMap: IntArray): Boolean =
-        PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(boolMap, intMap) }
+    private fun isAutomorphism(
+        problem: Problem,
+        base: Map<StructuralKey, Int>,
+        boolMap: IntArray,
+        intMap: IntArray,
+    ): Boolean = PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(boolMap, intMap) }
 
     /** A fresh identity remap over the int variables (`map[v] == v`). Callers mutate a few slots for a
      *  remap/automorphism check via [withSwap], which restores them. */
@@ -499,12 +504,12 @@ internal object SymmetryBreaking {
         varsOf: (Factor) -> IntArray,
         wrongKind: (Factor) -> Boolean,
         blockEligible: (IntArray) -> Boolean,
-        shapeOf: (Factor, IntArray) -> String?,
-        swapVerified: (Map<String, Int>, IntArray, IntArray) -> Boolean,
+        shapeOf: (Factor, IntArray) -> StructuralKey?,
+        swapVerified: (Map<StructuralKey, Int>, IntArray, IntArray) -> Boolean,
         emit: (IntArray, IntArray) -> Factor,
     ): List<Factor> {
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return emptyList()
-        val byShape = HashMap<String, MutableList<IntArray>>()
+        val byShape = HashMap<StructuralKey, MutableList<IntArray>>()
         for (f in problem.factors) {
             if (wrongKind(f)) continue
             val block = varsOf(f).distinct().sorted().toIntArray()
@@ -529,7 +534,7 @@ internal object SymmetryBreaking {
     /** Canonical structure key for a block of variables (bool when [isBool], else int): remap its
      *  (sorted) variables to `0..k-1` with the other kind left identity, so two isomorphic factors
      *  over disjoint variables share a key. `null` if the factor isn't keyed. */
-    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray, isBool: Boolean): String? {
+    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray, isBool: Boolean): StructuralKey? {
         val boolMap = identityBoolMap(problem)
         val intMap = identityIntMap(problem)
         val target = if (isBool) boolMap else intMap

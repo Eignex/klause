@@ -3,8 +3,10 @@ package com.eignex.klause.solver.factor.arithmetic
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.ReifiedFactor
 import com.eignex.klause.solver.factor.bool.internals.pbDegree
 import com.eignex.klause.solver.factor.bool.internals.pbHolds
@@ -30,10 +32,14 @@ class ReifiedPseudoBoolean(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
 
-    /** `PseudoBoolean.structuralKey` plus the reifying [auxBoolVar]; the `rpb` prefix keeps it disjoint
-     *  from a bare pseudo-Boolean's key (#443). */
-    override fun structuralKey(): String = "rpb:$auxBoolVar:$op:$bound:" +
-        literals.indices.sortedBy { literals[it] }.joinToString(",") { "${literals[it]}=${weights[it]}" }
+    /** `PseudoBoolean.structuralKey` plus the reifying [auxBoolVar]; the distinct factor kind keeps it
+     *  disjoint from a bare pseudo-Boolean's key (#443). */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_PSEUDO_BOOLEAN) {
+        int(auxBoolVar)
+        enum(op)
+        int(bound)
+        pairsByKey(literals) { weights[it].toLong() }
+    }
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
 

@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -47,7 +49,13 @@ class Element(
     // rather than sorting. Encodes every distinguishing field — array kind, offset, idx, result,
     // and the ordered array (var ids when [arrIsVars], else constant values) — so two non-equivalent
     // Elements never collide (a coarser key would let symmetry verification accept a false swap).
-    override fun structuralKey(): String = "element:$arrIsVars:$indexOffset:$idx:$result:" + arr.joinToString(",")
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ELEMENT) {
+        bool(arrIsVars)
+        int(indexOffset)
+        int(idx)
+        int(result)
+        ints(arr)
+    }
 
     // No remapValues override (value symmetry stays blocked when an Element is present, #536): the
     // value-symmetry verifier relabels a factor's value *constants* and compares keys, but `idx` is a

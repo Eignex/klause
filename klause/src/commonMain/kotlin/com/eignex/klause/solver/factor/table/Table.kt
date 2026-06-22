@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.util.IntIntMap
 
@@ -40,13 +42,20 @@ class Table(
 
     // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so row strings are sorted.
     // Encodes the full var sequence and tuple set — collision-free up to variable identity.
-    override fun structuralKey(): String {
-        val rows = ArrayList<String>(numTuples)
-        for (r in 0 until numTuples) {
-            rows.add((0 until arity).joinToString(".") { c -> tuples[r * arity + c].toString() })
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.TABLE) {
+        ints(xs)
+        int(arity)
+        int(numTuples)
+        val order = (0 until numTuples).sortedWith { r1, r2 ->
+            var c = 0
+            var d = 0
+            while (c < arity && d == 0) {
+                d = tuples[r1 * arity + c].compareTo(tuples[r2 * arity + c])
+                c++
+            }
+            d
         }
-        rows.sort()
-        return "table:" + xs.joinToString(",") + ":" + rows.joinToString(";")
+        for (r in order) for (c in 0 until arity) int(tuples[r * arity + c])
     }
 
     /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the

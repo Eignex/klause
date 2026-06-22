@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
@@ -74,8 +76,12 @@ class Disjunctive(
 
     /** Position-faithful: keeps the task arrays in order and folds in the constant durations and the
      *  var/const split (#531). */
-    override fun structuralKey(): String = "disjunctive:${durations.joinToString(",")}:" +
-        "${starts.joinToString(",")}:${presents.joinToString(",")}:${durationVars.joinToString(",")}"
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DISJUNCTIVE) {
+        ints(durations)
+        ints(starts)
+        ints(presents)
+        ints(durationVars)
+    }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = if (durationVars.isEmpty()) starts else starts + durationVars

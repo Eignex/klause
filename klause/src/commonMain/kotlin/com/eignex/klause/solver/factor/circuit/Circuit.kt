@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.circuit.internals.cycleScan
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -54,7 +56,7 @@ class Circuit(
 
     /** Position-faithful: `succ(i)` is node i's successor, so the array order is meaningful — the key
      *  keeps the variables in order rather than sorting them (#443). */
-    override fun structuralKey(): String = "circuit:" + succ.joinToString(",")
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CIRCUIT) { ints(succ) }
 
     /**
      * Graded cost: `|numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`.

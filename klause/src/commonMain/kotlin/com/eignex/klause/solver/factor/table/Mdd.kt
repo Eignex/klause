@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -66,9 +68,16 @@ class Mdd(
     /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
      *  diagram — per-layer state counts, layer offsets, the transition records, the initial and
      *  accepting states, the record stride, and the cost var (#531). */
-    override fun structuralKey(): String = "mdd:$initial:$recordStride:$cost:${numStatesPerLayer.joinToString(",")}:" +
-        "${layerStarts.joinToString(",")}:${transitions.joinToString(",")}:" +
-        "${accepting.joinToString(",")}:${seq.joinToString(",")}"
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.MDD) {
+        int(initial)
+        int(recordStride)
+        int(cost)
+        ints(numStatesPerLayer)
+        ints(layerStarts)
+        ints(transitions)
+        ints(accepting)
+        ints(seq)
+    }
 
     /** Symbol relabeling (#536): each transition record is `(fromState, symbol, toState[, cost])`, so a
      *  value permutation maps the symbol field of every record. Sound — the `seq` values are the
