@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
@@ -13,6 +14,7 @@ import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.solver.presolve.Presolve
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
@@ -79,6 +81,16 @@ class LocalSearchState(
      *  factor's [Invariant.seedFeasible] never overwrites another's seeded vars, so the post-seed
      *  assignment satisfies every seeded global simultaneously. */
     val implicitSeedFactors: IntArray by lazy { electImplicitSeedSet() }
+
+    /** Binary-implication graph of [problem], literal-indexed at `2·numBoolVars`: `graph[Lit.make(v,
+     *  value)]` lists every literal that pinning `v = value` forces (sound, from probing-style
+     *  propagation). Built once on first access — the implication-aware move sources
+     *  ([com.eignex.klause.solver.localsearch.movesource.FlipAndPropagate]) bundle a flip's forced
+     *  literals into one atomic move. The candidate cap mirrors probing's free-Boolean bound, so the
+     *  build cost is paid once per solve rather than per move. */
+    val implicationGraph: Array<IntArray> by lazy {
+        Presolve.implicationGraph(problem, problem.numBoolVars, Cancellation.Never)
+    }
 
     private fun electImplicitFactors(): IntArray {
         val out = IntArrayList()

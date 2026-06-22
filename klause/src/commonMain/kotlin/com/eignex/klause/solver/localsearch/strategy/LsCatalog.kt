@@ -234,6 +234,12 @@ object LsCatalog {
         LsArm.FeasibilityJumpFixed ->
             LsRecipe(arm.label, FeasibilityJump().withRestart(FixedCadenceRestart()))
 
+        // Flip-and-propagate: stall-gated implication-aware flip compounds (a seed flip bundled with
+        // the literals it forces through the binary-implication graph). The boolean-core niche where a
+        // flip cascades through binary implications the search would otherwise repair one step at a time.
+        LsArm.CblsFlipPropFixed ->
+            cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(flipPropagateCap = 8, tabu = cblsTabu()) }
+
         // SA with periodic reheating: the schedule re-diversifies a cooled-and-stuck run without
         // discarding the incumbent. Restart epoch (100k) spans several reheat periods (20k) so the
         // reheats fire before a restart resets the schedule.
@@ -278,6 +284,8 @@ object LsCatalog {
         LsArm.CblsCliqueFixed,
         // Feasibility-Jump arm; kept last pending its cross-seed credit pass.
         LsArm.FeasibilityJumpFixed,
+        // Implication-aware flip niche; kept last pending its cross-seed credit pass.
+        LsArm.CblsFlipPropFixed,
         // Schedule-diversity SA arms; kept last pending their cross-seed credit pass.
         LsArm.SaReheatFixed, LsArm.SaPhasedFixed,
     )
@@ -337,6 +345,7 @@ internal enum class LsArm(val label: String) {
     CblsImplicitFixed("cbls-implicit/fixed"),
     CblsCliqueFixed("cbls-clique/fixed"),
     FeasibilityJumpFixed("fjump/fixed"),
+    CblsFlipPropFixed("cbls-flipprop/fixed"),
     SaReheatFixed("sa-reheat/fixed"),
     SaPhasedFixed("sa-phased/fixed"),
 }

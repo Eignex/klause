@@ -22,6 +22,7 @@ object MoveSourceCatalog {
         "stall-kick" to { StallKick(DEFAULT_KICK_VARS) },
         "pair-swap" to { PairSwap(DEFAULT_PAIR_SWAP_CAP) },
         "clique-swap" to { CliqueSwap(DEFAULT_CLIQUE_SWAP_CAP) },
+        "flip-propagate" to { FlipAndPropagate(DEFAULT_FLIP_PROPAGATE_CAP, DEFAULT_FLIP_PROPAGATE_DEPTH) },
     )
 
     /** Every known source label, in catalog order. */
@@ -54,4 +55,6 @@ object MoveSourceCatalog {
     private const val DEFAULT_KICK_VARS = 8
     private const val DEFAULT_PAIR_SWAP_CAP = 8
     private const val DEFAULT_CLIQUE_SWAP_CAP = 8
+    private const val DEFAULT_FLIP_PROPAGATE_CAP = 8
+    private const val DEFAULT_FLIP_PROPAGATE_DEPTH = 16
 }
