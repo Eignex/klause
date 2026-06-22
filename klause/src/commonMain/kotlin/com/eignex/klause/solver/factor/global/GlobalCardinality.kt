@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
@@ -73,18 +75,21 @@ class GlobalCardinality(
     // xs is a set (counts are per cover value, order-independent) so xs/presents pairs are sorted by
     // var id; cover triples are sorted by value. Encodes every distinguishing field — fine enough
     // that two non-equivalent GCCs never collide (a coarser key would let a symmetry swap through).
-    override fun structuralKey(): String {
-        val xsPart = xs.indices.sortedBy { xs[it] }.joinToString(",") { i ->
-            if (presents.isEmpty()) "${xs[i]}" else "${xs[i]}@${presents[i]}"
-        }
-        val coverPart = cover.indices.sortedBy { cover[it] }.joinToString(",") { i ->
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GLOBAL_CARDINALITY) {
+        bool(closed)
+        bool(presents.isEmpty())
+        if (presents.isEmpty()) sortedInts(xs) else pairsByKey(xs) { presents[it].toLong() }
+        bool(countVars != null)
+        int(cover.size)
+        for (i in cover.indices.sortedBy { cover[it] }) {
+            int(cover[i])
             if (countVars != null) {
-                "${cover[i]}=v${countVars[i]}"
+                int(countVars[i])
             } else {
-                "${cover[i]}=${requireNotNull(countLow)[i]}_${requireNotNull(countHigh)[i]}"
+                int(requireNotNull(countLow)[i])
+                int(requireNotNull(countHigh)[i])
             }
         }
-        return "gcc:$closed:$xsPart:$coverPart"
     }
 
     /** Relabel the cover values (#374). Only the constant-count form is value-relabelable: with count

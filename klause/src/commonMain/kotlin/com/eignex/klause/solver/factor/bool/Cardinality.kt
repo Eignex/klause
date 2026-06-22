@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
 
@@ -20,7 +22,11 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
 
     override val intVars: IntArray = EmptyIntArray
 
-    override fun structuralKey(): String = "card:$min:$max:" + literals.sorted().joinToString(",")
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CARDINALITY) {
+        int(min)
+        int(max)
+        sortedInts(literals)
+    }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cardinality(literals.remapLits(boolMap), min, max)
 

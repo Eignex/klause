@@ -3,8 +3,10 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
 
@@ -17,9 +19,11 @@ class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp,
 
     override val intVars: IntArray = EmptyIntArray
 
-    override fun structuralKey(): String = "pb:$op:$bound:" + literals.indices.sortedBy { literals[it] }.joinToString(
-        ",",
-    ) { "${literals[it]}=${weights[it]}" }
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.PSEUDO_BOOLEAN) {
+        enum(op)
+        int(bound)
+        pairsByKey(literals) { weights[it].toLong() }
+    }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         PseudoBoolean(weights, literals.remapLits(boolMap), op, bound)

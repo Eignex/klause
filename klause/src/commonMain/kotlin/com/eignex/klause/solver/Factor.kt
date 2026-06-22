@@ -41,14 +41,14 @@ interface Factor {
     fun remap(boolMap: IntArray, intMap: IntArray): Factor
 
     /**
-     * A canonical string identifying this constraint up to variable identity: same factor type,
-     * same constants (coefficients, bounds, polarities), and the same multiset of variables — in a
-     * representation that does not depend on internal ordering — produce the same key. Used by
-     * symmetry detection to check whether permuting variables maps the factor set to itself
-     * (an automorphism). `null` (the default) means "not keyed"; verification falls back to the
-     * conservative same-factor-set heuristic when any factor in the problem is unkeyed.
+     * A canonical [StructuralKey] identifying this constraint up to variable identity: same factor
+     * type, same constants (coefficients, bounds, polarities), and the same multiset of variables — in
+     * a representation that does not depend on internal ordering — produce equal keys. Used by symmetry
+     * detection to check whether permuting variables maps the factor set to itself (an automorphism).
+     * `null` (the default) means "not keyed"; verification falls back to the conservative
+     * same-factor-set heuristic when any factor in the problem is unkeyed.
      */
-    fun structuralKey(): String? = null
+    fun structuralKey(): StructuralKey? = null
 
     /**
      * Whether this factor's meaning is invariant under *any* relabeling of domain values — i.e. it

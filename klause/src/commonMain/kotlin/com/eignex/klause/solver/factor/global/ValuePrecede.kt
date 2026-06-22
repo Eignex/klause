@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -33,7 +35,11 @@ class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
 
     // Positional: the sequence order decides "before", so xs is not sorted. Encodes the values and
     // the full var sequence — collision-free up to variable identity (sound for symmetry checks).
-    override fun structuralKey(): String = "vprec:$s:$t:" + xs.joinToString(",")
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.VALUE_PRECEDE) {
+        int(s)
+        int(t)
+        ints(xs)
+    }
 
     /** Relabel the two named values (#374 value-symmetry verification): `value_precede(s,t)` maps to
      *  `value_precede(π(s), π(t))` under a value permutation π. */

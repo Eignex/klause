@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.ReifiedFactor
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.factor.litVars
@@ -29,9 +31,14 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)
 
-    /** `Cardinality.structuralKey` plus the reifying [auxBoolVar]; the `rcard` prefix keeps it disjoint
-     *  from a bare cardinality's key (#443). */
-    override fun structuralKey(): String = "rcard:$auxBoolVar:$min:$max:" + literals.sorted().joinToString(",")
+    /** `Cardinality.structuralKey` plus the reifying [auxBoolVar]; the distinct factor kind keeps it
+     *  disjoint from a bare cardinality's key (#443). */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_CARDINALITY) {
+        int(auxBoolVar)
+        int(min)
+        int(max)
+        sortedInts(literals)
+    }
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
 

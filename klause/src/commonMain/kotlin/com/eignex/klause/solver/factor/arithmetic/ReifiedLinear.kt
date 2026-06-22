@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.ReifiedFactor
 import com.eignex.klause.solver.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.solver.factor.bool.internals.coalesceLinearTerms
@@ -45,12 +47,14 @@ class ReifiedLinear private constructor(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedLinear(boolMap[auxBoolVar], coeffs, vars.remapVars(intMap), op, bound)
 
-    /** [Linear.structuralKey] plus the reifying [auxBoolVar]; the `rlin` prefix keeps it disjoint from
-     *  a bare linear's key, so a reified row and an asserted one never share a bucket (#443). */
-    override fun structuralKey(): String =
-        "rlin:$auxBoolVar:$op:$bound:" + vars.indices.sortedBy { vars[it] }.joinToString(
-            ",",
-        ) { "${vars[it]}=${coeffs[it]}" }
+    /** [Linear.structuralKey] plus the reifying [auxBoolVar]; the distinct factor kind keeps it disjoint
+     *  from a bare linear's key, so a reified row and an asserted one never share a bucket (#443). */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_LINEAR) {
+        int(auxBoolVar)
+        enum(op)
+        int(bound)
+        pairsByKey(vars) { coeffs[it].toLong() }
+    }
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
 

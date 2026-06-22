@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
@@ -58,8 +60,11 @@ class NValue(
     /** The distinct-value count ignores the order of [xs], so the counted vars are sorted (paired with
      *  their presence literal to keep an opt position with its presence); [n] (the count var) and
      *  [mode] are positional constants (#443). */
-    override fun structuralKey(): String = "nvalue:$mode:$n:" +
-        xs.indices.sortedBy { xs[it] }.joinToString(",") { "${xs[it]}/${presents.getOrElse(it) { -1 }}" }
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.NVALUE) {
+        enum(mode)
+        int(n)
+        pairsByKey(xs) { presents.getOrElse(it) { -1 }.toLong() }
+    }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = xs + intArrayOf(n)

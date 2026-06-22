@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
@@ -112,10 +114,16 @@ class Cumulative(
     /** Position-faithful (task i is fixed by index): keeps every array in order and folds in all
      *  constants — durations/resources/capacity and the var/const split — so two non-equivalent
      *  cumulatives never collide (#531). */
-    override fun structuralKey(): String =
-        "cumulative:$capacity:$capacityVar:${durations.joinToString(",")}:${resources.joinToString(",")}:" +
-            "${starts.joinToString(",")}:${presents.joinToString(",")}:" +
-            "${durationVars.joinToString(",")}:${resourceVars.joinToString(",")}"
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CUMULATIVE) {
+        int(capacity)
+        int(capacityVar)
+        ints(durations)
+        ints(resources)
+        ints(starts)
+        ints(presents)
+        ints(durationVars)
+        ints(resourceVars)
+    }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = run {

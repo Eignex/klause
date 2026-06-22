@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.util.IntIntMap
 
@@ -56,11 +58,14 @@ class Diffn(
 
     /** Position-faithful (rectangle i is fixed by index): keeps the coordinate arrays in order and
      *  folds in the constant sizes, the var-size split, and the [nonStrict] flag (#531). */
-    override fun structuralKey(): String {
-        val wv = widthVars?.joinToString(",").orEmpty()
-        val hv = heightVars?.joinToString(",").orEmpty()
-        return "diffn:$nonStrict:${widths.joinToString(",")}:${heights.joinToString(",")}:" +
-            "${xs.joinToString(",")}:${ys.joinToString(",")}:$wv:$hv"
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DIFFN) {
+        bool(nonStrict)
+        ints(widths)
+        ints(heights)
+        ints(xs)
+        ints(ys)
+        ints(widthVars ?: IntArray(0))
+        ints(heightVars ?: IntArray(0))
     }
 
     override val boolVars: IntArray = EmptyIntArray

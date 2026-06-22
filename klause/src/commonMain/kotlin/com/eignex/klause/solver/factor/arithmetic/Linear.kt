@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.solver.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.solver.factor.remapVars
@@ -33,8 +35,11 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     constructor(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(coalesceLinearTerms(vars, coeffs), op, bound)
 
-    override fun structuralKey(): String =
-        "lin:$op:$bound:" + vars.indices.sortedBy { vars[it] }.joinToString(",") { "${vars[it]}=${coeffs[it]}" }
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) {
+        enum(op)
+        int(bound)
+        pairsByKey(vars) { coeffs[it].toLong() }
+    }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
 
