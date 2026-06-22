@@ -7,11 +7,12 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.lp.ExactBasisCertifier
 import com.eignex.klause.solver.lp.LpBuilder
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.Sense
+import com.eignex.klause.solver.lp.integerCertify
+import com.eignex.klause.solver.lp.integerFarkasRay
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.LpExplanation
 import com.eignex.klause.solver.lp.relaxation.LpRelaxation
@@ -45,7 +46,7 @@ class LpLearnTest {
         val relaxation = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
             .build(session)
         val result = assertNotNull(RevisedSimplex(relaxation.model).solve())
-        val cert = assertNotNull(ExactBasisCertifier.certify(relaxation.model, result.basis))
+        val cert = assertNotNull(integerCertify(relaxation.model, result.duals))
         val reason = LpExplanation.objectiveBoundReason(relaxation, cert, session)
         assertNotNull(reason, "an optimal LP over global rows must yield an objective-bound reason")
         // x is seated at its (binding) lower bound with a positive reduced cost, so the reason cites
@@ -67,9 +68,7 @@ class LpLearnTest {
         val model = b.build(Sense.MINIMIZE)
         val simplex = RevisedSimplex(model)
         assertTrue(simplex.solve() == null, "the LP is infeasible, so solve() must return null")
-        val ray = assertNotNull(
-            ExactBasisCertifier.farkasRay(model, assertNotNull(simplex.infeasibleBasis), simplex.infeasibleRow),
-        )
+        val ray = assertNotNull(integerFarkasRay(model, assertNotNull(simplex.infeasibleRay)))
         val relaxation = LpRelaxation(
             model = model,
             colVarId = intArrayOf(x),

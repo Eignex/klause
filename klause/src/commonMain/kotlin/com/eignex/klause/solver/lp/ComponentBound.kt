@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.lp
 
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -19,9 +18,10 @@ import com.eignex.klause.util.LongArrayList
  * solve fails to certify. A null only forgoes the decomposition; the caller's monolithic path then
  * produces the (identical) bound, so this is sound by construction.
  *
- * The bounds are summed as exact rationals and ceiled **once** — `⌈Σ⌉ ≠ Σ⌈·⌉`, so per-block ceiling
- * would be wrong; the per-block [ExactBasisCertifier.Certificate.objective] (each built with a zero
- * objective constant) carries the exact rational value.
+ * The bounds are summed as exact scaled integers and ceiled **once** — `⌈Σ⌉ ≠ Σ⌈·⌉`, so per-block
+ * ceiling would over-estimate (unsound); each block's exact objective `numerator / 2ᵏ`
+ * ([IntegerCertificate]) is brought to a common power-of-two denominator and summed before the single
+ * final ceiling.
  */
 internal fun componentLowerBoundCeil(model: LpModel, cancellation: Cancellation = Cancellation.Never): Long? {
     val n = model.n
@@ -55,34 +55,45 @@ internal fun componentLowerBoundCeil(model: LpModel, cancellation: Cancellation 
         }
     }
 
-    var total = BigRational.ZERO
-    // Isolated columns (in no row): contribute min over [0, uⱼ] of cⱼ·z'ⱼ = min(0, cⱼ)·uⱼ (shifted).
+    // Isolated columns (in no row) + objConstant: an exact integer-valued contribution.
+    val integerAcc = Int128()
     for (j in 0 until n) {
         if (inRow[j]) continue
         val c = model.cost[j]
         if (c < 0L) {
             if (!model.hasUpper[j]) return null // unbounded below → fall back
-            total += BigRational.of(c) * BigRational.of(model.upper[j])
+            integerAcc.addProduct(c, model.upper[j]) // min over [0, uⱼ] of cⱼ·z'ⱼ = min(0, cⱼ)·uⱼ (shifted)
         }
     }
+    integerAcc.addLong(model.objConstant)
 
-    // Group constrained columns by component root (ascending column order within each group).
+    // Group constrained columns by component root (ascending column order within each group), and
+    // certify each block's exact objective `Nᵦ / 2^kᵦ`.
     val groups = HashMap<Int, IntArrayList>()
     for (j in 0 until n) {
         if (!inRow[j]) continue
         groups.getOrPut(find(j)) { IntArrayList() }.add(j)
     }
-    for (cols in groups.values) {
-        total += componentObjective(model, cols, cancellation) ?: return null
-    }
+    val blocks = ArrayList<IntegerCertificate>(groups.size)
+    for (cols in groups.values) blocks.add(componentObjective(model, cols, cancellation) ?: return null)
 
-    total += BigRational.of(model.objConstant)
-    return total.ceil().toLongOrNull()
+    // Sum at the common (max) power-of-two denominator `2ᵏ`, then ceil once. ⌈Σ⌉ ≠ Σ⌈·⌉.
+    var k = 0
+    for (b in blocks) if (b.objectiveScaleBits > k) k = b.objectiveScaleBits
+    val acc = Int128()
+    integerAcc.shiftLeft(k) // integer part · 2ᵏ
+    acc.add(integerAcc)
+    for (b in blocks) {
+        val nb = b.objectiveNumerator()
+        nb.shiftLeft(k - b.objectiveScaleBits) // Nᵦ · 2^(k − kᵦ): rebase to the common denominator
+        acc.add(nb)
+    }
+    return acc.ceilDivPow2(k)
 }
 
-/** Exact certified objective of the sub-LP over the component's [cols] (a zero objective constant);
- *  null if the block's float solve does not certify, in which case the caller falls back. */
-private fun componentObjective(model: LpModel, cols: IntArrayList, cancellation: Cancellation): BigRational? {
+/** Exact certified objective of the sub-LP over the component's [cols] (a zero objective constant) as an
+ *  [IntegerCertificate]; null if the block's float solve does not certify, so the caller falls back. */
+private fun componentObjective(model: LpModel, cols: IntArrayList, cancellation: Cancellation): IntegerCertificate? {
     val n2 = cols.size
     // Rows touched by the component, ascending — so new row indices are monotone in old indices and a
     // column's ascending CSC iteration already produces ascending new rows (no per-column re-sort).
@@ -138,5 +149,5 @@ private fun componentObjective(model: LpModel, cols: IntArrayList, cancellation:
         tag = tag,
     )
     val result = RevisedSimplex(sub, cancellation).solve() ?: return null
-    return ExactBasisCertifier.certify(sub, result.basis)?.objective
+    return integerCertify(sub, result.duals)
 }

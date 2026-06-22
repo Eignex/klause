@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.lp.relaxation
 
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.lp.ExactBasisCertifier
+import com.eignex.klause.solver.lp.Int128
+import com.eignex.klause.solver.lp.IntegerCertificate
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -88,14 +88,14 @@ internal object LpExplanation {
      */
     fun objectiveBoundReason(
         relaxation: LpRelaxation,
-        cert: ExactBasisCertifier.Certificate,
+        cert: IntegerCertificate,
         session: PropagationSession,
     ): IntArray? {
         val lits = IntArrayList()
         val seen = IntHashSet()
         if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session)) return null
         for (col in relaxation.colVarId.indices) {
-            val sign = cert.reducedCost[col].signum()
+            val sign = cert.reducedCostSign(col)
             if (sign == 0) continue
             when (val lit = premiseLit(relaxation, session, col, lowerSide = sign > 0)) {
                 PREMISE_AUX -> return null
@@ -118,18 +118,19 @@ internal object LpExplanation {
      */
     fun infeasibilityClause(
         relaxation: LpRelaxation,
-        ray: Array<BigRational>,
+        ray: LongArray,
         session: PropagationSession,
     ): IntArray? {
         val model = relaxation.model
         val lits = IntArrayList()
         val seen = IntHashSet()
-        val rows = (0 until model.m).filter { ray[it].signum() != 0 }.toIntArray()
+        val rows = (0 until model.m).filter { ray[it] != 0L }.toIntArray()
         if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
         for (col in relaxation.colVarId.indices) {
-            var aj = BigRational.ZERO
-            model.forEachInColumn(col) { i, a -> aj += ray[i] * BigRational.of(a) }
-            val sign = aj.signum()
+            val ajAcc = Int128()
+            model.forEachInColumn(col) { i, a -> ajAcc.addProduct(ray[i], a) }
+            if (ajAcc.overflow) return null // can't determine the premise side ⇒ inexpressible
+            val sign = if (ajAcc.hi == 0L && ajAcc.lo == 0L) 0 else if (ajAcc.isNonNegative()) 1 else -1
             if (sign == 0) continue
             // ρ·A_j > 0 ⇒ the column's upper bound is load-bearing (upper side); < 0 ⇒ lower side.
             when (val lit = premiseLit(relaxation, session, col, lowerSide = sign < 0)) {
@@ -175,12 +176,12 @@ internal object LpExplanation {
         lits: IntArrayList,
         seen: IntHashSet,
         relaxation: LpRelaxation,
-        cert: ExactBasisCertifier.Certificate,
+        cert: IntegerCertificate,
         session: PropagationSession,
     ): Boolean {
         val model = relaxation.model
         for (i in 0 until model.m) {
-            if (!cert.dualNonzeroRow[i] || model.rowGlobal[i]) continue
+            if (!cert.dualNonzeroRow(i) || model.rowGlobal[i]) continue
             val prem = model.rowPremises[i] ?: return false
             for (k in prem.vars.indices) {
                 val lit = if (prem.isUpper[k]) {
