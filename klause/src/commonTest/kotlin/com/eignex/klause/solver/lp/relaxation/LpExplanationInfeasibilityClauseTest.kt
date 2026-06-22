@@ -1,19 +1,19 @@
 package com.eignex.klause.solver.lp.relaxation
 
-import com.eignex.klause.solver.lp.ExactBasisCertifier
+import com.eignex.klause.solver.lp.Int128
 import com.eignex.klause.solver.lp.LpBuilder
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.lp.RevisedSimplex
 import com.eignex.klause.solver.lp.Sense
-import com.eignex.klause.util.BigRational
+import com.eignex.klause.solver.lp.integerFarkasRay
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * #247/#705: the exact Farkas infeasibility ray ([ExactBasisCertifier.farkasRay]) and the bound-atom
+ * #247/#705: the integer Farkas infeasibility ray ([integerFarkasRay]) and the bound-atom
  * nogood derived from it must be sound — the clause may never exclude a point satisfying the original
  * constraints. The ray's column support uses only the seated box bounds, so `⋁ ¬(seated bound)` has to
  * be implied by the constraints alone, even though the node tightened bounds beyond the declared box.
@@ -22,11 +22,17 @@ class LpExplanationInfeasibilityClauseTest {
 
     private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)
 
-    /** Exact `ρ·A_col` for structural column [col] under ray [ray]. */
-    private fun rayDotColumn(model: LpModel, ray: Array<BigRational>, col: Int): BigRational {
-        var aj = BigRational.ZERO
-        model.forEachInColumn(col) { i, a -> aj += ray[i] * BigRational.of(a) }
-        return aj
+    /** Sign of `ρ·A_col` for structural column [col] under integer ray [ray] (`-1`/`0`/`+1`). */
+    private fun rayDotColumnSign(model: LpModel, ray: LongArray, col: Int): Int {
+        val acc = Int128()
+        model.forEachInColumn(col) { i, a -> acc.addProduct(ray[i], a) }
+        return if (acc.hi == 0L && acc.lo == 0L) {
+            0
+        } else if (acc.isNonNegative()) {
+            1
+        } else {
+            -1
+        }
     }
 
     @Test
@@ -40,11 +46,11 @@ class LpExplanationInfeasibilityClauseTest {
         val result = simplex.solve()
         assertTrue(result == null, "the LP is infeasible, so solve() must return null")
         val ray = assertNotNull(
-            ExactBasisCertifier.farkasRay(model, assertNotNull(simplex.infeasibleBasis), simplex.infeasibleRow),
+            integerFarkasRay(model, assertNotNull(simplex.infeasibleRay)),
             "expected a Farkas infeasibility ray",
         )
         // x's seated lower bound participates: ρ·A_x < 0 ⇒ the lower side is load-bearing.
-        assertTrue(rayDotColumn(model, ray, x).signum() < 0, "x's lower bound must participate in the ray")
+        assertTrue(rayDotColumnSign(model, ray, x) < 0, "x's lower bound must participate in the ray")
     }
 
     @Test
@@ -76,11 +82,10 @@ class LpExplanationInfeasibilityClauseTest {
             val model = b.build(Sense.MINIMIZE)
             val simplex = RevisedSimplex(model)
             if (simplex.solve() != null) return@repeat // feasible
-            val basis = simplex.infeasibleBasis ?: return@repeat
-            val ray = ExactBasisCertifier.farkasRay(model, basis, simplex.infeasibleRow) ?: return@repeat
+            val ray = integerFarkasRay(model, simplex.infeasibleRay ?: return@repeat) ?: return@repeat
             infeasibleInstances++
             // Seated side per structural column: ρ·A_j > 0 ⇒ upper, < 0 ⇒ lower, 0 ⇒ not in the box.
-            val seatUpper = IntArray(n) { col -> rayDotColumn(model, ray, col).signum() }
+            val seatUpper = IntArray(n) { col -> rayDotColumnSign(model, ray, col) }
             if (seatUpper.all { s -> s == 0 }) return@repeat
             withCert++
 

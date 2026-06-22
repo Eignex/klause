@@ -4,13 +4,14 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.lp.Int128
 import com.eignex.klause.solver.lp.IntegerCertificate
 import com.eignex.klause.solver.lp.LpModel
+import com.eignex.klause.solver.lp.integerFarkasRay
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms (#705: from
- * the revised simplex's exact [ExactBasisCertifier.Certificate], which carries the reduced-cost signs
+ * the integer-multiplier [IntegerCertificate], which carries the reduced-cost signs
  * and dual-weight rows the reasons lean on). Both artifacts share one
  * shape: a set of *premises* — column bounds the certificate leans on — whose negations form clause
  * literals, with the constraint rows kept implicit. Keeping the rows implicit is what makes the
@@ -107,7 +108,7 @@ internal object LpExplanation {
     }
 
     /**
-     * Nogood literals for an infeasibility [ray] (an exact Farkas certificate, [ExactBasisCertifier.farkasRay]),
+     * Nogood literals for an infeasibility [ray] (an exact integer Farkas certificate, [integerFarkasRay]),
      * or null when the certificate touches an auxiliary column, leans on a non-global row with no
      * recorded premises, or is constraint-only (no column premise — nothing to learn). The ray makes
      * `ρ·rhs > Σ_j max(0, ρ·A_j)·u_j`: each structural column with `ρ·A_j > 0` is seated at its upper
@@ -116,11 +117,7 @@ internal object LpExplanation {
      * rows, so the clause `⋁ ¬(premise)` is implied by the problem alone. Every literal is false at the
      * dead node; the engine registers the clause where one can become unassigned (1UIP backjump / restart).
      */
-    fun infeasibilityClause(
-        relaxation: LpRelaxation,
-        ray: LongArray,
-        session: PropagationSession,
-    ): IntArray? {
+    fun infeasibilityClause(relaxation: LpRelaxation, ray: LongArray, session: PropagationSession): IntArray? {
         val model = relaxation.model
         val lits = IntArrayList()
         val seen = IntHashSet()
@@ -130,7 +127,13 @@ internal object LpExplanation {
             val ajAcc = Int128()
             model.forEachInColumn(col) { i, a -> ajAcc.addProduct(ray[i], a) }
             if (ajAcc.overflow) return null // can't determine the premise side ⇒ inexpressible
-            val sign = if (ajAcc.hi == 0L && ajAcc.lo == 0L) 0 else if (ajAcc.isNonNegative()) 1 else -1
+            val sign = if (ajAcc.hi == 0L && ajAcc.lo == 0L) {
+                0
+            } else if (ajAcc.isNonNegative()) {
+                1
+            } else {
+                -1
+            }
             if (sign == 0) continue
             // ρ·A_j > 0 ⇒ the column's upper bound is load-bearing (upper side); < 0 ⇒ lower side.
             when (val lit = premiseLit(relaxation, session, col, lowerSide = sign < 0)) {

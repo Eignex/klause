@@ -6,9 +6,9 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * The integer-multiplier bound ([integerDualLowerBoundCeil]) must be SOUND — never exceeding the exact
- * authoritative bound — and usefully tight. Validated against the rational [ExactBasisCertifier] (the
- * oracle) and the exact LP optimum, the same way [SafeObjectiveBoundTest] checks the float bound.
+ * The integer-multiplier bound ([integerDualLowerBoundCeil]) must be SOUND — never exceeding
+ * `ceil(LP optimum)` — and usefully tight (equal to it on the large majority), the same way
+ * [SafeObjectiveBoundTest] checks the float bound.
  */
 class IntegerDualBoundTest {
 
@@ -24,11 +24,11 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `integer bound is sound and never exceeds the exact certified ceil`() {
+    fun `integer bound is sound and tight against ceil of the LP optimum`() {
         val rng = Random(20260622)
         var total = 0
         var finite = 0
-        var matchesExact = 0
+        var matchesCeil = 0
         repeat(1500) {
             val model = randomModel(rng.nextInt(3, 10), rng.nextInt(3, 10), rng)
             val opt = exactLpOptimum(model)
@@ -38,20 +38,16 @@ class IntegerDualBoundTest {
             val bound = integerDualLowerBoundCeil(model, rev.duals) ?: return@repeat
             finite++
             // Sound: ceil of a valid LP lower bound never exceeds ceil(LP optimum).
+            val ceilOpt = ceil(opt)
             assertTrue(
-                bound.toDouble() <= ceil(opt) + 1e-6,
+                bound.toDouble() <= ceilOpt + 1e-6,
                 "UNSOUND integer bound $bound > ceil(optimum $opt)",
             )
-            // Must never exceed the authoritative rational certifier's ceil (the tight bound).
-            val exact = ExactBasisCertifier.lowerBoundCeil(model, rev.basis)
-            if (exact != null) {
-                assertTrue(bound <= exact, "integer bound $bound exceeded exact certified ceil $exact")
-                if (bound == exact) matchesExact++
-            }
+            // Power-of-two scaling should recover ceil(LP optimum) on the large majority of instances.
+            if (bound.toDouble() in (ceilOpt - 0.5)..(ceilOpt + 0.5)) matchesCeil++
         }
         assertTrue(total > 300, "covered only $total instances")
         assertTrue(finite >= total * 4 / 5, "integer bound was finite on only $finite/$total")
-        // Power-of-two scaling should recover the exact ceil on the large majority of instances.
-        assertTrue(matchesExact >= finite * 2 / 3, "matched the exact ceil on only $matchesExact/$finite")
+        assertTrue(matchesCeil >= finite * 2 / 3, "matched ceil(optimum) on only $matchesCeil/$finite")
     }
 }

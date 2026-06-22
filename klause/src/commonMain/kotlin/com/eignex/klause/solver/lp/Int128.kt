@@ -15,7 +15,7 @@ package com.eignex.klause.solver.lp
  * caller must discard it (keeping the node — sound, only a missed prune).
  *
  * Soundness contract: every operation is exact unless [overflow] latches; callers treat a latched
- * accumulator exactly like the `BigRational` certifier's `null` (no deduction).
+ * accumulator as a failed deduction (no prune / no cut), exactly like a non-finite float bound.
  */
 internal class Int128 {
     /** High 64 bits (signed). */
@@ -103,7 +103,11 @@ internal class Int128 {
     }
 
     /** An independent copy of this value (including the [overflow] latch). */
-    fun copy(): Int128 = Int128().also { it.hi = hi; it.lo = lo; it.overflow = overflow }
+    fun copy(): Int128 = Int128().also {
+        it.hi = hi
+        it.lo = lo
+        it.overflow = overflow
+    }
 
     /** True when the value is `≥ 0` (and [overflow] never latched). The signed-128 sign is the top bit
      *  of [hi], so non-negativity is simply `hi ≥ 0`. */

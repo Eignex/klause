@@ -4,8 +4,8 @@ package com.eignex.klause.solver.lp
  * Overflow-checked exact Long arithmetic for LP relaxation construction (coefficient/right-hand-side
  * assembly) and the integer bound computations. Long is deliberate, not a BigInteger fallback: 64-bit
  * integers keep the inner loops fast, and overflow is detected and raised as [LpOverflowException]
- * rather than silently wrapped (a wrapped coefficient would make the LP bound unsound). The exact
- * BigInt path lives in [ExactBasisCertifier], used only where basis determinants can grow.
+ * rather than silently wrapped (a wrapped coefficient would make the LP bound unsound). Exact
+ * larger-than-64-bit accumulation, where needed, uses the 128-bit [Int128] rather than a bignum.
  */
 
 /** `a` + `b`, or throw [LpOverflowException] on 64-bit overflow. */

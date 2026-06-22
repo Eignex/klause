@@ -8,9 +8,9 @@ import kotlin.math.roundToLong
 /**
  * Integer-multiplier exact lower bound on the minimized objective `cᵀz` — the Kotlin-Multiplatform
  * analogue of CP-SAT's `int128` `PropagateExactLpReason` (#B0). It is the integer-exact twin of the
- * floating-point [safeObjectiveLowerBound]: instead of solving the dual system exactly in rationals
- * (as [ExactBasisCertifier] does) it takes the *approximate* float duals [y], **rounds them to integer
- * multipliers** at a power-of-two scale `2ᵏ`, and evaluates the Lagrangian
+ * floating-point [safeObjectiveLowerBound]: instead of solving the dual system exactly in rationals it
+ * takes the *approximate* float duals [y], **rounds them to integer multipliers** at a power-of-two
+ * scale `2ᵏ`, and evaluates the Lagrangian
  * `L(y) = y·rhs + Σⱼ min_{[0,uⱼ]} dⱼ·zⱼ` exactly with a 128-bit accumulator ([Int128]).
  *
  * Soundness rests on the fact that the slack-form constraints are equalities, so `L(y)` is a valid
@@ -32,10 +32,10 @@ import kotlin.math.roundToLong
 internal fun integerDualLowerBoundCeil(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): Long? =
     integerCertify(model, y, scaleBits)?.objectiveBoundCeil(0L)
 
-/** The integer duals from rounding [y] at the chosen power-of-two scale `2ᵏ`. */
+/** The integer duals from rounding the float duals at the chosen power-of-two scale `2ᵏ`. */
 internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongArray)
 
-/** Round the float duals [y] to integer multipliers at a capped power-of-two scale `2ᵏ`, or null when a
+/** Round the float duals `y` to integer multipliers at a capped power-of-two scale `2ᵏ`, or null when a
  *  dual is non-finite or its scaled value escapes the exactly-representable range (so [roundToLong]
  *  recovers the true nearest integer). Shared by the bound, the [IntegerCertificate], the Farkas ray
  *  and the [integerTableauCuts] aggregation. */
@@ -61,8 +61,8 @@ internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT
 }
 
 /**
- * The integer-multiplier analogue of [ExactBasisCertifier.Certificate]: the LP-optimum data a node
- * deduction needs (objective lower bound, per-column reduced cost, dual-row support), carried as exact
+ * The integer-multiplier LP-optimum data a node deduction needs (objective lower bound, per-column
+ * reduced cost, dual-row support), carried as exact
  * scaled integers from rounded duals at scale `2ᵏ`. Every quantity is a valid deduction for **any**
  * integer multipliers, so rounding only weakens it — never makes it unsound (see [integerCertify]).
  */
@@ -87,7 +87,15 @@ internal class IntegerCertificate(
     fun dualNonzeroRow(row: Int): Boolean = mult[row] != 0L
 
     /** Sign of column [col]'s reduced cost (`-1`/`0`/`+1`). */
-    fun reducedCostSign(col: Int): Int = reduced[col].let { if (it > 0L) 1 else if (it < 0L) -1 else 0 }
+    fun reducedCostSign(col: Int): Int = reduced[col].let {
+        if (it > 0L) {
+            1
+        } else if (it < 0L) {
+            -1
+        } else {
+            0
+        }
+    }
 
     /** `⌈ objective + extraConstant ⌉` as a `Long`, or null when it does not fit (the caller keeps the
      *  node / falls back). [extraConstant] is the relaxation-level objective constant the caller folds in. */
@@ -123,8 +131,8 @@ internal class IntegerCertificate(
 
 /**
  * Certify a node LP optimum from the float duals [y] (e.g. [RevisedSimplex] `duals`), as an
- * [IntegerCertificate] over exact scaled integers — the int128 replacement for
- * [ExactBasisCertifier.certify]. Rounds the duals to integer multipliers and evaluates the Lagrangian
+ * [IntegerCertificate] over exact scaled integers. Rounds the duals to integer multipliers and evaluates
+ * the Lagrangian
  * `L(y) = y·rhs + Σⱼ min_{[0,uⱼ]} dⱼ·zⱼ` and every reduced cost in a 128-bit accumulator. Sound for
  * **any** integer multipliers (the slack-form constraints are equalities), so this never needs the
  * optimal dual; rounding only weakens the bound / reduced costs. Every error path returns null (the
@@ -166,8 +174,8 @@ internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEF
 }
 
 /**
- * Exact Farkas infeasibility certificate as an **integer** ray, the int128 replacement for
- * [ExactBasisCertifier.farkasRay]. [ray] is the float `ρ = B⁻ᵀeᵣ` the dual-unbounded termination
+ * Exact Farkas infeasibility certificate as an **integer** ray. [ray] is the float `ρ = B⁻ᵀeᵣ` the
+ * dual-unbounded termination
  * produced ([RevisedSimplex.infeasibleRay]); it is rounded to integer multipliers and both signs are
  * checked against the exact Farkas condition `ρ·rhs > Σⱼ max(0, ρ·Aⱼ)·uⱼ` in 128-bit arithmetic. The
  * returned integer ray (whichever sign certifies) proves infeasibility for **any** integer ρ, so a

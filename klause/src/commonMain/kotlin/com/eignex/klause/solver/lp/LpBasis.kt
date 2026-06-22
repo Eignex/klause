@@ -26,7 +26,7 @@ internal enum class VarStatus {
 
 /**
  * A basis: the `m` basic variable columns plus the bound each nonbasic variable is pinned to. The
- * float [RevisedSimplex] returns one for exact certification ([ExactBasisCertifier]); because
+ * float [RevisedSimplex] returns one for exact certification ([integerCertify]); because
  * branch-and-bound only tightens bounds, a parent basis stays dual-feasible so a child re-optimizes
  * with a few pivots instead of a cold solve.
  */

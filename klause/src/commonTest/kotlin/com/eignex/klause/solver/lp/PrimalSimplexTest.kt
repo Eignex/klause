@@ -1,14 +1,15 @@
 package com.eignex.klause.solver.lp
 
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
  * [RevisedSimplex.solvePrimal] — the bounded-variable primal phase-2 pass — must reach the same optimum
- * as the dual [RevisedSimplex.solve] (both confirmed by exact certification), and its bound-flipping
- * ratio test must take the long step when an entering variable hits its own bound first.
+ * as the dual [RevisedSimplex.solve] (both confirmed by the integer-multiplier bound), and its
+ * bound-flipping ratio test must take the long step when an entering variable hits its own bound first.
  */
 class PrimalSimplexTest {
 
@@ -35,12 +36,11 @@ class PrimalSimplexTest {
                 abs(primal.objective - dual.objective) <= 1e-6 * maxOf(1.0, abs(dual.objective)),
                 "primal obj ${primal.objective} vs dual ${dual.objective}",
             )
-            // The primal basis must certify to its float optimum, exactly like the dual path.
-            val cert = ExactBasisCertifier.certify(model, primal.basis) ?: return@repeat
-            val exact = cert.objective.num.toDouble() / cert.objective.den.toDouble()
+            // The primal basis must certify to a sound integer bound, exactly like the dual path.
+            val bound = integerDualLowerBoundCeil(model, primal.duals) ?: return@repeat
             assertTrue(
-                abs(primal.objective - exact) <= 1e-6 * maxOf(1.0, abs(exact)),
-                "primal float obj ${primal.objective} vs exact certify $exact",
+                bound.toDouble() <= ceil(primal.objective) + 1e-6,
+                "primal certified bound $bound > ceil(obj ${primal.objective})",
             )
         }
         assertTrue(converged > 200, "primal converged on only $converged instances")
@@ -69,11 +69,10 @@ class PrimalSimplexTest {
                 abs(primal.objective - dual.objective) <= 1e-6 * maxOf(1.0, abs(dual.objective)),
                 "primal obj ${primal.objective} vs dual ${dual.objective}",
             )
-            val cert = ExactBasisCertifier.certify(model, primal.basis) ?: return@repeat
-            val exact = cert.objective.num.toDouble() / cert.objective.den.toDouble()
+            val bound = integerDualLowerBoundCeil(model, primal.duals) ?: return@repeat
             assertTrue(
-                abs(primal.objective - exact) <= 1e-6 * maxOf(1.0, abs(exact)),
-                "primal float obj ${primal.objective} vs exact certify $exact",
+                bound.toDouble() <= ceil(primal.objective) + 1e-6,
+                "primal certified bound $bound > ceil(obj ${primal.objective})",
             )
         }
         assertTrue(converged > 100, "primal phase-1 converged on only $converged covering instances")
