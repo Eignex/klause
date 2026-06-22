@@ -67,6 +67,10 @@ internal class RevisedSimplex(
      *  steepest edge), which usually cuts the pivot count. Pricing is correctness-neutral — any rule
      *  yields the same certified optimum — so this only affects the search path, never the result. */
     private val pricing: SimplexPricing = SimplexPricing.DANTZIG,
+    /** Equilibrate each basis before factorization (power-of-two row scaling, [SparseLu.factorize]) for
+     *  better-conditioned pivoting on badly-scaled models. Transparent — the solve returns the same
+     *  result — so it is correctness-neutral; off by default (parity). */
+    private val scaling: Boolean = false,
 ) {
     private val m = model.m
     private val n = model.n
@@ -155,7 +159,7 @@ internal class RevisedSimplex(
                 nnzB += rs.size
             }
         }
-        val lu = SparseLu.factorize(rows, m) ?: return null
+        val lu = SparseLu.factorize(rows, m, equilibrate = scaling) ?: return null
         // Track LU fill (#27): how much the factorization grows the basis (fill ratio) and how dense
         // it becomes (nnz / m²). If density approaches 1 on real bases, the "sparse" LU is dense.
         if (m > 0 && nnzB > 0) {

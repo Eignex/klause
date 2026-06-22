@@ -1,6 +1,9 @@
 package com.eignex.klause.solver.lp
 
 import kotlin.math.abs
+import kotlin.math.floor
+import kotlin.math.log2
+import kotlin.math.pow
 
 /**
  * Sparse LU factorization `P·B·Q = L·U` of an `m × m` basis, with **Markowitz threshold pivoting**:
@@ -27,16 +30,21 @@ internal class SparseLu private constructor(
     private val uColIdx: Array<IntArray>, // U by column (pivot positions < k, strictly upper)
     private val uColVal: Array<DoubleArray>,
     private val uDiag: DoubleArray,
+    /** Per-original-row equilibration factor `eᵢ` applied before factorization (`L·U = E·B`); all 1.0
+     *  when equilibration is off. [ftran]/[btran]/[determinant] correct for it transparently, so a solve
+     *  returns the same mathematical result as factorizing the unscaled `B` — only more stably. */
+    private val rowScale: DoubleArray,
     /** Total nonzeros in `L` + `U` (incl. diagonal) — the factorization's fill (#27 sparsity audit). */
     val nnz: Int,
 ) {
 
     /** Solve `B x = b` (FTRAN). `b` is indexed by original row; the result by original column. */
     fun ftran(b: DoubleArray): DoubleArray {
-        // L y = P b (forward); rows/cols are in pivot-position space.
+        // B x = b ⟺ (E B) x = E b, so feeding the scaled rhs into the L·U = E·B factors yields the same x.
+        // L y = P (E b) (forward); rows/cols are in pivot-position space.
         val y = DoubleArray(m)
         for (k in 0 until m) {
-            var s = b[perm[k]]
+            var s = b[perm[k]] * rowScale[perm[k]]
             val idx = lRowIdx[k]
             val v = lRowVal[k]
             for (t in idx.indices) s -= v[t] * y[idx[t]]
@@ -77,14 +85,16 @@ internal class SparseLu private constructor(
             for (t in idx.indices) s -= v[t] * w[idx[t]]
             w[k] = s
         }
-        // P x = w  ⇒  x[perm[k]] = w[k].
+        // P x' = w gives x' = innerBtran(b); the true solution of Bᵀx = b is x = E·x' (since
+        // Bᵀ = B_sᵀ E⁻¹), so scale the result by the row factors.  x[perm[k]] = w[k]·e_{perm[k]}.
         val x = DoubleArray(m)
-        for (k in 0 until m) x[perm[k]] = w[k]
+        for (k in 0 until m) x[perm[k]] = w[k] * rowScale[perm[k]]
         return x
     }
 
     /**
-     * `det(B)` in floating point: `sign(P)·sign(Q)·∏ uDiag` (since `P B Q = L U`, `det L = 1`). For an
+     * `det(B)` in floating point: `sign(P)·sign(Q)·∏ uDiag / ∏ eᵢ` — the factors are of `E·B`, so the
+     * row-equilibration product is divided back out (a no-op when equilibration is off). For an
      * integer basis the true determinant is an integer; this float value is only a *guess* of it — the
      * exact dual solve (#34) scales by `round(det)` and verifies the result exactly, so any float error
      * here merely costs a sound failed verification, never a wrong answer.
@@ -92,6 +102,7 @@ internal class SparseLu private constructor(
     fun determinant(): Double {
         var d = permutationSign(perm) * permutationSign(colPerm)
         for (k in 0 until m) d *= uDiag[k]
+        for (i in 0 until m) d /= rowScale[i] // undo the row equilibration (rowScale all 1.0 when off)
         return d
     }
 
@@ -121,9 +132,30 @@ internal class SparseLu private constructor(
         /**
          * Factorize the matrix whose rows are [rows] (`rows[i][col] = B[i][col]`, dense per-row maps),
          * size [m]. Returns null if no numerically acceptable pivot remains (singular basis).
+         *
+         * With [equilibrate], each row is first scaled by a power of two `eᵢ ≈ 1/max|rowᵢ|` so the
+         * largest magnitude in every row lands in `[1, 2)` — better-conditioned pivoting, and exact in
+         * floating point (a power-of-two scale only shifts the exponent, introducing no rounding). The
+         * scale is recorded and undone transparently in [ftran]/[btran]/[determinant], so the solve
+         * returns the same result as factorizing the unscaled matrix.
          */
         @Suppress("NestedBlockDepth", "CyclomaticComplexMethod")
-        fun factorize(rows: Array<HashMap<Int, Double>>, m: Int): SparseLu? {
+        fun factorize(rows: Array<HashMap<Int, Double>>, m: Int, equilibrate: Boolean = false): SparseLu? {
+            val rowScale = DoubleArray(m) { 1.0 }
+            if (equilibrate) {
+                for (i in 0 until m) {
+                    var maxAbs = 0.0
+                    for ((_, value) in rows[i]) {
+                        val a = abs(value)
+                        if (a > maxAbs) maxAbs = a
+                    }
+                    if (maxAbs <= 0.0) continue
+                    val e = 2.0.pow(-floor(log2(maxAbs)).toInt())
+                    if (e == 1.0) continue
+                    rowScale[i] = e
+                    for ((c, value) in HashMap(rows[i])) rows[i][c] = value * e
+                }
+            }
             val u = rows // eliminated in place; u[perm[k]] ends as U's pivot row k (pivot cols ≥ k)
             // L multipliers recorded per elimination step, keyed by the eliminated original row.
             val lAtStep = Array(m) { HashMap<Int, Double>() }
@@ -192,16 +224,17 @@ internal class SparseLu private constructor(
                     }
                 }
             }
-            return freeze(u, lAtStep, perm, colPerm, m)
+            return freeze(u, lAtStep, perm, colPerm, m, rowScale)
         }
 
-        @Suppress("LongMethod")
+        @Suppress("LongMethod", "LongParameterList")
         private fun freeze(
             u: Array<HashMap<Int, Double>>,
             lAtStep: Array<HashMap<Int, Double>>,
             perm: IntArray,
             colPerm: IntArray,
             m: Int,
+            rowScale: DoubleArray,
         ): SparseLu {
             val invPerm = IntArray(m).also { for (k in 0 until m) it[perm[k]] = k }
             val invColPerm = IntArray(m).also { for (k in 0 until m) it[colPerm[k]] = k }
@@ -253,7 +286,7 @@ internal class SparseLu private constructor(
                 m, perm, colPerm, lRowIdx, lRowVal, uRowIdx, uRowVal,
                 Array(m) { lColB[it].toIntArray() }, Array(m) { lColBv[it].toDoubleArray() },
                 Array(m) { uColB[it].toIntArray() }, Array(m) { uColBv[it].toDoubleArray() },
-                uDiag, nnz,
+                uDiag, rowScale, nnz,
             )
         }
     }
