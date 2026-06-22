@@ -33,12 +33,13 @@ internal fun integerDualLowerBoundCeil(model: LpModel, y: DoubleArray, scaleBits
     integerCertify(model, y, scaleBits)?.objectiveBoundCeil(0L)
 
 /** The integer duals from rounding [y] at the chosen power-of-two scale `2ᵏ`. */
-private class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongArray)
+internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongArray)
 
 /** Round the float duals [y] to integer multipliers at a capped power-of-two scale `2ᵏ`, or null when a
  *  dual is non-finite or its scaled value escapes the exactly-representable range (so [roundToLong]
- *  recovers the true nearest integer). Shared by the bound, the [IntegerCertificate] and the Farkas ray. */
-private fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int): RoundedDuals? {
+ *  recovers the true nearest integer). Shared by the bound, the [IntegerCertificate], the Farkas ray
+ *  and the [integerTableauCuts] aggregation. */
+internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): RoundedDuals? {
     val m = model.m
     var maxY = 0.0
     for (i in 0 until m) {
