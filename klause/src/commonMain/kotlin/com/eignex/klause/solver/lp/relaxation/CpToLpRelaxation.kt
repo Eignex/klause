@@ -1373,11 +1373,14 @@ internal class CpToLpRelaxation(
          * `p` whose index value `p + indexOffset` is in `idx`'s declared domain (layout stable across
          * nodes; pinned to 0 when that value left the live domain). Rows: `Σ_p y_p = 1`, index channel
          * `Σ_p (p + off)·y_p = idx`, and result channel `Σ_p arr[p]·y_p = result`. Arrays longer than
-         * [MAX_ELEM] are skipped (the added columns would dominate). Variable arrays are not handled
-         * here — their channel is bilinear, so a sound big-M form is a separate follow-up.
+         * [MAX_ELEM] are skipped (the added columns would dominate). A *variable* array routes to
+         * [buildVarElementHull] (the result channel is then bilinear and needs a big-M form).
          */
         private fun buildElementHull(factor: Element) {
-            if (factor.arrIsVars) return
+            if (factor.arrIsVars) {
+                buildVarElementHull(factor)
+                return
+            }
             val len = factor.arr.size
             if (len > MAX_ELEM) return
             val off = factor.indexOffset
@@ -1483,6 +1486,61 @@ internal class CpToLpRelaxation(
                     // result ≥ xs[i] − M(1 − z_i)  ⇒  xs[i] − result + M·z_i ≤ M.
                     builder.addRow(intArrayOf(xCol, resCol, z), longArrayOf(1L, -1L, m), Relation.LE, m)
                 }
+            }
+        }
+
+        /**
+         * Big-M linearization of one [Element] `result = arr[idx − indexOffset]` over a **variable**
+         * array (#C5). The same one-hot selectors `y_p` and index channel `Σ_p (p + off)·y_p = idx` as
+         * the constant case, but the result channel is bilinear (`arr[p]` is a variable), so it is
+         * relaxed with two big-M rows per position that force `result = arr[p]` when `y_p = 1` and are
+         * slack when `y_p = 0`:
+         *   `result − arr[p] + M_p·y_p ≤ M_p`   and   `arr[p] − result + M_p·y_p ≤ M_p`,
+         * with `M_p = max(rHi, aHi) − min(rLo, aLo)` from the **declared** domains — a global bound on
+         * `|result − arr[p]|`, so the rows hold at every integer solution (sound: never cuts a feasible
+         * point; verified by brute enumeration in the tests). Arrays longer than [MAX_ELEM] are skipped.
+         */
+        private fun buildVarElementHull(factor: Element) {
+            val len = factor.arr.size
+            if (len > MAX_ELEM) return
+            val off = factor.indexOffset
+            val declared = problem.intDomains[factor.idx]
+            val live = session.intDomain(factor.idx)
+            val selCols = IntArrayList()
+            val positions = IntArrayList()
+            for (p in 0 until len) {
+                val idxVal = p + off
+                if (idxVal !in declared) continue
+                selCols.add(auxColumn(0L, if (idxVal in live) 1L else 0L, presence = intArrayOf(factor.idx, idxVal)))
+                positions.add(p)
+            }
+            val k = selCols.size
+            if (k == 0) return
+            builder.addRow(selCols.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L)
+            // Index channel Σ_p (p + off)·y_p − idx = 0.
+            val idxCols = IntArray(k + 1)
+            val idxVals = LongArray(k + 1)
+            for (t in 0 until k) {
+                idxCols[t] = selCols[t]
+                idxVals[t] = (positions[t] + off).toLong()
+            }
+            idxCols[k] = intColumn(factor.idx)
+            idxVals[k] = -1L
+            builder.addRow(idxCols, idxVals, Relation.EQ, 0L)
+            // Per position: two big-M rows tying result to arr[p] when its selector is on.
+            val resCol = intColumn(factor.result)
+            val rDom = problem.intDomains[factor.result]
+            for (t in 0 until k) {
+                val arrVar = factor.arr[positions[t]]
+                val aDom = problem.intDomains[arrVar]
+                val m = maxOf(rDom.max, aDom.max).toLong() - minOf(rDom.min, aDom.min).toLong()
+                if (m < 0L) continue // empty domain — leave that position unconstrained (sound)
+                val arrCol = intColumn(arrVar)
+                val y = selCols[t]
+                // result − arr[p] + M·y_p ≤ M  ⇒  result ≤ arr[p] when y_p = 1, slack otherwise.
+                builder.addRow(intArrayOf(resCol, arrCol, y), longArrayOf(1L, -1L, m), Relation.LE, m)
+                // arr[p] − result + M·y_p ≤ M  ⇒  arr[p] ≤ result when y_p = 1, slack otherwise.
+                builder.addRow(intArrayOf(arrCol, resCol, y), longArrayOf(1L, -1L, m), Relation.LE, m)
             }
         }
 

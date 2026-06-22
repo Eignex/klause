@@ -11,6 +11,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * #22 Element LP linearization: the one-hot selector model for a constant array. It is the exact
@@ -103,9 +104,11 @@ class CpToLpRelaxationElementHullTest {
     }
 
     @Test
-    fun `variable array element adds no selector columns`() {
-        // Variable-array Element is deferred (its result channel is bilinear), so the hull builder
-        // adds nothing: the relaxation has only the objective's result column, no selectors.
+    fun `variable array element builds a sound big-M hull`() {
+        // Variable-array Element is now linearized with a big-M selector hull (#C5): it adds selector
+        // columns + one-hot/index/big-M rows, and the LP bound on `result` is a sound relaxation
+        // bound — never above the true integer optimum.
+        // arr = [v0∈[4,6], v1∈[1,2], v2∈[8,9]], idx∈{0,1,2}, minimize result ⇒ integer min = 1 (idx=1).
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 5, // 0=idx, 1=result, 2..4 = arr vars
@@ -120,14 +123,11 @@ class CpToLpRelaxationElementHullTest {
                 Element(idx = 0, result = 1, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
             ),
         )
-        val r = CpToLpRelaxation(
-            p,
-            LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L, 0L)),
-            elementHull = true,
-        )
-            .build(PropagationSession(p))
-        // Only the objective's result column exists; no selector/index/result-channel columns or rows.
-        assertEquals(1, r.model.n)
-        assertEquals(0, r.model.m)
+        val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L, 0L)))
+        // The hull adds selector columns and the one-hot + index-channel + big-M rows.
+        assertTrue(r.model.n > 1, "selector columns are added")
+        assertTrue(r.model.m >= 3, "one-hot + index channel + per-position big-M rows")
+        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertTrue(sol.objectiveValue <= 1.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum 1")
     }
 }
