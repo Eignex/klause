@@ -8,7 +8,7 @@ import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
 
 /**
- * `min ≤ (#true literals) ≤ max`. Payload at `longPayload(factorId)` is the count of true
+ * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
 class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {

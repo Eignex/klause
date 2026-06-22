@@ -14,7 +14,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 
 /**
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
- * current weighted sum.
+ * current weighted sum. Terms pair [weights] with [literals]; the sum is compared by [op] against
+ * [bound].
  */
 class ReifiedPseudoBoolean(
     override val auxBoolVar: Int,

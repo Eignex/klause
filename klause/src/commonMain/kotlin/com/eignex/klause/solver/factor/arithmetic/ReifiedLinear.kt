@@ -15,7 +15,8 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
  * multi-variable [com.eignex.klause.model.IntCompare] appears non-top-level so the rest of the
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
- * is the current weighted sum, mirrored from [Linear].
+ * is the current weighted sum, mirrored from [Linear]. Terms pair [coeffs] with [vars]; the sum
+ * is compared by [op] against [bound].
  */
 class ReifiedLinear private constructor(
     override val auxBoolVar: Int,

@@ -12,8 +12,9 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntHashSet
 
 /**
- * `Σ weights`i` * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
- * true, 0 when false). Payload at `intPayload(factorId)` is the current weighted sum.
+ * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
+ * true, 0 when false). Payload at `intPayload(factorId)` is the current weighted sum. Terms pair
+ * [weights] with [literals]; the sum is compared by [op] against [bound].
  */
 class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp, val bound: Int) : Factor {
 
