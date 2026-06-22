@@ -52,10 +52,7 @@ class AllDifferentPropagatorTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@ExcludeOnFix.boolVars
-            override val intVars get() = this@ExcludeOnFix.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test
@@ -847,10 +844,7 @@ class AllDifferentPropagatorTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@ExcludeOnFixWithAntecedent.boolVars
-            override val intVars get() = this@ExcludeOnFixWithAntecedent.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =

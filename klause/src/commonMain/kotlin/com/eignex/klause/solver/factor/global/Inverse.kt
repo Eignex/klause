@@ -80,5 +80,5 @@ class Inverse(
         gIndexOf,
     )
 
-    override fun asInvariant(): Invariant = InverseInvariant(boolVars, intVars, f, g, fOffset, gOffset)
+    override fun asInvariant(): Invariant = InverseInvariant(f, g, fOffset, gOffset)
 }

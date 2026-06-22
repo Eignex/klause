@@ -93,5 +93,5 @@ class Subcircuit(
 
     override fun asPropagator(): Propagator = SubcircuitPropagator(boolVars, intVars, succ, n)
 
-    override fun asInvariant(): Invariant = SubcircuitInvariant(boolVars, intVars, succ, n, ::computeCost)
+    override fun asInvariant(): Invariant = SubcircuitInvariant(succ, n, ::computeCost)
 }

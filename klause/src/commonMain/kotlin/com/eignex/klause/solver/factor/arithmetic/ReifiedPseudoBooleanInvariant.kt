@@ -22,8 +22,7 @@ internal class ReifiedPseudoBooleanInvariant(
     private val literals: IntArray,
     private val op: PbOp,
     private val bound: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    private val boolVars: IntArray,
 ) : Invariant {
 
     private val signedByVar: IntIntMap = buildSignedWeightByVar(weights, literals, exclude = auxBoolVar)

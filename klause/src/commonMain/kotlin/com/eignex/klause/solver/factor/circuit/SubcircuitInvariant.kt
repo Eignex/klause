@@ -9,8 +9,6 @@ import com.eignex.klause.util.IntIntMap
 /** LS implementation for [Subcircuit]: violation scoring and move proposal for the optional-cycle
  *  constraint. */
 internal class SubcircuitInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val succ: IntArray,
     private val n: Int,
     private val computeCost: (LocalSearchState, Int, Int) -> Int,

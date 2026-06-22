@@ -12,13 +12,8 @@ class ArrayMinMaxState(
 )
 
 /** LS invariant for [ArrayMinMax]: violation tracking and repair for `result = max/min(xs)`. */
-internal class ArrayMinMaxInvariant(
-    private val result: Int,
-    private val xs: IntArray,
-    private val max: Boolean,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
-) : Invariant {
+internal class ArrayMinMaxInvariant(private val result: Int, private val xs: IntArray, private val max: Boolean) :
+    Invariant {
 
     private fun cmp(a: Int, b: Int): Boolean = if (max) a > b else a < b
 

@@ -17,8 +17,7 @@ internal class ReifiedCardinalityInvariant(
     private val literals: IntArray,
     private val min: Int,
     private val max: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    private val boolVars: IntArray,
 ) : Invariant {
 
     private val signedByVar: IntIntMap

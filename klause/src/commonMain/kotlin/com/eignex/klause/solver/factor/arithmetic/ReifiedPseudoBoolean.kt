@@ -47,5 +47,5 @@ class ReifiedPseudoBoolean(
         ReifiedPseudoBooleanPropagator(auxBoolVar, weights, literals, op, bound, boolVars, intVars)
 
     override fun asInvariant(): Invariant =
-        ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars, intVars)
+        ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars)
 }

@@ -45,10 +45,7 @@ class IntEventWatchTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@StrictLessThan.boolVars
-            override val intVars get() = this@StrictLessThan.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     /** `x ≠ y`, propagating only on assignment: when one side is fixed, carve its value from the
@@ -74,10 +71,7 @@ class IntEventWatchTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@Disequal.boolVars
-            override val intVars get() = this@Disequal.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
@@ -161,10 +155,7 @@ class IntEventWatchTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@WakeCounter.boolVars
-            override val intVars get() = this@WakeCounter.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test

@@ -100,13 +100,14 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
      *  none is eligible. */
     private fun randomHotSpotJump(state: LocalSearchState): Move? {
         if (state.violated.isEmpty()) return null
-        val f = state.factors[state.violated.random(state.rng)]
-        val nInt = f.intVars.size
-        val nBool = f.boolVars.size
+        val fid = state.violated.random(state.rng)
+        val scope = state.problem.factors[fid]
+        val nInt = scope.intVars.size
+        val nBool = scope.boolVars.size
         if (nInt + nBool == 0) return null
         val pick = state.rng.nextInt(nInt + nBool)
         if (pick < nInt) {
-            val v = f.intVars[pick]
+            val v = scope.intVars[pick]
             if (state.assumptions.isFrozenInt(v)) return null
             val d = state.problem.intDomains[v]
             if (d.size <= 1) return null
@@ -114,7 +115,7 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
             if (nv == state.assignment.intValue(v)) return null
             return state.synthesizeChannelingMove(v, nv)
         }
-        val v = f.boolVars[pick - nInt]
+        val v = scope.boolVars[pick - nInt]
         if (state.assumptions.isFrozenBool(v)) return null
         return Move.BoolFlip(v)
     }

@@ -82,7 +82,7 @@ internal fun anchorAndPerturb(
                 } else {
                     repeat(perturbationStrength) {
                         val fid = state.rng.nextInt(numFactors)
-                        val f = state.factors[fid]
+                        val f = state.problem.factors[fid]
                         for (b in f.boolVars) state.assignment.flipBool(b)
                         for (i in f.intVars) {
                             val d = problem.intDomains[i]

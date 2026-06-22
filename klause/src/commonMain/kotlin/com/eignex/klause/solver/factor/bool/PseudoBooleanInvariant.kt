@@ -15,8 +15,7 @@ import com.eignex.klause.util.IntIntMap
 
 /** LS invariant for [PseudoBoolean]: violation scoring and break/make maintenance. */
 internal class PseudoBooleanInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
+    private val boolVars: IntArray,
     private val weights: IntArray,
     private val literals: IntArray,
     private val op: PbOp,

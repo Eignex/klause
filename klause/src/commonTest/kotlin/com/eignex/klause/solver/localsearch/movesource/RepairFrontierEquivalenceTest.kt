@@ -52,7 +52,7 @@ class RepairFrontierEquivalenceTest {
         repeat(minOf(sampleCount, state.violated.size)) {
             if (budget <= 0) return
             val fid = state.violated.random(state.rng)
-            val f = state.factors[fid]
+            val f = state.problem.factors[fid]
             for (v in f.intVars) {
                 for (nf in problem.intOccurrences[v]) {
                     if (nf == fid) continue
@@ -72,7 +72,7 @@ class RepairFrontierEquivalenceTest {
 
     private fun addNeighbourMoves(state: LocalSearchState, sink: MoveSink, nf: Int, budget: Int): Int {
         var b = budget
-        val nfac = state.factors[nf]
+        val nfac = state.problem.factors[nf]
         for (u in nfac.intVars) {
             if (b <= 0) return b
             val cur = state.assignment.intValue(u)

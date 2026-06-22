@@ -8,8 +8,6 @@ import com.eignex.klause.util.IntHashSet
 
 /** LS invariant for [Regular]. Constructed by [Regular.asInvariant]. */
 internal class RegularInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val seq: IntArray,
     private val numStates: Int,
     private val alphabetSize: Int,

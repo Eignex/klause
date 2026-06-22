@@ -32,5 +32,5 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     override fun asPropagator(): Propagator = SortPropagator(boolVars, intVars, xs, ys)
 
-    override fun asInvariant(): Invariant = SortInvariant(boolVars, intVars, xs, ys)
+    override fun asInvariant(): Invariant = SortInvariant(xs, ys)
 }

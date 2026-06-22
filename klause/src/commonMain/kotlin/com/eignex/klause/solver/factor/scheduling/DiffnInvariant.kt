@@ -13,8 +13,6 @@ import com.eignex.klause.solver.localsearch.MoveSink
  * overlapping-pair count, computing deltas using the affected-pair trick.
  */
 internal class DiffnInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val xs: IntArray,
     private val ys: IntArray,
     private val widths: IntArray,

@@ -26,8 +26,6 @@ import kotlin.math.min
  * usage timeline and computes graded overage deltas.
  */
 internal class CumulativeInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val starts: IntArray,
     private val durations: IntArray,
     private val resources: IntArray,

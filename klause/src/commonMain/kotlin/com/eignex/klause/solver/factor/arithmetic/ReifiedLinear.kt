@@ -63,6 +63,5 @@ class ReifiedLinear private constructor(
     override fun asPropagator(): Propagator =
         ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, coeffs, vars, op, bound)
 
-    override fun asInvariant(): Invariant =
-        ReifiedLinearInvariant(auxBoolVar, boolVars, intVars, coeffs, vars, op, bound)
+    override fun asInvariant(): Invariant = ReifiedLinearInvariant(auxBoolVar, coeffs, vars, op, bound)
 }

@@ -8,8 +8,6 @@ import com.eignex.klause.solver.localsearch.MoveSink
 
 /** LS invariant logic for `inverse`. */
 internal class InverseInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val f: IntArray,
     private val g: IntArray,
     private val fOffset: Int,

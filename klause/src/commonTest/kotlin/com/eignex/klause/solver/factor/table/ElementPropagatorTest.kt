@@ -136,10 +136,7 @@ class ElementPropagatorTest {
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
         override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {
-            override val boolVars get() = this@ExcludeOnFix.boolVars
-            override val intVars get() = this@ExcludeOnFix.intVars
-        }
+        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test

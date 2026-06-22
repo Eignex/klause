@@ -36,5 +36,5 @@ class LexLess(
 
     override fun asPropagator(): Propagator = LexLessPropagator(boolVars, intVars, xs, ys, strict)
 
-    override fun asInvariant(): Invariant = LexLessInvariant(boolVars, intVars, xs, ys, strict)
+    override fun asInvariant(): Invariant = LexLessInvariant(xs, ys, strict)
 }

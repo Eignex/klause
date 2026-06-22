@@ -61,5 +61,5 @@ class Clause(val literals: IntArray) : Factor {
 
     override fun asPropagator(): Propagator = ClausePropagator(boolVars, intVars, literals)
 
-    override fun asInvariant(): Invariant = ClauseInvariant(boolVars, intVars, literals)
+    override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals)
 }

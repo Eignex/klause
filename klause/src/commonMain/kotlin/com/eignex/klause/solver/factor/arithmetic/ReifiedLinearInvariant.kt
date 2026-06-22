@@ -14,8 +14,6 @@ import com.eignex.klause.solver.localsearch.MoveSink
 /** LS invariant for [ReifiedLinear]: reified violation tracking and repair. */
 internal class ReifiedLinearInvariant(
     private val auxBoolVar: Int,
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val coeffs: IntArray,
     private val vars: IntArray,
     private val op: LinearOp,
@@ -109,7 +107,7 @@ internal class ReifiedLinearInvariant(
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    /** [boolVars] contains only [auxBoolVar], so a bool flip is always an aux flip. Flipping
+    /** The bool scope contains only [auxBoolVar], so a bool flip is always an aux flip. Flipping
      *  aux always toggles violation (sum unchanged), so the aux's own contribution simply
      *  swaps between break and make. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {

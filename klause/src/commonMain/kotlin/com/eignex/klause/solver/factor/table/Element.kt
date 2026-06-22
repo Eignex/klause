@@ -72,8 +72,6 @@ class Element(
     )
 
     override fun asInvariant(): Invariant = ElementInvariant(
-        boolVars,
-        intVars,
         idx,
         result,
         arr,

@@ -34,7 +34,7 @@ class StallSwaps(
         var attempts = cap * ATTEMPTS_PER_SWAP
         while (budget > 0 && attempts-- > 0) {
             val fid = state.violated.random(rng)
-            val vars = state.factors[fid].intVars
+            val vars = state.problem.factors[fid].intVars
             if (vars.isEmpty()) continue
             val u = vars[rng.nextInt(vars.size)]
             val w = if (vars.size >= 2 && rng.nextBoolean()) {
@@ -42,7 +42,7 @@ class StallSwaps(
             } else {
                 val occ = problem.intOccurrences[u]
                 if (occ.isEmpty()) continue
-                val nvars = state.factors[occ[rng.nextInt(occ.size)]].intVars
+                val nvars = state.problem.factors[occ[rng.nextInt(occ.size)]].intVars
                 if (nvars.isEmpty()) continue
                 nvars[rng.nextInt(nvars.size)]
             }

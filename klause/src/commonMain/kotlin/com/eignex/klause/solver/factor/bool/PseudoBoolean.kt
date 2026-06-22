@@ -31,7 +31,7 @@ class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp,
 
     override fun asPropagator(): Propagator = PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
-    override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, intVars, weights, literals, op, bound)
+    override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 }
 
 /**

@@ -36,5 +36,5 @@ class SymmetricAllDifferent(
 
     override fun asPropagator(): Propagator = SymmetricAllDifferentPropagator(boolVars, intVars, xs, indexOffset)
 
-    override fun asInvariant(): Invariant = SymmetricAllDifferentInvariant(boolVars, intVars, xs, indexOffset)
+    override fun asInvariant(): Invariant = SymmetricAllDifferentInvariant(xs, indexOffset)
 }

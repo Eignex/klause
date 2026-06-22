@@ -186,8 +186,6 @@ class Cumulative(
     )
 
     override fun asInvariant(): Invariant = CumulativeInvariant(
-        boolVars = boolVars,
-        intVars = intVars,
         starts = starts,
         durations = durations,
         resources = resources,

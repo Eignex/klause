@@ -79,8 +79,7 @@ class Regular(
     override fun asPropagator(): Propagator =
         RegularPropagator(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)
 
-    override fun asInvariant(): Invariant =
-        RegularInvariant(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)
+    override fun asInvariant(): Invariant = RegularInvariant(seq, numStates, alphabetSize, transitions, q0, accepting)
 
     /*
      * Pesant's layered-DAG GAC, now reversible and delta-driven (see `RegularIncrementalState`):

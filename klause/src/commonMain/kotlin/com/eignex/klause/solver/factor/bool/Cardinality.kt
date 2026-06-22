@@ -28,7 +28,7 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
 
     override fun asPropagator(): Propagator = CardinalityPropagator(boolVars, intVars, literals, min, max)
 
-    override fun asInvariant(): Invariant = CardinalityInvariant(boolVars, intVars, literals, min, max)
+    override fun asInvariant(): Invariant = CardinalityInvariant(boolVars, literals, min, max)
 
     /** Factory methods for this factor. */
     companion object {

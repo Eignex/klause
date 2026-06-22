@@ -57,5 +57,5 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 
     override fun asPropagator(): Propagator = LinearPropagator(boolVars, intVars, coeffs, vars, op, bound)
 
-    override fun asInvariant(): Invariant = LinearInvariant(boolVars, intVars, coeffs, vars, op, bound)
+    override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
 }

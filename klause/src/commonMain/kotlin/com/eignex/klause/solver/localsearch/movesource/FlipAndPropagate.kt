@@ -46,7 +46,7 @@ class FlipAndPropagate(
         repeat(minOf(cap, state.violated.size)) {
             if (budget <= 0) return
             val fid = state.violated.random(state.rng)
-            val seeds = state.factors[fid].boolVars
+            val seeds = state.problem.factors[fid].boolVars
             if (seeds.isEmpty()) return@repeat
             val seedVar = seeds[state.rng.nextInt(seeds.size)]
             if (state.assumptions.isFrozenBool(seedVar)) return@repeat

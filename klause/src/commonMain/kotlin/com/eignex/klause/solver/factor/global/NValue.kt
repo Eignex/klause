@@ -100,8 +100,6 @@ class NValue(
     }
 
     override fun asInvariant(): Invariant = NValueInvariant(
-        boolVars,
-        intVars,
         n,
         xs,
         mode,

@@ -73,5 +73,5 @@ class Table(
     override fun asPropagator(): Propagator = TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples)
 
     override fun asInvariant(): Invariant =
-        TableInvariant(boolVars, intVars, xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar)
+        TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar)
 }

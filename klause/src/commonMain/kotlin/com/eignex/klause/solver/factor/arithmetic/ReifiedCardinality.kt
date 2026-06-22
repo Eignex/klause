@@ -48,6 +48,5 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
     override fun asPropagator(): Propagator =
         ReifiedCardinalityPropagator(auxBoolVar, literals, min, max, boolVars, intVars)
 
-    override fun asInvariant(): Invariant =
-        ReifiedCardinalityInvariant(auxBoolVar, literals, min, max, boolVars, intVars)
+    override fun asInvariant(): Invariant = ReifiedCardinalityInvariant(auxBoolVar, literals, min, max, boolVars)
 }

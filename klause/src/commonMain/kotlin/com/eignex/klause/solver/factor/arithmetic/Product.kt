@@ -28,5 +28,5 @@ class Product(
 
     override fun asPropagator(): Propagator = ProductPropagator(a, b, result, boolVars, intVars)
 
-    override fun asInvariant(): Invariant = ProductInvariant(a, b, result, boolVars, intVars)
+    override fun asInvariant(): Invariant = ProductInvariant(a, b, result)
 }

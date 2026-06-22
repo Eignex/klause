@@ -7,8 +7,6 @@ import com.eignex.klause.solver.localsearch.MoveSink
 
 /** LS invariant for [Element]. Constructed by [Element.asInvariant]. */
 internal class ElementInvariant(
-    override val boolVars: IntArray,
-    override val intVars: IntArray,
     private val idx: Int,
     private val result: Int,
     private val arr: IntArray,
