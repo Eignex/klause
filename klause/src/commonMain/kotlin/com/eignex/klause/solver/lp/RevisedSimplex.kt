@@ -427,20 +427,31 @@ internal class RevisedSimplex(
         }
         val basis = Basis(basicVar.copyOf(), status.copyOf())
         optimalBasis = basis
+        optimalPrimal = primal
         return FloatLpResult(basis, obj, duals(factor), primal, pivots, maxLuFill, maxLuDensity)
     }
 
     /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
     private var optimalBasis: Basis? = null
 
-    /** Exact Gomory integrality cuts from the last optimal basis (#22), up to [maxCuts]; empty if the
-     *  last solve was not optimal. Exact (rational) tableau rows, so the cuts are rigorously valid. */
-    fun gomoryCuts(maxCuts: Int): List<Cut> =
-        optimalBasis?.let { ExactBasisCertifier.tableauCuts(model, it, maxCuts, mir = false) }.orEmpty()
+    /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
+    private var optimalPrimal: DoubleArray? = null
 
-    /** Exact Gomory mixed-integer (MIR) cuts from the last optimal basis (#22), up to [maxCuts]. */
-    fun mirCuts(maxCuts: Int): List<Cut> =
-        optimalBasis?.let { ExactBasisCertifier.tableauCuts(model, it, maxCuts, mir = true) }.orEmpty()
+    /** Gomory (Chvátal) integrality cuts from the last optimal basis (#22), up to [maxCuts]; empty if the
+     *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
+     *  bits ([integerTableauCuts]), so the cuts are rigorously valid. */
+    fun gomoryCuts(maxCuts: Int): List<Cut> {
+        val basis = optimalBasis ?: return emptyList()
+        val primal = optimalPrimal ?: return emptyList()
+        return integerTableauCuts(model, basis, primal, maxCuts, mir = false)
+    }
+
+    /** Gomory mixed-integer (MIR) cuts from the last optimal basis (#22), up to [maxCuts]. */
+    fun mirCuts(maxCuts: Int): List<Cut> {
+        val basis = optimalBasis ?: return emptyList()
+        val primal = optimalPrimal ?: return emptyList()
+        return integerTableauCuts(model, basis, primal, maxCuts, mir = true)
+    }
 
     /** Seed the basis from a prior [warm] basis; false (⇒ cold start) on a structural mismatch or an
      *  out-of-range column. A singular warm factorization is caught by [solve]'s refactor fallback. */
