@@ -90,6 +90,9 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
 
     /** Implied-bound cuts from the probing implication graph (#D3); a cut family. */
     IMPLIED_BOUND("implied-bound", LpTiming.EXHAUSTIVE),
+
+    /** Single-node flow-cover cuts from VUB / capacity structure (#D1 / #D2); a cut family. */
+    FLOW_COVER("flow-cover", LpTiming.EXHAUSTIVE),
     ;
 
     /** Token lookup and the id listing for spec parsing / help. */

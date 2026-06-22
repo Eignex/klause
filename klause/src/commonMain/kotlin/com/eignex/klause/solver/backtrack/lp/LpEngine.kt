@@ -17,6 +17,7 @@ import com.eignex.klause.solver.lp.cut.CutExchange
 import com.eignex.klause.solver.lp.cut.CutPool
 import com.eignex.klause.solver.lp.cut.CutSeparator
 import com.eignex.klause.solver.lp.cut.CutSharing
+import com.eignex.klause.solver.lp.cut.FlowCoverSeparator
 import com.eignex.klause.solver.lp.cut.GccSeparator
 import com.eignex.klause.solver.lp.cut.ImpliedBoundSeparator
 import com.eignex.klause.solver.lp.cut.KnapsackCoverSeparator
@@ -89,6 +90,7 @@ internal class LpEngine(
                 add(CliqueCutSeparator())
                 add(AggregationMirSeparator())
                 if (params.lpPlan.impliedBoundCuts) add(ImpliedBoundSeparator())
+                if (params.lpPlan.flowCoverCuts) add(FlowCoverSeparator())
                 val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
                 add(AssignmentObjectiveCut(coef))
             }
