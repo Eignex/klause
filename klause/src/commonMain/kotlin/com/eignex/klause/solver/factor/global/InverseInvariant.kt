@@ -18,28 +18,7 @@ internal class InverseInvariant(
     private fun gValueToFIndex(i: Int): Int = i - fOffset
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        var bad = 0
-        for (i in f.indices) {
-            val j = state.assignment.intValue(f[i])
-            val gIdx = fValueToGIndex(j)
-            if (gIdx !in g.indices) {
-                bad++
-                continue
-            }
-            val gVal = state.assignment.intValue(g[gIdx])
-            if (gVal != i + fOffset) bad++
-        }
-        for (i in g.indices) {
-            val j = state.assignment.intValue(g[i])
-            val fIdx = gValueToFIndex(j)
-            if (fIdx !in f.indices) {
-                bad++
-                continue
-            }
-            val fVal = state.assignment.intValue(f[fIdx])
-            if (fVal != i + gOffset) bad++
-        }
-        state.refPayload[factorId] = InverseState(bad)
+        state.refPayload[factorId] = InverseState(countBrokenPairs(state))
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -62,7 +41,7 @@ internal class InverseInvariant(
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
         val s = state.refPayload[factorId] as InverseState
         val before = s.violated
-        s.violated = countViolations(state)
+        s.violated = countBrokenPairs(state)
         return compressViolation(s.violated.toLong(), state.violationSoftCap) -
             compressViolation(before.toLong(), state.violationSoftCap)
     }
@@ -155,7 +134,7 @@ internal class InverseInvariant(
         return true
     }
 
-    private fun countViolations(state: LocalSearchState): Int {
+    private fun countBrokenPairs(state: LocalSearchState): Int {
         var bad = 0
         for (i in f.indices) {
             val j = state.assignment.intValue(f[i])

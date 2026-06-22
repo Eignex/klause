@@ -3,6 +3,8 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
+import com.eignex.klause.solver.factor.bool.internals.buildSignedLitsByVar
+import com.eignex.klause.solver.factor.bool.internals.nonReifiedBoolUpdateBreakMakeLoop
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -17,14 +19,7 @@ internal class CardinalityInvariant(
 ) : Invariant {
 
     /** Signed contribution of each variable to the count, built from [literals]. */
-    private val signedByVar: IntIntMap = run {
-        val signs = HashMap<Int, Int>()
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            signs[v] = (signs[v] ?: 0) + if (Lit.isPositive(lit)) 1 else -1
-        }
-        IntIntMap.build(keys = signs.keys.toIntArray(), values = signs.values.toIntArray(), absent = 0)
-    }
+    private val signedByVar: IntIntMap = buildSignedLitsByVar(literals)
 
     private fun signedForVar(v: Int): Int = signedByVar[v]
 
@@ -173,24 +168,14 @@ internal class CardinalityInvariant(
         ) {
             return
         }
-        for (u in boolVars) {
-            val signedU = signedForVar(u)
-            if (signedU == 0) continue
-            val uPost = state.assignment.boolValue(u)
-            val uPre = if (u == flippedVar) !uPost else uPost
-            val preDelta = signedDelta(oldN, u, uPre, state.violationSoftCap)
-            val postDelta = signedDelta(newN, u, uPost, state.violationSoftCap)
-            val preBreak = preDelta > 0
-            val preMake = preDelta < 0
-            val postBreak = postDelta > 0
-            val postMake = postDelta < 0
-            if (preBreak != postBreak) {
-                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
-            }
-            if (preMake != postMake) {
-                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
-            }
-        }
+        nonReifiedBoolUpdateBreakMakeLoop(
+            state,
+            flippedVar,
+            signedByVar,
+            boolVars,
+            oldN,
+            newN,
+        ) { sum, cap -> cardDegree(sum, cap) }
     }
 
     companion object {

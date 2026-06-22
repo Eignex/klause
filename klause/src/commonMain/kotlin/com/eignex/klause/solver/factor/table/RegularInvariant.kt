@@ -16,72 +16,70 @@ internal class RegularInvariant(
     private val accepting: IntArray,
 ) : Invariant {
 
-    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        val aset = buildAcceptingSet(accepting)
-        return !regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, aset)
+    private val acceptingSet: IntHashSet = buildAcceptingSet(accepting)
+
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        state.factorDegree[factorId] = violationDegree(state, factorId)
     }
 
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
-        val aset = buildAcceptingSet(accepting)
-        return compressViolation(
-            regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, aset) {
+    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+        !regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, acceptingSet)
+
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = compressViolation(
+        regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
+            state.assignment.intValue(seq[it])
+        }.toLong(),
+        state.violationSoftCap,
+    )
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val after = compressViolation(
+            regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
+                val v = seq[it]
+                if (v == intVar) newValue else state.assignment.intValue(v)
+            }.toLong(),
+            state.violationSoftCap,
+        )
+        return after - state.factorDegree[factorId]
+    }
+
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        val newValue = state.assignment.intValue(intVar)
+        if (newValue == oldValue) return 0
+        val after = compressViolation(
+            regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
                 state.assignment.intValue(seq[it])
             }.toLong(),
             state.violationSoftCap,
         )
+        return after - state.factorDegree[factorId]
     }
-
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val aset = buildAcceptingSet(accepting)
-        val before = regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, aset) {
-            state.assignment.intValue(seq[it])
-        }
-        val after = regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, aset) {
-            val v = seq[it]
-            if (v == intVar) newValue else state.assignment.intValue(v)
-        }
-        return compressViolation(after.toLong(), state.violationSoftCap) -
-            compressViolation(before.toLong(), state.violationSoftCap)
-    }
-
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        val aset = buildAcceptingSet(accepting)
-        if (!regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, aset)) {
-            var q = q0
-            for (i in seq.indices) {
-                val s = state.assignment.intValue(seq[i])
-                val next = regularDelta(transitions, numStates, alphabetSize, q, s)
-                if (next == 0) {
-                    val d = state.problem.intDomains[seq[i]]
-                    d.forEach { sym ->
-                        if (sym != s && regularDelta(transitions, numStates, alphabetSize, q, sym) != 0) {
-                            sink.addChannelingIntSet(state, seq[i], sym)
-                        }
-                    }
-                    return
-                }
-                q = next
-            }
-            if (q !in aset && seq.isNotEmpty()) {
-                val last = seq.size - 1
-                var qPrev = q0
-                for (i in 0 until last) {
-                    qPrev = regularDelta(
-                        transitions,
-                        numStates,
-                        alphabetSize,
-                        qPrev,
-                        state.assignment.intValue(seq[i]),
-                    )
-                }
-                val curLast = state.assignment.intValue(seq[last])
-                val d = state.problem.intDomains[seq[last]]
+        if (seq.isEmpty() || regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, acceptingSet)) return
+        val path = IntArray(seq.size + 1)
+        path[0] = q0
+        for (i in seq.indices) {
+            val s = state.assignment.intValue(seq[i])
+            val next = regularDelta(transitions, numStates, alphabetSize, path[i], s)
+            if (next == 0) {
+                val d = state.problem.intDomains[seq[i]]
                 d.forEach { sym ->
-                    val target = regularDelta(transitions, numStates, alphabetSize, qPrev, sym)
-                    if (sym != curLast && target in aset) sink.addChannelingIntSet(state, seq[last], sym)
+                    if (sym != s && regularDelta(transitions, numStates, alphabetSize, path[i], sym) != 0) {
+                        sink.addChannelingIntSet(state, seq[i], sym)
+                    }
                 }
+                return
+            }
+            path[i + 1] = next
+        }
+        if (path[seq.size] !in acceptingSet) {
+            val last = seq.size - 1
+            val curLast = state.assignment.intValue(seq[last])
+            val d = state.problem.intDomains[seq[last]]
+            d.forEach { sym ->
+                val target = regularDelta(transitions, numStates, alphabetSize, path[last], sym)
+                if (sym != curLast && target in acceptingSet) sink.addChannelingIntSet(state, seq[last], sym)
             }
         }
     }

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Invariant
-import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.factor.compressViolation
+import com.eignex.klause.solver.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
@@ -58,23 +58,8 @@ internal class SortInvariant(private val xs: IntArray, private val ys: IntArray)
         }
     }
 
-    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (xs.size < 2) return
-        var emitted = 0
-        var attempts = 0
-        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
-            attempts++
-            val a = xs[state.rng.nextInt(xs.size)]
-            val b = xs[state.rng.nextInt(xs.size)]
-            if (a == b) continue
-            val va = state.assignment.intValue(a)
-            val vb = state.assignment.intValue(b)
-            if (va == vb) continue
-            if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) continue
-            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
-            emitted++
-        }
-    }
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
+        proposeRandomSwaps(state, xs, sink, STRUCTURED_SWAP_CAP, SWAP_ATTEMPT_STRIDE) { _, _ -> true }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         val sortedXs = IntArray(xs.size) { state.assignment.intValue(xs[it]) }.also { it.sort() }

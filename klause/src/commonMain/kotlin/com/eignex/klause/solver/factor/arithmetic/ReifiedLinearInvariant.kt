@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.factor.arithmetic.internals.findCoeff
+import com.eignex.klause.solver.factor.arithmetic.internals.initLinearSum
 import com.eignex.klause.solver.factor.bool.internals.linearDegree
 import com.eignex.klause.solver.factor.bool.internals.linearHolds
 import com.eignex.klause.solver.factor.bool.internals.reifiedDegree
@@ -21,11 +22,7 @@ internal class ReifiedLinearInvariant(
     private val bound: Int,
 ) : Invariant {
 
-    override fun initialize(state: LocalSearchState, factorId: Int) {
-        var sum = 0L
-        for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
-        state.longPayload[factorId] = sum
-    }
+    override fun initialize(state: LocalSearchState, factorId: Int) = initLinearSum(state, factorId, coeffs, vars)
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         state.assignment.boolValue(auxBoolVar) != linearHolds(state.longPayload[factorId], op, bound)

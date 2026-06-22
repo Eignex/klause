@@ -2,32 +2,18 @@ package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.solver.factor.circuit.internals.CpGate
+import com.eignex.klause.solver.factor.circuit.internals.buildSuccWatches
 import com.eignex.klause.solver.factor.circuit.internals.shaveClaimedFromEndpoints
 import com.eignex.klause.solver.factor.circuit.internals.tightenSuccToRange
-import com.eignex.klause.solver.propagation.IntEvent
+import com.eignex.klause.solver.factor.circuit.internals.walkPredChain
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 
 /** CP implementation for [Circuit]: propagation of the Hamiltonian-cycle constraint over successor vars. */
-internal class CircuitPropagator(
-    val boolVars: IntArray,
-    val intVars: IntArray,
-    private val succ: IntArray,
-    private val n: Int,
-) : Propagator {
+internal class CircuitPropagator(private val succ: IntArray, private val n: Int) : Propagator {
 
-    override val initialIntEventWatches: IntArray = run {
-        val distinct = succ.toHashSet()
-        val out = IntArray(distinct.size * IntEvent.COUNT)
-        var w = 0
-        for (v in distinct) {
-            out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-            out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-            out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-            out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-        }
-        out
-    }
+    override val initialIntEventWatches: IntArray = buildSuccWatches(succ)
     override val consumesIntEventDelta: Boolean = true
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
@@ -105,18 +91,10 @@ internal class CircuitPropagator(
             val v = succ[i]
             val d = state.intDomains[v]
             if (d.min == d.max) continue
-            var start = i
-            var chainNodes = 1
-            var cur = i
-            while (true) {
-                val prev = pred[cur]
-                if (prev == -1) break
-                if (prev == start) return false
-                start = prev
-                chainNodes++
-                cur = prev
-                if (chainNodes > n) return false
-            }
+            val c = walkPredChain(pred, i, n)
+            if (c.cycleDetected) return false
+            val start = c.head
+            val chainNodes = c.length
             if (chainNodes == n) {
                 if (start !in d) return false
                 if (!state.tightenIntMin(v, start, ant)) return false
@@ -132,9 +110,5 @@ internal class CircuitPropagator(
             }
         }
         return true
-    }
-
-    private class CpGate {
-        var started: Boolean = false
     }
 }

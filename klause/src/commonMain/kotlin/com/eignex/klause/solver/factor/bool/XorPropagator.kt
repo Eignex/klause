@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.CoeffLookup
+import com.eignex.klause.solver.factor.bool.internals.buildParityByVar
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntHashSet
 
@@ -15,15 +16,7 @@ internal class XorPropagator(
 ) : Propagator {
 
     /** Per-var parity contribution: precomputed `(occurrences in `literals`) and 1` per `boolVar`. */
-    private val parityByVar: CoeffLookup = run {
-        val parities = IntArray(boolVars.size)
-        for (i in boolVars.indices) {
-            var n = 0
-            for (lit in literals) if (Lit.variable(lit) == boolVars[i]) n++
-            parities[i] = n and 1
-        }
-        CoeffLookup.build(boolVars, parities)
-    }
+    private val parityByVar: CoeffLookup = buildParityByVar(boolVars, literals)
 
     private fun parityOf(v: Int): Int = parityByVar.coeffOf(v)
 

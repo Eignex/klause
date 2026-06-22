@@ -91,7 +91,7 @@ class Subcircuit(
         return abs(scan.numCycles - 1) + (numIncluded - scan.nodesInCycles) + numPointToExcluded + numOob
     }
 
-    override fun asPropagator(): Propagator = SubcircuitPropagator(boolVars, intVars, succ, n)
+    override fun asPropagator(): Propagator = SubcircuitPropagator(succ, n)
 
     override fun asInvariant(): Invariant = SubcircuitInvariant(succ, n, ::computeCost)
 }

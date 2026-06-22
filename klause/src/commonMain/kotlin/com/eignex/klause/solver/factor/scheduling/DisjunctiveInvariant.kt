@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.factor.scheduling
 
 import com.eignex.klause.solver.Invariant
-import com.eignex.klause.solver.Move
+import com.eignex.klause.solver.factor.scheduling.internals.firstInDomainAtLeast
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.argsortByIntKey
@@ -48,30 +48,10 @@ internal class DisjunctiveInvariant(
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
-    /** Feasibility-preserving neighbourhood: swap the start times of two **equal-duration** tasks.
-     *  The pair of occupied intervals `{[s_i, s_i+d), [s_j, s_j+d)}` is exactly preserved (each task
-     *  takes the other's slot), so the no-overlap relation with every other task is untouched — only
-     *  which task sits in which slot changes. Restricted to the non-optional form. */
-    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (presents.isNotEmpty() || starts.size < 2) return
-        var emitted = 0
-        var attempts = 0
-        while (emitted < DISJUNCTIVE_STRUCTURED_SWAP_CAP &&
-            attempts < DISJUNCTIVE_STRUCTURED_SWAP_CAP * DISJUNCTIVE_SWAP_ATTEMPT_STRIDE
-        ) {
-            attempts++
-            val i = state.rng.nextInt(starts.size)
-            val j = state.rng.nextInt(starts.size)
-            if (i == j || starts[i] == starts[j]) continue
-            if (durationOf(state, i) != durationOf(state, j)) continue
-            val si = state.assignment.intValue(starts[i])
-            val sj = state.assignment.intValue(starts[j])
-            if (si == sj) continue
-            if (sj !in state.problem.intDomains[starts[i]] || si !in state.problem.intDomains[starts[j]]) continue
-            sink.addCompound(listOf(Move.IntSet(starts[i], sj), Move.IntSet(starts[j], si)))
-            emitted++
-        }
-    }
+    /** Feasibility-preserving neighbourhood: delegates to the unit-capacity [CumulativeInvariant] backing,
+     *  which swaps equal-duration, equal-resource (unit) task pairs. */
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
+        cumulativeBacking.proposeStructuredMoves(state, factorId, sink)
 
     /** Feasible init: left-pack the tasks in earliest-start order, each placed at the first
      *  in-domain time at or after the previous task's end so no two overlap. Returns false —
@@ -91,7 +71,7 @@ internal class DisjunctiveInvariant(
                 prevEnd = s + dur
             } else {
                 val cand = max(state.problem.intDomains[v].min, prevEnd)
-                val s = firstInDomainAtLeast(state, v, cand) ?: return false
+                val s = firstInDomainAtLeast(state.problem.intDomains[v], cand) ?: return false
                 state.assignment.setInt(v, s)
                 prevEnd = s + dur
             }
@@ -102,16 +82,4 @@ internal class DisjunctiveInvariant(
     /** Current duration of task [i]: the constant, or the duration variable's value. */
     private fun durationOf(state: LocalSearchState, i: Int): Int =
         if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
-
-    /** Smallest value in [varId]'s domain that is ≥ [lo], or null if none. */
-    private fun firstInDomainAtLeast(state: LocalSearchState, varId: Int, lo: Int): Int? {
-        val d = state.problem.intDomains[varId]
-        if (lo > d.max) return null
-        var pick = -1
-        d.forEach { if (pick < 0 && it >= lo) pick = it }
-        return if (pick < 0) null else pick
-    }
 }
-
-private const val DISJUNCTIVE_STRUCTURED_SWAP_CAP: Int = 4
-private const val DISJUNCTIVE_SWAP_ATTEMPT_STRIDE: Int = 8

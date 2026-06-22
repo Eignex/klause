@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.scheduling.internals.applyCumulativeDurDe
 import com.eignex.klause.solver.factor.scheduling.internals.applyCumulativeResDelta
 import com.eignex.klause.solver.factor.scheduling.internals.applyCumulativeStartDelta
 import com.eignex.klause.solver.factor.scheduling.internals.cumulativeCapacityDelta
+import com.eignex.klause.solver.factor.scheduling.internals.firstInDomainAtLeast
 import com.eignex.klause.solver.factor.scheduling.internals.simulateCumulativeDurDelta
 import com.eignex.klause.solver.factor.scheduling.internals.simulateCumulativeResDelta
 import com.eignex.klause.solver.factor.scheduling.internals.simulateCumulativeStartDelta
@@ -377,10 +378,7 @@ internal class CumulativeInvariant(
             } else {
                 val d = state.problem.intDomains[v]
                 val cand = max(d.min, prevEnd)
-                if (cand > d.max) return false
-                var s = -1
-                d.forEach { if (s < 0 && it >= cand) s = it }
-                if (s < 0) return false
+                val s = firstInDomainAtLeast(d, cand) ?: return false
                 state.assignment.setInt(v, s)
                 prevEnd = s + dur
             }

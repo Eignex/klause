@@ -85,7 +85,7 @@ class Circuit(
         return abs(scan.numCycles - 1) + (n - scan.nodesInCycles) + numSelfLoops + numOob
     }
 
-    override fun asPropagator(): Propagator = CircuitPropagator(boolVars, intVars, succ, n)
+    override fun asPropagator(): Propagator = CircuitPropagator(succ, n)
 
     override fun asInvariant(): Invariant = CircuitInvariant(succ, n, ::computeCost)
 }

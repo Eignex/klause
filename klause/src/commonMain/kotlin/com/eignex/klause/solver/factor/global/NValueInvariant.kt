@@ -4,6 +4,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.compressViolation
+import com.eignex.klause.solver.factor.global.internals.countPresentOccurrences
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntHashSet
@@ -57,8 +58,7 @@ internal class NValueInvariant(
         if (cur == oldValue) return 0
         val nBefore = if (intVar == n) oldValue else state.assignment.intValue(n)
         val beforeDeg = nvDegree(s.distinctCount, nBefore)
-        var occurrences = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentNvInvFn(state, i)) occurrences++
+        val occurrences = countPresentOccurrences(xs, intVar, state) { st, i -> presentNvInvFn(st, i) }
         if (occurrences > 0) {
             val oldCount = s.counts.getOrDefault(oldValue, 0)
             val after = oldCount - occurrences
@@ -231,8 +231,7 @@ internal class NValueInvariant(
     }
 
     private fun simulateDistinct(state: LocalSearchState, s: NValueState, intVar: Int, newValue: Int): Int {
-        var occurrences = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentNvInvFn(state, i)) occurrences++
+        val occurrences = countPresentOccurrences(xs, intVar, state) { st, i -> presentNvInvFn(st, i) }
         if (occurrences == 0) return s.distinctCount
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return s.distinctCount
