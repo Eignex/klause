@@ -4,15 +4,6 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.lp.cut.Cut
 import kotlin.math.abs
 
-/** Dual-simplex leaving-variable pricing rule (correctness-neutral; affects pivot count only). */
-internal enum class SimplexPricing {
-    /** Most-violated basic bound (Dantzig). */
-    DANTZIG,
-
-    /** Devex reference-weight pricing (approximate dual steepest edge). */
-    DEVEX,
-}
-
 /**
  * Result of a [RevisedSimplex] solve: the optimal [basis] (to warm-start or exactly certify), the
  * float objective, and the dual vector `y` (one per row) used by the Neumaier–Shcherbina safe
@@ -54,30 +45,13 @@ internal class RevisedSimplex(
     private val model: LpModel,
     private val cancellation: Cancellation = Cancellation.Never,
     private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
-    /** Use the long-step bound-flipping ratio test in the dual entering selection; false reproduces the
-     *  plain minimum-ratio test (the parity baseline). */
-    private val boundFlip: Boolean = true,
-    /** Harris two-pass ratio test: among the entering candidates whose ratio is within a tolerance of
-     *  the minimum, pick the one with the largest pivot magnitude (numerical stability), rather than the
-     *  strict minimum-ratio column. Correctness-neutral — the chosen column is still dual-eligible and
-     *  the basis is certified downstream — so it only changes the pivot path. Off by default (parity). */
-    private val harris: Boolean = false,
-    /** Leaving-variable pricing rule. [SimplexPricing.DANTZIG] (default) picks the most-violated basic
-     *  bound; [SimplexPricing.DEVEX] weights each violation by a Devex reference norm (approximate dual
-     *  steepest edge), which usually cuts the pivot count. Pricing is correctness-neutral — any rule
-     *  yields the same certified optimum — so this only affects the search path, never the result. */
-    private val pricing: SimplexPricing = SimplexPricing.DANTZIG,
-    /** Equilibrate each basis before factorization (power-of-two row scaling, [SparseLu.factorize]) for
-     *  better-conditioned pivoting on badly-scaled models. Transparent — the solve returns the same
-     *  result — so it is correctness-neutral; off by default (parity). */
-    private val scaling: Boolean = false,
 ) {
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
 
     /** Devex reference weights γ_i per basic row position (approximate ‖B⁻ᵀeᵢ‖²); all 1 at a fresh
-     *  reference frame, reset on every refactorization. Only read/written under [SimplexPricing.DEVEX]. */
+     *  reference frame, reset on every refactorization. */
     private val gamma = DoubleArray(m) { 1.0 }
 
     // Sparse CSC of the structural columns; slack column n+i is the unit vector e_i (implicit).
@@ -164,7 +138,7 @@ internal class RevisedSimplex(
                 nnzB += rs.size
             }
         }
-        val lu = SparseLu.factorize(rows, m, equilibrate = scaling) ?: return null
+        val lu = SparseLu.factorize(rows, m, equilibrate = true) ?: return null
         // Track LU fill (#27): how much the factorization grows the basis (fill ratio) and how dense
         // it becomes (nnz / m²). If density approaches 1 on real bases, the "sparse" LU is dense.
         if (m > 0 && nnzB > 0) {
@@ -180,9 +154,9 @@ internal class RevisedSimplex(
     private fun duals(factor: EtaBasis): DoubleArray =
         factor.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
 
-    /** Reset the Devex reference weights to 1 (a no-op under [SimplexPricing.DANTZIG]). */
+    /** Reset the Devex reference weights to 1 (a fresh reference frame). */
     private fun resetGamma() {
-        if (pricing == SimplexPricing.DEVEX) for (i in 0 until m) gamma[i] = 1.0
+        for (i in 0 until m) gamma[i] = 1.0
     }
 
     /**
@@ -248,9 +222,9 @@ internal class RevisedSimplex(
                 }
             }
             val beta = factor.ftran(rhsAdj)
-            // Leaving: the most infeasible basic bound, scored by the pricing rule. Dantzig maximises the
-            // raw violation; Devex maximises violation² / γ_i (approximate dual steepest edge). `worst`
-            // keeps the *raw* violation of the chosen row for the bound-flipping ratio test.
+            // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
+            // dual steepest edge). `worst` keeps the *raw* violation of the chosen row for the
+            // bound-flipping ratio test.
             var r = -1
             var bestScore = 0.0
             var worst = 0.0
@@ -262,7 +236,7 @@ internal class RevisedSimplex(
                 val isBelow = below >= above
                 val viol = if (isBelow) below else above
                 if (viol <= TOL) continue
-                val score = if (pricing == SimplexPricing.DEVEX) viol * viol / gamma[i] else viol
+                val score = viol * viol / gamma[i]
                 if (score > bestScore) {
                     bestScore = score
                     r = i
@@ -307,7 +281,7 @@ internal class RevisedSimplex(
             denseColumn(q, aq)
             val alpha = factor.ftran(aq) // spike η = B⁻¹ A_q in the pre-pivot factorization
             if (abs(alpha[r]) < TOL) return null // numerically singular pivot
-            if (pricing == SimplexPricing.DEVEX) updateGamma(alpha, r)
+            updateGamma(alpha, r)
             status[basicVar[r]] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
             basicVar[r] = q
             status[q] = VarStatus.BASIC
@@ -326,29 +300,20 @@ internal class RevisedSimplex(
 
     /**
      * Pick the dual entering variable from the eligible set [elig] (ratios in [ratioBuf], pivot-row
-     * coefficients in [pivotRowEntry]). The plain rule takes the minimum ratio. The bound-flipping long
-     * step ([boundFlip]) instead walks the eligible breakpoints in ratio order, flipping each bounded
-     * nonbasic whose breakpoint is passed — accumulating `|a_j|·u_j` toward the leaving variable's
-     * violation [delta] — until that capacity covers the violation or an unbounded column is reached;
-     * that column enters. It tends to pick a larger pivot magnitude and clears more infeasibility per
-     * iteration. Mutates [status] for the flips; sound regardless, since the basis is certified downstream.
+     * coefficients in [pivotRowEntry]). The bound-flipping long step walks the eligible breakpoints in
+     * ratio order, flipping each bounded nonbasic whose breakpoint is passed — accumulating `|a_j|·u_j`
+     * toward the leaving variable's violation [delta] — until that capacity covers the violation or an
+     * unbounded column is reached; that column enters. Among the contiguous ratio-cluster within
+     * [HARRIS_TOL] of the stopping ratio (all valid entering choices) it takes the largest pivot
+     * magnitude (Harris, numerical stability). Mutates [status] for the flips; sound regardless, since
+     * the basis is certified downstream.
      */
-    @Suppress("CyclomaticComplexMethod")
     private fun chooseEntering(
         elig: ArrayList<Int>,
         ratioBuf: DoubleArray,
         pivotRowEntry: DoubleArray,
         delta: Double,
     ): Int {
-        if (!boundFlip) {
-            var q = elig[0]
-            for (idx in 1 until elig.size) {
-                val j = elig[idx]
-                if (ratioBuf[j] < ratioBuf[q]) q = j
-            }
-            // Harris pass 2: keep the largest-pivot column among those within tolerance of the min ratio.
-            return if (harris) mostStableWithinTol(elig, ratioBuf, pivotRowEntry, ratioBuf[q]) else q
-        }
         elig.sortBy { ratioBuf[it] }
         var acc = 0.0
         for (idx in elig.indices) {
@@ -362,7 +327,6 @@ internal class RevisedSimplex(
             } else {
                 // The long step stops at column j (ratio θ). Harris: among the contiguous ratio-cluster
                 // [idx..] within tolerance of θ — all valid entering choices — take the largest pivot.
-                if (!harris) return j
                 val theta = ratioBuf[j]
                 var best = j
                 var bestMag = abs(pivotRowEntry[j])
@@ -380,28 +344,6 @@ internal class RevisedSimplex(
             }
         }
         return elig[elig.size - 1] // defensive: the loop returns on the last element
-    }
-
-    /** Harris pass 2 for the plain min-ratio path: among [elig] whose ratio is within [HARRIS_TOL] of
-     *  [minRatio], the column with the largest pivot magnitude (most numerically stable). */
-    private fun mostStableWithinTol(
-        elig: ArrayList<Int>,
-        ratioBuf: DoubleArray,
-        pivotRowEntry: DoubleArray,
-        minRatio: Double,
-    ): Int {
-        var best = elig[0]
-        var bestMag = -1.0
-        for (idx in elig.indices) {
-            val j = elig[idx]
-            if (ratioBuf[j] > minRatio + HARRIS_TOL) continue
-            val mag = abs(pivotRowEntry[j])
-            if (mag > bestMag) {
-                bestMag = mag
-                best = j
-            }
-        }
-        return best
     }
 
     private fun optimal(beta: DoubleArray, factor: EtaBasis): FloatLpResult {

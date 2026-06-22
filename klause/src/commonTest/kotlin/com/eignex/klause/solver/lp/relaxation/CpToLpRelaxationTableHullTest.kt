@@ -44,14 +44,15 @@ class CpToLpRelaxationTableHullTest {
 
     @Test
     fun `hull minimizes a linear objective over the allowed tuples`() {
-        // minimize x0 + x1 over {(0,5),(2,2),(4,0)} -> (2,2) wins with value 4.
+        // minimize x0 + x1 over {(0,5),(2,2),(4,0)} -> value 4, achieved on the (2,2)–(4,0) face (a tie),
+        // so assert the invariant optimum and that the point sits on that optimal face (x0 + x1 = 4)
+        // rather than a specific degenerate vertex (which the pivot path may pick either end of).
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 5))
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 1L)))
 
         assertEquals(LpStatus.OPTIMAL, sol.status)
         assertEquals(4.0, sol.objectiveValue, eps)
-        assertEquals(2.0, sol.primal(intCol(r, 0)), eps)
-        assertEquals(2.0, sol.primal(intCol(r, 1)), eps)
+        assertEquals(4.0, sol.primal(intCol(r, 0)) + sol.primal(intCol(r, 1)), eps)
     }
 
     @Test

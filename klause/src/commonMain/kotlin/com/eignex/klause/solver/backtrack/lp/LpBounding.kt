@@ -11,7 +11,6 @@ import com.eignex.klause.solver.lp.IntegerCertificate
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.RevisedSimplex
-import com.eignex.klause.solver.lp.SimplexPricing
 import com.eignex.klause.solver.lp.VarStatus
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.cut.Cut
@@ -73,16 +72,11 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
     Long.MIN_VALUE
 }
 
-/** A [RevisedSimplex] over [model] using the engine's configured leaving-variable pricing (#B1):
- *  Devex when [LpPlan.devexPricing] is set, else the default Dantzig rule. Pricing is correctness-
- *  neutral, so this never changes the result — only the pivot path. */
-private fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): RevisedSimplex = RevisedSimplex(
-    model,
-    cancellation,
-    harris = params.lpPlan.harris,
-    pricing = if (params.lpPlan.devexPricing) SimplexPricing.DEVEX else SimplexPricing.DANTZIG,
-    scaling = params.lpPlan.scaling,
-)
+/** A [RevisedSimplex] over [model]. The simplex always uses Devex pricing, the Harris two-pass ratio
+ *  test, the bound-flipping long step and basis equilibration — all correctness-neutral (they change
+ *  only the pivot path / conditioning, never the certified optimum). */
+private fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): RevisedSimplex =
+    RevisedSimplex(model, cancellation)
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */

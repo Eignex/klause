@@ -368,15 +368,12 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `aggressive enables the new parity techniques and correctness-neutral knobs`() {
-        // ArrayMinMax ⇒ lin-max tight face (#C3); the correctness-neutral engine knobs ride along
-        // whenever LP bounding is active (they change only the pivot path / certificate, not the optimum).
+    fun `aggressive enables the new parity techniques`() {
+        // ArrayMinMax ⇒ lin-max tight face (#C3). (The simplex always uses Devex / Harris / scaling /
+        // bound-flip internally — they are no longer plan knobs.)
         val mm = LpAutoConfig.recommend(problem(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
         assertTrue(mm.lpPlan.bounding)
         assertTrue(mm.lpPlan.linMaxTightFace)
-        assertTrue(mm.lpPlan.devexPricing)
-        assertTrue(mm.lpPlan.harris)
-        assertTrue(mm.lpPlan.scaling)
 
         // Product ⇒ McCormick envelope (#C4).
         val prod = LpAutoConfig.recommend(problem(Product(a = 0, b = 1, result = 2)))
