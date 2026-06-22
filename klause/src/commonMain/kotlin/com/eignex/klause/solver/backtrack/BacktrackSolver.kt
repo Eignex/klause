@@ -16,6 +16,7 @@ import com.eignex.klause.solver.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.solver.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.solver.backtrack.lp.rootLpRelaxationBound
 import com.eignex.klause.solver.backtrack.lp.shaveObjectiveLb
+import com.eignex.klause.solver.backtrack.lp.shaveVariableBounds
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.objective.LinearObjective
@@ -539,6 +540,15 @@ class BacktrackSolver(override val problem: Problem) :
                         lpEngine.shaveObjectiveLb(obj.varId, obj.ascending, rootToken)?.let { lb ->
                             session.implyIntAtLeast(obj.varId, lb)
                         }
+                    }
+                }
+                // Variable shaving (#E3): tighten integer domains the LP + propagation prove cannot reach
+                // their declared bounds. Sound — each tightening is a proof — so applying it to the root
+                // session only strengthens pruning.
+                if (lpEngine.params.lpPlan.variableShaving) {
+                    for (sb in lpEngine.shaveVariableBounds(rootToken)) {
+                        session.implyIntAtLeast(sb.varId, sb.lo)
+                        session.implyIntAtMost(sb.varId, sb.hi)
                     }
                 }
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound

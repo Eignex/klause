@@ -119,4 +119,59 @@ class ObjectiveShavingTest {
         }
         assertTrue(covered > 50, "shaving engaged on only $covered instances")
     }
+
+    @Test
+    fun `randomized variable shaving never excludes a feasible value`() {
+        val rng = Random(20260625)
+        var shaved = 0
+        repeat(300) { _ ->
+            val n = rng.nextInt(2, 4)
+            val hi = rng.nextInt(2, 5)
+            val domains = Array(n) { IntDomain(0, hi) }
+            val factors = ArrayList<Factor>()
+            repeat(rng.nextInt(1, 4)) { _ ->
+                val coeffs = LongArray(n) { rng.nextInt(-2, 3).toLong() }
+                if (coeffs.all { it == 0L }) return@repeat
+                val rel = if (rng.nextBoolean()) LinearOp.LE else LinearOp.GE
+                val rhs = rng.nextInt(-hi, hi * n + 1)
+                factors.add(Linear(coeffs.map { it.toInt() }.toIntArray(), IntArray(n) { it }, rel, rhs))
+            }
+            val p = Problem(0, n, domains, factors.toTypedArray())
+            val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
+            val params = BacktrackParams(lpPlan = LpPlan(bounding = true))
+            val engine = LpEngine(p, obj, params, SolveStatsSink(backend = "shave"))
+            val bounds = engine.shaveVariableBounds(Cancellation.Never)
+            if (bounds.isEmpty()) return@repeat
+            shaved++
+            // Brute force: every shaved [lo, hi] must contain every feasible value of that variable.
+            val point = IntArray(n)
+            fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
+                var s = 0L
+                for (i in f.vars.indices) s += f.coeffs[i].toLong() * point[f.vars[i]]
+                when (f.op) {
+                    LinearOp.LE -> s <= f.bound
+                    LinearOp.GE -> s >= f.bound
+                    else -> true
+                }
+            }
+            fun rec(idx: Int) {
+                if (idx == n) {
+                    if (!feasible()) return
+                    for (b in bounds) {
+                        assertTrue(
+                            point[b.varId] in b.lo..b.hi,
+                            "variable shaving excluded feasible x${b.varId}=${point[b.varId]} from [${b.lo},${b.hi}]",
+                        )
+                    }
+                    return
+                }
+                for (v in 0..hi) {
+                    point[idx] = v
+                    rec(idx + 1)
+                }
+            }
+            rec(0)
+        }
+        assertTrue(shaved > 0, "variable shaving never engaged across 300 instances")
+    }
 }

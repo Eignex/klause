@@ -270,6 +270,13 @@ data class LpPlan(
      */
     val objectiveShaving: Boolean = false,
     /**
+     * Variable shaving (#E3): before search, probe each integer variable's domain bounds — assume
+     * `v ≤ lo` (resp. `v ≥ hi`) and, if the LP relaxation + propagation prove that infeasible, tighten
+     * the bound inward. Sound (every tightening is a proof that the shaved-off values are infeasible).
+     * Requires [bounding]; costs probes per variable, so off by default.
+     */
+    val variableShaving: Boolean = false,
+    /**
      * Add the Anderson big-M tight face of each [com.eignex.klause.solver.factor.arithmetic.ArrayMinMax]
      * on top of the envelope (#C3), bounding the extremum from the tight side. Sound relaxation; gated.
      * Off by default.

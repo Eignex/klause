@@ -143,6 +143,46 @@ internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, to
     return improved
 }
 
+/** A proven-tighter domain for an integer variable from variable shaving: `varId ∈ [lo, hi]`. */
+internal class ShavedBound(val varId: Int, val lo: Int, val hi: Int)
+
+/**
+ * Variable shaving (#E3, CP-SAT's `VariablesShavingSolver`): tighten integer variables' domain bounds
+ * by probing. For each variable assume `v ≤ lo` (resp. `v ≥ hi`) and, if the sound propagation + LP
+ * relaxation proves that infeasible (`pruneNode` at an *infinite* incumbent, firing only on genuine
+ * infeasibility), raise `lo` (lower `hi`). Returns the variables whose declared bounds shaved inward,
+ * for the caller to apply to the root. **Sound:** each tightening is backed by a proof that the
+ * shaved-off values are infeasible. Bounded by [SHAVE_MAX_ITERS] total probes across all variables.
+ */
+internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound> {
+    if (lpRelaxer == null) return emptyList()
+    val root = PropagationSession(problem)
+    if (root.isUnsatAtRoot) return emptyList()
+    val out = ArrayList<ShavedBound>()
+    var probes = 0
+    for (v in 0 until problem.numIntVars) {
+        if (probes >= SHAVE_MAX_ITERS || token()) break
+        val d = root.intDomain(v)
+        var lo = d.min
+        var hi = d.max
+        if (lo >= hi) continue
+        while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, lo, atMost = true)) lo += 1
+        while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, hi, atMost = false)) hi -= 1
+        if (lo != d.min || hi != d.max) out.add(ShavedBound(v, lo, hi))
+    }
+    return out
+}
+
+/** Whether a fresh root with `v ≤ bound` (or `v ≥ bound` when not [atMost]) is provably infeasible —
+ *  propagation Unsat, or an LP infeasibility at an infinite incumbent (so `pruneNode` fires only on a
+ *  genuine infeasibility). Sound: a true result proves every solution lies strictly past [bound]. */
+private fun LpEngine.infeasibleUnder(v: Int, bound: Int, atMost: Boolean): Boolean {
+    val s = PropagationSession(problem)
+    if (s.isUnsatAtRoot) return false
+    val assumed = if (atMost) s.implyIntAtMost(v, bound) else s.implyIntAtLeast(v, bound)
+    return assumed is PropagationResult.Unsat || pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
+}
+
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
