@@ -80,13 +80,65 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `a pseudo-boolean knapsack contributes no clique`() {
+    fun `a knapsack whose weights cannot pairwise exceed the bound contributes no clique`() {
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2)),
+        )
+        assertTrue(Presolve.amoCliques(problem).isEmpty())
+    }
+
+    @Test
+    fun `a knapsack whose every pair exceeds the bound yields an at-most-one clique`() {
+        // x0 + x1 <= 1 is exactly at-most-one over {x0, x1}.
         val problem = Problem(
             2,
             0,
             emptyArray(),
             listOf(PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 1)),
         )
-        assertTrue(Presolve.amoCliques(problem).isEmpty())
+        assertEquals(listOf(setOf(pos(0), pos(1))), Presolve.amoCliques(problem))
+    }
+
+    @Test
+    fun `a knapsack yields a clique only over the large-weight literals whose pairs exceed the bound`() {
+        // 5*x0 + 4*x1 + 1*x2 <= 6: x0+x1 = 9 > 6 exclude, but x2 pairs (6, 5) do not exceed 6.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(intArrayOf(5, 4, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6)),
+        )
+        assertEquals(listOf(setOf(pos(0), pos(1))), Presolve.amoCliques(problem))
+    }
+
+    @Test
+    fun `an exactly-one cardinality yields the clique of its literals`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 1)),
+        )
+        assertEquals(listOf(setOf(pos(0), pos(1), pos(2))), Presolve.amoCliques(problem))
+    }
+
+    @Test
+    fun `overlapping binary cliques merge into one maximal clique`() {
+        // The three clauses pin at-most-one over each pair {x0,x1}, {x1,x2}, {x0,x2} — a triangle that
+        // collapses to a single at-most-one over all three.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            ),
+        )
+        assertEquals(listOf(setOf(pos(0), pos(1), pos(2))), Presolve.amoCliques(problem))
     }
 }

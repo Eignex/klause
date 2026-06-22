@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
 
 internal object CoefficientStrengthening {
@@ -18,8 +19,9 @@ internal object CoefficientStrengthening {
      * is then a multiple of `g`, lets the bound be tightened by flooring/ceiling:
      *  - `Σ aⱼxⱼ ≤ b`  ⟺  `Σ (aⱼ/g)xⱼ ≤ ⌊b/g⌋`
      *  - `Σ aⱼxⱼ ≥ b`  ⟺  `Σ (aⱼ/g)xⱼ ≥ ⌈b/g⌉`
-     *  - `Σ aⱼxⱼ = b`: divisible ⟹ `Σ (aⱼ/g)xⱼ = b/g`; otherwise left unchanged (the search
-     *    catches the infeasibility — no unsound rewrite here).
+     *  - `Σ aⱼxⱼ = b`: divisible ⟹ `Σ (aⱼ/g)xⱼ = b/g`; otherwise the left-hand side is always a
+     *    multiple of `g` while `b` is not, so the equality is **infeasible** — it is replaced by a
+     *    contradiction the bake propagation reports as `Unsat` (see [equalityContradiction]).
      *  - `Σ aⱼxⱼ ≠ b`: divisible ⟹ divide; otherwise the constraint is always true and is dropped.
      *
      * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
@@ -29,6 +31,14 @@ internal object CoefficientStrengthening {
         val out = ArrayList<Factor>(problem.factors.size)
         var changed = false
         for (factor in problem.factors) {
+            // An equality whose coefficient GCD does not divide its bound can never hold; replace it by
+            // an explicit contradiction (the original is redundant once the problem is infeasible).
+            val contradiction = equalityContradiction(factor, problem.intDomains)
+            if (contradiction != null) {
+                out.addAll(contradiction)
+                changed = true
+                continue
+            }
             val rewritten = when (factor) {
                 is Linear -> strengthenLinear(factor, problem.intDomains)
                 is PseudoBoolean -> strengthenPb(factor)
@@ -52,6 +62,52 @@ internal object CoefficientStrengthening {
         )
     }
 
+    /** The factors that make the model infeasible when [factor] is an equality whose coefficient GCD
+     *  `g > 1` does not divide its bound, else `null`. Such an equality `Σ coeffs·x = b` has a
+     *  left-hand side that is always a multiple of `g`, so it can never equal a non-multiple `b`.
+     *  Replacing the original by a contradiction is sound — an infeasible problem has no solutions
+     *  regardless of which constraint witnesses the conflict. */
+    private fun equalityContradiction(factor: Factor, domains: Array<IntDomain>): List<Factor>? = when (factor) {
+        is Linear ->
+            if (factor.op == LinearOp.EQ && indivisible(factor.coeffs, factor.bound)) {
+                intContradiction(factor.vars[0], domains)
+            } else {
+                null
+            }
+
+        is PseudoBoolean ->
+            if (factor.op == PbOp.EQ && indivisible(factor.weights, factor.bound)) {
+                boolContradiction(factor.literals[0])
+            } else {
+                null
+            }
+
+        else -> null
+    }
+
+    /** Whether `gcd(|coeffs|) > 1` fails to divide [bound] — the modular obstruction that makes an
+     *  equality `Σ coeffs·x = bound` unsatisfiable over the integers. */
+    private fun indivisible(coeffs: IntArray, bound: Int): Boolean {
+        val g = PresolveShared.gcdOf(coeffs)
+        return g > 1 && bound.mod(g) != 0
+    }
+
+    /** Two equalities pinning integer variable [v] to consecutive values — jointly unsatisfiable, so
+     *  the bake propagation reports `Unsat`. */
+    private fun intContradiction(v: Int, domains: Array<IntDomain>): List<Factor> {
+        val c = if (domains[v].min < Int.MAX_VALUE) domains[v].min else domains[v].min - 1
+        return listOf(
+            Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, c),
+            Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, c + 1),
+        )
+    }
+
+    /** A contradictory unit-clause pair on [lit]'s variable — jointly unsatisfiable (cf. [XorUnits]). */
+    private fun boolContradiction(lit: Int): List<Factor> {
+        val v = Lit.variable(lit)
+        return listOf(Clause(intArrayOf(Lit.make(v, true))), Clause(intArrayOf(Lit.make(v, false))))
+    }
+
     /** Relation common to [LinearOp] and [PbOp] so the bound rewrite is written once. */
     private enum class Rel { LE, GE, EQ, NE }
 
@@ -62,7 +118,7 @@ internal object CoefficientStrengthening {
         /** Constraint is always satisfied — drop it. */
         object Drop : Reduced
 
-        /** Leave the constraint as-is (non-divisible equality). */
+        /** Leave the constraint as-is. */
         object Unchanged : Reduced
     }
 

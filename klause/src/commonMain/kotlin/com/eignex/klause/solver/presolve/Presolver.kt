@@ -190,6 +190,13 @@ enum class PresolvePass(
             PassResult(Presolve.removeRedundantConstraints(problem))
     },
 
+    /** Element-constraint structural reduction — rewrites `result = arr(idx)` into a plain equality when
+     *  a fixed index or a constant single-value array pins the selection, removing the global.
+     *  Feasible-set-preserving, so it stays on for solution-set-sensitive queries. */
+    REDUCE_ELEMENT("element", Stage.PROBLEM, PresolveTiming.FAST, preservesSolutionSet = true, autoEligible = true) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.reduceElement(problem))
+    },
+
     /** Duplicate / parallel column aggregation — the column-side mirror of [REMOVE_REDUNDANT]. Folds
      *  two integer variables with coinciding columns into one aggregate, reconstructing the dropped
      *  variable from the aggregate's value. Like [ELIMINATE_AFFINE_SINGLETONS] the dropped variable is
