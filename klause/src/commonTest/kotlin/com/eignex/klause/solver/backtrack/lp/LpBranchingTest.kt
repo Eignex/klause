@@ -41,11 +41,33 @@ class LpBranchingTest {
             boolColOf = IntArray(0),
         )
         val hints = LpHints(1, 0)
-        hints.record(relaxation, result.primal)
+        hints.record(relaxation, result.primal, result.duals)
 
         val ordered = hints.order(VarRef.IntVar(0), sequenceOf(0, 1, 2, 3, 4, 5)).toList()
         // round(2/3)=1 first; ties (0,2 both dist 1) keep input order.
         assertEquals(listOf(1, 0, 2, 3, 4, 5), ordered)
+    }
+
+    @Test
+    fun `branchScore is positive for a fractional variable and absent for an unrecorded one`() {
+        // max x s.t. 3x <= 2 -> x = 2/3 fractional ⇒ a positive branch score (fractionality 1/3).
+        val b = LpBuilder()
+        val x = b.addVar(0, 5, cost = 1)
+        b.addRow(mapOf(x to 3L), Relation.LE, 2)
+        val model = b.build(Sense.MAXIMIZE)
+        val result = assertNotNull(RevisedSimplex(model).solve())
+        val relaxation = LpRelaxation(
+            model = model,
+            colVarId = intArrayOf(0),
+            colIsBool = booleanArrayOf(false),
+            objectiveConstant = 0L,
+            intColOf = intArrayOf(0),
+            boolColOf = IntArray(0),
+        )
+        val hints = LpHints(1, 0)
+        hints.record(relaxation, result.primal, result.duals)
+        assertTrue(hints.branchScore(VarRef.IntVar(0)) > 0.0, "a fractional LP variable must score > 0")
+        assertTrue(hints.branchScore(VarRef.Bool(0)).isNaN(), "an unrecorded variable has no score")
     }
 
     @Test
