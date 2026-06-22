@@ -224,6 +224,11 @@ internal class CpToLpRelaxation(
      *  inequalities). For `a = b` (a square) the envelope degenerates to the secant/tangent relaxation.
      *  Adds four rows per product over the existing columns, so it is gated; off by default. */
     private val productMcCormick: Boolean = false,
+    /** When true, add the **tight face** of each [ArrayMinMax] (#C3, Anderson big-M form) on top of the
+     *  always-emitted envelope: one-hot selectors `z_i` (`Σ z_i = 1`) and per-operand rows forcing
+     *  `result = xs[i]` when `z_i = 1`, so the extremum is bounded from the tight side too (`result ≤
+     *  max` / `result ≥ min`), not just the envelope side. Adds O(|xs|) columns, so it is gated. */
+    private val linMaxTightFace: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -880,6 +885,7 @@ internal class CpToLpRelaxation(
                                 rhs = 0L,
                             )
                         }
+                        if (linMaxTightFace) buildLinMaxTightFace(factor)
                     }
 
                     is PseudoBoolean -> {
@@ -1446,6 +1452,38 @@ internal class CpToLpRelaxation(
             val cols = coeff.keys.toIntArray()
             val vals = LongArray(cols.size) { coeff.getValue(cols[it]) }
             builder.addRow(cols, vals, rel, rhs)
+        }
+
+        /**
+         * Anderson tight face of `result = max(xs)` / `min(xs)` (#C3). The always-emitted envelope gives
+         * `result ≥ xs[i]` (max) / `≤` (min); this adds the *tight* side: one-hot selectors `z_i` with
+         * `Σ z_i = 1` and, per operand, a big-M row that forces `result = xs[i]` when `z_i = 1` and is
+         * slack otherwise — so the LP also bounds `result ≤ max` / `result ≥ min`. `M_i = max(rHi, xHi) −
+         * min(rLo, xLo)` from the **declared** domains bounds `|result − xs[i]|` globally, so the rows
+         * hold at every integer solution (sound — never cuts a feasible point; verified by enumeration).
+         */
+        private fun buildLinMaxTightFace(factor: ArrayMinMax) {
+            val n = factor.xs.size
+            if (n == 0) return
+            val sel = IntArray(n) { auxColumn(0L, 1L) } // free binaries z_i ∈ [0,1]
+            builder.addRow(sel, LongArray(n) { 1L }, Relation.EQ, 1L) // Σ z_i = 1
+            val resCol = intColumn(factor.result)
+            val rDom = problem.intDomains[factor.result]
+            for (i in 0 until n) {
+                val x = factor.xs[i]
+                val xDom = problem.intDomains[x]
+                val m = maxOf(rDom.max, xDom.max).toLong() - minOf(rDom.min, xDom.min).toLong()
+                if (m < 0L) continue
+                val xCol = intColumn(x)
+                val z = sel[i]
+                if (factor.max) {
+                    // result ≤ xs[i] + M(1 − z_i)  ⇒  result − xs[i] + M·z_i ≤ M.
+                    builder.addRow(intArrayOf(resCol, xCol, z), longArrayOf(1L, -1L, m), Relation.LE, m)
+                } else {
+                    // result ≥ xs[i] − M(1 − z_i)  ⇒  xs[i] − result + M·z_i ≤ M.
+                    builder.addRow(intArrayOf(xCol, resCol, z), longArrayOf(1L, -1L, m), Relation.LE, m)
+                }
+            }
         }
 
         /**
