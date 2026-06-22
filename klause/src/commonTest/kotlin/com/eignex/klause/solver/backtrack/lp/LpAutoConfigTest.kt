@@ -8,8 +8,10 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.Product
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.global.AllDifferent
@@ -366,17 +368,36 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `constant-array element enables element hull but a variable array does not`() {
+    fun `aggressive enables the new parity techniques and correctness-neutral knobs`() {
+        // ArrayMinMax ⇒ lin-max tight face (#C3); the correctness-neutral engine knobs ride along
+        // whenever LP bounding is active (they change only the pivot path / certificate, not the optimum).
+        val mm = LpAutoConfig.recommend(problem(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
+        assertTrue(mm.lpPlan.bounding)
+        assertTrue(mm.lpPlan.linMaxTightFace)
+        assertTrue(mm.lpPlan.integerCertify)
+        assertTrue(mm.lpPlan.devexPricing)
+        assertTrue(mm.lpPlan.harris)
+        assertTrue(mm.lpPlan.scaling)
+
+        // Product ⇒ McCormick envelope (#C4).
+        val prod = LpAutoConfig.recommend(problem(Product(a = 0, b = 1, result = 2)))
+        assertTrue(prod.lpPlan.bounding)
+        assertTrue(prod.lpPlan.productMcCormick)
+    }
+
+    @Test
+    fun `element hull is enabled for both constant and variable arrays`() {
         val constArr = LpAutoConfig.recommend(
             problem(Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 0)),
         )
         assertTrue(constArr.lpPlan.bounding)
         assertTrue(constArr.lpPlan.element)
 
+        // Variable arrays now also enable the element hull — they route to the big-M form (#C5).
         val varArr = LpAutoConfig.recommend(
             problem(Element(idx = 0, result = 1, arr = intArrayOf(2), arrIsVars = true, indexOffset = 0)),
         )
-        assertFalse(varArr.lpPlan.element)
+        assertTrue(varArr.lpPlan.element)
     }
 
     @Test

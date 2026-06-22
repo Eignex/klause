@@ -3,7 +3,9 @@ package com.eignex.klause.solver.backtrack.lp
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.Product
 import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
@@ -121,6 +123,8 @@ object LpAutoConfig {
         var mdd = false
         var gccCount = false
         var diffn = false
+        var arrayMinMax = false
+        var product = false
         var rows = 0L
         for (f in problem.factors) {
             when (f) {
@@ -175,7 +179,13 @@ object LpAutoConfig {
 
                 is Subcircuit -> circuit = true
 
-                is Element -> if (!f.arrIsVars) constArrayElement = true
+                // Both constant- and variable-array Element route to the element hull (the variable case
+                // builds the big-M form, #C5); the size guard still caps it internally.
+                is Element -> constArrayElement = true
+
+                is ArrayMinMax -> arrayMinMax = true
+
+                is Product -> product = true
 
                 is Table -> table = true
 
@@ -219,7 +229,8 @@ object LpAutoConfig {
         // Structural LP-amenability, independent of the size guard.
         val structApplicable =
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
-                table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0
+                table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0 ||
+                arrayMinMax || product
         // #571: an explicit objective-cone request drops the disjunctive big-M rows and every variable
         // disconnected from the objective, so it always fits the cap even when the full model is over it.
         val coneRequested = base.lpPlan.objectiveCone
@@ -282,6 +293,21 @@ object LpAutoConfig {
                     (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
                 cumulativeFlow = base.lpPlan.cumulativeFlow ||
                     (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
+                // ArrayMinMax tight face (#C3) and Product McCormick (#C4): EXHAUSTIVE-tier relaxations,
+                // on when their structure is present and the emphasis permits them.
+                linMaxTightFace = base.lpPlan.linMaxTightFace ||
+                    (lpActive && arrayMinMax && config.resolved(LpTechnique.LINMAX_TIGHT)),
+                productMcCormick = base.lpPlan.productMcCormick ||
+                    (lpActive && product && config.resolved(LpTechnique.PRODUCT_MCCORMICK)),
+                // Implied-bound cuts (#D3): a cut family, so requires cuts active + Boolean structure.
+                impliedBoundCuts = base.lpPlan.impliedBoundCuts ||
+                    (cuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
+                // Correctness-neutral engine knobs (#B0/#B1/#B2/#B3): on whenever LP bounding runs — they
+                // change the pivot path / certificate / conditioning, never the certified optimum.
+                integerCertify = base.lpPlan.integerCertify || lpActive,
+                devexPricing = base.lpPlan.devexPricing || lpActive,
+                harris = base.lpPlan.harris || lpActive,
+                scaling = base.lpPlan.scaling || lpActive,
                 lagrangian = base.lpPlan.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
                 energeticReasoning = base.lpPlan.energeticReasoning || energetic,
                 // Derive the cadence only when the auto path is the one enabling the check — an
@@ -368,14 +394,16 @@ object LpAutoConfig {
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            if (f !is Element || f.arrIsVars || f.arr.size > CpToLpRelaxation.MAX_ELEM) continue
+            if (f !is Element || f.arr.size > CpToLpRelaxation.MAX_ELEM) continue
             val declared = problem.intDomains[f.idx]
             var k = 0L
             for (p in f.arr.indices) if ((p + f.indexOffset) in declared) k++
             if (k == 0L) continue
             any = true
             cols += k
-            rows += 3L // Σ y = 1 + index channel + result channel
+            // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array (#C5):
+            // Σ y = 1 + index channel + two big-M rows per selector (2 + 2k).
+            rows += if (f.arrIsVars) 2L + 2L * k else 3L
         }
         return if (any) HullEstimate(LpTechnique.ELEMENT, cols, rows) else null
     }

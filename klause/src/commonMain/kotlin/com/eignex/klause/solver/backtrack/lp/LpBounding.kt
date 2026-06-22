@@ -79,7 +79,9 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
 private fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): RevisedSimplex = RevisedSimplex(
     model,
     cancellation,
+    harris = params.lpPlan.harris,
     pricing = if (params.lpPlan.devexPricing) SimplexPricing.DEVEX else SimplexPricing.DANTZIG,
+    scaling = params.lpPlan.scaling,
 )
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
