@@ -2,8 +2,10 @@ package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
+import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -23,6 +25,14 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ArrayMinMax(intMap[result], xs.remapVars(intMap), max)
+
+    /** [max] (min vs max) and the output [result] are positional; the operands [xs] are a set
+     *  (min/max is symmetric in them), so they are sorted. */
+    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ARRAY_MIN_MAX) {
+        bool(max)
+        int(result)
+        sortedInts(xs)
+    }
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs + intArrayOf(result)
