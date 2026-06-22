@@ -52,9 +52,8 @@ class StallKick(
             if (pick < nInts) {
                 val v = factor.intVars[pick]
                 val d = problem.intDomains[v]
-                val span = (d.max.toLong() - d.min.toLong()).toInt()
-                if (span > 0) {
-                    val nv = d.min + state.rng.nextInt(span + 1)
+                if (d.size > 1) {
+                    val nv = d.valueAt(state.rng.nextInt(d.size)) // sparse-aware: never lands on a hole
                     if (nv != state.assignment.intValue(v)) {
                         scratch.addChannelingIntSet(state, v, nv)
                         budget--
