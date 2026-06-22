@@ -88,6 +88,45 @@ class Int128Test {
     }
 
     @Test
+    fun `floorDivPositive matches BigInt floor division`() {
+        val rng = Random(2024)
+        val divisors = longArrayOf(1L, 2L, 3L, 7L, 1024L, 1L shl 20, 1L shl 40, (1L shl 52) - 1, Long.MAX_VALUE)
+        for (d in divisors) {
+            val dBig = BigInt.of(d)
+            repeat(700) {
+                val acc = Int128()
+                repeat(rng.nextInt(1, 10)) {
+                    acc.addProduct(rng.nextLong(-(1L shl 50), 1L shl 50), rng.nextLong(-4096, 4096))
+                }
+                val value = acc.toBigInt()
+                val (q, r) = value.divideAndRemainder(dBig)
+                val floor = if (r.signum() < 0) q - BigInt.ONE else q // truncation → floor for d > 0
+                assertEquals(floor.toLongOrNull(), acc.floorDivPositive(d), "floor($value / $d)")
+            }
+        }
+    }
+
+    @Test
+    fun `shiftLeft matches BigInt times power of two`() {
+        // Bounded inputs (< 2⁵³) shifted by ≤ 62 stay < 2¹¹⁵, so no shift overflows here; this exercises
+        // the value path exactly. (Overflow simply latches → ceilDivPow2 yields null → sound fallback.)
+        val rng = Random(7)
+        for (bits in intArrayOf(0, 1, 5, 20, 40, 62)) {
+            val mul = BigInt.of(1L shl bits)
+            repeat(700) {
+                val acc = Int128()
+                repeat(rng.nextInt(1, 8)) {
+                    acc.addProduct(rng.nextLong(-(1L shl 40), 1L shl 40), rng.nextLong(-1024, 1024))
+                }
+                val expected = acc.toBigInt() * mul
+                acc.shiftLeft(bits)
+                assertFalse(acc.overflow, "bounded value must not overflow on << $bits")
+                assertEquals(expected, acc.toBigInt(), "value << $bits")
+            }
+        }
+    }
+
+    @Test
     fun `overflow latches instead of wrapping`() {
         val acc = Int128()
         // 2^126 + 2^126 + 2^126 + 2^126 = 2^128 overflows the signed 128-bit range.

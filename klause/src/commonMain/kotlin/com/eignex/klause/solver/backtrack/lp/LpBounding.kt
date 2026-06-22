@@ -7,7 +7,6 @@ import com.eignex.klause.solver.backtrack.GOMORY_CUTS_PER_ROUND
 import com.eignex.klause.solver.backtrack.SEARCH_CUT_ROUNDS
 import com.eignex.klause.solver.backtrack.snapshotAssignment
 import com.eignex.klause.solver.lp.Basis
-import com.eignex.klause.solver.lp.ExactBasisCertifier
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.RevisedSimplex
@@ -18,7 +17,10 @@ import com.eignex.klause.solver.lp.cut.Cut
 import com.eignex.klause.solver.lp.cut.CutContext
 import com.eignex.klause.solver.lp.cut.CutPool
 import com.eignex.klause.solver.lp.cut.CutSeparator
+import com.eignex.klause.solver.lp.IntegerCertificate
+import com.eignex.klause.solver.lp.integerCertify
 import com.eignex.klause.solver.lp.integerDualLowerBoundCeil
+import com.eignex.klause.solver.lp.integerFarkasRay
 import com.eignex.klause.solver.lp.mulExact
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.LpExplanation
@@ -28,8 +30,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.BigRational
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import kotlin.math.abs
@@ -140,8 +140,8 @@ internal fun LpEngine.lpBoundAndFix(
         cutsAllowed,
     )
 } catch (_: LpOverflowException) {
-    // A determinant or coefficient overflow in the relaxation build loses the bound; recover a sound
-    // one via the exact BigInt basis-certification pipeline. A failure just keeps the node.
+    // A coefficient overflow in the relaxation build loses the bound; recover a sound one via the
+    // integer-multiplier 128-bit certification. A failure just keeps the node.
     sparseCertifiedPrune(relaxer, session, bound, globalCuts, sink, cancellation)
 } finally {
     sink.lpClockStop()
@@ -179,12 +179,8 @@ internal fun LpEngine.sparseSafePrune(
         // Infeasibility prune (#705): a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
         // Any other failure (non-convergence / singular) keeps the node.
-        val basis = simplex.infeasibleBasis
-        val ray = if (basis != null) {
-            ExactBasisCertifier.farkasRay(relaxation.model, basis, simplex.infeasibleRow)
-        } else {
-            null
-        }
+        val floatRay = simplex.infeasibleRay
+        val ray = if (floatRay != null) integerFarkasRay(relaxation.model, floatRay) else null
         if (ray != null) {
             sink.observeLpInfeasiblePrune()
             // With learning, the Farkas ray becomes a bound-atom nogood (#247) for a 1UIP backjump;
@@ -246,7 +242,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when either needs it; a singular/unbounded certify yields
     // null and both fall back to the cheap reason-less paths, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
-        ExactBasisCertifier.certify(boundRel.model, boundRes.basis)
+        integerCertify(boundRel.model, boundRes.duals)
     } else {
         null
     }
@@ -257,7 +253,7 @@ internal fun LpEngine.sparseSafePrune(
     // so either floor ≤ the true optimum.
     if (canPropagate && full.isFinite()) {
         val exactFloor = if (learn && cert != null) {
-            (cert.objective + BigRational.of(boundRel.objectiveConstant)).ceil().toLongOrNull()
+            cert.objectiveBoundCeil(boundRel.objectiveConstant.toLong())
         } else {
             null
         }
@@ -293,8 +289,8 @@ internal fun LpEngine.sparseSafePrune(
 }
 
 /**
- * Reduced-cost fixing (#21/#282) from the exact [ExactBasisCertifier.Certificate], over exact
- * rationals. At the LP optimum a nonbasic column sits at a bound; moving it Δ integer steps raises the
+ * Reduced-cost fixing (#21/#282) from the [IntegerCertificate], over exact scaled integers. At the LP
+ * optimum a nonbasic column sits at a bound; moving it Δ integer steps raises the
  * objective by `|reducedCost|·Δ`, and any incumbent-beating solution has objective `≤ ⌈bound⌉ − 1`, so
  * the column can move at most `floor((improvingMax − lpOptimum) / |reducedCost|)` steps before it alone
  * overshoots. With [learn] each integer fixing carries the LP dual-decomposition reason (the other
@@ -305,7 +301,7 @@ internal fun LpEngine.sparseSafePrune(
 @Suppress("LongParameterList", "CyclomaticComplexMethod")
 internal fun LpEngine.applySparseReducedCostFixing(
     relaxation: LpRelaxation,
-    cert: ExactBasisCertifier.Certificate,
+    cert: IntegerCertificate,
     basis: Basis,
     session: PropagationSession,
     bound: Double,
@@ -315,8 +311,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     learn: Boolean = false,
 ): Boolean {
     val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
-    val slack = BigRational.of(improvingMax) - cert.objective // exact gap; ≥ 0 (node not bound-pruned)
-    if (slack.signum() < 0) return false
+    if (!cert.improvingGapNonNegative(improvingMax)) return false // gap ≥ 0 (node not bound-pruned)
     val status = basis.status
     // Learnable reason support (#282): a fixing of column `col` is justified
     // by the OTHER support columns' seated bounds (premise side = reduced-cost sign) + the incumbent
@@ -338,7 +333,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
             }
             for (c in relaxation.colVarId.indices) {
                 if (status[c] == VarStatus.BASIC) continue
-                val sign = cert.reducedCost[c].signum()
+                val sign = cert.reducedCostSign(c)
                 if (sign == 0) continue
                 val lit = LpExplanation.premiseLit(relaxation, session, c, lowerSide = sign > 0)
                 if (lit == LpExplanation.PREMISE_AUX) {
@@ -382,14 +377,12 @@ internal fun LpEngine.applySparseReducedCostFixing(
         }
         if (liveMin == liveMax) continue
         val span = liveMax - liveMin
-        val dj = cert.reducedCost[col]
         val res = when (st) {
-            // At lower bound: reducedCost ≥ 0; it can rise at most floor(slack / d) steps.
+            // At lower bound: reducedCost ≥ 0; it can rise at most floor(gap / d) steps.
             VarStatus.AT_LOWER -> {
-                if (dj.signum() <= 0) continue
-                val dMaxBig = (slack / dj).floor()
-                if (dMaxBig >= BigInt.of(span)) continue
-                val dMax = dMaxBig.toLongOrNull() ?: continue // overflow ⇒ skip (sound)
+                if (cert.reducedCostSign(col) <= 0) continue
+                val dMax = cert.fixSteps(col, improvingMax) ?: continue // overflow ⇒ skip (sound)
+                if (dMax >= span) continue
                 val hi = (liveMin + dMax).toInt()
                 when {
                     isBool -> session.implyBool(varId, false)
@@ -400,10 +393,9 @@ internal fun LpEngine.applySparseReducedCostFixing(
 
             // At upper bound: reducedCost ≤ 0; symmetric, tighten the lower bound.
             VarStatus.AT_UPPER -> {
-                if (dj.signum() >= 0) continue
-                val dMaxBig = (slack / (BigRational.ZERO - dj)).floor()
-                if (dMaxBig >= BigInt.of(span)) continue
-                val dMax = dMaxBig.toLongOrNull() ?: continue
+                if (cert.reducedCostSign(col) >= 0) continue
+                val dMax = cert.fixSteps(col, improvingMax) ?: continue
+                if (dMax >= span) continue
                 val lo = (liveMax - dMax).toInt()
                 when {
                     isBool -> session.implyBool(varId, true)
@@ -424,9 +416,10 @@ internal fun LpEngine.applySparseReducedCostFixing(
 }
 
 /**
- * Sound objective lower bound from the float revised simplex + exact BigInt basis-certification, used
- * when the cheap safe-bound path overflowed during the relaxation build. Prunes when the certified
- * bound (plus the relaxation's objective constant) reaches the incumbent. Any failure keeps the node.
+ * Sound objective lower bound from the float revised simplex + integer-multiplier 128-bit
+ * certification, used when the cheap safe-bound path overflowed during the relaxation build. Prunes when
+ * the certified bound (plus the relaxation's objective constant) reaches the incumbent. Any failure
+ * keeps the node.
  */
 internal fun LpEngine.sparseCertifiedPrune(
     relaxer: CpToLpRelaxation,
@@ -442,11 +435,10 @@ internal fun LpEngine.sparseCertifiedPrune(
     sink.observeLpSolve()
     val result = dualSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
-    // #B0: when enabled, take the cheap integer-multiplier 128-bit bound first (sound: ≤ the rational
-    // certified ceil), falling back to the BigRational dual solve only when the rounded multipliers
-    // yield no finite bound. Both include the model's lo-shift constant, so the result is interchangeable.
-    val lb = (if (params.lpPlan.integerCertify) integerDualLowerBoundCeil(relaxation.model, result.duals) else null)
-        ?: ExactBasisCertifier.lowerBoundCeil(relaxation.model, result.basis)
+    // The integer-multiplier 128-bit bound: round the float duals and evaluate the Lagrangian exactly.
+    // Sound by construction (a valid lower bound for any integer multipliers); includes the model's
+    // lo-shift constant. A null (no finite bound) keeps the node.
+    val lb = integerDualLowerBoundCeil(relaxation.model, result.duals)
         ?: return LpNodeOutcome(false, null)
     val full = try {
         addExact(lb, relaxation.objectiveConstant)
