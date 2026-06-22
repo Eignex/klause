@@ -1,12 +1,14 @@
 package com.eignex.klause.solver.presolve
 
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -84,7 +86,10 @@ class CoefficientStrengtheningTest {
         val numVars = domains.size
         val problem =
             Problem(0, numVars, Array(numVars) { IntDomain(domains[it].first, domains[it].last) }, listOf(original))
-        val rewritten = Presolve.strengthenCoefficients(problem).factors.getOrNull(0) as? Linear
+        // The rewrite may produce one factor (lifted / gcd-reduced), none (dropped ⇒ always-true), or
+        // a multi-factor contradiction (an indivisible equality ⇒ infeasible); the feasible set is the
+        // conjunction of whatever rewritten factors remain.
+        val rewritten = Presolve.strengthenCoefficients(problem).factors.filterIsInstance<Linear>()
         val values = Array(numVars) { v ->
             val d = problem.intDomains[v]
             IntArray(d.size) { d.valueAt(it) }
@@ -93,7 +98,7 @@ class CoefficientStrengtheningTest {
         enumerateMixed(values) { idx ->
             for (v in 0 until numVars) assign[v] = values[v][idx[v]]
             val origSat = evalLinear(original, assign)
-            val newSat = rewritten?.let { evalLinear(it, assign) } ?: true // dropped ⇒ always-true
+            val newSat = rewritten.all { evalLinear(it, assign) }
             assertEquals(origSat, newSat, "linear disagrees at ${assign.toList()}: $original -> $rewritten")
         }
     }
@@ -134,9 +139,52 @@ class CoefficientStrengtheningTest {
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.LE, 5))
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.GE, 5))
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 6)) // divisible
-        assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 5)) // indivisible
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 5)) // dropped
         assertLinearEquivalent(2, 4, Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 6))
+    }
+
+    private fun assertInfeasibleAfterStrengthen(problem: Problem) {
+        val out = Presolve.strengthenCoefficients(problem)
+        assertTrue(
+            out.propagate(Assumptions.None) is PropagationResult.Unsat,
+            "strengthened problem should be infeasible: ${out.factors}",
+        )
+    }
+
+    @Test
+    fun `an indivisible linear equality is rewritten to an infeasible problem`() {
+        // 2*x0 + 4*x1 = 5: the left-hand side is always even, so it can never equal 5.
+        assertInfeasibleAfterStrengthen(
+            Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
+                listOf(Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 5)),
+            ),
+        )
+    }
+
+    @Test
+    fun `an indivisible pseudo-boolean equality is rewritten to an infeasible problem`() {
+        // 2*x0 + 4*x1 = 5 over booleans: even left-hand side can never equal 5.
+        val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true))
+        assertInfeasibleAfterStrengthen(
+            Problem(2, 0, emptyArray(), listOf(PseudoBoolean(intArrayOf(2, 4), lits, PbOp.EQ, 5))),
+        )
+    }
+
+    @Test
+    fun `a divisible equality is not flagged infeasible`() {
+        // 2*x0 + 4*x1 = 6 divides through cleanly and stays satisfiable (x0=1, x1=1).
+        val out = Presolve.strengthenCoefficients(
+            Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
+                listOf(Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 6)),
+            ),
+        )
+        assertTrue(out.propagate(Assumptions.None) !is PropagationResult.Unsat, "divisible equality stays feasible")
     }
 
     @Test

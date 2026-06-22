@@ -40,6 +40,7 @@ class PresolverTest {
             PresolvePass.DERIVE_XOR_UNITS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.REMOVE_REDUNDANT,
+            PresolvePass.REDUCE_ELEMENT,
             PresolvePass.MERGE_DUPLICATE_COLUMNS,
             PresolvePass.BREAK_SYMMETRIES,
             PresolvePass.DUAL_FIX,
@@ -133,14 +134,15 @@ class PresolverTest {
     fun `emphasis levels select cost tiers`() {
         val ctx = PresolveContext.EMPTY
         assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
-        // conservative → FAST tier only (strengthen + xor-units + affine + subsume + dup-columns),
-        // no symmetry.
+        // conservative → FAST tier only (strengthen + xor-units + affine + subsume + element +
+        // dup-columns), no symmetry.
         assertEquals(
             listOf(
                 PresolvePass.STRENGTHEN_COEFFICIENTS,
                 PresolvePass.DERIVE_XOR_UNITS,
                 PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
                 PresolvePass.REMOVE_REDUNDANT,
+                PresolvePass.REDUCE_ELEMENT,
                 PresolvePass.MERGE_DUPLICATE_COLUMNS,
             ),
             PresolveConfig.parse("conservative").problemPasses(ctx),
@@ -199,6 +201,25 @@ class PresolverTest {
         val once = Presolver.run(problem, PresolveConfig.AUTO).problem
         assertTrue(once !== problem, "expected the engine to transform the problem")
         assertSame(once, Presolver.run(once, PresolveConfig.AUTO).problem, "re-presolving a fixpoint must be a no-op")
+    }
+
+    @Test
+    fun `the full pipeline turns an indivisible equality into a detected infeasibility`() {
+        // 2x + 4y = 5 is parity-infeasible; strengthen replaces it with a contradiction the later
+        // rounds (affine, redundancy) must carry through to a clean Unsat without looping or crashing.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
+            listOf(Linear(intArrayOf(2, 4), intArrayOf(0, 1), LinearOp.EQ, 5)),
+        )
+        val pre = Presolver.run(problem, PresolveConfig.AUTO)
+        assertTrue(pre.problem.propagate(Assumptions.None) is PropagationResult.Unsat, "infeasibility must be detected")
+        assertSame(
+            pre.problem,
+            Presolver.run(pre.problem, PresolveConfig.AUTO).problem,
+            "the infeasible residue is itself a fixpoint",
+        )
     }
 
     @Test
