@@ -97,7 +97,7 @@ internal object AffineSingletons {
                 // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
                 // `y`'s domain is restricted below, so it too must stay clear of the objective — the
                 // pass leaves every objective variable untouched.
-                if (a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
+                if (a == 0 || a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
                 if (x in objectiveIntVars || y in objectiveIntVars) continue
                 if (!isContained(factors, di, x)) continue
                 val domY = domains[y]
@@ -206,6 +206,7 @@ internal object AffineSingletons {
      *  integral. */
     private fun dividesAllPartnersAndBound(f: Linear, xi: Int): Boolean {
         val cx = f.coeffs[xi]
+        if (cx == 0) return false
         if (f.bound % cx != 0) return false
         for (j in f.vars.indices) if (j != xi && f.coeffs[j] % cx != 0) return false
         return true
