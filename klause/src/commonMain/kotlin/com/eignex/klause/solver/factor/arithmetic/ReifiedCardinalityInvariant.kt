@@ -3,6 +3,8 @@ package com.eignex.klause.solver.factor.arithmetic
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
+import com.eignex.klause.solver.factor.bool.internals.buildSignedLitsByVar
+import com.eignex.klause.solver.factor.bool.internals.reifiedBoolUpdateBreakMake
 import com.eignex.klause.solver.factor.bool.internals.reifiedDegree
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -20,17 +22,7 @@ internal class ReifiedCardinalityInvariant(
     private val boolVars: IntArray,
 ) : Invariant {
 
-    private val signedByVar: IntIntMap
-
-    init {
-        val signs = HashMap<Int, Int>()
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == auxBoolVar) continue
-            signs[v] = (signs[v] ?: 0) + if (Lit.isPositive(lit)) 1 else -1
-        }
-        signedByVar = IntIntMap.build(keys = signs.keys.toIntArray(), values = signs.values.toIntArray(), absent = 0)
-    }
+    private val signedByVar: IntIntMap = buildSignedLitsByVar(literals, exclude = auxBoolVar)
 
     private fun reifSignedFor(v: Int): Int = signedByVar[v]
 
@@ -107,54 +99,8 @@ internal class ReifiedCardinalityInvariant(
     }
 
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
-        val newTotal = state.longPayload[factorId]
-        val newAux = state.assignment.boolValue(auxBoolVar)
-        val oldAux: Boolean
-        val oldTotal: Long
-        if (flippedVar == auxBoolVar) {
-            oldAux = !newAux
-            oldTotal = newTotal
-        } else {
-            oldAux = newAux
-            val signedFlipped = reifSignedFor(flippedVar)
-            if (signedFlipped == 0) return
-            val flippedPost = state.assignment.boolValue(flippedVar)
-            val changeV = if (flippedPost) signedFlipped else -signedFlipped
-            oldTotal = newTotal - changeV
-        }
-        val cap = state.violationSoftCap
-        val oldDeg = reifDegree(oldTotal, oldAux, cap)
-        val newDeg = reifDegree(newTotal, newAux, cap)
-        for (u in boolVars) {
-            val preDelta: Int
-            val postDelta: Int
-            if (u == auxBoolVar) {
-                preDelta = reifDegree(oldTotal, !oldAux, cap) - oldDeg
-                postDelta = reifDegree(newTotal, !newAux, cap) - newDeg
-            } else {
-                val signedU = reifSignedFor(u)
-                if (signedU == 0) {
-                    preDelta = 0
-                    postDelta = 0
-                } else {
-                    val uPost = state.assignment.boolValue(u)
-                    val uPre = if (u == flippedVar) !uPost else uPost
-                    val preChangeU = if (uPre) -signedU else signedU
-                    val postChangeU = if (uPost) -signedU else signedU
-                    preDelta = reifDegree(oldTotal + preChangeU, oldAux, cap) - oldDeg
-                    postDelta = reifDegree(newTotal + postChangeU, newAux, cap) - newDeg
-                }
-            }
-            val preBreak = preDelta > 0
-            val preMake = preDelta < 0
-            val postBreak = postDelta > 0
-            val postMake = postDelta < 0
-            if (preBreak != postBreak) {
-                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
-            }
-            if (preMake != postMake) {
-                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
-            }
+        reifiedBoolUpdateBreakMake(state, factorId, flippedVar, auxBoolVar, signedByVar, boolVars) { total, aux, cap ->
+            reifDegree(total, aux, cap)
         }
     }
 

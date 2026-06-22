@@ -41,15 +41,10 @@ internal class TableInvariant(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (!isViolated(state, factorId)) return
+        val s = state.refPayload[factorId] as TableLsState
         data class Scored(val row: Int, val distance: Int)
         val scored = ArrayList<Scored>(numTuples)
-        for (row in 0 until numTuples) {
-            var dist = 0
-            for (col in 0 until arity) {
-                if (state.assignment.intValue(xs[col]) != tuples[row * arity + col]) dist++
-            }
-            scored.add(Scored(row, dist))
-        }
+        for (row in 0 until numTuples) scored.add(Scored(row, s.dist[row]))
         scored.sortBy { it.distance }
         val topK = minOf(2, scored.size)
         for (k in 0 until topK) {

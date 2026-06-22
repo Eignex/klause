@@ -18,7 +18,6 @@ import com.eignex.klause.util.argsortByIntKey
  * when a CP engine is initialised.
  */
 internal class CumulativePropagator(
-    val boolVars: IntArray,
     val intVars: IntArray,
     private val starts: IntArray,
     private val durations: IntArray,
@@ -190,31 +189,10 @@ internal class CumulativePropagator(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
-        val effDur = IntArray(n)
-        val effRes = IntArray(n)
-        for (i in 0 until n) {
-            if (durationVars.isEmpty()) {
-                effDur[i] = durations[i]
-            } else {
-                val d = state.intDomains[durationVars[i]]
-                if (d.min != d.max) return true
-                effDur[i] = d.min
-            }
-            if (resourceVars.isEmpty()) {
-                effRes[i] = resources[i]
-            } else {
-                val d = state.intDomains[resourceVars[i]]
-                if (d.min != d.max) return true
-                effRes[i] = d.min
-            }
-        }
-        val effCap = if (capacityVar < 0) {
-            capacity
-        } else {
-            val d = state.intDomains[capacityVar]
-            if (d.min != d.max) return true
-            d.min
-        }
+        val eff = effectiveSnapshot(state) ?: return true
+        val effDur = eff.dur
+        val effRes = eff.res
+        val effCap = eff.cap
         for (i in 0 until n) {
             if (OptPresence.isDefinitelyAbsent(presents, i, state)) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
@@ -231,7 +209,7 @@ internal class CumulativePropagator(
             profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
         }
         if (!profile.build(effCap)) return false
-        val eff = if (sharpReasonEligible) CumulativeEff(effDur, effRes, effCap) else null
+        val sharpEff = if (sharpReasonEligible) eff else null
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
@@ -255,7 +233,7 @@ internal class CumulativePropagator(
             }
             if (newMin > state.intDomains[v].max) return false
             if (newMin != oldMin) {
-                val ant = (if (eff != null) minTightenReason(state, i, d, oldMin, newMin, eff) else null)
+                val ant = (if (sharpEff != null) minTightenReason(state, i, d, oldMin, newMin, sharpEff) else null)
                     ?: state.composeIntVarAtomAntecedents(intVars)
                 if (!state.tightenIntMin(v, newMin, ant)) return false
             }
@@ -269,7 +247,7 @@ internal class CumulativePropagator(
             }
             if (newMax < state.intDomains[v].min) return false
             if (newMax != oldMax) {
-                val ant = (if (eff != null) maxTightenReason(state, i, d, oldMax, newMax, eff) else null)
+                val ant = (if (sharpEff != null) maxTightenReason(state, i, d, oldMax, newMax, sharpEff) else null)
                     ?: state.composeIntVarAtomAntecedents(intVars)
                 if (!state.tightenIntMax(v, newMax, ant)) return false
             }

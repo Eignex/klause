@@ -97,7 +97,6 @@ class Diffn(
     fun varToRectOf(varId: Int): Int = varToRect[varId]
 
     override fun asPropagator(): Propagator = DiffnPropagator(
-        boolVars = boolVars,
         intVars = intVars,
         xs = xs,
         ys = ys,

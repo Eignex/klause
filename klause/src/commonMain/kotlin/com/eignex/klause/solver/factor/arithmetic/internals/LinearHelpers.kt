@@ -3,9 +3,16 @@ package com.eignex.klause.solver.factor.arithmetic.internals
 import com.eignex.klause.solver.EmptyLongArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+
+internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: IntArray, vars: IntArray) {
+    var sum = 0L
+    for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
+    state.longPayload[factorId] = sum
+}
 
 /**
  * Look up the coefficient for [intVar] in [vars]/[coeffs]. Returns 0 if [intVar] is not found.

@@ -17,6 +17,10 @@ internal class MddInvariant(
     private val cost: Int,
 ) : Invariant {
 
+    override fun initialize(state: LocalSearchState, factorId: Int) {
+        state.factorDegree[factorId] = violationDegree(state, factorId)
+    }
+
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         !mddPathExists(state, seq, layerStarts, transitions, recordStride, initial, accepting, -1, 0)
 
@@ -28,38 +32,32 @@ internal class MddInvariant(
     )
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val before = mddAcceptDistance(
-            seq,
-            numStatesPerLayer,
-            layerStarts,
-            transitions,
-            recordStride,
-            initial,
-            accepting,
-        ) {
-            state.assignment.intValue(seq[it])
-        }
-        val after = mddAcceptDistance(
-            seq,
-            numStatesPerLayer,
-            layerStarts,
-            transitions,
-            recordStride,
-            initial,
-            accepting,
-        ) {
-            val v = seq[it]
-            if (v == intVar) newValue else state.assignment.intValue(v)
-        }
-        return compressViolation(after.toLong(), state.violationSoftCap) -
-            compressViolation(before.toLong(), state.violationSoftCap)
+        val after = compressViolation(
+            mddAcceptDistance(seq, numStatesPerLayer, layerStarts, transitions, recordStride, initial, accepting) {
+                val v = seq[it]
+                if (v == intVar) newValue else state.assignment.intValue(v)
+            }.toLong(),
+            state.violationSoftCap,
+        )
+        return after - state.factorDegree[factorId]
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        val newValue = state.assignment.intValue(intVar)
+        if (newValue == oldValue) return 0
+        val after = compressViolation(
+            mddAcceptDistance(seq, numStatesPerLayer, layerStarts, transitions, recordStride, initial, accepting) {
+                state.assignment.intValue(seq[it])
+            }.toLong(),
+            state.violationSoftCap,
+        )
+        return after - state.factorDegree[factorId]
+    }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (!isViolated(state, factorId)) return
-        var current = initial
+        if (!isViolated(state, factorId) || seq.isEmpty()) return
+        val path = IntArray(seq.size + 1)
+        path[0] = initial
         for (i in 0 until seq.size) {
             val symbol = state.assignment.intValue(seq[i])
             val start = layerStarts[i]
@@ -67,9 +65,7 @@ internal class MddInvariant(
             var matchedDst = -1
             var p = start
             while (p < end) {
-                if (transitions[p] == current &&
-                    transitions[p + 1] == symbol
-                ) {
+                if (transitions[p] == path[i] && transitions[p + 1] == symbol) {
                     matchedDst = transitions[p + 2]
                     break
                 }
@@ -79,7 +75,7 @@ internal class MddInvariant(
                 val d = state.problem.intDomains[seq[i]]
                 var q = start
                 while (q < end) {
-                    if (transitions[q] == current) {
+                    if (transitions[q] == path[i]) {
                         val altSym = transitions[q + 1]
                         if (altSym != symbol && altSym in d) sink.addChannelingIntSet(state, seq[i], altSym)
                     }
@@ -87,43 +83,24 @@ internal class MddInvariant(
                 }
                 return
             }
-            current = matchedDst
+            path[i + 1] = matchedDst
         }
-        if (seq.isNotEmpty()) {
-            val last = seq.size - 1
-            var qPrev = initial
-            for (i in 0 until last) {
-                val symbol = state.assignment.intValue(seq[i])
-                val start = layerStarts[i]
-                val end = layerStarts[i + 1]
-                var p = start
-                while (p < end) {
-                    if (transitions[p] == qPrev && transitions[p + 1] == symbol) {
-                        qPrev = transitions[p + 2]
-                        break
-                    }
-                    p += recordStride
+        val last = seq.size - 1
+        val qPrev = path[last]
+        val curLast = state.assignment.intValue(seq[last])
+        val d = state.problem.intDomains[seq[last]]
+        val start = layerStarts[last]
+        val end = layerStarts[last + 1]
+        var p = start
+        while (p < end) {
+            if (transitions[p] == qPrev) {
+                val sym = transitions[p + 1]
+                val dst = transitions[p + 2]
+                if (sym != curLast && sym in d && accepting.any { it == dst }) {
+                    sink.addChannelingIntSet(state, seq[last], sym)
                 }
             }
-            val curLast = state.assignment.intValue(seq[last])
-            val d = state.problem.intDomains[seq[last]]
-            val start = layerStarts[last]
-            val end = layerStarts[last + 1]
-            var p = start
-            while (p < end) {
-                if (transitions[p] == qPrev) {
-                    val sym = transitions[p + 1]
-                    val dst = transitions[p + 2]
-                    if (sym != curLast && sym in d && accepting.any { it == dst }) {
-                        sink.addChannelingIntSet(
-                            state,
-                            seq[last],
-                            sym,
-                        )
-                    }
-                }
-                p += recordStride
-            }
+            p += recordStride
         }
     }
 

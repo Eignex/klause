@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
 import com.eignex.klause.solver.factor.bool.internals.buildSignedWeightByVar
+import com.eignex.klause.solver.factor.bool.internals.nonReifiedBoolUpdateBreakMakeLoop
 import com.eignex.klause.solver.factor.bool.internals.pbDegree
 import com.eignex.klause.solver.factor.bool.internals.pbDistance
 import com.eignex.klause.solver.factor.bool.internals.pbHolds
@@ -141,27 +142,8 @@ internal class PseudoBooleanInvariant(
         val flippedPost = state.assignment.boolValue(flippedVar)
         val changeV = if (flippedPost) signedFlipped else -signedFlipped
         val oldSum = newSum - changeV
-        for (u in boolVars) {
-            val signedU = signedForVar(u)
-            if (signedU == 0) continue
-            val uPost = state.assignment.boolValue(u)
-            val uPre = if (u == flippedVar) !uPost else uPost
-            val oldChangeU = if (uPre) -signedU else signedU
-            val newChangeU = if (uPost) -signedU else signedU
-            val preDelta = pbDegree(oldSum + oldChangeU, op, bound, state.violationSoftCap) -
-                pbDegree(oldSum, op, bound, state.violationSoftCap)
-            val postDelta = pbDegree(newSum + newChangeU, op, bound, state.violationSoftCap) -
-                pbDegree(newSum, op, bound, state.violationSoftCap)
-            val preBreak = preDelta > 0
-            val preMake = preDelta < 0
-            val postBreak = postDelta > 0
-            val postMake = postDelta < 0
-            if (preBreak != postBreak) {
-                if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
-            }
-            if (preMake != postMake) {
-                if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
-            }
+        nonReifiedBoolUpdateBreakMakeLoop(state, flippedVar, signedByVar, boolVars, oldSum, newSum) { sum, cap ->
+            pbDegree(sum, op, bound, cap)
         }
     }
 

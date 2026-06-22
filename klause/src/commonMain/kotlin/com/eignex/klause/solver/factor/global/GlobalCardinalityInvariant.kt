@@ -2,9 +2,10 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.factor.global.internals.GccState
+import com.eignex.klause.solver.factor.global.internals.countPresentOccurrences
+import com.eignex.klause.solver.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
@@ -48,8 +49,7 @@ internal class GlobalCardinalityInvariant(
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
         val s = state.refPayload[factorId] as GccState
         val sim = s.counts.copyOf()
-        var occurrencesInXs = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentGccInvFn(state, i)) occurrencesInXs++
+        val occurrencesInXs = countPresentOccurrences(xs, intVar, state) { s, i -> presentGccInvFn(s, i) }
         if (occurrencesInXs > 0) {
             val old = state.assignment.intValue(intVar)
             val oldIdx = coverIndexByValue[old]
@@ -66,8 +66,7 @@ internal class GlobalCardinalityInvariant(
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
         val beforeDeg = state.factorDegree[factorId]
-        var occurrencesInXs = 0
-        for (i in xs.indices) if (xs[i] == intVar && presentGccInvFn(state, i)) occurrencesInXs++
+        val occurrencesInXs = countPresentOccurrences(xs, intVar, state) { s, i -> presentGccInvFn(s, i) }
         if (occurrencesInXs > 0) {
             val oldIdx = coverIndexByValue[oldValue]
             if (oldIdx >= 0) s.counts[oldIdx] -= occurrencesInXs
@@ -178,26 +177,13 @@ internal class GlobalCardinalityInvariant(
         }
     }
 
-    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (xs.size < 2) return
-        var emitted = 0
-        var attempts = 0
-        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
-            attempts++
-            val ai = state.rng.nextInt(xs.size)
-            val bi = state.rng.nextInt(xs.size)
-            val a = xs[ai]
-            val b = xs[bi]
-            if (a == b) continue
-            if (!presentGccInvFn(state, ai) || !presentGccInvFn(state, bi)) continue
-            val va = state.assignment.intValue(a)
-            val vb = state.assignment.intValue(b)
-            if (va == vb) continue
-            if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) continue
-            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
-            emitted++
-        }
-    }
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) = proposeRandomSwaps(
+        state,
+        xs,
+        sink,
+        STRUCTURED_SWAP_CAP,
+        SWAP_ATTEMPT_STRIDE,
+    ) { s, idx -> presentGccInvFn(s, idx) }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         val counts = IntArray(cover.size)

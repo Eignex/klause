@@ -4,6 +4,8 @@ import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.factor.compressViolation
+import com.eignex.klause.solver.factor.global.internals.countPresentOccurrences
+import com.eignex.klause.solver.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
@@ -232,36 +234,19 @@ internal class AllDifferentInvariant(
         if (cur > d.min) sink.addChannelingIntSet(state, occupant, cur - 1)
     }
 
-    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (vars.size < 2) return
-        var emitted = 0
-        var attempts = 0
-        val cap = MAX_STRUCTURED_SWAPS
-        while (emitted < cap && attempts < cap * SWAP_ATTEMPT_STRIDE) {
-            attempts++
-            val ai = state.rng.nextInt(vars.size)
-            val bi = state.rng.nextInt(vars.size)
-            val a = vars[ai]
-            val b = vars[bi]
-            if (a == b) continue
-            if (!presentInvFn(state, ai) || !presentInvFn(state, bi)) continue
-            val va = state.assignment.intValue(a)
-            val vb = state.assignment.intValue(b)
-            if (va == vb) continue
-            if (vb !in state.problem.intDomains[a]) continue
-            if (va !in state.problem.intDomains[b]) continue
-            sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
-            emitted++
-        }
-    }
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) = proposeRandomSwaps(
+        state,
+        vars,
+        sink,
+        MAX_STRUCTURED_SWAPS,
+        SWAP_ATTEMPT_STRIDE,
+    ) { s, idx -> presentInvFn(s, idx) }
 
     private fun excessOf(count: Int): Int = if (count > 1) count - 1 else 0
 
     private fun presentOccurrences(state: LocalSearchState, intVar: Int): Int {
         if (presents.isEmpty()) return occurrencesByVar[intVar]
-        var c = 0
-        for (i in vars.indices) if (vars[i] == intVar && presentInvFn(state, i)) c++
-        return c
+        return countPresentOccurrences(vars, intVar, state) { s, i -> presentInvFn(s, i) }
     }
 
     private fun adjustExcess(counts: IntArray, valueIdx: Int, delta: Int): Int {

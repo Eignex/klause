@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor.bool.internals
 
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.factor.CoeffLookup
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.solver.factor.arithmetic.internals.floorDivLong
@@ -379,4 +380,58 @@ internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: In
         }
     }
     return longArrayOf(lo, hi)
+}
+
+internal fun buildParityByVar(boolVars: IntArray, literals: IntArray): CoeffLookup {
+    val parities = IntArray(boolVars.size)
+    for (i in boolVars.indices) {
+        var n = 0
+        for (lit in literals) if (Lit.variable(lit) == boolVars[i]) n++
+        parities[i] = n and 1
+    }
+    return CoeffLookup.build(boolVars, parities)
+}
+
+internal fun buildSignedLitsByVar(literals: IntArray, exclude: Int = -1): IntIntMap {
+    val signs = HashMap<Int, Int>()
+    for (lit in literals) {
+        val v = Lit.variable(lit)
+        if (v == exclude) continue
+        signs[v] = (signs[v] ?: 0) + if (Lit.isPositive(lit)) 1 else -1
+    }
+    return IntIntMap.build(keys = signs.keys.toIntArray(), values = signs.values.toIntArray(), absent = 0)
+}
+
+internal inline fun nonReifiedBoolUpdateBreakMakeLoop(
+    state: LocalSearchState,
+    flippedVar: Int,
+    signedByVar: IntIntMap,
+    boolVars: IntArray,
+    oldSum: Long,
+    newSum: Long,
+    degreeAt: (sum: Long, softCap: Int) -> Int,
+) {
+    val cap = state.violationSoftCap
+    val oldDeg = degreeAt(oldSum, cap)
+    val newDeg = degreeAt(newSum, cap)
+    for (u in boolVars) {
+        val signedU = signedByVar[u]
+        if (signedU == 0) continue
+        val uPost = state.assignment.boolValue(u)
+        val uPre = if (u == flippedVar) !uPost else uPost
+        val oldChangeU = if (uPre) -signedU else signedU
+        val newChangeU = if (uPost) -signedU else signedU
+        val preDelta = degreeAt(oldSum + oldChangeU, cap) - oldDeg
+        val postDelta = degreeAt(newSum + newChangeU, cap) - newDeg
+        val preBreak = preDelta > 0
+        val preMake = preDelta < 0
+        val postBreak = postDelta > 0
+        val postMake = postDelta < 0
+        if (preBreak != postBreak) {
+            if (postBreak) state.boolBreakCount[u]++ else state.boolBreakCount[u]--
+        }
+        if (preMake != postMake) {
+            if (postMake) state.boolMakeCount[u]++ else state.boolMakeCount[u]--
+        }
+    }
 }

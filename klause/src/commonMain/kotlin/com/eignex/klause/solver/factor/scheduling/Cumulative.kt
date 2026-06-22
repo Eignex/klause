@@ -170,7 +170,6 @@ class Cumulative(
     fun resPosOf(varId: Int): Int = resPos[varId]
 
     override fun asPropagator(): Propagator = CumulativePropagator(
-        boolVars = boolVars,
         intVars = intVars,
         starts = starts,
         durations = durations,

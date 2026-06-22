@@ -93,7 +93,6 @@ class Disjunctive(
     )
 
     override fun asPropagator(): Propagator = DisjunctivePropagator(
-        boolVars = boolVars,
         intVars = intVars,
         starts = starts,
         durations = durations,
