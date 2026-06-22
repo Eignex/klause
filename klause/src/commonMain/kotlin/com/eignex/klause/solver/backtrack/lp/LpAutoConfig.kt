@@ -302,6 +302,7 @@ object LpAutoConfig {
                 // Implied-bound cuts (#D3): a cut family, so requires cuts active + Boolean structure.
                 impliedBoundCuts = base.lpPlan.impliedBoundCuts ||
                     (cuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
+                flowCoverCuts = base.lpPlan.flowCoverCuts || (cuts && config.resolved(LpTechnique.FLOW_COVER)),
                 lagrangian = base.lpPlan.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
                 energeticReasoning = base.lpPlan.energeticReasoning || energetic,
                 // Derive the cadence only when the auto path is the one enabling the check — an

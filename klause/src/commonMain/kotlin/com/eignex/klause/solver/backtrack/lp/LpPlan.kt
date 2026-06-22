@@ -279,4 +279,10 @@ data class LpPlan(
      * solution); requires [cuts]. Off by default.
      */
     val impliedBoundCuts: Boolean = false,
+    /**
+     * Separate single-node flow-cover cuts (#D1 / #D2): detect a capacity row `Σ yⱼ ≤ b` whose flows
+     * carry variable-upper-bounds `yⱼ ≤ uⱼ·xⱼ` (`xⱼ ∈ {0,1}`) and add the violated Padberg–Van Roy–Wolsey
+     * flow-cover inequality. Sound (valid at every integer solution); requires [cuts]. Off by default.
+     */
+    val flowCoverCuts: Boolean = false,
 )
