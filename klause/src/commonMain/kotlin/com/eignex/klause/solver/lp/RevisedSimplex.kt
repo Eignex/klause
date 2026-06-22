@@ -48,6 +48,11 @@ internal class RevisedSimplex(
     /** Use the long-step bound-flipping ratio test in the dual entering selection; false reproduces the
      *  plain minimum-ratio test (the parity baseline). */
     private val boundFlip: Boolean = true,
+    /** Harris two-pass ratio test: among the entering candidates whose ratio is within a tolerance of
+     *  the minimum, pick the one with the largest pivot magnitude (numerical stability), rather than the
+     *  strict minimum-ratio column. Correctness-neutral — the chosen column is still dual-eligible and
+     *  the basis is certified downstream — so it only changes the pivot path. Off by default (parity). */
+    private val harris: Boolean = false,
 ) {
     private val m = model.m
     private val n = model.n
@@ -283,7 +288,8 @@ internal class RevisedSimplex(
                 val j = elig[idx]
                 if (ratioBuf[j] < ratioBuf[q]) q = j
             }
-            return q
+            // Harris pass 2: keep the largest-pivot column among those within tolerance of the min ratio.
+            return if (harris) mostStableWithinTol(elig, ratioBuf, pivotRowEntry, ratioBuf[q]) else q
         }
         elig.sortBy { ratioBuf[it] }
         var acc = 0.0
@@ -296,10 +302,48 @@ internal class RevisedSimplex(
                 status[j] = if (status[j] == VarStatus.AT_LOWER) VarStatus.AT_UPPER else VarStatus.AT_LOWER
                 acc += cap
             } else {
-                return j
+                // The long step stops at column j (ratio θ). Harris: among the contiguous ratio-cluster
+                // [idx..] within tolerance of θ — all valid entering choices — take the largest pivot.
+                if (!harris) return j
+                val theta = ratioBuf[j]
+                var best = j
+                var bestMag = abs(pivotRowEntry[j])
+                var k = idx + 1
+                while (k < elig.size && ratioBuf[elig[k]] <= theta + HARRIS_TOL) {
+                    val cand = elig[k]
+                    val mag = abs(pivotRowEntry[cand])
+                    if (mag > bestMag) {
+                        bestMag = mag
+                        best = cand
+                    }
+                    k++
+                }
+                return best
             }
         }
         return elig[elig.size - 1] // defensive: the loop returns on the last element
+    }
+
+    /** Harris pass 2 for the plain min-ratio path: among [elig] whose ratio is within [HARRIS_TOL] of
+     *  [minRatio], the column with the largest pivot magnitude (most numerically stable). */
+    private fun mostStableWithinTol(
+        elig: ArrayList<Int>,
+        ratioBuf: DoubleArray,
+        pivotRowEntry: DoubleArray,
+        minRatio: Double,
+    ): Int {
+        var best = elig[0]
+        var bestMag = -1.0
+        for (idx in elig.indices) {
+            val j = elig[idx]
+            if (ratioBuf[j] > minRatio + HARRIS_TOL) continue
+            val mag = abs(pivotRowEntry[j])
+            if (mag > bestMag) {
+                bestMag = mag
+                best = j
+            }
+        }
+        return best
     }
 
     private fun optimal(beta: DoubleArray, factor: EtaBasis): FloatLpResult {
@@ -625,6 +669,10 @@ internal class RevisedSimplex(
 
     private companion object {
         const val TOL: Double = 1e-7
+
+        /** Ratio-tolerance band for the Harris two-pass entering test: columns whose dual ratio is
+         *  within this of the minimum are all valid pivots, so the largest-magnitude one is chosen. */
+        const val HARRIS_TOL: Double = 1e-9
 
         /** Slack tolerance on the initial primal-feasibility check ([solvePrimal]). */
         const val FEAS_TOL: Double = 1e-6
