@@ -228,11 +228,7 @@ internal object SymmetryBreaking {
         val n = values.size
         if (n > MAX_VERIFIED_GROUP) return emptyList()
         val ds = IntDisjointSet(n)
-        for (i in 0 until n) {
-            for (j in i + 1 until n) {
-                if (!ds.connected(i, j) && verifyValueSwap(problem, base, values[i], values[j])) ds.union(i, j)
-            }
-        }
+        unionVerifiedPairs(ds, IntArray(n) { it }) { i, j -> verifyValueSwap(problem, base, values[i], values[j]) }
         return ds.groups().map { group -> group.map { values[it] } }
     }
 
@@ -280,8 +276,8 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int>,
     ): Pair<List<IntArray>, List<IntArray>>? {
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList()) ?: return null
-        val intMap = IntArray(problem.numIntVars) { it }
-        val boolMap = IntArray(problem.numBoolVars) { it }
+        val intMap = identityIntMap(problem)
+        val boolMap = identityBoolMap(problem)
 
         val (intColour, boolColour) = refineColours(problem, objectiveIntVars, objectiveBoolVars)
         val intCandidates = HashMap<Int, MutableList<Int>>()
@@ -289,24 +285,14 @@ internal object SymmetryBreaking {
             if (v !in objectiveIntVars) intCandidates.getOrPut(intColour[v]) { ArrayList() }.add(v)
         }
         val intOrbits = buildVerifiedOrbits(problem.numIntVars, intCandidates.values.toList()) { u, v ->
-            intMap[u] = v
-            intMap[v] = u
-            val ok = isAutomorphism(problem, base, boolMap, intMap)
-            intMap[u] = u
-            intMap[v] = v
-            ok
+            withSwap(intMap, u, v) { isAutomorphism(problem, base, boolMap, intMap) }
         }
         val boolCandidates = HashMap<Int, MutableList<Int>>()
         for (v in 0 until problem.numBoolVars) {
             if (v !in objectiveBoolVars) boolCandidates.getOrPut(boolColour[v]) { ArrayList() }.add(v)
         }
         val boolOrbits = buildVerifiedOrbits(problem.numBoolVars, boolCandidates.values.toList()) { u, v ->
-            boolMap[u] = v
-            boolMap[v] = u
-            val ok = isAutomorphism(problem, base, boolMap, intMap)
-            boolMap[u] = u
-            boolMap[v] = v
-            ok
+            withSwap(boolMap, u, v) { isAutomorphism(problem, base, boolMap, intMap) }
         }
         return intOrbits to boolOrbits
     }
@@ -422,6 +408,52 @@ internal object SymmetryBreaking {
     private fun isAutomorphism(problem: Problem, base: Map<String, Int>, boolMap: IntArray, intMap: IntArray): Boolean =
         PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(boolMap, intMap) }
 
+    /** A fresh identity remap over the int variables (`map[v] == v`). Callers mutate a few slots for a
+     *  remap/automorphism check via [withSwap], which restores them. */
+    private fun identityIntMap(problem: Problem) = IntArray(problem.numIntVars) { it }
+
+    /** A fresh identity remap over the bool variables. */
+    private fun identityBoolMap(problem: Problem) = IntArray(problem.numBoolVars) { it }
+
+    /** Apply the transposition `u ↔ v` to [map], run [body], then restore both slots to their identity
+     *  (the value they must hold on entry). Centralises the apply/verify/restore dance so a missed
+     *  restore — which would silently corrupt later automorphism checks — can't happen per call site. */
+    private inline fun withSwap(map: IntArray, u: Int, v: Int, body: () -> Boolean): Boolean {
+        map[u] = v
+        map[v] = u
+        val ok = body()
+        map[u] = u
+        map[v] = v
+        return ok
+    }
+
+    /** Apply the position-wise block swap `a[k] ↔ b[k]` to [map], run [body], then restore each
+     *  touched slot to its identity. [a] and [b] must be disjoint, equal length, and identity on entry. */
+    private inline fun withSwap(map: IntArray, a: IntArray, b: IntArray, body: () -> Boolean): Boolean {
+        for (k in a.indices) {
+            map[a[k]] = b[k]
+            map[b[k]] = a[k]
+        }
+        val ok = body()
+        for (k in a.indices) {
+            map[a[k]] = a[k]
+            map[b[k]] = b[k]
+        }
+        return ok
+    }
+
+    /** Test every unordered pair within [scope] with [verify] (skipping pairs already connected) and
+     *  union the verified ones in [ds]. The shared inner step of every verified-orbit grouping. */
+    private inline fun unionVerifiedPairs(ds: IntDisjointSet, scope: IntArray, verify: (Int, Int) -> Boolean) {
+        for (i in scope.indices) {
+            for (j in i + 1 until scope.size) {
+                val u = scope[i]
+                val v = scope[j]
+                if (!ds.connected(u, v) && verify(u, v)) ds.union(u, v)
+            }
+        }
+    }
+
     /**
      * Verified block / row symmetry (#367): groups of int variables defined by *isomorphic* factors
      * (e.g. matrix rows, each an AllDifferent over a distinct row) are interchangeable as blocks.
@@ -432,7 +464,8 @@ internal object SymmetryBreaking {
      * row and cell breaking don't interact unsoundly.
      */
     private fun verifiedBlockLex(problem: Problem, objectiveIntVars: Set<Int>, alreadyBroken: Set<Int>): List<Factor> {
-        val intMap = IntArray(problem.numIntVars) { it }
+        val intMap = identityIntMap(problem)
+        val boolIdentity = identityBoolMap(problem)
         return verifiedBlockLexShared(
             problem = problem,
             objectiveVars = objectiveIntVars,
@@ -440,8 +473,15 @@ internal object SymmetryBreaking {
             varsOf = { it.intVars },
             wrongKind = { it.boolVars.isNotEmpty() || it.intVars.isEmpty() },
             blockEligible = { true },
-            shapeOf = { f, block -> canonicalShape(problem, f, block) },
-            swapVerified = { base, a, b -> blocksSwapVerified(problem, base, intMap, a, b) },
+            shapeOf = { f, block -> canonicalShape(problem, f, block, isBool = false) },
+            swapVerified = { base, a, b ->
+                blockSwapVerified(
+                    intMap,
+                    a,
+                    b,
+                    positionOk = { x, y -> domainKey(problem.intDomains[x]) == domainKey(problem.intDomains[y]) },
+                ) { isAutomorphism(problem, base, boolIdentity, intMap) }
+            },
             emit = { a, b -> LexLess(a, b, strict = false) },
         )
     }
@@ -477,13 +517,7 @@ internal object SymmetryBreaking {
         for ((_, blocks) in byShape) {
             if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
             val ds = IntDisjointSet(blocks.size)
-            for (i in blocks.indices) {
-                for (j in i + 1 until blocks.size) {
-                    if (!ds.connected(i, j) && swapVerified(base, blocks[i], blocks[j])) {
-                        ds.union(i, j)
-                    }
-                }
-            }
+            unionVerifiedPairs(ds, IntArray(blocks.size) { it }) { i, j -> swapVerified(base, blocks[i], blocks[j]) }
             for (cls in ds.groups()) {
                 val ordered = cls.map { blocks[it] }.sortedBy { it[0] }
                 for (k in 0 until ordered.size - 1) extra.add(emit(ordered[k], ordered[k + 1]))
@@ -492,38 +526,35 @@ internal object SymmetryBreaking {
         return extra
     }
 
-    /** Canonical structure key for a block: remap its (sorted) variables to `0..k-1`, so two
-     *  isomorphic factors over disjoint variables share a key. `null` if the factor isn't keyed. */
-    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray): String? {
-        val intMap = IntArray(problem.numIntVars) { it }
-        for (k in block.indices) intMap[block[k]] = k
-        return f.remap(IntArray(problem.numBoolVars) { it }, intMap).structuralKey()
+    /** Canonical structure key for a block of variables (bool when [isBool], else int): remap its
+     *  (sorted) variables to `0..k-1` with the other kind left identity, so two isomorphic factors
+     *  over disjoint variables share a key. `null` if the factor isn't keyed. */
+    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray, isBool: Boolean): String? {
+        val boolMap = identityBoolMap(problem)
+        val intMap = identityIntMap(problem)
+        val target = if (isBool) boolMap else intMap
+        for (k in block.indices) target[block[k]] = k
+        return f.remap(boolMap, intMap).structuralKey()
     }
 
-    /** Whether swapping disjoint blocks [a] and [b] position-wise (`a[k] ↔ b[k]`) is an automorphism
-     *  and each position has equal domains (domains aren't encoded in factors, so checked here). */
-    private fun blocksSwapVerified(
-        problem: Problem,
-        base: Map<String, Int>,
-        intMap: IntArray,
+    /** Whether swapping disjoint blocks [a] and [b] position-wise (`a[k] ↔ b[k]`) on the working
+     *  remap [map] (identity outside the blocks) is an automorphism. [positionOk] is an extra
+     *  per-position precondition — int blocks require position-wise equal domains (not encoded in
+     *  factors, so checked here); bool blocks have none. Overlapping blocks are rejected (a swap
+     *  would tangle). [automorphic] runs the structural check with the swap applied. */
+    private inline fun blockSwapVerified(
+        map: IntArray,
         a: IntArray,
         b: IntArray,
+        positionOk: (Int, Int) -> Boolean,
+        automorphic: () -> Boolean,
     ): Boolean {
         if (a.size != b.size) return false
         for (k in a.indices) {
             if (a[k] in b) return false // overlapping blocks: swap would tangle
-            if (domainKey(problem.intDomains[a[k]]) != domainKey(problem.intDomains[b[k]])) return false
+            if (!positionOk(a[k], b[k])) return false
         }
-        for (k in a.indices) {
-            intMap[a[k]] = b[k]
-            intMap[b[k]] = a[k]
-        }
-        val ok = isAutomorphism(problem, base, IntArray(problem.numBoolVars) { it }, intMap)
-        for (k in a.indices) {
-            intMap[a[k]] = a[k]
-            intMap[b[k]] = b[k]
-        }
-        return ok
+        return withSwap(map, a, b, automorphic)
     }
 
     /**
@@ -544,7 +575,8 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int>,
         alreadyBroken: Set<Int>,
     ): List<Factor> {
-        val boolMap = IntArray(problem.numBoolVars) { it }
+        val boolMap = identityBoolMap(problem)
+        val intIdentity = identityIntMap(problem)
         return verifiedBlockLexShared(
             problem = problem,
             objectiveVars = objectiveBoolVars,
@@ -552,42 +584,14 @@ internal object SymmetryBreaking {
             varsOf = { it.boolVars },
             wrongKind = { it.intVars.isNotEmpty() || it.boolVars.isEmpty() },
             blockEligible = { it.size <= MAX_BOOL_LEX_WIDTH },
-            shapeOf = { f, block -> canonicalBoolShape(problem, f, block) },
-            swapVerified = { base, a, b -> boolBlocksSwapVerified(problem, base, boolMap, a, b) },
+            shapeOf = { f, block -> canonicalShape(problem, f, block, isBool = true) },
+            swapVerified = { base, a, b ->
+                blockSwapVerified(boolMap, a, b, positionOk = { _, _ -> true }) {
+                    isAutomorphism(problem, base, boolMap, intIdentity)
+                }
+            },
             emit = { a, b -> boolLexLeader(a, b) },
         )
-    }
-
-    /** Canonical structure key for a bool block: remap its (sorted) variables to `0..k-1`, so two
-     *  isomorphic bool-only factors over disjoint variables share a key. `null` if unkeyed. */
-    private fun canonicalBoolShape(problem: Problem, f: Factor, block: IntArray): String? {
-        val boolMap = IntArray(problem.numBoolVars) { it }
-        for (k in block.indices) boolMap[block[k]] = k
-        return f.remap(boolMap, IntArray(problem.numIntVars) { it }).structuralKey()
-    }
-
-    /** Whether swapping disjoint bool blocks [a] and [b] position-wise (`a[k] ↔ b[k]`) is an
-     *  automorphism. Bools carry no domain, so (unlike [blocksSwapVerified]) there is no domain
-     *  check — only structural verification via [isAutomorphism]. */
-    private fun boolBlocksSwapVerified(
-        problem: Problem,
-        base: Map<String, Int>,
-        boolMap: IntArray,
-        a: IntArray,
-        b: IntArray,
-    ): Boolean {
-        if (a.size != b.size) return false
-        for (k in a.indices) if (a[k] in b) return false // overlapping blocks: swap would tangle
-        for (k in a.indices) {
-            boolMap[a[k]] = b[k]
-            boolMap[b[k]] = a[k]
-        }
-        val ok = isAutomorphism(problem, base, boolMap, IntArray(problem.numIntVars) { it })
-        for (k in a.indices) {
-            boolMap[a[k]] = a[k]
-            boolMap[b[k]] = b[k]
-        }
-        return ok
     }
 
     /** Lex-leader `a ≤ₗₑₓ b` on two equal-length bool rows as a [PseudoBoolean]. Reading each row
@@ -621,13 +625,7 @@ internal object SymmetryBreaking {
             // Size guard (#367): each group costs O(size² × factors) verifications. Skip groups
             // beyond the cap — fewer symmetries broken, never unsound.
             if (group.size > MAX_VERIFIED_GROUP) continue
-            for (i in group.indices) {
-                for (j in i + 1 until group.size) {
-                    val u = group[i]
-                    val v = group[j]
-                    if (!ds.connected(u, v) && verify(u, v)) ds.union(u, v)
-                }
-            }
+            unionVerifiedPairs(ds, group.toIntArray(), verify)
         }
         val byRoot = HashMap<Int, MutableList<Int>>()
         for (group in candidateGroups) for (v in group) byRoot.getOrPut(ds.find(v)) { ArrayList() }.add(v)
