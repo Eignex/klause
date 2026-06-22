@@ -8,8 +8,10 @@ import com.eignex.klause.solver.backtrack.SEARCH_CUT_ROUNDS
 import com.eignex.klause.solver.backtrack.snapshotAssignment
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.ExactBasisCertifier
+import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.LpOverflowException
 import com.eignex.klause.solver.lp.RevisedSimplex
+import com.eignex.klause.solver.lp.SimplexPricing
 import com.eignex.klause.solver.lp.VarStatus
 import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.cut.Cut
@@ -70,6 +72,15 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
     // sound fallback.
     Long.MIN_VALUE
 }
+
+/** A [RevisedSimplex] over [model] using the engine's configured leaving-variable pricing (#B1):
+ *  Devex when [LpPlan.devexPricing] is set, else the default Dantzig rule. Pricing is correctness-
+ *  neutral, so this never changes the result — only the pivot path. */
+private fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): RevisedSimplex = RevisedSimplex(
+    model,
+    cancellation,
+    pricing = if (params.lpPlan.devexPricing) SimplexPricing.DEVEX else SimplexPricing.DANTZIG,
+)
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
@@ -161,7 +172,7 @@ internal fun LpEngine.sparseSafePrune(
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
-    val simplex = RevisedSimplex(relaxation.model, cancellation)
+    val simplex = dualSimplex(relaxation.model, cancellation)
     val result = simplex.solve(warm) ?: run {
         // Infeasibility prune (#705): a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
@@ -217,7 +228,7 @@ internal fun LpEngine.sparseSafePrune(
             } catch (_: LpOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
-            val r = RevisedSimplex(tightened.model, cancellation).solve() ?: break
+            val r = dualSimplex(tightened.model, cancellation).solve() ?: break
             sink.observeLpSolve()
             boundRel = tightened
             boundRes = r
@@ -427,7 +438,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     val relaxation = nodeRelaxation(relaxer, session, globalCuts)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
-    val result = RevisedSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
+    val result = dualSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
     // #B0: when enabled, take the cheap integer-multiplier 128-bit bound first (sound: ≤ the rational
     // certified ceil), falling back to the BigRational dual solve only when the rounded multipliers
@@ -463,7 +474,7 @@ internal fun LpEngine.rootLpRelaxationBound(
     if (relaxation.model.n == 0) {
         Double.NaN
     } else {
-        val result = RevisedSimplex(relaxation.model, cancellation).solve()
+        val result = dualSimplex(relaxation.model, cancellation).solve()
         val safe = result?.let { safeObjectiveLowerBound(relaxation.model, it.duals) }
         if (safe != null) safe + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
@@ -493,7 +504,7 @@ internal fun LpEngine.harvestRootCuts(
     try {
         var relaxation = relaxer.build(session)
         if (relaxation.model.n == 0) return emptyList()
-        var simplex = RevisedSimplex(relaxation.model, cancellation)
+        var simplex = dualSimplex(relaxation.model, cancellation)
         var result = simplex.solve() ?: return emptyList()
         var round = 0
         while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
@@ -509,7 +520,7 @@ internal fun LpEngine.harvestRootCuts(
             val added = pool.addAll(structural + (gomoryCuts + mirCuts).filter { it.global })
             if (added == 0) break
             relaxation = relaxer.build(session, pool.cuts())
-            simplex = RevisedSimplex(relaxation.model, cancellation)
+            simplex = dualSimplex(relaxation.model, cancellation)
             result = simplex.solve() ?: break
         }
         // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
@@ -541,7 +552,7 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
     val relaxation = CpToLpRelaxation(problem, objective).build(session)
     if (relaxation.model.n == 0) return null
     val result = try {
-        RevisedSimplex(relaxation.model, cancellation).solve()
+        dualSimplex(relaxation.model, cancellation).solve()
     } catch (_: LpOverflowException) {
         return null
     } ?: return null
@@ -644,8 +655,8 @@ private fun LpEngine.solveRelaxation(
     val relaxation = CpToLpRelaxation(problem, obj).build(session)
     if (relaxation.model.n == 0) return null
     val result = try {
-        RevisedSimplex(relaxation.model, cancellation).solvePrimal()
-            ?: RevisedSimplex(relaxation.model, cancellation).solve()
+        dualSimplex(relaxation.model, cancellation).solvePrimal()
+            ?: dualSimplex(relaxation.model, cancellation).solve()
     } catch (_: LpOverflowException) {
         return null
     } ?: return null
