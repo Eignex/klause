@@ -8,6 +8,7 @@ import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.solver.factor.arithmetic.Product
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.bool.Cardinality
@@ -219,6 +220,10 @@ internal class CpToLpRelaxation(
      *  a [CircuitArcModel] feeding [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets the
      *  hull only (its cutset structure differs, #431). Adds O(arcs) columns, so it is gated. */
     private val circuitArcs: Boolean = false,
+    /** When true, relax each [Product] `result = a·b` with its **McCormick envelope** (four bound-derived
+     *  inequalities). For `a = b` (a square) the envelope degenerates to the secant/tangent relaxation.
+     *  Adds four rows per product over the existing columns, so it is gated; off by default. */
+    private val productMcCormick: Boolean = false,
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -886,6 +891,8 @@ internal class CpToLpRelaxation(
                         addBoolRow(factor.literals, factor.weights, rel, factor.bound.toLong())
                     }
 
+                    is Product -> if (productMcCormick) buildProductMcCormick(factor)
+
                     else -> Unit // hard globals and unrecognized factors: handled elsewhere or skipped
                 }
             }
@@ -1402,6 +1409,43 @@ internal class CpToLpRelaxation(
             resCols[k] = intColumn(factor.result)
             resVals[k] = -1L
             builder.addRow(resCols, resVals, Relation.EQ, 0L)
+        }
+
+        /**
+         * McCormick envelope of one [Product] `result = a·b` (#C4) — the four bound-derived inequalities
+         * `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`, `(aH−a)(b−bL) ≥ 0`, `(a−aL)(bH−b) ≥ 0`, each expanded
+         * to a linear row in `result, a, b`. They are valid at every point with `aL ≤ a ≤ aH`,
+         * `bL ≤ b ≤ bH` and `result = a·b`, so the relaxation never cuts a feasible point. Bounds are the
+         * **declared** domains (global). For `a = b` (a square) the `a` and `b` coefficients coalesce, so
+         * the envelope becomes the secant/tangent relaxation of `result = a²`.
+         */
+        private fun buildProductMcCormick(factor: Product) {
+            val aDom = problem.intDomains[factor.a]
+            val bDom = problem.intDomains[factor.b]
+            val aL = aDom.min.toLong()
+            val aH = aDom.max.toLong()
+            val bL = bDom.min.toLong()
+            val bH = bDom.max.toLong()
+            val aCol = intColumn(factor.a)
+            val bCol = intColumn(factor.b)
+            val resCol = intColumn(factor.result)
+            // Each row is `result + ca·a + cb·b  rel  rhs`; coefficients coalesce when a and b coincide.
+            mcCormickRow(resCol, aCol, bCol, -bL, -aL, Relation.GE, -(aL * bL)) // (a−aL)(b−bL) ≥ 0
+            mcCormickRow(resCol, aCol, bCol, -bH, -aH, Relation.GE, -(aH * bH)) // (a−aH)(b−bH) ≥ 0
+            mcCormickRow(resCol, aCol, bCol, -bL, -aH, Relation.LE, -(aH * bL)) // (aH−a)(b−bL) ≥ 0
+            mcCormickRow(resCol, aCol, bCol, -bH, -aL, Relation.LE, -(aL * bH)) // (a−aL)(bH−b) ≥ 0
+        }
+
+        /** Emit `result + ca·a + cb·b rel rhs`, summing coefficients over shared columns (so a square
+         *  `a·a` collapses the two operand terms onto one column). */
+        private fun mcCormickRow(resCol: Int, aCol: Int, bCol: Int, ca: Long, cb: Long, rel: Relation, rhs: Long) {
+            val coeff = HashMap<Int, Long>()
+            coeff[resCol] = (coeff[resCol] ?: 0L) + 1L
+            coeff[aCol] = (coeff[aCol] ?: 0L) + ca
+            coeff[bCol] = (coeff[bCol] ?: 0L) + cb
+            val cols = coeff.keys.toIntArray()
+            val vals = LongArray(cols.size) { coeff.getValue(cols[it]) }
+            builder.addRow(cols, vals, rel, rhs)
         }
 
         /**
