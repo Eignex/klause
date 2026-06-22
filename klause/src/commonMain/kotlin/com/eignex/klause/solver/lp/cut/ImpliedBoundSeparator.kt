@@ -2,7 +2,6 @@ package com.eignex.klause.solver.lp.cut
 
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.presolve.Presolve
 

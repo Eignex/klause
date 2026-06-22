@@ -2,6 +2,7 @@ package com.eignex.klause.solver.lp.cut
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.lp.Relation
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -22,12 +23,12 @@ class ImpliedBoundSeparatorTest {
         return when (cut.rel) {
             Relation.LE -> lhs <= cut.rhs + 1e-9
             Relation.GE -> lhs >= cut.rhs - 1e-9
-            Relation.EQ -> kotlin.math.abs(lhs - cut.rhs) <= 1e-9
+            Relation.EQ -> abs(lhs - cut.rhs) <= 1e-9
         }
     }
 
     @Test
-    fun `cut holds exactly when the implication holds, over all polarities and assignments`() {
+    fun `cut holds exactly when the implication holds over all polarities and assignments`() {
         val boolColOf = intArrayOf(0, 1) // var 0 → col 0, var 1 → col 1
         for (fromPos in booleanArrayOf(true, false)) {
             for (toPos in booleanArrayOf(true, false)) {

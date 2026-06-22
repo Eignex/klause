@@ -76,6 +76,8 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
      * the pool, so the relaxation stays valid: selecting fewer cuts only loosens the bound, never
      * removes a feasible point. Insertion order breaks ties (the efficacy sort is stable).
      *
+     * @param primal the current LP point cuts are scored against.
+     * @param max the maximum number of cuts to return.
      * @param minEfficacy reject cuts whose normalised violation is below this (CP-SAT's `1e-4`).
      * @param minOrthogonality require each added cut's cosine-to-nearest-selected `≤ 1 − this`.
      */
@@ -108,8 +110,12 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
             if (col in primal.indices) lhs += cut.coeffs[k] * primal[col]
         }
         val violation = when (cut.rel) {
-            Relation.GE -> cut.rhs - lhs // `Σ ≥ rhs` violated when below
-            Relation.LE -> lhs - cut.rhs // `Σ ≤ rhs` violated when above
+            Relation.GE -> cut.rhs - lhs
+
+            // `Σ ≥ rhs` violated when below
+            Relation.LE -> lhs - cut.rhs
+
+            // `Σ ≤ rhs` violated when above
             Relation.EQ -> abs(lhs - cut.rhs)
         }
         if (violation <= 0.0) return 0.0
