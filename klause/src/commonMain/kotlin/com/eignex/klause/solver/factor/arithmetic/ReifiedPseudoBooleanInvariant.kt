@@ -4,10 +4,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move.BoolFlip
-import com.eignex.klause.solver.factor.bool.buildSignedWeightByVar
-import com.eignex.klause.solver.factor.bool.pbDistance
-import com.eignex.klause.solver.factor.bool.pbHolds
-import com.eignex.klause.solver.factor.bool.reifiedDegree
+import com.eignex.klause.solver.factor.bool.internals.buildSignedWeightByVar
+import com.eignex.klause.solver.factor.bool.internals.pbDistance
+import com.eignex.klause.solver.factor.bool.internals.pbHolds
+import com.eignex.klause.solver.factor.bool.internals.reifiedDegree
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink

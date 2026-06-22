@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
@@ -12,10 +13,11 @@ import com.eignex.klause.util.IntHashSet
 
 /**
  * `Σ weights`i` * lit_i ⟨op⟩ bound` over Boolean literals (each contributing its weight when
- * true, 0 when false). Payload at `intPayload[factorId]` is the current weighted sum.
+ * true, 0 when false). Payload at `intPayload(factorId)` is the current weighted sum.
  */
-class PseudoBoolean(weights: IntArray, literals: IntArray, op: PbOp, bound: Int) :
-    PseudoBooleanSumFactor(weights, literals, op, bound, excludedVar = -1) {
+class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp, val bound: Int) : Factor {
+
+    override val intVars: IntArray = EmptyIntArray
 
     override fun structuralKey(): String = "pb:$op:$bound:" + literals.indices.sortedBy { literals[it] }.joinToString(
         ",",
@@ -29,36 +31,6 @@ class PseudoBoolean(weights: IntArray, literals: IntArray, op: PbOp, bound: Int)
     override fun asPropagator(): Propagator = PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
     override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, intVars, weights, literals, op, bound)
-}
-
-/**
- * Range `[sumLo, sumHi]` reachable by `Σ weights`i` * lit_i` given current pins.
- *
- * Per-literal contribution: `{0, w}` (or `{w, 0}` for negative weights) when unassigned;
- * `{w}` when literal pinned true; `{0}` when pinned false.
- */
-internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: IntArray): LongArray {
-    var lo = 0L
-    var hi = 0L
-    for (i in literals.indices) {
-        val w = weights[i].toLong()
-        val v = Lit.variable(literals[i])
-        val b = state.boolValues[v]
-        when {
-            b == null -> {
-                lo += minOf(0L, w)
-                hi += maxOf(0L, w)
-            }
-
-            Lit.evaluate(literals[i], b) -> {
-                lo += w
-                hi += w
-            }
-
-            else -> { /* contributes 0 */ }
-        }
-    }
-    return longArrayOf(lo, hi)
 }
 
 /**

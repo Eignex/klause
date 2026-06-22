@@ -4,8 +4,10 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.ReifiedFactor
-import com.eignex.klause.solver.factor.bool.CoalescedTerms
-import com.eignex.klause.solver.factor.bool.coalesceLinearTerms
+import com.eignex.klause.solver.factor.bool.internals.CoalescedTerms
+import com.eignex.klause.solver.factor.bool.internals.coalesceLinearTerms
+import com.eignex.klause.solver.factor.bool.internals.linearHolds
+import com.eignex.klause.solver.factor.bool.internals.linearResidual
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.solver.localsearch.LocalSearchState
 
@@ -18,10 +20,18 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 class ReifiedLinear private constructor(
     override val auxBoolVar: Int,
     terms: CoalescedTerms,
-    op: LinearOp,
-    bound: Int,
-) : LinearSumFactor(terms, op, bound),
-    ReifiedFactor {
+    val op: LinearOp,
+    val bound: Int,
+) : ReifiedFactor {
+
+    val vars: IntArray = terms.vars
+    val coeffs: IntArray = terms.coeffs
+
+    init {
+        require(coeffs.isNotEmpty()) { "linear sum must have at least one term" }
+    }
+
+    override val intVars: IntArray = vars
 
     /**
      * `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced
@@ -43,10 +53,15 @@ class ReifiedLinear private constructor(
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
 
-    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
+        linearHolds(state.longPayload[factorId], op, bound)
 
-    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
-        residual(state.longPayload[factorId], softCap)
+    override fun residualNow(
+        state: LocalSearchState,
+        factorId: Int,
+        softCap: Int
+    ): Int =
+        linearResidual(state.longPayload[factorId], op, bound, softCap)
 
     override fun asPropagator(): Propagator =
         ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, coeffs, vars, op, bound)

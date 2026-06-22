@@ -4,8 +4,8 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
-import com.eignex.klause.solver.factor.bool.CoalescedTerms
-import com.eignex.klause.solver.factor.bool.coalesceLinearTerms
+import com.eignex.klause.solver.factor.bool.internals.CoalescedTerms
+import com.eignex.klause.solver.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -14,16 +14,20 @@ import com.eignex.klause.solver.factor.remapVars
  * variable, the integer value that on its own would put the sum on the right side of `bound`,
  * clamped to the variable's domain.
  */
-class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int) :
-    LinearSumFactor(
-        terms,
-        op,
-        bound,
-    ) {
+class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bound: Int) : Factor {
+
+    val vars: IntArray = terms.vars
+    val coeffs: IntArray = terms.coeffs
+
+    init {
+        require(coeffs.isNotEmpty()) { "linear sum must have at least one term" }
+    }
+
+    override val intVars: IntArray = vars
 
     /**
      * `Σ coeffs(i) * vars(i) ⟨op⟩ bound`. Duplicate variables are coalesced (their coefficients
-     * summed) so the local-search payload stays consistent regardless of caller (issue #84).
+     * summed) so the local-search payload stays consistent regardless of caller.
      */
     constructor(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(coalesceLinearTerms(vars, coeffs), op, bound)
@@ -36,7 +40,7 @@ class Linear private constructor(terms: CoalescedTerms, op: LinearOp, bound: Int
     /**
      * A pure binary value relation `c·x ⟨=|≠⟩ c·y` — two terms with opposite-equal coefficients and a
      * zero bound, comparing for equality or distinctness. Its allowed-tuple set (`{x = y}` / `{x ≠ y}`)
-     * is invariant under *any* uniform relabeling of values, so it is value-anonymous (#501). Every
+     * is invariant under *any* uniform relabeling of values, so it is value-anonymous. Every
      * other linear is value-meaningful: an ordering (`≤`/`≥`) is not relabeling-invariant, and a
      * nonzero bound or non-opposite coefficients tie the variables to specific magnitudes.
      */

@@ -3,9 +3,9 @@ package com.eignex.klause.solver.factor.arithmetic
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.factor.arithmetic.internals.findCoeff
-import com.eignex.klause.solver.factor.bool.linearDegree
-import com.eignex.klause.solver.factor.bool.linearHolds
-import com.eignex.klause.solver.factor.bool.snapLinearTarget
+import com.eignex.klause.solver.factor.bool.internals.linearDegree
+import com.eignex.klause.solver.factor.bool.internals.linearHolds
+import com.eignex.klause.solver.factor.bool.internals.snapLinearTarget
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 

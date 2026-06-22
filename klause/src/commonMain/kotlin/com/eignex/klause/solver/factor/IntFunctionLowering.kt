@@ -10,29 +10,12 @@ import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.bool.Clause
 import kotlin.math.abs
 
-/**
- * Shared factor-level encodings for the functional integer builtins that both front-ends
- * must lower the same way: `int_abs` and `int_min`/`int_max`. The schema compiler
- * ([com.eignex.klause.compile.Lowering]) and the FlatZinc compiler used to hand-build these
- * factors independently; this is the single source of truth so the two can't drift.
- *
- * Each function takes resolved integer-variable ids plus a `freshBool` allocator (the two
- * compilers number their auxiliary Booleans differently) and returns the replacement
- * factors over those vars. The caller is responsible for having declared `result` with an
- * adequate domain — these encodings constrain it but do not size it.
- *
- * `int_div`/`int_mod` are also here ([truncatedDivMod]). klause standardizes on MiniZinc's
- * truncated-toward-zero semantics for every front-end: SMT-LIB (which would want Euclidean)
- * rejects div/mod as nonlinear and XCSP3 doesn't build them, so nothing requires the old
- * Euclidean variant — one truncated encoding now serves both the schema DSL and FlatZinc.
- */
+// Single source of truth for int_abs, int_min/max, int_div/mod: the schema and FlatZinc compilers
+// used to encode these independently and could drift. Truncated-toward-zero throughout (MiniZinc
+// semantics); nothing in the supported front-ends requires Euclidean.
 internal object IntFunctionLowering {
 
-    /**
-     * `result = |operand|`: `operand ≤ result` and `−operand ≤ result` (so `result ≥ |operand|`,
-     * and `result ≥ 0` follows), plus `(result = operand) ∨ (result = −operand)` to pin it to
-     * the absolute value exactly.
-     */
+    // result = |operand|: operand ≤ result ∧ −operand ≤ result ∧ (result = operand ∨ result = −operand).
     fun absFactors(operand: Int, result: Int, freshBool: () -> Int): List<Factor> {
         val pa = freshBool()
         val pb = freshBool()
@@ -45,12 +28,8 @@ internal object IntFunctionLowering {
         )
     }
 
-    /**
-     * `result = max(args)` (when [isMax]) or `result = min(args)`. For max: `result ≥ arg` for
-     * every arg, plus `result` equals at least one arg; for min the bound flips to `result ≤ arg`.
-     * The "equals at least one" half is a disjunction of reified equalities, which is what makes
-     * the bound tight (otherwise `result` could float strictly above the max / below the min).
-     */
+    // The disjunction of reified equalities pins result to exactly one arg value; without it
+    // result could float strictly above the max or below the min.
     fun minMaxFactors(result: Int, args: IntArray, isMax: Boolean, freshBool: () -> Int): List<Factor> {
         val out = ArrayList<Factor>(args.size * 2 + 1)
         for (arg in args) {
@@ -69,19 +48,9 @@ internal object IntFunctionLowering {
         return out
     }
 
-    /** The vars and factors produced by [truncatedDivMod]: the quotient and remainder var
-     *  ids (whichever the caller passed through, or the ones freshly allocated) plus the
-     *  encoding [factors]. */
     class TruncDivMod(val quotient: Int, val remainder: Int, val factors: List<Factor>)
 
-    /**
-     * Truncated-toward-zero `q = a / b`, `rem = a − b·q` — MiniZinc's `int_div`/`int_mod`
-     * semantics: `|rem| < |b|` and `rem` takes the sign of the dividend `a`. Pass the
-     * caller-owned [quotient] / [remainder] var when it already exists (an FZN-declared
-     * result, or the value the caller wants back); pass `null` to have one minted via
-     * [freshInt]. [domainA] / [domainB] are the current domains of [a] / [b] and size the
-     * fresh aux vars. `b ≠ 0` is the caller's responsibility (left to propagation here).
-     */
+    // b ≠ 0 is the caller's responsibility (left to propagation).
     fun truncatedDivMod(
         a: Int,
         b: Int,
@@ -114,7 +83,6 @@ internal object IntFunctionLowering {
         val qDomain = if (bMag == 0) IntDomain(-aMag, aMag) else IntDomain(-aMag - 1, aMag + 1)
         val q = quotient ?: freshInt(qDomain)
         val rem = remainder ?: freshInt(IntDomain(-bMag + 1, bMag - 1))
-        // q · b = prod, then prod + rem = a.
         val prod = freshInt(IntDomain(-aMag - bMag - 1, aMag + bMag + 1))
         out += Product(a = q, b = b, result = prod)
         out += Linear(intArrayOf(1, 1, -1), intArrayOf(prod, rem, a), LinearOp.EQ, 0)

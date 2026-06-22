@@ -1,11 +1,13 @@
 package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.ReifiedFactor
-import com.eignex.klause.solver.factor.bool.PseudoBooleanSumFactor
+import com.eignex.klause.solver.factor.bool.internals.pbDegree
+import com.eignex.klause.solver.factor.bool.internals.pbHolds
 import com.eignex.klause.solver.factor.litVars
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.localsearch.LocalSearchState
@@ -14,9 +16,10 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
  * current weighted sum.
  */
-class ReifiedPseudoBoolean(override val auxBoolVar: Int, weights: IntArray, literals: IntArray, op: PbOp, bound: Int) :
-    PseudoBooleanSumFactor(weights, literals, op, bound, excludedVar = auxBoolVar),
+class ReifiedPseudoBoolean(override val auxBoolVar: Int, val weights: IntArray, val literals: IntArray, val op: PbOp, val bound: Int) :
     ReifiedFactor {
+
+    override val intVars:IntArray = EmptyIntArray
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
@@ -28,10 +31,15 @@ class ReifiedPseudoBoolean(override val auxBoolVar: Int, weights: IntArray, lite
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
 
-    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean = holds(state.longPayload[factorId])
+    override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
+        pbHolds(state.longPayload[factorId], op, bound)
 
-    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
-        residual(state.longPayload[factorId], softCap)
+    override fun residualNow(
+        state: LocalSearchState,
+        factorId: Int,
+        softCap: Int
+    ): Int =
+        pbDegree(state.longPayload[factorId], op, bound, softCap)
 
     override fun asPropagator(): Propagator =
         ReifiedPseudoBooleanPropagator(auxBoolVar, weights, literals, op, bound, boolVars, intVars)

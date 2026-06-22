@@ -7,12 +7,9 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  *  `ReifiedPseudoBoolean` — an interface so a factor can also extend a body abstraction. */
 interface ReifiedFactor : Factor {
 
-    /** Reification literal: true iff the body predicate holds. */
     val auxBoolVar: Int
 
-    /** Whether the body predicate currently holds. */
     fun holdsNow(state: LocalSearchState, factorId: Int): Boolean
 
-    /** Compressed body residual at the current payload — graded distance to satisfying the body. */
     fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int
 }

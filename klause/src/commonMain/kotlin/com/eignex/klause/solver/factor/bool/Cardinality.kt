@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.factor.bool
 
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
@@ -10,8 +11,14 @@ import com.eignex.klause.solver.factor.remapLits
  * `min ≤ (#true literals) ≤ max`. Payload at `longPayload(factorId)` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
-class Cardinality(literals: IntArray, min: Int, max: Int) :
-    CardinalitySumFactor(literals, min, max, excludedVar = -1) {
+class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
+
+    init {
+        require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
+        require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
+    }
+
+    override val intVars: IntArray = EmptyIntArray
 
     override fun structuralKey(): String = "card:$min:$max:" + literals.sorted().joinToString(",")
 

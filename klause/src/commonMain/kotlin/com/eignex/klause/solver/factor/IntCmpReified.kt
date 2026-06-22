@@ -15,7 +15,7 @@ fun reifiedIntCompare(auxBoolVar: Int, intVar: Int, op: IntCmpOp, bound: Int): R
     val (linOp, adjustedBound) = when (op) {
         IntCmpOp.LE -> LinearOp.LE to bound
 
-        // bound ∓ 1 widened to Long so a bound at Int.MIN/MAX doesn't wrap (issue #73).
+        // bound ∓ 1 widened to Long so a bound at Int.MIN/MAX doesn't wrap.
         IntCmpOp.LT -> LinearOp.LE to checkedBound(bound.toLong() - 1, op, bound)
 
         IntCmpOp.GE -> LinearOp.GE to bound
@@ -29,8 +29,7 @@ fun reifiedIntCompare(auxBoolVar: Int, intVar: Int, op: IntCmpOp, bound: Int): R
     return ReifiedLinear(auxBoolVar, intArrayOf(1), intArrayOf(intVar), linOp, adjustedBound)
 }
 
-/** Narrow a strict-inequality bound adjustment to `Int`, failing loudly when the ±1 shift
- *  would wrap past the `Int` range (e.g. `x > Int.MAX_VALUE`). */
+// ±1 shift of a strict-inequality bound can wrap past Int range (e.g. x > Int.MAX_VALUE).
 private fun checkedBound(value: Long, op: IntCmpOp, bound: Int): Int {
     require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
         "reifiedIntCompare: $op bound $bound adjusts to $value which exceeds Int range"
