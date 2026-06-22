@@ -34,7 +34,7 @@ class GaussianXor(
     /** The individual parity constraints forming this Gaussian system. */
     val constraints: List<Xor>,
 ) : Factor,
-    GaussianXorInvariant {
+    Invariant {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         GaussianXor(constraints.map { it.remap(boolMap, intMap) as Xor })
