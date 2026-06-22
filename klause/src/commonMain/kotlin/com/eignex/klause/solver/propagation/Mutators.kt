@@ -452,7 +452,16 @@ internal fun PropagationState.excludeIntValues(v: Int, values: IntArray, anteced
             if (undoLogging) logExclusionCarveAtom(v, iv[i])
         }
     }
-    dirtyInts.addLast(v)
+    // A batched exclusion can move both endpoints and carve interior holes at once; raise every
+    // event kind that actually occurred so typed-event advisors (e.g. a bounds-consistent [Linear]
+    // subscribed to LB_RAISED / UB_LOWERED, dropped from this var's occurrence-list wakeup) wake.
+    // Marking only [dirtyInts] without the kind bits under-sets the event and silently drops the
+    // wake — the single-value [excludeIntValueImpl] / [tightenBoundImpl] paths mark the kind too.
+    var kindMask = 0
+    if (newMin != d.min) kindMask = kindMask or IntEvent.LB_RAISED_BIT
+    if (newMax != d.max) kindMask = kindMask or IntEvent.UB_LOWERED_BIT
+    if (interior != null) kindMask = kindMask or IntEvent.VALUE_REMOVED_BIT
+    markIntDirty(v, kindMask)
     propagateAtomsForExclusionBatch(v, d.min, d.max, antMin, antMax, interior, antecedents)
     return true
 }

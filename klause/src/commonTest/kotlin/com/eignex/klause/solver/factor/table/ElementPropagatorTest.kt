@@ -10,6 +10,8 @@ import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.propagation.IntEvent
@@ -111,6 +113,40 @@ class ElementPropagatorTest {
                 }
             }
             assertEquals(brute, enumerate(problem, seed), "seed=$seed: const-array element must match brute force")
+        }
+    }
+
+    @Test
+    fun `const-array element narrowing wakes a bounds-subscribed linear summing its results`() {
+        // r1 = arr(idx1), r2 = arr(idx2) over constant arrays, with `r1 + r2 <= 60` capping their sum.
+        // The sum cap can't fold into either result's domain (each result alone is well under 60), so
+        // it stays an active Linear over the two results. During search, fixing an idx narrows its
+        // result to a single value via the batched GAC exclusion; that exclusion must raise the bound
+        // events so the Linear — which subscribes to LB_RAISED/UB_LOWERED and is dropped from each
+        // result's occurrence-list wakeup — fires and rejects a sum over 60. A batched exclusion that
+        // marked the var dirty without the event kind under-set the wake, so backtrack reached leaves
+        // with r1 + r2 = 100 and emitted them as solutions (#865).
+        val arr = intArrayOf(50, 10)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(0, 100), IntDomain(0, 100)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 2, arr = arr, arrIsVars = false, indexOffset = 1),
+                Element(idx = 1, result = 3, arr = arr, arrIsVars = false, indexOffset = 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.LE, 60),
+            ),
+        )
+        val brute = HashSet<List<Int>>()
+        for (i1 in 1..2) {
+            for (i2 in 1..2) {
+                val r1 = arr[i1 - 1]
+                val r2 = arr[i2 - 1]
+                if (r1 + r2 <= 60) brute.add(listOf(i1, i2, r1, r2))
+            }
+        }
+        for (seed in 1L..5L) {
+            assertEquals(brute, enumerate(problem, seed), "seed=$seed: must not emit r1+r2 > 60 leaves")
         }
     }
 
