@@ -16,10 +16,15 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
  * current weighted sum.
  */
-class ReifiedPseudoBoolean(override val auxBoolVar: Int, val weights: IntArray, val literals: IntArray, val op: PbOp, val bound: Int) :
-    ReifiedFactor {
+class ReifiedPseudoBoolean(
+    override val auxBoolVar: Int,
+    val weights: IntArray,
+    val literals: IntArray,
+    val op: PbOp,
+    val bound: Int,
+) : ReifiedFactor {
 
-    override val intVars:IntArray = EmptyIntArray
+    override val intVars: IntArray = EmptyIntArray
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
@@ -34,11 +39,7 @@ class ReifiedPseudoBoolean(override val auxBoolVar: Int, val weights: IntArray, 
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
         pbHolds(state.longPayload[factorId], op, bound)
 
-    override fun residualNow(
-        state: LocalSearchState,
-        factorId: Int,
-        softCap: Int
-    ): Int =
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         pbDegree(state.longPayload[factorId], op, bound, softCap)
 
     override fun asPropagator(): Propagator =

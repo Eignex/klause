@@ -56,11 +56,7 @@ class ReifiedLinear private constructor(
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
         linearHolds(state.longPayload[factorId], op, bound)
 
-    override fun residualNow(
-        state: LocalSearchState,
-        factorId: Int,
-        softCap: Int
-    ): Int =
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         linearResidual(state.longPayload[factorId], op, bound, softCap)
 
     override fun asPropagator(): Propagator =

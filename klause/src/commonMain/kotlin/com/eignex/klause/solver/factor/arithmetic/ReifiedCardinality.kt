@@ -40,11 +40,7 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
         return sum >= min && sum <= max
     }
 
-    override fun residualNow(
-        state: LocalSearchState,
-        factorId: Int,
-        softCap: Int
-    ): Int =
+    override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         compressViolation(countDistance(state.longPayload[factorId]), softCap)
 
     private fun countDistance(n: Long): Long = (if (n < min) min - n else 0L) + (if (n > max) n - max else 0L)
