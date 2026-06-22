@@ -78,7 +78,7 @@ class SubcircuitPropagatorTest {
     @Test
     fun `n=2 valid subcircuits are exactly self-loops and 2-cycle`() {
         // n=2: valid assignments are {0→0, 1→1} and {0→1, 1→0}.
-        val brute = setOf(listOf(0, 0), listOf(1, 0))
+        val brute = setOf(listOf(0, 1), listOf(1, 0))
         val problem = problem(2)
         val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L))
             .take(10_000).map { it.ints.toList() }.toHashSet()

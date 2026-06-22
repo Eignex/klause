@@ -68,7 +68,7 @@ class SubcircuitInvariantTest {
         val predicted = state.factors[0].deltaIfIntSet(state, 0, intVar = 2, newValue = 3)
         state.apply(IntSet(2, 3))
         val actual = state.intPayload[0]
-        assertEquals(actual, predicted + 0 /* old cost */, "predicted delta must equal actual cost change")
+        assertEquals(actual, predicted, "predicted delta must equal actual cost change")
         assertTrue(actual > 0, "including a node pointing to an excluded node should raise cost")
     }
 
@@ -92,8 +92,12 @@ class SubcircuitInvariantTest {
         assertEquals(0, oneCycleCost, "one 6-cycle should have zero cost")
 
         // Two disjoint 3-cycles.
-        state.assignment.setInt(0, 1); state.assignment.setInt(1, 2); state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 4); state.assignment.setInt(4, 5); state.assignment.setInt(5, 3)
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 0)
+        state.assignment.setInt(3, 4)
+        state.assignment.setInt(4, 5)
+        state.assignment.setInt(5, 3)
         state.recompute()
         val twoCycleCost = state.intPayload[0]
         assertTrue(twoCycleCost > 0, "two disjoint cycles should have positive cost")
