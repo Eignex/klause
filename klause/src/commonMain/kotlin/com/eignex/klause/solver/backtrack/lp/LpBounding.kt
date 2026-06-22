@@ -34,6 +34,7 @@ import com.eignex.klause.util.IntHashSet
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.round
+import kotlin.random.Random
 
 /**
  * Sound lower bound on a [LinearObjective] given the current partial assignment in
@@ -599,13 +600,17 @@ private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo:
  * rounded target sits at a declared bound — every Boolean and any integer rounded to its bound — and
  * omits interior integer targets, whose `|x − t|` is not linear; this only steers the search, never
  * affects soundness (a returned [Sample] is a fully-pinned, propagation-feasible assignment the caller
- * still re-evaluates). Stops at the first feasible rounding, a repeated rounding (cycle), or the round
- * cap. Re-solves prefer the primal pass ([RevisedSimplex.solvePrimal], phase-1 included) and fall back
- * to the dual [RevisedSimplex.solve].
+ * still re-evaluates). Stops at the first feasible rounding or the round cap. A repeated rounding
+ * (cycle) triggers a Fischetti–Glover–Lodi perturbation ([perturbRounding]) — flip the most-fractional
+ * coordinates and keep pumping — up to [PUMP_MAX_RESTARTS] times before giving up. Re-solves prefer the
+ * primal pass ([RevisedSimplex.solvePrimal], phase-1 included) and fall back to the dual
+ * [RevisedSimplex.solve].
  */
 internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation: Cancellation): Sample? {
     var solved = solveRelaxation(objective, cancellation) ?: return null
     val seen = HashSet<String>()
+    val rng = Random(params.randomSeed ?: 0L)
+    var restarts = 0
     repeat(PUMP_ROUNDS) {
         if (cancellation()) return null
         val (relaxation, primal) = solved
@@ -618,8 +623,13 @@ internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation
             val col = relaxation.boolColOf[b]
             col in 0 until primal.size && primal[col] >= 0.5
         }
-        if (!seen.add(intTarget.joinToString(",") + "|" + boolTarget.joinToString(","))) {
-            return null // repeated rounding ⇒ cycle; perturbation/restart is a follow-up
+        if (!seen.add(pumpKey(intTarget, boolTarget))) {
+            // Cycle: perturb the rounding (flip the most-fractional coordinates) and keep pumping, rather
+            // than giving up. Steering only — a returned [Sample] is still re-checked downstream.
+            if (++restarts > PUMP_MAX_RESTARTS) return null
+            val flips = PUMP_MIN_FLIP + rng.nextInt(PUMP_MIN_FLIP + 1)
+            perturbRounding(relaxation, primal, intTarget, boolTarget, flips)
+            seen.add(pumpKey(intTarget, boolTarget))
         }
         val session = PropagationSession(problem)
         if (!session.isUnsatAtRoot) {
@@ -630,6 +640,50 @@ internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation
         solved = solveRelaxation(distance, cancellation) ?: return null
     }
     return null
+}
+
+/** The dedup key of a feasibility-pump rounding (its full integer + Boolean target tuple). */
+private fun pumpKey(intTarget: IntArray, boolTarget: BooleanArray): String =
+    intTarget.joinToString(",") + "|" + boolTarget.joinToString(",")
+
+/**
+ * Fischetti–Glover–Lodi perturbation: flip the [count] most-fractional structural coordinates of a
+ * pump rounding **in place** — a Boolean flips its bit, an integer rounds the other way (toward the LP
+ * value, clamped to its domain) — so a cycled pump escapes to a fresh rounding. Pure steering: the pump
+ * only proposes roundings that [pinToward] re-realizes and the caller re-evaluates, so this never
+ * affects soundness.
+ */
+private fun LpEngine.perturbRounding(
+    relaxation: LpRelaxation,
+    primal: DoubleArray,
+    intTarget: IntArray,
+    boolTarget: BooleanArray,
+    count: Int,
+) {
+    // Live structural columns by fractionality |primal − target|, descending.
+    val cols = IntArrayList()
+    val fracs = ArrayList<Double>()
+    for (col in relaxation.colVarId.indices) {
+        if (col >= primal.size || relaxation.colVarId[col] < 0) continue
+        val t = targetOfCol(relaxation, intTarget, boolTarget, col) ?: continue
+        val f = abs(primal[col] - t)
+        if (f > PUMP_FRAC_TOL) {
+            cols.add(col)
+            fracs.add(f)
+        }
+    }
+    val order = (0 until cols.size).sortedByDescending { fracs[it] }
+    for (rank in 0 until minOf(count, order.size)) {
+        val col = cols[order[rank]]
+        val v = relaxation.colVarId[col]
+        if (relaxation.colIsBool[col]) {
+            boolTarget[v] = !boolTarget[v]
+        } else {
+            val d = problem.intDomains[v]
+            val cur = intTarget[v]
+            intTarget[v] = if (primal[col] >= cur) (cur + 1).coerceAtMost(d.max) else (cur - 1).coerceAtLeast(d.min)
+        }
+    }
 }
 
 /** Build [obj]'s relaxation at the root and solve it, preferring the primal pass (phase-1 included) and
@@ -707,3 +761,12 @@ private fun LpEngine.distanceObjective(
 
 /** Round cap for the feasibility pump before it gives up to search. */
 private const val PUMP_ROUNDS = 20
+
+/** Max pump cycles to escape by perturbation before giving up. */
+private const val PUMP_MAX_RESTARTS = 8
+
+/** Base count of most-fractional coordinates flipped per perturbation (actual = base + rand[0, base]). */
+private const val PUMP_MIN_FLIP = 3
+
+/** Below this `|primal − target|` a coordinate is effectively integral — not worth flipping. */
+private const val PUMP_FRAC_TOL = 1e-6
