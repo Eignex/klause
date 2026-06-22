@@ -25,6 +25,7 @@ class MoveSourceCatalogTest {
             "ejection-chains" to EjectionChains.ID,
             "stall-kick" to StallKick.ID,
             "pair-swap" to PairSwap.ID,
+            "clique-swap" to CliqueSwap.ID,
         )
         assertEquals(expected.keys, MoveSourceCatalog.labels.toSet(), "catalog labels drifted")
         for ((label, id) in expected) {

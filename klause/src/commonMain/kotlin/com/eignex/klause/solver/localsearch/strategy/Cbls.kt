@@ -5,6 +5,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.solver.localsearch.TabuFilter
 import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.solver.localsearch.movesource.CliqueSwap
 import com.eignex.klause.solver.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.solver.localsearch.movesource.EjectionChains
 import com.eignex.klause.solver.localsearch.movesource.Frontier
@@ -67,6 +68,9 @@ fun Cbls(
     stallChainCap: Int = 0,
     /** Maximum repair steps per ejection chain (only consulted when [stallChainCap] > 0). */
     stallChainDepth: Int = 4,
+    /** **Clique swaps** (opt-in, `0` = off): cap on stall-gated, score-only at-most-one clique-swap
+     *  compounds per pick — the categorical relocation packing/assignment cliques need. */
+    stallCliqueSwapCap: Int = 0,
     /** **Targeted kick** (opt-in, `0` = off): steps without a strict cost drop before a bounded
      *  LNS-style [StallKick] perturbation fires. Should be ≫ [frontierAfterStall]. */
     stallKickAfter: Int = 0,
@@ -93,6 +97,7 @@ fun Cbls(
         if (stallChainCap > 0) {
             add(ConfiguredSource(EjectionChains(stallChainCap, stallChainDepth), stallGated = true))
         }
+        if (stallCliqueSwapCap > 0) add(ConfiguredSource(CliqueSwap(stallCliqueSwapCap), stallGated = true))
     }
     return SourceDrivenStrategy(
         sources = sources,
