@@ -111,6 +111,38 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession): VarRef? {
     return best
 }
 
+/**
+ * Objective shaving (#E3, CP-SAT's `ShaveObjectiveLb`): raise the proven lower bound on an ascending
+ * (minimized) [objectiveVar] by probing. Assume `objectiveVar ≤ v` in a fresh root session and, if the
+ * sound propagation + LP relaxation proves that infeasible — `pruneNode` run with an *infinite*
+ * incumbent, so it fires only on a genuine (Farkas-certified / propagation) infeasibility, never on
+ * bound dominance — conclude `objectiveVar ≥ v + 1` and step `v` up. Returns the improved bound (the
+ * largest `v + 1` proven), or null when nothing shaves or the objective is not a single ascending
+ * variable. **Sound:** every raise is backed by a proof that all lower values are infeasible; the caller
+ * tightens the search's objective lower bound to the returned value. Bounded by [SHAVE_MAX_ITERS] and
+ * [token].
+ */
+internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, token: Cancellation): Int? {
+    if (!ascending || objectiveVar < 0 || lpRelaxer == null) return null
+    val root = PropagationSession(problem)
+    if (root.isUnsatAtRoot) return null
+    var candidate = root.intDomain(objectiveVar).min
+    var improved: Int? = null
+    var iters = 0
+    while (iters++ < SHAVE_MAX_ITERS && !token()) {
+        val s = PropagationSession(problem)
+        if (s.isUnsatAtRoot) break
+        // objectiveVar ≤ candidate infeasible (propagation Unsat, or LP infeasible at an infinite bound)
+        // ⇒ every solution has objectiveVar ≥ candidate + 1.
+        val infeasible = s.implyIntAtMost(objectiveVar, candidate) is PropagationResult.Unsat ||
+            pruneNode(s, Double.POSITIVE_INFINITY, objectiveVar, ascending)
+        if (!infeasible) break
+        candidate += 1
+        improved = candidate
+    }
+    return improved
+}
+
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
@@ -798,6 +830,9 @@ private const val LP_BRANCH_MIN_SCORE = 1e-9
 
 /** Skip reduced-cost-average branching above this variable count — the per-decision scan is `O(vars)`. */
 private const val LP_BRANCH_SCAN_CAP = 8192
+
+/** Max upward probes for objective shaving before it stops (each probe is one propagation + LP solve). */
+private const val SHAVE_MAX_ITERS = 64
 
 /** Round cap for the feasibility pump before it gives up to search. */
 private const val PUMP_ROUNDS = 20

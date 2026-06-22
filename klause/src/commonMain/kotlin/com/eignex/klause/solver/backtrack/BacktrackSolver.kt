@@ -15,6 +15,7 @@ import com.eignex.klause.solver.backtrack.lp.lpBranchPick
 import com.eignex.klause.solver.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.solver.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.solver.backtrack.lp.rootLpRelaxationBound
+import com.eignex.klause.solver.backtrack.lp.shaveObjectiveLb
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.objective.LinearObjective
@@ -530,6 +531,16 @@ class BacktrackSolver(override val problem: Problem) :
                 // root relaxation cannot starve search of its first node.
                 val rootToken = rootLpBudget()
                 initRootLp(rootToken)
+                // Objective shaving (#E3): raise the objective's proven lower bound before search when
+                // the LP + propagation prove lower values infeasible. Sound — every raise is a proof —
+                // so tightening the root session here only strengthens pruning.
+                if (lpEngine.params.lpPlan.objectiveShaving) {
+                    singleObj?.let { obj ->
+                        lpEngine.shaveObjectiveLb(obj.varId, obj.ascending, rootToken)?.let { lb ->
+                            session.implyIntAtLeast(obj.varId, lb)
+                        }
+                    }
+                }
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
                 if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
