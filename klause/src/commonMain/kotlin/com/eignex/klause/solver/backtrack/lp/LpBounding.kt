@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.CUT_POOL_ROUNDS
 import com.eignex.klause.solver.backtrack.GOMORY_CUTS_PER_ROUND
 import com.eignex.klause.solver.backtrack.SEARCH_CUT_ROUNDS
+import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.backtrack.snapshotAssignment
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.IntegerCertificate
@@ -77,6 +78,37 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
  *  only the pivot path / conditioning, never the certified optimum). */
 private fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): RevisedSimplex =
     RevisedSimplex(model, cancellation)
+
+/**
+ * Reduced-cost-average branching (#E1): pick the unassigned variable with the highest LP branch score
+ * (reduced-cost pseudo-cost × fractionality, [LpHints.branchScore]), or null when LP branching is off,
+ * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
+ * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
+ * branch, so search stays complete and correct regardless. `O(unassigned)` per call, capped.
+ */
+internal fun LpEngine.lpBranchPick(session: PropagationSession): VarRef? {
+    val hints = lpHints ?: return null
+    if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
+    var best: VarRef? = null
+    var bestScore = LP_BRANCH_MIN_SCORE
+    for (b in 0 until problem.numBoolVars) {
+        if (session.boolValue(b) != null) continue
+        val s = hints.branchScore(VarRef.Bool(b))
+        if (!s.isNaN() && s > bestScore) {
+            bestScore = s
+            best = VarRef.Bool(b)
+        }
+    }
+    for (i in 0 until problem.numIntVars) {
+        if (session.intDomain(i).size <= 1) continue
+        val s = hints.branchScore(VarRef.IntVar(i))
+        if (!s.isNaN() && s > bestScore) {
+            bestScore = s
+            best = VarRef.IntVar(i)
+        }
+    }
+    return best
+}
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
@@ -186,9 +218,10 @@ internal fun LpEngine.sparseSafePrune(
     }
     sink.observeLpPivots(result.pivots)
     sink.observeLpLuFill(result.luMaxFill, result.luMaxDensity)
-    // LP-guided branching (#287): record the fractional primal so the descent can order branch values
-    // toward the LP point. Purely advisory — it never changes feasibility or the optimum.
-    hints?.record(relaxation, result.primal)
+    // LP-guided branching (#287): record the fractional primal + reduced costs so the descent can order
+    // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
+    // advisory — it never changes feasibility or the optimum.
+    hints?.record(relaxation, result.primal, result.duals)
     // The optimal basis is cached by the caller and reused to warm-start this node's children (#705).
     // It is the basis of the un-tightened persistent relaxation, which the children re-solve.
     val optimalBasis = result.basis
@@ -704,6 +737,13 @@ private fun LpEngine.distanceObjective(
     }
     return if (any) LinearObjective(boolWeights = boolCoef, intCoefficients = intCoef) else null
 }
+
+/** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
+ *  this a variable is effectively LP-integral / cost-free, so the configured heuristic decides. */
+private const val LP_BRANCH_MIN_SCORE = 1e-9
+
+/** Skip reduced-cost-average branching above this variable count — the per-decision scan is `O(vars)`. */
+private const val LP_BRANCH_SCAN_CAP = 8192
 
 /** Round cap for the feasibility pump before it gives up to search. */
 private const val PUMP_ROUNDS = 20

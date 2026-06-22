@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.backtrack.lp.LpAutoConfig
 import com.eignex.klause.solver.backtrack.lp.LpEngine
 import com.eignex.klause.solver.backtrack.lp.harvestRootCuts
+import com.eignex.klause.solver.backtrack.lp.lpBranchPick
 import com.eignex.klause.solver.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.solver.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.solver.backtrack.lp.rootLpRelaxationBound
@@ -577,7 +578,10 @@ class BacktrackSolver(override val problem: Problem) :
                         continue@outer
                     }
                     if (descend) {
-                        val varRef = params.variableSelector.pick(session, rng)
+                        // Reduced-cost-average branching (#E1): prefer the LP's most cost-impactful
+                        // fractional variable; null falls back to the configured selector. Advisory —
+                        // any branch is sound, and the selector's event hooks still fire below.
+                        val varRef = lpEngine.lpBranchPick(session) ?: params.variableSelector.pick(session, rng)
                         if (varRef == null) {
                             val snap = snapshotAssignment(session)
                             params.variableSelector.onSolution(snap)
