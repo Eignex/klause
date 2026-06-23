@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.solver.factor.global.internals.reginTarjanScc
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -45,9 +46,14 @@ internal class NValuePropagator(
         val ant = collectHoleAndBoundAntecedents(state, intVars)
         // atLeast / eq: the distinct count cannot exceed the maximum number of variables that can be
         // assigned pairwise-distinct values — a maximum bipartite var↦value matching. Tighter than
-        // |union of domains|, which ignores that there are only `xs.size` variables.
+        // |union of domains|, which ignores that there are only `xs.size` variables. When the count is
+        // pinned to that maximum, a maximum matching is mandatory, so Régin value-pruning applies.
         if (mode != NValue.Mode.AtMost) {
-            if (!state.tightenIntMax(n, maxMatching(state), ant)) return false
+            val matching = buildMatching(state)
+            if (!state.tightenIntMax(n, matching.size, ant)) return false
+            if (state.intDomains[n].min == matching.size) {
+                if (!atLeastGacPrune(state, matching, ant)) return false
+            }
         }
         // atMost / eq: Beldiceanu's O(n+d) bound-consistency — the count is at least the size of a
         // maximal set of pairwise-disjoint value windows, and when that lower bound meets `n`'s upper
@@ -98,25 +104,81 @@ internal class NValuePropagator(
         return true
     }
 
-    /** Size of a maximum bipartite matching between `xs` and their domain values (Kuhn's algorithm). */
-    private fun maxMatching(state: PropagationState): Int {
+    /** A maximum bipartite matching between `xs` and their domain values (Kuhn's algorithm). */
+    private class Matching(
+        val varToVal: IntArray,
+        val valToVar: IntArray,
+        val values: IntArray,
+        val adj: Array<IntArrayList>,
+        val size: Int,
+    )
+
+    private fun buildMatching(state: PropagationState): Matching {
         val valueId = HashMap<Int, Int>()
+        val values = IntArrayList()
         val adj = Array(xs.size) { i ->
             val ids = IntArrayList()
             state.intDomains[xs[i]].forEach { v ->
-                val id = valueId.getOrPut(v) { valueId.size }
+                val id = valueId.getOrPut(v) { values.add(v); values.size - 1 }
                 ids.add(id)
             }
             ids
         }
-        val matchValToVar = IntArray(valueId.size) { -1 }
-        val seen = BooleanArray(valueId.size)
+        val nVals = values.size
+        val valToVar = IntArray(nVals) { -1 }
+        val seen = BooleanArray(nVals)
         var matched = 0
         for (i in xs.indices) {
             seen.fill(false)
-            if (augment(i, adj, matchValToVar, seen)) matched++
+            if (augment(i, adj, valToVar, seen)) matched++
         }
-        return matched
+        val varToVal = IntArray(xs.size) { -1 }
+        for (v in 0 until nVals) if (valToVar[v] >= 0) varToVal[valToVar[v]] = v
+        return Matching(varToVal, valToVar, values.toIntArray(), adj, matched)
+    }
+
+    /**
+     * Régin value-pruning for atLeast/eq once the count is pinned to the maximum matching size: a
+     * maximum matching is then mandatory, so any var-value pair that lies in no maximum matching has
+     * no support and is removed, while a matched pair that crosses a strong component (in every
+     * maximum matching) is forced. Orientation: matched edges value→var, the rest var→value, with a
+     * source/sink wiring free vars/values so alternating paths from exposed vertices join one SCC.
+     */
+    @Suppress("ReturnCount", "NestedBlockDepth")
+    private fun atLeastGacPrune(state: PropagationState, m: Matching, ant: IntArray?): Boolean {
+        val nv = xs.size
+        val nVals = m.valToVar.size
+        val total = nv + nVals + 2
+        val src = nv + nVals
+        val sink = nv + nVals + 1
+        val adj = Array(total) { IntArrayList() }
+        for (i in 0 until nv) {
+            val row = m.adj[i]
+            for (k in 0 until row.size) {
+                val vId = row[k]
+                val vNode = nv + vId
+                if (m.varToVal[i] == vId) adj[vNode].add(i) else adj[i].add(vNode)
+            }
+            if (m.varToVal[i] == -1) adj[src].add(i) else adj[i].add(src)
+        }
+        for (vId in 0 until nVals) {
+            val vNode = nv + vId
+            if (m.valToVar[vId] == -1) adj[vNode].add(sink) else adj[sink].add(vNode)
+        }
+        val scc = reginTarjanScc(adj, total)
+        for (i in 0 until nv) {
+            val vIds = m.adj[i].toIntArray()
+            for (vId in vIds) {
+                if (scc[i] == scc[nv + vId]) continue
+                val value = m.values[vId]
+                if (m.varToVal[i] == vId) {
+                    if (!state.setInt(xs[i], value, ant)) return false
+                } else {
+                    if (!state.excludeIntValue(xs[i], value, ant)) return false
+                }
+            }
+        }
+        return true
     }
 
     private fun augment(i: Int, adj: Array<IntArrayList>, matchValToVar: IntArray, seen: BooleanArray): Boolean {
