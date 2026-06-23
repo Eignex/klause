@@ -126,6 +126,24 @@ class Int128Test {
     }
 
     @Test
+    fun `floorDivPositive fast path matches the oracle on Long-range dividends`() {
+        // The fitsLong fast path replaces the 128-bit loop with native floored division; pin its edges
+        // (Long extremes, negatives with a remainder) against the BigInteger oracle. fitsLong holds for
+        // every value here, so this exercises only the fast path.
+        val dividends = longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE, -1L, 0L, 1L, -7L, 7L, -1024L, 123_456_789L)
+        val divisors = longArrayOf(1L, 2L, 3L, 7L, 1024L, Long.MAX_VALUE)
+        for (value in dividends) {
+            for (d in divisors) {
+                val acc = Int128().apply { addProduct(value, 1L) }
+                assertTrue(acc.fitsLong(), "$value must fit a Long")
+                val (q, r) = big(value).divideAndRemainder(big(d))
+                val floor = if (r.signum() < 0) q - BigInteger.ONE else q
+                assertEquals(floor.toLongOrNull(), acc.floorDivPositive(d), "floor($value / $d)")
+            }
+        }
+    }
+
+    @Test
     fun `shiftLeft matches the oracle times a power of two`() {
         // Bounded inputs (< 2⁵³) shifted by ≤ 62 stay < 2¹¹⁵, so no shift overflows here; this exercises
         // the value path exactly. (Overflow simply latches → ceilDivPow2 yields null → sound fallback.)
