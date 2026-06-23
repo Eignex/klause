@@ -21,6 +21,31 @@ import kotlin.test.assertTrue
 class DisjunctivePropagatorTest {
 
     @Test
+    fun `energetic-window conflict reason cites only the tasks packed into the overloaded window`() {
+        // Four unit tasks over starts [0,9] (globally schedulable). A decision squeezes tasks 0,1,2
+        // to start ≤ 1, packing three unit jobs into the length-2 window [0,2) — an edge-finding
+        // overload with no compulsory overlap, so the mutual-precedence/profile paths miss it. The
+        // sharp reason must cite only tasks 0,1,2, never the idle task 3 (start ≥ 5), and be entailed.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
+            factors = arrayOf<Factor>(Disjunctive(starts = intArrayOf(0, 1, 2, 3), durations = intArrayOf(1, 1, 1, 1))),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 1)); check(state.tightenIntMax(1, 1)); check(state.tightenIntMax(2, 1))
+        check(state.tightenIntMin(3, 5)) // idle task tightened so a coarse reason would cite it
+        assertFalse(problem.propagators[0].propagate(state, 0))
+        val reason = problem.propagators[0].conflictReason(state, 0)!!
+        val citedVars = reason.map { state.atomIntVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        assertTrue(citedVars.all { it in setOf(0, 1, 2) }, "reason must cite only the packed tasks, got $citedVars")
+        assertTrue(3 !in citedVars, "idle task 3 must not appear in the sharp reason")
+        ConflictReasonOracle.assertEntailed(problem, state, 0, "disjunctive-energetic")
+    }
+
+    @Test
     fun `mutual-precedence conflict reason is a sound nogood citing only the two tasks`() {
         // Three duration-3 tasks over starts [0,9] (globally schedulable at 0,3,6). A decision
         // squeezes task 0 and task 1 both to start ≤ 2: each would then have to run strictly after

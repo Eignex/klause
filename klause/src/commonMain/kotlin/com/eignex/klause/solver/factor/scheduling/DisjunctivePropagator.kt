@@ -40,33 +40,91 @@ internal class DisjunctivePropagator(
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        // Sharp reason for a mutual-precedence contradiction: two tasks each forced to run strictly
-        // after the other (`est_i + dur_i > lst_j` both ways) is implied by just those two starts'
-        // bounds (plus their duration vars, if variable). Other failures — time-table / edge-finding
-        // overloads, which would need the overloaded window reconstructed — fall back to the sound
-        // whole-scope reason.
+        // Each sharp path cites only the tasks responsible for a self-contained contradiction; any
+        // failure none of them matches falls back to the sound whole-scope reason.
         val effDur = effDurOrNull(state)
         if (effDur != null) {
-            for (i in 0 until n) {
-                if (effDur[i] == 0 || !OptPresence.isDefinitelyPresent(presents, i, state)) continue
-                val di = state.intDomains[starts[i]]
-                for (j in 0 until n) {
-                    if (j == i || effDur[j] == 0 || !OptPresence.isDefinitelyPresent(presents, j, state)) continue
-                    val dj = state.intDomains[starts[j]]
-                    if (di.min + effDur[i] > dj.max && dj.min + effDur[j] > di.max) {
-                        val vars = IntArrayList()
-                        vars.add(starts[i])
-                        vars.add(starts[j])
-                        if (durationVars.isNotEmpty()) {
-                            vars.add(durationVars[i])
-                            vars.add(durationVars[j])
-                        }
-                        return collectLinearTightenAntecedents(state, vars.toIntArray(), excludeIdx = -1, extraLit = 0)
-                    }
+            mutualPrecedenceReason(state, effDur)?.let { return it }
+            profileOverloadReason(state, effDur)?.let { return it }
+            energeticWindowReason(state, effDur)?.let { return it }
+        }
+        return collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+    }
+
+    private fun isActive(state: PropagationState, i: Int, effDur: IntArray): Boolean =
+        effDur[i] != 0 && OptPresence.isDefinitelyPresent(presents, i, state)
+
+    private fun reasonOver(state: PropagationState, taskIdx: IntArrayList): IntArray? {
+        val vars = IntArrayList()
+        for (t in 0 until taskIdx.size) {
+            val i = taskIdx[t]
+            vars.add(starts[i])
+            if (durationVars.isNotEmpty()) vars.add(durationVars[i])
+        }
+        return collectLinearTightenAntecedents(state, vars.toIntArray(), excludeIdx = -1, extraLit = 0)
+    }
+
+    /** Two tasks each forced strictly after the other — implied by just those two starts. */
+    private fun mutualPrecedenceReason(state: PropagationState, effDur: IntArray): IntArray? {
+        for (i in 0 until n) {
+            if (!isActive(state, i, effDur)) continue
+            val di = state.intDomains[starts[i]]
+            for (j in 0 until n) {
+                if (j == i || !isActive(state, j, effDur)) continue
+                val dj = state.intDomains[starts[j]]
+                if (di.min + effDur[i] > dj.max && dj.min + effDur[j] > di.max) {
+                    val pair = IntArrayList()
+                    pair.add(i)
+                    pair.add(j)
+                    return reasonOver(state, pair)
                 }
             }
         }
-        return collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        return null
+    }
+
+    /** Tasks whose compulsory parts stack two-deep over one time point — a unit-resource overload. */
+    private fun profileOverloadReason(state: PropagationState, effDur: IntArray): IntArray? {
+        val profile = MandatoryProfile()
+        for (i in 0 until n) {
+            if (!isActive(state, i, effDur)) continue
+            val dom = state.intDomains[starts[i]]
+            profile.addTask(lst = dom.max, ect = dom.min + effDur[i], resource = 1)
+        }
+        if (profile.build(cap = 1)) return null
+        val t = profile.overloadTime
+        val covering = IntArrayList()
+        for (i in 0 until n) {
+            if (!isActive(state, i, effDur)) continue
+            val dom = state.intDomains[starts[i]]
+            if (dom.max <= t && t < dom.min + effDur[i]) covering.add(i)
+        }
+        return if (covering.size >= 2) reasonOver(state, covering) else null
+    }
+
+    /** A window `[t1, t2)` whose fully-contained tasks' durations sum past its length cannot pack. */
+    private fun energeticWindowReason(state: PropagationState, effDur: IntArray): IntArray? {
+        for (a in 0 until n) {
+            if (!isActive(state, a, effDur)) continue
+            val t1 = state.intDomains[starts[a]].min
+            for (b in 0 until n) {
+                if (!isActive(state, b, effDur)) continue
+                val t2 = state.intDomains[starts[b]].max + effDur[b]
+                if (t2 <= t1) continue
+                val inside = IntArrayList()
+                var load = 0L
+                for (i in 0 until n) {
+                    if (!isActive(state, i, effDur)) continue
+                    val dom = state.intDomains[starts[i]]
+                    if (dom.min >= t1 && dom.max + effDur[i] <= t2) {
+                        inside.add(i)
+                        load += effDur[i].toLong()
+                    }
+                }
+                if (load > (t2 - t1).toLong() && inside.size >= 2) return reasonOver(state, inside)
+            }
+        }
+        return null
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
