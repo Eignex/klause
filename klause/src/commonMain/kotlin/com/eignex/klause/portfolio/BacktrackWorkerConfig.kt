@@ -62,7 +62,7 @@ internal data class BacktrackWorkerConfig(
         var params = build(seed + 1000L + index, workerEvent)
         pools?.clauses?.let { params = params.copy(clauseExchange = PoolClauseExchange(it)) }
         pools?.cuts?.let { params = params.copy(cutExchange = PoolCutExchange(it)) }
-        // Wire this arm to the shared objective lower-bound manager (#809 / F1) when optimising: publish
+        // Wire this arm to the shared objective lower-bound manager when optimising: publish
         // the bounds it proves and tighten its objective floor to the cross-arm maximum.
         if (objective != null) {
             pools?.bounds?.let { bounds ->
@@ -123,18 +123,18 @@ internal data class BacktrackWorkerConfig(
             BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpConfig = LpConfig(emphasis))
         }
 
-        /** A best-bound-dive LP arm (#809 / F3): the DEFAULT LP stack plus the `lb_tree_search` primal
-         *  subsolver (#E2), which explores the branch-and-bound tree best-first before search to land good
+        /** A best-bound-dive LP arm: the DEFAULT LP stack plus the `lb_tree_search` primal
+         *  subsolver, which explores the branch-and-bound tree best-first before search to land good
          *  incumbents fast. The flag rides the base plan, which the LP auto-config preserves; it is a no-op
          *  when the LP relaxation is off (so a `--lp off` ceiling neutralises it). The other LP primal
-         *  heuristic — the rounding probe and its feasibility-pump fallback (#E4) — is already auto-on for
+         *  heuristic — the rounding probe and its feasibility-pump fallback — is already auto-on for
          *  every LP arm, so no separate pump arm is needed. */
         fun lpTreeSearchArm() = BacktrackWorkerConfig("lp-lbtree") { seed, onEvent ->
             val base = BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
             base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT), lpPlan = base.lpPlan.copy(lbTreeSearch = true))
         }
 
-        // COP spread (#429 / #809 F3): the OFF arms (satOptimized / conflictDriven / linucb / free) hedge
+        // COP spread: the OFF arms (satOptimized / conflictDriven / linucb / free) hedge
         // the per-instance LP trade against an LP-intensity spread — AGGRESSIVE (closes the bound hard),
         // DEFAULT (simplex bounding), CONSERVATIVE (cheap combinatorial bounds) — plus the best-bound-dive
         // primal arm. A supplied `--lp` ceiling caps every LP arm via [diverse].

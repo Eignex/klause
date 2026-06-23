@@ -82,19 +82,19 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Cumulative / Disjunctive time-indexed `x_{i,t}` reformulation over a bounded horizon (#453). */
     CUMULATIVE_TIME_INDEXED("cumulative-time-indexed", LpTiming.EXHAUSTIVE),
 
-    /** ArrayMinMax Anderson big-M tight face on top of the envelope (#C3). */
+    /** ArrayMinMax Anderson big-M tight face on top of the envelope. */
     LINMAX_TIGHT("linmax-tight", LpTiming.EXHAUSTIVE),
 
-    /** Product `result = a·b` McCormick envelope (square ⇒ secant/tangent) (#C4). */
+    /** Product `result = a·b` McCormick envelope (square ⇒ secant/tangent). */
     PRODUCT_MCCORMICK("product-mccormick", LpTiming.EXHAUSTIVE),
 
-    /** Boolean RLT: knapsack-row × binary products with McCormick (#D4). */
+    /** Boolean RLT: knapsack-row × binary products with McCormick. */
     BOOLEAN_RLT("boolean-rlt", LpTiming.EXHAUSTIVE),
 
-    /** Implied-bound cuts from the probing implication graph (#D3); a cut family. */
+    /** Implied-bound cuts from the probing implication graph; a cut family. */
     IMPLIED_BOUND("implied-bound", LpTiming.EXHAUSTIVE),
 
-    /** Single-node flow-cover cuts from VUB / capacity structure (#D1 / #D2); a cut family. */
+    /** Single-node flow-cover cuts from VUB / capacity structure; a cut family. */
     FLOW_COVER("flow-cover", LpTiming.EXHAUSTIVE),
     ;
 

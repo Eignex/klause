@@ -6,8 +6,8 @@ import kotlin.math.log2
 import kotlin.math.roundToLong
 
 /**
- * Integer-multiplier exact lower bound on the minimized objective `cᵀz` — the Kotlin-Multiplatform
- * analogue of CP-SAT's `int128` `PropagateExactLpReason` (#B0). It is the integer-exact twin of the
+ * Integer-multiplier exact lower bound on the minimized objective `cᵀz`, in portable Kotlin-Multiplatform
+ * 128-bit integer arithmetic. It is the integer-exact twin of the
  * floating-point [safeObjectiveLowerBound]: instead of solving the dual system exactly in rationals it
  * takes the *approximate* float duals [y], **rounds them to integer multipliers** at a power-of-two
  * scale `2ᵏ`, and evaluates the Lagrangian

@@ -224,11 +224,11 @@ internal class CpToLpRelaxation(
      *  inequalities). For `a = b` (a square) the envelope degenerates to the secant/tangent relaxation.
      *  Adds four rows per product over the existing columns, so it is gated; off by default. */
     private val productMcCormick: Boolean = false,
-    /** When true, add Boolean RLT rows (#D4): multiply each small 0/1 knapsack row by its binaries and
+    /** When true, add Boolean RLT rows: multiply each small 0/1 knapsack row by its binaries and
      *  linearize the products with the McCormick envelope. Adds product columns + rows (capped), so it
      *  is gated; off by default. Sound — the relaxation excludes no integer-feasible point. */
     private val booleanRlt: Boolean = false,
-    /** When true, add the **tight face** of each [ArrayMinMax] (#C3, Anderson big-M form) on top of the
+    /** When true, add the **tight face** of each [ArrayMinMax] (Anderson big-M form) on top of the
      *  always-emitted envelope: one-hot selectors `z_i` (`Σ z_i = 1`) and per-operand rows forcing
      *  `result = xs[i]` when `z_i = 1`, so the extremum is bounded from the tight side too (`result ≤
      *  max` / `result ≥ min`), not just the envelope side. Adds O(|xs|) columns, so it is gated. */
@@ -346,7 +346,7 @@ internal class CpToLpRelaxation(
         /** Above this array length the O(len)-column Element selector model is skipped. */
         const val MAX_ELEM: Int = 256
 
-        /** Boolean RLT (#D4) skips knapsack rows wider than this (each adds O(width) product columns). */
+        /** Boolean RLT skips knapsack rows wider than this (each adds O(width) product columns). */
         const val MAX_RLT_ROW: Int = 8
 
         /** Cap on the total Boolean-RLT product columns added, bounding the dense-tableau cost. */
@@ -1433,7 +1433,7 @@ internal class CpToLpRelaxation(
         }
 
         /**
-         * McCormick envelope of one [Product] `result = a·b` (#C4) — the four bound-derived inequalities
+         * McCormick envelope of one [Product] `result = a·b` — the four bound-derived inequalities
          * `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`, `(aH−a)(b−bL) ≥ 0`, `(a−aL)(bH−b) ≥ 0`, each expanded
          * to a linear row in `result, a, b`. They are valid at every point with `aL ≤ a ≤ aH`,
          * `bL ≤ b ≤ bH` and `result = a·b`, so the relaxation never cuts a feasible point. Bounds are the
@@ -1458,7 +1458,7 @@ internal class CpToLpRelaxation(
         }
 
         /**
-         * Boolean Reformulation-Linearization-Technique cuts (#D4, CP-SAT's `_RLT`). For a 0/1 knapsack
+         * Boolean Reformulation-Linearization-Technique cuts. For a 0/1 knapsack
          * row `Σₖ aₖ·xₖ ≤ b` (`aₖ > 0`, every `xₖ ∈ {0,1}`) and a multiplier `xᵢ` from it, multiplying by
          * `xᵢ ≥ 0` gives the valid `Σₖ aₖ·(xₖxᵢ) ≤ b·xᵢ`. Each product `wₖᵢ = xₖ·xᵢ` becomes an auxiliary
          * column with the binary McCormick envelope `wₖᵢ ≤ xₖ`, `wₖᵢ ≤ xᵢ`, `wₖᵢ ≥ xₖ + xᵢ − 1`
@@ -1516,7 +1516,7 @@ internal class CpToLpRelaxation(
         }
 
         /**
-         * Anderson tight face of `result = max(xs)` / `min(xs)` (#C3). The always-emitted envelope gives
+         * Anderson tight face of `result = max(xs)` / `min(xs)`. The always-emitted envelope gives
          * `result ≥ xs[i]` (max) / `≤` (min); this adds the *tight* side: one-hot selectors `z_i` with
          * `Σ z_i = 1` and, per operand, a big-M row that forces `result = xs[i]` when `z_i = 1` and is
          * slack otherwise — so the LP also bounds `result ≤ max` / `result ≥ min`. `M_i = max(rHi, xHi) −
@@ -1549,7 +1549,7 @@ internal class CpToLpRelaxation(
 
         /**
          * Big-M linearization of one [Element] `result = arr[idx − indexOffset]` over a **variable**
-         * array (#C5). The same one-hot selectors `y_p` and index channel `Σ_p (p + off)·y_p = idx` as
+         * array. The same one-hot selectors `y_p` and index channel `Σ_p (p + off)·y_p = idx` as
          * the constant case, but the result channel is bilinear (`arr[p]` is a variable), so it is
          * relaxed with two big-M rows per position that force `result = arr[p]` when `y_p = 1` and are
          * slack when `y_p = 0`:

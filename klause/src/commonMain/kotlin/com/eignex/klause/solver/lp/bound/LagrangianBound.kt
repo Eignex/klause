@@ -128,7 +128,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
             // Only a *true* all-distinct admits the weighted-assignment bound: the excepted values of an
             // `alldifferent_except` may repeat (so "fewer distinct values than variables" is not
             // infeasible, and the assignment lower bound over-counts), and a conditional/optional
-            // AllDifferent (`presents`) need not hold at all. Treating either as hard is unsound (#714).
+            // AllDifferent (`presents`) need not hold at all. Treating either as hard is unsound.
             if (f.exceptSet.isNotEmpty() || f.presents.isNotEmpty()) continue
             if (total + f.vars.size > MAX_TOTAL_VARS) continue
             if (f.vars.any { it in used }) continue // keep blocks disjoint so the subproblems decouple

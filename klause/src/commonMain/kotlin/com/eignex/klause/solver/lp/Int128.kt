@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.lp
 
 /**
- * Minimal signed 128-bit integer accumulator for the integer-multiplier LP certification (#B0). It is
- * the Kotlin-Multiplatform stand-in for CP-SAT's `absl::int128`: the dual-bound recomputation sums
+ * Minimal signed 128-bit integer accumulator for the integer-multiplier LP certification. It is
+ * the Kotlin-Multiplatform stand-in for a wider integer: the dual-bound recomputation sums
  * products of two 64-bit integers, where each product fits in 64 bits (the multipliers are scaled to
  * keep them small) but the *running sum* overflows it. A two-`Long` (hi · 2⁶⁴ + lo) value covers that,
  * with no exotic intrinsic — carry detection uses the common-stdlib unsigned compare, and the one

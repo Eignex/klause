@@ -17,7 +17,7 @@ private const val TABLEAU_MIN_VIOLATION = 1e-4
 private const val MAX_DIVISORS = 32
 
 /**
- * Gomory / MIR tableau cuts via CP-SAT-style integer-multiplier row aggregation, in 128-bit integer
+ * Gomory / MIR tableau cuts via integer-multiplier row aggregation, in 128-bit integer
  * arithmetic — the int128 replacement for the rational tableau-cut path.
  *
  * For each basic structural variable with a fractional LP value, the float tableau row `ρ = B⁻ᵀeᵢ` is

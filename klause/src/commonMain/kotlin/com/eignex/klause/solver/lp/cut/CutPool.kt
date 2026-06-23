@@ -8,7 +8,7 @@ import kotlin.math.sqrt
  * An activity-managed pool of globally-valid cuts (#40). Cuts are added with deduplication by
  * [Cut.key]; a hard [maxCuts] cap bounds the per-node LP cost the pool imposes once its cuts are folded
  * into every node's relaxation. When the cap is exceeded the least-active cuts are evicted, where
- * activity is tightness at the LP optimum — the CP-SAT cut-management signal: a cut the LP point sits
+ * activity is tightness at the LP optimum — the cut-management signal: a cut the LP point sits
  * on shapes the relaxation face, while a slack cut is dead weight on every solve.
  *
  * Eviction is sound: every pooled cut is valid at every solution ([Cut.global]), so dropping one only
@@ -67,8 +67,8 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
     }
 
     /**
-     * Select up to [max] pooled cuts to add to the LP at the current point [primal], CP-SAT
-     * `LinearConstraintManager::ChangeLp`-style: rank by **efficacy** (the normalised violation
+     * Select up to [max] pooled cuts to add to the LP at the current point [primal]: rank by
+     * **efficacy** (the normalised violation
      * `violation / ‖coeffs‖₂` — how deeply the point cuts past the inequality) and add greedily,
      * skipping a candidate that is near-parallel to one already chosen (an **orthogonality** filter on
      * the cosine of their coefficient vectors). A cut the point already satisfies (efficacy below
@@ -78,7 +78,7 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
      *
      * @param primal the current LP point cuts are scored against.
      * @param max the maximum number of cuts to return.
-     * @param minEfficacy reject cuts whose normalised violation is below this (CP-SAT's `1e-4`).
+     * @param minEfficacy reject cuts whose normalised violation is below this.
      * @param minOrthogonality require each added cut's cosine-to-nearest-selected `≤ 1 − this`.
      */
     fun select(
@@ -155,7 +155,7 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
          */
         const val DEFAULT_MAX_CUTS: Int = 2048
 
-        /** Minimum normalised violation for [select] to add a cut (CP-SAT's efficacy floor). */
+        /** Minimum normalised violation for [select] to add a cut (efficacy floor). */
         const val MIN_EFFICACY: Double = 1e-4
 
         /** Minimum orthogonality for [select]: an added cut's cosine to any already-selected cut must

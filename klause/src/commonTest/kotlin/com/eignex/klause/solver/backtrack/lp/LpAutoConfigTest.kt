@@ -369,13 +369,13 @@ class LpAutoConfigTest {
 
     @Test
     fun `aggressive enables the new parity techniques`() {
-        // ArrayMinMax ⇒ lin-max tight face (#C3). (The simplex always uses Devex / Harris / scaling /
+        // ArrayMinMax ⇒ lin-max tight face. (The simplex always uses Devex / Harris / scaling /
         // bound-flip internally — they are no longer plan knobs.)
         val mm = LpAutoConfig.recommend(problem(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
         assertTrue(mm.lpPlan.bounding)
         assertTrue(mm.lpPlan.linMaxTightFace)
 
-        // Product ⇒ McCormick envelope (#C4).
+        // Product ⇒ McCormick envelope.
         val prod = LpAutoConfig.recommend(problem(Product(a = 0, b = 1, result = 2)))
         assertTrue(prod.lpPlan.bounding)
         assertTrue(prod.lpPlan.productMcCormick)
@@ -389,7 +389,7 @@ class LpAutoConfigTest {
         assertTrue(constArr.lpPlan.bounding)
         assertTrue(constArr.lpPlan.element)
 
-        // Variable arrays now also enable the element hull — they route to the big-M form (#C5).
+        // Variable arrays now also enable the element hull — they route to the big-M form.
         val varArr = LpAutoConfig.recommend(
             problem(Element(idx = 0, result = 1, arr = intArrayOf(2), arrIsVars = true, indexOffset = 0)),
         )

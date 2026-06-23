@@ -50,6 +50,6 @@ class CutSharingPortfolioTest {
     @Test
     fun `cut sharing is on by default`() {
         val scenario = PortfolioScenario(cores = 1, arms = 3, kind = Kind.COP, engine = EngineMix.BACKTRACK)
-        assertEquals(true, scenario.shareCuts, "global-cut sharing defaults on (#809 / F2)")
+        assertEquals(true, scenario.shareCuts, "global-cut sharing defaults on")
     }
 }

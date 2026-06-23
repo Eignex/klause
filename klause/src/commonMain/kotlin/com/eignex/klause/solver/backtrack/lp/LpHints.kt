@@ -20,7 +20,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) {
     private val intVal = DoubleArray(numIntVars) { Double.NaN }
     private val boolVal = DoubleArray(numBoolVars) { Double.NaN }
 
-    // Decayed running average of `|reduced cost|` each variable showed while nonbasic, a CP-SAT-style
+    // Decayed running average of `|reduced cost|` each variable showed while nonbasic, a
     // reduced-cost pseudo-cost (an estimate of the objective's sensitivity to the variable). NaN = the
     // variable has never been nonbasic, so there is no estimate yet. Read by [branchScore]; advisory.
     private val intRc = DoubleArray(numIntVars) { Double.NaN }

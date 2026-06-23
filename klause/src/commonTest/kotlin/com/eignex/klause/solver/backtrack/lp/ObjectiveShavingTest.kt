@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Objective shaving (#E3) must be SOUND — it may only raise the objective lower bound to a value proven
+ * Objective shaving must be SOUND — it may only raise the objective lower bound to a value proven
  * (by propagation + the LP relaxation) to be a true lower bound, never above the optimum (which would
  * lose the optimal solution). Checked directly (the shaved bound equals the brute-force optimum on a
  * triangle vertex cover) and end-to-end (the solved optimum is unchanged with shaving on).

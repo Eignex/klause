@@ -123,7 +123,7 @@ object PortfolioBuilder {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
         val cuts = if (scenario.shareCuts) SharedCutPool(concurrency.lock()) else null
-        // The objective lower-bound manager (#809 / F1) is the dual of the shared incumbent: harmless for a
+        // The objective lower-bound manager is the dual of the shared incumbent: harmless for a
         // CSP pool (no arm publishes a bound), so it is always present and only an optimising arm feeds it.
         return SharedPools(SharedClausePool(concurrency.lock()), cuts, SharedObjectiveBound(concurrency.lock()))
     }

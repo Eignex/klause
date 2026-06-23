@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * #809 / F1: the shared objective lower-bound manager keeps the cross-arm maximum of the bounds arms
+ * The shared objective lower-bound manager keeps the cross-arm maximum of the bounds arms
  * prove, ignoring non-informative values. Verified in isolation (no executor), since the logic is a
  * deterministic monotone fold.
  */

@@ -6,7 +6,7 @@ import com.eignex.klause.solver.lp.Relation
 import com.eignex.klause.solver.presolve.Presolve
 
 /**
- * Implied-bound cuts (#D3, CP-SAT's `_RB` family) from the binary **implication graph**. Probing
+ * Implied-bound cuts from the binary **implication graph**. Probing
  * derives implications `litA ⇒ litB` that hold at every solution but are not explicit binary clauses
  * (those already enter the LP as clause rows). Each such implication is the linear inequality
  * `litVal(A) ≤ litVal(B)` — where `litVal` of a positive literal over Boolean column `c` is `xₑ` and of

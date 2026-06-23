@@ -180,7 +180,7 @@ object LpAutoConfig {
                 is Subcircuit -> circuit = true
 
                 // Both constant- and variable-array Element route to the element hull (the variable case
-                // builds the big-M form, #C5); the size guard still caps it internally.
+                // builds the big-M form); the size guard still caps it internally.
                 is Element -> constArrayElement = true
 
                 is ArrayMinMax -> arrayMinMax = true
@@ -293,17 +293,17 @@ object LpAutoConfig {
                     (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
                 cumulativeFlow = base.lpPlan.cumulativeFlow ||
                     (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
-                // ArrayMinMax tight face (#C3) and Product McCormick (#C4): EXHAUSTIVE-tier relaxations,
+                // ArrayMinMax tight face and Product McCormick: EXHAUSTIVE-tier relaxations,
                 // on when their structure is present and the emphasis permits them.
                 linMaxTightFace = base.lpPlan.linMaxTightFace ||
                     (lpActive && arrayMinMax && config.resolved(LpTechnique.LINMAX_TIGHT)),
                 productMcCormick = base.lpPlan.productMcCormick ||
                     (lpActive && product && config.resolved(LpTechnique.PRODUCT_MCCORMICK)),
-                // Implied-bound cuts (#D3): a cut family, so requires cuts active + Boolean structure.
+                // Implied-bound cuts: a cut family, so requires cuts active + Boolean structure.
                 impliedBoundCuts = base.lpPlan.impliedBoundCuts ||
                     (cuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
                 flowCoverCuts = base.lpPlan.flowCoverCuts || (cuts && config.resolved(LpTechnique.FLOW_COVER)),
-                // Boolean RLT (#D4): relaxation strengthening; a no-op without 0/1 knapsack rows.
+                // Boolean RLT: relaxation strengthening; a no-op without 0/1 knapsack rows.
                 booleanRlt = base.lpPlan.booleanRlt || (cuts && config.resolved(LpTechnique.BOOLEAN_RLT)),
                 lagrangian = base.lpPlan.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
                 energeticReasoning = base.lpPlan.energeticReasoning || energetic,
@@ -398,7 +398,7 @@ object LpAutoConfig {
             if (k == 0L) continue
             any = true
             cols += k
-            // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array (#C5):
+            // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
             // Σ y = 1 + index channel + two big-M rows per selector (2 + 2k).
             rows += if (f.arrIsVars) 2L + 2L * k else 3L
         }
