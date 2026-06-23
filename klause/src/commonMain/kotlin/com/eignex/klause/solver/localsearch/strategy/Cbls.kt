@@ -11,6 +11,7 @@ import com.eignex.klause.solver.localsearch.movesource.EjectionChains
 import com.eignex.klause.solver.localsearch.movesource.FlipAndPropagate
 import com.eignex.klause.solver.localsearch.movesource.Frontier
 import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.solver.localsearch.movesource.PairSwap
 import com.eignex.klause.solver.localsearch.movesource.Phase
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.movesource.StallKick
@@ -90,6 +91,10 @@ fun Cbls(
     /** **Implicit-solving neighbourhoods** (`0` = off): cap on elected structural globals sampled per
      *  *infeasible* pick for their feasibility-preserving structured moves. */
     implicitStructuredCap: Int = 0,
+    /** **Objective-hot-spot pair swaps** (opt-in, `0` = off): cap on score-only [PairSwap] candidates
+     *  per *feasible* pick whose first int endpoint is drawn from the objective gradient, so
+     *  objective-descent swaps concentrate on variables that can move the objective. */
+    pairSwapHotSpotCap: Int = 0,
 ): SourceDrivenStrategy {
     val sources = buildList {
         add(ConfiguredSource(ViolatedRepairs(violatedSampleCount)))
@@ -109,6 +114,7 @@ fun Cbls(
         if (flipPropagateCap > 0) {
             add(ConfiguredSource(FlipAndPropagate(flipPropagateCap, flipPropagateDepth), stallGated = true))
         }
+        if (pairSwapHotSpotCap > 0) add(ConfiguredSource(PairSwap.hotSpot(pairSwapHotSpotCap)))
     }
     return SourceDrivenStrategy(
         sources = sources,
