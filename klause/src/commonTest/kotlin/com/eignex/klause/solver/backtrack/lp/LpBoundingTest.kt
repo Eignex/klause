@@ -168,4 +168,41 @@ class LpBoundingTest {
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(0.0, result.objectiveValue)
     }
+
+    @Test
+    fun `objective-variable divisor rounding preserves the optimum`() {
+        // v = 2(a+b+c) so v is always even; the triangle forces a+b+c >= 2, so the optimum is v = 4.
+        // The continuous LP relaxes a+b+c to 1.5 (v = 3.0); rounding 3 up to the next even value gives
+        // the exact bound 4 at the root. The proven optimum must equal the baseline's.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 12), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, -2, -2, -2), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L, 0L))
+        val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 1L))
+        val on = BacktrackSolver(problem).minimize(
+            obj,
+            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)),
+        )
+        assertTrue(off is MinimizeResult.Optimal, "baseline should prove optimality")
+        assertTrue(on is MinimizeResult.Optimal, "lp-bounded should prove optimality")
+        assertEquals(4.0, off.objectiveValue)
+        assertEquals(4.0, on.objectiveValue, "divisor rounding must not change the optimum")
+    }
+
+    @Test
+    fun `roundUpToResidue lifts to the next congruent value`() {
+        assertEquals(4L, roundUpToResidue(3L, 2L, 0L)) // 3 -> next even
+        assertEquals(4L, roundUpToResidue(4L, 2L, 0L)) // already even, unchanged
+        assertEquals(5L, roundUpToResidue(3L, 3L, 2L)) // next value congruent to 2 mod 3
+        assertEquals(3L, roundUpToResidue(3L, 3L, 0L)) // 3 is 0 mod 3, unchanged
+        assertEquals(-2L, roundUpToResidue(-3L, 2L, 0L)) // negative lower bound -> next even
+    }
 }
