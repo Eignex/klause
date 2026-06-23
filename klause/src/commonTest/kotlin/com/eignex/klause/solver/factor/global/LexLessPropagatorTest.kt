@@ -14,6 +14,7 @@ import com.eignex.klause.solver.propagation.ConflictAnalyzer
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.propagation.addLearnedClause
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -76,11 +77,50 @@ class LexLessPropagatorTest {
     }
 
     @Test
+    fun `strict lex tightens the last deciding position strictly`() {
+        // x0 = y0 = 0 is a fixed-equal prefix, so the relation hinges on the last position. The
+        // suffix is exhausted there, so strict `lex_less` forces x1 < y1: with x1 ∈ [0,3] and
+        // y1 ∈ [0,2] the β look-ahead derives x1 ≤ y1.max − 1 = 1 and y1 ≥ x1.min + 1 = 1.
+        // A plain `x1 ≤ y1.max` step would only reach x1 ≤ 2. Layout: x0=0, x1=1, y0=2, y1=3.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 3), IntDomain(0, 0), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentFactor = 0
+        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertEquals(1, state.intDomains[1].max, "strict suffix should force x1 ≤ 1")
+        assertEquals(1, state.intDomains[3].min, "strict suffix should force y1 ≥ 1")
+    }
+
+    @Test
+    fun `lesseq forces a strict head step when the tail is pinned greater`() {
+        // lex_lesseq([x0,x1],[y0,y1]) with the tail pinned x1 = 2 > y1 = 0. The tail can never
+        // rescue equality at the head, so the β look-ahead forces x0 < y0 even though the
+        // relation itself is non-strict: x0 ≤ 1 and y0 ≥ 1. Layout: x0=0, x1=1, y0=2, y1=3.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(2, 2), IntDomain(0, 2), IntDomain(0, 0)),
+            factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = false)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentFactor = 0
+        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertEquals(1, state.intDomains[0].max, "forced-greater tail should force x0 ≤ 1")
+        assertEquals(1, state.intDomains[2].min, "forced-greater tail should force y0 ≥ 1")
+    }
+
+    @Test
     fun `learned clause through a per-tighten lex deduction carries the prefix-equality literals`() {
-        // Regression for #75. The index-i tightening `xs[i].max ≤ ys[i].max` is sound only
-        // because the prefix `xs[0..i-1] = ys[0..i-1]` is pinned equal — index i is the
+        // Regression for #75. The deciding-position tightening `xs[a].max ≤ ys[a].max` is sound
+        // only because the prefix `xs[0..a-1] = ys[0..a-1]` is pinned equal — index a is the
         // deciding position precisely because of that prefix. The per-tighten antecedent is
-        // recorded on the implied atom `[xs[i] ≤ ys[i].max]`; when a *later* conflict (seeded
+        // recorded on the implied atom `[xs[a] ≤ ys[a].max]`; when a *later* conflict (seeded
         // by another factor) resolves through that atom in the 1UIP loop, the prefix-equality
         // literals must reappear in the learned clause. If they're omitted the clause is too
         // weak — it reads as a global fact and can excise feasible assignments on later
@@ -90,12 +130,21 @@ class LexLessPropagatorTest {
         // x0 = y0 prefix as decisions, tighten y1 below its max, run the lex propagator (which
         // tightens x1 ≤ 1 and records its antecedent on the atom `[x1 ≤ 1]`), then seed a
         // conflict forbidding `[x1 ≤ 1] ∧ [y1 ≤ 1]` and assert the learned clause references
-        // the prefix vars x0 and y0. Layout: x0=var0, x1=var1, y0=var2, y1=var3.
-        val lex = LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)
+        // the prefix vars x0 and y0. The free third position keeps the deciding step non-strict
+        // so x1 lands at y1.max = 1 (not the strict y1.max − 1). Layout: x*=var{0,1,2},
+        // y*=var{3,4,5}.
+        val lex = LexLess(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5), strict = true)
         val problem = Problem(
             numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 3), IntDomain(0, 2), IntDomain(0, 3)),
+            numIntVars = 6,
+            intDomains = arrayOf(
+                IntDomain(0, 2),
+                IntDomain(0, 3),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 3),
+                IntDomain(0, 2),
+            ),
             factors = arrayOf<Factor>(lex),
         )
         val state = PropagationState(problem, Assumptions.None)
@@ -104,17 +153,17 @@ class LexLessPropagatorTest {
         // Allocate the two tail atoms first so the lex tighten / y1 decision attach their
         // antecedents to them, and so `[x1 ≤ 1]` is picked as the 1UIP pivot before `[y1 ≤ 1]`.
         val atomX1Le1 = state.atomVarLe(1, 1)
-        val atomY1Le1 = state.atomVarLe(3, 1)
+        val atomY1Le1 = state.atomVarLe(4, 1)
 
         // Decisions: x0 = y0 = 1 at level 1 (a real, non-forced equal prefix).
         state.currentLevel = 1
         state.currentFactor = -1
         check(state.setInt(0, 1)) { "pin x0=1" }
-        check(state.setInt(2, 1)) { "pin y0=1" }
+        check(state.setInt(3, 1)) { "pin y0=1" }
         // Decision: y1 ≤ 1 at level 2 (tighten below its original max so the lex tighten of
         // x1 lands below 3 and the antecedent is non-trivial).
         state.currentLevel = 2
-        check(state.tightenIntMax(3, 1)) { "tighten y1.max=1" }
+        check(state.tightenIntMax(4, 1)) { "tighten y1.max=1" }
 
         // Run the lex propagator attributed to factor 0; it walks the equal x0=y0 prefix and
         // tightens x1.max ≤ y1.max = 1, recording the prefix-aware antecedent on `[x1 ≤ 1]`.
@@ -135,8 +184,8 @@ class LexLessPropagatorTest {
             .map { atomId -> state.atomIntVar[atomId] }
             .toSet()
         assertTrue(
-            0 in intVarsInClause && 2 in intVarsInClause,
-            "learned clause must cite the prefix vars x0(0) and y0(2) — omitting them is the " +
+            0 in intVarsInClause && 3 in intVarsInClause,
+            "learned clause must cite the prefix vars x0(0) and y0(3) — omitting them is the " +
                 "#75 too-weak reason; got int vars $intVarsInClause from ${learned.literals.toList()}",
         )
     }
