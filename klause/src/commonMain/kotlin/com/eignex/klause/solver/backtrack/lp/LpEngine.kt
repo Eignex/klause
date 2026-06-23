@@ -2,6 +2,8 @@ package com.eignex.klause.solver.backtrack.lp
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.bound.CumulativeFlowBound
@@ -164,6 +166,43 @@ internal class LpEngine(
         CumulativeFlowBound(problem).takeIf { it.applicable }
     } else {
         null
+    }
+
+    /** The single objective variable's modular residue, when it is defined by a linear equality
+     *  `a·v + Σ cⱼ·xⱼ = b` with `|a| = 1` and `g = gcd(cⱼ) > 1`: then `v ≡ r (mod g)` in every solution
+     *  (`r = (a·b) mod g`), recorded as `(v, g, r)`. An LP lower bound on `v` can be rounded up to the
+     *  next value congruent to `r` — a tighter sound cutoff. `null` when no defining equality gives one. */
+    internal val objectiveModulus: Triple<Int, Int, Int>? by lazy { computeObjectiveModulus() }
+
+    private fun computeObjectiveModulus(): Triple<Int, Int, Int>? {
+        val v = objective.singleIntObjective()?.varId ?: return null
+        var best: Triple<Int, Int, Int>? = null
+        for (f in problem.factors) {
+            if (f !is Linear || f.op != LinearOp.EQ) continue
+            val vi = f.vars.indexOf(v)
+            if (vi < 0) continue
+            val a = f.coeffs[vi]
+            if (a != 1 && a != -1) continue
+            var g = 0
+            for (j in f.vars.indices) if (j != vi) g = gcdOfInt(g, f.coeffs[j])
+            if (g <= 1) continue
+            // a·v ≡ b (mod g); a = ±1 ⇒ v ≡ a·b (mod g). Keep the largest modulus (tightest rounding).
+            if (best != null && g <= best.second) continue
+            val residue = (a.toLong() * f.bound.toLong()).mod(g.toLong()).toInt()
+            best = Triple(v, g, residue)
+        }
+        return best
+    }
+
+    private fun gcdOfInt(a: Int, b: Int): Int {
+        var x = if (a < 0) -a else a
+        var y = if (b < 0) -b else b
+        while (y != 0) {
+            val t = x % y
+            x = y
+            y = t
+        }
+        return x
     }
     private var lpCheckCounter = 0
     private var energeticCheckCounter = 0

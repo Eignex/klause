@@ -76,6 +76,10 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
     Long.MIN_VALUE
 }
 
+/** The smallest value `≥ lb` congruent to `r` modulo `g` (`g ≥ 1`, `0 ≤ r < g`). When `lb` already
+ *  has residue `r` it is returned unchanged. */
+internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).mod(g)
+
 /** A [RevisedSimplex] over [model]. The simplex always uses Devex pricing, the Harris two-pass ratio
  *  test, the bound-flipping long step and basis equilibration — all correctness-neutral (they change
  *  only the pivot path / conditioning, never the certified optimum). */
@@ -499,16 +503,27 @@ internal fun LpEngine.sparseSafePrune(
         }
         val lpFloor = exactFloor ?: ceil(full).takeIf { it in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble() }
             ?.toLong()
-        if (lpFloor != null && lpFloor in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
-            val reason = if (learn && cert != null) {
+        // Round the bound up to the objective variable's achievable residue (`v ≡ r mod g` from its
+        // defining equality): a tighter, still-sound cutoff. A strict lift cannot be witnessed by the
+        // reduced-cost reason (the modular premise is not in it), so it is imposed reason-less — a sound
+        // conflict-analysis leaf — while an unchanged bound keeps the certified reason.
+        val mod = objectiveModulus?.takeIf { it.first == objectiveVar }
+        val rounded = if (lpFloor != null && mod != null) {
+            roundUpToResidue(lpFloor, mod.second.toLong(), mod.third.toLong())
+                .takeIf { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() } ?: lpFloor
+        } else {
+            lpFloor
+        }
+        if (rounded != null && rounded in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+            val reason = if (learn && cert != null && rounded == lpFloor) {
                 LpExplanation.objectiveBoundReason(boundRel, cert, session)
             } else {
                 null
             }
             val res = if (reason != null) {
-                session.implyIntAtLeastWithReason(objectiveVar, lpFloor.toInt(), reason)
+                session.implyIntAtLeastWithReason(objectiveVar, rounded.toInt(), reason)
             } else {
-                session.implyIntAtLeast(objectiveVar, lpFloor.toInt())
+                session.implyIntAtLeast(objectiveVar, rounded.toInt())
             }
             if (res is PropagationResult.Unsat) {
                 sink.observeLpPrune()
