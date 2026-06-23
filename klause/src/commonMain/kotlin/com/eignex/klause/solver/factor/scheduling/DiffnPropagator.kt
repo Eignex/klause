@@ -66,65 +66,12 @@ internal class DiffnPropagator(
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (varSize) return propagateVarSizeSoundOnly(state)
-        if (!pairwise(state)) return false
-        // Sweep-based tightening on each axis: pairwise reasoning sees one neighbour at a time, but a
-        // wall built from several rectangles' compulsory parts can forbid a span no single pair rules
-        // out. The sweep advances a rectangle's origin to the first column where some orthogonal
-        // position escapes every compulsory part.
+        // Sweep each axis: advance every rectangle's origin to the first column where some orthogonal
+        // position escapes all other rectangles' compulsory parts. This subsumes pairwise reasoning
+        // (a forced overlap gives both rectangles a compulsory part the sweep already sees) and also
+        // catches multi-rectangle walls no single pair rules out.
         if (!sweepAxis(state, xs, widths, ys, heights)) return false
         if (!sweepAxis(state, ys, heights, xs, widths)) return false
-        return true
-    }
-
-    private fun pairwise(state: PropagationState): Boolean {
-        for (i in 0 until n) {
-            val wI = widths[i]
-            val hI = heights[i]
-            if (nonStrict && (wI == 0 || hI == 0)) continue
-            val xiLo = state.intDomains[xs[i]].min
-            val xiHi = state.intDomains[xs[i]].max
-            val yiLo = state.intDomains[ys[i]].min
-            val yiHi = state.intDomains[ys[i]].max
-            for (j in i + 1 until n) {
-                val wJ = widths[j]
-                val hJ = heights[j]
-                if (nonStrict && (wJ == 0 || hJ == 0)) continue
-                val xjLo = state.intDomains[xs[j]].min
-                val xjHi = state.intDomains[xs[j]].max
-                val yjLo = state.intDomains[ys[j]].min
-                val yjHi = state.intDomains[ys[j]].max
-                val xMust = xiHi < xjLo + wJ && xjHi < xiLo + wI
-                val yMust = yiHi < yjLo + hJ && yjHi < yiLo + hI
-                if (xMust && yMust) return false
-                if (xMust) {
-                    val aFeasible = yiLo + hI <= yjHi
-                    val bFeasible = yjLo + hJ <= yiHi
-                    if (!aFeasible && !bFeasible) return false
-                    if (aFeasible && !bFeasible) {
-                        val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i], xs[j], ys[i], ys[j]))
-                        if (!state.tightenIntMax(ys[i], yjHi - hI, ant)) return false
-                        if (!state.tightenIntMin(ys[j], yiLo + hI, ant)) return false
-                    } else if (bFeasible && !aFeasible) {
-                        val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i], xs[j], ys[i], ys[j]))
-                        if (!state.tightenIntMax(ys[j], yiHi - hJ, ant)) return false
-                        if (!state.tightenIntMin(ys[i], yjLo + hJ, ant)) return false
-                    }
-                } else if (yMust) {
-                    val aFeasible = xiLo + wI <= xjHi
-                    val bFeasible = xjLo + wJ <= xiHi
-                    if (!aFeasible && !bFeasible) return false
-                    if (aFeasible && !bFeasible) {
-                        val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i], xs[j], ys[i], ys[j]))
-                        if (!state.tightenIntMax(xs[i], xjHi - wI, ant)) return false
-                        if (!state.tightenIntMin(xs[j], xiLo + wI, ant)) return false
-                    } else if (bFeasible && !aFeasible) {
-                        val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i], xs[j], ys[i], ys[j]))
-                        if (!state.tightenIntMax(xs[j], xiHi - wJ, ant)) return false
-                        if (!state.tightenIntMin(xs[i], xjLo + wJ, ant)) return false
-                    }
-                }
-            }
-        }
         return true
     }
 
