@@ -3,8 +3,11 @@ package com.eignex.klause.solver.factor.global
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.factor.compressViolation
+import com.eignex.klause.solver.factor.global.internals.reginTryAugment
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /** LS invariant logic for `inverse`. */
 internal class InverseInvariant(
@@ -118,7 +121,12 @@ internal class InverseInvariant(
         }
     }
 
-    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean =
+        seedIdentity(state) || seedByMatching(state)
+
+    /** The fast path: the identity permutation `f(i) = i`, `g(i) = i`. Atomic — checks every variable
+     *  before writing any, so a failure leaves the assignment untouched for the matching fallback. */
+    private fun seedIdentity(state: LocalSearchState): Boolean {
         val n = f.size
         for (i in 0 until n) {
             val fv = i + gOffset
@@ -130,6 +138,52 @@ internal class InverseInvariant(
         for (i in 0 until n) {
             if (!state.assumptions.isFrozenInt(f[i])) state.assignment.setInt(f[i], i + gOffset)
             if (!state.assumptions.isFrozenInt(g[i])) state.assignment.setInt(g[i], i + fOffset)
+        }
+        return true
+    }
+
+    /**
+     * Matching-based seed for restricted domains where the identity permutation is infeasible (a
+     * derangement-shaped channel, say). The bipartite graph puts f-index `i` on the left and the
+     * g-index (= the value `f(i)` selects, offset-normalized) on the right, with an edge only when
+     * both sides accept it: `i`'s f value lies in `dom(f[i])` and the back-reference `i` lies in
+     * `dom(g[that index])`. A perfect matching is exactly a feasible inverse pair, found by reusing
+     * the all-different augmenting-path matcher [reginTryAugment].
+     *
+     * Restricted to disjoint, equal-length, unfrozen `f`/`g`: a self-inverse (overlapping `f`/`g`)
+     * needs a symmetric matching the plain matcher does not guarantee, and frozen variables keep the
+     * identity-only path, so both fall through to the caller's `false`.
+     */
+    private fun seedByMatching(state: LocalSearchState): Boolean {
+        val n = f.size
+        if (g.size != n) return false
+        for (i in 0 until n) {
+            if (state.assumptions.isFrozenInt(f[i]) || state.assumptions.isFrozenInt(g[i])) return false
+        }
+        val fVars = IntHashSet(n)
+        for (v in f) fVars.add(v)
+        for (v in g) if (fVars.contains(v)) return false
+        val valuesPerVar = Array(n) { i ->
+            val allowed = IntArrayList()
+            val fd = state.problem.intDomains[f[i]]
+            for (vid in 0 until n) {
+                if (vid + gOffset !in fd) continue
+                if (i + fOffset !in state.problem.intDomains[g[vid]]) continue
+                allowed.add(vid)
+            }
+            IntArray(allowed.size) { allowed[it] }
+        }
+        val matchVar = IntArray(n) { -1 }
+        val matchVal = IntArray(n) { -1 }
+        val visited = BooleanArray(n)
+        for (i in 0 until n) {
+            visited.fill(false)
+            if (!reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)) return false
+        }
+        for (i in 0 until n) {
+            val vid = matchVar[i]
+            state.assignment.setInt(f[i], vid + gOffset)
+            state.assignment.setInt(g[vid], i + fOffset)
         }
         return true
     }

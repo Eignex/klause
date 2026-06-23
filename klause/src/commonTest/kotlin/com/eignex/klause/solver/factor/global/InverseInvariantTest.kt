@@ -26,6 +26,29 @@ class InverseInvariantTest {
     )
 
     @Test
+    fun `matching seed finds a feasible inverse when the identity is out of domain`() {
+        // f[0] cannot be 0 and f[2] cannot be 2, so the identity permutation is infeasible; a
+        // matching seed must still find a feasible inverse pair.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = arrayOf(
+                IntDomain(1, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 1),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+            ),
+            factors = arrayOf<Factor>(Inverse(f, g, fOffset = 0, gOffset = 0)),
+        )
+        val state = LocalSearchState(problem, Random(0))
+        assertTrue(state.factors[0].seedFeasible(state, 0), "matching seed must find a feasible inverse")
+        state.recompute()
+        assertEquals(0L, state.cost, "the seeded assignment must satisfy inverse")
+    }
+
+    @Test
     fun `not violated when f and g are a true inverse pair`() {
         val p = problem()
         val state = LocalSearchState(p, Random(0))
