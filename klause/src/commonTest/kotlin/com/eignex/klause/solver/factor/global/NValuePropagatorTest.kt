@@ -1,9 +1,11 @@
 package com.eignex.klause.solver.factor.global
 
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.FactorPropagationOracle
@@ -46,6 +48,45 @@ class NValuePropagatorTest {
                 val nDomain = IntDomain(minOf(a, b), maxOf(a, b))
                 FactorPropagationOracle.assertSound(nvalueProblem(xsDomains, nDomain, mode), "nvalue-$mode#$iter")
             }
+        }
+    }
+
+    @Test
+    fun `atleast nvalues forces a variable pinned by the maximum matching`() {
+        // x0 ∈ {0}, x1 ∈ {0,1}, with at-least 2 distinct values required. x1 = 0 would leave only
+        // one distinct value, so the maximum matching forces x1 = 1. Layout: x0=0, x1=1, n=2.
+        val problem = nvalueProblem(
+            xsDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 1)),
+            nDomain = IntDomain(2, 2),
+            mode = NValue.Mode.AtLeast,
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentFactor = 0
+        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertEquals(1, state.intDomains[1].min, "x1 must be pinned to 1 by the maximum-matching GAC")
+        assertEquals(1, state.intDomains[1].max, "x1 must be pinned to 1 by the maximum-matching GAC")
+    }
+
+    @Test
+    fun `atleast nvalues reaches arc consistency`() {
+        // Stronger than assertSound: when the count is pinned to the maximum matching size, the
+        // Régin value-pruning must remove exactly the values with no support — full GAC.
+        val rng = Random(0xA71EA57)
+        repeat(300) { iter ->
+            val k = 2 + rng.nextInt(2) // 2..3 counted vars
+            val maxVal = if (k >= 3) 4 else 5
+            val xsDomains = Array(k) {
+                val a = rng.nextInt(maxVal + 1)
+                val b = rng.nextInt(maxVal + 1)
+                IntDomain(minOf(a, b), maxOf(a, b))
+            }
+            // Pin the count high to provoke the matching-saturated pruning regime.
+            val target = 1 + rng.nextInt(k)
+            FactorPropagationOracle.assertGac(
+                nvalueProblem(xsDomains, IntDomain(target, target), NValue.Mode.AtLeast),
+                "atleast-gac#$iter",
+            )
         }
     }
 
