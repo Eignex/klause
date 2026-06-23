@@ -179,6 +179,14 @@ internal class LpEngine(
         top = LpEffort.ceiling(cutsPermitted = params.lpPlan.cuts),
         reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
     )
+
+    // Per-separator activity gate (#59): disables a single unproductive cut family while the others keep
+    // separating — the per-technique complement of the whole-rung [lpLadder]. Sound: skipping a separator
+    // only forgoes its cuts, never a solution.
+    val lpSeparatorGate = LpSeparatorGate(
+        count = lpSeparators.size,
+        reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
+    )
     val lpNogoods: LpNogoodPool? = if (params.lpPlan.learn) LpNogoodPool() else null
     private val lpBasisByDepth = ArrayList<Basis?>()
     val lpHints = if (params.lpPlan.branching) LpHints(problem.numIntVars, problem.numBoolVars) else null

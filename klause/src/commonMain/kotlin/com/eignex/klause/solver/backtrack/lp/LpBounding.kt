@@ -413,7 +413,15 @@ internal fun LpEngine.sparseSafePrune(
         var rounds = 0
         while (rounds++ < SEARCH_CUT_ROUNDS && !cancellation()) {
             val ctx = CutContext(problem, boundRel, boundRes.primal, session)
-            val fresh = lpSeparators.flatMap { it.separate(ctx) }
+            // Per-separator gating (#59): skip a family the gate has disabled for being unproductive, and
+            // credit each family it does run with whether it produced a violated cut this round.
+            val fresh = ArrayList<Cut>()
+            for (i in lpSeparators.indices) {
+                if (!lpSeparatorGate.shouldRun(i)) continue
+                val produced = lpSeparators[i].separate(ctx)
+                lpSeparatorGate.record(i, produced.isNotEmpty())
+                fresh.addAll(produced)
+            }
             if (fresh.isEmpty()) break
             recordSearchCuts(fresh, boundRes.primal) // persist the global cuts; invalidate the base
             for (c in fresh) if (!c.global) localCuts.add(c)
