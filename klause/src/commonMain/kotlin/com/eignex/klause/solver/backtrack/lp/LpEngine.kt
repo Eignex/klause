@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.backtrack.lp
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.factor.arithmetic.Linear
@@ -59,28 +60,35 @@ internal class LpEngine(
     val params: BacktrackParams =
         params0.lpConfig?.let { LpAutoConfig.resolve(problem, it, params0) } ?: params0
 
-    val lpRelaxer = if (params.lpPlan.bounding) {
+    /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
+     *  ineffective-hull probe can build variants with individual hulls turned off. */
+    private fun buildRelaxer(plan: LpPlan): CpToLpRelaxation? = if (plan.bounding) {
         CpToLpRelaxation(
             problem,
             objective,
-            elementHull = params.lpPlan.element,
-            tableHull = params.lpPlan.table,
-            cumulative = params.lpPlan.cumulative,
-            diffn = params.lpPlan.diffn,
-            cumulativeTimeIndexed = params.lpPlan.cumulativeTimeIndexed,
-            nValueHull = params.lpPlan.nValue,
-            regularHull = params.lpPlan.regular,
-            mddHull = params.lpPlan.mdd,
-            gccCountHull = params.lpPlan.gccCount,
-            circuitArcs = params.lpPlan.circuit,
-            objectiveCone = params.lpPlan.objectiveCone,
-            linMaxTightFace = params.lpPlan.linMaxTightFace,
-            productMcCormick = params.lpPlan.productMcCormick,
-            booleanRlt = params.lpPlan.booleanRlt,
+            elementHull = plan.element,
+            tableHull = plan.table,
+            cumulative = plan.cumulative,
+            diffn = plan.diffn,
+            cumulativeTimeIndexed = plan.cumulativeTimeIndexed,
+            nValueHull = plan.nValue,
+            regularHull = plan.regular,
+            mddHull = plan.mdd,
+            gccCountHull = plan.gccCount,
+            circuitArcs = plan.circuit,
+            objectiveCone = plan.objectiveCone,
+            linMaxTightFace = plan.linMaxTightFace,
+            productMcCormick = plan.productMcCormick,
+            booleanRlt = plan.booleanRlt,
         )
     } else {
         null
     }
+
+    /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
+     *  [params]-resolved one for the whole search. */
+    var lpRelaxer = buildRelaxer(params.lpPlan)
+        private set
 
     // Structure-based cut separators (#22/#705) run on the sparse LP point; circuit cuts are deferred
     // until the arc model is rebuilt on the sparse relaxation.
@@ -459,4 +467,58 @@ internal class LpEngine(
         KnapsackLagrangianArm(),
         LpSimplexBound(),
     )
+
+    /**
+     * Drop each convex-hull technique that adds no strength to the root LP optimum, rebuilding the
+     * relaxer once over the survivors. For every enabled hull it solves the root LP with that one hull
+     * turned off and keeps the hull only if its removal loosens the optimum; a hull whose removal leaves
+     * the optimum unchanged (often because root propagation already achieves the same bound) is pure
+     * per-node build cost and is dropped. This is the per-technique counterpart of [LpEffortLadder]'s
+     * whole-simplex demotion, applied to the build-time hulls a search cannot cheaply toggle per node —
+     * so the decision is made once, here, before the persistent base is first built.
+     *
+     * Comparison uses the true LP optimum ([rootLpObjective]), not the safe under-estimate, so a hull's
+     * real tightening is visible. Sound: a hull is a sound relaxation whether present or not, and one is
+     * dropped only when the root optimum is identical without it. Costs one extra root solve per enabled
+     * hull, bounded by [cancellation] (the shared root budget). A no-op when bounding is off or no hull is
+     * enabled.
+     */
+    fun pruneIneffectiveHulls(cancellation: Cancellation) {
+        val relaxer = lpRelaxer ?: return
+        var plan = params.lpPlan
+        val full = rootLpObjective(relaxer, cancellation)
+        if (full.isNaN()) return
+        for (disable in HULL_DISABLERS) {
+            val candidate = disable(plan) ?: continue // null when this hull is already off
+            val probe = buildRelaxer(candidate) ?: continue
+            val bound = rootLpObjective(probe, cancellation)
+            // Removing a hull can only loosen a minimisation LP optimum; if it is unchanged (within tol)
+            // the hull added no root strength, so drop it. A NaN probe (the hull-free relaxation is empty)
+            // means the hull is the only structure — keep it.
+            if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) plan = candidate
+        }
+        if (plan !== params.lpPlan) lpRelaxer = buildRelaxer(plan)
+    }
+
+    private companion object {
+        /** A root optimum this close to the all-hulls optimum counts as "no strength added". */
+        const val HULL_PRUNE_TOL = 1e-6
+
+        /** One disabler per prunable convex-hull flag: returns the plan with that hull off, or null when
+         *  it is already off. The base relaxation, objective cone, circuit arcs and cumulative makespan
+         *  row are not hulls and are excluded. */
+        val HULL_DISABLERS: List<(LpPlan) -> LpPlan?> = listOf(
+            { p -> if (p.element) p.copy(element = false) else null },
+            { p -> if (p.table) p.copy(table = false) else null },
+            { p -> if (p.nValue) p.copy(nValue = false) else null },
+            { p -> if (p.regular) p.copy(regular = false) else null },
+            { p -> if (p.mdd) p.copy(mdd = false) else null },
+            { p -> if (p.gccCount) p.copy(gccCount = false) else null },
+            { p -> if (p.linMaxTightFace) p.copy(linMaxTightFace = false) else null },
+            { p -> if (p.productMcCormick) p.copy(productMcCormick = false) else null },
+            { p -> if (p.cumulativeTimeIndexed) p.copy(cumulativeTimeIndexed = false) else null },
+            { p -> if (p.diffn) p.copy(diffn = false) else null },
+            { p -> if (p.booleanRlt) p.copy(booleanRlt = false) else null },
+        )
+    }
 }

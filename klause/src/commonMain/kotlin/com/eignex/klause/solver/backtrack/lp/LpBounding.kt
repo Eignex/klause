@@ -733,6 +733,28 @@ internal fun LpEngine.rootLpRelaxationBound(
 }
 
 /**
+ * The **true** root LP optimum (the float simplex objective, plus the relaxation's objective constant),
+ * or NaN when the relaxation is empty / not optimal / overflows. Unlike [rootLpRelaxationBound] this is
+ * the raw LP value, not the Neumaier–Shcherbina safe under-estimate — so it reflects how much a hull
+ * actually tightens the relaxation, which the safe bound can miss. Used only to compare relaxation
+ * variants in [LpEngine.pruneIneffectiveHulls], never as a sound prune bound.
+ */
+internal fun LpEngine.rootLpObjective(
+    relaxer: CpToLpRelaxation,
+    cancellation: Cancellation = Cancellation.Never,
+): Double = try {
+    val relaxation = relaxer.build(PropagationSession(problem))
+    if (relaxation.model.n == 0) {
+        Double.NaN
+    } else {
+        val result = dualSimplex(relaxation.model, cancellation).solve()
+        if (result != null) result.objective + relaxation.objectiveConstant.toDouble() else Double.NaN
+    }
+} catch (_: LpOverflowException) {
+    Double.NaN
+}
+
+/**
  * Harvest a persistent pool of **global** cuts from the root relaxation (#22/#705) on the sparse
  * revised-simplex path. Each round solves the (cut-augmented) root LP, separates violated cuts from the
  * LP point, and keeps the fresh ones; because the separation reads the undecided root domains, every

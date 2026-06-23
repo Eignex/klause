@@ -518,6 +518,8 @@ class BacktrackSolver(override val problem: Problem) :
          * shared root-LP budget (#31) — the slice/global cancellation time-boxed to `LpPlan.rootBudgetFraction`.
          */
         private fun initRootLp(token: Cancellation) {
+            // Drop hulls that add no root strength before the harvest + persistent base read the relaxer.
+            if (lpEngine.params.lpPlan.pruneHulls) lpEngine.pruneIneffectiveHulls(token)
             val relaxer = lpEngine.lpRelaxer ?: return
             val gomory = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.gomory
             val mir = lpEngine.params.lpPlan.cuts && lpEngine.params.lpPlan.mir
