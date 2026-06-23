@@ -79,9 +79,41 @@ interface Factor {
      */
     fun remapValues(valueMap: (Int) -> Int): Factor? = null
 
+    /**
+     * A structural self-reduction of this factor under the current integer [domains]: a rewrite into
+     * simpler / lower-arity factors when the factor's own structure (a fixed selector, a degenerate
+     * arity, a constant table) pins it, which plain propagation cannot do — propagation filters the
+     * domains, it never removes the constraint. [FactorReduction.Unchanged] (the default) means no
+     * structural reduction applies.
+     *
+     * The contract is **solution-set exact**: the returned [FactorReduction.Rewrite.replacement]
+     * (conjoined with its [FactorReduction.Rewrite.tightenedBounds]) must accept exactly the same
+     * assignments as this factor — so the driving pass can stay solution-set-preserving. A factor that
+     * needs a *relaxation* (a superset, for deduction harvesting) belongs to a different hook, not this
+     * one.
+     */
+    fun structuralReduce(domains: Array<IntDomain>): FactorReduction = FactorReduction.Unchanged
+
     /** The [Propagator] the CP engine uses for this constraint. */
     fun asPropagator(): Propagator
 
     /** The [Invariant] the LS engine uses for this constraint. */
     fun asInvariant(): Invariant
+}
+
+/**
+ * The outcome of [Factor.structuralReduce]: either no reduction, or a solution-set-exact rewrite into
+ * a (possibly empty) list of replacement factors plus optional per-variable bound narrowings.
+ */
+sealed interface FactorReduction {
+    /** No structural reduction applies — the factor is kept as-is. */
+    object Unchanged : FactorReduction
+
+    /**
+     * Replace the factor with [replacement] (an empty list drops it as vacuous) and narrow each variable
+     * in [tightenedBounds] to the given `min..max` range. The conjunction of the replacement and the
+     * narrowings must be solution-set-equivalent to the original factor.
+     */
+    class Rewrite(val replacement: List<Factor>, val tightenedBounds: Map<Int, IntRange> = emptyMap()) :
+        FactorReduction
 }

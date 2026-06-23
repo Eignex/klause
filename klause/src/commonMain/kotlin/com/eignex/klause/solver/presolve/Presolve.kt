@@ -26,8 +26,9 @@ object Presolve {
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): Problem = RedundantConstraints.removeRedundantConstraints(problem)
 
-    /** Element-constraint structural reduction. See [ElementReduction]. */
-    fun reduceElement(problem: Problem): Problem = ElementReduction.reduceElement(problem)
+    /** Per-factor structural self-reduction via [com.eignex.klause.solver.Factor.structuralReduce].
+     *  See [StructuralReduction]. */
+    fun reduceStructural(problem: Problem): Problem = StructuralReduction.reduce(problem)
 
     /** Maximal at-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s
      *  factors — including those implied by pseudo-Boolean knapsacks — and grown into maximal cliques,
