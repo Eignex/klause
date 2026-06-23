@@ -40,7 +40,7 @@ class PresolverTest {
             PresolvePass.DERIVE_XOR_UNITS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.REMOVE_REDUNDANT,
-            PresolvePass.REDUCE_ELEMENT,
+            PresolvePass.REDUCE_STRUCTURAL,
             PresolvePass.MERGE_DUPLICATE_COLUMNS,
             PresolvePass.BREAK_SYMMETRIES,
             PresolvePass.DUAL_FIX,
@@ -134,7 +134,7 @@ class PresolverTest {
     fun `emphasis levels select cost tiers`() {
         val ctx = PresolveContext.EMPTY
         assertEquals(emptyList(), PresolveConfig.parse("off").problemPasses(ctx))
-        // conservative → FAST tier only (strengthen + xor-units + affine + subsume + element +
+        // conservative → FAST tier only (strengthen + xor-units + affine + subsume + structural +
         // dup-columns), no symmetry.
         assertEquals(
             listOf(
@@ -142,7 +142,7 @@ class PresolverTest {
                 PresolvePass.DERIVE_XOR_UNITS,
                 PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
                 PresolvePass.REMOVE_REDUNDANT,
-                PresolvePass.REDUCE_ELEMENT,
+                PresolvePass.REDUCE_STRUCTURAL,
                 PresolvePass.MERGE_DUPLICATE_COLUMNS,
             ),
             PresolveConfig.parse("conservative").problemPasses(ctx),

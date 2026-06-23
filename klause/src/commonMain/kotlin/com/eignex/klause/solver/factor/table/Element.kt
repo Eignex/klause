@@ -3,9 +3,13 @@ package com.eignex.klause.solver.factor.table
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.remapVars
 
 /**
@@ -68,6 +72,38 @@ class Element(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)
+
+    // Structural reduction to a plain equality when the selection is pinned (propagation only filters
+    // domains, it never removes the global). Both cases are solution-set exact:
+    //  - a fixed index p selects arr[p], so result = arr[p] (a constant, or the selected variable; a
+    //    self-reference result = result is vacuous and drops);
+    //  - a constant array of one value c fixes result = c, and the implicit idx-in-range constraint is
+    //    kept by narrowing idx to its valid positions.
+    // An out-of-range fixed index, or a disjoint index range, is left to the propagator (an
+    // infeasibility it already reports).
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        val idxDom = domains[idx]
+        if (idxDom.min == idxDom.max) {
+            val pos = idxDom.min - indexOffset
+            if (pos !in arr.indices) return FactorReduction.Unchanged
+            if (!arrIsVars) return FactorReduction.Rewrite(listOf(resultEquals(arr[pos])))
+            val v = arr[pos]
+            return if (v == result) FactorReduction.Rewrite(emptyList()) else FactorReduction.Rewrite(listOf(equate(v)))
+        }
+        if (!arrIsVars && arr.all { it == arr[0] }) {
+            val lo = indexOffset
+            val hi = indexOffset + arr.size - 1
+            if (maxOf(idxDom.min, lo) > minOf(idxDom.max, hi)) return FactorReduction.Unchanged
+            return FactorReduction.Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi))
+        }
+        return FactorReduction.Unchanged
+    }
+
+    /** The equality `result = [value]`. */
+    private fun resultEquals(value: Int): Linear = Linear(intArrayOf(1), intArrayOf(result), LinearOp.EQ, value)
+
+    /** The equality `result = [v]` between the result and an array variable. */
+    private fun equate(v: Int): Linear = Linear(intArrayOf(1, -1), intArrayOf(result, v), LinearOp.EQ, 0)
 
     override fun asPropagator(): Propagator = ElementPropagator(
         boolVars,

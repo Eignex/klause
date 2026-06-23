@@ -11,10 +11,11 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * Element-constraint structural reduction ([Presolve.reduceElement]). Each test asserts the global is
- * rewritten into the equality its fixed structure implies, or left untouched when nothing pins it.
+ * Per-factor structural reduction ([Presolve.reduceStructural]), exercised through [Element]'s
+ * [Element.structuralReduce]. Each test asserts the global is rewritten into the equality its fixed
+ * structure implies, or left untouched when nothing pins it.
  */
-class ElementReductionTest {
+class StructuralReductionTest {
 
     private fun theLinear(problem: Problem): Linear = problem.factors.filterIsInstance<Linear>().single()
 
@@ -27,7 +28,7 @@ class ElementReductionTest {
             arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false)),
         )
-        val out = Presolve.reduceElement(problem)
+        val out = Presolve.reduceStructural(problem)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -44,7 +45,7 @@ class ElementReductionTest {
             Array(5) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(2, 3, 4), arrIsVars = true)),
         )
-        val out = Presolve.reduceElement(problem)
+        val out = Presolve.reduceStructural(problem)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -61,7 +62,7 @@ class ElementReductionTest {
             Array(3) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(1, 2), arrIsVars = true)),
         )
-        val out = Presolve.reduceElement(problem)
+        val out = Presolve.reduceStructural(problem)
         assertTrue(out.factors.isEmpty(), "the vacuous element drops with no replacement")
     }
 
@@ -74,7 +75,7 @@ class ElementReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 10)),
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(7, 7, 7), arrIsVars = false)),
         )
-        val out = Presolve.reduceElement(problem)
+        val out = Presolve.reduceStructural(problem)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         assertEquals(7, theLinear(out).bound)
         assertEquals(1, out.intDomains[0].min, "index lower bound clamped to the array's first position")
@@ -89,6 +90,6 @@ class ElementReductionTest {
             arrayOf(IntDomain(1, 3), IntDomain(0, 100)),
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false)),
         )
-        assertSame(problem, Presolve.reduceElement(problem), "no fixed index and a varied array is the no-op signal")
+        assertSame(problem, Presolve.reduceStructural(problem), "no fixed index and a varied array is the no-op signal")
     }
 }
