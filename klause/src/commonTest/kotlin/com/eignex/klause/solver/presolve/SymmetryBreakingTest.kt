@@ -99,6 +99,38 @@ class SymmetryBreakingTest {
     }
 
     @Test
+    fun `generator search breaks a composite bool-int symmetry no single transposition can`() {
+        // Two reified factors b0 ↔ (x0 = 1) and b1 ↔ (x1 = 1) are interchangeable only as the joint
+        // swap (b0,x0) ↔ (b1,x1); swapping x0 ↔ x1 alone is not an automorphism, so transposition-only
+        // detection finds nothing. The individualization–refinement generator search recovers the
+        // composite permutation (individualizing x0 cascades through its factor to distinguish b0),
+        // yielding the int orbit {x0,x1} and bool orbit {b0,b1}. This mixed bool+int symmetry is the
+        // mechanism by which lowered set/list structure becomes breakable.
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            factors = listOf(
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
+                ReifiedLinear(
+                    auxBoolVar = 1,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(1),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
+            ),
+        )
+        checkSound("composite bool-int", problem, expectReduced = true)
+    }
+
+    @Test
     fun `law-lee value precedence collapses value-symmetric solutions`() {
         // Three variables over {0,1,2} with no constraints: pure value symmetry. The symmetry classes
         // are the Bell(3)=5 set partitions, and the value_precede_chain keeps exactly one canonical
