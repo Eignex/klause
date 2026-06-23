@@ -270,4 +270,35 @@ class CircuitInvariantTest {
         val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 13L)).assignment
         assertTrue(sample != null, "LS should find a valid Subcircuit configuration")
     }
+
+    // A 5-node active cycle (0..4) with node 5 excluded (self-loop).
+    private fun subcircuitWithExcluded(): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = 6,
+        intDomains = Array(6) { IntDomain(0, 5) },
+        factors = arrayOf<Factor>(Subcircuit(succ = intArrayOf(0, 1, 2, 3, 4, 5))),
+    )
+
+    private fun seededSubcircuit(seed: Long): LocalSearchState {
+        val state = LocalSearchState(subcircuitWithExcluded(), Random(seed))
+        for (i in 0 until 5) state.assignment.setInt(i, (i + 1) % 5)
+        state.assignment.setInt(5, 5)
+        state.recompute()
+        return state
+    }
+
+    @Test
+    fun `every structured subcircuit move preserves the active sub-tour`() {
+        for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L)) {
+            val state = seededSubcircuit(seed)
+            assertEquals(0, state.cost, "active 5-cycle with one excluded node must be feasible")
+            val sink = MoveSink()
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            for (move in sink.list) {
+                val check = seededSubcircuit(0)
+                check.apply(move)
+                assertEquals(0, check.cost, "structured subcircuit move $move broke the active sub-tour")
+            }
+        }
+    }
 }

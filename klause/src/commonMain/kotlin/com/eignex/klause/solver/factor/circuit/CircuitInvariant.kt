@@ -91,43 +91,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
             cur = nx
         }
         if (cur != 0) return
-        var emitted = 0
-        var attempts = 0
-        while (emitted < MAX_SWAP_CANDIDATES && attempts < MAX_SWAP_CANDIDATES * STRUCTURED_ATTEMPT_STRIDE) {
-            attempts++
-            val i = state.rng.nextInt(n - 1)
-            val maxSeg = minOf(MAX_REVERSAL_SEGMENT, n - 1 - i)
-            if (maxSeg < 2) continue
-            val j = i + 2 + state.rng.nextInt(maxSeg - 1)
-            val parts = reversalCompound(state, order, i, j) ?: continue
-            sink.addCompound(parts)
-            emitted++
-        }
-    }
-
-    /** Successor-var moves that reverse the tour segment at positions `(i, j]`: edge `order(i) ->
-     *  order(j)`, the reversed interior `order(k) -> order(k-1)`, and `order(i+1) -> order(j+1)`.
-     *  Null if any new edge is frozen or out of its successor variable's domain. */
-    private fun reversalCompound(state: LocalSearchState, order: IntArray, i: Int, j: Int): List<Move>? {
-        val parts = ArrayList<Move>(j - i + 1)
-        if (!appendEdge(state, order[i], order[j], parts)) return null
-        var k = j
-        while (k >= i + 2) {
-            if (!appendEdge(state, order[k], order[k - 1], parts)) return null
-            k--
-        }
-        if (!appendEdge(state, order[i + 1], order[(j + 1) % n], parts)) return null
-        return parts
-    }
-
-    /** Append the move setting `from`'s successor variable to `to`, or return false if that variable
-     *  is frozen or cannot take `to`. */
-    private fun appendEdge(state: LocalSearchState, from: Int, to: Int, parts: ArrayList<Move>): Boolean {
-        val v = succ[from]
-        if (state.assumptions.isFrozenInt(v)) return false
-        if (to !in state.problem.intDomains[v]) return false
-        parts.add(Move.IntSet(v, to))
-        return true
+        proposeReversals(state, order, sink, MAX_SWAP_CANDIDATES, STRUCTURED_ATTEMPT_STRIDE)
     }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
@@ -192,9 +156,5 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
         const val MAX_TARGETS: Int = 4
         const val MAX_SWAP_CANDIDATES: Int = 4
         const val STRUCTURED_ATTEMPT_STRIDE: Int = 6
-
-        /** Longest tour segment a single 2-opt reversal flips; bounds the compound's size so the
-         *  reversal stays a cheap local move rather than a near-global rewrite. */
-        const val MAX_REVERSAL_SEGMENT: Int = 12
     }
 }

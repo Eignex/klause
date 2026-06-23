@@ -100,6 +100,30 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
                 }
             }
         }
+        proposeActiveReversals(state, sink, nextOf, active, activeNodes)
+    }
+
+    /** 2-opt reversals over the active sub-tour, when the active nodes form a single cycle. Walks the
+     *  cycle from an active node into an order array and delegates to the shared reversal generator. */
+    private fun proposeActiveReversals(
+        state: LocalSearchState,
+        sink: MoveSink,
+        nextOf: IntArray,
+        active: BooleanArray,
+        activeNodes: IntArray,
+    ) {
+        val activeCount = activeNodes.size
+        if (activeCount < 4) return
+        val order = IntArray(activeCount)
+        val seen = BooleanArray(active.size)
+        var cur = activeNodes[0]
+        for (k in 0 until activeCount) {
+            if (cur < 0 || cur >= active.size || !active[cur] || seen[cur]) return
+            seen[cur] = true
+            order[k] = cur
+            cur = nextOf[cur]
+        }
+        if (cur == activeNodes[0]) proposeReversals(state, order, sink, STRUCTURED_MOVE_CAP, MOVE_ATTEMPT_STRIDE)
     }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
