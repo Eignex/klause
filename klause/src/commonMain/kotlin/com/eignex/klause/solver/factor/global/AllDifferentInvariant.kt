@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.factor.global.internals.countPresentOccurrences
+import com.eignex.klause.solver.factor.global.internals.proposeRandomRotations
 import com.eignex.klause.solver.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -234,13 +235,14 @@ internal class AllDifferentInvariant(
         if (cur > d.min) sink.addChannelingIntSet(state, occupant, cur - 1)
     }
 
-    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) = proposeRandomSwaps(
-        state,
-        vars,
-        sink,
-        MAX_STRUCTURED_SWAPS,
-        SWAP_ATTEMPT_STRIDE,
-    ) { s, idx -> presentInvFn(s, idx) }
+    override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        proposeRandomSwaps(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
+            presentInvFn(s, idx)
+        }
+        proposeRandomRotations(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
+            presentInvFn(s, idx)
+        }
+    }
 
     private fun excessOf(count: Int): Int = if (count > 1) count - 1 else 0
 

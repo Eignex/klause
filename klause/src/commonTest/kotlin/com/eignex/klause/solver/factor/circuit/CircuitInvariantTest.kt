@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor.circuit
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Move.IntSet
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.circuit.Circuit
@@ -10,6 +11,7 @@ import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -143,6 +145,50 @@ class CircuitInvariantTest {
             node = sample.ints[node]
         }
         assertEquals(0, node, "must return to start in ${sample.ints.toList()}")
+    }
+
+    private fun nNodeCircuit(n: Int): Problem = Problem(
+        numBoolVars = 0,
+        numIntVars = n,
+        intDomains = Array(n) { IntDomain(0, n - 1) },
+        factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it })),
+    )
+
+    private fun seedTour(state: LocalSearchState, n: Int) {
+        for (i in 0 until n) state.assignment.setInt(i, (i + 1) % n)
+        state.recompute()
+    }
+
+    @Test
+    fun `every structured circuit move preserves the Hamiltonian tour`() {
+        val n = 8
+        for (seed in longArrayOf(1L, 2L, 3L, 13L, 99L)) {
+            val state = LocalSearchState(nNodeCircuit(n), Random(seed))
+            seedTour(state, n)
+            assertEquals(0, state.cost, "the seed tour must be feasible")
+            val sink = MoveSink()
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            for (move in sink.list) {
+                val check = LocalSearchState(nNodeCircuit(n), Random(0))
+                seedTour(check, n)
+                check.apply(move)
+                assertEquals(0, check.cost, "structured move $move broke the tour")
+            }
+        }
+    }
+
+    @Test
+    fun `2-opt reversals reach compounds a 3-edge swap cannot`() {
+        val n = 8
+        var maxParts = 0
+        for (seed in 0L until 40L) {
+            val state = LocalSearchState(nNodeCircuit(n), Random(seed))
+            seedTour(state, n)
+            val sink = MoveSink()
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            for (m in sink.list) if (m is Move.Compound) maxParts = maxOf(maxParts, m.parts.size)
+        }
+        assertTrue(maxParts > 3, "reversals must emit compounds longer than a 3-edge swap, got max $maxParts")
     }
 
     // --- from SubcircuitTest (LS tests) ---
