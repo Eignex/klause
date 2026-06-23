@@ -44,8 +44,11 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
     ): Problem {
-        // Verified detection: each candidate swap is proven an automorphism (every factor is keyed).
-        val (intGroups, boolGroups) = verifiedSymmetryOrbits(problem, objectiveIntVars, objectiveBoolVars)
+        // Generator-based detection: individualization–refinement over the unified variable+factor
+        // colouring yields verified automorphism generators; their orbits are the interchangeable
+        // variable classes (catches composite and bool/int-mixed symmetries the per-kind heuristics miss).
+        val generators = findGenerators(problem, objectiveIntVars, objectiveBoolVars)
+        val (intGroups, boolGroups) = generatorOrbits(problem, generators, objectiveIntVars, objectiveBoolVars)
         // Block/row symmetry (#367): interchangeable blocks of int vars (matrix rows defined by
         // isomorphic factors), ordered by lex-leader.
         val brokenInts = intGroups.flatMap { it.toList() }.toHashSet()
@@ -237,48 +240,6 @@ internal object SymmetryBreaking {
         return true
     }
 
-    /**
-     * Verified interchangeable-variable detection (#334): a variable transposition is a genuine
-     * symmetry iff swapping the two variables maps the factor multiset onto itself. Each candidate
-     * swap is *checked* by remapping every factor and comparing structural keys — so it catches
-     * symmetries the same-factor-set heuristic misses (variables in different but isomorphic
-     * factors, matrix rows), and is sound by construction. Returns `null` when any factor lacks a
-     * [Factor.structuralKey] (then the caller uses the conservative heuristic). Returns the int and
-     * bool orbits (size ≥ 2) otherwise; objective variables are excluded.
-     *
-     * Candidate groups come from Weisfeiler–Leman colour refinement ([refineColours], #373): only
-     * same-colour variables can be interchangeable, so the colour classes are exactly the candidate
-     * groups, finer than the old domain-only / single-bool-group partition. This finds more (finer
-     * classes fit under the [MAX_VERIFIED_GROUP] size guard that would skip a large coarse group)
-     * and verifies fewer impossible pairs — and stays sound because each candidate is still verified.
-     */
-    private fun verifiedSymmetryOrbits(
-        problem: Problem,
-        objectiveIntVars: Set<Int>,
-        objectiveBoolVars: Set<Int>,
-    ): Pair<List<IntArray>, List<IntArray>> {
-        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
-        val intMap = identityIntMap(problem)
-        val boolMap = identityBoolMap(problem)
-
-        val (intColour, boolColour) = refineColours(problem, objectiveIntVars, objectiveBoolVars)
-        val intCandidates = HashMap<Int, MutableList<Int>>()
-        for (v in 0 until problem.numIntVars) {
-            if (v !in objectiveIntVars) intCandidates.getOrPut(intColour[v]) { ArrayList() }.add(v)
-        }
-        val intOrbits = buildVerifiedOrbits(problem.numIntVars, intCandidates.values.toList()) { u, v ->
-            withSwap(intMap, u, v) { isAutomorphism(problem, base, boolMap, intMap) }
-        }
-        val boolCandidates = HashMap<Int, MutableList<Int>>()
-        for (v in 0 until problem.numBoolVars) {
-            if (v !in objectiveBoolVars) boolCandidates.getOrPut(boolColour[v]) { ArrayList() }.add(v)
-        }
-        val boolOrbits = buildVerifiedOrbits(problem.numBoolVars, boolCandidates.values.toList()) { u, v ->
-            withSwap(boolMap, u, v) { isAutomorphism(problem, base, boolMap, intMap) }
-        }
-        return intOrbits to boolOrbits
-    }
-
     /** Sentinel "variable id" marking the focal variable in a [refineColours] port signature; far
      *  above any colour id (colours are small dense counters) so it never collides with one. */
     private const val WL_FOCAL = 1_000_000_000
@@ -302,6 +263,26 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
     ): Pair<IntArray, IntArray> {
+        val seedInt = Array(problem.numIntVars) { v ->
+            if (v in objectiveIntVars) "o$v" else domainKey(problem.intDomains[v])
+        }
+        val seedBool = Array(problem.numBoolVars) { v -> if (v in objectiveBoolVars) "o$v" else "b" }
+        return equitablePartition(problem, seedInt, seedBool)
+    }
+
+    /**
+     * Weisfeiler–Leman refinement to an equitable partition (the colour-refinement core shared by
+     * candidate seeding and the individualization–refinement generator search). [seedInt] / [seedBool]
+     * are the initial colour signatures per variable — domain/kind for plain refinement, a unique
+     * marker for an individualized vertex, or `"o$v"` for a distinguished objective fixpoint. Colours
+     * are assigned in a canonical order (sorted by signature, bool space below int) so a discrete
+     * partition's colour *is* a labeling comparable across individualization branches.
+     */
+    private fun equitablePartition(
+        problem: Problem,
+        seedInt: Array<String>,
+        seedBool: Array<String>,
+    ): Pair<IntArray, IntArray> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
         val intInc = Array(nInt) { ArrayList<Int>() }
@@ -312,11 +293,7 @@ internal object SymmetryBreaking {
         }
         val intColour = IntArray(nInt)
         val boolColour = IntArray(nBool)
-        val initInt = Array(nInt) { v ->
-            if (v in objectiveIntVars) "o$v" else domainKey(problem.intDomains[v])
-        }
-        val initBool = Array(nBool) { v -> if (v in objectiveBoolVars) "o$v" else "b" }
-        var numColours = assignColours(initInt, initBool, intColour, boolColour)
+        var numColours = assignColours(seedInt, seedBool, intColour, boolColour)
         // Working colour maps reused across all port queries in a round (rebuilt each round).
         val intMap = IntArray(nInt)
         val boolMap = IntArray(nBool)
@@ -367,23 +344,186 @@ internal object SymmetryBreaking {
     }
 
     /** Re-colour every variable by its signature, writing dense ids into [intColour]/[boolColour] and
-     *  returning the number of distinct colours. Int and bool signatures are kept in disjoint spaces
-     *  (prefixed) so the two kinds never share a colour. */
+     *  returning the number of distinct colours. Ids are assigned in **canonical** order — distinct
+     *  signatures sorted, bool space (`"B…"`) below int (`"I…"`) — so a discrete partition's colour is
+     *  a labeling comparable across individualization branches (needed by the generator search), while
+     *  plain refinement callers, which only read colour *classes*, are unaffected. */
     private fun assignColours(
         sigInt: Array<String>,
         sigBool: Array<String>,
         intColour: IntArray,
         boolColour: IntArray,
     ): Int {
-        val ids = HashMap<String, Int>()
-        for (v in sigInt.indices) intColour[v] = ids.getOrPut("I" + sigInt[v]) { ids.size }
-        for (v in sigBool.indices) boolColour[v] = ids.getOrPut("B" + sigBool[v]) { ids.size }
+        val distinct = HashSet<String>()
+        for (s in sigInt) distinct.add("I$s")
+        for (s in sigBool) distinct.add("B$s")
+        val ids = HashMap<String, Int>(distinct.size)
+        for (s in distinct.sorted()) ids[s] = ids.size
+        for (v in sigInt.indices) intColour[v] = ids.getValue("I" + sigInt[v])
+        for (v in sigBool.indices) boolColour[v] = ids.getValue("B" + sigBool[v])
         return ids.size
     }
 
     /** Test-only view of [refineColours] with no objective variables (#373). */
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         refineColours(problem, emptySet(), emptySet())
+
+    /** Total individualize-refine leaves the generator search may compute before bailing (returning
+     *  the generators found so far — sound, just possibly incomplete), mirroring CP-SAT's node cap. */
+    private const val GENERATOR_NODE_BUDGET = 20_000
+
+    /**
+     * Generators of the constraint-graph automorphism group, found by individualization–refinement
+     * (a CP-SAT / nauty-style search) over the unified variable+factor colouring. Unlike the
+     * transposition/same-shape-block heuristics this catches composite symmetries and — because the
+     * automorphism is verified on the whole factor multiset ([isAutomorphism]) rather than per-kind
+     * factor rows — symmetries whose factors mix bool and int variables (e.g. lowered set/list
+     * structure). Every returned permutation `(intMap, boolMap)` is a *verified* automorphism, so the
+     * downstream orbit/lex breaking is sound by construction; an imperfect search only finds fewer.
+     */
+    private fun findGenerators(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        objectiveBoolVars: Set<Int>,
+    ): List<Pair<IntArray, IntArray>> {
+        val nInt = problem.numIntVars
+        val nBool = problem.numBoolVars
+        if (nInt + nBool == 0) return emptyList()
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
+        val seedIntBase = Array(nInt) { v ->
+            if (v in objectiveIntVars) "o$v" else domainKey(problem.intDomains[v])
+        }
+        val seedBoolBase = Array(nBool) { v -> if (v in objectiveBoolVars) "o$v" else "b" }
+
+        // Cells of the base equitable partition: only same-colour variables can be interchangeable.
+        val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase)
+        val cells = HashMap<Int, MutableList<Int>>()
+        for (v in 0 until nInt) if (v !in objectiveIntVars) cells.getOrPut(intColour[v]) { ArrayList() }.add(v)
+        for (v in 0 until nBool) {
+            if (v !in objectiveBoolVars) cells.getOrPut(boolColour[v]) { ArrayList() }.add(nInt + v)
+        }
+
+        val gens = ArrayList<Pair<IntArray, IntArray>>()
+        val budget = intArrayOf(GENERATOR_NODE_BUDGET)
+        for (members in cells.values) {
+            if (members.size < 2 || members.size > MAX_VERIFIED_GROUP) continue
+            val sorted = members.sorted()
+            val r = sorted[0]
+            val refLeaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, r, budget) ?: continue
+            // Disjoint set over this cell's members tracks r's orbit under generators found so far, so
+            // a member already in the orbit is skipped (it would only re-derive an existing element).
+            val index = HashMap<Int, Int>()
+            sorted.forEachIndexed { i, g -> index[g] = i }
+            val orbit = IntDisjointSet(sorted.size)
+            for (v in sorted) {
+                if (v == r || budget[0] <= 0) continue
+                if (orbit.connected(index.getValue(r), index.getValue(v))) continue
+                val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget) ?: continue
+                val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
+                if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
+                gens.add(perm)
+                for ((g, gi) in index) {
+                    val img = if (g < nInt) perm.first[g] else nInt + perm.second[g - nInt]
+                    index[img]?.let { orbit.union(gi, it) }
+                }
+            }
+        }
+        return gens
+    }
+
+    /**
+     * Individualize the global vertex [firstIndiv] (int `v` is id `v`; bool `v` is id `nInt+v`) and
+     * refine to a discrete partition, individualizing the lowest vertex of the lowest non-singleton
+     * cell at each subsequent step. Both the seed marker (`"@step"`) and the target rule are canonical,
+     * so two calls that individualize structurally-equal vertices produce comparable labelings. Returns
+     * `leaf[rank] = globalVertex` (the canonical colour is the rank), or `null` if the budget runs out.
+     */
+    @Suppress("ReturnCount")
+    private fun refineToDiscrete(
+        problem: Problem,
+        seedIntBase: Array<String>,
+        seedBoolBase: Array<String>,
+        firstIndiv: Int,
+        budget: IntArray,
+    ): IntArray? {
+        val nInt = problem.numIntVars
+        val nBool = problem.numBoolVars
+        val n = nInt + nBool
+        val seedInt = seedIntBase.copyOf()
+        val seedBool = seedBoolBase.copyOf()
+        fun individualize(globalV: Int, step: Int) {
+            if (globalV < nInt) seedInt[globalV] = "@$step" else seedBool[globalV - nInt] = "@$step"
+        }
+        individualize(firstIndiv, 0)
+        var step = 1
+        while (true) {
+            if (budget[0]-- <= 0) return null
+            val (ic, bc) = equitablePartition(problem, seedInt, seedBool)
+            val leaf = IntArray(n) { -1 }
+            val cellSize = IntArray(n)
+            for (v in 0 until nInt) {
+                leaf[ic[v]] = v
+                cellSize[ic[v]]++
+            }
+            for (v in 0 until nBool) {
+                leaf[bc[v]] = nInt + v
+                cellSize[bc[v]]++
+            }
+            var target = -1
+            for (c in 0 until n) {
+                if (cellSize[c] > 1) {
+                    target = c
+                    break
+                }
+            }
+            if (target == -1) return leaf // discrete
+            // Lowest global vertex in the target cell.
+            var chosen = Int.MAX_VALUE
+            for (v in 0 until nInt) if (ic[v] == target && v < chosen) chosen = v
+            for (v in 0 until nBool) if (bc[v] == target && nInt + v < chosen) chosen = nInt + v
+            individualize(chosen, step)
+            step++
+        }
+    }
+
+    /** The permutation mapping [refLeaf]'s rank-`i` vertex to [leaf]'s, split into `(intMap, boolMap)`.
+     *  `null` if any rank pairs an int with a bool vertex (then it is not a kind-preserving map). */
+    private fun buildPerm(refLeaf: IntArray, leaf: IntArray, nInt: Int, nBool: Int): Pair<IntArray, IntArray>? {
+        val intMap = IntArray(nInt) { it }
+        val boolMap = IntArray(nBool) { it }
+        for (i in refLeaf.indices) {
+            val a = refLeaf[i]
+            val b = leaf[i]
+            when {
+                a < nInt && b < nInt -> intMap[a] = b
+                a >= nInt && b >= nInt -> boolMap[a - nInt] = b - nInt
+                else -> return null
+            }
+        }
+        return intMap to boolMap
+    }
+
+    /** Variable orbits (size ≥ 2) under the [generators]: union each variable with its image under
+     *  every generator. Groups touching an objective variable are dropped (an asymmetric objective
+     *  must not be permuted). Returns `(intGroups, boolGroups)`, each group sorted. */
+    private fun generatorOrbits(
+        problem: Problem,
+        generators: List<Pair<IntArray, IntArray>>,
+        objectiveIntVars: Set<Int>,
+        objectiveBoolVars: Set<Int>,
+    ): Pair<List<IntArray>, List<IntArray>> {
+        val dsInt = IntDisjointSet(problem.numIntVars)
+        val dsBool = IntDisjointSet(problem.numBoolVars)
+        for ((intMap, boolMap) in generators) {
+            for (v in intMap.indices) if (intMap[v] != v) dsInt.union(v, intMap[v])
+            for (v in boolMap.indices) if (boolMap[v] != v) dsBool.union(v, boolMap[v])
+        }
+        fun groups(ds: IntDisjointSet, objective: Set<Int>): List<IntArray> = ds.groups().asSequence()
+            .filter { it.size >= 2 && it.none { v -> v in objective } }
+            .map { it.sorted().toIntArray() }
+            .toList()
+        return groups(dsInt, objectiveIntVars) to groups(dsBool, objectiveBoolVars)
+    }
 
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
      *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
@@ -400,18 +540,6 @@ internal object SymmetryBreaking {
 
     /** A fresh identity remap over the bool variables. */
     private fun identityBoolMap(problem: Problem) = IntArray(problem.numBoolVars) { it }
-
-    /** Apply the transposition `u ↔ v` to [map], run [body], then restore both slots to their identity
-     *  (the value they must hold on entry). Centralises the apply/verify/restore dance so a missed
-     *  restore — which would silently corrupt later automorphism checks — can't happen per call site. */
-    private inline fun withSwap(map: IntArray, u: Int, v: Int, body: () -> Boolean): Boolean {
-        map[u] = v
-        map[v] = u
-        val ok = body()
-        map[u] = u
-        map[v] = v
-        return ok
-    }
 
     /** Apply the position-wise block swap `a[k] ↔ b[k]` to [map], run [body], then restore each
      *  touched slot to its identity. [a] and [b] must be disjoint, equal length, and identity on entry. */
@@ -596,26 +724,6 @@ internal object SymmetryBreaking {
             weights[m + k] = -w
         }
         return PseudoBoolean(weights, literals, PbOp.LE, 0)
-    }
-
-    /** Union the candidate variables whose pairwise transposition [verify]s as a symmetry, then
-     *  return the resulting orbits of size ≥ 2 (each sorted). Transpositions generate the full
-     *  symmetric group on an orbit, so a total order over it is a sound symmetry break. */
-    private fun buildVerifiedOrbits(
-        numVars: Int,
-        candidateGroups: List<List<Int>>,
-        verify: (Int, Int) -> Boolean,
-    ): List<IntArray> {
-        val ds = IntDisjointSet(numVars)
-        for (group in candidateGroups) {
-            // Size guard (#367): each group costs O(size² × factors) verifications. Skip groups
-            // beyond the cap — fewer symmetries broken, never unsound.
-            if (group.size > MAX_VERIFIED_GROUP) continue
-            unionVerifiedPairs(ds, group.toIntArray(), verify)
-        }
-        val byRoot = HashMap<Int, MutableList<Int>>()
-        for (group in candidateGroups) for (v in group) byRoot.getOrPut(ds.find(v)) { ArrayList() }.add(v)
-        return byRoot.values.filter { it.size >= 2 }.map { it.sorted().toIntArray() }
     }
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
