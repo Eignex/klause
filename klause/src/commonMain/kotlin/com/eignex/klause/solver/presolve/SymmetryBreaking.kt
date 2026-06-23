@@ -45,34 +45,30 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int> = emptySet(),
     ): Problem {
         // Generator-based detection: individualization–refinement over the unified variable+factor
-        // colouring yields verified automorphism generators; their orbits are the interchangeable
-        // variable classes (catches composite and bool/int-mixed symmetries the per-kind heuristics miss).
+        // colouring yields verified automorphism generators (catching composite and bool/int-mixed
+        // symmetries the per-kind heuristics miss). Each generator is broken by a lex-leader constraint
+        // `V ≤lex σ(V)` — sound because the lex-minimum of every orbit satisfies it for every group
+        // element, and for a row-swap generator it is exactly the orbitope row ordering.
         val generators = findGenerators(problem, objectiveIntVars, objectiveBoolVars)
-        val (intGroups, boolGroups) = generatorOrbits(problem, generators, objectiveIntVars, objectiveBoolVars)
+        val genLex = generatorLexConstraints(problem, generators)
+        // For an orbit whose members are *individually* interchangeable (each single transposition is
+        // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
+        // order is sound and strictly stronger than the generator lex, so post it too.
+        val scalarLex = scalarTotalOrders(problem, generators, objectiveIntVars, objectiveBoolVars)
         // Block/row symmetry (#367): interchangeable blocks of int vars (matrix rows defined by
-        // isomorphic factors), ordered by lex-leader.
-        val brokenInts = intGroups.flatMap { it.toList() }.toHashSet()
-        val blockLex = verifiedBlockLex(problem, objectiveIntVars, brokenInts)
+        // isomorphic factors), ordered by lex-leader — complementary when the generator search bails.
+        val blockLex = verifiedBlockLex(problem, objectiveIntVars, emptySet())
         // Bool block/row symmetry (#373): the boolean analogue, ordered by a binary-number lex-leader.
-        val brokenBools = boolGroups.flatMap { it.toList() }.toHashSet()
-        val boolBlockLex = verifiedBoolBlockLex(problem, objectiveBoolVars, brokenBools)
+        val boolBlockLex = verifiedBoolBlockLex(problem, objectiveBoolVars, emptySet())
         val valuePins = breakValueSymmetry(problem, objectiveIntVars)
-        if (intGroups.isEmpty() && boolGroups.isEmpty() && blockLex.isEmpty() &&
+        if (genLex.isEmpty() && scalarLex.isEmpty() && blockLex.isEmpty() &&
             boolBlockLex.isEmpty() && valuePins.isEmpty()
         ) {
             return problem
         }
         val extra = ArrayList<Factor>()
-        for (group in intGroups) {
-            for (j in 0 until group.size - 1) {
-                extra.add(Linear(intArrayOf(1, -1), intArrayOf(group[j], group[j + 1]), LinearOp.LE, 0))
-            }
-        }
-        for (group in boolGroups) {
-            for (j in 0 until group.size - 1) {
-                extra.add(Clause(intArrayOf(Lit.make(group[j], false), Lit.make(group[j + 1], true))))
-            }
-        }
+        extra.addAll(genLex)
+        extra.addAll(scalarLex)
         extra.addAll(blockLex)
         extra.addAll(boolBlockLex)
         extra.addAll(valuePins)
@@ -503,26 +499,103 @@ internal object SymmetryBreaking {
         return intMap to boolMap
     }
 
-    /** Variable orbits (size ≥ 2) under the [generators]: union each variable with its image under
-     *  every generator. Groups touching an objective variable are dropped (an asymmetric objective
-     *  must not be permuted). Returns `(intGroups, boolGroups)`, each group sorted. */
-    private fun generatorOrbits(
+    /**
+     * One lex-leader constraint per generator, `V ≤lex σ(V)`. This is the standard sound static break:
+     * the lex-minimum of every orbit satisfies `V ≤lex σ(V)` for every group element, so at least one
+     * representative per orbit always survives. A pure-int generator orders its moved variables in id
+     * order ([LexLess]); a pure-bool one uses the binary-number lex-leader ([boolLexLeader]). For a
+     * generator that moves both kinds, the int ordering alone is posted — a sound relaxation (it never
+     * forbids the orbit lex-minimum). A row-swap generator yields exactly the orbitope row ordering, so
+     * matrix/row symmetry is broken row-wise, never by the unsound per-column ordering that treating
+     * each column as an independent orbit would produce.
+     */
+    private fun generatorLexConstraints(problem: Problem, generators: List<Pair<IntArray, IntArray>>): List<Factor> {
+        val extra = ArrayList<Factor>()
+        for ((intMap, boolMap) in generators) {
+            val movedInts = (0 until problem.numIntVars).filter { intMap[it] != it }
+            if (movedInts.isNotEmpty()) {
+                val xs = movedInts.toIntArray()
+                extra.add(LexLess(xs, IntArray(xs.size) { intMap[xs[it]] }, strict = false))
+                continue
+            }
+            val movedBools = (0 until problem.numBoolVars).filter { boolMap[it] != it }
+            if (movedBools.isNotEmpty() && movedBools.size <= MAX_BOOL_LEX_WIDTH) {
+                generatorBoolLex(movedBools.toIntArray(), boolMap)?.let { extra.add(it) }
+            }
+        }
+        return extra
+    }
+
+    /**
+     * Total-order chains for orbits that are *scalar* symmetric — every member individually
+     * interchangeable, i.e. each adjacent single transposition `(oⱼ oⱼ₊₁)` (moving only those two) is
+     * itself an automorphism. Then the orbit's symmetric group acts on the variables as singletons and
+     * `o₀ ≤ o₁ ≤ …` keeps exactly one representative (sound and strictly stronger than the generator
+     * lex). A lockstep matrix orbit fails the single-transposition check (swapping one cell without its
+     * row is not an automorphism), so it is left to the row-wise generator lex — never column-ordered.
+     */
+    private fun scalarTotalOrders(
         problem: Problem,
         generators: List<Pair<IntArray, IntArray>>,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
-    ): Pair<List<IntArray>, List<IntArray>> {
+    ): List<Factor> {
+        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val dsInt = IntDisjointSet(problem.numIntVars)
         val dsBool = IntDisjointSet(problem.numBoolVars)
         for ((intMap, boolMap) in generators) {
             for (v in intMap.indices) if (intMap[v] != v) dsInt.union(v, intMap[v])
             for (v in boolMap.indices) if (boolMap[v] != v) dsBool.union(v, boolMap[v])
         }
-        fun groups(ds: IntDisjointSet, objective: Set<Int>): List<IntArray> = ds.groups().asSequence()
-            .filter { it.size >= 2 && it.none { v -> v in objective } }
-            .map { it.sorted().toIntArray() }
-            .toList()
-        return groups(dsInt, objectiveIntVars) to groups(dsBool, objectiveBoolVars)
+        val intMapId = IntArray(problem.numIntVars) { it }
+        val boolMapId = IntArray(problem.numBoolVars) { it }
+        fun swapAuto(map: IntArray, a: Int, b: Int): Boolean {
+            map[a] = b
+            map[b] = a
+            val ok = isAutomorphism(problem, base, boolMapId, intMapId)
+            map[a] = a
+            map[b] = b
+            return ok
+        }
+        val extra = ArrayList<Factor>()
+        for (orbit in dsInt.groups()) {
+            if (orbit.size < 2 || orbit.any { it in objectiveIntVars }) continue
+            val o = orbit.sorted()
+            if ((0 until o.size - 1).all { swapAuto(intMapId, o[it], o[it + 1]) }) {
+                for (j in 0 until o.size - 1) {
+                    extra.add(Linear(intArrayOf(1, -1), intArrayOf(o[j], o[j + 1]), LinearOp.LE, 0))
+                }
+            }
+        }
+        for (orbit in dsBool.groups()) {
+            if (orbit.size < 2 || orbit.any { it in objectiveBoolVars }) continue
+            val o = orbit.sorted()
+            if ((0 until o.size - 1).all { swapAuto(boolMapId, o[it], o[it + 1]) }) {
+                for (j in 0 until o.size - 1) {
+                    extra.add(Clause(intArrayOf(Lit.make(o[j], false), Lit.make(o[j + 1], true))))
+                }
+            }
+        }
+        return extra
+    }
+
+    /** `x ≤lex σ(x)` over the moved bool [moved] (id order), as a binary-number [PseudoBoolean]:
+     *  `Σ 2^(m-1-k)·(x_{moved[k]} − x_{σ(moved[k])}) ≤ 0`. Unlike [boolLexLeader] the image overlaps
+     *  the domain (σ permutes the same set), so per-variable coefficients are summed. `null` if every
+     *  coefficient cancels (the constraint would be vacuous). */
+    private fun generatorBoolLex(moved: IntArray, boolMap: IntArray): PseudoBoolean? {
+        val m = moved.size
+        val coeff = HashMap<Int, Int>()
+        for (k in 0 until m) {
+            val w = 1 shl (m - 1 - k)
+            coeff[moved[k]] = (coeff[moved[k]] ?: 0) + w
+            coeff[boolMap[moved[k]]] = (coeff[boolMap[moved[k]]] ?: 0) - w
+        }
+        val entries = coeff.entries.filter { it.value != 0 }
+        if (entries.isEmpty()) return null
+        val lits = IntArray(entries.size) { Lit.make(entries[it].key, true) }
+        val weights = IntArray(entries.size) { entries[it].value }
+        return PseudoBoolean(weights, lits, PbOp.LE, 0)
     }
 
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by

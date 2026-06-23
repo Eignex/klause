@@ -13,6 +13,7 @@ import com.eignex.klause.solver.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.circuit.Subcircuit
@@ -96,6 +97,29 @@ class SymmetryBreakingTest {
             w -> v
             else -> x
         }
+    }
+
+    @Test
+    fun `row-symmetric matrix is broken soundly without column-wise overcut`() {
+        // A 2x2 bool matrix whose only solutions are one symmetry orbit: ((0,1),(1,0)) and its
+        // row/column swap ((1,0),(0,1)). Totally ordering each column orbit independently would cut
+        // BOTH representatives and make the problem UNSAT — unsound. The break must keep ≥1 solution.
+        // Layout b00=0, b01=1, b10=2, b11=3; factors b00≡b11, b01≡b10, b00≠b01, b10≠b11.
+        fun eq(a: Int, b: Int) = listOf(
+            Clause(intArrayOf(Lit.make(a, false), Lit.make(b, true))),
+            Clause(intArrayOf(Lit.make(a, true), Lit.make(b, false))),
+        )
+        fun neq(a: Int, b: Int) = listOf(
+            Clause(intArrayOf(Lit.make(a, true), Lit.make(b, true))),
+            Clause(intArrayOf(Lit.make(a, false), Lit.make(b, false))),
+        )
+        val problem = Problem(4, 0, emptyArray(), eq(0, 3) + eq(1, 2) + neq(0, 1) + neq(2, 3))
+        val broken = Presolve.breakSymmetries(problem)
+        assertEquals(
+            countFeasible(problem) > 0,
+            countFeasible(broken) > 0,
+            "breaking turned a satisfiable symmetric orbit UNSAT (unsound column-wise cut)",
+        )
     }
 
     @Test
