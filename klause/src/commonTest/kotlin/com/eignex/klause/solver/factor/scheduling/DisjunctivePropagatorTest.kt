@@ -3,19 +3,51 @@ package com.eignex.klause.solver.factor.scheduling
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.ConflictReasonOracle
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DisjunctivePropagatorTest {
+
+    @Test
+    fun `mutual-precedence conflict reason is a sound nogood citing only the two tasks`() {
+        // Three duration-3 tasks over starts [0,9] (globally schedulable at 0,3,6). A decision
+        // squeezes task 0 and task 1 both to start ≤ 2: each would then have to run strictly after
+        // the other — a contradiction implied by just those two starts. The sharp reason must cite
+        // only vars 0 and 1, never the idle task 2 (tightened to start≥6), and must be entailed.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
+            factors = arrayOf<Factor>(Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(3, 3, 3))),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 2))
+        check(state.tightenIntMax(1, 2))
+        check(state.tightenIntMin(2, 6)) // idle task tightened so a coarse reason would cite it
+        assertFalse(problem.propagators[0].propagate(state, 0))
+        val reason = problem.propagators[0].conflictReason(state, 0)!!
+        val citedVars = reason.map { state.atomIntVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        assertTrue(
+            citedVars.all { it == 0 || it == 1 },
+            "reason must cite only the two conflicting tasks, got $citedVars",
+        )
+        assertTrue(2 !in citedVars, "idle task 2 must not appear in the sharp reason")
+        ConflictReasonOracle.assertEntailed(problem, state, 0, "disjunctive-precedence")
+    }
 
     // --- From DisjunctiveConflictReasonTest ---
 
