@@ -4,6 +4,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.RelaxationBuilder
 import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
@@ -385,8 +386,9 @@ internal class CpToLpRelaxation(
 
     private fun boolCost(b: Int): Long = objective?.boolWeights?.getOrElse(b) { 0L } ?: 0L
 
-    /** Per-build mutable state: the builder, the column maps, and the row emitters. */
-    private inner class Assembler(private val session: PropagationSession) {
+    /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
+     *  [RelaxationBuilder] so a factor's [com.eignex.klause.solver.Linearizer] can emit into it. */
+    private inner class Assembler(private val session: PropagationSession) : RelaxationBuilder {
         private val builder = LpBuilder()
         private val intCol = IntArray(problem.numIntVars) { -1 }
         private val boolCol = IntArray(problem.numBoolVars) { -1 }
@@ -860,12 +862,12 @@ internal class CpToLpRelaxation(
             }
 
             val coneL = cone
-            for (factor in problem.factors) {
+            for ((factorId, factor) in problem.factors.withIndex()) {
                 // #571: in cone mode emit only factors connected to the objective; this also drops
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
                 when (factor) {
-                    is Linear -> linearRow(factor.op, factor.vars, factor.coeffs, factor.bound.toLong())
+                    is Linear -> factor.asLinearizer().linearize(this, factorId)
 
                     is ReifiedLinear -> reifiedRows(factor)
 
@@ -1709,14 +1711,14 @@ internal class CpToLpRelaxation(
             }
         }
 
-        private fun linearRow(op: LinearOp, vars: IntArray, coeffs: IntArray, bound: Long) {
+        override fun linearRow(op: LinearOp, intVars: IntArray, coeffs: IntArray, bound: Long) {
             val rel = when (op) {
                 LinearOp.LE -> Relation.LE
                 LinearOp.GE -> Relation.GE
                 LinearOp.EQ -> Relation.EQ
                 LinearOp.NE -> return // not LP-relaxable
             }
-            addIntRow(vars, coeffs, auxCol = -1, auxCoeff = 0L, rel = rel, rhs = bound)
+            addIntRow(intVars, coeffs, auxCol = -1, auxCoeff = 0L, rel = rel, rhs = bound)
         }
     }
 }

@@ -13,9 +13,10 @@ internal val EmptyLongArray: LongArray = LongArray(0)
 
 /**
  * Structural contract for a constraint in [Problem]: variable membership, remapping, and
- * structural identity. The deductive half is [Propagator] (returned by [asPropagator]) and
- * the local-search half is [Invariant] (returned by [asInvariant]); each is a separate object
- * whose allocation is deferred to when the corresponding engine is initialised.
+ * structural identity. The deductive half is [Propagator] (returned by [asPropagator]), the
+ * local-search half is [Invariant] (returned by [asInvariant]), and the LP-relaxation half is
+ * [Linearizer] (returned by [asLinearizer]); each is a separate object whose allocation is deferred
+ * to when the corresponding engine is initialised.
  *
  * Variables touched by a factor split into two id spaces: Boolean vars in [boolVars] and
  * integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty; pure-integer factors
@@ -99,6 +100,9 @@ interface Factor {
 
     /** The [Invariant] the LS engine uses for this constraint. */
     fun asInvariant(): Invariant
+
+    /** The [Linearizer] the LP engine uses for this constraint. Default: [NoLinearizer] (no relaxation). */
+    fun asLinearizer(): Linearizer = NoLinearizer
 }
 
 /**

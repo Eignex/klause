@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.bool.internals.CoalescedTerms
@@ -63,4 +64,6 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     override fun asPropagator(): Propagator = LinearPropagator(boolVars, intVars, coeffs, vars, op, bound)
 
     override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
+
+    override fun asLinearizer(): Linearizer = LinearLinearizer(op, vars, coeffs, bound)
 }
