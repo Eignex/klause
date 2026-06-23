@@ -57,6 +57,16 @@ internal class RegularInvariant(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (seq.isEmpty() || regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, acceptingSet)) return
+        // DP-optimal repair: a minimum-change in-domain accepting run. Each position where it differs
+        // from the current symbol is a move that strictly reduces the accept distance, so the search
+        // can walk straight to feasibility instead of chasing one dead-state fix at a time.
+        val target = regularRepairPath(state, seq, numStates, alphabetSize, transitions, q0, acceptingSet)
+        if (target != null) {
+            for (i in seq.indices) {
+                if (target[i] != state.assignment.intValue(seq[i])) sink.addChannelingIntSet(state, seq[i], target[i])
+            }
+            return
+        }
         val path = IntArray(seq.size + 1)
         path[0] = q0
         for (i in seq.indices) {
@@ -241,4 +251,61 @@ internal fun regularAcceptDistance(
     var best = inf
     for (q in 1..numStates) if (q in acceptingSet && dp[q] < best) best = dp[q]
     return best
+}
+
+/**
+ * A minimum-change accepting run using only in-domain symbols, returned as the symbol per position,
+ * or null when no accepting run is reachable within the domains. The domain-aware,
+ * traceback-carrying counterpart of [regularAcceptDistance]: forward DP over allowed symbols with
+ * parent pointers, then a backtrack from the cheapest accepting state.
+ */
+internal fun regularRepairPath(
+    state: LocalSearchState,
+    seq: IntArray,
+    numStates: Int,
+    alphabetSize: Int,
+    transitions: IntArray,
+    q0: Int,
+    acceptingSet: IntHashSet,
+): IntArray? {
+    val n = seq.size
+    val inf = n + 1
+    val dp = Array(n + 1) { IntArray(numStates + 1) { inf } }
+    val parentState = Array(n + 1) { IntArray(numStates + 1) { -1 } }
+    val parentSymbol = Array(n + 1) { IntArray(numStates + 1) { -1 } }
+    dp[0][q0] = 0
+    for (i in 0 until n) {
+        val cur = state.assignment.intValue(seq[i])
+        for (q in 1..numStates) {
+            val base = dp[i][q]
+            if (base >= inf) continue
+            for (s in 1..alphabetSize) {
+                if (!regularSymbolAllowed(state, seq, i, s)) continue
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                if (nq == 0) continue
+                val cost = base + if (s == cur) 0 else 1
+                if (cost < dp[i + 1][nq]) {
+                    dp[i + 1][nq] = cost
+                    parentState[i + 1][nq] = q
+                    parentSymbol[i + 1][nq] = s
+                }
+            }
+        }
+    }
+    var best = inf
+    var bestQ = -1
+    for (q in 1..numStates) {
+        if (q in acceptingSet && dp[n][q] < best) {
+            best = dp[n][q]
+            bestQ = q
+        }
+    }
+    if (bestQ == -1) return null
+    val out = IntArray(n)
+    var q = bestQ
+    for (i in n downTo 1) {
+        out[i - 1] = parentSymbol[i][q]
+        q = parentState[i][q]
+    }
+    return out
 }

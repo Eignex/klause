@@ -36,6 +36,22 @@ class AllDifferentInvariantTest {
     }
 
     @Test
+    fun `matching seed succeeds where first-fit greedy fails on tight domains`() {
+        // First-fit gives v0 the value 0, leaving the singleton v1 with nothing; a matching places
+        // v1 on 0 and shifts v0, so the seed must still succeed.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 0), IntDomain(1, 2)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
+        )
+        val state = LocalSearchState(problem, Random(0))
+        assertTrue(state.factors[0].seedFeasible(state, 0), "matching seed must place all vars distinctly")
+        state.recompute()
+        assertTrue(state.cost == 0L, "the seeded assignment must satisfy all-different")
+    }
+
+    @Test
     fun `structured moves include feasibility-preserving 3-cycles`() {
         val problem = Problem(
             numBoolVars = 0,

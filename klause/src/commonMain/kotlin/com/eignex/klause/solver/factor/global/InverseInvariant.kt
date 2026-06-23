@@ -17,6 +17,11 @@ internal class InverseInvariant(
     private val gOffset: Int,
 ) : Invariant {
 
+    /** True when f and g are the same variables in the same order (XCSP3 `channel` over one list):
+     *  the constraint is then `f(f(x)) = x`, a self-inverse / involution, and the generic channel swap
+     *  would write the shared variables twice. */
+    private val selfInverse: Boolean = fOffset == gOffset && f.contentEquals(g)
+
     private fun fValueToGIndex(j: Int): Int = j - gOffset
     private fun gValueToFIndex(i: Int): Int = i - fOffset
 
@@ -88,6 +93,10 @@ internal class InverseInvariant(
     }
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (selfInverse) {
+            proposeInvolutionMoves(state, sink)
+            return
+        }
         val n = f.size
         if (n < 2) return
         var emitted = 0
@@ -119,6 +128,53 @@ internal class InverseInvariant(
             )
             emitted++
         }
+    }
+
+    /**
+     * Involution-preserving structured moves for the self-inverse case. Each move recombines the
+     * current pairing into another involution: transpose two fixed points, split a transposition into
+     * two fixed points, or recombine two transpositions `(a,a'), (b,b') -> (a,b), (a',b')`. All keep
+     * `f(f(x)) = x`, so they preserve feasibility; the identity seed (every point fixed) is already a
+     * valid involution.
+     */
+    private fun proposeInvolutionMoves(state: LocalSearchState, sink: MoveSink) {
+        val n = f.size
+        if (n < 2) return
+        var emitted = 0
+        var attempts = 0
+        while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
+            attempts++
+            val a = state.rng.nextInt(n)
+            val pa = state.assignment.intValue(f[a]) - gOffset
+            val b = state.rng.nextInt(n)
+            val pb = state.assignment.intValue(f[b]) - gOffset
+            if (pa !in 0 until n || pb !in 0 until n) continue
+            val ok = when {
+                pa == a && pb == b && a != b -> emitInvolution(state, sink, intArrayOf(a, b), intArrayOf(b, a))
+
+                pa != a && pb != b && b != a && b != pa && pb != a && pb != pa ->
+                    emitInvolution(state, sink, intArrayOf(a, b, pa, pb), intArrayOf(b, a, pb, pa))
+
+                pa != a -> emitInvolution(state, sink, intArrayOf(a, pa), intArrayOf(a, pa))
+
+                else -> false
+            }
+            if (ok) emitted++
+        }
+    }
+
+    /** Emit the compound setting `f[indices[k]] = targets[k] + gOffset`, or skip (return false) if any
+     *  target is out of its variable's domain. Indices are distinct by construction. */
+    private fun emitInvolution(state: LocalSearchState, sink: MoveSink, indices: IntArray, targets: IntArray): Boolean {
+        val parts = ArrayList<Move>(indices.size)
+        for (k in indices.indices) {
+            val v = f[indices[k]]
+            val value = targets[k] + gOffset
+            if (value !in state.problem.intDomains[v]) return false
+            parts.add(Move.IntSet(v, value))
+        }
+        sink.addCompound(parts)
+        return true
     }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean =

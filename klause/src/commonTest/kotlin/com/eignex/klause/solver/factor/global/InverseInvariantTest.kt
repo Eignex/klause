@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.global.Inverse
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +25,42 @@ class InverseInvariantTest {
         intDomains = Array(6) { IntDomain(0, 2) },
         factors = arrayOf<Factor>(Inverse(f, g, fOffset = 0, gOffset = 0)),
     )
+
+    @Test
+    fun `self-inverse structured moves preserve the involution`() {
+        // XCSP3 channel over one list: f and g are the same variables, so the constraint is f(f(x))=x.
+        val vars = intArrayOf(0, 1, 2, 3)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 3) },
+            factors = arrayOf<Factor>(Inverse(f = vars, g = vars)),
+        )
+        // Two valid involutions to start from: all fixed points, and two transpositions.
+        val starts = listOf(intArrayOf(0, 1, 2, 3), intArrayOf(1, 0, 3, 2))
+        fun seeded(start: IntArray, seed: Long): LocalSearchState {
+            val state = LocalSearchState(problem, Random(seed))
+            for (i in 0 until 4) state.assignment.setInt(i, start[i])
+            state.recompute()
+            return state
+        }
+        var moves = 0
+        for (start in starts) {
+            for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L)) {
+                val state = seeded(start, seed)
+                assertTrue(state.cost == 0L, "the starting involution must be feasible")
+                val sink = MoveSink()
+                state.factors[0].proposeStructuredMoves(state, 0, sink)
+                for (m in sink.list) {
+                    moves++
+                    val check = seeded(start, 0)
+                    check.apply(m)
+                    assertTrue(check.cost == 0L, "involution move $m broke the self-inverse")
+                }
+            }
+        }
+        assertTrue(moves > 0, "self-inverse must propose involution-preserving moves")
+    }
 
     @Test
     fun `matching seed finds a feasible inverse when the identity is out of domain`() {
