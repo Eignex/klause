@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 /**
- * #714: the Lagrangian AllDifferent bound must not treat an `alldifferent_except` as a pure
+ * The Lagrangian AllDifferent bound must not treat an `alldifferent_except` as a pure
  * all-different. Three vars over {0,1} with `alldifferent_except_0` is feasible (all may be 0), but a
  * *pure* all-different over 3 vars / 2 values is Hall-infeasible — so treating it as pure would prove
  * a false UNSAT and prune the real optimum.
@@ -32,7 +32,7 @@ class LagrangianAllDiffExceptTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        // Lagrangian on (the AllDifferent bound) + the LP bounding stack — the #714 trigger.
+        // Lagrangian on (the AllDifferent bound) + the LP bounding stack — the soundness trigger.
         val r = BacktrackSolver(p).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, lagrangian = true)),

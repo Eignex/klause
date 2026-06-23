@@ -89,7 +89,7 @@ private class LbDecision(val isBool: Boolean, val varId: Int, val lower: Boolean
 private class LbNode(val decisions: List<LbDecision>, val bound: Double)
 
 /**
- * Best-bound (best-first) tree-search subsolver (#E2, CP-SAT's `lb_tree_search`). Explores the
+ * Best-bound (best-first) tree-search subsolver. Explores the
  * branch-and-bound tree expanding the open node with the smallest LP relaxation bound first, diving
  * toward integer-feasible leaves to find good incumbents fast — the complement of depth-first search.
  * Each node re-derives a fresh session from its root decisions, solves the node LP for an ordering
@@ -180,7 +180,7 @@ private fun mostFractionalCol(relaxation: LpRelaxation, primal: DoubleArray): Tr
 }
 
 /**
- * Reduced-cost-average branching (#E1): pick the unassigned variable with the highest LP branch score
+ * Reduced-cost-average branching: pick the unassigned variable with the highest LP branch score
  * (reduced-cost pseudo-cost × fractionality, [LpHints.branchScore]), or null when LP branching is off,
  * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
@@ -211,7 +211,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession): VarRef? {
 }
 
 /**
- * Objective shaving (#E3, CP-SAT's `ShaveObjectiveLb`): raise the proven lower bound on an ascending
+ * Objective shaving: raise the proven lower bound on an ascending
  * (minimized) [objectiveVar] by probing. Assume `objectiveVar ≤ v` in a fresh root session and, if the
  * sound propagation + LP relaxation proves that infeasible — `pruneNode` run with an *infinite*
  * incumbent, so it fires only on a genuine (Farkas-certified / propagation) infeasibility, never on
@@ -246,7 +246,7 @@ internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, to
 internal class ShavedBound(val varId: Int, val lo: Int, val hi: Int)
 
 /**
- * Variable shaving (#E3, CP-SAT's `VariablesShavingSolver`): tighten integer variables' domain bounds
+ * Variable shaving: tighten integer variables' domain bounds
  * by probing. For each variable assume `v ≤ lo` (resp. `v ≥ hi`) and, if the sound propagation + LP
  * relaxation proves that infeasible (`pruneNode` at an *infinite* incumbent, firing only on genuine
  * infeasibility), raise `lo` (lower `hi`). Returns the variables whose declared bounds shaved inward,

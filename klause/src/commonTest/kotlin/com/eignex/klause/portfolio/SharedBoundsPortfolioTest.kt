@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 /**
- * #809 / F1: sharing the objective lower bound across backtrack arms must not change the proven optimum.
+ * Sharing the objective lower bound across backtrack arms must not change the proven optimum.
  * Each arm tightens its objective variable to the cross-arm maximum bound — a sound floor every feasible
  * solution meets — so a portfolio reaches the same answer it would with no bound sharing.
  */

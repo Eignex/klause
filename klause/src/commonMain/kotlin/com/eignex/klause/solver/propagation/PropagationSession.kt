@@ -253,7 +253,7 @@ class PropagationSession(
      * calls this on each new incumbent so the bound is pushed into the objective variable
      * and the constraint defining it (linear, product, element, a global's output — any
      * structure) propagates the tightening back into the decision variables. This is
-     * CP-SAT-style objective propagation, strictly stronger than a passive lower-bound
+     * objective propagation, strictly stronger than a passive lower-bound
      * check, and it gives objective pruning even for non-linear-defined objectives that the
      * predicate path cannot bound. Permanent: survives forgetting and persists for the rest
      * of the session; later incumbents assert progressively tighter (subsuming) units.

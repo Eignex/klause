@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The best-bound tree-search subsolver ([lbTreeSearch], #E2) is a primal heuristic: it must return only
+ * The best-bound tree-search subsolver ([lbTreeSearch]) is a primal heuristic: it must return only
  * fully-pinned, propagation-feasible incumbents (the caller records them without re-checking), and on a
  * small problem its best-first dive should reach an optimal one. Checked by brute force.
  */

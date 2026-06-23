@@ -5,7 +5,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 /**
- * Per-connected-component LP lower bound (#C1, the CP-SAT `AddLPConstraints`-by-component analogue).
+ * Per-connected-component LP lower bound (the per-component decomposition).
  * The structural columns partition into independent blocks — two columns are coupled iff they share a
  * constraint row — and the slack-form objective is a plain sum over columns, so the LP **separates**:
  * its optimum is the sum of the per-block optima plus the isolated (row-free) columns' contributions.

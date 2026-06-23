@@ -6,7 +6,7 @@ import com.eignex.klause.solver.lp.Relation
 import kotlin.math.max
 
 /**
- * Single-node flow-cover cuts (#D1 / #D2, CP-SAT's `_FC` family). Detects single-node flow structure
+ * Single-node flow-cover cuts. Detects single-node flow structure
  * directly from the integer model — a **capacity row** `Σⱼ yⱼ ≤ b` whose flow variables each carry a
  * **variable-upper-bound** (VUB) `yⱼ ≤ uⱼ·xⱼ` with `xⱼ ∈ {0,1}` (every constraint a plain [Linear], no
  * new columns) — and separates the Padberg–Van Roy–Wolsey flow-cover inequality.

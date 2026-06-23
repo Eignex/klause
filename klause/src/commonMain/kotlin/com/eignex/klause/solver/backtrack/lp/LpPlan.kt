@@ -263,21 +263,21 @@ data class LpPlan(
      */
     val learn: Boolean = false,
     /**
-     * Objective shaving (#E3): before search, probe whether the objective can be proven to exceed its
+     * Objective shaving: before search, probe whether the objective can be proven to exceed its
      * current lower bound — assume `objVar ≤ v` and, if the LP relaxation + propagation prove that
      * infeasible, raise the root lower bound to `v + 1`. Sound (every raise is a proof that lower values
      * are infeasible). Requires [bounding] and a single ascending objective variable. Off by default.
      */
     val objectiveShaving: Boolean = false,
     /**
-     * Variable shaving (#E3): before search, probe each integer variable's domain bounds — assume
+     * Variable shaving: before search, probe each integer variable's domain bounds — assume
      * `v ≤ lo` (resp. `v ≥ hi`) and, if the LP relaxation + propagation prove that infeasible, tighten
      * the bound inward. Sound (every tightening is a proof that the shaved-off values are infeasible).
      * Requires [bounding]; costs probes per variable, so off by default.
      */
     val variableShaving: Boolean = false,
     /**
-     * Best-bound tree-search primal subsolver (#E2): before search, explore the branch-and-bound tree
+     * Best-bound tree-search primal subsolver: before search, explore the branch-and-bound tree
      * best-first (lowest LP bound first) to dive for good incumbents fast. Pure heuristic — returns only
      * propagation-feasible incumbents (re-checked), so it never changes the optimum. Requires [bounding];
      * off by default.
@@ -285,29 +285,29 @@ data class LpPlan(
     val lbTreeSearch: Boolean = false,
     /**
      * Add the Anderson big-M tight face of each [com.eignex.klause.solver.factor.arithmetic.ArrayMinMax]
-     * on top of the envelope (#C3), bounding the extremum from the tight side. Sound relaxation; gated.
+     * on top of the envelope, bounding the extremum from the tight side. Sound relaxation; gated.
      * Off by default.
      */
     val linMaxTightFace: Boolean = false,
     /**
      * Relax each [com.eignex.klause.solver.factor.arithmetic.Product] `result = a·b` with its McCormick
-     * envelope (#C4; the square case degenerates to secant/tangent). Sound relaxation; gated. Off by default.
+     * envelope (the square case degenerates to secant/tangent). Sound relaxation; gated. Off by default.
      */
     val productMcCormick: Boolean = false,
     /**
-     * Separate implied-bound cuts from the probing implication graph (#D3): `litVal(A) ≤ litVal(B)` for
+     * Separate implied-bound cuts from the probing implication graph: `litVal(A) ≤ litVal(B)` for
      * each violated probing implication not already an explicit binary clause. Sound (valid at every
      * solution); requires [cuts]. Off by default.
      */
     val impliedBoundCuts: Boolean = false,
     /**
-     * Separate single-node flow-cover cuts (#D1 / #D2): detect a capacity row `Σ yⱼ ≤ b` whose flows
+     * Separate single-node flow-cover cuts: detect a capacity row `Σ yⱼ ≤ b` whose flows
      * carry variable-upper-bounds `yⱼ ≤ uⱼ·xⱼ` (`xⱼ ∈ {0,1}`) and add the violated Padberg–Van Roy–Wolsey
      * flow-cover inequality. Sound (valid at every integer solution); requires [cuts]. Off by default.
      */
     val flowCoverCuts: Boolean = false,
     /**
-     * Boolean RLT relaxation (#D4): multiply each small 0/1 knapsack row by its binaries and linearize
+     * Boolean RLT relaxation: multiply each small 0/1 knapsack row by its binaries and linearize
      * the products `xₖ·xᵢ` with their McCormick envelope (product columns + rows). Sound — the
      * relaxation excludes no integer solution; adds capped product columns, so it is gated. Requires
      * [bounding]; off by default.

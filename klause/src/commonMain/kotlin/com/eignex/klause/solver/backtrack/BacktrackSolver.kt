@@ -470,7 +470,7 @@ class BacktrackSolver(override val problem: Problem) :
         }
 
         /**
-         * Tighten the objective variable to the portfolio's shared lower bound (#809 / F1). The bound is
+         * Tighten the objective variable to the portfolio's shared lower bound. The bound is
          * a valid global lower bound on the optimum, and every feasible solution has `objVar ≥ optimum`,
          * so asserting `objVar ≥ ⌈bound⌉` removes no solution — it only strengthens this arm's propagation
          * and pruning with a floor a peer arm proved. A no-op without a single ascending objective
@@ -513,7 +513,7 @@ class BacktrackSolver(override val problem: Problem) :
             }
             val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token)
             sink.observeRootLpBound(0, rootBound)
-            // Publish the root LP bound to the portfolio's shared lower-bound manager (#809 / F1): a sound
+            // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound
             // global lower bound on the optimum, so a peer arm can pair it with its own incumbent to prove
             // optimality. A NaN (no LP structure) carries no information and the sink ignores it.
             if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
@@ -554,7 +554,7 @@ class BacktrackSolver(override val problem: Problem) :
                 // root relaxation cannot starve search of its first node.
                 val rootToken = rootLpBudget()
                 initRootLp(rootToken)
-                // Objective shaving (#E3): raise the objective's proven lower bound before search when
+                // Objective shaving: raise the objective's proven lower bound before search when
                 // the LP + propagation prove lower values infeasible. Sound — every raise is a proof —
                 // so tightening the root session here only strengthens pruning.
                 if (lpEngine.params.lpPlan.objectiveShaving) {
@@ -564,7 +564,7 @@ class BacktrackSolver(override val problem: Problem) :
                         }
                     }
                 }
-                // Variable shaving (#E3): tighten integer domains the LP + propagation prove cannot reach
+                // Variable shaving: tighten integer domains the LP + propagation prove cannot reach
                 // their declared bounds. Sound — each tightening is a proof — so applying it to the root
                 // session only strengthens pruning.
                 if (lpEngine.params.lpPlan.variableShaving) {
@@ -582,7 +582,7 @@ class BacktrackSolver(override val problem: Problem) :
                         ?: lpEngine.lpFeasibilityPump(objective, rootToken)
                     if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
                 }
-                // Best-bound tree-search primal subsolver (#E2): dive best-first for an incumbent. Pure
+                // Best-bound tree-search primal subsolver: dive best-first for an incumbent. Pure
                 // heuristic — the returned assignment is propagation-feasible and re-evaluated here.
                 if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
                     lpEngine.lbTreeSearch(objective, rootToken)?.let { seed ->
@@ -591,7 +591,7 @@ class BacktrackSolver(override val problem: Problem) :
                 }
             }
             // Re-read the shared lower bound each slice: a peer arm may have proven a tighter floor since
-            // this arm last ran (#809 / F1). Monotone and sound, so re-asserting only strengthens pruning.
+            // this arm last ran. Monotone and sound, so re-asserting only strengthens pruning.
             applySharedObjectiveFloor()
             outer@ while (true) {
                 if (!runActive) {
@@ -632,7 +632,7 @@ class BacktrackSolver(override val problem: Problem) :
                         continue@outer
                     }
                     if (descend) {
-                        // Reduced-cost-average branching (#E1): prefer the LP's most cost-impactful
+                        // Reduced-cost-average branching: prefer the LP's most cost-impactful
                         // fractional variable; null falls back to the configured selector. Advisory —
                         // any branch is sound, and the selector's event hooks still fire below.
                         val varRef = lpEngine.lpBranchPick(session) ?: params.variableSelector.pick(session, rng)

@@ -14,7 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Single-node flow-cover cuts (#D1 / #D2) must be SOUND: every emitted inequality holds at every
+ * Single-node flow-cover cuts must be SOUND: every emitted inequality holds at every
  * integer-feasible point, so it only tightens the relaxation and never removes a solution. Checked by
  * brute-force enumeration of small single-node-flow problems (`Σ yⱼ ≤ b`, `yⱼ ≤ uⱼ·xⱼ`, `xⱼ ∈ {0,1}`),
  * and that a cut fires on the fractional max-flow LP point.

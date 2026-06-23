@@ -13,7 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Boolean RLT (#D4) is a relaxation *strengthening*: every integer-feasible point sets its product
+ * Boolean RLT is a relaxation *strengthening*: every integer-feasible point sets its product
  * variables `wₖᵢ = xₖ·xᵢ` to satisfy every McCormick + RLT row, so the augmented relaxation excludes no
  * feasible point and its LP optimum stays a valid lower bound on the integer optimum. Checked by brute
  * force: over random 0/1 knapsack problems the RLT LP bound never exceeds the true integer optimum, and

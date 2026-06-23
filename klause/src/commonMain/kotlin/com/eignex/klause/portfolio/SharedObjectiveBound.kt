@@ -5,7 +5,7 @@ import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
 
 /**
- * The cross-arm objective **lower** bound of one minimisation portfolio (#809 / F1) — the dual of the
+ * The cross-arm objective **lower** bound of one minimisation portfolio — the dual of the
  * shared incumbent (the upper-bound cutoff already threaded through every arm's
  * `BacktrackParams.objectiveBoundSupplier`). Each arm publishes the global lower bounds it proves (its
  * root LP relaxation bound, raised objective floors); the manager keeps their **maximum**, the tightest
