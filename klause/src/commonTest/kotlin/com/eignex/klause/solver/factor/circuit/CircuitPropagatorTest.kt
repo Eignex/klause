@@ -3,11 +3,14 @@ package com.eignex.klause.solver.factor.circuit
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.ConflictReasonOracle
+import com.eignex.klause.solver.factor.FactorPropagationOracle
 import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.circuit.Subcircuit
 import com.eignex.klause.solver.factor.circuit.SuccessorCycleFactor
@@ -21,6 +24,77 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CircuitPropagatorTest {
+
+    @Test
+    fun `strong connectivity rejects a candidate graph with an inescapable component`() {
+        // Nodes {3,4,5} only point within themselves, so once the cycle enters that block (via 0→3)
+        // it can never return — no Hamiltonian circuit exists. No edge is fixed, so the subtour /
+        // chain checks see nothing; only the strong-connectivity (SCC) condition rules it out.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = arrayOf(
+                IntDomain(1, 3),
+                IntDomain(0, 2),
+                IntDomain(0, 1),
+                IntDomain(4, 5),
+                IntDomain(3, 5),
+                IntDomain(3, 4),
+            ),
+            factors = arrayOf<Factor>(Circuit(succ = intArrayOf(0, 1, 2, 3, 4, 5))),
+        )
+        assertTrue(problem.propagate() is Unsat, "an inescapable component must be rejected by SCC reasoning")
+    }
+
+    @Test
+    fun `subtour conflict reason is a sound nogood citing only the subtour edges`() {
+        // Globally satisfiable (4-node Hamiltonian cycles exist). A decision fixes succ[0]=1 and
+        // succ[1]=0, a premature 2-cycle. The sharp reason must cite only those two successor vars,
+        // not the idle var 2 (tightened but uninvolved), and must be entailed by the circuit.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 2), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(Circuit(succ = intArrayOf(0, 1, 2, 3))),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 1))
+        check(state.tightenIntMax(0, 1)) // succ[0]=1
+        check(state.tightenIntMin(1, 0))
+        check(state.tightenIntMax(1, 0)) // succ[1]=0
+        check(state.tightenIntMax(2, 2)) // idle var 2 tightened → a coarse reason would cite it
+        state.currentFactor = 0
+        assertFalse(problem.propagators[0].propagate(state, 0))
+        val reason = problem.propagators[0].conflictReason(state, 0)!!
+        val citedVars = reason.map { state.atomIntVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        assertTrue(citedVars.all { it == 0 || it == 1 }, "reason must cite only the subtour edges, got $citedVars")
+        assertTrue(2 !in citedVars, "idle successor var 2 must not appear in the sharp reason")
+        ConflictReasonOracle.assertEntailed(problem, state, 0, "circuit-subtour")
+    }
+
+    @Test
+    fun `circuit filtering never over-prunes`() {
+        // Brute-force oracle: the SCC condition (and the rest of the pass) must not exclude any value
+        // that lies on some Hamiltonian circuit. n=4 ⇒ 4^4 = 256 assignments, under the brute cap.
+        val rng = Random(0xC141)
+        repeat(400) { iter ->
+            val nNodes = 4
+            val doms = Array(nNodes) {
+                val a = rng.nextInt(nNodes)
+                val b = rng.nextInt(nNodes)
+                IntDomain(minOf(a, b), maxOf(a, b))
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = nNodes,
+                intDomains = doms,
+                factors = arrayOf<Factor>(Circuit(succ = IntArray(nNodes) { it })),
+            )
+            FactorPropagationOracle.assertSound(problem, "circuit#$iter")
+        }
+    }
 
     // --- from CircuitBruteTest ---
 
