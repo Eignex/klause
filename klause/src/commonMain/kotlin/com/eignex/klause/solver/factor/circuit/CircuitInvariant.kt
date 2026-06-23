@@ -7,11 +7,8 @@ import com.eignex.klause.util.IntArrayList
 
 /** LS implementation for [Circuit]: violation scoring and move proposal for the Hamiltonian-cycle
  *  constraint. */
-internal class CircuitInvariant(
-    succ: IntArray,
-    n: Int,
-    computeCost: (LocalSearchState, Int, Int) -> Int,
-) : SuccessorCycleInvariant(succ, n, computeCost) {
+internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Int) -> Int) :
+    SuccessorCycleInvariant(succ, n, computeCost) {
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (state.intPayload[factorId] == 0) return

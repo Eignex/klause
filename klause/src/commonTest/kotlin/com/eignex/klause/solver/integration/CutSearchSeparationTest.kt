@@ -123,6 +123,51 @@ class CutSearchSeparationTest {
         }
     }
 
+    @Test
+    fun `pooled-cut selection preserves the optimum`() {
+        // The harvested global cuts are folded per node by efficacy/orthogonality selection (#60), not all
+        // at once. With a non-empty pool the select-then-resolve path runs; the optimum must be unchanged
+        // (the selected cuts are a subset of the globally-valid pool), validated against brute force.
+        val rng = Random(60_60_60)
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
+            var withPool = 0
+            repeat(80) { _ ->
+                val n = rng.nextInt(3, 5)
+                val ub = n - 1 + rng.nextInt(0, 3)
+                val cost = LongArray(n) { rng.nextLong(-5, 6) }
+                val vars = IntArray(n) { it }
+                val cons = listOf(IntArray(n) { rng.nextInt(0, 3) } to rng.nextInt(n, n * ub + 1))
+                val brute = bruteMin(n, ub, cost, cons)
+
+                val factors = ArrayList<Factor>()
+                factors.add(AllDifferent(vars, domainMin = 0, domainSize = ub + 1))
+                for ((c, r) in cons) factors.add(Linear(c, vars, LinearOp.LE, r))
+                val problem = Problem(0, n, Array(n) { IntDomain(0, ub) }, factors.toTypedArray())
+                val obj = LinearObjective(intCoefficients = cost)
+
+                when (val res = BacktrackSolver(problem).minimize(obj, searchCutParams(60L))) {
+                    is MinimizeResult.Optimal -> {
+                        assertEquals(
+                            (brute ?: error("solver Optimal but brute infeasible")).toDouble(),
+                            res.objective,
+                            1e-9,
+                        )
+                        if (res.stats.lpCuts.sum > 0.0) withPool++
+                    }
+
+                    is MinimizeResult.Infeasible -> assertTrue(brute == null, "solver Infeasible but brute feasible")
+
+                    else -> error("unexpected $res")
+                }
+            }
+            assertTrue(withPool > 0, "no instance harvested a cut pool, so selection was never exercised")
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
     /** Min Σ cost·x over distinct assignments in [0,ub] satisfying the LE constraints, or null. */
     private fun bruteMin(n: Int, ub: Int, cost: LongArray, cons: List<Pair<IntArray, Int>>): Long? {
         val x = IntArray(n)

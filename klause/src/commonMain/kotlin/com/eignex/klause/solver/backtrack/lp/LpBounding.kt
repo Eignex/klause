@@ -8,6 +8,7 @@ import com.eignex.klause.solver.backtrack.SEARCH_CUT_ROUNDS
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.backtrack.snapshotAssignment
 import com.eignex.klause.solver.lp.Basis
+import com.eignex.klause.solver.lp.FloatLpResult
 import com.eignex.klause.solver.lp.IntegerCertificate
 import com.eignex.klause.solver.lp.LpModel
 import com.eignex.klause.solver.lp.LpOverflowException
@@ -117,7 +118,9 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
         val session = PropagationSession(problem)
         if (session.isUnsatAtRoot) continue
         if (node.decisions.any { applyLbDecision(session, it) is PropagationResult.Unsat }) continue
-        val relaxation = nodeRelaxation(relaxer, session, lpGlobalCuts)
+        // The cut-free base relaxation suffices for this primal dive — the harvested cuts only tighten the
+        // ordering bound, never the feasibility of a realized incumbent (which pinToward re-checks).
+        val relaxation = nodeRelaxation(relaxer, session)
         if (relaxation.model.n == 0) continue
         val result = dualSimplex(relaxation.model, cancellation).solve() ?: continue // infeasible / unknown ⇒ drop
         if (result.objective >= bestObj) continue
@@ -322,7 +325,6 @@ internal fun LpEngine.lpBoundAndFix(
     sink: SolveStatsSink,
     objectiveVar: Int,
     objectiveAscending: Boolean,
-    globalCuts: List<Cut>,
     cancellation: Cancellation,
     hints: LpHints? = null,
     learn: Boolean = false,
@@ -331,15 +333,45 @@ internal fun LpEngine.lpBoundAndFix(
 ): LpNodeOutcome = try {
     sink.lpClockStart()
     sparseSafePrune(
-        relaxer, session, bound, globalCuts, sink, cancellation, objectiveVar, objectiveAscending, hints, learn, warm,
+        relaxer, session, bound, sink, cancellation, objectiveVar, objectiveAscending, hints, learn, warm,
         cutsAllowed,
     )
 } catch (_: LpOverflowException) {
     // A coefficient overflow in the relaxation build loses the bound; recover a sound one via the
     // integer-multiplier 128-bit certification. A failure just keeps the node.
-    sparseCertifiedPrune(relaxer, session, bound, globalCuts, sink, cancellation)
+    sparseCertifiedPrune(relaxer, session, bound, sink, cancellation)
 } finally {
     sink.lpClockStop()
+}
+
+/**
+ * Fold the pooled global cuts the LP point [res] violates into the node relaxation and re-solve
+ * (#40 / D8). [CutPool.select] ranks the pool by efficacy (normalised violation) at [res], drops the
+ * cuts the point already satisfies, and keeps a mutually-orthogonal subset — so only cuts that actually
+ * move this point are loaded, bounding the per-node cut count by efficacy rather than the whole pool.
+ * Returns the tightened `(relaxation, result)` when a cut subset re-solves, else [base]/[res] unchanged
+ * (empty pool, nothing violated, an overflowing build, or a failed re-solve). Sound: the selected cuts
+ * are a subset of the globally-valid pool, so the augmented relaxation excludes no feasible point.
+ */
+private fun LpEngine.foldSelectedCuts(
+    relaxer: CpToLpRelaxation,
+    session: PropagationSession,
+    base: LpRelaxation,
+    res: FloatLpResult,
+    cancellation: Cancellation,
+    sink: SolveStatsSink,
+): Pair<LpRelaxation, FloatLpResult> {
+    if (cutPool.size == 0) return base to res
+    val selected = cutPool.select(res.primal, cutPool.maxCuts)
+    if (selected.isEmpty()) return base to res
+    val tightened = try {
+        relaxer.build(session, selected)
+    } catch (_: LpOverflowException) {
+        return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
+    }
+    val r = dualSimplex(tightened.model, cancellation).solve() ?: return base to res
+    sink.observeLpSolve()
+    return tightened to r
 }
 
 /**
@@ -355,7 +387,6 @@ internal fun LpEngine.sparseSafePrune(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     bound: Double,
-    globalCuts: List<Cut>,
     sink: SolveStatsSink,
     cancellation: Cancellation,
     objectiveVar: Int,
@@ -365,7 +396,7 @@ internal fun LpEngine.sparseSafePrune(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome {
-    val relaxation = nodeRelaxation(relaxer, session, globalCuts)
+    val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
@@ -400,12 +431,17 @@ internal fun LpEngine.sparseSafePrune(
         return LpNodeOutcome(false, optimalBasis) // feasible, nothing more to deduce
     }
     // During-search separation (#41): at a gated shallow node, tighten this node's relaxation with the
-    // cuts its LP point violates. Global cuts are persisted into the pool (descendants inherit them via
-    // the rebuilt base); node-local cuts tighten only this solve, so they never leak to a sibling and
-    // the bound stays sound. The bound, certificate and reduced-cost fixing below read the tightened
-    // relaxation; the cached warm-start basis stays the un-tightened one for the children.
-    var boundRel = relaxation
-    var boundRes = result
+    // cuts its LP point violates. Global cuts are persisted into the pool (descendants inherit them);
+    // node-local cuts tighten only this solve, so they never leak to a sibling and the bound stays sound.
+    // The bound, certificate and reduced-cost fixing below read the tightened relaxation; the cached
+    // warm-start basis stays the cut-free one for the children.
+    // The pooled global cuts this node's LP point violates are folded in first (#40 / D8): the
+    // most-effective, mutually-orthogonal subset chosen by CutPool.select, re-solved once. A subset of
+    // globally-valid cuts only tightens the bound, and selecting against the live point loads just the
+    // cuts that move it — bounding the per-node cut count by efficacy instead of the whole pool.
+    val (cutRel, cutRes) = foldSelectedCuts(relaxer, session, relaxation, result, cancellation, sink)
+    var boundRel = cutRel
+    var boundRes = cutRes
     if (cutsAllowed && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
         lpSeparators.isNotEmpty()
     ) {
@@ -415,10 +451,10 @@ internal fun LpEngine.sparseSafePrune(
             val ctx = CutContext(problem, boundRel, boundRes.primal, session)
             val fresh = lpSeparators.flatMap { it.separate(ctx) }
             if (fresh.isEmpty()) break
-            recordSearchCuts(fresh, boundRes.primal) // persist the global cuts; invalidate the base
+            recordSearchCuts(fresh, boundRes.primal) // persist the global cuts into the pool
             for (c in fresh) if (!c.global) localCuts.add(c)
             val tightened = try {
-                relaxer.build(session, lpGlobalCuts + localCuts)
+                relaxer.build(session, cutPool.select(boundRes.primal, cutPool.maxCuts) + localCuts)
             } catch (_: LpOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
@@ -621,12 +657,13 @@ internal fun LpEngine.sparseCertifiedPrune(
     relaxer: CpToLpRelaxation,
     session: PropagationSession,
     bound: Double,
-    globalCuts: List<Cut>,
     sink: SolveStatsSink,
     cancellation: Cancellation,
 ): LpNodeOutcome {
     if (!bound.isFinite()) return LpNodeOutcome(false, null) // no incumbent to prune against
-    val relaxation = nodeRelaxation(relaxer, session, globalCuts)
+    // Cut-free recovery: this path is reached because the cut-augmented build overflowed, and cuts are a
+    // common overflow source, so the base relaxation (no cuts) is what yields a sound — if looser — bound.
+    val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.observeLpSolve()
     val result = dualSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
