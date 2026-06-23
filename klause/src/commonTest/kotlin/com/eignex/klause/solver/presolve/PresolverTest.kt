@@ -349,19 +349,23 @@ class PresolverTest {
 
     @Test
     fun `dropping a vacuous global frees an implied variable for elimination`() {
-        // x0 = x1 + 1 (a unit-pivot definition) and x0 also sits in AllDifferent(x0, x2). With
-        // dom(x0)=[1,2] disjoint from dom(x2)=[5,6] that all-different is vacuous, so subsumption drops
-        // it (#553); x0 is then contained in just its defining equality, and the affine pass projects it
-        // out — implied-free elimination the global previously blocked. x1 sits in a *real*
-        // AllDifferent(x1, x3) over [0,1], which stays.
+        // x0 = x1 + 1 (a unit-pivot definition) and x0 also sits in AllDifferent(x0, x2, x4). With
+        // dom(x0)=[1,2], dom(x2)=[5,6], dom(x4)=[9,10] pairwise disjoint that all-different is vacuous,
+        // so subsumption drops it (#553); x0 is then contained in just its defining equality, and the
+        // affine pass projects it out — implied-free elimination the global previously blocked. x1 sits
+        // in a *real* AllDifferent(x1, x3, x5) over [0,2], which stays. Three-variable all-differents
+        // are used so the structural-reduction pass (two-var → binary disequality) leaves them alone.
         val problem = Problem(
             0,
-            4,
-            arrayOf(IntDomain(1, 2), IntDomain(0, 1), IntDomain(5, 6), IntDomain(0, 1)),
+            6,
+            arrayOf(
+                IntDomain(1, 2), IntDomain(0, 1), IntDomain(5, 6),
+                IntDomain(0, 2), IntDomain(9, 10), IntDomain(0, 2),
+            ),
             listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
-                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 7), // vacuous (disjoint)
-                AllDifferent(intArrayOf(1, 3), domainMin = 0, domainSize = 2), // real (overlapping)
+                AllDifferent(intArrayOf(0, 2, 4), domainMin = 0, domainSize = 11), // vacuous (disjoint)
+                AllDifferent(intArrayOf(1, 3, 5), domainMin = 0, domainSize = 3), // real (overlapping)
             ),
         )
         val pre = Presolver.run(problem, PresolveConfig.DEFAULT)

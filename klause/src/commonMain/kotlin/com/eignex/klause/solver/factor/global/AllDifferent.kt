@@ -3,10 +3,14 @@ package com.eignex.klause.solver.factor.global
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
@@ -114,6 +118,16 @@ class AllDifferent(
         exceptSet,
         boundsConsistent,
     )
+
+    // A plain two-variable all-different is exactly the disequality `v0 != v1`, so collapse it to a
+    // binary `!=` (a cheap disequality propagator instead of the full Régin matching/SCC machinery).
+    // The optional (presents) and excepted-value variants have weaker semantics, so leave them alone.
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
+        if (vars.size == 2 && presents.isEmpty() && exceptSet.isEmpty()) {
+            FactorReduction.Rewrite(listOf(Linear(intArrayOf(1, -1), intArrayOf(vars[0], vars[1]), LinearOp.NE, 0)))
+        } else {
+            FactorReduction.Unchanged
+        }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars
