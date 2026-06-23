@@ -6,11 +6,8 @@ import com.eignex.klause.solver.localsearch.MoveSink
 
 /** LS implementation for [Subcircuit]: violation scoring and move proposal for the optional-cycle
  *  constraint. */
-internal class SubcircuitInvariant(
-    succ: IntArray,
-    n: Int,
-    computeCost: (LocalSearchState, Int, Int) -> Int,
-) : SuccessorCycleInvariant(succ, n, computeCost) {
+internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Int) -> Int) :
+    SuccessorCycleInvariant(succ, n, computeCost) {
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (state.intPayload[factorId] == 0) return

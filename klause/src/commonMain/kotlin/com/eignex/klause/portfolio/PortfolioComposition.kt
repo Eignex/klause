@@ -68,9 +68,9 @@ data class PortfolioScenario(
      *  recipes (a named base, or the curated pool with axis edits applied). */
     val lsPool: List<() -> LsRecipe>? = null,
     /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool] (#809), the
-     *  cut analogue of the always-on learned-clause pool. Off by default until #809 phase 3 measures
-     *  whether it pays off on the corpus; sound either way (only global cuts cross arms). */
-    val shareCuts: Boolean = false,
+     *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
+     *  cuts cross arms, so it never changes any arm's optimum). */
+    val shareCuts: Boolean = true,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
