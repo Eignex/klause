@@ -263,6 +263,15 @@ data class LpPlan(
      */
     val learn: Boolean = false,
     /**
+     * Per-hull pruning: before search, drop each convex-hull technique that adds no strength to the root
+     * relaxation bound (solve the root LP with the hull off; keep it only if its removal loosens the
+     * bound). The build-time counterpart of the adaptive effort ladder — it sheds a single unhelpful hull
+     * while the rest keep running, so a hull that costs per-node build effort without tightening is paid
+     * for once at the root rather than at every node. Sound (a hull is a sound relaxation either way, and
+     * one is dropped only when the root bound is unchanged). Requires [bounding]; off by default.
+     */
+    val pruneHulls: Boolean = false,
+    /**
      * Objective shaving: before search, probe whether the objective can be proven to exceed its
      * current lower bound — assume `objVar ≤ v` and, if the LP relaxation + propagation prove that
      * infeasible, raise the root lower bound to `v + 1`. Sound (every raise is a proof that lower values
