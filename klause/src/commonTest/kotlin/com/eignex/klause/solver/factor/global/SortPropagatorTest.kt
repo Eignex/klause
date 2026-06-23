@@ -6,12 +6,57 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.FactorPropagationOracle
 import com.eignex.klause.solver.factor.global.Sort
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class SortPropagatorTest {
+
+    private fun sortProblem(domains: Array<IntDomain>): Problem {
+        val n = domains.size / 2
+        return Problem(
+            numBoolVars = 0,
+            numIntVars = domains.size,
+            intDomains = domains,
+            factors = arrayOf<Factor>(
+                Sort(xs = IntArray(n) { it }, ys = IntArray(n) { n + it }),
+            ),
+        )
+    }
+
+    @Test
+    fun `mehlhorn-thiel filtering never over-prunes`() {
+        // Brute-force oracle: every bound the propagator tightens must hold on all sortedness
+        // solutions. Catches an over-pruning transcription bug in the matching / SCC narrowing.
+        // Instances are kept small so BruteForceSolver stays under its 2^18 enumeration cap.
+        val rng = Random(0x5021)
+        repeat(400) { iter ->
+            val n = 2 + rng.nextInt(2) // 2 or 3
+            val maxVal = if (n == 3) 5 else 6
+            val domains = Array(2 * n) {
+                val a = rng.nextInt(maxVal + 1)
+                val b = rng.nextInt(maxVal + 1)
+                IntDomain(minOf(a, b), maxOf(a, b))
+            }
+            FactorPropagationOracle.assertSound(sortProblem(domains), "sort#$iter")
+        }
+    }
+
+    @Test
+    fun `mehlhorn-thiel filtering never over-prunes on width-four vectors`() {
+        val rng = Random(0x404)
+        repeat(200) { iter ->
+            val domains = Array(8) {
+                val a = rng.nextInt(4)
+                val b = rng.nextInt(4)
+                IntDomain(minOf(a, b), maxOf(a, b))
+            }
+            FactorPropagationOracle.assertSound(sortProblem(domains), "sort4#$iter")
+        }
+    }
 
     @Test
     fun `sort matches sorted xs`() {
