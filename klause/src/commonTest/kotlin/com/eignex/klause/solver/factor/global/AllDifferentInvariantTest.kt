@@ -36,6 +36,36 @@ class AllDifferentInvariantTest {
     }
 
     @Test
+    fun `structured moves include feasibility-preserving 3-cycles`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
+        )
+        fun seeded(seed: Long): LocalSearchState {
+            val state = LocalSearchState(problem, Random(seed))
+            for (i in 0 until 5) state.assignment.setInt(i, i)
+            state.recompute()
+            return state
+        }
+        var sawRotation = false
+        for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L, 29L)) {
+            val state = seeded(seed)
+            assertTrue(state.cost == 0L, "the identity permutation must be feasible")
+            val sink = MoveSink()
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            for (m in sink.list) {
+                if (m is Compound && m.parts.size == 3) sawRotation = true
+                val check = seeded(0)
+                check.apply(m)
+                assertTrue(check.cost == 0L, "structured move $m broke all-different")
+            }
+        }
+        assertTrue(sawRotation, "3-cycle rotations must be emitted alongside 2-swaps")
+    }
+
+    @Test
     fun `three vars room for one duplicate requires unique values`() {
         val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)
         val problem = Problem(
