@@ -189,6 +189,10 @@ internal class CumulativePropagator(
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
+        // Energetic-reasoning pass runs first and on variable durations/heights/capacity — unlike the
+        // time-tabling / edge-finding below it does not need a fully fixed snapshot, so it is the only
+        // filtering that fires while resource demands or durations are still ranges.
+        if (!energeticNaivePass(state)) return false
         val eff = effectiveSnapshot(state) ?: return true
         val effDur = eff.dur
         val effRes = eff.res
@@ -251,6 +255,78 @@ internal class CumulativePropagator(
                     ?: state.composeIntVarAtomAntecedents(intVars)
                 if (!state.tightenIntMax(v, newMax, ant)) return false
             }
+        }
+        return true
+    }
+
+    private fun minDur(state: PropagationState, i: Int): Int =
+        if (durationVars.isEmpty()) durations[i] else state.intDomains[durationVars[i]].min
+
+    private fun maxDur(state: PropagationState, i: Int): Int =
+        if (durationVars.isEmpty()) durations[i] else state.intDomains[durationVars[i]].max
+
+    private fun minHeight(state: PropagationState, i: Int): Int =
+        if (resourceVars.isEmpty()) resources[i] else state.intDomains[resourceVars[i]].min
+
+    private fun capMax(state: PropagationState): Int =
+        if (capacityVar < 0) capacity else state.intDomains[capacityVar].max
+
+    private fun clampToInt(v: Long): Int = when {
+        v > Int.MAX_VALUE.toLong() -> Int.MAX_VALUE
+        v < Int.MIN_VALUE.toLong() -> Int.MIN_VALUE
+        else -> v.toInt()
+    }
+
+    /**
+     * Naive energetic reasoning (after Baptiste–Le Pape–Nuijten, as in choco's `energyNaive`). For
+     * the running window `[xMin, xMax]` spanned by the tasks seen so far in non-decreasing latest
+     * completion order, every such task's whole execution lies inside the window, so their minimum
+     * energies sum to at most `capacity · |window|`. That bounds the current task's resource height
+     * and duration and lower-bounds the capacity, and an exceeded budget is a contradiction. Sound
+     * for any task order; unlike the time-tabling pass it reasons over variable demands/durations.
+     */
+    @Suppress("ReturnCount")
+    private fun energeticNaivePass(state: PropagationState): Boolean {
+        val act = IntArrayList()
+        for (i in 0 until n) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (minDur(state, i) > 0 && minHeight(state, i) >= 0) act.add(i)
+        }
+        val m = act.size
+        if (m == 0) return true
+        val ids = IntArray(m) { act[it] }
+        val est = IntArray(m) { state.intDomains[starts[ids[it]]].min }
+        val lct = IntArray(m) { state.intDomains[starts[ids[it]]].max + maxDur(state, ids[it]) }
+        val order = argsortByIntKey(m) { lct[it] }
+        val camax = capMax(state)
+        val ant = state.composeIntVarAtomAntecedents(intVars)
+        var xMin = Int.MAX_VALUE
+        var xMax = Int.MIN_VALUE
+        var surface = 0L
+        for (p in 0 until m) {
+            val k = order[p]
+            val i = ids[k]
+            if (est[k] < xMin) xMin = est[k]
+            if (lct[k] > xMax) xMax = lct[k]
+            val len = (xMax - xMin).toLong()
+            if (len > 0L) {
+                val availSurf = len * camax.toLong() - surface
+                if (availSurf < 0L) return false
+                val md = minDur(state, i)
+                if (resourceVars.isNotEmpty() && md > 0) {
+                    if (!state.tightenIntMax(resourceVars[i], clampToInt(availSurf / md), ant)) return false
+                }
+                val mh = minHeight(state, i)
+                if (durationVars.isNotEmpty() && mh > 0) {
+                    if (!state.tightenIntMax(durationVars[i], clampToInt(availSurf / mh), ant)) return false
+                }
+                if (capacityVar >= 0) {
+                    val capLb = (surface + len - 1L) / len
+                    if (!state.tightenIntMin(capacityVar, clampToInt(capLb), ant)) return false
+                }
+            }
+            surface += minDur(state, i).toLong() * minHeight(state, i).toLong()
+            if (surface > (xMax - xMin).toLong() * camax.toLong()) return false
         }
         return true
     }
