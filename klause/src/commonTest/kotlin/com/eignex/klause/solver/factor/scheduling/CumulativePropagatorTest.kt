@@ -60,6 +60,36 @@ class CumulativePropagatorTest {
     }
 
     @Test
+    fun `profile height pruning beats the energetic area bound at a compulsory peak`() {
+        // Task 0 spans [0,4) with variable height; three unit tasks pinned at 0 stack a height-3
+        // compulsory peak in [0,1). Under capacity 5 the peak forces height0 ≤ 5−3 = 2, whereas the
+        // energetic bound (energy 3 spread over the length-4 window) would only give ≤ 4.
+        // Layout: starts 0..3, heights (resource vars) 4..7.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 8,
+            intDomains = arrayOf(
+                IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 0),
+                IntDomain(0, 5), IntDomain(1, 1), IntDomain(1, 1), IntDomain(1, 1),
+            ),
+            factors = arrayOf<Factor>(
+                Cumulative(
+                    starts = intArrayOf(0, 1, 2, 3),
+                    durations = intArrayOf(4, 1, 1, 1),
+                    resources = intArrayOf(5, 1, 1, 1),
+                    capacity = 5,
+                    resourceVars = intArrayOf(4, 5, 6, 7),
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentFactor = 0
+        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertEquals(2, state.intDomains[4].max, "the compulsory peak must cap task 0's height at 2")
+    }
+
+    @Test
     fun `cumulative with variable heights never over-prunes`() {
         // Brute-force oracle over small random instances with variable resource demands — the regime
         // the old propagator skipped entirely (it needed a fully-fixed snapshot). Kept under the

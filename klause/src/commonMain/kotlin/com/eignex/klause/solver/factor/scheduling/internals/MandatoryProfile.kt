@@ -85,6 +85,25 @@ internal class MandatoryProfile {
         return true
     }
 
+    /** The highest mandatory level over any segment intersecting `[from, to)`, or 0 if none — the
+     *  peak compulsory demand a task spanning that window must coexist with. */
+    fun maxLevelOver(from: Int, to: Int): Int {
+        if (from >= to) return 0
+        var lo = 0
+        var hi = segCount
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (segToA[mid] <= from) lo = mid + 1 else hi = mid
+        }
+        var best = 0
+        var k = lo
+        while (k < segCount && segFromA[k] < to) {
+            if (segLevelA[k] > best) best = segLevelA[k]
+            k++
+        }
+        return best
+    }
+
     /**
      * True iff placing a task occupying `[s, sPlusD)` with resource demand [r] would push
      * some mandatory segment over [cap] — after discounting the task's own already-counted
