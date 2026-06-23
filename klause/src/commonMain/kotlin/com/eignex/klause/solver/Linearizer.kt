@@ -7,27 +7,26 @@ package com.eignex.klause.solver
  * emit nothing.
  *
  * The relaxation driver calls [linearize] once per relaxation build, passing the [RelaxationBuilder]
- * the factor emits into and the factor's index in [Problem.factors] as `factorId`.
+ * the factor emits into and the factor's index in [Problem.factors] as `factorId`. A single
+ * linearize pass may mix [Contribution.CORE] and [Contribution.HULL] rows — the kind is chosen per
+ * row at emit time, not per factor.
  */
 interface Linearizer {
-    /**
-     * How the root relaxation treats this factor's rows. [Contribution.CORE] rows define the
-     * relaxation's feasible region and are always kept; [Contribution.HULL] rows only strengthen the
-     * bound and may be dropped when they add no root strength. Dropping rows from a valid relaxation
-     * only loosens it — it never invalidates it — so this gates effort, not soundness.
-     */
-    val contribution: Contribution get() = Contribution.HULL
-
     /** Emit this factor's rows, columns, and auxiliary variables into [builder]. Default: nothing. */
     fun linearize(builder: RelaxationBuilder, factorId: Int) {}
 }
 
-/** Whether a [Linearizer]'s rows define the relaxation ([CORE]) or only strengthen it ([HULL]). */
+/**
+ * How the root relaxation treats an emitted row. [CORE] rows define the relaxation's feasible region
+ * and are always kept; [HULL] rows only strengthen the bound and may be dropped when they add no root
+ * strength. Dropping rows from a valid relaxation only loosens it — it never invalidates it — so this
+ * gates effort, not soundness.
+ */
 enum class Contribution {
-    /** Feasibility-defining rows, always kept. */
+    /** A feasibility-defining row, always kept. */
     CORE,
 
-    /** Bound-strengthening rows the root pruner may drop when they add no strength. */
+    /** A bound-strengthening row the root pruner may drop when it adds no strength. */
     HULL,
 }
 

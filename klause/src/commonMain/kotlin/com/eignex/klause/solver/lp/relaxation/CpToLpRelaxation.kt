@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.lp.relaxation
 
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.Contribution
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -1711,7 +1712,16 @@ internal class CpToLpRelaxation(
             }
         }
 
-        override fun linearRow(op: LinearOp, intVars: IntArray, coeffs: IntArray, bound: Long) {
+        // [contribution] (CORE/HULL) is part of the row-emission contract but not yet consumed: the
+        // root hull pruner still gates whole families via the LP plan. A later pass keys pruning off
+        // the per-factor HULL rows recorded here.
+        override fun linearRow(
+            op: LinearOp,
+            intVars: IntArray,
+            coeffs: IntArray,
+            bound: Long,
+            contribution: Contribution,
+        ) {
             val rel = when (op) {
                 LinearOp.LE -> Relation.LE
                 LinearOp.GE -> Relation.GE
