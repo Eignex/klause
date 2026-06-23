@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.lp.LpEmphasis
+import com.eignex.klause.solver.backtrack.lp.lpHarvest
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -248,9 +249,17 @@ internal fun Solvable.presolved(
 ): Solvable {
     val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
     val pre = Presolver.run(problem, config, context, cancellation)
-    if (pre.problem === problem) return this
+    // LP-relaxation harvest (#10): when LP variable shaving is configured, fold the LP's proven domain
+    // tightenings into the problem permanently so every backend (local search included) sees them — the
+    // backtrack solver's own root shave reaches only its search session. Solution-set-preserving (every
+    // shaved value is proven infeasible), so it is safe even for solution-set-sensitive queries.
+    val harvested = annotatedBacktrackParams
+        ?.takeIf { it.lpConfig != null || it.lpPlan.variableShaving }
+        ?.let { lpHarvest(pre.problem, linearObjective ?: LinearObjective(), it, cancellation) }
+        ?: pre.problem
+    if (harvested === problem) return this
     return Solvable(
-        problem = pre.problem,
+        problem = harvested,
         optimize = optimize,
         maximize = maximize,
         lsObjective = lsObjective,
