@@ -68,6 +68,25 @@ class ObjectiveShavingTest {
     }
 
     @Test
+    fun `the proven objective floor reaches the lower-bound sink`() {
+        // The shaved floor (cost >= 2) is a global lower bound; it must be published to the portfolio's
+        // shared lower-bound sink so a peer arm can pick it up.
+        val p = triangleCover()
+        val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
+        val published = ArrayList<Double>()
+        val result = BacktrackSolver(p).minimize(
+            obj,
+            BacktrackParams(
+                randomSeed = 1L,
+                lpPlan = LpPlan(bounding = true, objectiveShaving = true),
+                objectiveLowerBoundSink = { published.add(it) },
+            ),
+        )
+        assertTrue(result is MinimizeResult.Optimal && result.objectiveValue == 2.0, "optimum is 2")
+        assertTrue(published.any { it >= 2.0 }, "the proven floor (cost >= 2) must reach the sink, got $published")
+    }
+
+    @Test
     fun `randomized shaving never exceeds the brute-force optimum`() {
         val rng = Random(20260623)
         var covered = 0

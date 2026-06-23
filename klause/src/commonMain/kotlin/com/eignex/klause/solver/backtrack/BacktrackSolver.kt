@@ -487,6 +487,29 @@ class BacktrackSolver(override val problem: Problem) :
             }
         }
 
+        /** The highest objective floor already published to the shared manager, so a republication only
+         *  fires when the bound has genuinely risen. */
+        private var lastPublishedFloor = Double.NEGATIVE_INFINITY
+
+        /**
+         * Publish this arm's level-0 objective floor to the portfolio's shared lower-bound manager. At
+         * decision level 0 the objective variable's domain minimum is a proven global lower bound on the
+         * optimum — raised since the root by objective shaving, level-0 learned objective bounds, and any
+         * imported floor — so republishing it lets a bound this arm tightens mid-search reach its peers. A
+         * no-op without a single ascending objective variable, off level 0 (where the bound would be
+         * node-local, not global), or when the floor has not risen.
+         */
+        private fun publishObjectiveFloor() {
+            val sink = params.objectiveLowerBoundSink ?: return
+            val obj = singleObj?.takeIf { it.ascending } ?: return
+            if (session.decisionLevel != 0) return
+            val floor = session.intDomain(obj.varId).min.toDouble()
+            if (floor > lastPublishedFloor) {
+                lastPublishedFloor = floor
+                sink(floor)
+            }
+        }
+
         /**
          * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation
          * bound for the integrality-gap metric (search only bounds from level 1 down, so this is the
@@ -574,6 +597,8 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                 }
                 applySharedObjectiveFloor()
+                // Publish the root floor (post-shaving) so peers see the bound this arm proved up front.
+                publishObjectiveFloor()
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
                 if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
@@ -844,6 +869,11 @@ class BacktrackSolver(override val problem: Problem) :
             params.clauseExchange?.onRestart(session)
             params.cutExchange?.let { lpEngine.exchangeCuts(it) }
             if (assertObjectiveBoundAtRoot()) return terminalExhausted()
+            // At level 0 import the shared objective lower bound (tightening this arm's objVar) and
+            // republish this arm's own raised floor, so a bound proven mid-search on any arm propagates
+            // through the pool.
+            applySharedObjectiveFloor()
+            publishObjectiveFloor()
             params.variableSelector.onRestart()
             params.valueSelector.onRestart()
             forgetIfOverCap(session, params)
