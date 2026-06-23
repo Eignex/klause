@@ -183,6 +183,23 @@ data class BacktrackParams(
      */
     val objectiveLowerBoundSupplier: (() -> Double)? = null,
     /**
+     * Sink for the **globally-valid** decision-level-0 integer-variable bound tightenings this worker
+     * proves — `(varId, lo, hi)`, each a bound that holds at *every* solution (root propagation, the
+     * variable-shaving deductions), published so a portfolio can keep their cross-arm intersection. Only
+     * unconditional tightenings are published here; incumbent-relative reduced-cost fixings are not (they
+     * stay arm-local against the shared cutoff). `null` (default) disables it.
+     */
+    val globalVarBoundSink: ((varId: Int, lo: Int, hi: Int) -> Unit)? = null,
+    /**
+     * Suppliers of the portfolio's shared globally-valid level-0 variable bounds — the tightest lower /
+     * upper bound any arm has proven for an integer variable. The engine imports them at its own level 0
+     * (`Int.MIN_VALUE` / `Int.MAX_VALUE` meaning "nothing shared"). Sound: every shared bound holds at
+     * every solution, so importing one only tightens a domain. `null` (default) disables import.
+     */
+    val globalVarLowerSupplier: ((varId: Int) -> Int)? = null,
+    /** Companion of [globalVarLowerSupplier] for the shared upper bounds. */
+    val globalVarUpperSupplier: ((varId: Int) -> Int)? = null,
+    /**
      * The emphasis-driven LP-relaxation selector (#429): an [LpEmphasis] cost ceiling + per-technique
      * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]
      * at `minimize`/`improvements`. `null` (the raw default) uses the explicit per-technique flags

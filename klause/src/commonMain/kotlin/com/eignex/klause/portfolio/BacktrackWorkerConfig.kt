@@ -71,6 +71,13 @@ internal data class BacktrackWorkerConfig(
                     objectiveLowerBoundSupplier = bounds::current,
                 )
             }
+            pools?.varBounds?.let { vb ->
+                params = params.copy(
+                    globalVarBoundSink = vb::publish,
+                    globalVarLowerSupplier = vb::lowerOf,
+                    globalVarUpperSupplier = vb::upperOf,
+                )
+            }
         }
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =

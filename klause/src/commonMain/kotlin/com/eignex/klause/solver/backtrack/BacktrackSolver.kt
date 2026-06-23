@@ -511,6 +511,39 @@ class BacktrackSolver(override val problem: Problem) :
         }
 
         /**
+         * Import the portfolio's shared globally-valid level-0 variable bounds, tightening this arm's
+         * domains at level 0. Each shared bound holds at every solution, so importing one only ever
+         * soundly tightens — never excludes a solution. A no-op off level 0 or without the suppliers.
+         */
+        private fun importGlobalVarBounds() {
+            val lower = params.globalVarLowerSupplier ?: return
+            val upper = params.globalVarUpperSupplier ?: return
+            if (session.decisionLevel != 0) return
+            for (v in 0 until problem.numIntVars) {
+                val lo = lower(v)
+                if (lo != Int.MIN_VALUE) session.implyIntAtLeast(v, lo)
+                val hi = upper(v)
+                if (hi != Int.MAX_VALUE) session.implyIntAtMost(v, hi)
+            }
+        }
+
+        /**
+         * Publish this arm's globally-valid level-0 variable tightenings — the root domains after
+         * propagation and shaving, before any incumbent-relative reduced-cost fixing — so peers can import
+         * them. Called once at the root (not at restarts, where level-0 domains may carry incumbent-relative
+         * fixings that are not globally valid). A no-op without the sink.
+         */
+        private fun publishGlobalVarBounds() {
+            val sink = params.globalVarBoundSink ?: return
+            if (session.decisionLevel != 0) return
+            for (v in 0 until problem.numIntVars) {
+                val d = session.intDomain(v)
+                val declared = problem.intDomains[v]
+                if (d.min > declared.min || d.max < declared.max) sink(v, d.min, d.max)
+            }
+        }
+
+        /**
          * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation
          * bound for the integrality-gap metric (search only bounds from level 1 down, so this is the
          * sole root capture). Run from [runUntilEvent]'s `started` guard — not at construction — so the
@@ -601,6 +634,10 @@ class BacktrackSolver(override val problem: Problem) :
                 applySharedObjectiveFloor()
                 // Publish the root floor (post-shaving) so peers see the bound this arm proved up front.
                 publishObjectiveFloor()
+                // Exchange globally-valid level-0 variable tightenings: import peers' first, then publish
+                // this arm's (root propagation + shaving), before any incumbent-relative fixing runs.
+                importGlobalVarBounds()
+                publishGlobalVarBounds()
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
                 if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
@@ -876,6 +913,9 @@ class BacktrackSolver(override val problem: Problem) :
             // through the pool.
             applySharedObjectiveFloor()
             publishObjectiveFloor()
+            // Import peers' globally-valid level-0 variable tightenings (import only — not publish, since
+            // level-0 domains here may carry this arm's incumbent-relative fixings, which are not global).
+            importGlobalVarBounds()
             params.variableSelector.onRestart()
             params.valueSelector.onRestart()
             forgetIfOverCap(session, params)

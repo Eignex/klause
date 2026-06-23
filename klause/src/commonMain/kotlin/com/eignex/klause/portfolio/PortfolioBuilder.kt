@@ -49,7 +49,7 @@ object PortfolioBuilder {
         lsObjective,
         definitionalSweep,
         onEvent,
-        pools = poolsFor(scenario),
+        pools = poolsFor(scenario, problem),
     )
 
     /**
@@ -119,12 +119,17 @@ object PortfolioBuilder {
      * platform mutex under the parallel `Portfolio`'s concurrent writers. The clause pool is always
      * present; the cut pool only when [PortfolioScenario.shareCuts] opts in (#809).
      */
-    private fun poolsFor(scenario: PortfolioScenario): SharedPools? {
+    private fun poolsFor(scenario: PortfolioScenario, problem: Problem): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
         val cuts = if (scenario.shareCuts) SharedCutPool(concurrency.lock()) else null
-        // The objective lower-bound manager is the dual of the shared incumbent: harmless for a
-        // CSP pool (no arm publishes a bound), so it is always present and only an optimising arm feeds it.
-        return SharedPools(SharedClausePool(concurrency.lock()), cuts, SharedObjectiveBound(concurrency.lock()))
+        // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
+        // publishes), so they are always present and only an optimising arm feeds them.
+        return SharedPools(
+            SharedClausePool(concurrency.lock()),
+            cuts,
+            SharedObjectiveBound(concurrency.lock()),
+            SharedVarBounds(problem.numIntVars, concurrency.lock()),
+        )
     }
 }
