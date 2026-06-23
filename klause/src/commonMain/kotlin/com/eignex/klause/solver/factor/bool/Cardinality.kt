@@ -3,6 +3,8 @@ package com.eignex.klause.solver.factor.bool
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
@@ -29,6 +31,11 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cardinality(literals.remapLits(boolMap), min, max)
+
+    // `min == 0 && max == literals.size` accepts every assignment of the literals, so the constraint
+    // is vacuous and drops (propagation never prunes it but keeps the factor around otherwise).
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
+        if (min == 0 && max == literals.size) FactorReduction.Rewrite(emptyList()) else FactorReduction.Unchanged
 
     override val boolVars: IntArray = literals.litVars()
 

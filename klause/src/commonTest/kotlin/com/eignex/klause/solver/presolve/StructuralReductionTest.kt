@@ -1,9 +1,12 @@
 package com.eignex.klause.solver.presolve
 
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.bool.Cardinality
+import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.table.Element
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,9 +14,9 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * Per-factor structural reduction ([Presolve.reduceStructural]), exercised through [Element]'s
- * [Element.structuralReduce]. Each test asserts the global is rewritten into the equality its fixed
- * structure implies, or left untouched when nothing pins it.
+ * Per-factor structural reduction ([Presolve.reduceStructural]), exercised through the factors that
+ * implement [com.eignex.klause.solver.Factor.structuralReduce]. Each test asserts the global is
+ * rewritten into the simpler factor its structure implies, or left untouched when nothing pins it.
  */
 class StructuralReductionTest {
 
@@ -91,5 +94,55 @@ class StructuralReductionTest {
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false)),
         )
         assertSame(problem, Presolve.reduceStructural(problem), "no fixed index and a varied array is the no-op signal")
+    }
+
+    @Test
+    fun `a two-variable all-different becomes a binary disequality`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
+        )
+        val out = Presolve.reduceStructural(problem)
+        assertTrue(out.factors.none { it is AllDifferent }, "the all-different global is removed")
+        val ne = theLinear(out)
+        assertEquals(LinearOp.NE, ne.op)
+        assertEquals(setOf(0, 1), ne.vars.toSet())
+        assertEquals(0, ne.bound)
+    }
+
+    @Test
+    fun `an all-different over three variables is left as a global`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)),
+        )
+        assertSame(problem, Presolve.reduceStructural(problem), "a 3-var all-different keeps its global form")
+    }
+
+    @Test
+    fun `a vacuous cardinality drops`() {
+        // 0 <= (#true of three literals) <= 3 accepts every assignment.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 3)),
+        )
+        assertTrue(Presolve.reduceStructural(problem).factors.isEmpty(), "the vacuous cardinality drops")
+    }
+
+    @Test
+    fun `a binding cardinality is left untouched`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 1)),
+        )
+        assertSame(problem, Presolve.reduceStructural(problem), "an at-most-one still constrains, so it stays")
     }
 }
