@@ -2,6 +2,7 @@ package com.eignex.klause.solver.localsearch
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.objective.LinearObjective
@@ -49,6 +50,25 @@ class LocalSearchImprovementsTest {
             "terminal yield's objective must match the last intermediate or be no worse",
         )
         assertEquals(3.0, termBest.objective, "expected LS to reach the global optimum 3.0")
+    }
+
+    @Test
+    fun `a warm-started optimum survives greedy repair as the first incumbent`() {
+        // 40 bools under an at-most-one cardinality, minimising the count of true bools: the optimum is
+        // all-false (objective 0). Warm-start from it. The greedy-repair pass on a ≥32-variable restart
+        // is objective-blind — it accepts any flip that keeps cost 0 — so it would set one bool true
+        // (objective 1) and surface that as the first incumbent unless a warm start skips the pass.
+        val n = 40
+        val factor = Cardinality.atMostOne(IntArray(n) { Lit.make(it, true) })
+        val problem = Problem(n, 0, emptyArray(), listOf(factor))
+        val obj = LinearObjective(boolWeights = LongArray(n) { 1L })
+        val optimum = Sample(BooleanArray(n) { false }, intArrayOf())
+        val first = LocalSearchSolver(problem).improvements(
+            obj,
+            LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L, initialAssignment = optimum),
+        ).first()
+        val bf = assertIs<MinimizeResult.BestFound>(first)
+        assertEquals(0.0, bf.objective, "warm start must yield the seed objective, not a scrambled one")
     }
 
     @Test
