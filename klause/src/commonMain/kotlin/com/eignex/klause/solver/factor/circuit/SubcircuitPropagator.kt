@@ -87,6 +87,73 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
                 }
             }
         }
+        if (!stronglyConnectedSubcircuit(state)) return false
         return true
+    }
+
+    /**
+     * Necessary condition for the single sub-cycle: every node that cannot opt out (its own index is
+     * no longer in `succ(i)`'s domain, so it must lie on the cycle) must reach, and be reached by,
+     * every other such mandatory node over non-self candidate arcs — the cycle visits them all in
+     * one strongly-connected loop. Optional nodes may serve as intermediate stops, so reachability
+     * is taken over the full candidate graph. A correct sub-circuit never trips it.
+     */
+    private fun stronglyConnectedSubcircuit(state: PropagationState): Boolean {
+        val mandatory = BooleanArray(n)
+        var mandCount = 0
+        var root = -1
+        for (i in 0 until n) {
+            if (i !in state.intDomains[succ[i]]) {
+                mandatory[i] = true
+                mandCount++
+                if (root < 0) root = i
+            }
+        }
+        if (mandCount < 2) return true
+        val rev = Array(n) { IntArrayList() }
+        for (i in 0 until n) {
+            state.intDomains[succ[i]].forEach { j -> if (j != i && j in 0 until n) rev[j].add(i) }
+        }
+        return reachesAllMandatory(state, root, mandatory, mandCount, forward = true, rev = rev) &&
+            reachesAllMandatory(state, root, mandatory, mandCount, forward = false, rev = rev)
+    }
+
+    private fun reachesAllMandatory(
+        state: PropagationState,
+        root: Int,
+        mandatory: BooleanArray,
+        mandCount: Int,
+        forward: Boolean,
+        rev: Array<IntArrayList>,
+    ): Boolean {
+        val seen = BooleanArray(n)
+        val stack = IntArrayList()
+        seen[root] = true
+        stack.add(root)
+        var reached = 1
+        while (!stack.isEmpty()) {
+            val u = stack[stack.size - 1]
+            stack.removeAt(stack.size - 1)
+            if (forward) {
+                state.intDomains[succ[u]].forEach { v ->
+                    if (v != u && v in 0 until n && !seen[v]) {
+                        seen[v] = true
+                        if (mandatory[v]) reached++
+                        stack.add(v)
+                    }
+                }
+            } else {
+                val preds = rev[u]
+                for (idx in 0 until preds.size) {
+                    val v = preds[idx]
+                    if (!seen[v]) {
+                        seen[v] = true
+                        if (mandatory[v]) reached++
+                        stack.add(v)
+                    }
+                }
+            }
+        }
+        return reached == mandCount
     }
 }

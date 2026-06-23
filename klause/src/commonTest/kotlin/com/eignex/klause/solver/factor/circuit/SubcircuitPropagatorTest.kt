@@ -4,18 +4,82 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.circuit.Subcircuit
 import com.eignex.klause.solver.propagation.IntEvent
 import com.eignex.klause.solver.propagation.PropagationResult.Implied
 import com.eignex.klause.solver.propagation.PropagationResult.Unsat
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SubcircuitPropagatorTest {
+
+    /** Is `next` (length n, each in [0,n)) a valid sub-circuit: the non-self-loop nodes form exactly
+     *  one cycle (all self-loops — the empty sub-circuit — is allowed)? */
+    private fun isValidSubcircuit(next: IntArray): Boolean {
+        val n = next.size
+        val included = (0 until n).filter { next[it] != it }
+        if (included.isEmpty()) return true
+        val visited = HashSet<Int>()
+        var cur = included[0]
+        while (cur !in visited) {
+            if (next[cur] == cur) return false // stepped onto an excluded node
+            visited.add(cur)
+            cur = next[cur]
+        }
+        return cur == included[0] && visited.size == included.size
+    }
+
+    @Test
+    fun `BacktrackSolver matches brute oracle on restricted-domain subcircuits`() {
+        // End-to-end: a false conflict from the strong-connectivity check would surface as a false
+        // UNSAT here (a sub-circuit exists but the solver reports none). Brute-counts the solutions
+        // over each random restricted domain and checks the solver's SAT/UNSAT verdict agrees.
+        val rng = Random(0x5BC141)
+        repeat(3000) { _ ->
+            val n = rng.nextInt(3, 6) // 3..5 nodes
+            val los = IntArray(n)
+            val his = IntArray(n)
+            for (i in 0 until n) {
+                val a = rng.nextInt(0, n)
+                val b = rng.nextInt(0, n)
+                los[i] = minOf(a, b)
+                his[i] = maxOf(a, b)
+            }
+            var brute = 0
+            val cur = los.copyOf()
+            while (true) {
+                if (isValidSubcircuit(cur)) brute++
+                var i = 0
+                while (i < n) {
+                    if (cur[i] < his[i]) {
+                        cur[i]++
+                        break
+                    }
+                    cur[i] = los[i]
+                    i++
+                }
+                if (i == n) break
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(los[it], his[it]) },
+                factors = arrayOf<Factor>(Subcircuit(succ = IntArray(n) { it })),
+            )
+            val result = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L))
+            if (brute > 0) {
+                assertTrue(result is SolveResult.Sat, "false UNSAT: los=${los.toList()} his=${his.toList()}")
+            } else {
+                assertTrue(result is SolveResult.Unsat, "false SAT: los=${los.toList()} his=${his.toList()}")
+            }
+        }
+    }
 
     private fun problem(n: Int, lo: Int = 0, hi: Int = n - 1): Problem {
         val factor = Subcircuit(succ = IntArray(n) { it })

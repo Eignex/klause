@@ -5,11 +5,11 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.FactorPropagationOracle
 import com.eignex.klause.solver.factor.global.NValue
+import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

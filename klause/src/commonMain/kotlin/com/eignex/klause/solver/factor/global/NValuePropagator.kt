@@ -119,7 +119,10 @@ internal class NValuePropagator(
         val adj = Array(xs.size) { i ->
             val ids = IntArrayList()
             state.intDomains[xs[i]].forEach { v ->
-                val id = valueId.getOrPut(v) { values.add(v); values.size - 1 }
+                val id = valueId.getOrPut(v) {
+                    values.add(v)
+                    values.size - 1
+                }
                 ids.add(id)
             }
             ids
