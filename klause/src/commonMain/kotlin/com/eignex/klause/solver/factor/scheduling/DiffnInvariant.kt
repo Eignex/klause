@@ -150,7 +150,18 @@ internal class DiffnInvariant(
         val s = state.refPayload[factorId] as DiffnLsState
         if (state.assignment.intValue(intVar) == oldValue) return 0
         val before = s.overlappingPairs
-        s.overlappingPairs = countOverlaps(state, ov = -1, nv = 0)
+        // Mirror the affected-pair delta: the move is already applied, so the after-pairs involving
+        // the moved rectangle are read from the current assignment and the before-pairs by overriding
+        // the moved variable back to oldValue. Only pairs touching that rectangle changed, so this is
+        // O(n) — the full O(n^2) recount is kept only for a variable shared across rectangles.
+        val r = varToRectOf(intVar)
+        s.overlappingPairs = if (r < 0) {
+            countOverlaps(state, ov = -1, nv = 0)
+        } else {
+            val newPairsR = pairsInvolvingRect(state, r, ov = -1, nv = 0)
+            val oldPairsR = pairsInvolvingRect(state, r, ov = intVar, nv = oldValue)
+            before - oldPairsR + newPairsR
+        }
         return compressViolation(s.overlappingPairs.toLong(), state.violationSoftCap) -
             compressViolation(before.toLong(), state.violationSoftCap)
     }
