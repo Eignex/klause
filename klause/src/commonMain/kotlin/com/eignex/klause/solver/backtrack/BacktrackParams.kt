@@ -165,6 +165,24 @@ data class BacktrackParams(
      */
     val objectiveBoundSupplier: (() -> Double)? = null,
     /**
+     * Sink for global objective **lower** bounds this worker proves — the dual of
+     * [objectiveBoundSupplier]'s shared incumbent cutoff. The root LP relaxation bound (and any raised
+     * objective floor) is published here so a portfolio keeps their cross-arm maximum (#809 / F1) and can
+     * prove optimality by pairing one arm's bound with another's incumbent. Every published value is a
+     * sound lower bound on the optimum. `null` (default) disables lower-bound sharing; only meaningful for
+     * a [com.eignex.klause.solver.objective.LinearObjective].
+     */
+    val objectiveLowerBoundSink: ((Double) -> Unit)? = null,
+    /**
+     * Supplier of the portfolio's shared objective lower bound (the cross-arm maximum of every arm's
+     * [objectiveLowerBoundSink] publications — #809 / F1). Every feasible solution has objective `≥` the
+     * optimum `≥` this bound, so the engine tightens its single ascending objective variable to
+     * `⌈supplier()⌉` before each search slice: a sound floor (it removes no solution) that lets a peer
+     * arm's proven bound strengthen this arm's propagation and pruning. `null` (default) disables it; a
+     * no-op without a single ascending objective variable.
+     */
+    val objectiveLowerBoundSupplier: (() -> Double)? = null,
+    /**
      * The emphasis-driven LP-relaxation selector (#429): an [LpEmphasis] cost ceiling + per-technique
      * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]
      * at `minimize`/`improvements`. `null` (the raw default) uses the explicit per-technique flags

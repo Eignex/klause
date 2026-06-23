@@ -62,6 +62,16 @@ internal data class BacktrackWorkerConfig(
         var params = build(seed + 1000L + index, workerEvent)
         pools?.clauses?.let { params = params.copy(clauseExchange = PoolClauseExchange(it)) }
         pools?.cuts?.let { params = params.copy(cutExchange = PoolCutExchange(it)) }
+        // Wire this arm to the shared objective lower-bound manager (#809 / F1) when optimising: publish
+        // the bounds it proves and tighten its objective floor to the cross-arm maximum.
+        if (objective != null) {
+            pools?.bounds?.let { bounds ->
+                params = params.copy(
+                    objectiveLowerBoundSink = bounds::publish,
+                    objectiveLowerBoundSupplier = bounds::current,
+                )
+            }
+        }
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
             if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
