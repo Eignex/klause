@@ -69,6 +69,13 @@ class BruteForceSolver(override val problem: Problem) :
 
     private val chunks: List<Chunk> = buildChunks(problem)
 
+    override fun describe(params: BruteForceParams): String =
+        """
+        brute-force
+          enumeration: exhaustive
+          chunks:      ${chunks.size}
+        """.trimIndent()
+
     override fun solve(params: BruteForceParams): SolveResult {
         for (sample in walk(params)) {
             return SolveResult.Sat(sample)

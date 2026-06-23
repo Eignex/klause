@@ -277,28 +277,50 @@ class CliTest {
             deleteOnExit()
         }
         // The default pool lists the curated arms; no solve output on stdout.
-        val default = captureErr { main(arrayOf("-e", "ls", "--param", "dry-run=on", fzn.absolutePath)) }
+        val default = captureErr { main(arrayOf("-e", "ls", "--param", "dry-run-solver=on", fzn.absolutePath)) }
         assertTrue("ls dry-run:" in default, default)
         assertTrue("cbls/fixed" in default, default)
 
         // A global source removal drops `violated` from every arm.
         val removed = captureErr {
-            main(arrayOf("-e", "ls", "--param", "sources=-violated", "--param", "dry-run=on", fzn.absolutePath))
+            main(arrayOf("-e", "ls", "--param", "sources=-violated", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("violated-repairs" !in removed, removed)
 
         // A scoped scalar edit sets break scoring on the cbls family only.
         val scoped = captureErr {
-            main(arrayOf("-e", "ls", "--param", "scoring=cbls.break", "--param", "dry-run=on", fzn.absolutePath))
+            main(arrayOf("-e", "ls", "--param", "scoring=cbls.break", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("scoring=Break" in scoped, scoped)
 
         // An acceptance edit to sa attaches a cooling schedule to arms that carried none.
         val annealed = captureErr {
-            main(arrayOf("-e", "ls", "--param", "acceptance=sa", "--param", "dry-run=on", fzn.absolutePath))
+            main(arrayOf("-e", "ls", "--param", "acceptance=sa", "--param", "dry-run-solver=on", fzn.absolutePath))
         }
         assertTrue("acceptance=Metropolis" in annealed, annealed)
         assertTrue("temperature=Geometric" in annealed, annealed)
+    }
+
+    @Test
+    fun `dry-run-solver describes a backtrack engine`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        val out = captureErr { main(arrayOf("-e", "cp-single", "--param", "dry-run-solver=on", fzn.absolutePath)) }
+        assertTrue("solver dry-run:" in out, out)
+        assertTrue("backtrack" in out && "var-select:" in out, out)
+    }
+
+    @Test
+    fun `dry-run-presolve prints the presolved problem`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
+        assertTrue("presolve dry-run:" in out, out)
+        assertTrue("factors:" in out, out)
     }
 
     @Test
@@ -310,7 +332,15 @@ class CliTest {
         // arm= resolves a one-arm pool of exactly that catalog arm (the fair-tester sweep).
         val dry = captureErr {
             main(
-                arrayOf("-e", "ls", "--param", "arm=cbls-plateau/ils-basin", "--param", "dry-run=on", fzn.absolutePath),
+                arrayOf(
+                    "-e",
+                    "ls",
+                    "--param",
+                    "arm=cbls-plateau/ils-basin",
+                    "--param",
+                    "dry-run-solver=on",
+                    fzn.absolutePath,
+                ),
             )
         }
         assertTrue("ls dry-run: 1 arm(s)" in dry, dry)

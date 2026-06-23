@@ -64,6 +64,20 @@ class BacktrackSolver(override val problem: Problem) :
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
         ResumableMinimize(objective, params)
 
+    override fun describe(params: BacktrackParams): String {
+        val lp = params.lpConfig?.let { "config" }
+            ?: if (params.lpPlan.bounding) "bounding${if (params.lpPlan.variableShaving) "+shave" else ""}" else "off"
+        return """
+            backtrack
+              seed:        ${params.randomSeed ?: "auto"}
+              var-select:  ${params.variableSelector::class.simpleName}
+              val-select:  ${params.valueSelector::class.simpleName}
+              luby:        ${params.lubyRestartBase ?: "off"}
+              max-learned: ${params.maxLearnedClauses ?: "unbounded"}
+              lp:          $lp
+        """.trimIndent()
+    }
+
     override fun solve(params: BacktrackParams): SolveResult {
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()

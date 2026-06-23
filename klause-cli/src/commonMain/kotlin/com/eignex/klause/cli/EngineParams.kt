@@ -177,8 +177,9 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
 
 /** Resolved local-search arm pool for the `ls` engine: per-arm factories (a *fresh* recipe per slot,
  *  so parallel workers never share mutable strategy state). A null [pool] means the default curated
- *  pool — the portfolio builds it unchanged. [dryRun] short-circuits the solve to print the pool. */
-internal class LsResolution(val pool: List<() -> LsRecipe>?, val dryRun: Boolean)
+ *  pool — the portfolio builds it unchanged. [dryRunSolver] short-circuits the solve to print the
+ *  resolved arm pool (the solver configuration) instead of solving. */
+internal class LsResolution(val pool: List<() -> LsRecipe>?, val dryRunSolver: Boolean)
 
 private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
     "weighted" -> MoveScoring.Weighted
@@ -302,11 +303,11 @@ private fun applyEdits(
  * axis keys then *edit* the base across all matching arms, presolve-style: `sources=` takes a bare
  * force-exactly list or `+`/`-` add/remove; `scoring`/`acceptance`/`restart` set a single value. Any
  * token may carry an arm-family selector (`cbls.break`) so an edit scopes to part of the pool. Plain
- * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run=on` lists the
- * resolved arms instead of solving.
+ * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run-solver=on` lists
+ * the resolved arms instead of solving.
  */
 internal fun resolveLsRecipes(p: EngineParams): LsResolution {
-    val dryRun = p.bool("dry-run") ?: false
+    val dryRunSolver = p.bool("dry-run-solver") ?: false
     val noiseRaw = p.double("noise")
     val cbRaw = p.double("cb")
     val skewRaw = p.double("skew-alpha")
@@ -386,7 +387,7 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
             listOf({ edit(base()) })
         }
     }
-    return LsResolution(pool, dryRun)
+    return LsResolution(pool, dryRunSolver)
 }
 
 /** Canonical base name for consumption checks — collapses the `strategy=` aliases. */
