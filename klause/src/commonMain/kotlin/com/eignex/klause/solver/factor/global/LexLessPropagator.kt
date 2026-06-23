@@ -16,8 +16,7 @@ internal class LexLessPropagator(
 
     /**
      * Advisor subscription (#623): lexicographic propagation is bound-only (see [propagate], which
-     * compares `min`/`max` at the deciding position and tightens bounds — its own comment notes it
-     * "can't propagate further with bound-only reasoning"). An interior hole moves no bound, so the
+     * reasons from `min`/`max` at the deciding position). An interior hole moves no bound, so the
      * factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
      * interior `VALUE_REMOVED` wakes.
      */
@@ -40,45 +39,106 @@ internal class LexLessPropagator(
         return collectLinearTightenAntecedents(state, combined, excludeIdx = -1, extraLit = 0)
     }
 
+    /**
+     * Frisch–Hnich–Kiziltan–Miguel–Walsh lexicographic filtering ("Global Constraints for
+     * Lexicographic Orderings"). Each call recomputes the two pointers from the current domains:
+     *
+     *  - `α` (`a`): the deciding index — the first position whose `(x, y)` pair is not yet pinned
+     *    to a common value, so every earlier position is fixed-equal and the relation hinges here.
+     *  - `β` (`b`): the most significant index from which the suffix is forced the wrong way
+     *    (`x ≥ y`); `β = ∞` when the suffix can stay equal to the end without violating the
+     *    length tie-break.
+     *
+     * The extra strength over a plain `xα ≤ yα` step is the `β` look-ahead: when `β = α + 1` the
+     * suffix cannot rescue equality at `α`, so the position must be *strictly* ordered and the
+     * bound tightens to `xα ≤ yα.max − 1` / `yα ≥ xα.min + 1`. `α ≥ β` means no lexicographic
+     * completion survives — a contradiction.
+     */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val len = minOf(xs.size, ys.size)
-        var i = 0
-        while (i < len) {
-            val dx = state.intDomains[xs[i]]
-            val dy = state.intDomains[ys[i]]
-            if (dx.min == dx.max && dy.min == dy.max) {
-                when {
-                    dx.min < dy.min -> return true
+        val nx = xs.size
+        val ny = ys.size
+        val len = minOf(nx, ny)
+        // When the whole common prefix is forced equal, the relation is settled by the length
+        // tie-break: a proper-prefix `xs` is strictly less; equal length needs `!strict`; a longer
+        // `xs` is strictly greater and so violates. `tailAllowsEquality` is also `β`'s `∞` test —
+        // a suffix that may stay equal to the end forces no strict step at `α`.
+        val tailAllowsEquality = nx < ny || (nx == ny && !strict)
 
-                    dx.min > dy.min -> return false
+        var a = 0
+        while (true) {
+            while (a < len) {
+                val dx = state.intDomains[xs[a]]
+                val dy = state.intDomains[ys[a]]
+                if (dx.min == dx.max && dy.min == dy.max && dx.min == dy.min) a++ else break
+            }
+            if (a == len) return tailAllowsEquality
 
-                    else -> {
-                        i++
-                        continue
-                    }
+            val dxa = state.intDomains[xs[a]]
+            val dya = state.intDomains[ys[a]]
+            if (dxa.max < dya.min) return true
+
+            var i = a
+            var b = -1
+            while (i < len) {
+                val dxi = state.intDomains[xs[i]]
+                val dyi = state.intDomains[ys[i]]
+                if (dxi.min > dyi.max) break
+                if (dxi.min == dyi.max) {
+                    if (b == -1) b = i
+                } else {
+                    b = -1
                 }
+                i++
             }
-            if (dx.max < dy.min) return true
-            if (dx.min > dy.max) return false
-            val prefixVars = IntArray(2 * i)
-            for (j in 0 until i) {
-                prefixVars[j] = xs[j]
-                prefixVars[i + j] = ys[j]
+            val betaInfinite: Boolean
+            if (i == len && tailAllowsEquality) {
+                betaInfinite = true
+                b = Int.MAX_VALUE
+            } else {
+                betaInfinite = false
+                if (b == -1) b = i
             }
-            val antFromY = state.composeIntVarAtomAntecedents(prefixVars + ys[i])
-            val antFromX = state.composeIntVarAtomAntecedents(prefixVars + xs[i])
-            if (!state.tightenIntMax(xs[i], dy.max, antFromY)) return false
-            if (!state.tightenIntMin(ys[i], dx.min, antFromX)) return false
-            val dx2 = state.intDomains[xs[i]]
-            val dy2 = state.intDomains[ys[i]]
-            if (!(dx2.min == dx2.max && dy2.min == dy2.max)) return true
-            if (dx2.min != dy2.min) return dx2.min < dy2.min
-            i++
+            if (b <= a) return false
+
+            val strictHere = !betaInfinite && b == a + 1
+            val newXMax = if (strictHere) dya.max - 1 else dya.max
+            val newYMin = if (strictHere) dxa.min + 1 else dxa.min
+            val ant = state.composeIntVarAtomAntecedents(reasonVars(a, i, strictHere))
+            if (!state.tightenIntMax(xs[a], newXMax, ant)) return false
+            if (!state.tightenIntMin(ys[a], newYMin, ant)) return false
+
+            val dxa2 = state.intDomains[xs[a]]
+            val dya2 = state.intDomains[ys[a]]
+            if (dxa2.max < dya2.min) return true
+            if (dxa2.min == dxa2.max && dya2.min == dya2.max && dxa2.min == dya2.min) {
+                a++
+                continue
+            }
+            return true
         }
-        return when {
-            xs.size == ys.size -> !strict
-            xs.size < ys.size -> true
-            else -> false
+    }
+
+    /**
+     * Premise variables whose current bounds justify the tightening at `α`: the fixed-equal prefix
+     * (why `α` is the deciding index), the `α` pair itself, and — when the step is strict — the
+     * scanned suffix `α+1..scanStop` that forced strictness. A superset is sound; original-domain
+     * bounds are level-0 facts and drop out inside [PropagationState.composeIntVarAtomAntecedents].
+     */
+    private fun reasonVars(a: Int, scanStop: Int, strictHere: Boolean): IntArray {
+        val vars = ArrayList<Int>(2 * (a + 1))
+        for (j in 0 until a) {
+            vars.add(xs[j])
+            vars.add(ys[j])
         }
+        vars.add(xs[a])
+        vars.add(ys[a])
+        if (strictHere) {
+            val len = minOf(xs.size, ys.size)
+            for (j in a + 1..minOf(scanStop, len - 1)) {
+                vars.add(xs[j])
+                vars.add(ys[j])
+            }
+        }
+        return vars.toIntArray()
     }
 }
