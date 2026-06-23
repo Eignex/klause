@@ -9,9 +9,9 @@ import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
+import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.OptionalFactor
 import com.eignex.klause.solver.factor.remapLits
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.util.IntHashSet
@@ -119,15 +119,58 @@ class AllDifferent(
         boundsConsistent,
     )
 
-    // A plain two-variable all-different is exactly the disequality `v0 != v1`, so collapse it to a
-    // binary `!=` (a cheap disequality propagator instead of the full Régin matching/SCC machinery).
-    // The optional (presents) and excepted-value variants have weaker semantics, so leave them alone.
-    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
-        if (vars.size == 2 && presents.isEmpty() && exceptSet.isEmpty()) {
-            FactorReduction.Rewrite(listOf(Linear(intArrayOf(1, -1), intArrayOf(vars[0], vars[1]), LinearOp.NE, 0)))
-        } else {
-            FactorReduction.Unchanged
+    // Structural reductions for a plain all-different (the optional / excepted-value variants have
+    // weaker semantics and are left alone):
+    //  - two variables → the disequality `v0 != v1` (a cheap binary propagator instead of Régin);
+    //  - otherwise, split into independent all-differents over value-disjoint components — when the
+    //    variables' value ranges partition into groups that cannot share a value, distinctness across
+    //    groups is automatic, so each group is its own (smaller, cheaper) all-different and any
+    //    singleton group drops. Exact, and it exposes per-component symmetry the whole constraint hid.
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        if (presents.isNotEmpty() || exceptSet.isNotEmpty()) return FactorReduction.Unchanged
+        if (vars.size == 2) {
+            return FactorReduction.Rewrite(
+                listOf(Linear(intArrayOf(1, -1), intArrayOf(vars[0], vars[1]), LinearOp.NE, 0)),
+            )
         }
+        return splitIntoValueDisjointComponents(domains)
+    }
+
+    /** Partition [vars] into value-range-connected components (a sweep over `[min, max]` intervals: two
+     *  variables are connected when their intervals overlap). With more than one component the
+     *  all-different splits into one per multi-variable component — singleton components impose nothing
+     *  and drop — else there is nothing to split. */
+    private fun splitIntoValueDisjointComponents(domains: Array<IntDomain>): FactorReduction {
+        // Sort by interval min and cut a new component wherever the next interval starts beyond the
+        // running max — each component is a contiguous slice of the sorted order.
+        val order = vars.indices.sortedBy { domains[vars[it]].min }
+        val components = ArrayList<List<Int>>()
+        var start = 0
+        var runningMax = domains[vars[order[0]]].max
+        for (k in 1 until order.size) {
+            val d = domains[vars[order[k]]]
+            if (d.min <= runningMax) {
+                if (d.max > runningMax) runningMax = d.max
+            } else {
+                components.add(order.subList(start, k).map { vars[it] })
+                start = k
+                runningMax = d.max
+            }
+        }
+        components.add(order.subList(start, order.size).map { vars[it] })
+        if (components.size == 1) return FactorReduction.Unchanged
+        val replacement = components.mapNotNull { group ->
+            if (group.size < 2) return@mapNotNull null
+            var lo = Int.MAX_VALUE
+            var hi = Int.MIN_VALUE
+            for (v in group) {
+                lo = minOf(lo, domains[v].min)
+                hi = maxOf(hi, domains[v].max)
+            }
+            AllDifferent(group.toIntArray(), domainMin = lo, domainSize = hi - lo + 1)
+        }
+        return FactorReduction.Rewrite(replacement)
+    }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
     override val intVars: IntArray = vars

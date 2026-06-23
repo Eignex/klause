@@ -3,6 +3,8 @@ package com.eignex.klause.solver.factor.scheduling
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
@@ -110,6 +112,30 @@ class Cumulative(
         resourceVars.remapVars(intMap),
         if (capacityVar >= 0) intMap[capacityVar] else capacityVar,
     )
+
+    // When no two tasks can run at once — the two smallest resource demands already exceed the capacity
+    // — the resource is never shared, so the cumulative is exactly a [Disjunctive] (no-overlap), whose
+    // theta-tree / edge-finding propagator is both stronger and cheaper for that case. Only constant
+    // durations/resources/capacity reduce; a single demand above capacity is left to the propagator to
+    // report infeasible.
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        if (durationVars.isNotEmpty() || resourceVars.isNotEmpty() || capacityVar >= 0 || n < 2) {
+            return FactorReduction.Unchanged
+        }
+        var min1 = Int.MAX_VALUE
+        var min2 = Int.MAX_VALUE
+        for (r in resources) {
+            if (r > capacity) return FactorReduction.Unchanged
+            if (r < min1) {
+                min2 = min1
+                min1 = r
+            } else if (r < min2) {
+                min2 = r
+            }
+        }
+        if (min1.toLong() + min2.toLong() <= capacity.toLong()) return FactorReduction.Unchanged
+        return FactorReduction.Rewrite(listOf(Disjunctive(starts, durations, presents)))
+    }
 
     /** Position-faithful (task i is fixed by index): keeps every array in order and folds in all
      *  constants — durations/resources/capacity and the var/const split — so two non-equivalent

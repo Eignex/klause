@@ -7,6 +7,8 @@ import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.scheduling.Cumulative
+import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.factor.table.Element
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -144,5 +146,77 @@ class StructuralReductionTest {
             listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 1)),
         )
         assertSame(problem, Presolve.reduceStructural(problem), "an at-most-one still constrains, so it stays")
+    }
+
+    @Test
+    fun `an all-different over value-disjoint groups splits into independent all-differents`() {
+        // x0..x2 live in [0,5], x3..x5 in [10,15] — the two ranges cannot share a value.
+        val problem = Problem(
+            0,
+            6,
+            arrayOf(
+                IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(0, 5),
+                IntDomain(10, 15),
+                IntDomain(10, 15),
+                IntDomain(10, 15),
+            ),
+            listOf(AllDifferent(intArrayOf(0, 1, 2, 3, 4, 5), domainMin = 0, domainSize = 16)),
+        )
+        val out = Presolve.reduceStructural(problem)
+        val groups = out.factors.filterIsInstance<AllDifferent>().map { it.vars.toSet() }
+        assertEquals(setOf(setOf(0, 1, 2), setOf(3, 4, 5)), groups.toSet(), "splits into the two value-disjoint groups")
+    }
+
+    @Test
+    fun `an all-different over overlapping ranges is left whole`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6)),
+        )
+        assertSame(problem, Presolve.reduceStructural(problem), "one connected component does not split")
+    }
+
+    @Test
+    fun `a cumulative whose tasks cannot share the resource becomes a disjunctive`() {
+        // Three tasks each demanding 3 of capacity 4: no two fit together, so it is a no-overlap.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            listOf(
+                Cumulative(
+                    starts = intArrayOf(0, 1, 2),
+                    durations = intArrayOf(2, 2, 2),
+                    resources = intArrayOf(3, 3, 3),
+                    capacity = 4,
+                ),
+            ),
+        )
+        val out = Presolve.reduceStructural(problem)
+        assertTrue(out.factors.none { it is Cumulative }, "the cumulative is removed")
+        val disj = out.factors.filterIsInstance<Disjunctive>().single()
+        assertEquals(listOf(0, 1, 2), disj.starts.toList())
+    }
+
+    @Test
+    fun `a cumulative whose tasks can share the resource is left alone`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            listOf(
+                Cumulative(
+                    starts = intArrayOf(0, 1, 2),
+                    durations = intArrayOf(2, 2, 2),
+                    resources = intArrayOf(1, 1, 1),
+                    capacity = 4,
+                ),
+            ),
+        )
+        assertSame(problem, Presolve.reduceStructural(problem), "tasks fit together, so it stays cumulative")
     }
 }
