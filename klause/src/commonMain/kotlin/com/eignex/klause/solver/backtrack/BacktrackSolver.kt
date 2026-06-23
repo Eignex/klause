@@ -31,6 +31,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
+import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -469,6 +470,24 @@ class BacktrackSolver(override val problem: Problem) :
         }
 
         /**
+         * Tighten the objective variable to the portfolio's shared lower bound (#809 / F1). The bound is
+         * a valid global lower bound on the optimum, and every feasible solution has `objVar ≥ optimum`,
+         * so asserting `objVar ≥ ⌈bound⌉` removes no solution — it only strengthens this arm's propagation
+         * and pruning with a floor a peer arm proved. A no-op without a single ascending objective
+         * variable or a shared bound (a satisfaction arm, or a non-portfolio solve).
+         */
+        private fun applySharedObjectiveFloor() {
+            val supplier = params.objectiveLowerBoundSupplier ?: return
+            val obj = singleObj?.takeIf { it.ascending } ?: return
+            val bound = supplier()
+            if (!bound.isFinite()) return
+            val floor = ceil(bound)
+            if (floor in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble()) {
+                session.implyIntAtLeast(obj.varId, floor.toInt())
+            }
+        }
+
+        /**
          * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation
          * bound for the integrality-gap metric (search only bounds from level 1 down, so this is the
          * sole root capture). Run from [runUntilEvent]'s `started` guard — not at construction — so the
@@ -492,10 +511,12 @@ class BacktrackSolver(override val problem: Problem) :
                 )
                 sink.observeLpCuts(lpEngine.lpGlobalCuts.size)
             }
-            sink.observeRootLpBound(
-                0,
-                lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token),
-            )
+            val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token)
+            sink.observeRootLpBound(0, rootBound)
+            // Publish the root LP bound to the portfolio's shared lower-bound manager (#809 / F1): a sound
+            // global lower bound on the optimum, so a peer arm can pair it with its own incumbent to prove
+            // optimality. A NaN (no LP structure) carries no information and the sink ignores it.
+            if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
         }
 
         /**
@@ -552,6 +573,7 @@ class BacktrackSolver(override val problem: Problem) :
                         session.implyIntAtMost(sb.varId, sb.hi)
                     }
                 }
+                applySharedObjectiveFloor()
                 // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
                 // prunes and reduced-cost fixing bite from the first node.
                 if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
@@ -568,6 +590,9 @@ class BacktrackSolver(override val problem: Problem) :
                     }
                 }
             }
+            // Re-read the shared lower bound each slice: a peer arm may have proven a tighter floor since
+            // this arm last ran (#809 / F1). Monotone and sound, so re-asserting only strengthens pruning.
+            applySharedObjectiveFloor()
             outer@ while (true) {
                 if (!runActive) {
                     perRunBudget = if (glucose != null) {
