@@ -193,6 +193,7 @@ internal class CumulativePropagator(
         // time-tabling / edge-finding below it does not need a fully fixed snapshot, so it is the only
         // filtering that fires while resource demands or durations are still ranges.
         if (!energeticNaivePass(state)) return false
+        if (!profileHeightPass(state)) return false
         val eff = effectiveSnapshot(state) ?: return true
         val effDur = eff.dur
         val effRes = eff.res
@@ -327,6 +328,40 @@ internal class CumulativePropagator(
             }
             surface += minDur(state, i).toLong() * minHeight(state, i).toLong()
             if (surface > (xMax - xMin).toLong() * camax.toLong()) return false
+        }
+        return true
+    }
+
+    /**
+     * Profile-based resource-height pruning (choco's `updateHeights`). A mandatory profile built
+     * from each present task's compulsory part `[start.max, start.min + minDur)` at its *minimum*
+     * demand bounds how tall a task spanning a peak may be: `height ≤ capacity − (peak − ownMin)`.
+     * Sharper than the energetic area bound at a tall, narrow compulsory peak inside a long window.
+     * Bounds-only on min demands, so it is sound while heights are still ranges.
+     */
+    @Suppress("ReturnCount")
+    private fun profileHeightPass(state: PropagationState): Boolean {
+        if (resourceVars.isEmpty()) return true
+        val cap = capMax(state)
+        val profile = MandatoryProfile()
+        for (i in 0 until n) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            val lst = state.intDomains[starts[i]].max
+            val ect = state.intDomains[starts[i]].min + minDur(state, i)
+            val h = minHeight(state, i)
+            if (lst < ect && h > 0) profile.addTask(lst, ect, h)
+        }
+        if (!profile.build(cap)) return false
+        val ant = state.composeIntVarAtomAntecedents(intVars)
+        for (i in 0 until n) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            val lst = state.intDomains[starts[i]].max
+            val ect = state.intDomains[starts[i]].min + minDur(state, i)
+            if (lst >= ect) continue
+            val newUb = cap - (profile.maxLevelOver(lst, ect) - minHeight(state, i))
+            if (newUb < state.intDomains[resourceVars[i]].max && !state.tightenIntMax(resourceVars[i], newUb, ant)) {
+                return false
+            }
         }
         return true
     }
