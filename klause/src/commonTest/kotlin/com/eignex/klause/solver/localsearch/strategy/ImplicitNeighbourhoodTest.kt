@@ -10,6 +10,7 @@ import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -127,6 +128,58 @@ class ImplicitNeighbourhoodTest {
         state.recompute()
         state.seedImplicitFeasible()
         assertTrue(state.assignment.intValue(0) == 2, "frozen var must keep its value")
+    }
+
+    @Test
+    fun `feasible init records the seeded global as owner of its vars`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
+        )
+        val state = LocalSearchState(problem, Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+        state.seedImplicitFeasible()
+        val owners = assertNotNull(state.ownerInt, "seeding must populate the owner map")
+        assertTrue(
+            owners.toList() == listOf(0, 0, 0),
+            "the all-different (factor 0) owns its three vars, got ${owners.toList()}",
+        )
+    }
+
+    @Test
+    fun `only the owner may move an owned var`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2), 0, 3)),
+        )
+        val state = LocalSearchState(problem, Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+        state.seedImplicitFeasible()
+        state.recompute()
+        assertTrue(state.cost == 0L, "seeding leaves the all-different satisfied")
+
+        // A generic add (no proposing factor) on an owned var is filtered out of the neighbourhood.
+        val generic = MoveSink()
+        generic.setOwners(state.ownerInt)
+        generic.addIntSet(0, 2)
+        assertTrue(generic.list.isEmpty(), "the generic pool must not touch an owned var")
+
+        // The owner's own structure-preserving moves on the same vars survive the filter.
+        val owned = MoveSink()
+        owned.setOwners(state.ownerInt)
+        owned.proposer = 0
+        state.factors[0].proposeStructuredMoves(state, 0, owned)
+        assertTrue(owned.list.isNotEmpty(), "the owner must still be able to move the vars it owns")
     }
 
     @Test

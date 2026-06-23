@@ -51,14 +51,11 @@ class SatisfiedStructured private constructor(
         when (scope) {
             Scope.Sampled -> repeat(sampleCount) {
                 val fid = state.rng.nextInt(total)
-                if (!state.violated.contains(fid)) {
-                    state.factors[fid].proposeStructuredMoves(state, fid, sink)
-                }
+                if (!state.violated.contains(fid)) proposeAsOwner(state, fid, sink)
             }
 
             Scope.All -> for (fid in 0 until total) {
-                val f = state.factors[fid]
-                if (!f.isViolated(state, fid)) f.proposeStructuredMoves(state, fid, sink)
+                if (!state.factors[fid].isViolated(state, fid)) proposeAsOwner(state, fid, sink)
             }
 
             Scope.Elected -> {
@@ -67,12 +64,19 @@ class SatisfiedStructured private constructor(
                 if (n == 0) return
                 repeat(minOf(sampleCount, n)) {
                     val fid = elected[state.rng.nextInt(n)]
-                    if (!state.violated.contains(fid)) {
-                        state.factors[fid].proposeStructuredMoves(state, fid, sink)
-                    }
+                    if (!state.violated.contains(fid)) proposeAsOwner(state, fid, sink)
                 }
             }
         }
+    }
+
+    /** Propose [fid]'s structured moves with the sink's owner attributed to [fid], so its
+     *  feasibility-preserving moves on the variables it owns survive the implicit-solving owner
+     *  filter (a non-owner's moves on those variables are dropped). */
+    private fun proposeAsOwner(state: LocalSearchState, fid: Int, sink: MoveSink) {
+        sink.proposer = fid
+        state.factors[fid].proposeStructuredMoves(state, fid, sink)
+        sink.proposer = MoveSink.NO_PROPOSER
     }
 
     /** Catalog identity and scope factories. */

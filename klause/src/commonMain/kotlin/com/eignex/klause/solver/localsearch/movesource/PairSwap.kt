@@ -21,6 +21,11 @@ import com.eignex.klause.solver.localsearch.MoveSink
 class PairSwap(
     /** Candidates of each kind (bool, int) drawn per [generate] call. */
     private val cap: Int,
+    /** When true, the first endpoint of each int swap is drawn from the objective hot-spot
+     *  ([LocalSearchState.objectiveHotSpotIntVar]) so swaps concentrate on objective-relevant
+     *  variables; false keeps the uniform-random draw. No effect once the objective exposes no int
+     *  gradient (the draw falls back to uniform). */
+    private val hotSpot: Boolean = false,
 ) : MoveSource {
     init {
         require(cap >= 0) { "cap >= 0, got $cap" }
@@ -36,7 +41,7 @@ class PairSwap(
             sink.addCompound(swap.parts)
         }
         repeat(cap) {
-            val swap = drawIntSwap(state) ?: return@repeat
+            val swap = drawIntSwap(state, hotSpot) ?: return@repeat
             sink.addCompound(swap.parts)
         }
     }
@@ -46,6 +51,10 @@ class PairSwap(
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("pair-swap")
+
+        /** Objective-hot-spot variant: bias the first int-swap endpoint toward objective-relevant
+         *  variables. */
+        fun hotSpot(cap: Int): PairSwap = PairSwap(cap, hotSpot = true)
 
         /** Draw one random bool-pair swap (a true var and a false var, both flipped), or null if the
          *  drawn pair is degenerate (same var, frozen, or equal-valued). Consumes two RNG ints. */
@@ -64,15 +73,22 @@ class PairSwap(
         }
 
         /** Draw one random int-pair swap (two int vars with different values that fit in each other's
-         *  domain, values exchanged), or null if the drawn pair is degenerate. Consumes two RNG ints. */
-        fun drawIntSwap(state: LocalSearchState): Move.Compound? {
+         *  domain, values exchanged), or null if the drawn pair is degenerate. Consumes two RNG ints.
+         *  When [hotSpot] is set, the first endpoint is drawn from the objective hot-spot (falling back
+         *  to uniform when the objective exposes no int gradient). */
+        fun drawIntSwap(state: LocalSearchState, hotSpot: Boolean = false): Move.Compound? {
             val nInt = state.problem.numIntVars
             if (nInt < 2) return null
             val rng = state.rng
-            val a = rng.nextInt(nInt)
+            val hot = if (hotSpot) state.objectiveHotSpotIntVar(rng) else -1
+            val a = if (hot >= 0) hot else rng.nextInt(nInt)
             val b = rng.nextInt(nInt)
             if (a == b) return null
             if (state.assumptions.isFrozenInt(a) || state.assumptions.isFrozenInt(b)) return null
+            // Owned by an implicitly-solved global: only that global may move it (a blind swap would
+            // break the constraint it was seeded feasible into).
+            val owners = state.ownerInt
+            if (owners != null && (owners[a] >= 0 || owners[b] >= 0)) return null
             val va = state.assignment.intValue(a)
             val vb = state.assignment.intValue(b)
             if (va == vb) return null

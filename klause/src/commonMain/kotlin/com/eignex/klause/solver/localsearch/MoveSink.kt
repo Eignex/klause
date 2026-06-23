@@ -45,6 +45,32 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         invariants = net
     }
 
+    private var ownerInt: IntArray? = null
+
+    /**
+     * Install the implicit-solving owner map: `owners[v]` is the factor id that owns int var `v`
+     * (`-1` = unowned). An owned variable is a decision variable of an implicit-solving global that
+     * was seeded feasible and is kept feasible only by that global's own structure-preserving moves
+     * (see [com.eignex.klause.solver.localsearch.LocalSearchState.ownerInt]). The sink drops any int
+     * move on an owned variable unless [proposer] is its owner, so the generic repair/jump/swap
+     * sources never break an implicitly-solved constraint — the search treats those variables as
+     * removed from its neighbourhood, exactly as a defined var is. `null` disables ownership.
+     */
+    fun setOwners(owners: IntArray?) {
+        ownerInt = owners
+    }
+
+    /** The factor currently proposing into this sink, or [NO_PROPOSER] for the generic sources that
+     *  add moves without a proposing factor. Set around a factor's propose call so its own moves on
+     *  the variables it owns survive the owner filter while every other source's do not. */
+    var proposer: Int = NO_PROPOSER
+
+    private fun ownedByOther(varId: Int): Boolean {
+        val owners = ownerInt ?: return false
+        val owner = owners[varId]
+        return owner >= 0 && owner != proposer
+    }
+
     /** Queue a Boolean-flip move on `boolVar`. */
     fun addBoolFlip(varId: Int) {
         if (assumptions.isFrozenBool(varId)) return
@@ -57,6 +83,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     fun addIntSet(varId: Int, newValue: Int) {
         if (assumptions.isFrozenInt(varId)) return
         if (invariants?.isDefinedInt(varId) == true) return
+        if (ownedByOther(varId)) return
         lane.add(encodeIntSet(varId, newValue))
         cachedList = null
     }
@@ -74,13 +101,13 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         // Under per-move invariants, parts targeting defined vars are redundant (propagation
         // recomputes them) — drop them individually rather than the whole compound.
         val net = invariants
-        val kept = if (net == null) {
+        val kept = if (net == null && ownerInt == null) {
             parts
         } else {
             parts.filter { p ->
                 when (p) {
-                    is Move.BoolFlip -> !net.isDefinedBool(p.varId)
-                    is Move.IntSet -> !net.isDefinedInt(p.varId)
+                    is Move.BoolFlip -> net?.isDefinedBool(p.varId) != true
+                    is Move.IntSet -> net?.isDefinedInt(p.varId) != true && !ownedByOther(p.varId)
                     is Move.Compound -> true
                 }
             }
@@ -106,6 +133,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         lane.clear()
         compounds = null
         cachedList = null
+        proposer = NO_PROPOSER
     }
 
     /** Channeling-aware variant of [addIntSet]. Asks [state] to synthesize the coordinated
@@ -141,6 +169,10 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     /** Shared [MoveSink] helpers. */
     companion object {
+        /** [proposer] value for the generic sources that add moves without a proposing factor — no
+         *  factor owns their moves, so any owned variable is filtered. */
+        const val NO_PROPOSER: Int = -1
+
         private const val INITIAL_CAPACITY: Int = 16
         private const val KIND_BIT: Long = 1L shl 63
         private const val VAR_MASK: Long = (1L shl 31) - 1L

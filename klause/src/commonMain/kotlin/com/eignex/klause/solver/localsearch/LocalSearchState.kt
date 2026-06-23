@@ -3,6 +3,7 @@ package com.eignex.klause.solver.localsearch
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
@@ -10,6 +11,7 @@ import com.eignex.klause.solver.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
@@ -80,6 +82,16 @@ class LocalSearchState(
      *  assignment satisfies every seeded global simultaneously. */
     val implicitSeedFactors: IntArray by lazy { electImplicitSeedSet() }
 
+    /** Implicit-solving owner map over int vars: `ownerInt[v]` is the factor id that owns int var
+     *  `v`, or `-1` if `v` is searched freely. A variable is owned once [seedImplicitFeasible] seeds
+     *  its [implicitSeedFactors] global feasibly; from then on only that global's structure-preserving
+     *  [Invariant.proposeStructuredMoves] may change it, so the generic neighbourhood can never break
+     *  the implicitly-solved constraint. `null` until the first seeding pass, and only ever populated
+     *  when implicit feasible-init is enabled — so a search that does not seed implicitly is
+     *  unaffected. The [MoveSink] enforces the filter via [MoveSink.setOwners]. */
+    var ownerInt: IntArray? = null
+        private set
+
     /** Binary-implication graph of [problem], literal-indexed at `2·numBoolVars`: `graph[Lit.make(v,
      *  value)]` lists every literal that pinning `v = value` forces (sound, from probing-style
      *  propagation). Built once on first access — the implication-aware move sources
@@ -127,10 +139,20 @@ class LocalSearchState(
      *  subsequent [recompute]. */
     fun seedImplicitFeasible() {
         val seeds = implicitSeedFactors
+        if (seeds.isEmpty()) return
+        val owners = ownerInt ?: IntArray(problem.numIntVars) { -1 }
+        owners.fill(-1)
         for (i in seeds.indices) {
             val fid = seeds[i]
-            factors[fid].seedFeasible(this, fid)
+            // Own a global's variables only when it actually seeded feasible: a failed seed (e.g. an
+            // all-different with no perfect matching) leaves its vars infeasible, so they must stay in
+            // the generic neighbourhood to be repaired rather than be frozen out as "implicitly solved".
+            if (factors[fid].seedFeasible(this, fid)) {
+                for (v in problem.factors[fid].intVars) owners[v] = fid
+            }
         }
+        ownerInt = owners
+        moveSink.setOwners(owners)
     }
 
     /** Step counter incremented on every accepted move. Strategies use this together with
@@ -175,6 +197,48 @@ class LocalSearchState(
      *  consulting [shapedBreakScore] fall back to the unshaped break score. */
     var objective: Objective? = null
         internal set
+
+    private var objIntVarsCache: IntArray? = null
+    private var objIntVarsFor: Objective? = null
+
+    /**
+     * Int decision variables the current [objective] depends on — nonzero-coefficient vars of a
+     * [LinearObjective], leaf vars of a [FunctionalObjective], empty for any other shape or a
+     * satisfiability problem. Recomputed only when [objective] changes. This is the *objective*
+     * hot-spot set: the feasible-phase analogue of the violated-factor bias the infeasibility-phase
+     * sources already use, so an objective-descent structural move can concentrate on variables that
+     * actually move the objective rather than swapping objective-irrelevant pairs.
+     */
+    val objectiveIntVars: IntArray
+        get() {
+            val obj = objective ?: return EmptyIntArray
+            val cached = objIntVarsCache
+            if (cached != null && objIntVarsFor === obj) return cached
+            val computed = computeObjectiveIntVars(obj)
+            objIntVarsCache = computed
+            objIntVarsFor = obj
+            return computed
+        }
+
+    private fun computeObjectiveIntVars(obj: Objective): IntArray = when (obj) {
+        is LinearObjective -> {
+            val out = IntArrayList()
+            for (v in obj.intCoefficients.indices) if (obj.intCoefficients[v] != 0L) out.add(v)
+            IntArray(out.size) { out[it] }
+        }
+
+        is FunctionalObjective -> obj.leafVars.copyOf()
+
+        else -> EmptyIntArray
+    }
+
+    /** Sample an int decision variable biased toward the objective gradient ([objectiveIntVars]),
+     *  consuming one RNG int, or `-1` when the objective exposes no per-var int direction. The shared
+     *  hot-spot variable-selection primitive for feasible-phase structured sources. */
+    fun objectiveHotSpotIntVar(rng: Random): Int {
+        val vs = objectiveIntVars
+        return if (vs.isEmpty()) -1 else vs[rng.nextInt(vs.size)]
+    }
 
     /** Lambda coefficient from `params.costShaping` for pre-feasibility shaping. Set by the engine
      *  on entering `minimize`; 0.0 (no shaping) otherwise or under

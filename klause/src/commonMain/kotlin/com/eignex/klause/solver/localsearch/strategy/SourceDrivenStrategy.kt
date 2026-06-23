@@ -119,6 +119,8 @@ class SourceDrivenStrategy(
         scoreSink.setAssumptions(state.assumptions)
         noiseSink.setInvariants(state.invariants)
         scoreSink.setInvariants(state.invariants)
+        noiseSink.setOwners(state.ownerInt)
+        scoreSink.setOwners(state.ownerInt)
         for (cs in sources) {
             if (!cs.enabled) continue
             if (cs.stallGated && !stalled) continue
