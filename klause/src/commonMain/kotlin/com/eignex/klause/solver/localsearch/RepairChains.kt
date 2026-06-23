@@ -38,7 +38,10 @@ internal fun LocalSearchState.proposeRepairChains(
     firstMoveCap: Int,
     sink: MoveSink,
 ): Int {
-    val propose = MoveSink(assumptions).also { it.setInvariants(invariants) }
+    val propose = MoveSink(assumptions).also {
+        it.setInvariants(invariants)
+        it.setOwners(ownerInt)
+    }
     factors[seedFactor].proposeRepairMoves(this, seedFactor, propose)
     var emitted = sampleChainFirsts(propose.list, firstMoveCap, maxDepth, propose, sink)
     // Ejection firsts: primitives on the variables of factors neighbouring the seed (sharing a

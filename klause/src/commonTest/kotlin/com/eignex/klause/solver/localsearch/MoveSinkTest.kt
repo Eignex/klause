@@ -107,6 +107,52 @@ class MoveSinkTest {
     }
 
     @Test
+    fun `owned int var is filtered when no factor is proposing`() {
+        val sink = MoveSink()
+        sink.setOwners(intArrayOf(-1, 7, -1)) // var 1 owned by factor 7
+        sink.addIntSet(0, 10)
+        sink.addIntSet(1, 20)
+        sink.addIntSet(2, 30)
+        assertEquals(listOf(Move.IntSet(0, 10), Move.IntSet(2, 30)), sink.list)
+    }
+
+    @Test
+    fun `owner may move the var it owns`() {
+        val sink = MoveSink()
+        sink.setOwners(intArrayOf(-1, 7, -1))
+        sink.proposer = 7
+        sink.addIntSet(1, 20)
+        assertEquals(listOf(Move.IntSet(1, 20)), sink.list)
+    }
+
+    @Test
+    fun `a non-owner factor cannot move another owner's var`() {
+        val sink = MoveSink()
+        sink.setOwners(intArrayOf(-1, 7, -1))
+        sink.proposer = 9 // a different factor
+        sink.addIntSet(1, 20)
+        assertTrue(sink.list.isEmpty())
+    }
+
+    @Test
+    fun `compound parts on a foreign-owned var are dropped individually`() {
+        val sink = MoveSink()
+        sink.setOwners(intArrayOf(-1, 7, -1, -1))
+        // var 1 owned by 7; proposer is no-one, so the part on 1 drops and the swap collapses to a primitive.
+        sink.addCompound(listOf(Move.IntSet(0, 10), Move.IntSet(1, 20)))
+        assertEquals(listOf(Move.IntSet(0, 10)), sink.list)
+    }
+
+    @Test
+    fun `clearing owners restores the var to the generic neighbourhood`() {
+        val sink = MoveSink()
+        sink.setOwners(intArrayOf(-1, 7))
+        sink.setOwners(null)
+        sink.addIntSet(1, 20)
+        assertEquals(listOf(Move.IntSet(1, 20)), sink.list)
+    }
+
+    @Test
     fun `growth past initial capacity preserves entries`() {
         val sink = MoveSink()
         for (v in 0 until 100) sink.addIntSet(v, v * 7)

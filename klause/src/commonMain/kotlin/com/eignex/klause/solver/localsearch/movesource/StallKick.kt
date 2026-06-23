@@ -40,6 +40,7 @@ class StallKick(
         scratch.clear()
         scratch.setAssumptions(state.assumptions)
         scratch.setInvariants(state.invariants)
+        scratch.setOwners(state.ownerInt)
         var budget = kickVars
         var attempts = kickVars * ATTEMPTS_PER_KICK
         while (budget > 0 && attempts-- > 0) {
