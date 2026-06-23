@@ -166,6 +166,12 @@ internal class Int128 {
     fun floorDivPositive(d: Long): Long? {
         require(d > 0L) { "divisor must be positive: $d" }
         if (overflow) return null
+        // Fast path: a dividend that already fits a `Long` needs only native floored division. Its
+        // quotient is no larger in magnitude, so it always fits a `Long`, and the result is identical to
+        // the 128-bit restoring loop (validated by the `BigInteger` oracle). This is the common case in
+        // reduced-cost fixing — most reduced-cost numerators are well within 64 bits — so it avoids the
+        // unconditional 128-iteration loop on every nonbasic column.
+        if (fitsLong()) return lo.floorDiv(d)
         val negative = hi < 0L
         val uLo: ULong
         val uHi: ULong
