@@ -113,12 +113,12 @@ internal class LpEngine(
      * other arms published — re-mapped onto this engine's stable column layout — and export this
      * engine's own. A no-op until a persistent relaxation exists, since cut sharing rides its
      * fixed column→variable maps; a non-persistent relaxation has no single layout to map through.
-     * Importing only adds globally-valid cuts, so it is sound at any node; new imports invalidate the
-     * persistent base so the next node folds them in (mirroring [recordSearchCuts]).
+     * Importing only adds globally-valid cuts, so it is sound at any node; the next node folds the
+     * violated subset in via [CutPool.select], so no base invalidation is needed (mirroring
+     * [recordSearchCuts]).
      */
     internal fun exchangeCuts(exchange: CutExchange) {
         val relaxation = persistentRelaxation ?: return
-        val before = cutPool.size
         exchange.exchange(
             object : CutSharing {
                 override fun exportGlobalCuts(): List<SharedCut> =
@@ -129,21 +129,19 @@ internal class LpEngine(
                 }
             },
         )
-        if (cutPool.size != before) persistentResolved = false
     }
 
     /**
      * Persist the globally-valid members of [cuts] into the [cutPool] (#41); node-local cuts are
-     * ignored here (the caller uses them transiently). When the pool grows, the persistent base is
-     * invalidated so the next node rebuilds it with the new cuts, and the pool is trimmed to its cap by
-     * activity at [primal]. Sound: every persisted cut is global, valid at every solution.
+     * ignored here (the caller uses them transiently). The pool is trimmed to its cap by activity at
+     * [primal]. The cut-free persistent base is untouched — every node folds the violated subset via
+     * [CutPool.select]. Sound: every persisted cut is global, valid at every solution.
      */
     fun recordSearchCuts(cuts: List<Cut>, primal: DoubleArray) {
         var added = 0
         for (c in cuts) if (c.global && cutPool.add(c)) added++
         if (added == 0) return
         if (cutPool.size > cutPool.maxCuts) cutPool.retainMostActive(primal)
-        persistentResolved = false // rebuild the persistent base with the enlarged pool
     }
     private val lagBound = if (params.lpPlan.lagrangian) {
         LagrangianBound(problem, objective).takeIf { it.applicable }
@@ -186,29 +184,27 @@ internal class LpEngine(
 
     // Persistent global LP (#39): for a node-invariant relaxation (no auxiliary columns, no live-M
     // rows) the per-node delta is column bounds only, so the relaxation is built once from the declared
-    // domains and re-bound at each node instead of rebuilt. `resolved` makes the one-time probe lazy —
-    // it runs after the root-cut harvest so the global cuts are folded into the persistent structure.
+    // domains and re-bound at each node instead of rebuilt. The base is cut-free — global cuts are folded
+    // per node by [LpBounding] via [CutPool.select], so the pool can grow without invalidating the base.
     private var persistentResolved = false
     private var persistentRelaxation: LpRelaxation? = null
 
     /**
-     * The LP relaxation for the current node (#39): the persistent relaxation re-bound to [session]'s
-     * live column bounds when eligible, else a fresh per-node build. On first call it builds a base
-     * relaxation from the declared domains (with the harvested [globalCuts]); if that base is
-     * [LpRelaxation.persistentEligible] it is cached and every node re-binds it — bit-identical to a
-     * rebuild for eligible models, but skipping the matrix reconstruction.
+     * The **cut-free** LP relaxation for the current node (#39): the persistent relaxation re-bound to
+     * [session]'s live column bounds when eligible, else a fresh per-node build. On first call it builds a
+     * base relaxation from the declared domains; if that base is [LpRelaxation.persistentEligible] it is
+     * cached and every node re-binds it — bit-identical to a rebuild for eligible models, but skipping the
+     * matrix reconstruction. The harvested global cuts are not baked in here: the bound path folds the
+     * subset its LP point actually violates via [CutPool.select] (#40 / D8), so the base stays
+     * node-invariant and the per-node cut count is bounded by efficacy rather than the whole pool.
      */
-    internal fun nodeRelaxation(
-        relaxer: CpToLpRelaxation,
-        session: PropagationSession,
-        globalCuts: List<Cut>,
-    ): LpRelaxation {
+    internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
         if (!persistentResolved) {
             persistentResolved = true
-            val base = relaxer.build(PropagationSession(problem), globalCuts)
+            val base = relaxer.build(PropagationSession(problem))
             if (base.persistentEligible) persistentRelaxation = base
         }
-        return persistentRelaxation?.rebound(session) ?: relaxer.build(session, globalCuts)
+        return persistentRelaxation?.rebound(session) ?: relaxer.build(session)
     }
 
     /** The asserting LP backjump clause derived during the last [pruneNode] (#280), or null. */
@@ -379,7 +375,6 @@ internal class LpEngine(
                 sink,
                 objectiveVar = objectiveVar,
                 objectiveAscending = objectiveAscending,
-                globalCuts = lpGlobalCuts,
                 cancellation = params.cancellation,
                 hints = lpHints,
                 learn = params.lpPlan.learn,
