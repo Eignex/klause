@@ -10,6 +10,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.backtrack.selector.Vsids
+import com.eignex.klause.solver.factor.FactorPropagationOracle
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.scheduling.Cumulative
@@ -28,6 +29,69 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CumulativePropagatorTest {
+
+    // --- Energetic reasoning (#4) ---
+
+    @Test
+    fun `energetic reasoning caps a resource height that cannot fit the shared window`() {
+        // Two tasks both start at 0. Task 0 (dur 2, height pinned 2) and task 1 (dur 3, height
+        // ∈ [0,3]) share the window [0,3] under capacity 3. Energetic area: 3·3 = 9; task 0 commits
+        // 2·2 = 4, leaving 5 for task 1 across its 3 units ⇒ height1 ≤ ⌊5/3⌋ = 1. Time-tabling alone
+        // never touches the (variable) height. Layout: s0=0, s1=1, r0=2, r1=3.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(2, 2), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(
+                Cumulative(
+                    starts = intArrayOf(0, 1),
+                    durations = intArrayOf(2, 3),
+                    resources = intArrayOf(2, 3),
+                    capacity = 3,
+                    resourceVars = intArrayOf(2, 3),
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentFactor = 0
+        assertTrue(problem.propagators[0].propagate(state, 0))
+        assertEquals(1, state.intDomains[3].max, "task 1 height must be capped at 1 by energetic reasoning")
+    }
+
+    @Test
+    fun `cumulative with variable heights never over-prunes`() {
+        // Brute-force oracle over small random instances with variable resource demands — the regime
+        // the old propagator skipped entirely (it needed a fully-fixed snapshot). Kept under the
+        // BruteForceSolver 2^18 cap.
+        val rng = Random(0xC0FFEE)
+        repeat(300) { iter ->
+            val tasks = 2 + rng.nextInt(2) // 2 or 3 tasks
+            val starts = IntArray(tasks) { it }
+            val resourceVars = IntArray(tasks) { tasks + it }
+            val durations = IntArray(tasks) { 1 + rng.nextInt(2) } // 1 or 2
+            val resourceUbs = IntArray(tasks) { 3 }
+            val capacity = 2 + rng.nextInt(2) // 2 or 3
+            val doms = ArrayList<IntDomain>()
+            repeat(tasks) { doms.add(IntDomain(0, 2)) } // start domains
+            repeat(tasks) { doms.add(IntDomain(0, 2)) } // height domains
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2 * tasks,
+                intDomains = doms.toTypedArray(),
+                factors = arrayOf<Factor>(
+                    Cumulative(
+                        starts = starts,
+                        durations = durations,
+                        resources = resourceUbs,
+                        capacity = capacity,
+                        resourceVars = resourceVars,
+                    ),
+                ),
+            )
+            FactorPropagationOracle.assertSound(problem, "cumulative-varH#$iter")
+        }
+    }
 
     // --- From CumulativeConflictReasonTest ---
 
