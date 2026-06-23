@@ -124,6 +124,18 @@ class LocalSearchSolver(
         state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
     }
 
+    override fun describe(params: LocalSearchParams): String {
+        val sources = strategy.sources.joinToString(",") { it.source.id.label }
+        return """
+            local-search
+              sources:    [$sources]
+              scoring:    ${strategy.scoring}
+              acceptance: ${strategy.acceptance}
+              restart:    ${restartPolicy::class.simpleName}
+              max-flips:  ${params.maxFlips}
+        """.trimIndent()
+    }
+
     override fun solve(params: LocalSearchParams): SolveResult = solveInternal(params, warm = null)
 
     override fun samples(params: LocalSearchParams): Sequence<Sample> = samplesInternal(params, warm = null)

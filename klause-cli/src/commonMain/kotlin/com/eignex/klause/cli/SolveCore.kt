@@ -9,6 +9,7 @@ import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -20,6 +21,7 @@ import com.eignex.klause.solver.localsearch.strategy.LsCatalog
 import com.eignex.klause.solver.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
+import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
@@ -56,6 +58,12 @@ internal object SolveCore {
         // each phase restart the clock and blow the limit cumulatively.
         val (deadline, cancel) = deadlineCancellation(common)
         val solvable = rawSolvable.presolved(config, solutionSetSensitive, cancel)
+        // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
+        // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
+        if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
+            printPresolved(rawSolvable.problem, solvable.problem)
+            return
+        }
         cliLogger(common.verbose).v {
             val p0 = rawSolvable.problem
             val p1 = solvable.problem
@@ -131,6 +139,10 @@ internal object SolveCore {
         val lpConfig = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: base.lpConfig
+        val engineParams = EngineParams(common.engineParams)
+        // Consume `dry-run-solver` before applyBacktrackParams validates the leftover keys, so it isn't
+        // rejected as unknown; it's an engine-agnostic mode, handled below.
+        val dryRunSolver = engineParams.bool("dry-run-solver") ?: false
         val params = applyBacktrackParams(
             base.copy(
                 randomSeed = common.randomSeed ?: base.randomSeed,
@@ -138,13 +150,19 @@ internal object SolveCore {
                 onEvent = verboseListener(common.verbose),
                 lpConfig = lpConfig,
             ),
-            EngineParams(common.engineParams),
+            engineParams,
             allowSelectors = allowSelectors,
         )
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
-        runGeneric(BacktrackSolver(solvable.problem), params, solvable, common, output, complete = true, deadline)
+        val solver = BacktrackSolver(solvable.problem)
+        if (dryRunSolver) {
+            errPrintln("solver dry-run:")
+            errPrintln(solver.describe(params))
+            return
+        }
+        runGeneric(solver, params, solvable, common, output, complete = true, deadline)
     }
 
     /** Print the resolved LS arm pool (`dry-run`), one line per arm, to stderr so the solution
@@ -162,6 +180,36 @@ internal object SolveCore {
             )
         }
     }
+
+    /** Print what presolve did (`dry-run-presolve`) to stderr: variable/constraint counts, total
+     *  integer-domain span, the per-factor-kind histogram delta, and any proven infeasibility — so the
+     *  effect of a `--presolve` config can be inspected and A/B-compared without solving. */
+    private fun printPresolved(original: Problem, presolved: Problem) {
+        errPrintln("presolve dry-run:")
+        errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
+        errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")
+        errPrintln("  int-domain span: ${domainSpan(original)} -> ${domainSpan(presolved)}")
+        val before = factorHistogram(original)
+        val after = factorHistogram(presolved)
+        for (kind in (before.keys + after.keys).sorted()) {
+            val b = before[kind] ?: 0
+            val a = after[kind] ?: 0
+            if (b != a) errPrintln("  $kind: $b -> $a")
+        }
+        if (presolved.baked is PropagationResult.Unsat) {
+            errPrintln("  INFEASIBLE: presolve proved the problem unsatisfiable")
+        }
+    }
+
+    /** Total integer-domain span `Σ (max − min)` — the coarse problem-size measure presolve shrinks. */
+    private fun domainSpan(problem: Problem): Long {
+        var span = 0L
+        for (d in problem.intDomains) span += d.max.toLong() - d.min.toLong()
+        return span
+    }
+
+    private fun factorHistogram(problem: Problem): Map<String, Int> =
+        problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()
 
     private fun runPortfolio(
         solvable: Solvable,
@@ -181,10 +229,10 @@ internal object SolveCore {
         } ?: LpConfig.AGGRESSIVE
         // For an LS-bearing pool, resolve the four-axis arm overrides (a `strategy=` base + per-axis
         // edits) before consuming the portfolio knobs from the same params. A null pool keeps the
-        // curated catalog. `dry-run` lists the resolved pool and exits without solving.
+        // curated catalog. `dry-run-solver` lists the resolved pool and exits without solving.
         val params = EngineParams(common.engineParams)
         val lsResolution = if (mix != EngineMix.BACKTRACK) resolveLsRecipes(params) else LsResolution(null, false)
-        if (lsResolution.dryRun) {
+        if (lsResolution.dryRunSolver) {
             printLsPool(lsResolution.pool)
             return
         }

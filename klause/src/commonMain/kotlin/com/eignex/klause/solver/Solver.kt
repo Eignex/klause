@@ -111,6 +111,11 @@ interface Solver<P : SolverParams> {
     /** Solve the problem once and return a [SolveResult]. */
     fun solve(params: P): SolveResult
 
+    /** A one-line, human-readable description of this solver's resolved configuration under [params] —
+     *  what the CLI `dry-run-solver` mode prints instead of solving. The default names the solver
+     *  class; concrete backends override to surface their key knobs (selectors, restart, LP, strategy). */
+    fun describe(params: P): String = this::class.simpleName ?: "solver"
+
     /**
      * Default implementation drains [samples] for one yield. Wraps it in
      * [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
