@@ -10,8 +10,15 @@ import com.eignex.klause.solver.factor.arithmetic.LinearOp
  */
 interface RelaxationBuilder {
     /**
-     * Emit `Σ coeffs(k) · intVars(k) ⟨op⟩ bound` over integer variables (raw ids). [LinearOp.NE] is
-     * not linear-relaxable and is ignored.
+     * Emit `Σ coeffs(k) · intVars(k) ⟨op⟩ bound` over integer variables (raw ids), tagged
+     * [Contribution.CORE] or [Contribution.HULL] by [contribution] (default [Contribution.CORE]).
+     * [LinearOp.NE] is not linear-relaxable and is ignored.
      */
-    fun linearRow(op: LinearOp, intVars: IntArray, coeffs: IntArray, bound: Long)
+    fun linearRow(
+        op: LinearOp,
+        intVars: IntArray,
+        coeffs: IntArray,
+        bound: Long,
+        contribution: Contribution = Contribution.CORE,
+    )
 }
