@@ -16,8 +16,49 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     override val initialIntEventWatches: IntArray = buildSuccWatches(succ)
     override val consumesIntEventDelta: Boolean = true
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, succ, excludeIdx = -1, extraLit = 0)
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        // Sharp reason for a premature subtour: the fixed edges forming a cycle shorter than n are
+        // a complete, self-contained cause, so cite only those successor variables. Any other
+        // failure (e.g. strong-connectivity) falls back to the sound whole-scope reason.
+        val cycle = fixedSubtour(state)
+        if (cycle != null) return collectLinearTightenAntecedents(state, cycle, excludeIdx = -1, extraLit = 0)
+        return collectLinearTightenAntecedents(state, succ, excludeIdx = -1, extraLit = 0)
+    }
+
+    /** The successor variables on a fixed-edge cycle of length < n, or null if none exists. */
+    private fun fixedSubtour(state: PropagationState): IntArray? {
+        val nextFixed = IntArray(n) { -1 }
+        for (i in 0 until n) {
+            val d = state.intDomains[succ[i]]
+            if (d.min == d.max && d.min in 0 until n) nextFixed[i] = d.min
+        }
+        val state0 = IntArray(n) // 0 unvisited, 1 on current path, 2 done
+        val pos = IntArray(n) { -1 }
+        val path = IntArrayList()
+        for (start in 0 until n) {
+            if (state0[start] != 0) continue
+            path.clear()
+            var cur = start
+            while (cur != -1 && state0[cur] == 0) {
+                state0[cur] = 1
+                pos[cur] = path.size
+                path.add(cur)
+                cur = nextFixed[cur]
+            }
+            if (cur != -1 && cur in 0 until n && pos[cur] >= 0) {
+                val cycleStart = pos[cur]
+                val cycleLen = path.size - cycleStart
+                if (cycleLen < n) {
+                    return IntArray(cycleLen) { succ[path[cycleStart + it]] }
+                }
+            }
+            for (k in 0 until path.size) {
+                state0[path[k]] = 2
+                pos[path[k]] = -1
+            }
+        }
+        return null
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val gate = (state.refPayload[factorId] as? CpGate) ?: run {
@@ -109,6 +150,55 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
                 }
             }
         }
+        if (n >= 2 && !stronglyConnected(state)) return false
         return true
+    }
+
+    /**
+     * Necessary condition for a Hamiltonian circuit: the candidate-successor digraph (node `i` →
+     * every value still in `succ(i)`'s domain) must be strongly connected, since the circuit itself
+     * is a strongly-connected spanning subgraph. Tested as forward + reverse reachability from node
+     * 0 — both must cover all `n` nodes. Done right, per-arc SCC pruning reduces to exactly this
+     * check (an arc between two SCCs is in no cycle, but if any such arc exists the graph is already
+     * not strongly connected). A correct circuit never trips it, so it only ever rules out dead ends.
+     */
+    private fun stronglyConnected(state: PropagationState): Boolean {
+        val rev = Array(n) { IntArrayList() }
+        for (i in 0 until n) {
+            state.intDomains[succ[i]].forEach { k -> if (k in 0 until n) rev[k].add(i) }
+        }
+        return reachesAll(state, forward = true, rev = rev) && reachesAll(state, forward = false, rev = rev)
+    }
+
+    private fun reachesAll(state: PropagationState, forward: Boolean, rev: Array<IntArrayList>): Boolean {
+        val seen = BooleanArray(n)
+        val stack = IntArrayList()
+        seen[0] = true
+        stack.add(0)
+        var count = 1
+        while (!stack.isEmpty()) {
+            val u = stack[stack.size - 1]
+            stack.removeAt(stack.size - 1)
+            if (forward) {
+                state.intDomains[succ[u]].forEach { v ->
+                    if (v in 0 until n && !seen[v]) {
+                        seen[v] = true
+                        count++
+                        stack.add(v)
+                    }
+                }
+            } else {
+                val preds = rev[u]
+                for (idx in 0 until preds.size) {
+                    val v = preds[idx]
+                    if (!seen[v]) {
+                        seen[v] = true
+                        count++
+                        stack.add(v)
+                    }
+                }
+            }
+        }
+        return count == n
     }
 }
