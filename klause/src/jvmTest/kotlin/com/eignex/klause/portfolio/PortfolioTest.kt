@@ -40,12 +40,17 @@ class PortfolioTest {
     @Test
     fun `cop backtrack palette spreads lp-intensity arms and csp has none`() {
         val cop = BacktrackWorkerConfig.ranked(Kind.COP).map { it.label }
-        // The spectrum: an AGGRESSIVE and a DEFAULT LP arm hedged by the OFF (no-LP) arms (#429).
+        // The spectrum (#429 / #809 F3): AGGRESSIVE, DEFAULT and CONSERVATIVE LP arms plus a best-bound
+        // dive arm, hedged by the OFF (no-LP) arms.
         assertTrue("lp-aggressive" in cop && "lp-default" in cop, "COP palette must carry the LP arms, got $cop")
+        assertTrue("lp-conservative" in cop && "lp-lbtree" in cop, "COP palette must spread LP emphasis, got $cop")
         val aggressive = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-aggressive" }
         assertEquals(LpEmphasis.AGGRESSIVE, aggressive.build(1L, null).lpConfig?.emphasis)
         val default = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-default" }
         assertEquals(LpEmphasis.DEFAULT, default.build(1L, null).lpConfig?.emphasis)
+        // The best-bound dive arm carries the lb_tree_search flag on its base plan (#E2).
+        val lbtree = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-lbtree" }
+        assertTrue(lbtree.build(1L, null).lpPlan.lbTreeSearch, "the lp-lbtree arm must enable lb_tree_search")
         // The #117 guard stays at slot 0.
         assertEquals("satOptimized", cop.first())
 
