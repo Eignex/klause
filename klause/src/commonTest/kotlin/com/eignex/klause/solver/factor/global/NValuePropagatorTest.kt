@@ -6,13 +6,62 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.solver.factor.FactorPropagationOracle
 import com.eignex.klause.solver.factor.global.NValue
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class NValuePropagatorTest {
+
+    private fun nvalueProblem(xsDomains: Array<IntDomain>, nDomain: IntDomain, mode: NValue.Mode): Problem {
+        val k = xsDomains.size
+        return Problem(
+            numBoolVars = 0,
+            numIntVars = k + 1,
+            intDomains = xsDomains + nDomain,
+            factors = arrayOf<Factor>(NValue(n = k, xs = IntArray(k) { it }, mode = mode)),
+        )
+    }
+
+    @Test
+    fun `nvalue matching and kernel filtering never over-prune`() {
+        // Brute-force oracle across all three modes: matching upper bound (atLeast/eq), kernel
+        // lower bound and kernel xs-squeeze (atMost/eq) must hold on every solution. Instances stay
+        // under the BruteForceSolver 2^18 cap.
+        val rng = Random(0x57A1)
+        for (mode in NValue.Mode.entries) {
+            repeat(300) { iter ->
+                val k = 2 + rng.nextInt(3) // 2..4 counted vars
+                val maxVal = if (k >= 4) 3 else 4
+                val xsDomains = Array(k) {
+                    val a = rng.nextInt(maxVal + 1)
+                    val b = rng.nextInt(maxVal + 1)
+                    IntDomain(minOf(a, b), maxOf(a, b))
+                }
+                val a = rng.nextInt(k + 1)
+                val b = rng.nextInt(k + 1)
+                val nDomain = IntDomain(minOf(a, b), maxOf(a, b))
+                FactorPropagationOracle.assertSound(nvalueProblem(xsDomains, nDomain, mode), "nvalue-$mode#$iter")
+            }
+        }
+    }
+
+    @Test
+    fun `atmost kernel squeezes a variable into its window`() {
+        // Two vars pinned to disjoint values 0 and 2 form a 2-window kernel; with n ≤ 2 the third
+        // var (∈ [0,2]) may not take a value outside the kernel windows — but since both windows are
+        // singletons here the only freedom is forced. Soundness is the assertion; the oracle checks
+        // the propagated bounds against the 3-solution ground truth.
+        val problem = nvalueProblem(
+            xsDomains = arrayOf(IntDomain(0, 0), IntDomain(2, 2), IntDomain(0, 2)),
+            nDomain = IntDomain(0, 2),
+            mode = NValue.Mode.AtMost,
+        )
+        FactorPropagationOracle.assertSound(problem, "atmost-kernel")
+    }
 
     @Test
     fun `nvalue counts distinct values exactly`() {

@@ -28,16 +28,38 @@ internal class NValuePropagator(
         collectHoleAndBoundAntecedents(state, intVars)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        if (presents.isEmpty()) {
-            val gate = (state.refPayload[factorId] as? NValueCpGate) ?: run {
-                val fresh = NValueCpGate()
-                state.refPayload[factorId] = fresh
-                fresh
-            }
-            val dirty = state.drainIntEventDirtyVars(factorId)
-            if (gate.started && dirty.isEmpty()) return true
-            gate.started = true
+        // The optional-presence variant keeps the order-insensitive greedy bounds: a presence flip
+        // changes the count without an int-domain event, so the stronger domain-driven filtering
+        // (which assumes every counted variable is present) does not apply cleanly.
+        if (presents.isNotEmpty()) return propagateGreedy(state)
+
+        val gate = (state.refPayload[factorId] as? NValueCpGate) ?: run {
+            val fresh = NValueCpGate()
+            state.refPayload[factorId] = fresh
+            fresh
         }
+        val dirty = state.drainIntEventDirtyVars(factorId)
+        if (gate.started && dirty.isEmpty()) return true
+        gate.started = true
+
+        val ant = collectHoleAndBoundAntecedents(state, intVars)
+        // atLeast / eq: the distinct count cannot exceed the maximum number of variables that can be
+        // assigned pairwise-distinct values — a maximum bipartite var↦value matching. Tighter than
+        // |union of domains|, which ignores that there are only `xs.size` variables.
+        if (mode != NValue.Mode.AtMost) {
+            if (!state.tightenIntMax(n, maxMatching(state), ant)) return false
+        }
+        // atMost / eq: Beldiceanu's O(n+d) bound-consistency — the count is at least the size of a
+        // maximal set of pairwise-disjoint value windows, and when that lower bound meets `n`'s upper
+        // bound every variable is forced into the window of its kernel representative.
+        if (mode != NValue.Mode.AtLeast) {
+            if (!kernelBoundConsistency(state, ant)) return false
+        }
+        return true
+    }
+
+    /** The original order-insensitive greedy bounds, retained for the optional-presence variant. */
+    private fun propagateGreedy(state: PropagationState): Boolean {
         val unionValues = IntHashSet()
         for (i in xs.indices) {
             if (definitelyAbsentNvFn(i, state)) continue
@@ -74,6 +96,190 @@ internal class NValuePropagator(
             }
         }
         return true
+    }
+
+    /** Size of a maximum bipartite matching between `xs` and their domain values (Kuhn's algorithm). */
+    private fun maxMatching(state: PropagationState): Int {
+        val valueId = HashMap<Int, Int>()
+        val adj = Array(xs.size) { i ->
+            val ids = IntArrayList()
+            state.intDomains[xs[i]].forEach { v ->
+                val id = valueId.getOrPut(v) { valueId.size }
+                ids.add(id)
+            }
+            ids
+        }
+        val matchValToVar = IntArray(valueId.size) { -1 }
+        val seen = BooleanArray(valueId.size)
+        var matched = 0
+        for (i in xs.indices) {
+            seen.fill(false)
+            if (augment(i, adj, matchValToVar, seen)) matched++
+        }
+        return matched
+    }
+
+    private fun augment(i: Int, adj: Array<IntArrayList>, matchValToVar: IntArray, seen: BooleanArray): Boolean {
+        val row = adj[i]
+        for (k in 0 until row.size) {
+            val v = row[k]
+            if (seen[v]) continue
+            seen[v] = true
+            if (matchValToVar[v] == -1 || augment(matchValToVar[v], adj, matchValToVar, seen)) {
+                matchValToVar[v] = i
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Bound-consistency for atMost (Beldiceanu, "Filtering Algorithms for the NValue Constraint").
+     * Mirrors choco's `PropAtMostNValues_BC`: a kernel is a maximal set of pairwise-disjoint
+     * `[lb, ub]` windows; its size lower-bounds the distinct count, and when it equals `n`'s upper
+     * bound each variable is squeezed into the window of its kernel representative. Bounds-only, so
+     * interior holes are ignored (sound — the interval over-approximates the domain). Each `while`
+     * iteration takes one snapshot of the bounds and runs both a lower-bound pass and an upper-bound
+     * pass off it (as in choco), looping until neither pass narrows anything.
+     */
+    private fun kernelBoundConsistency(state: PropagationState, ant: IntArray?): Boolean {
+        val nv = xs.size
+        val minVal = IntArray(nv)
+        val maxVal = IntArray(nv)
+        val order = IntArray(nv)
+        var loop = true
+        while (loop) {
+            loop = false
+            for (i in 0 until nv) {
+                minVal[i] = state.intDomains[xs[i]].min
+                maxVal[i] = state.intDomains[xs[i]].max
+            }
+            val rLb = kernelPass(state, ant, nv, minVal, maxVal, order, lowerPass = true)
+            if (rLb < 0) return false
+            if (rLb > 0) loop = true
+            val rUb = kernelPass(state, ant, nv, minVal, maxVal, order, lowerPass = false)
+            if (rUb < 0) return false
+            if (rUb > 0) loop = true
+        }
+        return true
+    }
+
+    /** One kernel pass. Returns -1 on conflict, 1 if it narrowed a domain, 0 otherwise. */
+    @Suppress("LongParameterList", "ReturnCount")
+    private fun kernelPass(
+        state: PropagationState,
+        ant: IntArray?,
+        nv: Int,
+        minVal: IntArray,
+        maxVal: IntArray,
+        order: IntArray,
+        lowerPass: Boolean,
+    ): Int {
+        // Scan variables in value order (lower bound ascending, or upper bound descending), ties by
+        // index descending — matching choco's bucket-and-reverse traversal so the kernel grouping is
+        // identical. A window closes whenever the next variable cannot overlap the running one. The
+        // order is produced by sorting packed `(primary << 32) | tie` longs to avoid boxed Integers:
+        // `primary` is `minVal` (or `-maxVal` to sort descending) and `tie = nv-1-i` makes equal
+        // primaries break by index descending.
+        val packed = LongArray(nv)
+        for (i in 0 until nv) {
+            val primary = (if (lowerPass) minVal[i] else -maxVal[i]).toLong()
+            packed[i] = (primary shl 32) or ((nv - 1 - i).toLong() and 0xFFFFFFFFL)
+        }
+        packed.sort()
+        for (idx in 0 until nv) order[idx] = nv - 1 - (packed[idx] and 0xFFFFFFFFL).toInt()
+        val kerRep = BooleanArray(nv)
+        var min = Int.MIN_VALUE
+        var max = Int.MIN_VALUE
+        var nbKer = 0
+        for (idx in 0 until nv) {
+            val node = order[idx]
+            if (min == Int.MIN_VALUE) {
+                min = minVal[node]
+                max = maxVal[node]
+                nbKer++
+            } else if (overlaps(lowerPass, minVal[node], maxVal[node], min, max)) {
+                min = maxOf(min, minVal[node])
+                max = minOf(max, maxVal[node])
+            } else {
+                min = minVal[node]
+                max = maxVal[node]
+                kerRep[node] = true
+                nbKer++
+            }
+        }
+        var status = 0
+        if (state.intDomains[n].min < nbKer) {
+            if (!state.tightenIntMin(n, nbKer, ant)) return -1
+            status = 1
+        }
+        // When the kernel count is forced to equal n's max, no variable may stray outside its
+        // window's value range, so squeeze each group.
+        if (nbKer == state.intDomains[n].max) {
+            val stamp = IntArrayList()
+            for (idx in 0 until nv) {
+                val node = order[idx]
+                if (kerRep[node]) {
+                    val s = squeeze(state, ant, stamp, if (lowerPass) minVal[node] else maxVal[node], lowerPass)
+                    if (s < 0) return -1
+                    if (s > 0) status = 1
+                    stamp.clear()
+                }
+                stamp.add(node)
+            }
+            val s = squeeze(state, ant, stamp, if (lowerPass) Int.MAX_VALUE else Int.MIN_VALUE, lowerPass)
+            if (s < 0) return -1
+            if (s > 0) status = 1
+        }
+        return status
+    }
+
+    private fun overlaps(lowerPass: Boolean, nodeMin: Int, nodeMax: Int, min: Int, max: Int): Boolean =
+        if (lowerPass) nodeMin <= max else nodeMax >= min
+
+    /**
+     * The variables in [stamp] form one kernel group; any member that cannot reach the next group's
+     * [frontier] value is clamped to the group's tightest shared bound. Returns -1 on conflict, 1 if
+     * it narrowed a domain, 0 otherwise.
+     */
+    private fun squeeze(
+        state: PropagationState,
+        ant: IntArray?,
+        stamp: IntArrayList,
+        frontier: Int,
+        lowerPass: Boolean,
+    ): Int {
+        var status = 0
+        if (lowerPass) {
+            var newMin = Int.MIN_VALUE
+            for (i in 0 until stamp.size) {
+                val vid = xs[stamp[i]]
+                if (state.intDomains[vid].max < frontier) newMin = maxOf(newMin, state.intDomains[vid].min)
+            }
+            if (newMin == Int.MIN_VALUE) return 0
+            for (i in 0 until stamp.size) {
+                val vid = xs[stamp[i]]
+                if (state.intDomains[vid].max < frontier && state.intDomains[vid].min < newMin) {
+                    if (!state.tightenIntMin(vid, newMin, ant)) return -1
+                    status = 1
+                }
+            }
+        } else {
+            var newMax = Int.MAX_VALUE
+            for (i in 0 until stamp.size) {
+                val vid = xs[stamp[i]]
+                if (state.intDomains[vid].min > frontier) newMax = minOf(newMax, state.intDomains[vid].max)
+            }
+            if (newMax == Int.MAX_VALUE) return 0
+            for (i in 0 until stamp.size) {
+                val vid = xs[stamp[i]]
+                if (state.intDomains[vid].min > frontier && state.intDomains[vid].max > newMax) {
+                    if (!state.tightenIntMax(vid, newMax, ant)) return -1
+                    status = 1
+                }
+            }
+        }
+        return status
     }
 }
 
