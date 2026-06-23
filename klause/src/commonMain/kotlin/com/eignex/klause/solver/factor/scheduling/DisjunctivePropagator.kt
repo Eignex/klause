@@ -39,8 +39,35 @@ internal class DisjunctivePropagator(
         return out
     }
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        // Sharp reason for a mutual-precedence contradiction: two tasks each forced to run strictly
+        // after the other (`est_i + dur_i > lst_j` both ways) is implied by just those two starts'
+        // bounds (plus their duration vars, if variable). Other failures — time-table / edge-finding
+        // overloads, which would need the overloaded window reconstructed — fall back to the sound
+        // whole-scope reason.
+        val effDur = effDurOrNull(state)
+        if (effDur != null) {
+            for (i in 0 until n) {
+                if (effDur[i] == 0 || !OptPresence.isDefinitelyPresent(presents, i, state)) continue
+                val di = state.intDomains[starts[i]]
+                for (j in 0 until n) {
+                    if (j == i || effDur[j] == 0 || !OptPresence.isDefinitelyPresent(presents, j, state)) continue
+                    val dj = state.intDomains[starts[j]]
+                    if (di.min + effDur[i] > dj.max && dj.min + effDur[j] > di.max) {
+                        val vars = IntArrayList()
+                        vars.add(starts[i])
+                        vars.add(starts[j])
+                        if (durationVars.isNotEmpty()) {
+                            vars.add(durationVars[i])
+                            vars.add(durationVars[j])
+                        }
+                        return collectLinearTightenAntecedents(state, vars.toIntArray(), excludeIdx = -1, extraLit = 0)
+                    }
+                }
+            }
+        }
+        return collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         if (n == 0) return true
