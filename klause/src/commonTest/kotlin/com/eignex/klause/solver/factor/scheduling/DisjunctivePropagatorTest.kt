@@ -35,7 +35,9 @@ class DisjunctivePropagatorTest {
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.currentLevel = 1
-        check(state.tightenIntMax(0, 1)); check(state.tightenIntMax(1, 1)); check(state.tightenIntMax(2, 1))
+        check(state.tightenIntMax(0, 1))
+        check(state.tightenIntMax(1, 1))
+        check(state.tightenIntMax(2, 1))
         check(state.tightenIntMin(3, 5)) // idle task tightened so a coarse reason would cite it
         assertFalse(problem.propagators[0].propagate(state, 0))
         val reason = problem.propagators[0].conflictReason(state, 0)!!

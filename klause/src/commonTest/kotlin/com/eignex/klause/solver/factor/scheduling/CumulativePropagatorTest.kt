@@ -69,8 +69,14 @@ class CumulativePropagatorTest {
             numBoolVars = 0,
             numIntVars = 8,
             intDomains = arrayOf(
-                IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 0),
-                IntDomain(0, 5), IntDomain(1, 1), IntDomain(1, 1), IntDomain(1, 1),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+                IntDomain(0, 5),
+                IntDomain(1, 1),
+                IntDomain(1, 1),
+                IntDomain(1, 1),
             ),
             factors = arrayOf<Factor>(
                 Cumulative(

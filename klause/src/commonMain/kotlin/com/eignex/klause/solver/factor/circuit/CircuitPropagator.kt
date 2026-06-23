@@ -151,7 +151,120 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             }
         }
         if (n >= 2 && !stronglyConnected(state)) return false
+        if (n >= 2 && !dominatorFilter(state, ant)) return false
         return true
+    }
+
+    /**
+     * Dominator-based arc removal (choco `PropCircuit_ArboFiltering`). Split node 0 into a virtual
+     * source whose out-arcs are node 0's candidate successors, and compute that source's dominator
+     * tree over the candidate digraph. If value `y` dominates node `x` — every path from the source
+     * to `x` passes through `y` — then `succ(x) = y` would close a loop `y ⇝ x → y` that bypasses
+     * the source, a premature subtour; so `y` is removed from `succ(x)`. Dominators via the
+     * Cooper–Harvey–Kennedy iterative algorithm (same tree as Lengauer–Tarjan, simpler to verify).
+     */
+    private fun dominatorFilter(state: PropagationState, ant: IntArray?): Boolean {
+        val total = n + 1
+        val source = n
+        val succAdj = Array(total) { IntArrayList() }
+        val predAdj = Array(total) { IntArrayList() }
+        for (i in 0 until n) {
+            val from = if (i == 0) source else i
+            state.intDomains[succ[i]].forEach { y ->
+                if (y in 0 until n) {
+                    succAdj[from].add(y)
+                    predAdj[y].add(from)
+                }
+            }
+        }
+        val idom = computeDominators(succAdj, predAdj, total, source)
+        for (v in 0 until n) if (idom[v] == -1) return false // source cannot reach every node
+        for (x in 1 until n) {
+            val dvals = IntArrayList()
+            state.intDomains[succ[x]].forEach { y -> if (y in 0 until n) dvals.add(y) }
+            for (k in 0 until dvals.size) {
+                val y = dvals[k]
+                if (y != x && dominates(idom, source, y, x)) {
+                    if (!state.excludeIntValue(succ[x], y, ant)) return false
+                }
+            }
+        }
+        return true
+    }
+
+    /** Cooper–Harvey–Kennedy iterative dominators from [source]; `idom[source]=source`, `-1` for
+     *  nodes the source cannot reach. */
+    private fun computeDominators(
+        succAdj: Array<IntArrayList>,
+        predAdj: Array<IntArrayList>,
+        total: Int,
+        source: Int,
+    ): IntArray {
+        // Postorder of the source-reachable subgraph, and each node's reverse-postorder index.
+        val order = IntArrayList()
+        val visited = BooleanArray(total)
+        val stack = IntArrayList()
+        val iter = IntArray(total)
+        stack.add(source)
+        visited[source] = true
+        while (!stack.isEmpty()) {
+            val u = stack[stack.size - 1]
+            val neigh = succAdj[u]
+            if (iter[u] < neigh.size) {
+                val w = neigh[iter[u]]
+                iter[u]++
+                if (!visited[w]) {
+                    visited[w] = true
+                    stack.add(w)
+                }
+            } else {
+                order.add(u)
+                stack.removeAt(stack.size - 1)
+            }
+        }
+        val rpoNum = IntArray(total) { -1 }
+        val m = order.size
+        for (p in 0 until m) rpoNum[order[p]] = m - 1 - p
+        val idom = IntArray(total) { -1 }
+        idom[source] = source
+        var changed = true
+        while (changed) {
+            changed = false
+            for (p in m - 1 downTo 0) {
+                val b = order[p]
+                if (b == source) continue
+                var newIdom = -1
+                val preds = predAdj[b]
+                for (q in 0 until preds.size) {
+                    val pNode = preds[q]
+                    if (idom[pNode] == -1) continue
+                    newIdom = if (newIdom == -1) pNode else intersect(idom, rpoNum, pNode, newIdom)
+                }
+                if (newIdom != -1 && idom[b] != newIdom) {
+                    idom[b] = newIdom
+                    changed = true
+                }
+            }
+        }
+        return idom
+    }
+
+    private fun intersect(idom: IntArray, rpoNum: IntArray, a: Int, b: Int): Int {
+        // Climb toward the root, which has the smallest reverse-postorder number: advance whichever
+        // finger sits deeper (larger rpoNum). The inverse comparison spins at the root forever.
+        var x = a
+        var y = b
+        while (x != y) {
+            while (rpoNum[x] > rpoNum[y]) x = idom[x]
+            while (rpoNum[y] > rpoNum[x]) y = idom[y]
+        }
+        return x
+    }
+
+    private fun dominates(idom: IntArray, source: Int, y: Int, x: Int): Boolean {
+        var c = x
+        while (c != source && c != y) c = idom[c]
+        return c == y
     }
 
     /**
