@@ -412,11 +412,27 @@ class LocalSearchSolver(
         // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
         // restart; null by default. See [LocalSearchParams.initialAssignment].
         val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
-        if (!seeded) restarts.restart(state, bestSoFar = null)
+        if (seeded) {
+            // Reconcile the warm-loaded assignment exactly as the restart path does: the seed sets only
+            // the variables its producing engine emitted, so any *defined* variable must be re-derived
+            // from the seeded decision variables — otherwise a definitional constraint reads as violated
+            // and the engine fights up from a spuriously-infeasible state, discarding the warm start.
+            definitionalSweep?.let { sweep ->
+                sweep.sweep(state.assignment, problem.intDomains, problem.factors) {
+                    state.assumptions.isFrozenBool(it)
+                }
+                state.recompute()
+            }
+        } else {
+            restarts.restart(state, bestSoFar = null)
+        }
         // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
-        // microseconds and the repair pass is pure overhead.
+        // microseconds and the repair pass is pure overhead. Skip it on a warm start: the seed is
+        // already feasible, and the repair sweep is objective-blind (it accepts any flip that doesn't
+        // raise cost), so on a cost-0 seed it would wander across equal-cost feasibles and discard the
+        // seed's objective — defeating the warm start.
         val largeEnoughForGreedy = (problem.numBoolVars + problem.numIntVars) >= 32
-        if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+        if (greedyRepairOnRestart && largeEnoughForGreedy && !seeded) greedyRepairPass(state)
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
