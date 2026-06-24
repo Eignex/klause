@@ -238,11 +238,23 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     ) { o.showVersion = true },
 )
 
+/** Round cap for the presolve↔LP-harvest fixpoint (#14): a spin guard, never the real stop. The loop
+ *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
+private const val MAX_PRESOLVE_HARVEST_ROUNDS = 4
+
 /**
  * Apply a presolve [config] to this Solvable, returning one whose [Solvable.problem] is the
  * transformed problem and whose [Solvable.render] / [Solvable.objectiveValue] reconstruct the
  * solution back to the original variables first. Every other field is valid unchanged because
  * the same-space passes keep variable ids. Returns `this` when nothing changed.
+ *
+ * Presolve and the LP-relaxation harvest are iterated to a fixpoint (#14): the harvest's proven domain
+ * tightenings can unlock further reductions (coefficient strengthening, affine elimination, structural
+ * reductions), which can in turn expose more for the next harvest. The loop is self-gating — it runs a
+ * second [Presolver.run] only when a harvest actually tightened the problem, so a model with no LP
+ * harvest pays for exactly one presolve pass — and bounded by [MAX_PRESOLVE_HARVEST_ROUNDS]. Each
+ * round's reconstruct composes in application order: a final-problem solution is lifted back through the
+ * later rounds first (the harvest only narrows domains, keeping the variable space, so it adds none).
  */
 internal fun Solvable.presolved(
     config: PresolveConfig,
@@ -250,26 +262,47 @@ internal fun Solvable.presolved(
     cancellation: Cancellation = Cancellation.Never,
 ): Solvable {
     val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
-    val pre = Presolver.run(problem, config, context, cancellation)
-    // LP-relaxation harvest (#10): when LP variable shaving is configured, fold the LP's proven domain
-    // tightenings into the problem permanently so every backend (local search included) sees them — the
-    // backtrack solver's own root shave reaches only its search session. Solution-set-preserving (every
-    // shaved value is proven infeasible), so it is safe even for solution-set-sensitive queries.
-    val harvested = annotatedBacktrackParams
+    // LP-relaxation harvest (#10): when LP shaving is configured, fold the LP's proven domain tightenings
+    // into the problem permanently so every backend (local search included) sees them — the backtrack
+    // solver's own root shave reaches only its search session. Solution-set-preserving (every shaved value
+    // is proven infeasible), so it is safe even for solution-set-sensitive queries.
+    val harvestParams = annotatedBacktrackParams
         ?.takeIf { it.lpConfig != null || it.lpPlan.variableShaving || it.lpPlan.objectiveShaving }
-        ?.let { lpHarvest(pre.problem, linearObjective ?: LinearObjective(), it, cancellation) }
-        ?: pre.problem
-    if (harvested === problem) return this
-    // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when shaving tightened
-    // domains) and the net constraint drop / proven infeasibility.
-    val passes = pre.passesFired.map { it.id } + (if (harvested !== pre.problem) listOf("lp-harvest") else emptyList())
+    val objective = linearObjective ?: LinearObjective()
+
+    var current = problem
+    val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
+    val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
+    var harvestFired = false
+    var round = 0
+    while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
+        val pre = Presolver.run(current, config, context, cancellation)
+        val harvested = harvestParams?.let { lpHarvest(pre.problem, objective, it, cancellation) } ?: pre.problem
+        // Neither presolve nor the harvest changed anything this round → fixpoint.
+        if (pre.problem === current && harvested === pre.problem) break
+        pre.passesFired.forEach { firedPasses.add(it.id) }
+        // The harvest only narrows domains, so it contributes no reconstruct; add presolve's only when it
+        // actually transformed the problem (else it is the identity).
+        if (pre.problem !== current) reconstructs.add(pre.reconstruct)
+        if (harvested !== pre.problem) harvestFired = true
+        current = harvested
+        // A no-op harvest means the next round's presolve would re-derive the same fixpoint with no new
+        // domain tightenings to chew on, so stop here rather than spend another LP solve to prove it.
+        if (harvested === pre.problem) break
+    }
+    if (current === problem) return this
+
+    // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when shaving tightened domains)
+    // and the net constraint drop / proven infeasibility.
+    val passes = firedPasses.toList() + (if (harvestFired) listOf("lp-harvest") else emptyList())
     val presolveStats = PresolveStats(
         passes = passes,
-        constraintsRemoved = problem.factors.size - harvested.factors.size,
-        infeasible = harvested.baked is PropagationResult.Unsat,
+        constraintsRemoved = problem.factors.size - current.factors.size,
+        infeasible = current.baked is PropagationResult.Unsat,
     )
+    val reconstruct: (Sample) -> Sample = { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
     return Solvable(
-        problem = harvested,
+        problem = current,
         presolve = presolveStats,
         optimize = optimize,
         maximize = maximize,
@@ -277,8 +310,8 @@ internal fun Solvable.presolved(
         linearObjective = linearObjective,
         objVarId = objVarId,
         definitionalSweep = definitionalSweep,
-        render = { sample -> render(pre.reconstruct(sample)) },
-        objectiveValue = objectiveValue?.let { ov -> { sample -> ov(pre.reconstruct(sample)) } },
+        render = { sample -> render(reconstruct(sample)) },
+        objectiveValue = objectiveValue?.let { ov -> { sample -> ov(reconstruct(sample)) } },
         annotatedBacktrackParams = annotatedBacktrackParams,
     )
 }
