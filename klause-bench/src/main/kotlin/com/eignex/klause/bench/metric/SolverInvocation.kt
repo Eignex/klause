@@ -90,7 +90,10 @@ internal object SolverInvocation {
         } else {
             minizincCommand(entry, solverId, settings, budget, optimize)
         }
-        return invoke(cmd)
+        // Hard wall-clock ceiling: a solve that ignores its `-t` deadline (e.g. an expensive move source
+        // that polls cancellation too rarely) must not hang the harness. Generous over the budget so it
+        // only ever kills a genuine runaway, never a solve that's merely flushing at the deadline.
+        return invoke(cmd, hardTimeoutMs = budget.timeoutMillis * 2 + 20_000)
     }
 
     /** The provisioned klause-cli binary (its mtime keys the cache so a klause rebuild invalidates
@@ -181,8 +184,17 @@ internal object SolverInvocation {
         }
     }
 
-    private fun invoke(cmd: List<String>): Result {
+    private fun invoke(cmd: List<String>, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
         val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
+        // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
+        // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
+        // killed child's stream closes, the loop returns, and the partial output is scored as usual.
+        Thread {
+            runCatching { if (!process.waitFor(hardTimeoutMs, TimeUnit.MILLISECONDS)) process.destroyForcibly() }
+        }.apply {
+            isDaemon = true
+            start()
+        }
         val stderr = StringBuilder()
         val drain = Thread { process.errorStream.bufferedReader().forEachLine { stderr.appendLine(it) } }
         drain.isDaemon = true
