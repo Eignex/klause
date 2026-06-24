@@ -90,6 +90,12 @@ internal class PoolClauseExchange(
 
     override fun onSearchEnd(session: PropagationSession) = export(session)
 
+    /** Publish a globally-valid nogood straight to the pool (no LBD/length filter), deduped by the
+     *  `seen` set so this arm neither double-publishes it nor re-imports its own. */
+    override fun publishGlobal(clause: SharedClause) {
+        if (seen.add(clause.key)) pool.publish(listOf(clause))
+    }
+
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
     private fun export(session: PropagationSession) {

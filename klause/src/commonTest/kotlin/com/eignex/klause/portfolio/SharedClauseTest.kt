@@ -48,6 +48,39 @@ class SharedClauseTest {
     }
 
     @Test
+    fun `publishGlobal shares a globally-valid nogood the glue export would drop`() {
+        // A long / high-LBD LP Farkas nogood is globally valid but never clears the LBD glue filter, so
+        // it must reach peers through the direct publish path instead (#844).
+        val problem = twoIntVars()
+        val pool = SharedClausePool()
+        val producer = PoolClauseExchange(pool)
+        val consumer = PoolClauseExchange(pool)
+
+        val src = PropagationSession(problem)
+        val nogood = intArrayOf(src.boundGeLit(0, 3, true), src.boundLeLit(1, 2, true))
+        src.addLearnedClause(Clause(nogood), lbd = 9)
+        assertTrue(src.exportGlueClauses(maxLbd = 4, maxLen = 8).isEmpty(), "glue export drops the high-LBD nogood")
+
+        producer.publishGlobal(src.asSharedClause(nogood, lbd = 9))
+        val dst = PropagationSession(problem)
+        consumer.onRestart(dst)
+        assertEquals(1, dst.learnedClauseCount, "a peer imports the globally-valid nogood despite its LBD")
+    }
+
+    @Test
+    fun `publishGlobal does not re-import the publishing arm's own nogood`() {
+        val problem = twoIntVars()
+        val pool = SharedClausePool()
+        val arm = PoolClauseExchange(pool)
+        val session = PropagationSession(problem)
+        val nogood = intArrayOf(session.boundGeLit(0, 3, true), session.boundLeLit(1, 2, true))
+
+        arm.publishGlobal(session.asSharedClause(nogood, lbd = 9))
+        arm.onRestart(session) // drains the pool — must skip the arm's own published nogood
+        assertEquals(0, session.learnedClauseCount, "the publisher does not import back its own nogood")
+    }
+
+    @Test
     fun `pool de-dups by key and advances the cursor`() {
         val pool = SharedClausePool()
         val a = SharedClause(intArrayOf(2, 5), IntArray(0), lbd = 2)
