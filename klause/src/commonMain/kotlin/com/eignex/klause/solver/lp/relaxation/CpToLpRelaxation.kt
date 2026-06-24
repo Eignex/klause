@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.lp.relaxation
 
-import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Contribution
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -34,7 +33,6 @@ import com.eignex.klause.solver.lp.addExact
 import com.eignex.klause.solver.lp.cut.CircuitArcModel
 import com.eignex.klause.solver.lp.cut.CircuitSeparator
 import com.eignex.klause.solver.lp.cut.Cut
-import com.eignex.klause.solver.lp.mulExact
 import com.eignex.klause.solver.lp.subExact
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
@@ -585,242 +583,6 @@ internal class CpToLpRelaxation(
             builder.addRow(cols, vals, rel, subExact(rhs, constant))
         }
 
-        /**
-         * Indicator rows for `auxBoolVar ↔ (L op bound)` via big-M, where `L = Σ coeffs·vars`. The
-         * big-Ms are the tightest possible from the live range `[lMin, lMax]` of `L`, and the
-         * `¬(L op bound)` side uses integrality (`¬(L ≤ bound) ⇔ L ≥ bound + 1`) so the rows are as
-         * strong as a single indicator allows.
-         *
-         * For `EQ` only the `aux = 1 ⇒ L = bound` direction is emitted, and for `NE` only the
-         * `aux = 0 ⇒ L = bound` direction: the complementary side is the disjunction `L ≠ bound`,
-         * whose convex hull is the whole interval, so it yields no valid LP cut and is dropped.
-         *
-         * A live big-M bakes branch-tightened bounds into the row's constants, so the row only holds
-         * inside the node's box. Each row is therefore marked global exactly when its M equals the
-         * M the *declared* range `[lMinD, lMaxD]` would give — then the relaxed face spans the whole
-         * declared box and the row holds at every solution (see [LpModel.rowGlobal]). A non-global
-         * row records the live bounds its M rests on as [LpRowPremises] — the lMax-side rows cite
-         * each variable's M-relevant live bound (`≤ max` for positive coefficients, `≥ min` for
-         * negative; mirrored for lMin-side rows) — so a certificate that leans on the row can cite
-         * those atoms instead of being withheld (see the LP explanation).
-         */
-        private fun reifiedRows(rl: ReifiedLinear) {
-            var lMin = 0L
-            var lMax = 0L
-            var lMinD = 0L
-            var lMaxD = 0L
-            for (k in rl.vars.indices) {
-                val c = rl.coeffs[k].toLong()
-                val dom = session.intDomain(rl.vars[k])
-                val dec = problem.intDomains[rl.vars[k]]
-                if (c >= 0L) {
-                    lMin = addExact(lMin, mulExact(c, dom.min.toLong()))
-                    lMax = addExact(lMax, mulExact(c, dom.max.toLong()))
-                    lMinD = addExact(lMinD, mulExact(c, dec.min.toLong()))
-                    lMaxD = addExact(lMaxD, mulExact(c, dec.max.toLong()))
-                } else {
-                    lMin = addExact(lMin, mulExact(c, dom.max.toLong()))
-                    lMax = addExact(lMax, mulExact(c, dom.min.toLong()))
-                    lMinD = addExact(lMinD, mulExact(c, dec.max.toLong()))
-                    lMaxD = addExact(lMaxD, mulExact(c, dec.min.toLong()))
-                }
-            }
-            val a = boolColumn(rl.auxBoolVar)
-            val bound = rl.bound.toLong()
-            val boundUp = addExact(bound, 1L) // L ≥ bound + 1 is the integer negation of L ≤ bound
-            val boundDown = subExact(bound, 1L)
-
-            // The live bounds the lMax side (maxSide = true) or lMin side of the M rests on; only
-            // bounds tighter than declared are cited (the rest hold everywhere).
-            fun sidePremises(maxSide: Boolean): LpRowPremises {
-                val pv = IntArrayList()
-                val pt = IntArrayList()
-                val pu = ArrayList<Boolean>()
-                for (k in rl.vars.indices) {
-                    val c = rl.coeffs[k]
-                    if (c == 0) continue
-                    val v = rl.vars[k]
-                    val dom = session.intDomain(v)
-                    val dec = problem.intDomains[v]
-                    if ((c >= 0) == maxSide) {
-                        if (dom.max != dec.max) {
-                            pv.add(v)
-                            pu.add(true)
-                            pt.add(dom.max)
-                        }
-                    } else if (dom.min != dec.min) {
-                        pv.add(v)
-                        pu.add(false)
-                        pt.add(dom.min)
-                    }
-                }
-                return LpRowPremises(pv.toIntArray(), BooleanArray(pu.size) { pu[it] }, pt.toIntArray())
-            }
-
-            fun row(auxCoeff: Long, rel: Relation, rhs: Long, global: Boolean, maxSide: Boolean) = addIntRow(
-                rl.vars,
-                rl.coeffs,
-                a,
-                auxCoeff,
-                rel,
-                rhs,
-                global,
-                premises = if (global) null else sidePremises(maxSide),
-            )
-
-            when (rl.op) {
-                LinearOp.LE -> {
-                    val m1 = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    row(m1, Relation.LE, addExact(bound, m1), m1 == maxOf(0L, subExact(lMaxD, bound)), maxSide = true)
-                    val m2 = maxOf(0L, subExact(boundUp, lMin)) // aux=0 ⇒ L ≥ bound+1
-                    row(m2, Relation.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)), maxSide = false)
-                }
-
-                LinearOp.GE -> {
-                    val m1 = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
-                    row(
-                        -m1,
-                        Relation.GE,
-                        subExact(bound, m1),
-                        m1 == maxOf(0L, subExact(bound, lMinD)),
-                        maxSide = false,
-                    )
-                    val m2 = maxOf(0L, subExact(lMax, boundDown)) // aux=0 ⇒ L ≤ bound-1
-                    row(
-                        -m2,
-                        Relation.LE,
-                        boundDown,
-                        m2 == maxOf(0L, subExact(lMaxD, boundDown)),
-                        maxSide = true,
-                    )
-                }
-
-                LinearOp.EQ -> {
-                    val mHi = maxOf(0L, subExact(lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    row(
-                        mHi,
-                        Relation.LE,
-                        addExact(bound, mHi),
-                        mHi == maxOf(0L, subExact(lMaxD, bound)),
-                        maxSide = true,
-                    )
-                    val mLo = maxOf(0L, subExact(bound, lMin)) // aux=1 ⇒ L ≥ bound
-                    row(
-                        -mLo,
-                        Relation.GE,
-                        subExact(bound, mLo),
-                        mLo == maxOf(0L, subExact(bound, lMinD)),
-                        maxSide = false,
-                    )
-                }
-
-                LinearOp.NE -> {
-                    val mHi = maxOf(0L, subExact(lMax, bound)) // aux=0 ⇒ L ≤ bound
-                    row(-mHi, Relation.LE, bound, mHi == maxOf(0L, subExact(lMaxD, bound)), maxSide = true)
-                    val mLo = maxOf(0L, subExact(bound, lMin)) // aux=0 ⇒ L ≥ bound
-                    row(mLo, Relation.GE, bound, mLo == maxOf(0L, subExact(bound, lMinD)), maxSide = false)
-                }
-            }
-        }
-
-        /** The Boolean fan-in of a reified weighted sum folded over its columns: `Σ coeffs·x_col +
-         *  constant`, with the declared `[lMin, lMax]` range of the `Σ coeffs·x_col` part over `x ∈ [0,1]`.
-         *  A negative literal `w·(1 − x)` folds to coefficient `−w` and `+w` into the constant. */
-        private inner class BoolSum(
-            val cols: IntArray,
-            val coeffs: LongArray,
-            val constant: Long,
-            val lMin: Long,
-            val lMax: Long,
-        )
-
-        private fun boolSum(literals: IntArray, weights: IntArray?): BoolSum {
-            val coeffByCol = LinkedHashMap<Int, Long>()
-            var constant = 0L
-            for (k in literals.indices) {
-                val lit = literals[k]
-                val w = (weights?.get(k) ?: 1).toLong()
-                val col = boolColumn(Lit.variable(lit))
-                val c = if (Lit.isPositive(lit)) w else -w
-                if (!Lit.isPositive(lit)) constant = addExact(constant, w)
-                coeffByCol[col] = addExact(coeffByCol.getOrElse(col) { 0L }, c)
-            }
-            val cols = IntArray(coeffByCol.size)
-            val coeffs = LongArray(coeffByCol.size)
-            var lMin = 0L
-            var lMax = 0L
-            var i = 0
-            for ((col, c) in coeffByCol) {
-                cols[i] = col
-                coeffs[i] = c
-                i++
-                if (c >= 0L) lMax = addExact(lMax, c) else lMin = addExact(lMin, c)
-            }
-            return BoolSum(cols, coeffs, constant, lMin, lMax)
-        }
-
-        /** Emit `Σ sum.coeffs·x + auxCoeff·x_aux  rel  rhs`. The big-M rests on the *declared* `[0,1]`
-         *  literal ranges, so the row holds at every solution — globally valid (and cacheable), unlike
-         *  the live-big-M [reifiedRows]; no [LpRowPremises] are needed. */
-        private fun boolReifiedRow(sum: BoolSum, auxCol: Int, auxCoeff: Long, rel: Relation, rhs: Long) {
-            val cols = sum.cols.copyOf(sum.cols.size + 1)
-            val vals = sum.coeffs.copyOf(sum.coeffs.size + 1)
-            cols[sum.cols.size] = auxCol
-            vals[sum.coeffs.size] = auxCoeff
-            builder.addRow(cols, vals, rel, rhs)
-        }
-
-        /**
-         * Indicator rows for `auxBoolVar ↔ (Σ weights·lit ⟨op⟩ bound)` over Boolean literals — the
-         * pseudo-Boolean analogue of [reifiedRows]. The big-M comes from the declared `[0,1]` ranges
-         * (so the rows are global), and for `EQ` only the `aux = 1 ⇒ L = bound` direction is emitted
-         * (its complement is a disjunction with no single LP cut), mirroring [reifiedRows].
-         */
-        private fun reifiedPbRows(rpb: ReifiedPseudoBoolean) {
-            val sum = boolSum(rpb.literals, rpb.weights)
-            val a = boolColumn(rpb.auxBoolVar)
-            val bound = subExact(rpb.bound.toLong(), sum.constant)
-            when (rpb.op) {
-                PbOp.LE -> {
-                    val m1 = maxOf(0L, subExact(sum.lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    boolReifiedRow(sum, a, m1, Relation.LE, addExact(bound, m1))
-                    val m2 = maxOf(0L, subExact(addExact(bound, 1L), sum.lMin)) // aux=0 ⇒ L ≥ bound+1
-                    boolReifiedRow(sum, a, m2, Relation.GE, addExact(bound, 1L))
-                }
-
-                PbOp.GE -> {
-                    val m1 = maxOf(0L, subExact(bound, sum.lMin)) // aux=1 ⇒ L ≥ bound
-                    boolReifiedRow(sum, a, -m1, Relation.GE, subExact(bound, m1))
-                    val m2 = maxOf(0L, subExact(sum.lMax, subExact(bound, 1L))) // aux=0 ⇒ L ≤ bound-1
-                    boolReifiedRow(sum, a, -m2, Relation.LE, subExact(bound, 1L))
-                }
-
-                PbOp.EQ -> {
-                    val mHi = maxOf(0L, subExact(sum.lMax, bound)) // aux=1 ⇒ L ≤ bound
-                    boolReifiedRow(sum, a, mHi, Relation.LE, addExact(bound, mHi))
-                    val mLo = maxOf(0L, subExact(bound, sum.lMin)) // aux=1 ⇒ L ≥ bound
-                    boolReifiedRow(sum, a, -mLo, Relation.GE, subExact(bound, mLo))
-                }
-            }
-        }
-
-        /**
-         * Indicator rows for `auxBoolVar ↔ (min ≤ #true literals ≤ max)`. Only the
-         * `aux = 1 ⇒ (count ≥ min ∧ count ≤ max)` direction yields LP cuts (the `aux = 0` side is the
-         * disjunction `count < min ∨ count > max`, whose hull is the whole interval), so two rows are
-         * emitted, big-M'd from the declared `[0,1]` ranges (globally valid).
-         */
-        private fun reifiedCardRows(rc: ReifiedCardinality) {
-            val sum = boolSum(rc.literals, weights = null)
-            val a = boolColumn(rc.auxBoolVar)
-            val lo = subExact(rc.min.toLong(), sum.constant)
-            val hi = subExact(rc.max.toLong(), sum.constant)
-            val mHi = maxOf(0L, subExact(sum.lMax, hi)) // aux=1 ⇒ count ≤ max
-            boolReifiedRow(sum, a, mHi, Relation.LE, addExact(hi, mHi))
-            val mLo = maxOf(0L, subExact(lo, sum.lMin)) // aux=1 ⇒ count ≥ min
-            boolReifiedRow(sum, a, -mLo, Relation.GE, subExact(lo, mLo))
-        }
-
         fun assemble(extraCuts: List<Cut>): LpRelaxation {
             // Materialize objective-only variables first so the relaxed objective is complete.
             objective?.let { obj ->
@@ -851,24 +613,10 @@ internal class CpToLpRelaxation(
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
                 currentHullEnabled = hullEnabledFor(factor)
-                when (factor) {
-                    is Linear -> factor.asLinearizer().linearize(this, factorId)
-                    is ReifiedLinear -> reifiedRows(factor)
-                    is ReifiedPseudoBoolean -> reifiedPbRows(factor)
-                    is ReifiedCardinality -> reifiedCardRows(factor)
-                    is Cardinality -> factor.asLinearizer().linearize(this, factorId)
-                    is Clause -> factor.asLinearizer().linearize(this, factorId)
-                    is ArrayMinMax -> factor.asLinearizer().linearize(this, factorId)
-                    is PseudoBoolean -> factor.asLinearizer().linearize(this, factorId)
-                    is Product -> factor.asLinearizer().linearize(this, factorId)
-                    is Element -> factor.asLinearizer().linearize(this, factorId)
-                    is Table -> factor.asLinearizer().linearize(this, factorId)
-                    is NValue -> factor.asLinearizer().linearize(this, factorId)
-                    is GlobalCardinality -> factor.asLinearizer().linearize(this, factorId)
-                    is Regular -> factor.asLinearizer().linearize(this, factorId)
-                    is Mdd -> factor.asLinearizer().linearize(this, factorId)
-                    else -> Unit // hard globals and unrecognized factors: handled elsewhere or skipped
-                }
+                // Each factor's own Linearizer emits its rows; factors with no linear relaxation
+                // (hard globals, cut-only or scheduling-view factors) return NoLinearizer and contribute
+                // nothing here — they are handled by the separators and the blocks above.
+                factor.asLinearizer().linearize(this, factorId)
             }
 
             if (booleanRlt) buildBooleanRlt()
@@ -1108,6 +856,49 @@ internal class CpToLpRelaxation(
             if (suppressed(contribution)) return
             val rel = relationOf(op) ?: return
             builder.addRow(columns, coeffs, rel, rhs)
+        }
+
+        override fun bigMRow(
+            columns: IntArray,
+            coeffs: LongArray,
+            op: LinearOp,
+            rhs: Long,
+            global: Boolean,
+            maxSide: Boolean,
+        ) {
+            val rel = relationOf(op) ?: return
+            val premises = if (global) null else derivePremises(columns, coeffs, maxSide)
+            builder.addRow(columns, coeffs, rel, rhs, global, premises)
+        }
+
+        /** The live bounds a non-global big-M row leans on, as [LpRowPremises]: per linearized integer
+         *  column, its tightened live bound on the [maxSide]-relevant side (upper when the coefficient
+         *  sign matches [maxSide], else lower). Auxiliary / Boolean indicator columns are skipped. */
+        private fun derivePremises(columns: IntArray, coeffs: LongArray, maxSide: Boolean): LpRowPremises {
+            val pv = IntArrayList()
+            val pu = ArrayList<Boolean>()
+            val pt = IntArrayList()
+            for (j in columns.indices) {
+                val col = columns[j]
+                if (colIsBool[col] == 1 || colVarId[col] < 0) continue
+                val c = coeffs[j]
+                if (c == 0L) continue
+                val v = colVarId[col]
+                val dom = session.intDomain(v)
+                val dec = problem.intDomains[v]
+                if ((c >= 0L) == maxSide) {
+                    if (dom.max != dec.max) {
+                        pv.add(v)
+                        pu.add(true)
+                        pt.add(dom.max)
+                    }
+                } else if (dom.min != dec.min) {
+                    pv.add(v)
+                    pu.add(false)
+                    pt.add(dom.min)
+                }
+            }
+            return LpRowPremises(pv.toIntArray(), BooleanArray(pu.size) { pu[it] }, pt.toIntArray())
         }
     }
 }

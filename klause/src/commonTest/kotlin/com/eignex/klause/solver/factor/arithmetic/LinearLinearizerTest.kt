@@ -34,8 +34,13 @@ class LinearLinearizerTest {
         }
 
         // Unused by the Linear path under test.
-        override fun boolRow(literals: IntArray, weights: IntArray?, op: LinearOp, bound: Long, contribution: Contribution) =
-            error("unused")
+        override fun boolRow(
+            literals: IntArray,
+            weights: IntArray?,
+            op: LinearOp,
+            bound: Long,
+            contribution: Contribution,
+        ) = error("unused")
 
         override fun hullEnabled(): Boolean = true
         override fun intColumn(intVar: Int): Int = error("unused")
@@ -45,6 +50,15 @@ class LinearLinearizerTest {
         override fun declaredDomain(intVar: Int): IntDomain = error("unused")
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) =
             error("unused")
+
+        override fun bigMRow(
+            columns: IntArray,
+            coeffs: LongArray,
+            op: LinearOp,
+            rhs: Long,
+            global: Boolean,
+            maxSide: Boolean,
+        ) = error("unused")
     }
 
     @Test

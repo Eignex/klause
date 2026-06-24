@@ -5,6 +5,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.ReifiedFactor
@@ -54,4 +55,6 @@ class ReifiedPseudoBoolean(
 
     override fun asInvariant(): Invariant =
         ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars)
+
+    override fun asLinearizer(): Linearizer = ReifiedPseudoBooleanLinearizer(literals, weights, op, bound, auxBoolVar)
 }

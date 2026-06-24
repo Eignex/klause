@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.ReifiedFactor
@@ -56,4 +57,6 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
         ReifiedCardinalityPropagator(auxBoolVar, literals, min, max, boolVars, intVars)
 
     override fun asInvariant(): Invariant = ReifiedCardinalityInvariant(auxBoolVar, literals, min, max, boolVars)
+
+    override fun asLinearizer(): Linearizer = ReifiedCardinalityLinearizer(literals, min, max, auxBoolVar)
 }
