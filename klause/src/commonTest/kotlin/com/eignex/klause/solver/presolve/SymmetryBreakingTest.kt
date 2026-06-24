@@ -485,10 +485,11 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `interchangeable values in a global cardinality are pinned`() {
+    fun `interchangeable values in a global cardinality are ordered by value precedence`() {
         // GCC over x0,x1 ∈ {0,1}: each of values 0,1 may occur 0..2 times. The two values are
         // interchangeable (same bounds, same domain-incidence). GCC is not value-anonymous, but
-        // remapValues verification (#374) catches the swap and pins a fully-internal var to the orbit min.
+        // remapValues verification (#374) catches the swap; the two internal vars are ordered by value
+        // precedence (introduce 0 before 1) — the default value break, stronger than a single pin.
         val problem = Problem(
             0,
             2,
@@ -506,10 +507,10 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `interchangeable values in a table are pinned`() {
+    fun `interchangeable values in a table are ordered by value precedence`() {
         // Table allowing (0,1) and (1,0): swapping values 0↔1 maps the row set to itself, so the two
-        // values are an interchangeable orbit (verified via Table.remapValues). A fully-internal var
-        // is pinned to the orbit minimum.
+        // values are an interchangeable orbit (verified via Table.remapValues). The two internal vars
+        // are ordered by value precedence (introduce 0 before 1) — the default value break.
         val problem = Problem(
             0,
             2,

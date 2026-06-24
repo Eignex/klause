@@ -36,7 +36,13 @@ object PermutationGroup {
      * follows from the lex-leader of a group element that fixes the prefix positions). [n] is the
      * permutation degree.
      */
-    fun orbitUnderStabilizer(generators: List<IntArray>, prefix: IntArray, point: Int, n: Int, cap: Int = 256): Set<Int> {
+    fun orbitUnderStabilizer(
+        generators: List<IntArray>,
+        prefix: IntArray,
+        point: Int,
+        n: Int,
+        cap: Int = 256,
+    ): Set<Int> {
         var h: List<IntArray> = dedup(generators)
         for (p in prefix) {
             if (h.isEmpty()) break
