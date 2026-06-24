@@ -4,6 +4,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.brute.BruteForceParams
@@ -29,7 +30,7 @@ import kotlin.test.assertTrue
  */
 class SymmetryPropagatorTest {
 
-    private fun key(s: com.eignex.klause.solver.Sample) = s.bools.toList() to s.ints.toList()
+    private fun key(s: Sample) = s.bools.toList() to s.ints.toList()
 
     private fun assertSoundUnderSearch(name: String, problem: Problem) {
         val broken = Presolve.breakSymmetries(problem)

@@ -8,7 +8,7 @@ package com.eignex.klause.util
  * beyond the raw generators sharpen lex-leader propagation. [strongGenerators] returns the input
  * generators plus the Schreier generators of the pointwise-stabiliser chain (Schreier's lemma) along
  * a base — every element a real product of generators, so every lex-leader posted from one stays
- * sound. The set is deduplicated and bounded by [cap] so per-node propagation cost stays controlled.
+ * sound. The set is deduplicated and bounded by a cap so per-node propagation cost stays controlled.
  */
 object PermutationGroup {
 
