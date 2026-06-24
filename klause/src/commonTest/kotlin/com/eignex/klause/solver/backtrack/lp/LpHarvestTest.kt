@@ -22,6 +22,7 @@ import kotlin.test.assertTrue
 class LpHarvestTest {
 
     private val shavingParams = BacktrackParams(lpPlan = LpPlan(bounding = true, variableShaving = true))
+    private val objShavingParams = BacktrackParams(lpPlan = LpPlan(bounding = true, objectiveShaving = true))
 
     @Test
     fun `harvest is a no-op when variable shaving is off`() {
@@ -93,6 +94,47 @@ class LpHarvestTest {
             rec(0)
         }
         assertTrue(engaged > 0, "variable-shaving harvest never engaged across 300 instances")
+    }
+
+    @Test
+    fun `objective-LB harvest raises the objective variable's lower bound`() {
+        // minimise z = x0 + x1 + x2 with the three pairwise covers x_i + x_j >= 1 over binaries. No
+        // single bound rises at the root, so z's declared min stays 0; shaving proves z >= 2 (any two
+        // covers force a second one). Objective shaving alone (variable shaving off) must fold that in.
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, -1, -1, -1), intArrayOf(3, 0, 1, 2), LinearOp.GE, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
+        val harvested = lpHarvest(problem, obj, objShavingParams, Cancellation.Never)
+        assertTrue(harvested !== problem, "objective shaving proved a floor; the harvest must apply it")
+        assertTrue(harvested.intDomains[3].min >= 2, "objective floor z>=2 not folded into the domain")
+        assertTrue(2 in harvested.intDomains[3], "harvest excluded the attainable optimum z=2")
+    }
+
+    @Test
+    fun `objective-LB harvest is a no-op for a maximised objective`() {
+        // shaveObjectiveLb binds only an ascending objective, so a maximise (descending) objective
+        // harvests no objective floor.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
+            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5)),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0L, -1L))
+        assertSame(
+            problem,
+            lpHarvest(problem, obj, objShavingParams, Cancellation.Never),
+            "a maximised objective yields no ascending floor, so the harvest is unchanged",
+        )
     }
 
     @Test
