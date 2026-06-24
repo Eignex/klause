@@ -20,6 +20,7 @@ import com.eignex.klause.solver.factor.circuit.Subcircuit
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.factor.global.Inverse
+import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.global.NValue
 import com.eignex.klause.solver.factor.global.Sort
 import com.eignex.klause.solver.factor.scheduling.Cumulative
@@ -395,8 +396,8 @@ class SymmetryBreakingTest {
     @Test
     fun `interchangeable bool rows are lex-ordered`() {
         // Two bool rows a0+2·a1 ≤ 2 and b0+2·b1 ≤ 2. The rows are interchangeable as blocks, but the
-        // cells within a row are NOT (different weights), so this is bool block/row symmetry — broken
-        // by a binary-number lex-leader (#373) rather than per-variable ordering.
+        // cells within a row are NOT (different weights), so this is bool row symmetry — broken by a
+        // lex-leader over 0/1 channels of the row literals (no width cap) rather than per-variable ordering.
         val problem = Problem(
             4,
             0,
@@ -407,6 +408,26 @@ class SymmetryBreakingTest {
             ),
         )
         checkSound("bool-rows", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `bool row order channels to a native lex and grows the integer space`() {
+        // Two interchangeable 3-wide bool rows. Breaking mirrors each row literal in a 0/1 integer
+        // channel and orders the rows with a native LexLess (no binary-number width cap), so the
+        // integer space grows by the channels — the mechanism that lets arbitrarily wide rows (a set
+        // var's indicator matrix) be broken. The presolve reconstruct drops the determined channels.
+        val problem = Problem(
+            6,
+            0,
+            emptyArray(),
+            listOf(
+                PseudoBoolean(intArrayOf(1, 2, 4), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 5),
+                PseudoBoolean(intArrayOf(1, 2, 4), intArrayOf(pos(3), pos(4), pos(5)), PbOp.LE, 5),
+            ),
+        )
+        val broken = Presolve.breakSymmetries(problem)
+        assertTrue(broken.numIntVars > problem.numIntVars, "channels should grow the integer space")
+        assertTrue(broken.factors.any { it is LexLess }, "bool row order should be posted as a native LexLess")
     }
 
     @Test

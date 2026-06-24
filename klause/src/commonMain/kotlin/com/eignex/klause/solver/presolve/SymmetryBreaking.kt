@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.presolve
 
-import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -8,8 +7,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.global.ValuePrecede
 import com.eignex.klause.util.IntDisjointSet
@@ -18,10 +17,6 @@ internal object SymmetryBreaking {
 
     /** Cap on a verified-symmetry candidate group; larger groups are skipped (#367 size guard). */
     private const val MAX_VERIFIED_GROUP = 40
-
-    /** Widest bool row a binary-number lex-leader can encode: `2^(m−1)` must fit in `Int`, so
-     *  `m ≤ 31`. Wider rows are left unbroken (#373); their lex needs an aux-var encoding. */
-    private const val MAX_BOOL_LEX_WIDTH = 31
 
     /**
      * Symmetry breaking by detecting interchangeable variables (#317, #334). A variable transposition
@@ -36,8 +31,10 @@ internal object SymmetryBreaking {
      * can't be cut — keep those sets empty for pure feasibility. (Per the issue policy this runs by
      * default except in a pure local-search portfolio.)
      *
-     * Also breaks verified block/row symmetry ([verifiedBlockLex] / [verifiedBoolBlockLex]) and value
-     * symmetry ([breakValueSymmetry]). Full graph-automorphism detection remains a follow-up.
+     * Also breaks value symmetry ([breakValueSymmetry]). A bool-row lex-leader is posted natively over
+     * 0/1 channels of the moved literals ([BoolChannels]) so it has no width cap, growing the integer
+     * variable space by those channels (the pass is solution-set-altering anyway, and the channels are
+     * functionally determined, so the presolve reconstruct simply drops them).
      */
     fun breakSymmetries(
         problem: Problem,
@@ -54,29 +51,26 @@ internal object SymmetryBreaking {
         // symmetry, so each yields a sound `V ≤lex σ(V)` lex-leader. The lex propagators then enforce
         // these at every search node (dynamic, full-group symmetry handling — not just the generators).
         val group = groupClosure(generators, problem.numIntVars, problem.numBoolVars)
-        val genLex = generatorLexConstraints(problem, group)
+        val channels = BoolChannels(problem.numIntVars)
+        val genLex = generatorLexConstraints(problem, group, channels)
         // For an orbit whose members are *individually* interchangeable (each single transposition is
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
         val scalarLex = scalarTotalOrders(problem, generators, objectiveIntVars, objectiveBoolVars)
-        // Block/row symmetry (#367): interchangeable blocks of int vars (matrix rows defined by
-        // isomorphic factors), ordered by lex-leader — complementary when the generator search bails.
-        val blockLex = verifiedBlockLex(problem, objectiveIntVars, emptySet())
-        // Bool block/row symmetry (#373): the boolean analogue, ordered by a binary-number lex-leader.
-        val boolBlockLex = verifiedBoolBlockLex(problem, objectiveBoolVars, emptySet())
         val valuePins = breakValueSymmetry(problem, objectiveIntVars)
-        if (genLex.isEmpty() && scalarLex.isEmpty() && blockLex.isEmpty() &&
-            boolBlockLex.isEmpty() && valuePins.isEmpty()
-        ) {
+        if (genLex.isEmpty() && scalarLex.isEmpty() && valuePins.isEmpty()) {
             return problem
         }
         val extra = ArrayList<Factor>()
+        extra.addAll(channels.factors)
         extra.addAll(genLex)
         extra.addAll(scalarLex)
-        extra.addAll(blockLex)
-        extra.addAll(boolBlockLex)
         extra.addAll(valuePins)
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra)
+        return PresolveShared.rebuildProblem(
+            problem,
+            problem.factors.toList() + extra,
+            extraIntDomains = channels.domains,
+        )
     }
 
     /**
@@ -527,9 +521,9 @@ internal object SymmetryBreaking {
         val frontier = ArrayDeque<Pair<IntArray, IntArray>>()
         for (g in generators) {
             if (seen.add(key(g))) {
-            elements.add(g)
-            frontier.addLast(g)
-        }
+                elements.add(g)
+                frontier.addLast(g)
+            }
         }
         while (frontier.isNotEmpty() && elements.size < MAX_GROUP_ELEMENTS) {
             val cur = frontier.removeFirst()
@@ -550,13 +544,17 @@ internal object SymmetryBreaking {
      * One lex-leader constraint per generator, `V ≤lex σ(V)`. This is the standard sound static break:
      * the lex-minimum of every orbit satisfies `V ≤lex σ(V)` for every group element, so at least one
      * representative per orbit always survives. A pure-int generator orders its moved variables in id
-     * order ([LexLess]); a pure-bool one uses the binary-number lex-leader ([boolLexLeader]). For a
-     * generator that moves both kinds, the int ordering alone is posted — a sound relaxation (it never
+     * order ([LexLess]); a pure-bool one orders 0/1 channels of the moved literals ([boolLexViaChannel]).
+     * For a generator that moves both kinds, the int ordering alone is posted — a sound relaxation (it never
      * forbids the orbit lex-minimum). A row-swap generator yields exactly the orbitope row ordering, so
      * matrix/row symmetry is broken row-wise, never by the unsound per-column ordering that treating
      * each column as an independent orbit would produce.
      */
-    private fun generatorLexConstraints(problem: Problem, generators: List<Pair<IntArray, IntArray>>): List<Factor> {
+    private fun generatorLexConstraints(
+        problem: Problem,
+        generators: List<Pair<IntArray, IntArray>>,
+        channels: BoolChannels,
+    ): List<Factor> {
         val extra = ArrayList<Factor>()
         for ((intMap, boolMap) in generators) {
             val movedInts = (0 until problem.numIntVars).filter { intMap[it] != it }
@@ -566,11 +564,49 @@ internal object SymmetryBreaking {
                 continue
             }
             val movedBools = (0 until problem.numBoolVars).filter { boolMap[it] != it }
-            if (movedBools.isNotEmpty() && movedBools.size <= MAX_BOOL_LEX_WIDTH) {
-                generatorBoolLex(movedBools.toIntArray(), boolMap)?.let { extra.add(it) }
-            }
+            if (movedBools.isNotEmpty()) extra.add(boolLexViaChannel(movedBools.toIntArray(), boolMap, channels))
         }
         return extra
+    }
+
+    /**
+     * Allocates the 0/1 integer channels a bool-row lex-leader compares over. Each Boolean literal is
+     * mirrored by a fresh integer variable pinned to its truth value via a [ReifiedLinear], so a bool
+     * row of any width is ordered by a native [LexLess] (no binary-number width cap). Channels are
+     * memoised per literal — a literal appearing in several rows (or on both sides of one lex, since a
+     * generator permutes the same set) reuses its channel. New variable ids start at [firstNewId] (the
+     * presolved problem's current integer-variable count); [domains] / [factors] are folded into the
+     * rebuilt problem and the channels are dropped on reconstruct (functionally determined).
+     */
+    private class BoolChannels(private val firstNewId: Int) {
+        val domains = ArrayList<IntDomain>()
+        val factors = ArrayList<Factor>()
+        private val byLit = HashMap<Int, Int>()
+
+        /** The integer-variable id whose value tracks the literal [lit] (allocating it on first use). */
+        fun channel(lit: Int): Int = byLit.getOrPut(lit) {
+            val id = firstNewId + domains.size
+            domains.add(IntDomain(0, 1))
+            val negated = !Lit.isPositive(lit)
+            factors.add(
+                ReifiedLinear(
+                    auxBoolVar = Lit.variable(lit),
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(id),
+                    op = LinearOp.EQ,
+                    bound = if (negated) 0 else 1,
+                ),
+            )
+            id
+        }
+    }
+
+    /** `x ≤lex σ(x)` over the moved bool [moved] (id order) as a native [LexLess] on 0/1 channels of the
+     *  literals: position `k` compares the channel of `moved[k]` against the channel of `σ(moved[k])`. */
+    private fun boolLexViaChannel(moved: IntArray, boolMap: IntArray, channels: BoolChannels): Factor {
+        val xs = IntArray(moved.size) { channels.channel(Lit.make(moved[it], true)) }
+        val ys = IntArray(moved.size) { channels.channel(Lit.make(boolMap[moved[it]], true)) }
+        return LexLess(xs, ys, strict = false)
     }
 
     /**
@@ -626,25 +662,6 @@ internal object SymmetryBreaking {
         return extra
     }
 
-    /** `x ≤lex σ(x)` over the moved bool [moved] (id order), as a binary-number [PseudoBoolean]:
-     *  `Σ 2^(m-1-k)·(x_{moved[k]} − x_{σ(moved[k])}) ≤ 0`. Unlike [boolLexLeader] the image overlaps
-     *  the domain (σ permutes the same set), so per-variable coefficients are summed. `null` if every
-     *  coefficient cancels (the constraint would be vacuous). */
-    private fun generatorBoolLex(moved: IntArray, boolMap: IntArray): PseudoBoolean? {
-        val m = moved.size
-        val coeff = HashMap<Int, Int>()
-        for (k in 0 until m) {
-            val w = 1 shl (m - 1 - k)
-            coeff[moved[k]] = (coeff[moved[k]] ?: 0) + w
-            coeff[boolMap[moved[k]]] = (coeff[boolMap[moved[k]]] ?: 0) - w
-        }
-        val entries = coeff.entries.filter { it.value != 0 }
-        if (entries.isEmpty()) return null
-        val lits = IntArray(entries.size) { Lit.make(entries[it].key, true) }
-        val weights = IntArray(entries.size) { entries[it].value }
-        return PseudoBoolean(weights, lits, PbOp.LE, 0)
-    }
-
     /** Whether remapping every factor through [boolMap]/[intMap] leaves the factor multiset (by
      *  structural key) unchanged — i.e. the maps encode an automorphism of the constraint set. */
     private fun isAutomorphism(
@@ -653,28 +670,6 @@ internal object SymmetryBreaking {
         boolMap: IntArray,
         intMap: IntArray,
     ): Boolean = PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(boolMap, intMap) }
-
-    /** A fresh identity remap over the int variables (`map[v] == v`). Callers mutate a few slots for a
-     *  remap/automorphism check via [withSwap], which restores them. */
-    private fun identityIntMap(problem: Problem) = IntArray(problem.numIntVars) { it }
-
-    /** A fresh identity remap over the bool variables. */
-    private fun identityBoolMap(problem: Problem) = IntArray(problem.numBoolVars) { it }
-
-    /** Apply the position-wise block swap `a[k] ↔ b[k]` to [map], run [body], then restore each
-     *  touched slot to its identity. [a] and [b] must be disjoint, equal length, and identity on entry. */
-    private inline fun withSwap(map: IntArray, a: IntArray, b: IntArray, body: () -> Boolean): Boolean {
-        for (k in a.indices) {
-            map[a[k]] = b[k]
-            map[b[k]] = a[k]
-        }
-        val ok = body()
-        for (k in a.indices) {
-            map[a[k]] = a[k]
-            map[b[k]] = b[k]
-        }
-        return ok
-    }
 
     /** Test every unordered pair within [scope] with [verify] (skipping pairs already connected) and
      *  union the verified ones in [ds]. The shared inner step of every verified-orbit grouping. */
@@ -686,164 +681,6 @@ internal object SymmetryBreaking {
                 if (!ds.connected(u, v) && verify(u, v)) ds.union(u, v)
             }
         }
-    }
-
-    /**
-     * Verified block / row symmetry (#367): groups of int variables defined by *isomorphic* factors
-     * (e.g. matrix rows, each an AllDifferent over a distinct row) are interchangeable as blocks.
-     * Candidate blocks are the sorted-variable sets of factors sharing a canonical shape; a block
-     * pair is verified an automorphism via [isAutomorphism] (with position-wise equal domains), and
-     * verified-equal blocks are ordered by a lex-leader [LexLess] chain. Skips bool-touching factors,
-     * objective variables, and variables already broken as single-var orbits ([alreadyBroken]) so
-     * row and cell breaking don't interact unsoundly.
-     */
-    private fun verifiedBlockLex(problem: Problem, objectiveIntVars: Set<Int>, alreadyBroken: Set<Int>): List<Factor> {
-        val intMap = identityIntMap(problem)
-        val boolIdentity = identityBoolMap(problem)
-        return verifiedBlockLexShared(
-            problem = problem,
-            objectiveVars = objectiveIntVars,
-            alreadyBroken = alreadyBroken,
-            varsOf = { it.intVars },
-            wrongKind = { it.boolVars.isNotEmpty() || it.intVars.isEmpty() },
-            blockEligible = { true },
-            shapeOf = { f, block -> canonicalShape(problem, f, block, isBool = false) },
-            swapVerified = { base, a, b ->
-                blockSwapVerified(
-                    intMap,
-                    a,
-                    b,
-                    positionOk = { x, y -> domainKey(problem.intDomains[x]) == domainKey(problem.intDomains[y]) },
-                ) { isAutomorphism(problem, base, boolIdentity, intMap) }
-            },
-            emit = { a, b -> LexLess(a, b, strict = false) },
-        )
-    }
-
-    /** Shared skeleton for verified block / row symmetry over either variable kind: bucket the
-     *  candidate blocks by canonical shape, union the verified-swap pairs, and order each resulting
-     *  class by a lex-leader chain. The kind-specific bits — which variables a factor contributes,
-     *  which factors to skip, the per-row width guard, the shape key, the swap verifier (which folds
-     *  in the int-only domain check), and the lex-leader factor — are supplied by the callers. */
-    @Suppress("LongParameterList")
-    private inline fun verifiedBlockLexShared(
-        problem: Problem,
-        objectiveVars: Set<Int>,
-        alreadyBroken: Set<Int>,
-        varsOf: (Factor) -> IntArray,
-        wrongKind: (Factor) -> Boolean,
-        blockEligible: (IntArray) -> Boolean,
-        shapeOf: (Factor, IntArray) -> StructuralKey,
-        swapVerified: (Map<StructuralKey, Int>, IntArray, IntArray) -> Boolean,
-        emit: (IntArray, IntArray) -> Factor,
-    ): List<Factor> {
-        val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
-        val byShape = HashMap<StructuralKey, MutableList<IntArray>>()
-        for (f in problem.factors) {
-            if (wrongKind(f)) continue
-            val block = varsOf(f).distinct().sorted().toIntArray()
-            if (!blockEligible(block)) continue
-            if (block.any { it in objectiveVars || it in alreadyBroken }) continue
-            val shape = shapeOf(f, block)
-            byShape.getOrPut(shape) { ArrayList() }.add(block)
-        }
-        val extra = ArrayList<Factor>()
-        for ((_, blocks) in byShape) {
-            if (blocks.size < 2 || blocks.size > MAX_VERIFIED_GROUP) continue
-            val ds = IntDisjointSet(blocks.size)
-            unionVerifiedPairs(ds, IntArray(blocks.size) { it }) { i, j -> swapVerified(base, blocks[i], blocks[j]) }
-            for (cls in ds.groups()) {
-                val ordered = cls.map { blocks[it] }.sortedBy { it[0] }
-                for (k in 0 until ordered.size - 1) extra.add(emit(ordered[k], ordered[k + 1]))
-            }
-        }
-        return extra
-    }
-
-    /** Canonical structure key for a block of variables (bool when [isBool], else int): remap its
-     *  (sorted) variables to `0..k-1` with the other kind left identity, so two isomorphic factors
-     *  over disjoint variables share a key. */
-    private fun canonicalShape(problem: Problem, f: Factor, block: IntArray, isBool: Boolean): StructuralKey {
-        val boolMap = identityBoolMap(problem)
-        val intMap = identityIntMap(problem)
-        val target = if (isBool) boolMap else intMap
-        for (k in block.indices) target[block[k]] = k
-        return f.remap(boolMap, intMap).structuralKey()
-    }
-
-    /** Whether swapping disjoint blocks [a] and [b] position-wise (`a[k] ↔ b[k]`) on the working
-     *  remap [map] (identity outside the blocks) is an automorphism. [positionOk] is an extra
-     *  per-position precondition — int blocks require position-wise equal domains (not encoded in
-     *  factors, so checked here); bool blocks have none. Overlapping blocks are rejected (a swap
-     *  would tangle). [automorphic] runs the structural check with the swap applied. */
-    private inline fun blockSwapVerified(
-        map: IntArray,
-        a: IntArray,
-        b: IntArray,
-        positionOk: (Int, Int) -> Boolean,
-        automorphic: () -> Boolean,
-    ): Boolean {
-        if (a.size != b.size) return false
-        for (k in a.indices) {
-            if (a[k] in b) return false // overlapping blocks: swap would tangle
-            if (!positionOk(a[k], b[k])) return false
-        }
-        return withSwap(map, a, b, automorphic)
-    }
-
-    /**
-     * Verified bool-block lex (#373): the boolean analogue of [verifiedBlockLex]. Blocks of Boolean
-     * variables defined by *isomorphic* bool-only factors (rows of a 0/1 matrix) are interchangeable
-     * as blocks; verified-equal blocks are ordered by a lexicographic-leader chain. Skips factors that
-     * touch int variables, objective bools, and bools already broken as single-var orbits
-     * ([alreadyBroken]) so row and cell breaking don't interact unsoundly.
-     *
-     * A Boolean lex-leader `a ≤ₗₑₓ b` is posted as a [PseudoBoolean] (see [boolLexLeader]): reading
-     * each id-sorted row as a binary number with the first position most-significant, lexicographic
-     * order on equal-length 0/1 vectors is exactly numeric order. The weights are powers of two, so a
-     * row wider than [MAX_BOOL_LEX_WIDTH] (where `2^(m−1)` overflows `Int`) is skipped — sound, just
-     * unbroken; the aux-variable lex encoding for wider rows is a follow-up.
-     */
-    private fun verifiedBoolBlockLex(
-        problem: Problem,
-        objectiveBoolVars: Set<Int>,
-        alreadyBroken: Set<Int>,
-    ): List<Factor> {
-        val boolMap = identityBoolMap(problem)
-        val intIdentity = identityIntMap(problem)
-        return verifiedBlockLexShared(
-            problem = problem,
-            objectiveVars = objectiveBoolVars,
-            alreadyBroken = alreadyBroken,
-            varsOf = { it.boolVars },
-            wrongKind = { it.intVars.isNotEmpty() || it.boolVars.isEmpty() },
-            blockEligible = { it.size <= MAX_BOOL_LEX_WIDTH },
-            shapeOf = { f, block -> canonicalShape(problem, f, block, isBool = true) },
-            swapVerified = { base, a, b ->
-                blockSwapVerified(boolMap, a, b, positionOk = { _, _ -> true }) {
-                    isAutomorphism(problem, base, boolMap, intIdentity)
-                }
-            },
-            emit = { a, b -> boolLexLeader(a, b) },
-        )
-    }
-
-    /** Lex-leader `a ≤ₗₑₓ b` on two equal-length bool rows as a [PseudoBoolean]. Reading each row
-     *  as a binary number (position 0 most-significant), lexicographic order is numeric order, so
-     *  `Σ 2^(m−1−k)·a`k` − Σ 2^(m−1−k)·b`k` ≤ 0`. Callers must keep `a.size == b.size ≤`
-     *  [MAX_BOOL_LEX_WIDTH] so the top weight `2^(m−1)` fits in `Int`. */
-    private fun boolLexLeader(a: IntArray, b: IntArray): PseudoBoolean {
-        val m = a.size
-        val literals = IntArray(2 * m)
-        val weights = IntArray(2 * m)
-        for (k in 0 until m) {
-            val w = 1 shl (m - 1 - k)
-            literals[k] = Lit.make(a[k], true)
-            weights[k] = w
-            literals[m + k] = Lit.make(b[k], true)
-            weights[m + k] = -w
-        }
-        return PseudoBoolean(weights, literals, PbOp.LE, 0)
     }
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */

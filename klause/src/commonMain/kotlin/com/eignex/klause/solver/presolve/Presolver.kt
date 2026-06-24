@@ -229,8 +229,18 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars))
+        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
+            val broken = Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars)
+            // A wide bool-row lex-leader grows the integer space by 0/1 channels appended after the
+            // originals; they are functionally determined, so reconstruct just drops the suffix.
+            val origInts = problem.numIntVars
+            val reconstruct = if (broken.numIntVars > origInts) {
+                { sample: Sample -> Sample(sample.bools, sample.ints.copyOf(origInts)) }
+            } else {
+                null
+            }
+            return PassResult(broken, reconstruct)
+        }
     },
 
     /** Law–Lee value precedence (#374 / #432) — the strong value-symmetry break. Opt-in: stacking it
