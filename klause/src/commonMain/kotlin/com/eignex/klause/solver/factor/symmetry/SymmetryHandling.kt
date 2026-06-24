@@ -58,7 +58,7 @@ class SymmetryHandling(
         // alone — the dynamic, single-propagator replacement for a static lex closure.
         val unified = generators.map { toUnified(it) }
         val strong = PermutationGroup.strongGenerators(unified, nInt + nBool, STRONG_GENERATOR_CAP)
-        return SymmetryPropagator(strong.map { toSequence(it) })
+        return SymmetryPropagator(strong.map { toSequence(it) }, strong, nInt)
     }
 
     override fun asInvariant(): Invariant = NoInvariant

@@ -29,6 +29,24 @@ object PermutationGroup {
     }
 
     /**
+     * The orbit of [point] under the pointwise stabiliser of [prefix] in `<generators>`: peel each
+     * prefix point off the generating set via Schreier's lemma (bounding the carried set at [cap]),
+     * then take the orbit of [point] under the resulting stabiliser. Every element used is a product
+     * of [generators], so an ordering `x_point ≤ x_j` derived for `j` in this orbit is sound (it
+     * follows from the lex-leader of a group element that fixes the prefix positions). [n] is the
+     * permutation degree.
+     */
+    fun orbitUnderStabilizer(generators: List<IntArray>, prefix: IntArray, point: Int, n: Int, cap: Int = 256): Set<Int> {
+        var h: List<IntArray> = dedup(generators)
+        for (p in prefix) {
+            if (h.isEmpty()) break
+            h = dedup(schreierGenerators(h, p, n))
+            if (h.size > cap) h = h.subList(0, cap)
+        }
+        return orbit(h, point)
+    }
+
+    /**
      * A strong-ish generating set: the [generators] plus the Schreier generators of the stabiliser
      * chain over [base] (default `0,1,…,n-1`), deduplicated (identity dropped) and capped at [cap].
      * Each Schreier generator is a product of [generators] (Schreier's lemma), so it is a real group
