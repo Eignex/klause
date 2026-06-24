@@ -1,10 +1,12 @@
 package com.eignex.klause.solver.factor.symmetry
 
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.brute.BruteForceParams
@@ -15,6 +17,7 @@ import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.presolve.Presolve
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -87,6 +90,37 @@ class SymmetryPropagatorTest {
             ),
         )
         assertSoundUnderSearch("bool-rows", problem)
+    }
+
+    @Test
+    fun `random symmetric instances stay satisfiable under search including orbital fixing`() {
+        // Orbital fixing is soundness-critical: a wrong stabiliser orbit would tighten x_k <= x_j for a
+        // j the lex-leader does not actually order, cutting valid solutions (false UNSAT). Breaking only
+        // *adds* constraints, so it can never invent a non-solution — the failure mode is losing the
+        // last representative of an orbit. So the sharp, cheap check is that the broken problem stays
+        // satisfiable exactly when the original is, over many random S_n-symmetric instances (full
+        // permutation symmetry makes orbital fixing fire on the whole orbit). The full BacktrackSolver
+        // (with clause learning) exercises the inline antecedents and the orbital-fixing reasons.
+        val rng = Random(0x0B17A1L)
+        repeat(60) {
+            val n = rng.nextInt(3, 5)
+            val d = rng.nextInt(1, 3)
+            val xs = IntArray(n) { it }
+            val factors = ArrayList<Factor>()
+            when (rng.nextInt(3)) {
+                0 -> factors.add(AllDifferent(xs, domainMin = 0, domainSize = d + 1))
+                1 -> factors.add(Linear(IntArray(n) { 1 }, xs, LinearOp.LE, rng.nextInt(0, n * d + 1)))
+                else -> {
+                    factors.add(Linear(IntArray(n) { 1 }, xs, LinearOp.GE, rng.nextInt(0, n * d + 1)))
+                    factors.add(Linear(IntArray(n) { 1 }, xs, LinearOp.LE, rng.nextInt(0, n * d + 1)))
+                }
+            }
+            val problem = Problem(0, n, Array(n) { IntDomain(0, d) }, factors)
+            val broken = Presolve.breakSymmetries(problem)
+            val origSat = BruteForceSolver(problem).solve(BruteForceParams(randomSeed = 0L)) is SolveResult.Sat
+            val brokenSat = BacktrackSolver(broken).solve(BacktrackParams(randomSeed = 1L)) is SolveResult.Sat
+            assertEquals(origSat, brokenSat, "random#$it(n=$n,d=$d): breaking changed satisfiability")
+        }
     }
 
     @Test

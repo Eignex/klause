@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.PermutationGroup
 
 /**
  * Dynamic symmetry handling: one global propagator for the whole automorphism group, replacing the
@@ -21,16 +22,75 @@ import com.eignex.klause.util.IntArrayList
  * position is a pin. Reasons cite the fixed-equal prefix, the deciding pair, and — when the step is
  * forced strict — the scanned suffix, as integer order-atoms plus Boolean literals.
  */
-internal class SymmetryPropagator(private val generators: List<Generator>) : Propagator {
+internal class SymmetryPropagator(
+    private val generators: List<Generator>,
+    private val unified: List<IntArray>,
+    private val nInt: Int,
+) : Propagator {
 
     /** A generator's lex sequence: position `k` compares [leftVar]`[k]` against its image
      *  [rightVar]`[k]`, both Boolean when [isBool]`[k]` (else both integer). */
     class Generator(val leftVar: IntArray, val rightVar: IntArray, val isBool: BooleanArray)
 
+    /** Permutation degree (`nInt + nBool`). */
+    private val n: Int = if (unified.isEmpty()) nInt else unified.first().size
+
+    /** The group's support (variables some generator moves), as unified ids in ascending order — the
+     *  fixed total order the orbital-fixing rule walks. */
+    private val supportOrder: IntArray = run {
+        val moved = HashSet<Int>()
+        for (p in unified) for (i in p.indices) if (p[i] != i) moved.add(i)
+        moved.toIntArray().also { it.sort() }
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         for (g in generators) if (!propagateLexLeader(state, g)) return false
+        return orbitalFix(state)
+    }
+
+    /**
+     * Orbital fixing: the lex-leader implies `x_k ≤ x_j` for every `j` in the orbit of `k` under the
+     * pointwise stabiliser of the positions preceding `k` in the order — a group element that fixes
+     * those positions auto-equalises the prefix, so position `k` decides `V ≤lex σ(V)`. Applied at the
+     * order's first unfixed position (the frontier; later positions follow as search fixes this one),
+     * this prunes using the whole group's stabiliser structure, not just the propagated generators —
+     * the strength that survives beyond the bounded generator expansion on large groups. Sound by
+     * construction (every orbit element comes from a genuine group element fixing the prefix).
+     */
+    @Suppress("ReturnCount")
+    private fun orbitalFix(state: PropagationState): Boolean {
+        if (unified.isEmpty()) return true
+        val prefix = IntArrayList()
+        for (k in supportOrder) {
+            val kBool = k >= nInt
+            val kVar = if (kBool) k - nInt else k
+            if (lo(state, kVar, kBool) == hi(state, kVar, kBool)) {
+                prefix.add(k)
+                continue
+            }
+            val orbit = PermutationGroup.orbitUnderStabilizer(unified, prefix.toIntArray(), k, n)
+            for (j in orbit) {
+                if (j == k) continue
+                val jBool = j >= nInt
+                val jVar = if (jBool) j - nInt else j
+                // x_k ≤ x_j: tighten x_k's max down to x_j's max, and x_j's min up to x_k's min.
+                if (!tightenHi(state, kVar, kBool, hi(state, jVar, jBool), boundReason(state, jVar, jBool))) return false
+                if (!tightenLo(state, jVar, jBool, lo(state, kVar, kBool), boundReason(state, kVar, kBool))) return false
+            }
+            return true // only the frontier position; deeper positions resolve as it fixes
+        }
         return true
     }
+
+    /** The premise of an `x ≤ y` bound transfer: the cited variable's current bound (an integer
+     *  order-atom, or the Boolean's current literal). A superset is sound. */
+    private fun boundReason(state: PropagationState, v: Int, isBool: Boolean): IntArray? =
+        if (isBool) {
+            val value = state.boolValues[v] ?: return null
+            intArrayOf(Lit.make(v, !value))
+        } else {
+            state.composeIntVarAtomAntecedents(intArrayOf(v))
+        }
 
     /**
      * The clause-form reason for a lex-leader conflict (`propagate` returned `false` on the
