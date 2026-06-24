@@ -57,18 +57,34 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     val v = atomIntVar[atomId]
     val k = atomThreshold[atomId]
     val truth = atomCurrentTruth(atomId) ?: return levelToDecisionVar.size
-    // atomLvl < 0 with the atom determined: the only remaining case is an eq atom ruled out by
-    // an *interior hole* materialized after the carve — its level comes from the hole-carve
-    // record. Bound atoms always carry a stored level once determined.
-    if (atomKind[atomId] == AtomKind.EQ && !truth) {
-        val d = intDomains[v]
-        // Interior hole, or a value carved on this path that a later bound move has since swept
-        // past: its truth was established at the carve, so the carve level is the real level —
-        // not the (possibly later) bound move that snapped over an already-dead value.
-        if ((k > d.min && k < d.max) || holeHistHas(v, k)) return holeLevelFor(v, k)
+    // Unstamped but determined: the atom was materialized after its bound already crossed, at a
+    // threshold *looser* than the tight endpoint (the tight case is stamped at allocation). Its
+    // truth is fixed by a live endpoint of `v`, so report that endpoint's establishment level — the
+    // side [atomAntecedentsDerived] cites the endpoint's reason from. Sound (the live bound entails
+    // the looser one) and resolvable: the atom resolves against that reason in the 1UIP loop instead
+    // of lingering as a current-level leaf, which is what left cumulative pointwise nogoods
+    // non-asserting (#744).
+    return when (atomKind[atomId]) {
+        AtomKind.GE -> endpointLevel(v, viaMax = !truth)
+
+        AtomKind.LE -> endpointLevel(v, viaMax = truth)
+
+        AtomKind.EQ -> if (truth) {
+            // A singleton: both endpoints pin it.
+            maxOf(endpointLevel(v, viaMax = false), endpointLevel(v, viaMax = true))
+        } else {
+            val d = intDomains[v]
+            // A value carved on this path (or strictly interior) was ruled out at its carve, so the
+            // carve level is the real level — not a later bound move that snapped over an
+            // already-dead value. A value swept past an endpoint is ruled out by that live endpoint.
+            when {
+                holeHistHas(v, k) -> holeLevelFor(v, k)
+                k < d.min -> endpointLevel(v, viaMax = false)
+                k > d.max -> endpointLevel(v, viaMax = true)
+                else -> holeLevelFor(v, k)
+            }
+        }
     }
-    val rl = reconstructCurrentBoundLevel(v, atomKind[atomId], k, stateOfTruth(truth))
-    return if (rl >= 0) rl else levelToDecisionVar.size
 }
 
 /** Reconstruct the trail level of a freshly-materialized **determined** atom from the per-side
@@ -174,38 +190,32 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
 
 /**
  * Antecedents of atom [atomId]: the reason on its trail slot ([PropagationState.atomAnt]) for an atom established on
- * the current path, else derived on demand. The derived cases: a true bound atom resolves to the
- * stored reason of the live bound; a false bound atom and a bound-excluded eq atom cite that live
- * opposing bound's reason ([falseBoundReason], over other variables); a true eq atom cites both
- * endpoint bounds; an interior-hole eq atom resolves to the carve's recorded reason
- * ([holeReasonFor]). `null` marks a root/bake fact or an undetermined atom — the analyzer keeps
- * such literals instead of resolving through them.
+ * the current path, else derived on demand. The derived cases: a determined bound atom (of any
+ * looseness) cites the live endpoint that fixes its truth ([endpointReason], over other variables);
+ * a true eq atom cites both endpoint bounds; a bound-excluded eq atom cites the live endpoint; an
+ * interior-hole eq atom resolves to the carve's recorded reason ([holeReasonFor]). `null` marks a
+ * root/bake fact or an undetermined atom — the analyzer keeps such literals instead of resolving
+ * through them.
  */
 internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     // Trail-resident fast path: an atom established on the current path (stamped by a bound move,
     // or reconstructed at materialization) carries its reason on [atomAnt] at its exact
     // establishment level — return it directly. The derivation below covers only the not-yet-stored
-    // cases (interior-hole eq atoms) and undetermined atoms.
+    // cases (looser-than-tight bound atoms, interior-hole eq atoms) and undetermined atoms.
     if (atomLvl[atomId] >= 0) return atomAnt[atomId]
     val v = atomIntVar[atomId]
     val k = atomThreshold[atomId]
     val d = intDomains[v]
     val truth = atomCurrentTruth(atomId) ?: return null
     return when (atomKind[atomId]) {
-        // True bound atom with no stored reason: reconstruct from the current-bound per-var
-        // antecedent (null = looser dead case ⇒ a leaf, sound). A false bound atom cites the
-        // opposing live bound's stored antecedent ([falseBoundReason]). No bound history.
-        AtomKind.GE -> if (truth) {
-            reconstructCurrentBoundReason(v, AtomKind.GE, k, 1)
-        } else {
-            falseBoundReason(v, viaMax = true)
-        }
+        // A determined bound atom is fixed by one live endpoint of `v`: a true `[v ≥ k]` (resp. a
+        // false one) by the min (resp. max) bound, a true `[v ≤ k]` (resp. false) by the max (resp.
+        // min) bound. Cite that endpoint's stored antecedent ([endpointReason]) for *any* looseness —
+        // the live bound entails the looser threshold, so resolution flows to the *other* variables
+        // with no same-var GE<->LE round trip (the cycle that left clauses non-asserting, #671/#744).
+        AtomKind.GE -> endpointReason(v, viaMax = !truth)
 
-        AtomKind.LE -> if (truth) {
-            reconstructCurrentBoundReason(v, AtomKind.LE, k, 1)
-        } else {
-            falseBoundReason(v, viaMax = false)
-        }
+        AtomKind.LE -> endpointReason(v, viaMax = truth)
 
         AtomKind.EQ -> if (truth) {
             composeIntVarAtomAntecedents(intArrayOf(v))
@@ -213,13 +223,13 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
             // Prefer the recorded interior-carve reason whenever the value was carved on the
             // current path — it cites the other variables that forced the exclusion (the original,
             // tightest reason). Otherwise the value was swept past by a bound move, so the live
-            // opposing endpoint rules it out; [falseBoundReason] cites that endpoint's stored
+            // opposing endpoint rules it out; [endpointReason] cites that endpoint's stored
             // reason (other variables), keeping resolution off the same-var GE<->LE cycle that
             // leaves the clause non-asserting (#671).
             when {
                 holeHistHas(v, k) -> holeReasonFor(v, k)
-                k < d.min -> falseBoundReason(v, viaMax = false)
-                k > d.max -> falseBoundReason(v, viaMax = true)
+                k < d.min -> endpointReason(v, viaMax = false)
+                k > d.max -> endpointReason(v, viaMax = true)
                 else -> holeReasonFor(v, k)
             }
         }
@@ -227,27 +237,40 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
 }
 
 /**
- * Antecedent of a bound atom that is **false** because `v`'s opposing bound rules it out.
+ * Antecedent of a determined bound atom: the **per-var stored antecedent of the live endpoint** that
+ * fixes its truth ([PropagationState.intMaxAntecedents] when [viaMax], else
+ * [PropagationState.intMinAntecedents]) — the real reason the bound stands where it does, so
+ * resolution flows straight to the *other* variables' bounds with no same-var GE<->LE round trip.
+ *
  * The classical lazy scheme cited the *complementary* bound atom (`¬[v ≥ k+1]` for a false
  * `[v ≤ k]`); the analyzer then unfolded that atom through its own reason, which couples a
  * GE atom to the LE atom of the same var and back — the same-level cycle that makes 1UIP
  * keep a resolved literal and the learned clause non-asserting (the 0.37%-asserting-rate
- * pathology this rewrite targets). Instead always cite the **per-var stored antecedent of the
- * live opposing endpoint** ([PropagationState.intMaxAntecedents] / [PropagationState.intMinAntecedents]):
- * the real reason the bound stands where it does — so resolution flows straight to the *other* variables' bounds
- * with no same-var round trip. This holds for any false atom, not just one adjacent to the
- * endpoint: `v ≤ d.max` already rules out `v ≥ k` for every `k > d.max` (symmetric for the min
- * side), and the bound's reason justifies it. A `null` stored antecedent means the endpoint is a
- * root/bake fact (no search move set it), which is the correct leaf.
+ * pathology this rewrite targets). Citing the endpoint directly avoids it.
  *
- * For a value strictly past the endpoint (looser than adjacent) this attributes the endpoint's
- * (possibly later) establishment level rather than the exact level the value was first ruled out
- * — sound (a true antecedent cited at its real level), and since the atom resolves against this
- * reason in the 1UIP loop it never lingers as a mis-levelled leaf. The earlier complementary-atom
- * citation kept the level tight but reintroduced the fatal cycle; avoiding the cycle wins.
+ * This holds for **any** looseness and **either** polarity, not just an atom adjacent to the
+ * endpoint: a false `[v ≥ k]` for every `k > d.max` is justified by `v ≤ d.max`, and a true
+ * `[v ≤ k]` for every `k ≥ d.max` is *entailed* by the same `v ≤ d.max` (symmetric on the min side).
+ * A `null` stored antecedent means the endpoint is a root/bake fact (no search move set it), the
+ * correct leaf.
+ *
+ * For a threshold strictly past the endpoint this attributes the endpoint's (possibly later)
+ * establishment level rather than the exact level the atom's truth was first fixed — sound (a true
+ * antecedent cited at its real level), and since the atom resolves against this reason in the 1UIP
+ * loop it never lingers as a mis-levelled leaf. The earlier complementary-atom citation kept the
+ * level tight but reintroduced the fatal cycle; avoiding the cycle wins.
  */
-internal fun PropagationState.falseBoundReason(v: Int, viaMax: Boolean): IntArray? =
+internal fun PropagationState.endpointReason(v: Int, viaMax: Boolean): IntArray? =
     if (viaMax) intMaxAntecedents[v] else intMinAntecedents[v]
+
+/** Establishment level of the live endpoint that fixes a determined bound atom's truth — the
+ *  per-side [PropagationState.intMaxLevel] (when [viaMax]) or [PropagationState.intMinLevel],
+ *  paired with [endpointReason]. A -1 slot means the bound is still at its root value, i.e. level 0.
+ */
+internal fun PropagationState.endpointLevel(v: Int, viaMax: Boolean): Int {
+    val lvl = if (viaMax) intMaxLevel[v] else intMinLevel[v]
+    return if (lvl >= 0) lvl else 0
+}
 
 internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Int): Boolean? {
     val d = intDomains[v]
