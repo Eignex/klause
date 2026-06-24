@@ -16,6 +16,7 @@ import com.eignex.klause.model.DisjunctiveExpr
 import com.eignex.klause.model.DisjunctiveExprOpt
 import com.eignex.klause.model.GccExprOpt
 import com.eignex.klause.model.Iff
+import com.eignex.klause.model.IncreasingExpr
 import com.eignex.klause.model.IntAbs
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
@@ -191,6 +192,19 @@ fun sort(xs: List<IntTerm>, ys: List<IntTerm>): BoolExpr {
     require(xs.size == ys.size) { "sort(): xs and ys must have the same length" }
     return SortExpr(xs.map { it.toIntExpr() }, ys.map { it.toIntExpr() })
 }
+
+/** `increasing(xs)` — [xs] is a non-decreasing chain (`xs[0] ≤ xs[1] ≤ …`). */
+fun increasing(xs: List<IntTerm>): BoolExpr = IncreasingExpr(xs.map { it.toIntExpr() }, strict = false)
+
+/** `strictlyIncreasing(xs)` — [xs] is a strictly increasing chain (`xs[0] < xs[1] < …`). */
+fun strictlyIncreasing(xs: List<IntTerm>): BoolExpr = IncreasingExpr(xs.map { it.toIntExpr() }, strict = true)
+
+/** `decreasing(xs)` — [xs] is a non-increasing chain (`xs[0] ≥ xs[1] ≥ …`), posted as the reverse. */
+fun decreasing(xs: List<IntTerm>): BoolExpr = IncreasingExpr(xs.reversed().map { it.toIntExpr() }, strict = false)
+
+/** `strictlyDecreasing(xs)` — [xs] is a strictly decreasing chain (`xs[0] > xs[1] > …`). */
+fun strictlyDecreasing(xs: List<IntTerm>): BoolExpr =
+    IncreasingExpr(xs.reversed().map { it.toIntExpr() }, strict = true)
 
 /**
  * `diffn(x, y, widths, heights)` — rectangles at `(x[i], y[i])` of size `widths[i] × heights[i]`

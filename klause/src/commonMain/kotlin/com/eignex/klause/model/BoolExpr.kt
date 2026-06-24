@@ -461,6 +461,24 @@ data class SortExpr(
 }
 
 /**
+ * `increasing`: [xs] forms an ordered integer chain — non-decreasing (`≤`), or strictly increasing
+ * (`<`) when [strict]. `decreasing` is the same constraint on the reversed sequence, so the DSL
+ * builders post it by reversing [xs]; this node only represents the ascending orientation.
+ */
+@Serializable
+@SerialName("increasing_global")
+data class IncreasingExpr(
+    /** Chain variables, in order. */
+    val xs: List<IntExpr>,
+    /** When true the chain is strictly increasing (`<`); otherwise non-decreasing (`≤`). */
+    val strict: Boolean = false,
+) : BoolExpr {
+    init {
+        require(xs.isNotEmpty()) { "IncreasingExpr: empty array" }
+    }
+}
+
+/**
  * `diffn`: rectangles at `(xs[i], ys[i])` of size `widths[i] × heights[i]` do not overlap.
  * Widths and heights are constants.
  */
