@@ -96,10 +96,15 @@ internal class CumulativePropagator(
             if (d <= 0 || r <= 0) continue
             val dom = state.intDomains[starts[k]]
             if (dom.max > t || t >= dom.min + d) continue
+            // Cite the task's *current* bounds, not the generalised overlap window [t-d+1, t]: the
+            // live `start ≤ dom.max ≤ t` and `start ≥ dom.min ≥ t-d+1` already entail the task spans
+            // `t`, and they are the canonical order literals the trail stamps — so 1UIP resolves them
+            // instead of leaving the generalised thresholds as extra same-var leaves that a single
+            // bound decision crossed, which left these nogoods non-asserting (#744). Mirrors how every
+            // other global constraint reasons ([PropagationState.composeIntVarAtomAntecedents]).
             val orig = state.problem.intDomains[starts[k]]
-            if (t < orig.max) out.add(Lit.make(state.atomVarLe(starts[k], t), false))
-            val geThreshold = t - d + 1
-            if (geThreshold > orig.min) out.add(Lit.make(state.atomVarGe(starts[k], geThreshold), false))
+            if (dom.max < orig.max) out.add(Lit.make(state.atomVarLe(starts[k], dom.max), false))
+            if (dom.min > orig.min) out.add(Lit.make(state.atomVarGe(starts[k], dom.min), false))
             citeEnergyBounds(out, state, k, eff)
         }
         if (capacityVar >= 0) {
