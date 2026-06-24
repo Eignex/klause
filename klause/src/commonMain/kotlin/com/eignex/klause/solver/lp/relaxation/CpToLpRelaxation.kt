@@ -81,6 +81,9 @@ internal class LpRelaxation(
     /** Per structural column, the upper bound an auxiliary column takes when present (see [colReq]);
      *  unused for CP-var columns. */
     val colPresentUpper: LongArray = LongArray(model.n),
+    /** Ids of the factors that emitted at least one [Contribution.HULL] row, in factor order — the
+     *  candidates the root pruner (`LpEngine.pruneIneffectiveHulls`) probes for individual removal. */
+    val hullFactorIds: IntArray = IntArray(0),
 )
 
 /**
@@ -232,6 +235,10 @@ internal class CpToLpRelaxation(
      *  `result = xs[i]` when `z_i = 1`, so the extremum is bounded from the tight side too (`result ≤
      *  max` / `result ≥ min`), not just the envelope side. Adds O(|xs|) columns, so it is gated. */
     private val linMaxTightFace: Boolean = false,
+    /** Factor ids whose [Contribution.HULL] rows are suppressed this build — the root pruner
+     *  (`LpEngine.pruneIneffectiveHulls`) fills this with the per-factor hulls it found add no root
+     *  strength, so they contribute only their CORE rows (if any). */
+    private val suppressedHullFactors: Set<Int> = emptySet(),
 ) {
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
@@ -389,6 +396,12 @@ internal class CpToLpRelaxation(
          *  forced off). Set per factor before [Factor.asLinearizer]; consulted by the row emitters so a
          *  disabled family contributes only its CORE rows. CORE rows ignore it. */
         private var currentHullEnabled = true
+
+        /** The factor whose Linearizer is currently emitting, for attributing HULL rows to it. */
+        private var currentFactorId = -1
+
+        /** Factors that emitted at least one HULL row, in factor order (the root pruner's candidates). */
+        private val hullFactorIds = LinkedHashSet<Int>()
 
         /** The plan flag gating [factor]'s HULL rows (its convex-hull family), false in cone mode.
          *  A factor with no HULL contribution is unaffected — the flag only suppresses HULL rows. */
@@ -612,7 +625,8 @@ internal class CpToLpRelaxation(
                 // #571: in cone mode emit only factors connected to the objective; this also drops
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
-                currentHullEnabled = hullEnabledFor(factor)
+                currentFactorId = factorId
+                currentHullEnabled = factorId !in suppressedHullFactors && hullEnabledFor(factor)
                 // Each factor's own Linearizer emits its rows; factors with no linear relaxation
                 // (hard globals, cut-only or scheduling-view factors) return NoLinearizer and contribute
                 // nothing here — they are handled by the separators and the blocks above.
@@ -651,6 +665,7 @@ internal class CpToLpRelaxation(
                 persistentEligible = eligible,
                 colReq = reqs,
                 colPresentUpper = presentUpper,
+                hullFactorIds = hullFactorIds.toIntArray(),
             )
         }
 
@@ -814,14 +829,16 @@ internal class CpToLpRelaxation(
             LinearOp.NE -> null // not LP-relaxable
         }
 
-        /** A HULL row is dropped when the current factor's hull family is disabled this build; CORE
-         *  rows always pass. */
-        private fun suppressed(contribution: Contribution): Boolean =
-            contribution == Contribution.HULL && !currentHullEnabled
+        /** True iff a row with this [contribution] should be skipped — a HULL row whose factor's hull is
+         *  off this build. A HULL row that passes is attributed to the current factor, so the root pruner
+         *  (`LpEngine.pruneIneffectiveHulls`) sees it as a removal candidate. CORE rows always pass. */
+        private fun skipRow(contribution: Contribution): Boolean {
+            if (contribution != Contribution.HULL) return false
+            if (!currentHullEnabled) return true
+            hullFactorIds.add(currentFactorId)
+            return false
+        }
 
-        // [contribution] (CORE/HULL) is part of the row-emission contract but not yet consumed: the
-        // root hull pruner still gates whole families via the LP plan. A later pass keys pruning off
-        // the per-factor HULL rows recorded here.
         override fun linearRow(
             op: LinearOp,
             intVars: IntArray,
@@ -829,7 +846,7 @@ internal class CpToLpRelaxation(
             bound: Long,
             contribution: Contribution,
         ) {
-            if (suppressed(contribution)) return
+            if (skipRow(contribution)) return
             val rel = relationOf(op) ?: return
             addIntRow(intVars, coeffs, auxCol = -1, auxCoeff = 0L, rel = rel, rhs = bound)
         }
@@ -841,7 +858,7 @@ internal class CpToLpRelaxation(
             bound: Long,
             contribution: Contribution,
         ) {
-            if (suppressed(contribution)) return
+            if (skipRow(contribution)) return
             val rel = relationOf(op) ?: return
             addBoolRow(literals, weights, rel, bound)
         }
@@ -853,7 +870,7 @@ internal class CpToLpRelaxation(
         override fun declaredDomain(intVar: Int): IntDomain = problem.intDomains[intVar]
 
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) {
-            if (suppressed(contribution)) return
+            if (skipRow(contribution)) return
             val rel = relationOf(op) ?: return
             builder.addRow(columns, coeffs, rel, rhs)
         }

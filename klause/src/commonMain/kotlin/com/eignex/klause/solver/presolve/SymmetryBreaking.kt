@@ -527,9 +527,9 @@ internal object SymmetryBreaking {
         val frontier = ArrayDeque<Pair<IntArray, IntArray>>()
         for (g in generators) {
             if (seen.add(key(g))) {
-            elements.add(g)
-            frontier.addLast(g)
-        }
+                elements.add(g)
+                frontier.addLast(g)
+            }
         }
         while (frontier.isNotEmpty() && elements.size < MAX_GROUP_ELEMENTS) {
             val cur = frontier.removeFirst()

@@ -72,6 +72,39 @@ class LpHullPruningTest {
     }
 
     @Test
+    fun `pruning drops only the ineffective hull of a family and keeps the effective one`() {
+        // Two Table hulls of the same family: A on the objective vars (x0, x1) forces x0 + x1 = 2 —
+        // effective; B on unrelated vars (x2, x3) adds no objective strength — ineffective. Whole-family
+        // pruning is all-or-nothing on `table` and would keep both (dropping the family loosens the
+        // optimum); per-factor pruning drops B and keeps A, leaving the root optimum at 2.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            factors = arrayOf<Factor>(
+                Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 2, 2, 0)),
+                Table(xs = intArrayOf(2, 3), tuples = intArrayOf(0, 2, 2, 0)),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 0, 0)) // minimize x0 + x1
+        val engine = LpEngine(
+            p,
+            obj,
+            BacktrackParams(lpPlan = LpPlan(bounding = true, table = true, pruneHulls = true)),
+            SolveStatsSink(backend = "hull"),
+        )
+        val original = engine.lpRelaxer
+        engine.pruneIneffectiveHulls(Cancellation.Never)
+        assertNotSame(original, engine.lpRelaxer, "the unrelated table hull must be dropped per-factor")
+        assertEquals(
+            2.0,
+            engine.rootLpObjective(engine.lpRelaxer!!, Cancellation.Never),
+            1e-6,
+            "the objective table hull must be kept, so the root optimum stays 2",
+        )
+    }
+
+    @Test
     fun `pruning preserves the optimum`() {
         val p = unrelatedProductProblem()
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))

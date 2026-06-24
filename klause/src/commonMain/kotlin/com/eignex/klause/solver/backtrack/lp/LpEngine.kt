@@ -61,29 +61,32 @@ internal class LpEngine(
         params0.lpConfig?.let { LpAutoConfig.resolve(problem, it, params0) } ?: params0
 
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
-     *  ineffective-hull probe can build variants with individual hulls turned off. */
-    private fun buildRelaxer(plan: LpPlan): CpToLpRelaxation? = if (plan.bounding) {
-        CpToLpRelaxation(
-            problem,
-            objective,
-            elementHull = plan.element,
-            tableHull = plan.table,
-            cumulative = plan.cumulative,
-            diffn = plan.diffn,
-            cumulativeTimeIndexed = plan.cumulativeTimeIndexed,
-            nValueHull = plan.nValue,
-            regularHull = plan.regular,
-            mddHull = plan.mdd,
-            gccCountHull = plan.gccCount,
-            circuitArcs = plan.circuit,
-            objectiveCone = plan.objectiveCone,
-            linMaxTightFace = plan.linMaxTightFace,
-            productMcCormick = plan.productMcCormick,
-            booleanRlt = plan.booleanRlt,
-        )
-    } else {
-        null
-    }
+     *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
+     *  hulls ([suppressedHullFactors]) turned off. */
+    private fun buildRelaxer(plan: LpPlan, suppressedHullFactors: Set<Int> = emptySet()): CpToLpRelaxation? =
+        if (plan.bounding) {
+            CpToLpRelaxation(
+                problem,
+                objective,
+                elementHull = plan.element,
+                tableHull = plan.table,
+                cumulative = plan.cumulative,
+                diffn = plan.diffn,
+                cumulativeTimeIndexed = plan.cumulativeTimeIndexed,
+                nValueHull = plan.nValue,
+                regularHull = plan.regular,
+                mddHull = plan.mdd,
+                gccCountHull = plan.gccCount,
+                circuitArcs = plan.circuit,
+                objectiveCone = plan.objectiveCone,
+                linMaxTightFace = plan.linMaxTightFace,
+                productMcCormick = plan.productMcCormick,
+                booleanRlt = plan.booleanRlt,
+                suppressedHullFactors = suppressedHullFactors,
+            )
+        } else {
+            null
+        }
 
     /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
      *  [params]-resolved one for the whole search. */
@@ -469,53 +472,58 @@ internal class LpEngine(
     )
 
     /**
-     * Drop each convex-hull technique that adds no strength to the root LP optimum, rebuilding the
-     * relaxer once over the survivors. For every enabled hull it solves the root LP with that one hull
-     * turned off and keeps the hull only if its removal loosens the optimum; a hull whose removal leaves
-     * the optimum unchanged (often because root propagation already achieves the same bound) is pure
-     * per-node build cost and is dropped. This is the per-technique counterpart of [LpEffortLadder]'s
-     * whole-simplex demotion, applied to the build-time hulls a search cannot cheaply toggle per node —
-     * so the decision is made once, here, before the persistent base is first built.
+     * Drop each convex hull that adds no strength to the root LP optimum, rebuilding the relaxer once
+     * over the survivors. Per-factor hulls (every factor whose [com.eignex.klause.solver.Linearizer]
+     * emits a [com.eignex.klause.solver.Contribution.HULL] row) are pruned individually: each is solved
+     * out in turn and kept only if its removal loosens the optimum, so two factors of the same family
+     * are judged separately. The non-per-factor hulls (cumulative time-indexed, diffn, Boolean RLT) are
+     * emitted by the driver, not a Linearizer, so they carry no per-factor tag and are pruned by whole
+     * family. A hull whose removal leaves the optimum unchanged (often because root propagation already
+     * achieves the same bound) is pure per-node build cost and is dropped. This is the per-technique
+     * counterpart of [LpEffortLadder]'s whole-simplex demotion, decided once before the persistent base
+     * is first built.
      *
      * Comparison uses the true LP optimum ([rootLpObjective]), not the safe under-estimate, so a hull's
      * real tightening is visible. Sound: a hull is a sound relaxation whether present or not, and one is
-     * dropped only when the root optimum is identical without it. Costs one extra root solve per enabled
-     * hull, bounded by [cancellation] (the shared root budget). A no-op when bounding is off or no hull is
-     * enabled.
+     * dropped only when the root optimum is identical without it. Costs one extra root solve per hull
+     * candidate, bounded by [cancellation] (the shared root budget). A no-op when bounding is off or no
+     * hull is enabled.
      */
     fun pruneIneffectiveHulls(cancellation: Cancellation) {
         val relaxer = lpRelaxer ?: return
-        var plan = params.lpPlan
         val full = rootLpObjective(relaxer, cancellation)
         if (full.isNaN()) return
+        // Per-factor: greedily solve out each tagged hull contribution; removing a hull can only loosen a
+        // minimisation optimum, so an unchanged optimum (within tol) means it added no root strength. A
+        // NaN probe (the hull is the only structure) keeps it. Candidates are the factors that emitted a
+        // HULL row in the full build.
+        val suppressed = mutableSetOf<Int>()
+        for (factorId in relaxer.build(PropagationSession(problem)).hullFactorIds) {
+            val probe = buildRelaxer(params.lpPlan, suppressed + factorId) ?: continue
+            val bound = rootLpObjective(probe, cancellation)
+            if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) suppressed.add(factorId)
+        }
+        // Per-family: the driver-emitted hulls with no per-factor tag.
+        var plan = params.lpPlan
         for (disable in HULL_DISABLERS) {
             val candidate = disable(plan) ?: continue // null when this hull is already off
-            val probe = buildRelaxer(candidate) ?: continue
+            val probe = buildRelaxer(candidate, suppressed) ?: continue
             val bound = rootLpObjective(probe, cancellation)
-            // Removing a hull can only loosen a minimisation LP optimum; if it is unchanged (within tol)
-            // the hull added no root strength, so drop it. A NaN probe (the hull-free relaxation is empty)
-            // means the hull is the only structure — keep it.
             if (!bound.isNaN() && bound >= full - HULL_PRUNE_TOL) plan = candidate
         }
-        if (plan !== params.lpPlan) lpRelaxer = buildRelaxer(plan)
+        if (plan !== params.lpPlan || suppressed.isNotEmpty()) lpRelaxer = buildRelaxer(plan, suppressed)
     }
 
     private companion object {
         /** A root optimum this close to the all-hulls optimum counts as "no strength added". */
         const val HULL_PRUNE_TOL = 1e-6
 
-        /** One disabler per prunable convex-hull flag: returns the plan with that hull off, or null when
-         *  it is already off. The base relaxation, objective cone, circuit arcs and cumulative makespan
-         *  row are not hulls and are excluded. */
+        /** One disabler per prunable hull that is **not** per-factor (emitted by the driver, not a
+         *  Linearizer, so it carries no [com.eignex.klause.solver.Contribution] tag): returns the plan
+         *  with that family off, or null when it is already off. The per-factor convex hulls are pruned
+         *  individually by [pruneIneffectiveHulls]; the base relaxation, objective cone and circuit arcs
+         *  are not hulls and are excluded. */
         val HULL_DISABLERS: List<(LpPlan) -> LpPlan?> = listOf(
-            { p -> if (p.element) p.copy(element = false) else null },
-            { p -> if (p.table) p.copy(table = false) else null },
-            { p -> if (p.nValue) p.copy(nValue = false) else null },
-            { p -> if (p.regular) p.copy(regular = false) else null },
-            { p -> if (p.mdd) p.copy(mdd = false) else null },
-            { p -> if (p.gccCount) p.copy(gccCount = false) else null },
-            { p -> if (p.linMaxTightFace) p.copy(linMaxTightFace = false) else null },
-            { p -> if (p.productMcCormick) p.copy(productMcCormick = false) else null },
             { p -> if (p.cumulativeTimeIndexed) p.copy(cumulativeTimeIndexed = false) else null },
             { p -> if (p.diffn) p.copy(diffn = false) else null },
             { p -> if (p.booleanRlt) p.copy(booleanRlt = false) else null },
