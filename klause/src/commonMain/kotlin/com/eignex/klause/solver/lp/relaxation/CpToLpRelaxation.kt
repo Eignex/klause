@@ -3,6 +3,7 @@ package com.eignex.klause.solver.lp.relaxation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Contribution
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RelaxationBuilder
@@ -408,10 +409,30 @@ internal class CpToLpRelaxation(
         /** Arc-indicator models recorded by `buildCircuitArcs` for the subtour-elimination separator. */
         private val circuitModels = ArrayList<CircuitArcModel>()
 
+        /** Whether the factor currently being linearized may contribute HULL rows: its convex-hull
+         *  family flag is on and we are not in objective-cone mode (where the column-heavy hulls are
+         *  forced off). Set per factor before [Factor.asLinearizer]; consulted by the row emitters so a
+         *  disabled family contributes only its CORE rows. CORE rows ignore it. */
+        private var currentHullEnabled = true
+
+        /** The plan flag gating [factor]'s HULL rows (its convex-hull family), false in cone mode.
+         *  A factor with no HULL contribution is unaffected — the flag only suppresses HULL rows. */
+        private fun hullEnabledFor(factor: Factor): Boolean = !objectiveCone && when (factor) {
+            is Element -> elementHull
+            is Table -> tableHull
+            is NValue -> nValueHull
+            is Regular -> regularHull
+            is Mdd -> mddHull
+            is GlobalCardinality -> gccCountHull
+            is ArrayMinMax -> linMaxTightFace
+            is Product -> productMcCormick
+            else -> true
+        }
+
         /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc.
          *  [presence] names the `(intVar, value)` memberships that must all hold for the column to be
          *  present (upper [hi]); when given, the column can be re-bound on the persistent path. */
-        private fun auxColumn(lo: Long, hi: Long, presence: IntArray? = null): Int {
+        override fun auxColumn(lo: Long, hi: Long, presence: IntArray?): Int {
             val c = builder.addVar(lo, hi, cost = 0L, tag = -1)
             colVarId.add(-1)
             colIsBool.add(0)
@@ -505,7 +526,7 @@ internal class CpToLpRelaxation(
         }
 
         /** Column for integer variable `i`, created on first use with its live domain bounds. */
-        private fun intColumn(i: Int): Int {
+        override fun intColumn(i: Int): Int {
             var c = intCol[i]
             if (c == -1) {
                 val dom = session.intDomain(i)
@@ -520,7 +541,7 @@ internal class CpToLpRelaxation(
         }
 
         /** Column for Boolean variable `b`; bounds collapse to a point if it is pinned this node. */
-        private fun boolColumn(b: Int): Int {
+        override fun boolColumn(b: Int): Int {
             var c = boolCol[b]
             if (c == -1) {
                 val pinned = session.boolValue(b)
@@ -867,6 +888,7 @@ internal class CpToLpRelaxation(
                 // #571: in cone mode emit only factors connected to the objective; this also drops
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
+                currentHullEnabled = hullEnabledFor(factor)
                 when (factor) {
                     is Linear -> factor.asLinearizer().linearize(this, factorId)
 
@@ -876,41 +898,15 @@ internal class CpToLpRelaxation(
 
                     is ReifiedCardinality -> reifiedCardRows(factor)
 
-                    is Cardinality -> {
-                        addBoolRow(factor.literals, null, Relation.GE, factor.min.toLong())
-                        addBoolRow(factor.literals, null, Relation.LE, factor.max.toLong())
-                    }
+                    is Cardinality -> factor.asLinearizer().linearize(this, factorId)
 
-                    is Clause -> addBoolRow(factor.literals, null, Relation.GE, 1L)
+                    is Clause -> factor.asLinearizer().linearize(this, factorId)
 
-                    // result = max(xs) / min(xs) — the extremum is the envelope of its operands:
-                    // result ≥ xs[i] for max, result ≤ xs[i] for min. One row per operand, sound
-                    // (the opposite face, result tight to some operand, is not a single LP cut).
-                    is ArrayMinMax -> {
-                        val rel = if (factor.max) Relation.GE else Relation.LE
-                        for (x in factor.xs) {
-                            addIntRow(
-                                intArrayOf(factor.result),
-                                intArrayOf(1),
-                                auxCol = intColumn(x),
-                                auxCoeff = -1L,
-                                rel = rel,
-                                rhs = 0L,
-                            )
-                        }
-                        if (linMaxTightFace) buildLinMaxTightFace(factor)
-                    }
+                    is ArrayMinMax -> factor.asLinearizer().linearize(this, factorId)
 
-                    is PseudoBoolean -> {
-                        val rel = when (factor.op) {
-                            PbOp.LE -> Relation.LE
-                            PbOp.GE -> Relation.GE
-                            PbOp.EQ -> Relation.EQ
-                        }
-                        addBoolRow(factor.literals, factor.weights, rel, factor.bound.toLong())
-                    }
+                    is PseudoBoolean -> factor.asLinearizer().linearize(this, factorId)
 
-                    is Product -> if (productMcCormick) buildProductMcCormick(factor)
+                    is Product -> factor.asLinearizer().linearize(this, factorId)
 
                     else -> Unit // hard globals and unrecognized factors: handled elsewhere or skipped
                 }
@@ -1436,31 +1432,6 @@ internal class CpToLpRelaxation(
         }
 
         /**
-         * McCormick envelope of one [Product] `result = a·b` — the four bound-derived inequalities
-         * `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`, `(aH−a)(b−bL) ≥ 0`, `(a−aL)(bH−b) ≥ 0`, each expanded
-         * to a linear row in `result, a, b`. They are valid at every point with `aL ≤ a ≤ aH`,
-         * `bL ≤ b ≤ bH` and `result = a·b`, so the relaxation never cuts a feasible point. Bounds are the
-         * **declared** domains (global). For `a = b` (a square) the `a` and `b` coefficients coalesce, so
-         * the envelope becomes the secant/tangent relaxation of `result = a²`.
-         */
-        private fun buildProductMcCormick(factor: Product) {
-            val aDom = problem.intDomains[factor.a]
-            val bDom = problem.intDomains[factor.b]
-            val aL = aDom.min.toLong()
-            val aH = aDom.max.toLong()
-            val bL = bDom.min.toLong()
-            val bH = bDom.max.toLong()
-            val aCol = intColumn(factor.a)
-            val bCol = intColumn(factor.b)
-            val resCol = intColumn(factor.result)
-            // Each row is `result + ca·a + cb·b  rel  rhs`; coefficients coalesce when a and b coincide.
-            mcCormickRow(resCol, aCol, bCol, -bL, -aL, Relation.GE, -(aL * bL)) // (a−aL)(b−bL) ≥ 0
-            mcCormickRow(resCol, aCol, bCol, -bH, -aH, Relation.GE, -(aH * bH)) // (a−aH)(b−bH) ≥ 0
-            mcCormickRow(resCol, aCol, bCol, -bL, -aH, Relation.LE, -(aH * bL)) // (aH−a)(b−bL) ≥ 0
-            mcCormickRow(resCol, aCol, bCol, -bH, -aL, Relation.LE, -(aL * bH)) // (a−aL)(bH−b) ≥ 0
-        }
-
-        /**
          * Boolean Reformulation-Linearization-Technique cuts. For a 0/1 knapsack
          * row `Σₖ aₖ·xₖ ≤ b` (`aₖ > 0`, every `xₖ ∈ {0,1}`) and a multiplier `xᵢ` from it, multiplying by
          * `xᵢ ≥ 0` gives the valid `Σₖ aₖ·(xₖxᵢ) ≤ b·xᵢ`. Each product `wₖᵢ = xₖ·xᵢ` becomes an auxiliary
@@ -1502,50 +1473,6 @@ internal class CpToLpRelaxation(
                     rltRow[xiCol] = (rltRow[xiCol] ?: 0L) - b // Σ aₖwₖᵢ ≤ b·xᵢ
                     val cols = rltRow.keys.toIntArray()
                     builder.addRow(cols, LongArray(cols.size) { rltRow.getValue(cols[it]) }, Relation.LE, 0L)
-                }
-            }
-        }
-
-        /** Emit `result + ca·a + cb·b rel rhs`, summing coefficients over shared columns (so a square
-         *  `a·a` collapses the two operand terms onto one column). */
-        private fun mcCormickRow(resCol: Int, aCol: Int, bCol: Int, ca: Long, cb: Long, rel: Relation, rhs: Long) {
-            val coeff = HashMap<Int, Long>()
-            coeff[resCol] = (coeff[resCol] ?: 0L) + 1L
-            coeff[aCol] = (coeff[aCol] ?: 0L) + ca
-            coeff[bCol] = (coeff[bCol] ?: 0L) + cb
-            val cols = coeff.keys.toIntArray()
-            val vals = LongArray(cols.size) { coeff.getValue(cols[it]) }
-            builder.addRow(cols, vals, rel, rhs)
-        }
-
-        /**
-         * Anderson tight face of `result = max(xs)` / `min(xs)`. The always-emitted envelope gives
-         * `result ≥ xs[i]` (max) / `≤` (min); this adds the *tight* side: one-hot selectors `z_i` with
-         * `Σ z_i = 1` and, per operand, a big-M row that forces `result = xs[i]` when `z_i = 1` and is
-         * slack otherwise — so the LP also bounds `result ≤ max` / `result ≥ min`. `M_i = max(rHi, xHi) −
-         * min(rLo, xLo)` from the **declared** domains bounds `|result − xs[i]|` globally, so the rows
-         * hold at every integer solution (sound — never cuts a feasible point; verified by enumeration).
-         */
-        private fun buildLinMaxTightFace(factor: ArrayMinMax) {
-            val n = factor.xs.size
-            if (n == 0) return
-            val sel = IntArray(n) { auxColumn(0L, 1L) } // free binaries z_i ∈ [0,1]
-            builder.addRow(sel, LongArray(n) { 1L }, Relation.EQ, 1L) // Σ z_i = 1
-            val resCol = intColumn(factor.result)
-            val rDom = problem.intDomains[factor.result]
-            for (i in 0 until n) {
-                val x = factor.xs[i]
-                val xDom = problem.intDomains[x]
-                val m = maxOf(rDom.max, xDom.max).toLong() - minOf(rDom.min, xDom.min).toLong()
-                if (m < 0L) continue
-                val xCol = intColumn(x)
-                val z = sel[i]
-                if (factor.max) {
-                    // result ≤ xs[i] + M(1 − z_i)  ⇒  result − xs[i] + M·z_i ≤ M.
-                    builder.addRow(intArrayOf(resCol, xCol, z), longArrayOf(1L, -1L, m), Relation.LE, m)
-                } else {
-                    // result ≥ xs[i] − M(1 − z_i)  ⇒  xs[i] − result + M·z_i ≤ M.
-                    builder.addRow(intArrayOf(xCol, resCol, z), longArrayOf(1L, -1L, m), Relation.LE, m)
                 }
             }
         }
@@ -1712,6 +1639,18 @@ internal class CpToLpRelaxation(
             }
         }
 
+        private fun relationOf(op: LinearOp): Relation? = when (op) {
+            LinearOp.LE -> Relation.LE
+            LinearOp.GE -> Relation.GE
+            LinearOp.EQ -> Relation.EQ
+            LinearOp.NE -> null // not LP-relaxable
+        }
+
+        /** A HULL row is dropped when the current factor's hull family is disabled this build; CORE
+         *  rows always pass. */
+        private fun suppressed(contribution: Contribution): Boolean =
+            contribution == Contribution.HULL && !currentHullEnabled
+
         // [contribution] (CORE/HULL) is part of the row-emission contract but not yet consumed: the
         // root hull pruner still gates whole families via the LP plan. A later pass keys pruning off
         // the per-factor HULL rows recorded here.
@@ -1722,13 +1661,39 @@ internal class CpToLpRelaxation(
             bound: Long,
             contribution: Contribution,
         ) {
-            val rel = when (op) {
-                LinearOp.LE -> Relation.LE
-                LinearOp.GE -> Relation.GE
-                LinearOp.EQ -> Relation.EQ
-                LinearOp.NE -> return // not LP-relaxable
-            }
+            if (suppressed(contribution)) return
+            val rel = relationOf(op) ?: return
             addIntRow(intVars, coeffs, auxCol = -1, auxCoeff = 0L, rel = rel, rhs = bound)
+        }
+
+        override fun boolRow(
+            literals: IntArray,
+            weights: IntArray?,
+            op: LinearOp,
+            bound: Long,
+            contribution: Contribution,
+        ) {
+            if (suppressed(contribution)) return
+            val rel = relationOf(op) ?: return
+            addBoolRow(literals, weights, rel, bound)
+        }
+
+        override fun hullEnabled(): Boolean = currentHullEnabled
+
+        override fun liveDomain(intVar: Int): IntDomain = session.intDomain(intVar)
+
+        override fun declaredDomain(intVar: Int): IntDomain = problem.intDomains[intVar]
+
+        override fun row(
+            columns: IntArray,
+            coeffs: LongArray,
+            op: LinearOp,
+            rhs: Long,
+            contribution: Contribution,
+        ) {
+            if (suppressed(contribution)) return
+            val rel = relationOf(op) ?: return
+            builder.addRow(columns, coeffs, rel, rhs)
         }
     }
 }

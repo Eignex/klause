@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 
@@ -37,4 +38,6 @@ class Product(
     override fun asPropagator(): Propagator = ProductPropagator(a, b, result, boolVars, intVars)
 
     override fun asInvariant(): Invariant = ProductInvariant(a, b, result)
+
+    override fun asLinearizer(): Linearizer = ProductLinearizer(a, b, result)
 }

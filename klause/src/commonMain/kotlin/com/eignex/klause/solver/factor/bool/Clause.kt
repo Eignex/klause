@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
@@ -64,4 +65,6 @@ class Clause(val literals: IntArray) : Factor {
     override fun asPropagator(): Propagator = ClausePropagator(boolVars, intVars, literals)
 
     override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals)
+
+    override fun asLinearizer(): Linearizer = ClauseLinearizer(literals)
 }
