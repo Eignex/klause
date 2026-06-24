@@ -3,6 +3,7 @@ package com.eignex.klause.solver.presolve
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.LinearRow
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.arithmetic.Linear
@@ -62,6 +63,18 @@ internal object RedundantConstraints {
             }
         }
         for (f in deduped) {
+            // Any factor with an exact linear form (a Linear comparator, or each pair of an increasing
+            // chain) feeds the dominator buckets through its rows; PB inequalities, which have no
+            // linear-row view, contribute through ineqNormalForm.
+            val rows = f.linearRows()
+            if (rows != null) {
+                for (row in rows) {
+                    val n = rowForm(row) ?: continue
+                    offer(n.key, n.bound, fromEq = n.fromEq)
+                    if (n.opposite != null) offer(n.opposite.key, n.opposite.bound, fromEq = true)
+                }
+                continue
+            }
             val n = ineqNormalForm(f) ?: continue
             offer(n.key, n.bound, fromEq = n.fromEq)
             // An `=` contributes its bound to both directions, so it can dominate either inequality.
@@ -128,19 +141,21 @@ internal object RedundantConstraints {
      *  coefficient. */
     private class LeRow(val factorIndex: Int, val coeffByVar: Map<Int, Int>, val bound: Long)
 
-    private fun leRowOf(f: Linear, factorIndex: Int): LeRow? {
-        val (coeffs, bound) = when (f.op) {
-            LinearOp.LE -> f.coeffs to f.bound.toLong()
-            LinearOp.GE -> negated(f.coeffs) to -f.bound.toLong()
+    /** A `≤`-normalised, GCD-reduced [LeRow] for an exact [LinearRow] (from any factor's
+     *  [Factor.linearRows]); `null` for a non-(`≤`/`≥`) row. Coalesced terms have distinct vars, so a
+     *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
+     *  the dominance ratio check), so skip them. */
+    private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
+        val (coeffs, bound) = when (row.op) {
+            LinearOp.LE -> row.coeffs to row.bound
+            LinearOp.GE -> negated(row.coeffs) to -row.bound
             else -> return null
         }
         val g = PresolveShared.gcdOf(coeffs)
-        val map = HashMap<Int, Int>(f.vars.size)
-        // Coalesced Linear has distinct vars, so a plain put per index is faithful. Zero coefficients
-        // carry no support and would otherwise divide by zero in the dominance ratio check, so skip them.
-        for (i in f.vars.indices) {
+        val map = HashMap<Int, Int>(row.vars.size)
+        for (i in row.vars.indices) {
             if (coeffs[i] == 0) continue
-            map[f.vars[i]] = if (g <= 1) coeffs[i] else coeffs[i] / g
+            map[row.vars[i]] = if (g <= 1) coeffs[i] else coeffs[i] / g
         }
         return LeRow(factorIndex, map, if (g <= 1) bound else bound.floorDiv(g.toLong()))
     }
@@ -158,15 +173,25 @@ internal object RedundantConstraints {
      * [SUBSET_DOMINATION_ROW_CAP] so the pairwise scan can't blow up.
      */
     private fun dropSubsetDominated(problem: Problem, factors: List<Factor>): List<Factor> {
-        val rows = ArrayList<LeRow>()
+        // Dominators: every exact `≤`-row in the model (so an increasing chain's pairs can dominate
+        // too). Drop candidates: only single-row factors — a multi-row factor (an increasing chain) is
+        // never dropped here, since one dominated pair does not make the whole chain redundant.
+        val dominators = ArrayList<LeRow>()
+        val candidates = ArrayList<LeRow>()
         for (i in factors.indices) {
             val f = factors[i]
-            if (f is Linear) leRowOf(f, i)?.let { rows.add(it) }
+            val fRows = f.linearRows() ?: continue
+            val droppable = f is Linear
+            for (row in fRows) {
+                val le = leRowOf(row, i) ?: continue
+                dominators.add(le)
+                if (droppable) candidates.add(le)
+            }
         }
-        if (rows.size < 2 || rows.size > SUBSET_DOMINATION_ROW_CAP) return factors
+        if (candidates.isEmpty() || dominators.size > SUBSET_DOMINATION_ROW_CAP) return factors
         val dropped = IntHashSet()
-        for (b in rows) {
-            for (a in rows) {
+        for (b in candidates) {
+            for (a in dominators) {
                 if (a.factorIndex == b.factorIndex || a.coeffByVar.size >= b.coeffByVar.size) continue
                 if (dominates(problem, a, b)) {
                     dropped.add(b.factorIndex)
@@ -267,6 +292,20 @@ internal object RedundantConstraints {
      *  `null` for `≠` and non-(Linear/PseudoBoolean) factors, which take no part in domination. */
     private class IneqForm(val key: TermKey, val bound: Long, val fromEq: Boolean, val opposite: IneqForm? = null) {
         fun copyWithOpposite(opp: IneqForm) = IneqForm(key, bound, fromEq, opp)
+    }
+
+    /** A single exact [LinearRow] as its `≤`-normalised [IneqForm] (an `=` row carries its opposite
+     *  direction and is never dropped); `null` for a `≠` row. */
+    private fun rowForm(row: LinearRow): IneqForm? = when (row.op) {
+        LinearOp.LE -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = false)
+
+        LinearOp.GE -> reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = false)
+
+        LinearOp.EQ -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = true).copyWithOpposite(
+            reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = true),
+        )
+
+        LinearOp.NE -> null
     }
 
     private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {

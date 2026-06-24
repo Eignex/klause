@@ -11,6 +11,7 @@ import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.global.Increasing
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -75,6 +76,20 @@ class RedundantConstraintsTest {
         val out = checkPreserved("dominated-le", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
         assertEquals(3, (out.factors[0] as Linear).bound, "the tighter bound is kept")
+    }
+
+    @Test
+    fun `increasing chain subsumes a redundant explicit comparator`() {
+        // strictly_increasing(x0, x1) exposes the exact row x0 - x1 <= -1, which dominates the
+        // redundant explicit x0 - x1 <= 0; the chain factor is never dropped.
+        val problem = Problem(
+            0,
+            2,
+            dom(2, 3),
+            listOf(Increasing(intArrayOf(0, 1), strict = true), le(0, 0, 1, 1, -1)),
+        )
+        val out = checkPreserved("increasing-subsumes-le", problem, expectDrop = true)
+        assertTrue(out.factors.single() is Increasing, "the increasing chain survives, the comparator drops")
     }
 
     @Test
