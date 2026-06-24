@@ -1,31 +1,39 @@
 package com.eignex.klause.solver.lp.cut
 
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.lp.Relation
 import kotlin.math.max
 
 /**
- * Single-node flow-cover cuts. Detects single-node flow structure
- * directly from the integer model — a **capacity row** `Σⱼ yⱼ ≤ b` whose flow variables each carry a
- * **variable-upper-bound** (VUB) `yⱼ ≤ uⱼ·xⱼ` with `xⱼ ∈ {0,1}` (every constraint a plain [Linear], no
- * new columns) — and separates the Padberg–Van Roy–Wolsey flow-cover inequality.
+ * Single-node flow-cover cuts (Padberg–Van Roy–Wolsey). Two structural forms are read directly from the
+ * integer model, both reducing to the same cover separation over LP columns:
  *
- * For a cover `C` whose capacity exceeds the demand by `λ = Σ_{C} uⱼ − b > 0`, every feasible
- * `(x, y)` satisfies `Σ_{j∈C} yⱼ + Σ_{j∈C} max(0, uⱼ − λ)·(1 − xⱼ) ≤ b`. The cover is chosen greedily
- * from the arcs the LP opens most (largest `xⱼ*`), and the inequality is emitted only when the LP point
- * violates it. Sound: the inequality holds at every integer-feasible point (brute-validated), so it only
- * tightens the relaxation — it never removes a feasible solution. Cuts from globally valid rows are
- * [Cut.global].
+ *  - **Explicit flow**: a capacity row `Σⱼ yⱼ ≤ b` whose flow variables each carry a variable-upper-bound
+ *    `yⱼ ≤ uⱼ·xⱼ` (a 2-term [Linear] `yⱼ − uⱼ·xⱼ ≤ 0`, `xⱼ ∈ {0,1}`).
+ *  - **Implicit / bin-packing**: a 0/1 knapsack `Σⱼ wⱼ·xⱼ ≤ C` (`xⱼ ∈ {0,1}`, `wⱼ > 0`) viewed as a
+ *    single-node flow with `yⱼ = wⱼ·xⱼ` — the flow and its indicator share the column, capacity `wⱼ`
+ *    (#843). This exposes the flow-cover family to bin-packing / network-flow models, which carry the
+ *    structure as plain weighted knapsacks rather than explicit flow variables.
+ *
+ * For a cover `C` whose capacity exceeds the demand by `λ = Σ_C capⱼ − b > 0`, every feasible point
+ * satisfies `Σ_C flowⱼ + Σ_C max(0, capⱼ − λ)·(1 − xⱼ) ≤ b`. The cover is chosen greedily from the arcs
+ * the LP opens most (largest `xⱼ*`), and the inequality is emitted only when the LP point violates it.
+ * Sound: it holds at every integer-feasible point (brute-validated for both forms), so it only tightens
+ * the relaxation. Cuts from globally valid rows are [Cut.global].
  */
 internal class FlowCoverSeparator : CutSeparator {
 
-    /** One flow arc: the integer flow variable, its `{0,1}` indicator, and the effective capacity `uⱼ`. */
-    private class Arc(val flowVar: Int, val indicatorVar: Int, val cap: Long)
+    /** One flow arc over LP columns: the flow contributes `flowCoeff · primal(flowCol)` (so the cut term
+     *  is `flowCoeff·flowCol`), gated by the `{0,1}` indicator column, with effective capacity [cap]. For
+     *  an implicit knapsack arc the flow and indicator are the same column (`flowCoeff = cap = wⱼ`). */
+    private class Arc(val flowCol: Int, val flowCoeff: Long, val indicatorCol: Int, val cap: Long)
 
     override fun separate(ctx: CutContext): List<Cut> {
         val problem = ctx.problem
-        // VUB per flow variable: yⱼ ≤ uⱼ·xⱼ ⇔ a 2-term Linear `yⱼ − uⱼ·xⱼ ≤ 0`, xⱼ ∈ {0,1}.
+        val intColOf = ctx.relaxation.intColOf
+        // Explicit VUB per flow variable: yⱼ ≤ uⱼ·xⱼ ⇔ a 2-term Linear `yⱼ − uⱼ·xⱼ ≤ 0`, xⱼ ∈ {0,1}.
         val indicator = HashMap<Int, Int>()
         val vubCap = HashMap<Int, Long>()
         for (f in problem.factors) {
@@ -37,16 +45,14 @@ internal class FlowCoverSeparator : CutSeparator {
             indicator[y] = x
             vubCap[y] = cap
         }
-        if (indicator.isEmpty()) return emptyList()
 
-        val intColOf = ctx.relaxation.intColOf
         val cuts = ArrayList<Cut>()
         for (f in problem.factors) {
-            if (f !is Linear || f.op != LinearOp.LE) continue
-            if (f.vars.size < 2 || f.coeffs.any { it != 1 }) continue // unit-coefficient capacity row
-            if (f.vars.any { it !in indicator }) continue // every flow var must carry a VUB
-            val cut = separateRow(ctx, f, indicator, vubCap, intColOf) ?: continue
-            cuts.add(cut)
+            if (f !is Linear || f.op != LinearOp.LE || f.vars.size < 2) continue
+            val arcs = explicitArcs(f, indicator, vubCap, intColOf)
+                ?: implicitArcs(f, problem, intColOf)
+                ?: continue
+            separateCover(ctx, arcs, f.bound.toLong())?.let { cuts.add(it) }
         }
         return cuts
     }
@@ -62,19 +68,41 @@ internal class FlowCoverSeparator : CutSeparator {
         }
     }
 
-    private fun separateRow(
-        ctx: CutContext,
-        capacityRow: Linear,
+    /** Arcs for an explicit capacity row `Σ yⱼ ≤ b` (unit coefficients) whose every flow variable carries
+     *  a registered VUB, or null when [f] is not that row. */
+    private fun explicitArcs(
+        f: Linear,
         indicator: Map<Int, Int>,
         vubCap: Map<Int, Long>,
         intColOf: IntArray,
-    ): Cut? {
-        val b = capacityRow.bound.toLong()
-        if (b < 0L) return null
-        val arcs = capacityRow.vars.map { y -> Arc(y, indicator.getValue(y), vubCap.getValue(y)) }
+    ): List<Arc>? {
+        if (f.coeffs.any { it != 1 } || f.vars.any { it !in indicator }) return null
+        return f.vars.map { y ->
+            val x = indicator.getValue(y)
+            if (intColOf[y] < 0 || intColOf[x] < 0) return null
+            Arc(flowCol = intColOf[y], flowCoeff = 1L, indicatorCol = intColOf[x], cap = vubCap.getValue(y))
+        }
+    }
 
+    /** Arcs for an implicit bin-packing knapsack `Σ wⱼ·xⱼ ≤ C` (`xⱼ ∈ {0,1}`, `wⱼ > 0`), each term a flow
+     *  `yⱼ = wⱼ·xⱼ` over the indicator's own column, or null when [f] is not that shape. */
+    private fun implicitArcs(f: Linear, problem: Problem, intColOf: IntArray): List<Arc>? {
+        for (i in f.vars.indices) {
+            if (f.coeffs[i] <= 0) return null
+            val d = problem.intDomains[f.vars[i]]
+            if (d.min != 0 || d.max != 1 || intColOf[f.vars[i]] < 0) return null
+        }
+        return f.vars.indices.map { i ->
+            val col = intColOf[f.vars[i]]
+            val w = f.coeffs[i].toLong()
+            Arc(flowCol = col, flowCoeff = w, indicatorCol = col, cap = w)
+        }
+    }
+
+    private fun separateCover(ctx: CutContext, arcs: List<Arc>, b: Long): Cut? {
+        if (b < 0L) return null
         // Greedy cover: open the arcs the LP favours (largest indicator value) until capacity exceeds b.
-        val byOpen = arcs.sortedByDescending { ctx.primalOf(intColOf[it.indicatorVar]) }
+        val byOpen = arcs.sortedByDescending { ctx.primalOf(it.indicatorCol) }
         val cover = ArrayList<Arc>()
         var capSum = 0L
         for (arc in byOpen) {
@@ -85,29 +113,26 @@ internal class FlowCoverSeparator : CutSeparator {
         val lambda = capSum - b
         if (lambda <= 0L) return null // not a cover
 
-        // Σ_C yⱼ + Σ_C mⱼ·(1 − xⱼ) ≤ b, mⱼ = max(0, uⱼ − λ). Rewrite over columns:
-        // Σ_C yⱼ − Σ_C mⱼ·xⱼ ≤ b − Σ_C mⱼ. Emit only if the LP point violates it.
-        val cols = ArrayList<Int>()
-        val coeffs = ArrayList<Long>()
+        // Σ_C flowⱼ + Σ_C mⱼ·(1 − xⱼ) ≤ b, mⱼ = max(0, capⱼ − λ). Rewrite over columns, coalescing the
+        // flow and indicator coefficients that share a column (the implicit knapsack arc).
+        val coeffByCol = LinkedHashMap<Int, Long>()
         var rhs = b
-        var activity = 0.0
         for (arc in cover) {
+            coeffByCol[arc.flowCol] = (coeffByCol[arc.flowCol] ?: 0L) + arc.flowCoeff
             val m = max(0L, arc.cap - lambda)
-            val yCol = intColOf[arc.flowVar]
-            cols.add(yCol)
-            coeffs.add(1L)
-            activity += ctx.primalOf(yCol)
             if (m != 0L) {
-                val xCol = intColOf[arc.indicatorVar]
-                cols.add(xCol)
-                coeffs.add(-m)
-                activity -= m * ctx.primalOf(xCol)
+                coeffByCol[arc.indicatorCol] = (coeffByCol[arc.indicatorCol] ?: 0L) - m
                 rhs -= m
             }
         }
+        var activity = 0.0
+        for ((col, c) in coeffByCol) activity += c * ctx.primalOf(col)
         if (activity <= rhs + VIOLATION_TOL) return null // not violated
+
+        val cols = coeffByCol.keys.toIntArray()
+        val coeffs = LongArray(cols.size) { coeffByCol.getValue(cols[it]) }
         // Globally valid iff the source rows are global (every detected row is a declared constraint).
-        return Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.LE, rhs, global = true)
+        return Cut(cols, coeffs, Relation.LE, rhs, global = true)
     }
 
     private companion object {
