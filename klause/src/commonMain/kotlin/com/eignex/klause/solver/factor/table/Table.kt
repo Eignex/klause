@@ -20,12 +20,17 @@ import com.eignex.klause.util.IntIntMap
  *
  * `table_bool` is supported via the same factor by channeling booleans to 0/1 ints upstream.
  */
-class Table(
+class Table private constructor(
     /** The variable ids forming each candidate tuple. */
     val xs: IntArray,
     /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
     val tuples: IntArray,
+    /** The cached tuple-derived key fragment when copying from a factor over the *same* [tuples]
+     *  (a pure variable [remap]); `null` forces a fresh computation when the tuples differ. */
+    cachedTupleKey: LongArray?,
 ) : Factor {
+
+    constructor(xs: IntArray, tuples: IntArray) : this(xs, tuples, null)
 
     /** Number of variables per tuple. */
     val arity: Int = xs.size
@@ -39,7 +44,27 @@ class Table(
         require(numTuples > 0) { "table: at least one tuple required" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(xs.remapVars(intMap), tuples)
+    // The tuple-derived part of the key (arity, count, sorted tuple set) is invariant under a variable
+    // remap, so it is computed once and carried across remaps — keeping the expensive row sort out of
+    // symmetry refinement's per-round hot path. Cleared (recomputed) only when the tuples change.
+    private var cachedTupleKey: LongArray? = cachedTupleKey
+
+    private fun tupleKey(): LongArray = cachedTupleKey ?: StructuralKey.words {
+        int(arity)
+        int(numTuples)
+        val order = (0 until numTuples).sortedWith { r1, r2 ->
+            var c = 0
+            var d = 0
+            while (c < arity && d == 0) {
+                d = tuples[r1 * arity + c].compareTo(tuples[r2 * arity + c])
+                c++
+            }
+            d
+        }
+        for (r in order) for (c in 0 until arity) int(tuples[r * arity + c])
+    }.also { cachedTupleKey = it }
+
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(xs.remapVars(intMap), tuples, tupleKey())
 
     // Affine substitution `x = scale·replacement + offset` rewrites every column holding x: a row's
     // required value v for x means replacement = (v − offset) / scale, so rows where (v − offset) is
@@ -63,22 +88,12 @@ class Table(
         return Table(newXs, newTuples)
     }
 
-    // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so row strings are sorted.
-    // Encodes the full var sequence and tuple set — collision-free up to variable identity.
+    // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so rows are sorted. Encodes
+    // the full var sequence and tuple set — collision-free up to variable identity. Only `ints(xs)`
+    // varies under a remap; the tuple part is the cached [tupleKey] fragment.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.TABLE) {
         ints(xs)
-        int(arity)
-        int(numTuples)
-        val order = (0 until numTuples).sortedWith { r1, r2 ->
-            var c = 0
-            var d = 0
-            while (c < arity && d == 0) {
-                d = tuples[r1 * arity + c].compareTo(tuples[r2 * arity + c])
-                c++
-            }
-            d
-        }
-        for (r in order) for (c in 0 until arity) int(tuples[r * arity + c])
+        words(tupleKey())
     }
 
     /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the

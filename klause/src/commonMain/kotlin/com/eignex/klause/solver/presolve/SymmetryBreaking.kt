@@ -132,13 +132,17 @@ internal object SymmetryBreaking {
             if (d.max > hi) hi = d.max
         }
         if (lo > hi) return null
+        // Size skip: the incidence scan below visits every value in [lo, hi] against every int
+        // variable, so a wide span across many variables is too costly to be worth the value pins.
+        if ((hi.toLong() - lo + 1) * problem.numIntVars > VALUE_ORBIT_SCAN_BUDGET) return null
         // Group values by domain-incidence signature: same set of containing variables ⇒ a candidate
-        // orbit (a swap within it maps every domain to itself).
-        val incidence = HashMap<String, MutableList<Int>>()
+        // orbit (a swap within it maps every domain to itself). The incident variable ids, in
+        // ascending order, are the signature words.
+        val incidence = HashMap<RefineKey, MutableList<Int>>()
         for (value in lo..hi) {
-            val sig = StringBuilder()
-            for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.append(x).append(',')
-            if (sig.isNotEmpty()) incidence.getOrPut(sig.toString()) { ArrayList() }.add(value)
+            val sig = ArrayList<Long>()
+            for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.add(x.toLong())
+            if (sig.isNotEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }
         val orbits = ArrayList<List<Int>>()
         for (candidate in incidence.values) {
@@ -235,6 +239,36 @@ internal object SymmetryBreaking {
      *  above any colour id (colours are small dense counters) so it never collides with one. */
     private const val WL_FOCAL = 1_000_000_000
 
+    // Colour-refinement signatures are [RefineKey]s (LongArray-backed, the non-string analog of
+    // StructuralKey). The leading word is a *space* tag so an int and a bool variable never share a
+    // colour; bool sorts below int (preserving the former "B" < "I" canonical order). The next word
+    // discriminates the seed/signature shape so distinct logical signatures never collide.
+    private const val SPACE_BOOL = 0L
+    private const val SPACE_INT = 1L
+    private const val SEED_DOMAIN = 0L
+    private const val SEED_OBJECTIVE = 1L
+    private const val SEED_BOOL = 2L
+    private const val SEED_INDIVIDUALIZED = 3L
+    private const val SIG_PORT = 4L
+
+    /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
+    private fun domainSeed(d: IntDomain): RefineKey {
+        val words = ArrayList<Long>()
+        words.add(SPACE_INT)
+        words.add(SEED_DOMAIN)
+        words.add(d.min.toLong())
+        words.add(d.max.toLong())
+        val holes = ArrayList<Long>()
+        d.forEachHole { holes.add(it.toLong()) }
+        words.add(holes.size.toLong())
+        words.addAll(holes)
+        return RefineKey(words.toLongArray())
+    }
+
+    /** A distinguished-fixpoint seed for objective variable [v] in [space] (each is its own colour). */
+    private fun objectiveSeed(space: Long, v: Int): RefineKey =
+        RefineKey(longArrayOf(space, SEED_OBJECTIVE, v.toLong()))
+
     /**
      * Weisfeiler–Leman colour refinement (#373) seeding verified-symmetry candidates. Two variables
      * can be interchangeable only if they share a WL colour (colour is an automorphism invariant),
@@ -255,24 +289,27 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int>,
     ): Pair<IntArray, IntArray> {
         val seedInt = Array(problem.numIntVars) { v ->
-            if (v in objectiveIntVars) "o$v" else domainKey(problem.intDomains[v])
+            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.intDomains[v])
         }
-        val seedBool = Array(problem.numBoolVars) { v -> if (v in objectiveBoolVars) "o$v" else "b" }
+        val seedBool = Array(problem.numBoolVars) { v ->
+            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
+        }
         return equitablePartition(problem, seedInt, seedBool)
     }
 
     /**
      * Weisfeiler–Leman refinement to an equitable partition (the colour-refinement core shared by
      * candidate seeding and the individualization–refinement generator search). [seedInt] / [seedBool]
-     * are the initial colour signatures per variable — domain/kind for plain refinement, a unique
-     * marker for an individualized vertex, or `"o$v"` for a distinguished objective fixpoint. Colours
+     * are the initial colour signatures per variable — a domain seed for plain refinement, an
+     * individualized-vertex marker, or an objective fixpoint seed. Colours
      * are assigned in a canonical order (sorted by signature, bool space below int) so a discrete
      * partition's colour *is* a labeling comparable across individualization branches.
      */
     private fun equitablePartition(
         problem: Problem,
-        seedInt: Array<String>,
-        seedBool: Array<String>,
+        seedInt: Array<RefineKey>,
+        seedBool: Array<RefineKey>,
+        budget: IntArray? = null,
     ): Pair<IntArray, IntArray> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -282,6 +319,11 @@ internal object SymmetryBreaking {
             for (v in f.intVars.distinct()) intInc[v].add(fi)
             for (v in f.boolVars.distinct()) boolInc[v].add(fi)
         }
+        // A round visits every variable–factor incidence once (one [portSignature] port per arc); that
+        // arc count is the deterministic work unit charged against the budget.
+        var arcsPerRound = 0
+        for (inc in intInc) arcsPerRound += inc.size
+        for (inc in boolInc) arcsPerRound += inc.size
         val intColour = IntArray(nInt)
         val boolColour = IntArray(nBool)
         var numColours = assignColours(seedInt, seedBool, intColour, boolColour)
@@ -289,6 +331,10 @@ internal object SymmetryBreaking {
         val intMap = IntArray(nInt)
         val boolMap = IntArray(nBool)
         repeat(nInt + nBool + 1) {
+            // Bail before a fresh round once the search's work budget is spent — returning the current
+            // (possibly not-yet-stable) partition. Callers treat a spent budget as "stop", so a partial
+            // colouring is never mistaken for a discrete one.
+            if (budget != null && budget[0] <= 0) return intColour to boolColour
             for (v in 0 until nInt) intMap[v] = intColour[v]
             for (v in 0 until nBool) boolMap[v] = boolColour[v]
             val sigInt = Array(
@@ -298,6 +344,7 @@ internal object SymmetryBreaking {
                 Array(
                     nBool,
                 ) { v -> portSignature(problem, boolInc[v], v, isBool = true, intMap, boolMap, boolColour[v]) }
+            if (budget != null) budget[0] -= arcsPerRound
             val next = assignColours(sigInt, sigBool, intColour, boolColour)
             if (next == numColours) return intColour to boolColour // partition stable
             numColours = next
@@ -316,8 +363,8 @@ internal object SymmetryBreaking {
         intMap: IntArray,
         boolMap: IntArray,
         oldColour: Int,
-    ): String {
-        val ports = ArrayList<String>(incident.size)
+    ): RefineKey {
+        val ports = ArrayList<StructuralKey>(incident.size)
         for (fi in incident) {
             val saved: Int
             if (isBool) {
@@ -327,31 +374,43 @@ internal object SymmetryBreaking {
                 saved = intMap[v]
                 intMap[v] = WL_FOCAL
             }
-            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey().toString())
+            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey())
             if (isBool) boolMap[v] = saved else intMap[v] = saved
         }
         ports.sort()
-        return "$oldColour|" + ports.joinToString(";")
+        // space | SIG_PORT | oldColour | port count | each port's words, in canonical order — built
+        // into one pre-sized LongArray (no per-word boxing, the WL inner-loop hot path).
+        var size = 4
+        for (port in ports) size += port.wordCount
+        val words = LongArray(size)
+        words[0] = if (isBool) SPACE_BOOL else SPACE_INT
+        words[1] = SIG_PORT
+        words[2] = oldColour.toLong()
+        words[3] = ports.size.toLong()
+        var at = 4
+        for (port in ports) at = port.writeWordsInto(words, at)
+        return RefineKey(words)
     }
 
     /** Re-colour every variable by its signature, writing dense ids into [intColour]/[boolColour] and
      *  returning the number of distinct colours. Ids are assigned in **canonical** order — distinct
-     *  signatures sorted, bool space (`"B…"`) below int (`"I…"`) — so a discrete partition's colour is
-     *  a labeling comparable across individualization branches (needed by the generator search), while
-     *  plain refinement callers, which only read colour *classes*, are unaffected. */
+     *  signatures sorted, bool space ([SPACE_BOOL]) below int ([SPACE_INT]) via the leading signature
+     *  word — so a discrete partition's colour is a labeling comparable across individualization
+     *  branches (needed by the generator search), while plain refinement callers, which only read
+     *  colour *classes*, are unaffected. */
     private fun assignColours(
-        sigInt: Array<String>,
-        sigBool: Array<String>,
+        sigInt: Array<RefineKey>,
+        sigBool: Array<RefineKey>,
         intColour: IntArray,
         boolColour: IntArray,
     ): Int {
-        val distinct = HashSet<String>()
-        for (s in sigInt) distinct.add("I$s")
-        for (s in sigBool) distinct.add("B$s")
-        val ids = HashMap<String, Int>(distinct.size)
+        val distinct = HashSet<RefineKey>()
+        for (s in sigInt) distinct.add(s)
+        for (s in sigBool) distinct.add(s)
+        val ids = HashMap<RefineKey, Int>(distinct.size)
         for (s in distinct.sorted()) ids[s] = ids.size
-        for (v in sigInt.indices) intColour[v] = ids.getValue("I" + sigInt[v])
-        for (v in sigBool.indices) boolColour[v] = ids.getValue("B" + sigBool[v])
+        for (v in sigInt.indices) intColour[v] = ids.getValue(sigInt[v])
+        for (v in sigBool.indices) boolColour[v] = ids.getValue(sigBool[v])
         return ids.size
     }
 
@@ -359,9 +418,34 @@ internal object SymmetryBreaking {
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         refineColours(problem, emptySet(), emptySet())
 
-    /** Total individualize-refine leaves the generator search may compute before bailing (returning
-     *  the generators found so far — sound, just possibly incomplete), mirroring CP-SAT's node cap. */
-    private const val GENERATOR_NODE_BUDGET = 20_000
+    // Three guards on the generator search, mirroring CP-SAT's FindCpModelSymmetries
+    // (ortools/sat/cp_model_symmetries.cc): a size skip for models too large to bother, a deterministic
+    // work budget on the refinement, and bailing with the generators found so far when it runs out.
+    // All three are sound: skipping or stopping early only ever finds *fewer* symmetries, never invents
+    // one (every returned permutation is still verified by [isAutomorphism]).
+
+    /** Skip the search when the problem is huge: both the variable and the factor count exceed this —
+     *  CP-SAT skips at 1e6 of each (`cp_model_symmetries.cc:665`). The work budget bounds the normal
+     *  case; this is the coarse guard against models where even building the graph does not pay off. */
+    private const val SKIP_VARS = 1_000_000
+    private const val SKIP_FACTORS = 1_000_000
+
+    /** Skip when the refinement graph is huge: both its node count (variables + factors) and its arc
+     *  count (variable–factor incidences) exceed this — CP-SAT's graph guard (`:685`). */
+    private const val SKIP_GRAPH_NODES = 1_000_000
+    private const val SKIP_GRAPH_ARCS = 1_000_000
+
+    /** Deterministic work budget for the whole generator search, charged per refinement arc visited
+     *  (a variable's incident factor, the unit of [equitablePartition] work) — the analog of CP-SAT's
+     *  `symmetry_detection_deterministic_time_limit`. A work count, not wall-clock, so it is
+     *  reproducible across machines; when it runs out the search bails with what it has found. */
+    private const val GENERATOR_WORK_BUDGET = 200_000
+
+    /** Size skip for value-symmetry detection (the same idea as the generator-search skip, applied to
+     *  the other half of the pass): the value-incidence scan is `O((maxValue − minValue) · numIntVars)`,
+     *  so a model with a wide value span across many variables is skipped rather than scanned. Sound —
+     *  skipping only forgoes value-symmetry pins, never adds an unsound one. */
+    private const val VALUE_ORBIT_SCAN_BUDGET = 50_000_000L
 
     /**
      * Generators of the constraint-graph automorphism group, found by individualization–refinement
@@ -380,14 +464,31 @@ internal object SymmetryBreaking {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
         if (nInt + nBool == 0) return emptyList()
+
+        // Size skip (CP-SAT `cp_model_symmetries.cc:665,685`): for a model — or its refinement graph —
+        // too large to pay off, do not even start. Graph nodes are variables + factors; arcs are the
+        // variable–factor incidences. Both dimensions must exceed the cap (a wide-but-shallow model
+        // still refines cheaply), so this only fires on the genuinely huge.
+        val numFactors = problem.factors.size
+        if (nInt + nBool > SKIP_VARS && numFactors > SKIP_FACTORS) return emptyList()
+        var arcs = 0
+        for (f in problem.factors) arcs += f.intVars.size + f.boolVars.size
+        if (nInt + nBool + numFactors > SKIP_GRAPH_NODES && arcs > SKIP_GRAPH_ARCS) return emptyList()
+
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
-            if (v in objectiveIntVars) "o$v" else domainKey(problem.intDomains[v])
+            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.intDomains[v])
         }
-        val seedBoolBase = Array(nBool) { v -> if (v in objectiveBoolVars) "o$v" else "b" }
+        val seedBoolBase = Array(nBool) { v ->
+            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
+        }
+
+        // One deterministic work budget for the whole search; every refinement draws from it and the
+        // search stops (keeping the generators found so far) when it is spent.
+        val budget = intArrayOf(GENERATOR_WORK_BUDGET)
 
         // Cells of the base equitable partition: only same-colour variables can be interchangeable.
-        val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase)
+        val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase, budget)
         val cells = HashMap<Int, MutableList<Int>>()
         for (v in 0 until nInt) if (v !in objectiveIntVars) cells.getOrPut(intColour[v]) { ArrayList() }.add(v)
         for (v in 0 until nBool) {
@@ -395,7 +496,6 @@ internal object SymmetryBreaking {
         }
 
         val gens = ArrayList<Pair<IntArray, IntArray>>()
-        val budget = intArrayOf(GENERATOR_NODE_BUDGET)
         for (members in cells.values) {
             if (members.size < 2 || members.size > MAX_VERIFIED_GROUP) continue
             val sorted = members.sorted()
@@ -432,8 +532,8 @@ internal object SymmetryBreaking {
     @Suppress("ReturnCount")
     private fun refineToDiscrete(
         problem: Problem,
-        seedIntBase: Array<String>,
-        seedBoolBase: Array<String>,
+        seedIntBase: Array<RefineKey>,
+        seedBoolBase: Array<RefineKey>,
         firstIndiv: Int,
         budget: IntArray,
     ): IntArray? {
@@ -443,13 +543,19 @@ internal object SymmetryBreaking {
         val seedInt = seedIntBase.copyOf()
         val seedBool = seedBoolBase.copyOf()
         fun individualize(globalV: Int, step: Int) {
-            if (globalV < nInt) seedInt[globalV] = "@$step" else seedBool[globalV - nInt] = "@$step"
+            if (globalV < nInt) {
+                seedInt[globalV] = RefineKey(longArrayOf(SPACE_INT, SEED_INDIVIDUALIZED, step.toLong()))
+            } else {
+                seedBool[globalV - nInt] = RefineKey(longArrayOf(SPACE_BOOL, SEED_INDIVIDUALIZED, step.toLong()))
+            }
         }
         individualize(firstIndiv, 0)
         var step = 1
         while (true) {
-            if (budget[0]-- <= 0) return null
-            val (ic, bc) = equitablePartition(problem, seedInt, seedBool)
+            // The refinement itself charges the budget per arc; a spent budget means the partition
+            // below may be partial, so abandon this leaf (the search then bails with what it has).
+            if (budget[0] <= 0) return null
+            val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget)
             val leaf = IntArray(n) { -1 }
             val cellSize = IntArray(n)
             for (v in 0 until nInt) {
@@ -567,12 +673,27 @@ internal object SymmetryBreaking {
             }
         }
     }
+}
 
-    /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
-    private fun domainKey(d: IntDomain): String {
-        val sb = StringBuilder()
-        sb.append(d.min).append(':').append(d.max).append(':')
-        d.forEachHole { sb.append(it).append('-') }
-        return sb.toString()
+/**
+ * A `LongArray`-backed colour-refinement signature — the non-string analog of
+ * [com.eignex.klause.solver.StructuralKey]. WL refinement composes signatures by appending integer
+ * words (variable colours and folded-in factor keys) rather than building and hashing decimal
+ * strings, which dominated presolve CPU and allocation on large structured models. Structural
+ * [equals]/[hashCode] make it a hash key; [compareTo] gives the canonical total order colour ids are
+ * assigned in.
+ */
+internal class RefineKey(private val words: LongArray) : Comparable<RefineKey> {
+    override fun equals(other: Any?): Boolean =
+        this === other || (other is RefineKey && words.contentEquals(other.words))
+
+    override fun hashCode(): Int = words.contentHashCode()
+
+    override fun compareTo(other: RefineKey): Int {
+        val shared = minOf(words.size, other.words.size)
+        for (i in 0 until shared) {
+            if (words[i] != other.words[i]) return if (words[i] < other.words[i]) -1 else 1
+        }
+        return words.size - other.words.size
     }
 }
