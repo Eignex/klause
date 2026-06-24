@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor.bool
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.NoInvariant
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.BacktrackSolver
@@ -114,8 +115,8 @@ class GaussianXorPropagatorTest {
     }
 
     @Test
-    fun `asInvariant returns the factor itself since GaussianXor has no ls state`() {
+    fun `asInvariant is NoInvariant since GaussianXor is propagator-only`() {
         val factor = GaussianXor(listOf(Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 0)))
-        assertSame(factor, factor.asInvariant(), "asInvariant should return this for a propagation-only factor")
+        assertSame(NoInvariant, factor.asInvariant(), "a propagator-only factor has no local-search role")
     }
 }

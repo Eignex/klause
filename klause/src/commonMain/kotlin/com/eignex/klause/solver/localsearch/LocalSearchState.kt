@@ -580,7 +580,7 @@ class LocalSearchState(
         // (indicator flip / sum counter-shift) via Invariant.contributeChanneling; the sink folds them
         // into one Compound and pins claimed vars so two siblings can't clobber the same target.
         val sink = ChannelingSink(intVar, newValue)
-        for (fid in problem.intOccurrences[intVar]) {
+        for (fid in problem.lsIntOccurrences[intVar]) {
             factors[fid].contributeChanneling(this, fid, intVar, cur, newValue, sink)
         }
         return sink.toMove()
@@ -700,7 +700,7 @@ class LocalSearchState(
     }
 
     private fun applyBoolFlip(boolVar: Int) = applyMove(
-        touchedFactors = problem.boolOccurrences[boolVar],
+        touchedFactors = problem.lsBoolOccurrences[boolVar],
         slot = boolVar,
         maintainsIncrementally = { it.maintainsBreakMakeIncrementally },
         commit = { assignment.flipBool(boolVar) },
@@ -713,7 +713,7 @@ class LocalSearchState(
         val old = assignment.intValue(intVar)
         if (old == newValue) return
         applyMove(
-            touchedFactors = problem.intOccurrences[intVar],
+            touchedFactors = problem.lsIntOccurrences[intVar],
             slot = problem.numBoolVars + intVar,
             maintainsIncrementally = { it.maintainsIntBreakMakeIncrementallyForIntSet },
             commit = { assignment.setInt(intVar, newValue) },
@@ -733,7 +733,7 @@ class LocalSearchState(
     /** Walk every factor touching bool var `v`, call its `deltaIfBoolFlipped`, and hand the
      *  (factorId, delta) pair to [action]. Inline so callers stay allocation-free. */
     internal inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
-        for (factorId in problem.boolOccurrences[v]) {
+        for (factorId in problem.lsBoolOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfBoolFlipped(this, factorId, v))
         }
     }
@@ -741,7 +741,7 @@ class LocalSearchState(
     /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var `v` with
      *  target value [newValue]. */
     internal inline fun forEachIntFactorDelta(v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit) {
-        for (factorId in problem.intOccurrences[v]) {
+        for (factorId in problem.lsIntOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
         }
     }

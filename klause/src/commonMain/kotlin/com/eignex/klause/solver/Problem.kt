@@ -171,11 +171,36 @@ class Problem(
         hasSymmetryBreaking = hasSymmetryBreaking,
     )
 
-    /** Factor ids mentioning each Boolean variable, indexed by bool var id. */
-    val boolOccurrences: Array<IntArray> = invert(numBoolVars) { it.boolVars }
+    /** True iff some factor is invariant-only ([NoPropagator]) — skipped by the CP occurrence lists. */
+    private val anyPropagatorAbsent: Boolean = propagators.any { it === NoPropagator }
 
-    /** Factor ids mentioning each integer variable, indexed by int var id. */
-    val intOccurrences: Array<IntArray> = invert(numIntVars) { it.intVars }
+    /** True iff some factor is propagator-only ([NoInvariant]) — skipped by the LS occurrence lists. */
+    private val anyInvariantAbsent: Boolean = invariants.any { it === NoInvariant }
+
+    /** Deductive occurrence lists: factor ids mentioning each Boolean variable, indexed by bool var id,
+     *  excluding invariant-only factors ([NoPropagator]) so CP propagation never wakes them. */
+    val boolOccurrences: Array<IntArray> = invert(numBoolVars, { propagators[it] !== NoPropagator }) { it.boolVars }
+
+    /** Deductive occurrence lists over integer variables; see [boolOccurrences]. */
+    val intOccurrences: Array<IntArray> = invert(numIntVars, { propagators[it] !== NoPropagator }) { it.intVars }
+
+    /** Local-search occurrence lists over Boolean variables, excluding propagator-only factors
+     *  ([NoInvariant]) so a move never touches them. Aliases [boolOccurrences] when no factor splits
+     *  its roles (the common case — both lists are then every factor). */
+    val lsBoolOccurrences: Array<IntArray> =
+        if (!anyPropagatorAbsent && !anyInvariantAbsent) {
+            boolOccurrences
+        } else {
+            invert(numBoolVars, { invariants[it] !== NoInvariant }) { it.boolVars }
+        }
+
+    /** Local-search occurrence lists over integer variables; see [lsBoolOccurrences]. */
+    val lsIntOccurrences: Array<IntArray> =
+        if (!anyPropagatorAbsent && !anyInvariantAbsent) {
+            intOccurrences
+        } else {
+            invert(numIntVars, { invariants[it] !== NoInvariant }) { it.intVars }
+        }
 
     /**
      * [boolOccurrences] minus factors that use per-literal wakeup (see
@@ -718,13 +743,13 @@ class Problem(
         )
     }
 
-    private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {
+    private inline fun invert(slots: Int, include: (Int) -> Boolean, vars: (Factor) -> IntArray): Array<IntArray> {
         val counts = IntArray(slots)
-        for (f in factors) for (v in vars(f)) counts[v]++
+        factors.forEachIndexed { id, f -> if (include(id)) for (v in vars(f)) counts[v]++ }
         val out = Array(slots) { IntArray(counts[it]) }
         val cursor = IntArray(slots)
         factors.forEachIndexed { id, f ->
-            for (v in vars(f)) out[v][cursor[v]++] = id
+            if (include(id)) for (v in vars(f)) out[v][cursor[v]++] = id
         }
         return out
     }

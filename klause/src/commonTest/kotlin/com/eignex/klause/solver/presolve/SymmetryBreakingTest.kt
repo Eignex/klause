@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.NoInvariant
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
@@ -25,6 +26,7 @@ import com.eignex.klause.solver.factor.global.Sort
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.factor.scheduling.Diffn
 import com.eignex.klause.solver.factor.scheduling.Disjunctive
+import com.eignex.klause.solver.factor.symmetry.SymmetryHandling
 import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.factor.table.Mdd
 import com.eignex.klause.solver.factor.table.Regular
@@ -395,8 +397,8 @@ class SymmetryBreakingTest {
     @Test
     fun `interchangeable bool rows are lex-ordered`() {
         // Two bool rows a0+2·a1 ≤ 2 and b0+2·b1 ≤ 2. The rows are interchangeable as blocks, but the
-        // cells within a row are NOT (different weights), so this is bool block/row symmetry — broken
-        // by a binary-number lex-leader (#373) rather than per-variable ordering.
+        // cells within a row are NOT (different weights), so this is bool row symmetry — broken by a
+        // lex-leader over 0/1 channels of the row literals (no width cap) rather than per-variable ordering.
         val problem = Problem(
             4,
             0,
@@ -407,6 +409,27 @@ class SymmetryBreakingTest {
             ),
         )
         checkSound("bool-rows", problem, expectReduced = true)
+    }
+
+    @Test
+    fun `bool row symmetry is handled by a propagator-only SymmetryHandling factor`() {
+        // Two interchangeable 3-wide bool rows. Breaking adds a single SymmetryHandling factor that
+        // enforces every generator's lex-leader dynamically (no static lex enumeration, no width cap,
+        // no integer-space growth) — the mechanism that lets arbitrarily wide rows, e.g. a set
+        // variable's indicator matrix, be broken. The factor is propagator-only (invisible to LS).
+        val problem = Problem(
+            6,
+            0,
+            emptyArray(),
+            listOf(
+                PseudoBoolean(intArrayOf(1, 2, 4), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 5),
+                PseudoBoolean(intArrayOf(1, 2, 4), intArrayOf(pos(3), pos(4), pos(5)), PbOp.LE, 5),
+            ),
+        )
+        val broken = Presolve.breakSymmetries(problem)
+        assertEquals(problem.numIntVars, broken.numIntVars, "dynamic handling must not grow the integer space")
+        val symmetry = broken.factors.filterIsInstance<SymmetryHandling>().single()
+        assertSame(NoInvariant, symmetry.asInvariant(), "symmetry handling must be propagator-only")
     }
 
     @Test

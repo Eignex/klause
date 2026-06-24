@@ -84,9 +84,9 @@ internal fun interface DestroyOperator {
                 freedCount++
                 if (freedCount >= k) break
                 val factorIds = if (v < problem.numBoolVars) {
-                    problem.boolOccurrences[v]
+                    problem.lsBoolOccurrences[v]
                 } else {
-                    problem.intOccurrences[v - problem.numBoolVars]
+                    problem.lsIntOccurrences[v - problem.numBoolVars]
                 }
                 for (fid in factorIds) {
                     val f = problem.factors[fid]
