@@ -23,6 +23,7 @@ import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.GccExprOpt
 import com.eignex.klause.model.Iff
 import com.eignex.klause.model.Implies
+import com.eignex.klause.model.IncreasingExpr
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
 import com.eignex.klause.model.IntLit
@@ -213,6 +214,8 @@ internal class Lowering(val config: KlauseConfig) {
         is DisjunctiveExpr -> reifyDisjunctive(expr)
 
         is SortExpr -> error("sort: reified context not supported (use at top-level)")
+
+        is IncreasingExpr -> error("increasing: reified context not supported (use at top-level)")
 
         is DiffnExpr -> error("diffn: reified context not supported (use at top-level)")
 

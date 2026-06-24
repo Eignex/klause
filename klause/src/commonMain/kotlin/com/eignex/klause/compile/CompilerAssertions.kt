@@ -20,6 +20,7 @@ import com.eignex.klause.model.FloatLinearConstraint
 import com.eignex.klause.model.GccExprOpt
 import com.eignex.klause.model.Iff
 import com.eignex.klause.model.Implies
+import com.eignex.klause.model.IncreasingExpr
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
 import com.eignex.klause.model.IntExpr
@@ -59,6 +60,7 @@ import com.eignex.klause.solver.factor.circuit.Circuit as CircuitFactor
 import com.eignex.klause.solver.factor.circuit.Subcircuit as SubcircuitFactor
 import com.eignex.klause.solver.factor.global.AllDifferent as AllDifferentFactor
 import com.eignex.klause.solver.factor.global.GlobalCardinality as GccFactor
+import com.eignex.klause.solver.factor.global.Increasing as IncreasingFactor
 import com.eignex.klause.solver.factor.global.Inverse as InverseFactor
 import com.eignex.klause.solver.factor.global.NValue as NValueFactor
 import com.eignex.klause.solver.factor.global.Sort as SortFactor
@@ -137,6 +139,8 @@ internal fun Lowering.assertExpr(expr: BoolExpr) {
         is DisjunctiveExpr -> assertDisjunctive(expr)
 
         is SortExpr -> assertSort(expr)
+
+        is IncreasingExpr -> assertIncreasing(expr)
 
         is DiffnExpr -> assertDiffn(expr)
 
@@ -471,6 +475,17 @@ internal fun Lowering.assertSort(expr: SortExpr) {
     val xsIds = IntArray(liftedXs.size) { intVarOf((liftedXs[it] as IntRef).name) }
     val ysIds = IntArray(liftedYs.size) { intVarOf((liftedYs[it] as IntRef).name) }
     factors += SortFactor(xs = xsIds, ys = ysIds)
+}
+
+internal fun Lowering.assertIncreasing(expr: IncreasingExpr) {
+    val lifted = expr.xs.map { lift(it) }
+    require(lifted.all { it is IntRef }) {
+        "increasing: every term must be a bare variable reference (no arithmetic)."
+    }
+    // A chain of 0 or 1 variables is trivially ordered — post nothing.
+    if (lifted.size < 2) return
+    val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
+    factors += IncreasingFactor(xs = ids, strict = expr.strict)
 }
 
 internal fun Lowering.assertDiffn(expr: DiffnExpr) {

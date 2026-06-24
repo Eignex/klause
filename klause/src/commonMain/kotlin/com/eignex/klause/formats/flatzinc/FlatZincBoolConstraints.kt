@@ -6,6 +6,7 @@ import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.bool.Xor
+import com.eignex.klause.solver.factor.global.Increasing
 import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.factor.table.Table
@@ -181,11 +182,9 @@ internal fun FlatZincCompiler.emitMonotoneBool(c: FznConstraint, op: MonotoneOp)
 }
 
 private fun FlatZincCompiler.emitMonotoneChain(xs: IntArray, op: MonotoneOp) {
-    val bound = if (op.strict) 1 else 0
-    for (i in 0 until xs.size - 1) {
-        val (a, b) = if (op.ascending) xs[i + 1] to xs[i] else xs[i] to xs[i + 1]
-        factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.GE, bound))
-    }
+    // One native ascending factor; a descending chain `a ≥ b ≥ c` is the reverse `c ≤ b ≤ a`.
+    val chain = if (op.ascending) xs else xs.reversedArray()
+    factors.add(Increasing(chain, strict = op.strict))
 }
 
 internal fun FlatZincCompiler.emitLexLessBool(c: FznConstraint, strict: Boolean) {

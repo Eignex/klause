@@ -69,6 +69,7 @@ internal enum class FactorKind {
     PRODUCT,
     GAUSSIAN_XOR,
     LEX_LESS,
+    INCREASING,
     SYMMETRIC_ALL_DIFFERENT,
     SYMMETRY_HANDLING,
 }
