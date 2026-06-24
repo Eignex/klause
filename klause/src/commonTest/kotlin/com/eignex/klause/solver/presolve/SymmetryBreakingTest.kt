@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.NoInvariant
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.solver.factor.arithmetic.Linear
@@ -20,12 +21,12 @@ import com.eignex.klause.solver.factor.circuit.Subcircuit
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.factor.global.Inverse
-import com.eignex.klause.solver.factor.global.LexLess
 import com.eignex.klause.solver.factor.global.NValue
 import com.eignex.klause.solver.factor.global.Sort
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.factor.scheduling.Diffn
 import com.eignex.klause.solver.factor.scheduling.Disjunctive
+import com.eignex.klause.solver.factor.symmetry.SymmetryHandling
 import com.eignex.klause.solver.factor.table.Element
 import com.eignex.klause.solver.factor.table.Mdd
 import com.eignex.klause.solver.factor.table.Regular
@@ -411,11 +412,11 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `bool row order channels to a native lex and grows the integer space`() {
-        // Two interchangeable 3-wide bool rows. Breaking mirrors each row literal in a 0/1 integer
-        // channel and orders the rows with a native LexLess (no binary-number width cap), so the
-        // integer space grows by the channels — the mechanism that lets arbitrarily wide rows (a set
-        // var's indicator matrix) be broken. The presolve reconstruct drops the determined channels.
+    fun `bool row symmetry is handled by a propagator-only SymmetryHandling factor`() {
+        // Two interchangeable 3-wide bool rows. Breaking adds a single SymmetryHandling factor that
+        // enforces every generator's lex-leader dynamically (no static lex enumeration, no width cap,
+        // no integer-space growth) — the mechanism that lets arbitrarily wide rows, e.g. a set
+        // variable's indicator matrix, be broken. The factor is propagator-only (invisible to LS).
         val problem = Problem(
             6,
             0,
@@ -426,8 +427,9 @@ class SymmetryBreakingTest {
             ),
         )
         val broken = Presolve.breakSymmetries(problem)
-        assertTrue(broken.numIntVars > problem.numIntVars, "channels should grow the integer space")
-        assertTrue(broken.factors.any { it is LexLess }, "bool row order should be posted as a native LexLess")
+        assertEquals(problem.numIntVars, broken.numIntVars, "dynamic handling must not grow the integer space")
+        val symmetry = broken.factors.filterIsInstance<SymmetryHandling>().single()
+        assertSame(NoInvariant, symmetry.asInvariant(), "symmetry handling must be propagator-only")
     }
 
     @Test

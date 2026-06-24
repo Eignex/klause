@@ -122,11 +122,10 @@ internal object PresolveShared {
         problem: Problem,
         factors: List<Factor>,
         intDomains: Array<IntDomain> = problem.intDomains.copyOf(),
-        extraIntDomains: List<IntDomain> = emptyList(),
     ): Problem = Problem(
         numBoolVars = problem.numBoolVars,
-        numIntVars = problem.numIntVars + extraIntDomains.size,
-        intDomains = if (extraIntDomains.isEmpty()) intDomains else intDomains + extraIntDomains,
+        numIntVars = problem.numIntVars,
+        intDomains = intDomains,
         factors = factors,
         probeFailedLiterals = problem.probeFailedLiterals,
         probeIntBounds = problem.probeIntBounds,

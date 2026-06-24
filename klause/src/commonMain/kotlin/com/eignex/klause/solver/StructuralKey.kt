@@ -70,6 +70,7 @@ internal enum class FactorKind {
     GAUSSIAN_XOR,
     LEX_LESS,
     SYMMETRIC_ALL_DIFFERENT,
+    SYMMETRY_HANDLING,
 }
 
 /** Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments. */
