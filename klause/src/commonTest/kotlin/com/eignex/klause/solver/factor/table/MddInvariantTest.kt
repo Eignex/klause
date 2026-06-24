@@ -2,6 +2,7 @@ package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.table.Mdd
 import com.eignex.klause.solver.localsearch.FixedCadenceRestart
@@ -45,6 +46,38 @@ class MddInvariantTest {
         state.recompute()
         assertFalse(state.factors[0].isViolated(state, 0))
         assertEquals(0, state.factors[0].violationDegree(state, 0))
+    }
+
+    @Test
+    fun `incremental degree and delta match a full recompute over a stream of moves`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
+            factors = arrayOf(mddFactor()),
+        )
+        val state = LocalSearchState(problem, Random(7))
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 1)
+        state.recompute()
+        val rng = Random(99)
+        repeat(400) { step ->
+            val v = rng.nextInt(2)
+            val nv = 1 + rng.nextInt(2)
+            val before = state.factors[0].violationDegree(state, 0)
+            val predicted = state.factors[0].deltaIfIntSet(state, 0, v, nv)
+            state.apply(Move.IntSet(v, nv))
+            val after = state.factors[0].violationDegree(state, 0)
+            assertEquals(after - before, predicted, "step $step: incremental delta mismatch")
+            val fresh = LocalSearchState(problem, Random(0))
+            for (k in 0 until 2) fresh.assignment.setInt(k, state.assignment.intValue(k))
+            fresh.recompute()
+            assertEquals(
+                fresh.factors[0].violationDegree(fresh, 0),
+                state.factors[0].violationDegree(state, 0),
+                "step $step: maintained degree drifted from a full recompute",
+            )
+        }
     }
 
     @Test
