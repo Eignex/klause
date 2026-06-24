@@ -8,6 +8,7 @@ import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertSame
@@ -155,5 +156,26 @@ class LpHarvestTest {
             assertTrue(harvested.intDomains[v].min >= problem.intDomains[v].min, "lower bound widened for x$v")
             assertTrue(harvested.intDomains[v].max <= problem.intDomains[v].max, "upper bound widened for x$v")
         }
+    }
+
+    @Test
+    fun `harvest proves a propagation-feasible but LP-infeasible problem UNSAT`() {
+        // x+y >= 3, y+z >= 3, x+z >= 3, x+y+z <= 4 over [0,10]: summing the three covers gives
+        // 2(x+y+z) >= 9, i.e. x+y+z >= 4.5 > 4 — an LP/Farkas infeasibility. Bounds propagation tightens
+        // no single variable past [0,4], so it does not catch it; the LP harvest must.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
+            ),
+        )
+        assertTrue(problem.baked !is PropagationResult.Unsat, "propagation alone must not catch this infeasibility")
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        assertTrue(harvested.baked is PropagationResult.Unsat, "the LP-certified infeasibility must bake to Unsat")
     }
 }

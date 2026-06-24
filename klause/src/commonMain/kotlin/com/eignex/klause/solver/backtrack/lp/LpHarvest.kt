@@ -1,8 +1,13 @@
 package com.eignex.klause.solver.backtrack.lp
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
+import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 
@@ -40,8 +45,12 @@ fun lpHarvest(
     cancellation: Cancellation = Cancellation.Never,
 ): Problem {
     val engine = LpEngine(problem, objective, params, SolveStatsSink(backend = "lp-harvest"))
+    if (engine.lpRelaxer == null) return problem
+    // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
+    // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
+    if (engine.rootInfeasible(cancellation)) return provenInfeasible(problem)
     val plan = engine.params.lpPlan
-    if (engine.lpRelaxer == null || (!plan.variableShaving && !plan.objectiveShaving)) return problem
+    if (!plan.variableShaving && !plan.objectiveShaving) return problem
 
     val shaved = if (plan.variableShaving) engine.shaveVariableBounds(cancellation) else emptyList()
     // The objective LB binds only a single ascending (minimised) objective variable; shaveObjectiveLb
@@ -66,6 +75,45 @@ fun lpHarvest(
         numIntVars = problem.numIntVars,
         intDomains = domains,
         factors = problem.factors,
+        probeFailedLiterals = problem.probeFailedLiterals,
+        probeIntBounds = problem.probeIntBounds,
+        probeIntHoles = problem.probeIntHoles,
+        probeBudgetPerVar = problem.probeBudgetPerVar,
+        probeTotalBudget = problem.probeTotalBudget,
+        probeSeed = problem.probeSeed,
+    )
+}
+
+/**
+ * [problem] with an explicit contradiction appended so its bake propagation reports `Unsat` — used when
+ * the LP harvest has *certified* the root relaxation infeasible. Two equalities pinning one variable to
+ * consecutive values (or a Boolean forced both ways) are jointly unsatisfiable regardless of domains, so
+ * the conflict is witnessed without depending on the LP proof being re-derivable downstream. Sound: an
+ * infeasible problem has no solutions, and the relaxation infeasibility certifies there are none.
+ */
+private fun provenInfeasible(problem: Problem): Problem {
+    val factors = ArrayList<Factor>(problem.factors.size + 2)
+    factors.addAll(problem.factors)
+    when {
+        problem.numIntVars > 0 -> {
+            val min = problem.intDomains[0].min
+            val c = if (min < Int.MAX_VALUE) min else min - 1
+            factors.add(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, c))
+            factors.add(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, c + 1))
+        }
+
+        problem.numBoolVars > 0 -> {
+            factors.add(Clause(intArrayOf(Lit.make(0, true)))) // b0 = true
+            factors.add(Clause(intArrayOf(Lit.make(0, false)))) // b0 = false
+        }
+
+        else -> return problem // no variable to pin a contradiction on (a variable-free problem)
+    }
+    return Problem(
+        numBoolVars = problem.numBoolVars,
+        numIntVars = problem.numIntVars,
+        intDomains = problem.intDomains.copyOf(),
+        factors = factors,
         probeFailedLiterals = problem.probeFailedLiterals,
         probeIntBounds = problem.probeIntBounds,
         probeIntHoles = problem.probeIntHoles,
