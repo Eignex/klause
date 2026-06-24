@@ -3,6 +3,7 @@ package com.eignex.klause.solver.factor.arithmetic
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.ReifiedFactor
@@ -68,4 +69,6 @@ class ReifiedLinear private constructor(
         ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, coeffs, vars, op, bound)
 
     override fun asInvariant(): Invariant = ReifiedLinearInvariant(auxBoolVar, coeffs, vars, op, bound)
+
+    override fun asLinearizer(): Linearizer = ReifiedLinearLinearizer(auxBoolVar, op, bound, vars, coeffs)
 }

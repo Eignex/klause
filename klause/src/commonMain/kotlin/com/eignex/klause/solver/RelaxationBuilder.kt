@@ -77,4 +77,16 @@ interface RelaxationBuilder {
         rhs: Long,
         contribution: Contribution = Contribution.CORE,
     )
+
+    /**
+     * Emit a big-M row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` whose constants bake in the live
+     * (node-current) bounds. [global] must be true exactly when the same big-M follows from the
+     * declared bounds — then the row holds at every solution and is cacheable. Otherwise it holds only
+     * inside the node's box, and the engine records the live bounds the big-M leaned on as the row's
+     * conflict-certificate premises: for each linearized integer column, its live upper bound when
+     * [maxSide] matches the coefficient's sign (positive on the `lMax` side), else its live lower bound
+     * — auxiliary indicator columns are ignored. A feasibility-defining CORE row. [LinearOp.NE] is
+     * ignored.
+     */
+    fun bigMRow(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean)
 }
