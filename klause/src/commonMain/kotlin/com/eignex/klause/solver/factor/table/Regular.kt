@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
@@ -88,6 +89,9 @@ class Regular(
         RegularPropagator(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)
 
     override fun asInvariant(): Invariant = RegularInvariant(seq, numStates, alphabetSize, transitions, q0, accepting)
+
+    override fun asLinearizer(): Linearizer =
+        RegularLinearizer(seq, numStates, alphabetSize, transitions, q0, accepting)
 
     /*
      * Pesant's layered-DAG GAC, now reversible and delta-driven (see `RegularIncrementalState`):

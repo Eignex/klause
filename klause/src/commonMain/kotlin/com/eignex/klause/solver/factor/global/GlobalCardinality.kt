@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.OptPresence
@@ -147,4 +148,6 @@ class GlobalCardinality(
         coverIndexByValue,
         { state, idx -> present(state, idx) },
     )
+
+    override fun asLinearizer(): Linearizer = GccCountLinearizer(xs, cover, countVars, presents)
 }

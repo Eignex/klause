@@ -39,9 +39,7 @@ import com.eignex.klause.solver.lp.subExact
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
@@ -346,38 +344,17 @@ internal class CpToLpRelaxation(
          *  large but sparse routing graphs through (#431); #429 may bench this threshold. */
         const val MAX_CIRCUIT_ARCS: Int = 1024
 
-        /** Above this array length the O(len)-column Element selector model is skipped. */
-        const val MAX_ELEM: Int = 256
-
         /** Boolean RLT skips knapsack rows wider than this (each adds O(width) product columns). */
         const val MAX_RLT_ROW: Int = 8
 
         /** Cap on the total Boolean-RLT product columns added, bounding the dense-tableau cost. */
         const val MAX_RLT_COLUMNS: Int = 256
 
-        /** Above this tuple count the O(numTuples)-column Table hull is skipped. */
-        const val MAX_TUPLES: Int = 1024
-
         /** Above this horizon (latest deadline − earliest start) the time-indexed model is skipped. */
         const val MAX_TI_HORIZON: Int = 512
 
         /** Above this many `x_{i,t}` columns one time-indexed Cumulative is skipped (the O(n·H) blow-up). */
         const val MAX_TI_COLS: Int = 4096
-
-        /** Above this total selector count (Σ over `xs` of the declared-domain size) the NValue
-         *  one-hot value hull is skipped. */
-        const val MAX_NVALUE_CELLS: Int = 1024
-
-        /** Above this many arc columns one Regular DFA flow hull is skipped (the O(len·states·alphabet)
-         *  blow-up). */
-        const val MAX_REGULAR_ARCS: Int = 4096
-
-        /** Above this many arc columns one Mdd flow hull is skipped (the transition-record blow-up). */
-        const val MAX_MDD_ARCS: Int = 4096
-
-        /** Above this total selector count (Σ over `xs` of the declared-domain size) the count-variable
-         *  GlobalCardinality one-hot hull is skipped. */
-        const val MAX_GCC_CELLS: Int = 1024
     }
 
     /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
@@ -851,26 +828,11 @@ internal class CpToLpRelaxation(
                 for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolColumn(b)
             }
             // Cone mode is the minimal linear+Boolean objective-cone probe: the column-heavy hull /
-            // circuit / cut / cumulative features are all forced off (see [objectiveCone]).
+            // circuit / cut / cumulative features are all forced off (see [objectiveCone]). The
+            // per-factor convex hulls are emitted by each factor's Linearizer in the main loop below
+            // (gated by [currentHullEnabled]); only the non-per-factor relaxations live here — circuit
+            // arcs feed the subtour separator, and the cumulative rows span a scheduling view.
             if (!objectiveCone) {
-                if (elementHull) {
-                    for (factor in problem.factors) if (factor is Element) buildElementHull(factor)
-                }
-                if (tableHull) {
-                    for (factor in problem.factors) if (factor is Table) buildTableHull(factor)
-                }
-                if (nValueHull) {
-                    for (factor in problem.factors) if (factor is NValue) buildNValueHull(factor)
-                }
-                if (regularHull) {
-                    for (factor in problem.factors) if (factor is Regular) buildRegularHull(factor)
-                }
-                if (mddHull) {
-                    for (factor in problem.factors) if (factor is Mdd) buildMddHull(factor)
-                }
-                if (gccCountHull) {
-                    for (factor in problem.factors) if (factor is GlobalCardinality) buildGccCountHull(factor)
-                }
                 if (circuitArcs) {
                     for (factor in problem.factors) {
                         if (factor is Circuit) buildCircuitArcs(factor)
@@ -891,23 +853,20 @@ internal class CpToLpRelaxation(
                 currentHullEnabled = hullEnabledFor(factor)
                 when (factor) {
                     is Linear -> factor.asLinearizer().linearize(this, factorId)
-
                     is ReifiedLinear -> reifiedRows(factor)
-
                     is ReifiedPseudoBoolean -> reifiedPbRows(factor)
-
                     is ReifiedCardinality -> reifiedCardRows(factor)
-
                     is Cardinality -> factor.asLinearizer().linearize(this, factorId)
-
                     is Clause -> factor.asLinearizer().linearize(this, factorId)
-
                     is ArrayMinMax -> factor.asLinearizer().linearize(this, factorId)
-
                     is PseudoBoolean -> factor.asLinearizer().linearize(this, factorId)
-
                     is Product -> factor.asLinearizer().linearize(this, factorId)
-
+                    is Element -> factor.asLinearizer().linearize(this, factorId)
+                    is Table -> factor.asLinearizer().linearize(this, factorId)
+                    is NValue -> factor.asLinearizer().linearize(this, factorId)
+                    is GlobalCardinality -> factor.asLinearizer().linearize(this, factorId)
+                    is Regular -> factor.asLinearizer().linearize(this, factorId)
+                    is Mdd -> factor.asLinearizer().linearize(this, factorId)
                     else -> Unit // hard globals and unrecognized factors: handled elsewhere or skipped
                 }
             }
@@ -945,490 +904,6 @@ internal class CpToLpRelaxation(
                 colReq = reqs,
                 colPresentUpper = presentUpper,
             )
-        }
-
-        /**
-         * Convex-hull linearization of one [Table] `(xs) ∈ tuples`: a selector column `y_t ∈ [0,1]`
-         * per allowed tuple, with `Σ_t y_t = 1` and a per-column channel `xs[j] = Σ_t tuple_t[j]·y_t`.
-         * The projection onto `xs` is exactly the convex hull of the allowed tuples — the strongest
-         * linear relaxation of the table. A tuple's column exists when every entry is in the declared
-         * domain of its variable (layout stable across nodes), and is pinned to 0 when any entry has
-         * left the live domain. Tables with more than [MAX_TUPLES] rows are skipped.
-         */
-        private fun buildTableHull(factor: Table) {
-            val numTuples = factor.numTuples
-            if (numTuples > MAX_TUPLES) return
-            val arity = factor.arity
-            val declared = Array(arity) { c -> problem.intDomains[factor.xs[c]] }
-            val live = Array(arity) { c -> session.intDomain(factor.xs[c]) }
-            val selCols = IntArrayList()
-            val rows = IntArrayList()
-            for (t in 0 until numTuples) {
-                var declaredFeasible = true
-                var liveFeasible = true
-                for (col in 0 until arity) {
-                    val v = factor.tuples[t * arity + col]
-                    if (v !in declared[col]) {
-                        declaredFeasible = false
-                        break
-                    }
-                    if (v !in live[col]) liveFeasible = false
-                }
-                if (!declaredFeasible) continue
-                // The tuple's selector is present while every entry stays in its column's live domain —
-                // the membership conjunction that lets the persistent relaxation re-bind this column.
-                val presence = IntArray(arity * 2)
-                for (col in 0 until arity) {
-                    presence[col * 2] = factor.xs[col]
-                    presence[col * 2 + 1] = factor.tuples[t * arity + col]
-                }
-                selCols.add(auxColumn(0L, if (liveFeasible) 1L else 0L, presence = presence))
-                rows.add(t)
-            }
-            val k = selCols.size
-            if (k == 0) return // no tuple feasible under the declared domains — leave it to propagation
-            builder.addRow(selCols.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L)
-            // xs[col] − Σ_t tuple_t[col]·y_t = 0 for each column.
-            for (col in 0 until arity) {
-                val cols = IntArray(k + 1)
-                val vals = LongArray(k + 1)
-                for (s in 0 until k) {
-                    cols[s] = selCols[s]
-                    vals[s] = -factor.tuples[rows[s] * arity + col].toLong()
-                }
-                cols[k] = intColumn(factor.xs[col])
-                vals[k] = 1L
-                builder.addRow(cols, vals, Relation.EQ, 0L)
-            }
-        }
-
-        /**
-         * One-hot value model for one [NValue] `n = |distinct(xs)|` (and the AtMost / AtLeast
-         * variants): a per-value "used" column `y_v ∈ [0,1]`, a one-hot selector `z_iv ∈ [0,1]` per
-         * variable/value with `Σ_v z_iv = 1` and the channel `Σ_v v·z_iv = xs(i)`, and `y_v ≥ z_iv` so
-         * a value taken by any variable forces its indicator up. The distinct count `Σ_v y_v` relates
-         * to `n` by the mode: `Eq → n = Σ y_v`, `AtMost (n ≥ distinct) → n ≥ Σ y_v`,
-         * `AtLeast (n ≤ distinct) → n ≤ Σ y_v`. Each relation holds at every integer solution (set
-         * `y_v = 1` iff value v is used), so the relaxation is sound; minimising `n` then reads a real
-         * lower bound off `Σ y_v`. Gated by [MAX_NVALUE_CELLS]; optional-presence NValue is skipped.
-         */
-        private fun buildNValueHull(factor: NValue) {
-            if (factor.presents.isNotEmpty()) return // count is over present vars only — defer
-            val xs = factor.xs
-            var cells = 0L
-            for (x in xs) cells += problem.intDomains[x].size.toLong()
-            if (cells == 0L || cells > MAX_NVALUE_CELLS) return
-            val yCols = IntArrayList()
-            val yByValue = MutableIntIntMap()
-            fun yOf(v: Int): Int {
-                val existing = yByValue.getOrDefault(v, -1) // columns are non-negative, so -1 marks absent
-                if (existing >= 0) return existing
-                // The "used" indicator is free in [0,1] regardless of the live domains — an empty
-                // requirement keeps it present so the relaxation stays persistent (#43).
-                val col = auxColumn(0L, 1L, presence = IntArray(0))
-                yCols.add(col)
-                yByValue.put(v, col)
-                return col
-            }
-            for (x in xs) {
-                val declared = problem.intDomains[x]
-                val live = session.intDomain(x)
-                val sel = IntArrayList()
-                val selVal = IntArrayList()
-                declared.forEach { v ->
-                    // The selector z_xv is present while value v stays in x's live domain.
-                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v))
-                    sel.add(z)
-                    selVal.add(v)
-                    builder.addRow(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), Relation.LE, 0L) // y_v ≥ z
-                }
-                val k = sel.size
-                if (k == 0) return // a variable with no declared values — leave it to propagation
-                builder.addRow(sel.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L) // Σ_v z = 1
-                // Σ_v v·z − xs(i) = 0.
-                val cCols = IntArray(k + 1)
-                val cVals = LongArray(k + 1)
-                for (s in 0 until k) {
-                    cCols[s] = sel[s]
-                    cVals[s] = selVal[s].toLong()
-                }
-                cCols[k] = intColumn(x)
-                cVals[k] = -1L
-                builder.addRow(cCols, cVals, Relation.EQ, 0L)
-            }
-            if (yCols.isEmpty()) return
-            // (Σ_v y_v) − n  {EQ | LE | GE}  0, per the mode (see KDoc).
-            val rel = when (factor.mode) {
-                NValue.Mode.Eq -> Relation.EQ
-                NValue.Mode.AtMost -> Relation.LE
-                NValue.Mode.AtLeast -> Relation.GE
-            }
-            val m = yCols.size
-            val cols = IntArray(m + 1)
-            val vals = LongArray(m + 1)
-            for (idx in 0 until m) {
-                cols[idx] = yCols[idx]
-                vals[idx] = 1L
-            }
-            cols[m] = intColumn(factor.n)
-            vals[m] = -1L
-            builder.addRow(cols, vals, rel, 0L)
-        }
-
-        /**
-         * One-hot selector model for one count-variable [GlobalCardinality] `counts(k) = #{i : xs(i) =
-         * cover(k)}`: a one-hot selector `z_iv ∈ [0,1]` per variable/value over `xs[i]`'s declared
-         * domain with `Σ_v z_iv = 1` and the channel `Σ_v v·z_iv = xs(i)`, and per cover value the
-         * exact count linkage `Σ_i z_{i,cover(k)} = counts(k)`. Each row holds at every integer solution
-         * (set `z_iv = 1` iff `xs(i) = v`), so the relaxation is sound and a count variable in the
-         * objective reads a true LP bound. Gated by [MAX_GCC_CELLS]; the constant-bound form (no count
-         * variable) and the optional-presence form (count over present vars only) are skipped — neither
-         * has a count variable this hull would bound.
-         */
-        private fun buildGccCountHull(factor: GlobalCardinality) {
-            if (factor.presents.isNotEmpty()) return // count is over present vars only — defer
-            val countVars = factor.countVars ?: return // constant-bound form has no count var to bound
-            val xs = factor.xs
-            var cells = 0L
-            for (x in xs) cells += problem.intDomains[x].size.toLong()
-            if (cells == 0L || cells > MAX_GCC_CELLS) return
-            // Selector columns contributing to each cover value's count, accumulated across all xs.
-            val selByCover = HashMap<Int, IntArrayList>()
-            for (v in factor.cover) selByCover[v] = IntArrayList()
-            for (x in xs) {
-                val declared = problem.intDomains[x]
-                val live = session.intDomain(x)
-                val sel = IntArrayList()
-                val selVal = IntArrayList()
-                declared.forEach { v ->
-                    // The selector z_xv is present while value v stays in x's live domain.
-                    val z = auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v))
-                    sel.add(z)
-                    selVal.add(v)
-                    selByCover[v]?.add(z) // only cover values carry a count row
-                }
-                val k = sel.size
-                if (k == 0) return // a variable with no declared values — leave it to propagation
-                builder.addRow(sel.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L) // Σ_v z = 1
-                // Σ_v v·z − xs(i) = 0.
-                val cCols = IntArray(k + 1)
-                val cVals = LongArray(k + 1)
-                for (s in 0 until k) {
-                    cCols[s] = sel[s]
-                    cVals[s] = selVal[s].toLong()
-                }
-                cCols[k] = intColumn(x)
-                cVals[k] = -1L
-                builder.addRow(cCols, cVals, Relation.EQ, 0L)
-            }
-            // Σ_i z_{i,cover(k)} − counts(k) = 0 per cover value (a cover value in no domain forces 0).
-            for (k in factor.cover.indices) {
-                val sel = selByCover[factor.cover[k]] ?: continue
-                val cols = IntArray(sel.size + 1)
-                val vals = LongArray(sel.size + 1)
-                for (i in 0 until sel.size) {
-                    cols[i] = sel[i]
-                    vals[i] = 1L
-                }
-                cols[sel.size] = intColumn(countVars[k])
-                vals[sel.size] = -1L
-                builder.addRow(cols, vals, Relation.EQ, 0L)
-            }
-        }
-
-        /**
-         * Layer-expanded DFA flow hull of one [Regular] `regular(seq, Q, S, δ, q0, F)` — the exact convex
-         * hull of the automaton's accepting strings. An arc variable `y ∈ [0,1]` per reachable
-         * `(position t, state q, symbol s)` whose transition `δ(q, s)` is live (pinned to 0 when symbol
-         * `s` left the live domain of `seq[t]`); states 1-based, `δ = 0` is the dead/reject sink. Rows:
-         * a source row `Σ y out of (0, q0) = 1`, flow conservation `Σ out(t,q) − Σ in(t,q) = 0` at every
-         * interior `(t, q)`, an acceptance row `Σ y into accepting states at the last layer = 1`, and a
-         * channel `Σ_s s·y_{t,·,s} = seq[t]` per position. The flow polytope is integral, so the LP is
-         * the true convex hull and its optimum a tight bound. Forward reachability from `q0` over the
-         * *declared* domains keeps the layout stable and bounds the arc count ([MAX_REGULAR_ARCS]); above
-         * the cap, or when no accepting path survives the declared domains, the factor is skipped (only
-         * loosens). 1-based symbol values are taken to *be* the `seq` values (per [Regular]).
-         */
-        @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
-        private fun buildRegularHull(factor: Regular) {
-            val seq = factor.seq
-            val len = seq.size
-            val s = factor.alphabetSize
-            val trans = factor.transitions
-            fun delta(state: Int, sym: Int): Int = trans[(state - 1) * s + (sym - 1)] // 1-based; 0 = dead
-            val accepting = factor.accepting
-            // States are 1-based ids in `1..numStates`, so the per-layer state→arc-columns maps are
-            // dense arrays indexed straight by the state id rather than boxed `HashMap<Int, _>` (#678).
-            val ns = factor.numStates
-
-            // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-            val reach = Array(len + 1) { IntHashSet() }
-            reach[0].add(factor.q0)
-            var arcCount = 0L
-            for (t in 0 until len) {
-                val dom = problem.intDomains[seq[t]]
-                reach[t].forEach { state ->
-                    dom.forEach { sym ->
-                        if (sym in 1..s) {
-                            val nxt = delta(state, sym)
-                            if (nxt != 0) {
-                                reach[t + 1].add(nxt)
-                                arcCount++
-                            }
-                        }
-                    }
-                }
-                if (reach[t + 1].isEmpty()) return // no accepting path under declared domains — leave to propagation
-            }
-            if (arcCount == 0L || arcCount > MAX_REGULAR_ARCS) return
-
-            val outCols = Array(len) { arrayOfNulls<IntArrayList>(ns + 1) }
-            val inCols = Array(len + 1) { arrayOfNulls<IntArrayList>(ns + 1) }
-            val chanCols = Array(len) { IntArrayList() }
-            val chanSym = Array(len) { IntArrayList() }
-            val acceptCols = IntArrayList()
-            for (t in 0 until len) {
-                val declared = problem.intDomains[seq[t]]
-                val live = session.intDomain(seq[t])
-                reach[t].forEach { state ->
-                    declared.forEach { sym ->
-                        if (sym !in 1..s) return@forEach
-                        val nxt = delta(state, sym)
-                        if (nxt == 0) return@forEach
-                        // The arc is present while symbol sym stays in seq[t]'s live domain.
-                        val col = auxColumn(0L, if (live.contains(sym)) 1L else 0L, presence = intArrayOf(seq[t], sym))
-                        (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
-                        (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)
-                        chanCols[t].add(col)
-                        chanSym[t].add(sym)
-                        if (t == len - 1 && nxt in accepting) acceptCols.add(col)
-                    }
-                }
-            }
-            // Source: one unit leaves (0, q0).
-            val src = outCols[0][factor.q0] ?: return
-            if (src.isEmpty()) return
-            builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
-            // Flow conservation at every interior node: Σ out − Σ in = 0.
-            for (t in 1 until len) {
-                reach[t].forEach { state ->
-                    val cols = IntArrayList()
-                    val vals = LongArrayList()
-                    outCols[t][state]?.let {
-                        for (k in 0 until it.size) {
-                            cols.add(it[k])
-                            vals.add(1L)
-                        }
-                    }
-                    inCols[t][state]?.let {
-                        for (k in 0 until it.size) {
-                            cols.add(it[k])
-                            vals.add(-1L)
-                        }
-                    }
-                    if (!cols.isEmpty()) builder.addRow(cols.toIntArray(), vals.toLongArray(), Relation.EQ, 0L)
-                }
-            }
-            // Acceptance: one unit enters an accepting state at the last layer.
-            if (acceptCols.isEmpty()) return // no accepting transition reachable — leave to propagation
-            builder.addRow(acceptCols.toIntArray(), LongArray(acceptCols.size) { 1L }, Relation.EQ, 1L)
-            // Channel: Σ_s s·y = seq[t] at each position.
-            for (t in 0 until len) {
-                val k = chanCols[t].size
-                if (k == 0) return
-                val cols = IntArray(k + 1)
-                val vals = LongArray(k + 1)
-                for (i in 0 until k) {
-                    cols[i] = chanCols[t][i]
-                    vals[i] = chanSym[t][i].toLong()
-                }
-                cols[k] = intColumn(seq[t])
-                vals[k] = -1L
-                builder.addRow(cols, vals, Relation.EQ, 0L)
-            }
-        }
-
-        /**
-         * Layered flow hull of one [Mdd] — the exact convex hull of the diagram's accepting paths. An
-         * arc variable `y ∈ [0,1]` per forward-reachable transition record `(src, value, dst[, weight])`
-         * at each layer (pinned to 0 when `value` left the live domain of `seq[layer]`). Rows: a source
-         * row (one unit leaves `(0, initial)`), flow conservation at every interior `(layer, state)`, an
-         * acceptance row (one unit enters an accepting state at the final layer), a value channel
-         * `Σ value·y = seq[layer]` per layer, and — for a cost-MDD (stride 4) — a cost channel
-         * `Σ weight·y = cost`, an **exact lower bound on the cost variable**. The flow polytope is
-         * integral, so the LP optimum is exact. Forward reachability over the declared domains keeps the
-         * layout stable and bounds the arc count ([MAX_MDD_ARCS]); above the cap, or when no accepting
-         * path survives, the factor is skipped (only loosens).
-         */
-        @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
-        private fun buildMddHull(factor: Mdd) {
-            val seq = factor.seq
-            val n = seq.size
-            val stride = factor.recordStride
-            val trans = factor.transitions
-            val starts = factor.layerStarts
-            // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-            val reach = Array(n + 1) { IntHashSet() }
-            reach[0].add(factor.initial)
-            var arcCount = 0L
-            for (layer in 0 until n) {
-                val dom = problem.intDomains[seq[layer]]
-                var p = starts[layer]
-                val end = starts[layer + 1]
-                while (p < end) {
-                    if (trans[p] in reach[layer] && trans[p + 1] in dom) {
-                        reach[layer + 1].add(trans[p + 2])
-                        arcCount++
-                    }
-                    p += stride
-                }
-                if (reach[layer + 1].isEmpty()) return // no accepting path under declared domains
-            }
-            if (arcCount == 0L || arcCount > MAX_MDD_ARCS) return
-
-            // States are layer-local dense ids in `[0, numStatesPerLayer(layer))`, so the per-layer
-            // state→arc-columns maps are arrays indexed straight by the state id (#678).
-            val nspl = factor.numStatesPerLayer
-            val outCols = Array(n) { arrayOfNulls<IntArrayList>(nspl[it]) }
-            val inCols = Array(n + 1) { arrayOfNulls<IntArrayList>(nspl[it]) }
-            val chanCols = Array(n) { IntArrayList() }
-            val chanVal = Array(n) { IntArrayList() }
-            val accepting = IntHashSet(factor.accepting.size).apply { for (a in factor.accepting) add(a) }
-            val acceptCols = IntArrayList()
-            val costArcs = IntArrayList()
-            val costWeight = IntArrayList()
-            for (layer in 0 until n) {
-                val declared = problem.intDomains[seq[layer]]
-                val live = session.intDomain(seq[layer])
-                var p = starts[layer]
-                val end = starts[layer + 1]
-                while (p < end) {
-                    val src = trans[p]
-                    val value = trans[p + 1]
-                    val dst = trans[p + 2]
-                    if (src in reach[layer] && value in declared) {
-                        // The arc is present while its value stays in seq[layer]'s live domain.
-                        val col = auxColumn(
-                            0L,
-                            if (live.contains(value)) 1L else 0L,
-                            presence = intArrayOf(seq[layer], value),
-                        )
-                        (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
-                        (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)
-                        chanCols[layer].add(col)
-                        chanVal[layer].add(value)
-                        if (layer == n - 1 && dst in accepting) acceptCols.add(col)
-                        if (stride == 4) {
-                            costArcs.add(col)
-                            costWeight.add(trans[p + 3])
-                        }
-                    }
-                    p += stride
-                }
-            }
-            val src = outCols[0][factor.initial] ?: return
-            if (src.isEmpty()) return
-            builder.addRow(src.toIntArray(), LongArray(src.size) { 1L }, Relation.EQ, 1L)
-            for (layer in 1 until n) {
-                reach[layer].forEach { state ->
-                    val cols = IntArrayList()
-                    val vals = LongArrayList()
-                    outCols[layer][state]?.let {
-                        for (k in 0 until it.size) {
-                            cols.add(it[k])
-                            vals.add(1L)
-                        }
-                    }
-                    inCols[layer][state]?.let {
-                        for (k in 0 until it.size) {
-                            cols.add(it[k])
-                            vals.add(-1L)
-                        }
-                    }
-                    if (!cols.isEmpty()) builder.addRow(cols.toIntArray(), vals.toLongArray(), Relation.EQ, 0L)
-                }
-            }
-            if (acceptCols.isEmpty()) return
-            builder.addRow(acceptCols.toIntArray(), LongArray(acceptCols.size) { 1L }, Relation.EQ, 1L)
-            for (layer in 0 until n) {
-                val k = chanCols[layer].size
-                if (k == 0) return
-                val cols = IntArray(k + 1)
-                val vals = LongArray(k + 1)
-                for (i in 0 until k) {
-                    cols[i] = chanCols[layer][i]
-                    vals[i] = chanVal[layer][i].toLong()
-                }
-                cols[k] = intColumn(seq[layer])
-                vals[k] = -1L
-                builder.addRow(cols, vals, Relation.EQ, 0L)
-            }
-            // Cost channel: Σ weight·y − cost = 0, an exact lower bound on the cost var.
-            if (factor.cost >= 0 && !costArcs.isEmpty()) {
-                val k = costArcs.size
-                val cols = IntArray(k + 1)
-                val vals = LongArray(k + 1)
-                for (i in 0 until k) {
-                    cols[i] = costArcs[i]
-                    vals[i] = costWeight[i].toLong()
-                }
-                cols[k] = intColumn(factor.cost)
-                vals[k] = -1L
-                builder.addRow(cols, vals, Relation.EQ, 0L)
-            }
-        }
-
-        /**
-         * One-hot selector linearization of one [Element] `result = arr[idx − indexOffset]` over a
-         * *constant* array — the exact convex hull. A selector column `y_p ∈ [0,1]` for each position
-         * `p` whose index value `p + indexOffset` is in `idx`'s declared domain (layout stable across
-         * nodes; pinned to 0 when that value left the live domain). Rows: `Σ_p y_p = 1`, index channel
-         * `Σ_p (p + off)·y_p = idx`, and result channel `Σ_p arr[p]·y_p = result`. Arrays longer than
-         * [MAX_ELEM] are skipped (the added columns would dominate). A *variable* array routes to
-         * [buildVarElementHull] (the result channel is then bilinear and needs a big-M form).
-         */
-        private fun buildElementHull(factor: Element) {
-            if (factor.arrIsVars) {
-                buildVarElementHull(factor)
-                return
-            }
-            val len = factor.arr.size
-            if (len > MAX_ELEM) return
-            val off = factor.indexOffset
-            val declared = problem.intDomains[factor.idx]
-            val live = session.intDomain(factor.idx)
-            val selCols = IntArrayList()
-            val positions = IntArrayList()
-            for (p in 0 until len) {
-                val idxVal = p + off
-                if (idxVal !in declared) continue
-                // The selector y_p is present while index value p+off stays in idx's live domain.
-                selCols.add(auxColumn(0L, if (idxVal in live) 1L else 0L, presence = intArrayOf(factor.idx, idxVal)))
-                positions.add(p)
-            }
-            val k = selCols.size
-            if (k == 0) return
-            builder.addRow(selCols.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L)
-            // Σ_p (p + off)·y_p − idx = 0.
-            val idxCols = IntArray(k + 1)
-            val idxVals = LongArray(k + 1)
-            for (t in 0 until k) {
-                idxCols[t] = selCols[t]
-                idxVals[t] = (positions[t] + off).toLong()
-            }
-            idxCols[k] = intColumn(factor.idx)
-            idxVals[k] = -1L
-            builder.addRow(idxCols, idxVals, Relation.EQ, 0L)
-            // Σ_p arr[p]·y_p − result = 0: the exact convex hull of the constant table.
-            val resCols = IntArray(k + 1)
-            val resVals = LongArray(k + 1)
-            for (t in 0 until k) {
-                resCols[t] = selCols[t]
-                resVals[t] = factor.arr[positions[t]].toLong()
-            }
-            resCols[k] = intColumn(factor.result)
-            resVals[k] = -1L
-            builder.addRow(resCols, resVals, Relation.EQ, 0L)
         }
 
         /**
@@ -1474,61 +949,6 @@ internal class CpToLpRelaxation(
                     val cols = rltRow.keys.toIntArray()
                     builder.addRow(cols, LongArray(cols.size) { rltRow.getValue(cols[it]) }, Relation.LE, 0L)
                 }
-            }
-        }
-
-        /**
-         * Big-M linearization of one [Element] `result = arr[idx − indexOffset]` over a **variable**
-         * array. The same one-hot selectors `y_p` and index channel `Σ_p (p + off)·y_p = idx` as
-         * the constant case, but the result channel is bilinear (`arr[p]` is a variable), so it is
-         * relaxed with two big-M rows per position that force `result = arr[p]` when `y_p = 1` and are
-         * slack when `y_p = 0`:
-         *   `result − arr[p] + M_p·y_p ≤ M_p`   and   `arr[p] − result + M_p·y_p ≤ M_p`,
-         * with `M_p = max(rHi, aHi) − min(rLo, aLo)` from the **declared** domains — a global bound on
-         * `|result − arr[p]|`, so the rows hold at every integer solution (sound: never cuts a feasible
-         * point; verified by brute enumeration in the tests). Arrays longer than [MAX_ELEM] are skipped.
-         */
-        private fun buildVarElementHull(factor: Element) {
-            val len = factor.arr.size
-            if (len > MAX_ELEM) return
-            val off = factor.indexOffset
-            val declared = problem.intDomains[factor.idx]
-            val live = session.intDomain(factor.idx)
-            val selCols = IntArrayList()
-            val positions = IntArrayList()
-            for (p in 0 until len) {
-                val idxVal = p + off
-                if (idxVal !in declared) continue
-                selCols.add(auxColumn(0L, if (idxVal in live) 1L else 0L, presence = intArrayOf(factor.idx, idxVal)))
-                positions.add(p)
-            }
-            val k = selCols.size
-            if (k == 0) return
-            builder.addRow(selCols.toIntArray(), LongArray(k) { 1L }, Relation.EQ, 1L)
-            // Index channel Σ_p (p + off)·y_p − idx = 0.
-            val idxCols = IntArray(k + 1)
-            val idxVals = LongArray(k + 1)
-            for (t in 0 until k) {
-                idxCols[t] = selCols[t]
-                idxVals[t] = (positions[t] + off).toLong()
-            }
-            idxCols[k] = intColumn(factor.idx)
-            idxVals[k] = -1L
-            builder.addRow(idxCols, idxVals, Relation.EQ, 0L)
-            // Per position: two big-M rows tying result to arr[p] when its selector is on.
-            val resCol = intColumn(factor.result)
-            val rDom = problem.intDomains[factor.result]
-            for (t in 0 until k) {
-                val arrVar = factor.arr[positions[t]]
-                val aDom = problem.intDomains[arrVar]
-                val m = maxOf(rDom.max, aDom.max).toLong() - minOf(rDom.min, aDom.min).toLong()
-                if (m < 0L) continue // empty domain — leave that position unconstrained (sound)
-                val arrCol = intColumn(arrVar)
-                val y = selCols[t]
-                // result − arr[p] + M·y_p ≤ M  ⇒  result ≤ arr[p] when y_p = 1, slack otherwise.
-                builder.addRow(intArrayOf(resCol, arrCol, y), longArrayOf(1L, -1L, m), Relation.LE, m)
-                // arr[p] − result + M·y_p ≤ M  ⇒  arr[p] ≤ result when y_p = 1, slack otherwise.
-                builder.addRow(intArrayOf(arrCol, resCol, y), longArrayOf(1L, -1L, m), Relation.LE, m)
             }
         }
 
@@ -1684,13 +1104,7 @@ internal class CpToLpRelaxation(
 
         override fun declaredDomain(intVar: Int): IntDomain = problem.intDomains[intVar]
 
-        override fun row(
-            columns: IntArray,
-            coeffs: LongArray,
-            op: LinearOp,
-            rhs: Long,
-            contribution: Contribution,
-        ) {
+        override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) {
             if (suppressed(contribution)) return
             val rel = relationOf(op) ?: return
             builder.addRow(columns, coeffs, rel, rhs)

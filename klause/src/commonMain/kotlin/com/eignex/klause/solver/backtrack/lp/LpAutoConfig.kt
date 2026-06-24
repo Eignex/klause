@@ -15,15 +15,21 @@ import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.circuit.Subcircuit
 import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.global.GccCountLinearizer
 import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.factor.global.NValue
+import com.eignex.klause.solver.factor.global.NValueLinearizer
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.factor.scheduling.Diffn
 import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.factor.table.Element
+import com.eignex.klause.solver.factor.table.ElementLinearizer
 import com.eignex.klause.solver.factor.table.Mdd
+import com.eignex.klause.solver.factor.table.MddLinearizer
 import com.eignex.klause.solver.factor.table.Regular
+import com.eignex.klause.solver.factor.table.RegularLinearizer
 import com.eignex.klause.solver.factor.table.Table
+import com.eignex.klause.solver.factor.table.TableLinearizer
 import com.eignex.klause.solver.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.CumulativeRelaxation
@@ -391,7 +397,7 @@ object LpAutoConfig {
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            if (f !is Element || f.arr.size > CpToLpRelaxation.MAX_ELEM) continue
+            if (f !is Element || f.arr.size > ElementLinearizer.MAX_ELEM) continue
             val declared = problem.intDomains[f.idx]
             var k = 0L
             for (p in f.arr.indices) if ((p + f.indexOffset) in declared) k++
@@ -411,7 +417,7 @@ object LpAutoConfig {
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            if (f !is Table || f.numTuples > CpToLpRelaxation.MAX_TUPLES) continue
+            if (f !is Table || f.numTuples > TableLinearizer.MAX_TUPLES) continue
             any = true
             cols += f.numTuples.toLong() // upper bound on the declared-feasible selectors
             rows += 1L + f.arity // Σ y = 1 + one channel per column
@@ -428,7 +434,7 @@ object LpAutoConfig {
             if (f !is NValue || f.presents.isNotEmpty()) continue
             var cells = 0L
             for (x in f.xs) cells += problem.intDomains[x].size.toLong()
-            if (cells == 0L || cells > CpToLpRelaxation.MAX_NVALUE_CELLS) continue
+            if (cells == 0L || cells > NValueLinearizer.MAX_NVALUE_CELLS) continue
             any = true
             cols += 2L * cells // z (per var×value) + y (≤ distinct values ≤ cells)
             rows += cells + 2L * f.xs.size + 1L // y≥z rows + (Σz=1, channel) per var + the count row
@@ -446,7 +452,7 @@ object LpAutoConfig {
             if (f !is GlobalCardinality || f.countVars == null || f.presents.isNotEmpty()) continue
             var cells = 0L
             for (x in f.xs) cells += problem.intDomains[x].size.toLong()
-            if (cells == 0L || cells > CpToLpRelaxation.MAX_GCC_CELLS) continue
+            if (cells == 0L || cells > GccCountLinearizer.MAX_GCC_CELLS) continue
             any = true
             cols += cells // one z selector per var×declared-value
             rows += 2L * f.xs.size + f.cover.size // (Σz=1, channel) per var + one count row per cover value
@@ -488,7 +494,7 @@ object LpAutoConfig {
                 reach.clear()
                 next.forEach { reach.add(it) }
             }
-            if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_REGULAR_ARCS) continue
+            if (!ok || arcs == 0L || arcs > RegularLinearizer.MAX_REGULAR_ARCS) continue
             any = true
             cols += arcs
             rows += arcs + len + 2L // conservation (≤ arcs) + channel (len) + source + acceptance
@@ -528,7 +534,7 @@ object LpAutoConfig {
                 reach.clear()
                 next.forEach { reach.add(it) }
             }
-            if (!ok || arcs == 0L || arcs > CpToLpRelaxation.MAX_MDD_ARCS) continue
+            if (!ok || arcs == 0L || arcs > MddLinearizer.MAX_MDD_ARCS) continue
             any = true
             cols += arcs
             rows += arcs + n + 3L // conservation (≤ arcs) + value channel (n) + source + acceptance + cost
