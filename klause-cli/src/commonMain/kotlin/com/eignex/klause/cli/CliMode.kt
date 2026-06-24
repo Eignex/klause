@@ -256,7 +256,7 @@ internal fun Solvable.presolved(
     // backtrack solver's own root shave reaches only its search session. Solution-set-preserving (every
     // shaved value is proven infeasible), so it is safe even for solution-set-sensitive queries.
     val harvested = annotatedBacktrackParams
-        ?.takeIf { it.lpConfig != null || it.lpPlan.variableShaving }
+        ?.takeIf { it.lpConfig != null || it.lpPlan.variableShaving || it.lpPlan.objectiveShaving }
         ?.let { lpHarvest(pre.problem, linearObjective ?: LinearObjective(), it, cancellation) }
         ?: pre.problem
     if (harvested === problem) return this
