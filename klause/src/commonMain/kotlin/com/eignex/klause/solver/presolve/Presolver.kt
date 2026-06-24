@@ -10,7 +10,13 @@ import com.eignex.klause.solver.objective.LinearObjective
  * function that maps a solution of [problem] back to a solution of the original problem. For an
  * all-identity pipeline [reconstruct] is the identity (no per-sample cost).
  */
-class Presolved(val problem: Problem, val reconstruct: (Sample) -> Sample)
+class Presolved(
+    val problem: Problem,
+    val reconstruct: (Sample) -> Sample,
+    /** The problem-stage passes that changed the problem at least once during the run, in first-fire
+     *  order — surfaced as presolve statistics (which techniques actually did something). */
+    val passesFired: List<PresolvePass> = emptyList(),
+)
 
 /**
  * Information a pass needs to stay sound. [objectiveIntVars] / [objectiveBoolVars] are the
@@ -539,6 +545,7 @@ object Presolver {
         // version is skipped until some other pass changes the problem — the fixpoint/delay scheme.
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()
+        val fired = LinkedHashSet<PresolvePass>() // passes that changed the problem, in first-fire order
         var round = 0
         var roundStartComplexity = complexity(current)
         while (round < maxRounds && !cancellation()) {
@@ -553,6 +560,7 @@ object Presolver {
                 if (result.problem !== before) {
                     current = result.problem
                     result.reconstruct?.let { reconstructs.add(it) }
+                    fired.add(pass)
                     version++
                 }
             }
@@ -574,6 +582,6 @@ object Presolver {
             } else {
                 { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
             }
-        return Presolved(current, reconstruct)
+        return Presolved(current, reconstruct, fired.toList())
     }
 }

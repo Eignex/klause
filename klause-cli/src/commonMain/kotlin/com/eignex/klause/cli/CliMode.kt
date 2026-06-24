@@ -14,6 +14,8 @@ import com.eignex.klause.solver.presolve.PresolveContext
 import com.eignex.klause.solver.presolve.PresolveEmphasis
 import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.solver.presolve.Presolver
+import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 
 /*
@@ -258,8 +260,17 @@ internal fun Solvable.presolved(
         ?.let { lpHarvest(pre.problem, linearObjective ?: LinearObjective(), it, cancellation) }
         ?: pre.problem
     if (harvested === problem) return this
+    // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when shaving tightened
+    // domains) and the net constraint drop / proven infeasibility.
+    val passes = pre.passesFired.map { it.id } + (if (harvested !== pre.problem) listOf("lp-harvest") else emptyList())
+    val presolveStats = PresolveStats(
+        passes = passes,
+        constraintsRemoved = problem.factors.size - harvested.factors.size,
+        infeasible = harvested.baked is PropagationResult.Unsat,
+    )
     return Solvable(
         problem = harvested,
+        presolve = presolveStats,
         optimize = optimize,
         maximize = maximize,
         lsObjective = lsObjective,
@@ -448,6 +459,8 @@ internal class Solvable(
      *  it unless `-f` (free search) is set. Null when the mode carries no search annotations
      *  (XCSP/SMT), so the driver falls back to its default CDCL configuration. */
     val annotatedBacktrackParams: BacktrackParams? = null,
+    /** Terse presolve summary for `-s`, set by [presolved] (null when presolve was off / a no-op). */
+    val presolve: PresolveStats? = null,
 )
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via

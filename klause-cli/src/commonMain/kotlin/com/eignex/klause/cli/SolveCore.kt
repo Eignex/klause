@@ -61,7 +61,7 @@ internal object SolveCore {
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
         // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
         if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
-            printPresolved(rawSolvable.problem, solvable.problem)
+            printPresolved(rawSolvable.problem, solvable.problem, solvable.presolve?.passes.orEmpty())
             return
         }
         cliLogger(common.verbose).v {
@@ -184,8 +184,9 @@ internal object SolveCore {
     /** Print what presolve did (`dry-run-presolve`) to stderr: variable/constraint counts, total
      *  integer-domain span, the per-factor-kind histogram delta, and any proven infeasibility — so the
      *  effect of a `--presolve` config can be inspected and A/B-compared without solving. */
-    private fun printPresolved(original: Problem, presolved: Problem) {
+    private fun printPresolved(original: Problem, presolved: Problem, passes: List<String>) {
         errPrintln("presolve dry-run:")
+        errPrintln("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
         errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
         errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")
         errPrintln("  int-domain span: ${domainSpan(original)} -> ${domainSpan(presolved)}")
@@ -301,7 +302,7 @@ internal object SolveCore {
 
             is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
         }
-        stats(common, output, r.stats, nowMillis() - t0, produced)
+        stats(common, output, solvable, r.stats, nowMillis() - t0, produced)
     }
 
     /** Emit an optimization verdict + the best model (if any) + stats. [complete] gates whether an
@@ -342,7 +343,7 @@ internal object SolveCore {
 
             is MinimizeResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
         }
-        stats(common, output, withModelObjective(r.stats, solvable, best), nowMillis() - t0, produced)
+        stats(common, output, solvable, withModelObjective(r.stats, solvable, best), nowMillis() - t0, produced)
     }
 
     // --- generic per-engine satisfy / optimize ---
@@ -382,17 +383,17 @@ internal object SolveCore {
                 is SolveResult.Sat -> {
                     emit(output, solvable, r.assignment)
                     output.onComplete(Verdict.SATISFIABLE)
-                    stats(common, output, r.stats, nowMillis() - t0, 1L)
+                    stats(common, output, solvable, r.stats, nowMillis() - t0, 1L)
                 }
 
                 is SolveResult.Unsat -> {
                     output.onComplete(if (complete) Verdict.UNSATISFIABLE else Verdict.UNKNOWN)
-                    stats(common, output, r.stats, nowMillis() - t0, 0L)
+                    stats(common, output, solvable, r.stats, nowMillis() - t0, 0L)
                 }
 
                 is SolveResult.Unknown -> {
                     output.onComplete(Verdict.UNKNOWN)
-                    stats(common, output, r.stats, nowMillis() - t0, 0L)
+                    stats(common, output, solvable, r.stats, nowMillis() - t0, 0L)
                 }
             }
             return
@@ -416,7 +417,7 @@ internal object SolveCore {
             else -> Verdict.SATISFIABLE
         }
         output.onComplete(verdict)
-        stats(common, output, SolveStats.EMPTY, nowMillis() - t0, produced)
+        stats(common, output, solvable, SolveStats.EMPTY, nowMillis() - t0, produced)
     }
 
     private fun <P : SolverParams> runOptimize(
@@ -450,20 +451,20 @@ internal object SolveCore {
                     if (step is MinimizeResult.Optimal) {
                         output.onComplete(Verdict.OPTIMAL)
                         val oriented = withModelObjective(step.stats, solvable, step.sample)
-                        stats(common, output, oriented, nowMillis() - t0, produced.toLong())
+                        stats(common, output, solvable, oriented, nowMillis() - t0, produced.toLong())
                         return
                     }
                 }
 
                 is MinimizeResult.Infeasible -> {
                     output.onComplete(Verdict.UNSATISFIABLE)
-                    stats(common, output, step.stats, nowMillis() - t0, produced.toLong())
+                    stats(common, output, solvable, step.stats, nowMillis() - t0, produced.toLong())
                     return
                 }
 
                 is MinimizeResult.Unknown -> {
                     output.onComplete(Verdict.UNKNOWN)
-                    stats(common, output, step.stats, nowMillis() - t0, produced.toLong())
+                    stats(common, output, solvable, step.stats, nowMillis() - t0, produced.toLong())
                     return
                 }
             }
@@ -472,7 +473,7 @@ internal object SolveCore {
         // incumbents were already streamed; report BEST_FOUND (or UNKNOWN if nothing feasible).
         output.onComplete(if (produced == 0) Verdict.UNKNOWN else Verdict.BEST_FOUND)
         val oriented = withModelObjective(lastStats, solvable, bestSample)
-        stats(common, output, oriented, nowMillis() - t0, produced.toLong())
+        stats(common, output, solvable, oriented, nowMillis() - t0, produced.toLong())
     }
 
     private fun <P : SolverParams> runOptimizeViaEnumerate(
@@ -511,7 +512,7 @@ internal object SolveCore {
             Verdict.BEST_FOUND
         }
         output.onComplete(verdict)
-        stats(common, output, SolveStats.EMPTY, nowMillis() - t0, if (best == null) 0L else 1L)
+        stats(common, output, solvable, SolveStats.EMPTY, nowMillis() - t0, if (best == null) 0L else 1L)
     }
 
     // --- helpers ---
@@ -520,8 +521,16 @@ internal object SolveCore {
         output.onSolution(solvable.render(sample), solvable.objectiveValue?.invoke(sample))
     }
 
-    private fun stats(common: CommonOptions, output: OutputProtocol, s: SolveStats, ms: Long, solutions: Long) {
-        if (common.statistics) output.onStatistics(s, ms, solutions)
+    private fun stats(
+        common: CommonOptions,
+        output: OutputProtocol,
+        solvable: Solvable,
+        s: SolveStats,
+        ms: Long,
+        solutions: Long,
+    ) {
+        // Fold the CLI-computed presolve summary into the solver's stats so `-s` reports it uniformly.
+        if (common.statistics) output.onStatistics(s.copy(presolve = solvable.presolve), ms, solutions)
     }
 
     /** Re-express the LS incumbent objective in the model's orientation, reusing the same sign-corrected
