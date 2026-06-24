@@ -14,7 +14,24 @@ package com.eignex.klause.solver
 interface Linearizer {
     /** Emit this factor's rows, columns, and auxiliary variables into [builder]. Default: nothing. */
     fun linearize(builder: RelaxationBuilder, factorId: Int) {}
+
+    /**
+     * An upper-bound estimate of the LP columns and rows this factor's convex-hull contribution would
+     * add under the declared [domains], or null when it contributes no sized hull — over its size cap,
+     * no applicable structure, or no hull at all. The LP auto-config sums these to keep the per-node
+     * tableau under budget, so the estimate must track [linearize]'s own caps and structure (the two
+     * live in the same class so they stay in step). Default: null.
+     */
+    fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? = null
 }
+
+/** The LP columns and rows a [Linearizer.sizeEstimate] predicts its hull adds (upper bounds). */
+class LinearizerEstimate(
+    /** Upper bound on the LP columns the hull contribution adds. */
+    val cols: Long,
+    /** Upper bound on the LP rows the hull contribution adds. */
+    val rows: Long,
+)
 
 /**
  * How the root relaxation treats an emitted row. [CORE] rows define the relaxation's feasible region

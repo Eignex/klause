@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Contribution
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Linearizer
+import com.eignex.klause.solver.LinearizerEstimate
 import com.eignex.klause.solver.RelaxationBuilder
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.util.IntArrayList
@@ -81,6 +83,16 @@ internal class NValueLinearizer(
         cols[m] = builder.intColumn(n)
         vals[m] = -1L
         builder.row(cols, vals, op, 0L, Contribution.HULL)
+    }
+
+    override fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+        if (presents.isNotEmpty()) return null
+        var cells = 0L
+        for (x in xs) cells += domains[x].size.toLong()
+        if (cells == 0L || cells > MAX_NVALUE_CELLS) return null
+        // z (per var×value) + y (≤ distinct values ≤ cells) columns; y≥z rows + (Σz=1, channel) per
+        // var + the count row.
+        return LinearizerEstimate(cols = 2L * cells, rows = cells + 2L * xs.size + 1L)
     }
 
     companion object {

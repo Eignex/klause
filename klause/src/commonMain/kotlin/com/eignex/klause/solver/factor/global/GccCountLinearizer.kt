@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.factor.global
 
 import com.eignex.klause.solver.Contribution
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Linearizer
+import com.eignex.klause.solver.LinearizerEstimate
 import com.eignex.klause.solver.RelaxationBuilder
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.util.IntArrayList
@@ -69,6 +71,15 @@ internal class GccCountLinearizer(
             vals[sel.size] = -1L
             builder.row(cols, vals, LinearOp.EQ, 0L, Contribution.HULL)
         }
+    }
+
+    override fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+        if (countVars == null || presents.isNotEmpty()) return null
+        var cells = 0L
+        for (x in xs) cells += domains[x].size.toLong()
+        if (cells == 0L || cells > MAX_GCC_CELLS) return null
+        // One z selector per var×declared-value; (Σz=1, channel) per var + one count row per cover value.
+        return LinearizerEstimate(cols = cells, rows = 2L * xs.size + cover.size)
     }
 
     companion object {

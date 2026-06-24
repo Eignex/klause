@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.backtrack.lp
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
@@ -15,26 +16,19 @@ import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.circuit.Circuit
 import com.eignex.klause.solver.factor.circuit.Subcircuit
 import com.eignex.klause.solver.factor.global.AllDifferent
-import com.eignex.klause.solver.factor.global.GccCountLinearizer
 import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.factor.global.NValue
-import com.eignex.klause.solver.factor.global.NValueLinearizer
 import com.eignex.klause.solver.factor.scheduling.Cumulative
 import com.eignex.klause.solver.factor.scheduling.Diffn
 import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.factor.table.Element
-import com.eignex.klause.solver.factor.table.ElementLinearizer
 import com.eignex.klause.solver.factor.table.Mdd
-import com.eignex.klause.solver.factor.table.MddLinearizer
 import com.eignex.klause.solver.factor.table.Regular
-import com.eignex.klause.solver.factor.table.RegularLinearizer
 import com.eignex.klause.solver.factor.table.Table
-import com.eignex.klause.solver.factor.table.TableLinearizer
 import com.eignex.klause.solver.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.solver.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.solver.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.solver.lp.relaxation.schedulingViews
-import com.eignex.klause.util.IntHashSet
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -261,14 +255,17 @@ object LpAutoConfig {
             emptyList()
         } else {
             buildList {
-                if (circuit) circuitEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
-                if (constArrayElement) elementEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
-                if (table) tableEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
-                if (nValue) nValueEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
-                if (regular) regularEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
-                if (mdd) mddEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
-                if (gccCount) gccCountEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
-                if (scheduling) timeIndexedEstimate(problem)?.let { if (hullAdmitted(config, it)) add(it) }
+                fun admit(e: HullEstimate?) = e?.let { if (hullAdmitted(config, it)) add(it) }
+                // Per-factor hull sizes come from each factor's Linearizer.sizeEstimate (single source with
+                // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
+                if (circuit) admit(circuitEstimate(problem))
+                if (constArrayElement) admit(hullEstimate(problem, LpTechnique.ELEMENT) { it is Element })
+                if (table) admit(hullEstimate(problem, LpTechnique.TABLE) { it is Table })
+                if (nValue) admit(hullEstimate(problem, LpTechnique.NVALUE) { it is NValue })
+                if (regular) admit(hullEstimate(problem, LpTechnique.REGULAR) { it is Regular })
+                if (mdd) admit(hullEstimate(problem, LpTechnique.MDD) { it is Mdd })
+                if (gccCount) admit(hullEstimate(problem, LpTechnique.GCC_COUNT) { it is GlobalCardinality })
+                if (scheduling) admit(timeIndexedEstimate(problem))
             }
         }
         val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
@@ -391,155 +388,21 @@ object LpAutoConfig {
         return if (any) HullEstimate(LpTechnique.CIRCUIT, cols, rows) else null
     }
 
-    /** Constant-array [Element] selector columns + 3 rows each (mirrors `buildElementHull`). */
-    private fun elementEstimate(problem: Problem): HullEstimate? {
+    /** The aggregate hull size of every factor matching [applies] (one per-factor convex-hull family),
+     *  summing each factor's own [com.eignex.klause.solver.Linearizer.sizeEstimate] — the single source
+     *  shared with the build, so the gating estimate cannot drift from the rows actually emitted. */
+    private fun hullEstimate(problem: Problem, technique: LpTechnique, applies: (Factor) -> Boolean): HullEstimate? {
         var cols = 0L
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            if (f !is Element || f.arr.size > ElementLinearizer.MAX_ELEM) continue
-            val declared = problem.intDomains[f.idx]
-            var k = 0L
-            for (p in f.arr.indices) if ((p + f.indexOffset) in declared) k++
-            if (k == 0L) continue
+            if (!applies(f)) continue
+            val e = f.asLinearizer().sizeEstimate(problem.intDomains) ?: continue
+            cols += e.cols
+            rows += e.rows
             any = true
-            cols += k
-            // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
-            // Σ y = 1 + index channel + two big-M rows per selector (2 + 2k).
-            rows += if (f.arrIsVars) 2L + 2L * k else 3L
         }
-        return if (any) HullEstimate(LpTechnique.ELEMENT, cols, rows) else null
-    }
-
-    /** [Table] selector columns (≤ tuple count) + `1 + arity` rows each (mirrors `buildTableHull`). */
-    private fun tableEstimate(problem: Problem): HullEstimate? {
-        var cols = 0L
-        var rows = 0L
-        var any = false
-        for (f in problem.factors) {
-            if (f !is Table || f.numTuples > TableLinearizer.MAX_TUPLES) continue
-            any = true
-            cols += f.numTuples.toLong() // upper bound on the declared-feasible selectors
-            rows += 1L + f.arity // Σ y = 1 + one channel per column
-        }
-        return if (any) HullEstimate(LpTechnique.TABLE, cols, rows) else null
-    }
-
-    /** [NValue] one-hot columns (`z` per var×value + `y` per value) and rows (mirrors `buildNValueHull`). */
-    private fun nValueEstimate(problem: Problem): HullEstimate? {
-        var cols = 0L
-        var rows = 0L
-        var any = false
-        for (f in problem.factors) {
-            if (f !is NValue || f.presents.isNotEmpty()) continue
-            var cells = 0L
-            for (x in f.xs) cells += problem.intDomains[x].size.toLong()
-            if (cells == 0L || cells > NValueLinearizer.MAX_NVALUE_CELLS) continue
-            any = true
-            cols += 2L * cells // z (per var×value) + y (≤ distinct values ≤ cells)
-            rows += cells + 2L * f.xs.size + 1L // y≥z rows + (Σz=1, channel) per var + the count row
-        }
-        return if (any) HullEstimate(LpTechnique.NVALUE, cols, rows) else null
-    }
-
-    /** Count-variable [GlobalCardinality] one-hot selector columns + rows (mirrors `buildGccCountHull`):
-     *  one `z` per var×declared-value, a `Σz=1` + channel row per var, and one count row per cover value. */
-    private fun gccCountEstimate(problem: Problem): HullEstimate? {
-        var cols = 0L
-        var rows = 0L
-        var any = false
-        for (f in problem.factors) {
-            if (f !is GlobalCardinality || f.countVars == null || f.presents.isNotEmpty()) continue
-            var cells = 0L
-            for (x in f.xs) cells += problem.intDomains[x].size.toLong()
-            if (cells == 0L || cells > GccCountLinearizer.MAX_GCC_CELLS) continue
-            any = true
-            cols += cells // one z selector per var×declared-value
-            rows += 2L * f.xs.size + f.cover.size // (Σz=1, channel) per var + one count row per cover value
-        }
-        return if (any) HullEstimate(LpTechnique.GCC_COUNT, cols, rows) else null
-    }
-
-    /** [Regular] DFA flow-hull arc columns + flow/channel rows over the under-cap factors, counting
-     *  forward-reachable transitions over the declared domains (mirrors `buildRegularHull`). */
-    private fun regularEstimate(problem: Problem): HullEstimate? {
-        var cols = 0L
-        var rows = 0L
-        var any = false
-        for (f in problem.factors) {
-            if (f !is Regular) continue
-            val len = f.seq.size
-            val s = f.alphabetSize
-            val reach = IntHashSet().also { it.add(f.q0) }
-            var arcs = 0L
-            var ok = true
-            for (t in 0 until len) {
-                val dom = problem.intDomains[f.seq[t]]
-                val next = IntHashSet()
-                reach.forEach { state ->
-                    dom.forEach { sym ->
-                        if (sym in 1..s) {
-                            val nx = f.transitions[(state - 1) * s + (sym - 1)]
-                            if (nx != 0) {
-                                next.add(nx)
-                                arcs++
-                            }
-                        }
-                    }
-                }
-                if (next.isEmpty()) {
-                    ok = false
-                    break
-                }
-                reach.clear()
-                next.forEach { reach.add(it) }
-            }
-            if (!ok || arcs == 0L || arcs > RegularLinearizer.MAX_REGULAR_ARCS) continue
-            any = true
-            cols += arcs
-            rows += arcs + len + 2L // conservation (≤ arcs) + channel (len) + source + acceptance
-        }
-        return if (any) HullEstimate(LpTechnique.REGULAR, cols, rows) else null
-    }
-
-    /** [Mdd] flow-hull arc columns + flow/channel rows over the under-cap factors, counting
-     *  forward-reachable transition records over the declared domains (mirrors `buildMddHull`). */
-    private fun mddEstimate(problem: Problem): HullEstimate? {
-        var cols = 0L
-        var rows = 0L
-        var any = false
-        for (f in problem.factors) {
-            if (f !is Mdd) continue
-            val n = f.seq.size
-            val stride = f.recordStride
-            val reach = IntHashSet().also { it.add(f.initial) }
-            var arcs = 0L
-            var ok = true
-            for (layer in 0 until n) {
-                val dom = problem.intDomains[f.seq[layer]]
-                val next = IntHashSet()
-                var p = f.layerStarts[layer]
-                val end = f.layerStarts[layer + 1]
-                while (p < end) {
-                    if (f.transitions[p] in reach && f.transitions[p + 1] in dom) {
-                        next.add(f.transitions[p + 2])
-                        arcs++
-                    }
-                    p += stride
-                }
-                if (next.isEmpty()) {
-                    ok = false
-                    break
-                }
-                reach.clear()
-                next.forEach { reach.add(it) }
-            }
-            if (!ok || arcs == 0L || arcs > MddLinearizer.MAX_MDD_ARCS) continue
-            any = true
-            cols += arcs
-            rows += arcs + n + 3L // conservation (≤ arcs) + value channel (n) + source + acceptance + cost
-        }
-        return if (any) HullEstimate(LpTechnique.MDD, cols, rows) else null
+        return if (any) HullEstimate(technique, cols, rows) else null
     }
 
     /** Time-indexed `x_{i,t}` columns + resource/assignment/channel rows over the bounded-horizon

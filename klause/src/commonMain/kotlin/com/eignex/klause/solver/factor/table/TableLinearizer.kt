@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.Contribution
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Linearizer
+import com.eignex.klause.solver.LinearizerEstimate
 import com.eignex.klause.solver.RelaxationBuilder
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.util.IntArrayList
@@ -63,6 +65,13 @@ internal class TableLinearizer(
             vals[k] = 1L
             builder.row(cols, vals, LinearOp.EQ, 0L, Contribution.HULL)
         }
+    }
+
+    override fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+        if (numTuples > MAX_TUPLES) return null
+        // One selector per tuple (upper bound on the declared-feasible ones) + Σ y = 1 + one channel
+        // per column.
+        return LinearizerEstimate(cols = numTuples.toLong(), rows = 1L + arity)
     }
 
     companion object {

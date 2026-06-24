@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.Contribution
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Linearizer
+import com.eignex.klause.solver.LinearizerEstimate
 import com.eignex.klause.solver.RelaxationBuilder
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.util.IntArrayList
@@ -28,32 +30,12 @@ internal class RegularLinearizer(
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
+        val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val len = seq.size
         val s = alphabetSize
         val trans = transitions
         fun delta(state: Int, sym: Int): Int = trans[(state - 1) * s + (sym - 1)] // 1-based; 0 = dead
         val ns = numStates
-
-        // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-        val reach = Array(len + 1) { IntHashSet() }
-        reach[0].add(q0)
-        var arcCount = 0L
-        for (t in 0 until len) {
-            val dom = builder.declaredDomain(seq[t])
-            reach[t].forEach { state ->
-                dom.forEach { sym ->
-                    if (sym in 1..s) {
-                        val nxt = delta(state, sym)
-                        if (nxt != 0) {
-                            reach[t + 1].add(nxt)
-                            arcCount++
-                        }
-                    }
-                }
-            }
-            if (reach[t + 1].isEmpty()) return // no accepting path under declared domains — leave to propagation
-        }
-        if (arcCount == 0L || arcCount > MAX_REGULAR_ARCS) return
 
         val outCols = Array(len) { arrayOfNulls<IntArrayList>(ns + 1) }
         val inCols = Array(len + 1) { arrayOfNulls<IntArrayList>(ns + 1) }
@@ -125,6 +107,43 @@ internal class RegularLinearizer(
             vals[k] = -1L
             builder.row(cols, vals, LinearOp.EQ, 0L, Contribution.HULL)
         }
+    }
+
+    override fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+        val reach = forwardReach { domains[it] } ?: return null
+        // arc columns + conservation (≤ arcs) + channel (len) + source + acceptance.
+        return LinearizerEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 2L)
+    }
+
+    private class Reach(val states: Array<IntHashSet>, val arcCount: Long)
+
+    /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count,
+     *  or null when a layer empties (no accepting path) or the arc count is 0 or over [MAX_REGULAR_ARCS].
+     *  Shared by [linearize] (which needs the states to lay out columns) and [sizeEstimate] (the count). */
+    private fun forwardReach(domainOf: (Int) -> IntDomain): Reach? {
+        val len = seq.size
+        val s = alphabetSize
+        val trans = transitions
+        val reach = Array(len + 1) { IntHashSet() }
+        reach[0].add(q0)
+        var arcCount = 0L
+        for (t in 0 until len) {
+            val dom = domainOf(seq[t])
+            reach[t].forEach { state ->
+                dom.forEach { sym ->
+                    if (sym in 1..s) {
+                        val nxt = trans[(state - 1) * s + (sym - 1)]
+                        if (nxt != 0) {
+                            reach[t + 1].add(nxt)
+                            arcCount++
+                        }
+                    }
+                }
+            }
+            if (reach[t + 1].isEmpty()) return null // no accepting path under these domains
+        }
+        if (arcCount == 0L || arcCount > MAX_REGULAR_ARCS) return null
+        return Reach(reach, arcCount)
     }
 
     companion object {
