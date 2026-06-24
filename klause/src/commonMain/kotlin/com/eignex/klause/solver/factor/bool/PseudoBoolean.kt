@@ -5,6 +5,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.litVars
@@ -33,4 +34,6 @@ class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp,
     override fun asPropagator(): Propagator = PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
     override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
+
+    override fun asLinearizer(): Linearizer = PseudoBooleanLinearizer(weights, literals, op, bound)
 }

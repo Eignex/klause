@@ -1,9 +1,10 @@
 package com.eignex.klause.solver.factor.arithmetic
 
 import com.eignex.klause.solver.Contribution
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.NoLinearizer
 import com.eignex.klause.solver.RelaxationBuilder
-import com.eignex.klause.solver.factor.bool.Clause
+import com.eignex.klause.solver.factor.global.AllDifferent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -31,6 +32,19 @@ class LinearLinearizerTest {
         ) {
             rows += Row(op, intVars.toList(), coeffs.toList(), bound, contribution)
         }
+
+        // Unused by the Linear path under test.
+        override fun boolRow(literals: IntArray, weights: IntArray?, op: LinearOp, bound: Long, contribution: Contribution) =
+            error("unused")
+
+        override fun hullEnabled(): Boolean = true
+        override fun intColumn(intVar: Int): Int = error("unused")
+        override fun boolColumn(boolVar: Int): Int = error("unused")
+        override fun auxColumn(lo: Long, hi: Long, presence: IntArray?): Int = error("unused")
+        override fun liveDomain(intVar: Int): IntDomain = error("unused")
+        override fun declaredDomain(intVar: Int): IntDomain = error("unused")
+        override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) =
+            error("unused")
     }
 
     @Test
@@ -50,11 +64,11 @@ class LinearLinearizerTest {
 
     @Test
     fun `a factor with no linear relaxation contributes nothing`() {
-        val clause = Clause(intArrayOf(0, 1))
+        val allDifferent = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)
         val builder = RecordingBuilder()
 
-        assertSame(NoLinearizer, clause.asLinearizer())
-        clause.asLinearizer().linearize(builder, factorId = 0)
+        assertSame(NoLinearizer, allDifferent.asLinearizer())
+        allDifferent.asLinearizer().linearize(builder, factorId = 0)
         assertTrue(builder.rows.isEmpty())
     }
 }

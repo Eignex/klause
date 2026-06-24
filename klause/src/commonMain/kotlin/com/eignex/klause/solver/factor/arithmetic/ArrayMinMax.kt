@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
@@ -40,4 +41,6 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
     override fun asPropagator(): Propagator = ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
 
     override fun asInvariant(): Invariant = ArrayMinMaxInvariant(result, xs, max)
+
+    override fun asLinearizer(): Linearizer = ArrayMinMaxLinearizer(result, xs, max)
 }

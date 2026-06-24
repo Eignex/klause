@@ -6,6 +6,7 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.litVars
@@ -42,6 +43,8 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
     override fun asPropagator(): Propagator = CardinalityPropagator(boolVars, intVars, literals, min, max)
 
     override fun asInvariant(): Invariant = CardinalityInvariant(boolVars, literals, min, max)
+
+    override fun asLinearizer(): Linearizer = CardinalityLinearizer(literals, min, max)
 
     /** Factory methods for this factor. */
     companion object {
