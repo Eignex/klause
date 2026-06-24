@@ -3,6 +3,7 @@ package com.eignex.klause.solver.localsearch.movesource
 import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
+import com.eignex.klause.solver.localsearch.MoveSizeDistribution
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -18,8 +19,12 @@ import com.eignex.klause.util.IntHashSet
  * the feasibility fight, fired on a certified-stuck window, not by the noise draw.
  */
 class StallKick(
-    /** Variables randomized per kick. */
+    /** Variables randomized per kick when [kickSize] is null; otherwise the distribution's mean. */
     private val kickVars: Int,
+    /** Optional move-size distribution: when set, each kick draws its variable budget from it instead
+     *  of using the fixed [kickVars], so kick strength varies over a principled mix rather than a
+     *  constant. Null keeps the fixed-size behaviour. */
+    private val kickSize: MoveSizeDistribution? = null,
 ) : MoveSource {
     init {
         require(kickVars >= 1) { "kickVars >= 1, got $kickVars" }
@@ -41,8 +46,9 @@ class StallKick(
         scratch.setAssumptions(state.assumptions)
         scratch.setInvariants(state.invariants)
         scratch.setOwners(state.ownerInt)
-        var budget = kickVars
-        var attempts = kickVars * ATTEMPTS_PER_KICK
+        val size = kickSize?.nextSize(state.rng) ?: kickVars
+        var budget = size
+        var attempts = size * ATTEMPTS_PER_KICK
         while (budget > 0 && attempts-- > 0) {
             // Step 1: a random variable of the current factor.
             val scope = state.problem.factors[factorId]

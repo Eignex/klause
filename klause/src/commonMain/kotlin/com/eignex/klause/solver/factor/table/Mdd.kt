@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
@@ -102,6 +103,17 @@ class Mdd(
     )
 
     override fun asInvariant(): Invariant = MddInvariant(
+        seq,
+        numStatesPerLayer,
+        layerStarts,
+        transitions,
+        initial,
+        accepting,
+        recordStride,
+        cost,
+    )
+
+    override fun asLinearizer(): Linearizer = MddLinearizer(
         seq,
         numStatesPerLayer,
         layerStarts,

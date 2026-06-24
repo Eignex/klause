@@ -6,6 +6,7 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.arithmetic.Linear
@@ -134,4 +135,6 @@ class Element(
         arrIsVars,
         indexOffset,
     )
+
+    override fun asLinearizer(): Linearizer = ElementLinearizer(idx, result, arr, arrIsVars, indexOffset)
 }

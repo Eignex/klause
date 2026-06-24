@@ -105,6 +105,9 @@ data class SolveStats(
     val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
     val wallMs: Long = 0L,
     val timedOut: Boolean = false,
+    /** Presolve outcome, set by the CLI after presolve runs (null when presolve was off / a no-op).
+     *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
+    val presolve: PresolveStats? = null,
 ) {
     /**
      * Combine two run snapshots: counters add, peak depth maxes, depth means weight-combine,
@@ -164,6 +167,7 @@ data class SolveStats(
             depthMean = mergeDepthMean(depthMean, other.depthMean),
             wallMs = maxOf(wallMs, other.wallMs),
             timedOut = timedOut || other.timedOut,
+            presolve = presolve ?: other.presolve,
         )
     }
 
@@ -449,3 +453,16 @@ internal class SolveStatsSink(val backend: String) {
         )
     }
 }
+
+/**
+ * Terse presolve outcome for `-s`: just enough to show presolve did something and which techniques —
+ * deliberately small so it doesn't dominate the solve counters (the verbose readout is
+ * `dry-run-presolve`). [passes] are the ids of the presolve passes that changed the problem;
+ * [constraintsRemoved] is the net drop in factor count; [infeasible] flags presolve-proven UNSAT.
+ */
+@Serializable
+data class PresolveStats(
+    val passes: List<String> = emptyList(),
+    val constraintsRemoved: Int = 0,
+    val infeasible: Boolean = false,
+)

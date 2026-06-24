@@ -23,6 +23,9 @@ object MoveSourceCatalog {
         "pair-swap" to { PairSwap(DEFAULT_PAIR_SWAP_CAP) },
         "clique-swap" to { CliqueSwap(DEFAULT_CLIQUE_SWAP_CAP) },
         "flip-propagate" to { FlipAndPropagate(DEFAULT_FLIP_PROPAGATE_CAP, DEFAULT_FLIP_PROPAGATE_DEPTH) },
+        "extended-structured" to { SatisfiedStructured.sampledExtended(DEFAULT_SATISFIED_SAMPLE) },
+        "extended-elected" to { SatisfiedStructured.electedExtended(DEFAULT_ELECTED_CAP) },
+        "extended-repairs" to { ViolatedRepairs.extended(DEFAULT_VIOLATED_SAMPLE) },
     )
 
     /** Every known source label, in catalog order. */

@@ -153,6 +153,8 @@ internal class MiniZincOutput : OutputProtocol {
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
         println("%%%mzn-stat: solutions=$solutions")
+        // Presolve summary is backend-independent (presolve runs before any engine), so emit it here.
+        for ((k, v) in presolveStatPairs(stats)) println("%%%mzn-stat: $k=$v")
         if (stats.backend.isNotEmpty()) {
             // Complete (backtrack/CDCL) counters are meaningful only when the systematic engine did work;
             // a pure-LS solve has none, so its block stays empty rather than a wall of zeros. A `mixed`

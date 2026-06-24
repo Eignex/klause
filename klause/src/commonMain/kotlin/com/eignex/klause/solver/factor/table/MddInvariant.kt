@@ -104,6 +104,25 @@ internal class MddInvariant(
         }
     }
 
+    override fun proposeExtendedRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (seq.isEmpty() || !isViolated(state, factorId)) return
+        // DP-optimal repair: a minimum-change in-domain accepting layer path. Each differing position
+        // is a move that strictly reduces the accept distance.
+        val target = mddRepairPath(
+            state,
+            seq,
+            numStatesPerLayer,
+            layerStarts,
+            transitions,
+            recordStride,
+            initial,
+            accepting,
+        ) ?: return
+        for (i in seq.indices) {
+            if (target[i] != state.assignment.intValue(seq[i])) sink.addChannelingIntSet(state, seq[i], target[i])
+        }
+    }
+
     override val providesImplicitNeighbourhood: Boolean get() = true
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -331,4 +350,67 @@ internal fun mddAcceptDistance(
     var best = inf
     for (s in accepting) if (s < dp.size && dp[s] < best) best = dp[s]
     return best
+}
+
+/**
+ * A minimum-change in-domain accepting layer path, as the symbol per layer, or null when none is
+ * reachable within the domains. The domain-aware, traceback-carrying counterpart of
+ * [mddAcceptDistance]: forward DP over allowed transitions with parent pointers, then a backtrack
+ * from the cheapest accepting state.
+ */
+internal fun mddRepairPath(
+    state: LocalSearchState,
+    seq: IntArray,
+    numStatesPerLayer: IntArray,
+    layerStarts: IntArray,
+    transitions: IntArray,
+    recordStride: Int,
+    initial: Int,
+    accepting: IntArray,
+): IntArray? {
+    val n = seq.size
+    val inf = n + 1
+    val dp = Array(n + 1) { IntArray(numStatesPerLayer[it]) { inf } }
+    val parentState = Array(n + 1) { IntArray(numStatesPerLayer[it]) { -1 } }
+    val parentSymbol = Array(n + 1) { IntArray(numStatesPerLayer[it]) { -1 } }
+    if (initial < dp[0].size) dp[0][initial] = 0
+    for (i in 0 until n) {
+        val cur = state.assignment.intValue(seq[i])
+        val frozen = state.assumptions.isFrozenInt(seq[i])
+        val d = state.problem.intDomains[seq[i]]
+        var p = layerStarts[i]
+        val end = layerStarts[i + 1]
+        while (p < end) {
+            val from = transitions[p]
+            val sym = transitions[p + 1]
+            val to = transitions[p + 2]
+            val allowed = if (frozen) sym == cur else sym in d
+            val base = dp[i][from]
+            if (allowed && base < inf) {
+                val cost = base + (if (sym == cur) 0 else 1)
+                if (cost < dp[i + 1][to]) {
+                    dp[i + 1][to] = cost
+                    parentState[i + 1][to] = from
+                    parentSymbol[i + 1][to] = sym
+                }
+            }
+            p += recordStride
+        }
+    }
+    var best = inf
+    var bestState = -1
+    for (s in accepting) {
+        if (s < dp[n].size && dp[n][s] < best) {
+            best = dp[n][s]
+            bestState = s
+        }
+    }
+    if (bestState == -1) return null
+    val out = IntArray(n)
+    var s = bestState
+    for (i in n downTo 1) {
+        out[i - 1] = parentSymbol[i][s]
+        s = parentState[i][s]
+    }
+    return out
 }

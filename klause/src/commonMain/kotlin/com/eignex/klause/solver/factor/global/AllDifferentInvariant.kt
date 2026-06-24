@@ -7,6 +7,7 @@ import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.factor.global.internals.countPresentOccurrences
 import com.eignex.klause.solver.factor.global.internals.proposeRandomRotations
 import com.eignex.klause.solver.factor.global.internals.proposeRandomSwaps
+import com.eignex.klause.solver.factor.global.internals.reginTryAugment
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
@@ -136,7 +137,13 @@ internal class AllDifferentInvariant(
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
-    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean =
+        seedGreedy(state) || seedByMatching(state)
+
+    /** Fast path: first-fit assignment, each present non-frozen var taking the first in-domain value
+     *  that is either an excepted value or not yet used. Mutates as it goes; a `false` result is
+     *  retried by [seedByMatching], which recomputes from the frozen vars and overwrites the rest. */
+    private fun seedGreedy(state: LocalSearchState): Boolean {
         val used = IntHashSet(vars.size)
         for (i in vars.indices) {
             if (!presentInvFn(state, i)) continue
@@ -163,6 +170,69 @@ internal class AllDifferentInvariant(
             }
         }
         return allDistinct
+    }
+
+    /**
+     * Matching-based seed for tight domains where first-fit gives up but a feasible assignment
+     * exists. Present non-frozen vars are matched to distinct non-excepted values via the
+     * all-different augmenting-path matcher [reginTryAugment]; frozen present vars pre-occupy their
+     * value. A var the matching leaves unmatched takes any excepted value in its domain (excepted
+     * values may be shared), and the seed fails only when such a var has no excepted fallback.
+     */
+    private fun seedByMatching(state: LocalSearchState): Boolean {
+        val taken = BooleanArray(domainSize)
+        val freeVars = IntArrayList()
+        for (i in vars.indices) {
+            if (!presentInvFn(state, i)) continue
+            val v = vars[i]
+            if (!state.assumptions.isFrozenInt(v)) {
+                freeVars.add(v)
+                continue
+            }
+            val value = state.assignment.intValue(v)
+            if (value in exceptValues) continue
+            val idx = value - domainMin
+            if (idx in 0 until domainSize) {
+                if (taken[idx]) return false
+                taken[idx] = true
+            }
+        }
+        val m = freeVars.size
+        val valuesPerVar = Array(m) { k ->
+            val d = state.problem.intDomains[freeVars[k]]
+            val allowed = IntArrayList()
+            d.forEach { cand ->
+                val idx = cand - domainMin
+                if (idx in 0 until domainSize && cand !in exceptValues && !taken[idx]) allowed.add(idx)
+            }
+            IntArray(allowed.size) { allowed[it] }
+        }
+        val matchVar = IntArray(m) { -1 }
+        val matchVal = IntArray(domainSize) { -1 }
+        val visited = BooleanArray(domainSize)
+        for (k in 0 until m) {
+            visited.fill(false)
+            reginTryAugment(k, valuesPerVar, matchVar, matchVal, visited)
+        }
+        for (k in 0 until m) {
+            val v = freeVars[k]
+            val vid = matchVar[k]
+            if (vid >= 0) {
+                state.assignment.setInt(v, vid + domainMin)
+                continue
+            }
+            var chosen = Int.MIN_VALUE
+            state.problem.intDomains[v].forEach { cand ->
+                if (chosen == Int.MIN_VALUE &&
+                    cand in exceptValues
+                ) {
+                    chosen = cand
+                }
+            }
+            if (chosen == Int.MIN_VALUE) return false
+            state.assignment.setInt(v, chosen)
+        }
+        return true
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -239,6 +309,9 @@ internal class AllDifferentInvariant(
         proposeRandomSwaps(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
             presentInvFn(s, idx)
         }
+    }
+
+    override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         proposeRandomRotations(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
             presentInvFn(s, idx)
         }

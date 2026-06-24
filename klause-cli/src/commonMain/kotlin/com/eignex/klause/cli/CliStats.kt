@@ -81,3 +81,17 @@ private fun round4(x: Double): String {
     val r = round(x * 10000.0) / 10000.0
     return if (r == r.toLong().toDouble()) "${r.toLong()}" else "$r"
 }
+
+/** Terse presolve stat pairs for `-s`: which passes fired, the net constraint drop, and proven
+ *  infeasibility — just enough to show presolve did something and which techniques, kept small so it
+ *  doesn't crowd out the solve counters (the verbose readout is `dry-run-presolve`). Empty when
+ *  presolve was off or a no-op. */
+internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
+    val p = stats.presolve ?: return emptyList()
+    if (p.passes.isEmpty() && p.constraintsRemoved == 0 && !p.infeasible) return emptyList()
+    val out = ArrayList<Pair<String, String>>()
+    if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")
+    if (p.constraintsRemoved != 0) out += "presolveConstraintsRemoved" to "${p.constraintsRemoved}"
+    if (p.infeasible) out += "presolveInfeasible" to "true"
+    return out
+}

@@ -483,9 +483,6 @@ internal object SymmetryBreaking {
         return intMap to boolMap
     }
 
-    /** Cap on the bounded group closure used for full-group lex-leader breaking. */
-    private const val MAX_GROUP_ELEMENTS = 256
-
     /**
      * Total-order chains for orbits that are *scalar* symmetric — every member individually
      * interchangeable, i.e. each adjacent single transposition `(oⱼ oⱼ₊₁)` (moving only those two) is

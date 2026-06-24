@@ -102,6 +102,38 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
         }
     }
 
+    override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        proposeActiveReversals(state, sink)
+    }
+
+    /** 2-opt reversals over the active sub-tour, when the active nodes form a single cycle. Materializes
+     *  the active cycle into an order array and delegates to the shared reversal generator. */
+    private fun proposeActiveReversals(state: LocalSearchState, sink: MoveSink) {
+        if (n < 2) return
+        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]) }
+        var firstActive = -1
+        var activeCount = 0
+        for (i in 0 until n) {
+            val s = nextOf[i]
+            if (s !in 0 until n) return
+            if (s != i) {
+                activeCount++
+                if (firstActive < 0) firstActive = i
+            }
+        }
+        if (activeCount < 4) return
+        val order = IntArray(activeCount)
+        val seen = BooleanArray(n)
+        var cur = firstActive
+        for (k in 0 until activeCount) {
+            if (cur < 0 || cur >= n || nextOf[cur] == cur || seen[cur]) return
+            seen[cur] = true
+            order[k] = cur
+            cur = nextOf[cur]
+        }
+        if (cur == firstActive) proposeReversals(state, order, sink, STRUCTURED_MOVE_CAP, MOVE_ATTEMPT_STRIDE)
+    }
+
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (n < 2) return false
         for (i in 0 until n) {

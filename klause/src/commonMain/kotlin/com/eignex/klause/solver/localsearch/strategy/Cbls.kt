@@ -11,6 +11,7 @@ import com.eignex.klause.solver.localsearch.movesource.EjectionChains
 import com.eignex.klause.solver.localsearch.movesource.FlipAndPropagate
 import com.eignex.klause.solver.localsearch.movesource.Frontier
 import com.eignex.klause.solver.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.solver.localsearch.movesource.PairSwap
 import com.eignex.klause.solver.localsearch.movesource.Phase
 import com.eignex.klause.solver.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.solver.localsearch.movesource.StallKick
@@ -90,6 +91,18 @@ fun Cbls(
     /** **Implicit-solving neighbourhoods** (`0` = off): cap on elected structural globals sampled per
      *  *infeasible* pick for their feasibility-preserving structured moves. */
     implicitStructuredCap: Int = 0,
+    /** **Objective-hot-spot pair swaps** (opt-in, `0` = off): cap on score-only [PairSwap] candidates
+     *  per *feasible* pick whose first int endpoint is drawn from the objective gradient, so
+     *  objective-descent swaps concentrate on variables that can move the objective. */
+    pairSwapHotSpotCap: Int = 0,
+    /** **Extended structured moves** (opt-in, `0` = off): cap on each factor's opt-in
+     *  `proposeExtendedStructuredMoves` (circuit 2-opt, all-different 3-cycle, …) sampled per pick —
+     *  drawn both at feasibility and, for elected implicit globals, during the infeasibility fight. */
+    extendedStructuredCap: Int = 0,
+    /** **Extended repairs** (opt-in): also draw each violated factor's opt-in
+     *  `proposeExtendedRepairMoves` (e.g. a Regular DP-optimal accepting run) during the
+     *  infeasibility fight. */
+    extendedRepair: Boolean = false,
 ): SourceDrivenStrategy {
     val sources = buildList {
         add(ConfiguredSource(ViolatedRepairs(violatedSampleCount)))
@@ -108,6 +121,16 @@ fun Cbls(
         if (stallCliqueSwapCap > 0) add(ConfiguredSource(CliqueSwap(stallCliqueSwapCap), stallGated = true))
         if (flipPropagateCap > 0) {
             add(ConfiguredSource(FlipAndPropagate(flipPropagateCap, flipPropagateDepth), stallGated = true))
+        }
+        if (pairSwapHotSpotCap > 0) add(ConfiguredSource(PairSwap.hotSpot(pairSwapHotSpotCap)))
+        if (extendedStructuredCap > 0) {
+            add(ConfiguredSource(SatisfiedStructured.sampledExtended(extendedStructuredCap)))
+            add(ConfiguredSource(SatisfiedStructured.electedExtended(extendedStructuredCap), phase = Phase.Infeasible))
+        }
+        if (extendedRepair) {
+            add(
+                ConfiguredSource(ViolatedRepairs.extended(violatedSampleCount), phase = Phase.Infeasible),
+            )
         }
     }
     return SourceDrivenStrategy(

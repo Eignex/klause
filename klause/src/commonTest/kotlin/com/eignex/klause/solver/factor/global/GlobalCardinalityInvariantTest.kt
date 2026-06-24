@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.factor.global.GlobalCardinality
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,6 +29,37 @@ class GlobalCardinalityInvariantTest {
             intDomains = Array(n) { IntDomain(0, domainHi) },
             factors = arrayOf<Factor>(GlobalCardinality(xs, cover, countLow = countLow, countHigh = countHigh)),
         )
+    }
+
+    @Test
+    fun `extended structured moves include count-preserving 3-cycles`() {
+        val p = problem(
+            xs = intArrayOf(0, 1, 2, 3),
+            cover = intArrayOf(1, 2, 3),
+            countLow = intArrayOf(1, 1, 1),
+            countHigh = intArrayOf(1, 1, 1),
+            domainHi = 3,
+        )
+        fun seeded(seed: Long): LocalSearchState {
+            val state = LocalSearchState(p, Random(seed))
+            for (i in 0 until 4) state.assignment.setInt(i, i)
+            state.recompute()
+            return state
+        }
+        var sawRotation = false
+        for (seed in longArrayOf(1L, 2L, 3L, 7L, 11L, 29L)) {
+            val state = seeded(seed)
+            assertTrue(state.cost == 0L, "the seed assignment must satisfy the global cardinality")
+            val sink = MoveSink()
+            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
+            for (m in sink.list) {
+                if (m is Move.Compound && m.parts.size == 3) sawRotation = true
+                val check = seeded(0)
+                check.apply(m)
+                assertTrue(check.cost == 0L, "extended move $m broke the count constraint")
+            }
+        }
+        assertTrue(sawRotation, "count-preserving 3-cycle rotations must be emitted")
     }
 
     @Test

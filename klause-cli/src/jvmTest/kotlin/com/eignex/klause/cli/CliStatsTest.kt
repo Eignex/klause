@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
@@ -8,6 +9,28 @@ import kotlin.test.assertTrue
 
 /** Formatting + gating of the `-s` LP-success block ([lpStatPairs]). */
 class CliStatsTest {
+
+    @Test
+    fun `presolve stats report which passes fired and the constraint drop, all presolve-prefixed`() {
+        val stats = SolveStats(
+            backend = "backtrack",
+            presolve = PresolveStats(passes = listOf("strengthen", "affine"), constraintsRemoved = 3),
+        )
+        val pairs = presolveStatPairs(stats)
+        val m = pairs.toMap()
+        assertEquals("strengthen,affine", m["presolvePasses"])
+        assertEquals("3", m["presolveConstraintsRemoved"])
+        for ((k, _) in pairs) assertTrue(k.startsWith("presolve"), "key not presolve-prefixed: $k")
+    }
+
+    @Test
+    fun `no presolve activity emits nothing`() {
+        assertTrue(presolveStatPairs(SolveStats.EMPTY).isEmpty(), "no presolve summary")
+        assertTrue(
+            presolveStatPairs(SolveStats(presolve = PresolveStats())).isEmpty(),
+            "a no-op presolve emits nothing",
+        )
+    }
 
     @Test
     fun `no lp activity emits nothing`() {
