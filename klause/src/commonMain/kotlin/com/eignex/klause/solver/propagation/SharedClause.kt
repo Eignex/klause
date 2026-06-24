@@ -72,4 +72,9 @@ interface ClauseExchange {
      *  could be all-false mid-search); exporting the learned DB is level-independent. Default no-op for
      *  exchanges that publish only at restarts. */
     fun onSearchEnd(session: PropagationSession) {}
+
+    /** Publish a globally-valid nogood (an LP Farkas infeasibility certificate) to the shared pool
+     *  directly, bypassing the LBD glue filter: it holds for every arm of the same problem regardless
+     *  of its LBD, but is too long / high-LBD to pass the glue export. Default no-op. */
+    fun publishGlobal(clause: SharedClause) {}
 }

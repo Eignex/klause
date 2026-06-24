@@ -362,33 +362,43 @@ class PropagationSession(
      */
     fun exportGlueClauses(maxLbd: Int, maxLen: Int): List<SharedClause> {
         val out = ArrayList<SharedClause>()
-        val numBool = problem.numBoolVars
         for (i in 0 until learnedClauseCount) {
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
             val lits = learnedClauseAt(i).literals
             if (lits.size > maxLen) continue
-            var boolCount = 0
-            for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
-            val bools = IntArray(boolCount)
-            val quads = IntArray((lits.size - boolCount) * SharedClause.QUAD)
-            var bi = 0
-            var qi = 0
-            for (lit in lits) {
-                val v = Lit.variable(lit)
-                if (v < numBool) {
-                    bools[bi++] = lit
-                } else {
-                    val atomId = v - numBool
-                    quads[qi++] = state.atomIntVar[atomId]
-                    quads[qi++] = state.atomKind[atomId].ordinal
-                    quads[qi++] = state.atomThreshold[atomId]
-                    quads[qi++] = if (Lit.isPositive(lit)) 0 else 1
-                }
-            }
-            out.add(SharedClause(bools, quads, lbd))
+            out.add(asSharedClause(lits, lbd))
         }
         return out
+    }
+
+    /**
+     * One clause's [lits] (this session's literals) in session-portable [SharedClause] form: boolean
+     * literals travel as-is, int-bound atom literals decode to `(intVar, kind, threshold, sign)` via the
+     * atom registry. The decode shared by [exportGlueClauses] and the direct publish of globally-valid
+     * nogoods (LP Farkas certificates), which bypass the LBD glue filter.
+     */
+    internal fun asSharedClause(lits: IntArray, lbd: Int): SharedClause {
+        val numBool = problem.numBoolVars
+        var boolCount = 0
+        for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
+        val bools = IntArray(boolCount)
+        val quads = IntArray((lits.size - boolCount) * SharedClause.QUAD)
+        var bi = 0
+        var qi = 0
+        for (lit in lits) {
+            val v = Lit.variable(lit)
+            if (v < numBool) {
+                bools[bi++] = lit
+            } else {
+                val atomId = v - numBool
+                quads[qi++] = state.atomIntVar[atomId]
+                quads[qi++] = state.atomKind[atomId].ordinal
+                quads[qi++] = state.atomThreshold[atomId]
+                quads[qi++] = if (Lit.isPositive(lit)) 0 else 1
+            }
+        }
+        return SharedClause(bools, quads, lbd)
     }
 
     /**

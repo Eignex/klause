@@ -917,6 +917,10 @@ class BacktrackSolver(override val problem: Problem) :
                 for (nogood in lpNogoods.drain()) {
                     val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
                     if (res is PropagationResult.Unsat) return terminalExhausted()
+                    // An LP Farkas nogood is globally valid (the relaxation is infeasible regardless of
+                    // the incumbent), so share it with peer arms directly — its LBD = length would never
+                    // clear the glue export filter (#844).
+                    params.clauseExchange?.publishGlobal(session.asSharedClause(nogood, nogood.size))
                 }
             }
             params.clauseExchange?.onRestart(session)
