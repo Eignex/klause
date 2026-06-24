@@ -8,6 +8,7 @@ import com.eignex.klause.solver.localsearch.FixedCadenceRestart
 import com.eignex.klause.solver.localsearch.LocalSearchParams
 import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.solver.localsearch.MoveSink
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,6 +45,31 @@ class MddInvariantTest {
         state.recompute()
         assertFalse(state.factors[0].isViolated(state, 0))
         assertEquals(0, state.factors[0].violationDegree(state, 0))
+    }
+
+    @Test
+    fun `DP-optimal repair moves reach an accepted path`() {
+        fun seeded(): LocalSearchState {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2,
+                intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
+                factors = arrayOf(mddFactor()),
+            )
+            val state = LocalSearchState(problem, Random(0))
+            state.assignment.setInt(0, 1) // (1,1) is rejected
+            state.assignment.setInt(1, 1)
+            state.recompute()
+            return state
+        }
+        val state = seeded()
+        assertTrue(state.factors[0].isViolated(state, 0))
+        val sink = MoveSink()
+        state.factors[0].proposeExtendedRepairMoves(state, 0, sink)
+        assertTrue(sink.list.isNotEmpty(), "extended repair must propose moves")
+        val check = seeded()
+        for (m in sink.list) check.apply(m)
+        assertFalse(check.factors[0].isViolated(check, 0), "applying the DP-optimal repair must reach an accepted path")
     }
 
     @Test

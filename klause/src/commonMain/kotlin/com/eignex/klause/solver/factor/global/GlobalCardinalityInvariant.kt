@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.factor.compressViolation
 import com.eignex.klause.solver.factor.global.internals.GccState
 import com.eignex.klause.solver.factor.global.internals.countPresentOccurrences
+import com.eignex.klause.solver.factor.global.internals.proposeRandomRotations
 import com.eignex.klause.solver.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.localsearch.MoveSink
@@ -184,6 +185,11 @@ internal class GlobalCardinalityInvariant(
         STRUCTURED_SWAP_CAP,
         SWAP_ATTEMPT_STRIDE,
     ) { s, idx -> presentGccInvFn(s, idx) }
+
+    override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) =
+        proposeRandomRotations(state, xs, sink, STRUCTURED_SWAP_CAP, SWAP_ATTEMPT_STRIDE) { s, idx ->
+            presentGccInvFn(s, idx)
+        }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         val counts = IntArray(cover.size)

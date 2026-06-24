@@ -309,6 +309,9 @@ internal class AllDifferentInvariant(
         proposeRandomSwaps(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
             presentInvFn(s, idx)
         }
+    }
+
+    override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         proposeRandomRotations(state, vars, sink, MAX_STRUCTURED_SWAPS, SWAP_ATTEMPT_STRIDE) { s, idx ->
             presentInvFn(s, idx)
         }

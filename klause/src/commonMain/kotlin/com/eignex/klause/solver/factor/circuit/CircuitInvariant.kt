@@ -65,6 +65,9 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
             )
             emitted++
         }
+    }
+
+    override fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         proposeReversalMoves(state, sink)
     }
 

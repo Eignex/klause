@@ -105,6 +105,24 @@ interface Invariant {
     }
 
     /**
+     * Opt-in extension of [proposeStructuredMoves]: richer feasibility-preserving moves a factor can
+     * offer but that aren't part of the default neighbourhood — coordinated multi-variable moves
+     * (a circuit 2-opt reversal, an all-different 3-cycle) that broaden reach but cost more to
+     * generate and aren't always net-positive. Drawn only by the opt-in extended-structured source,
+     * so the default arms never pay for them. Default: none.
+     */
+    fun proposeExtendedStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+    }
+
+    /**
+     * Opt-in extension of [proposeRepairMoves]: a richer repair a factor can offer (e.g. a Regular
+     * DP-optimal accepting run) that's costlier than the default piecemeal repair and not always
+     * net-positive. Drawn only by the opt-in extended-repair source. Default: none.
+     */
+    fun proposeExtendedRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+    }
+
+    /**
      * Append the sibling updates that keep this factor consistent when [intVar] moves from [oldValue]
      * to [newValue], for value-driven channeling ([LocalSearchState.synthesizeChannelingMove]). The
      * engine calls this on every factor mentioning [intVar] so each rolls its own indicator flip or
