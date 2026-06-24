@@ -11,11 +11,7 @@ import com.eignex.klause.solver.RelaxationBuilder
  * relaxation never cuts a feasible point. For `a = b` (a square) the `a` and `b` coefficients coalesce
  * into the secant/tangent relaxation. HULL: the relaxation is valid without these strengthenings.
  */
-internal class ProductLinearizer(
-    private val a: Int,
-    private val b: Int,
-    private val result: Int,
-) : Linearizer {
+internal class ProductLinearizer(private val a: Int, private val b: Int, private val result: Int) : Linearizer {
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
         val aDom = builder.declaredDomain(a)

@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
@@ -105,4 +106,6 @@ class Table(
 
     override fun asInvariant(): Invariant =
         TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar)
+
+    override fun asLinearizer(): Linearizer = TableLinearizer(xs, tuples, arity, numTuples)
 }

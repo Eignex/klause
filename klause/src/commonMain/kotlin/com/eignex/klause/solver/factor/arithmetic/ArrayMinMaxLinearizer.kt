@@ -11,11 +11,8 @@ import com.eignex.klause.solver.RelaxationBuilder
  * when `z_i = 1`, bounding the extremum from the tight side too. Each `M_i` comes from the declared
  * domains, so it bounds `|result − xs[i]|` globally and the rows hold at every integer solution.
  */
-internal class ArrayMinMaxLinearizer(
-    private val result: Int,
-    private val xs: IntArray,
-    private val max: Boolean,
-) : Linearizer {
+internal class ArrayMinMaxLinearizer(private val result: Int, private val xs: IntArray, private val max: Boolean) :
+    Linearizer {
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         val resultCol = builder.intColumn(result)
         val op = if (max) LinearOp.GE else LinearOp.LE
