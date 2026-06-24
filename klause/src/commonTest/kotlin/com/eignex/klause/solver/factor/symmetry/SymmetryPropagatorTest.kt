@@ -33,7 +33,9 @@ class SymmetryPropagatorTest {
 
     private fun assertSoundUnderSearch(name: String, problem: Problem) {
         val broken = Presolve.breakSymmetries(problem)
-        val original = BruteForceSolver(problem).enumerate(BruteForceParams(randomSeed = 0L)).map { key(it) }.toHashSet()
+        val original = BruteForceSolver(
+            problem,
+        ).enumerate(BruteForceParams(randomSeed = 0L)).map { key(it) }.toHashSet()
         val survivors = BacktrackSolver(broken).enumerate(BacktrackParams(randomSeed = 1L))
             .take(100_000).map { key(it) }.toList()
         for (s in survivors) {
@@ -94,8 +96,20 @@ class SymmetryPropagatorTest {
             2,
             arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
             listOf(
-                ReifiedLinear(auxBoolVar = 0, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 1),
-                ReifiedLinear(auxBoolVar = 1, coeffs = intArrayOf(1), vars = intArrayOf(1), op = LinearOp.EQ, bound = 1),
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(0),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
+                ReifiedLinear(
+                    auxBoolVar = 1,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(1),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
             ),
         )
         assertSoundUnderSearch("composite", problem)

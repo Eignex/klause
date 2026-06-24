@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.NoInvariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.PermutationGroup
 
 /**
  * Whole-group symmetry handling as a single propagator-only factor (#896): it carries the verified
@@ -30,6 +31,12 @@ class SymmetryHandling(
         require(generators.isNotEmpty()) { "SymmetryHandling needs at least one generator" }
     }
 
+    private companion object {
+        /** Cap on the lex-leaders propagated per node: the generators plus stabiliser Schreier
+         *  generators, bounded so per-node propagation stays cheap (one propagator, not one factor each). */
+        const val STRONG_GENERATOR_CAP = 64
+    }
+
     override val intVars: IntArray = support { it.first }
     override val boolVars: IntArray = support { it.second }
 
@@ -42,16 +49,36 @@ class SymmetryHandling(
         return if (moved.isEmpty()) EmptyIntArray else moved.toIntArray().also { it.sort() }
     }
 
-    override fun asPropagator(): Propagator = SymmetryPropagator(generators.map { toSequence(it) })
+    private val nInt: Int = generators.first().first.size
+    private val nBool: Int = generators.first().second.size
+
+    override fun asPropagator(): Propagator {
+        // Expand the raw generators with stabiliser-chain Schreier generators (still genuine group
+        // elements, so every lex-leader stays sound) for fuller group coverage than the generators
+        // alone — the dynamic, single-propagator replacement for a static lex closure.
+        val unified = generators.map { toUnified(it) }
+        val strong = PermutationGroup.strongGenerators(unified, nInt + nBool, STRONG_GENERATOR_CAP)
+        return SymmetryPropagator(strong.map { toSequence(it) })
+    }
 
     override fun asInvariant(): Invariant = NoInvariant
 
-    /** Order the support `[moved ints by id, then moved bools by id]` and pair each variable with its
-     *  image — the fixed lex order the lex-leader compares over. Any fixed total order is sound. */
-    private fun toSequence(g: Pair<IntArray, IntArray>): SymmetryPropagator.Generator {
-        val (intImage, boolImage) = g
-        val movedInts = (intImage.indices).filter { intImage[it] != it }
-        val movedBools = (boolImage.indices).filter { boolImage[it] != it }
+    /** Pack a `(intImage, boolImage)` generator into one permutation over `[0, nInt+nBool)`: integer
+     *  ids stay in place, Boolean ids are offset by [nInt]. Detection is kind-preserving, so the
+     *  packed permutation maps the integer block and Boolean block to themselves. */
+    private fun toUnified(g: Pair<IntArray, IntArray>): IntArray {
+        val out = IntArray(nInt + nBool)
+        for (i in 0 until nInt) out[i] = g.first[i]
+        for (b in 0 until nBool) out[nInt + b] = nInt + g.second[b]
+        return out
+    }
+
+    /** Order a unified permutation's support `[moved ints by id, then moved bools by id]`, pairing each
+     *  variable with its image — the fixed lex order the lex-leader compares over (any fixed order is
+     *  sound). Integer positions are `< nInt`; Boolean positions are shifted back by [nInt]. */
+    private fun toSequence(perm: IntArray): SymmetryPropagator.Generator {
+        val movedInts = (0 until nInt).filter { perm[it] != it }
+        val movedBools = (nInt until nInt + nBool).filter { perm[it] != it }
         val n = movedInts.size + movedBools.size
         val left = IntArray(n)
         val right = IntArray(n)
@@ -59,13 +86,13 @@ class SymmetryHandling(
         var k = 0
         for (v in movedInts) {
             left[k] = v
-            right[k] = intImage[v]
+            right[k] = perm[v]
             isBool[k] = false
             k++
         }
         for (v in movedBools) {
-            left[k] = v
-            right[k] = boolImage[v]
+            left[k] = v - nInt
+            right[k] = perm[v] - nInt
             isBool[k] = true
             k++
         }
@@ -77,7 +104,10 @@ class SymmetryHandling(
         // generator's support (variable elimination / column merge) cannot carry the permutation, so
         // that generator is dropped — sound, since dropping a symmetry break only forgoes pruning.
         val remapped = generators.mapNotNull { conjugate(it, boolMap, intMap) }
-        if (remapped.isEmpty()) return SymmetryHandling(listOf(IntArray(intMap.size) { it } to IntArray(boolMap.size) { it }))
+        if (remapped.isEmpty()) {
+            val identity = IntArray(intMap.size) { it } to IntArray(boolMap.size) { it }
+            return SymmetryHandling(listOf(identity))
+        }
         return SymmetryHandling(remapped)
     }
 

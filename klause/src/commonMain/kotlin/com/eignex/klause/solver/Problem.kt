@@ -188,13 +188,19 @@ class Problem(
      *  ([NoInvariant]) so a move never touches them. Aliases [boolOccurrences] when no factor splits
      *  its roles (the common case — both lists are then every factor). */
     val lsBoolOccurrences: Array<IntArray> =
-        if (!anyPropagatorAbsent && !anyInvariantAbsent) boolOccurrences
-        else invert(numBoolVars, { invariants[it] !== NoInvariant }) { it.boolVars }
+        if (!anyPropagatorAbsent && !anyInvariantAbsent) {
+            boolOccurrences
+        } else {
+            invert(numBoolVars, { invariants[it] !== NoInvariant }) { it.boolVars }
+        }
 
     /** Local-search occurrence lists over integer variables; see [lsBoolOccurrences]. */
     val lsIntOccurrences: Array<IntArray> =
-        if (!anyPropagatorAbsent && !anyInvariantAbsent) intOccurrences
-        else invert(numIntVars, { invariants[it] !== NoInvariant }) { it.intVars }
+        if (!anyPropagatorAbsent && !anyInvariantAbsent) {
+            intOccurrences
+        } else {
+            invert(numIntVars, { invariants[it] !== NoInvariant }) { it.intVars }
+        }
 
     /**
      * [boolOccurrences] minus factors that use per-literal wakeup (see
