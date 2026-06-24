@@ -17,41 +17,109 @@ internal class MddInvariant(
     private val cost: Int,
 ) : Invariant {
 
+    /** Positions in [seq] each variable occupies — usually one, so a single-symbol move recombines a
+     *  single DP layer. A variable repeated across positions falls back to a full recompute. */
+    private val positionsByVar: Map<Int, IntArray> = run {
+        val tmp = HashMap<Int, MutableList<Int>>()
+        for (i in seq.indices) tmp.getOrPut(seq[i]) { mutableListOf() }.add(i)
+        tmp.mapValues { it.value.toIntArray() }
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        state.factorDegree[factorId] = violationDegree(state, factorId)
+        val st = buildState(state)
+        state.refPayload[factorId] = st
+        state.factorDegree[factorId] = compressViolation(st.distance.toLong(), state.violationSoftCap)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         !mddPathExists(state, seq, layerStarts, transitions, recordStride, initial, accepting, -1, 0)
 
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = compressViolation(
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val st = state.refPayload[factorId] as? MddLsState ?: return fullDegree(state)
+        return compressViolation(st.distance.toLong(), state.violationSoftCap)
+    }
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val st = state.refPayload[factorId] as MddLsState
+        val newDist = distanceWith(state, st, intVar, newValue)
+        return compressViolation(newDist.toLong(), state.violationSoftCap) - state.factorDegree[factorId]
+    }
+
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        if (state.assignment.intValue(intVar) == oldValue) return 0
+        // Apply is once per accepted move; rebuild both layers (the order the old full recompute already
+        // cost) so the per-candidate delta stays O(Q·Σ).
+        val before = state.factorDegree[factorId]
+        val rebuilt = buildState(state)
+        state.refPayload[factorId] = rebuilt
+        return compressViolation(rebuilt.distance.toLong(), state.violationSoftCap) - before
+    }
+
+    private fun fullDegree(state: LocalSearchState): Int = compressViolation(
         mddAcceptDistance(seq, numStatesPerLayer, layerStarts, transitions, recordStride, initial, accepting) {
             state.assignment.intValue(seq[it])
         }.toLong(),
         state.violationSoftCap,
     )
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val after = compressViolation(
-            mddAcceptDistance(seq, numStatesPerLayer, layerStarts, transitions, recordStride, initial, accepting) {
-                val v = seq[it]
-                if (v == intVar) newValue else state.assignment.intValue(v)
-            }.toLong(),
-            state.violationSoftCap,
+    private fun buildState(state: LocalSearchState): MddLsState {
+        val getSym = { i: Int -> state.assignment.intValue(seq[i]) }
+        val forward = mddForwardLayers(
+            seq.size,
+            numStatesPerLayer,
+            layerStarts,
+            transitions,
+            recordStride,
+            initial,
+            getSym,
         )
-        return after - state.factorDegree[factorId]
+        val backward =
+            mddBackwardLayers(seq.size, numStatesPerLayer, layerStarts, transitions, recordStride, accepting, getSym)
+        return MddLsState(forward, backward, acceptingDistance(forward))
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        val newValue = state.assignment.intValue(intVar)
-        if (newValue == oldValue) return 0
-        val after = compressViolation(
-            mddAcceptDistance(seq, numStatesPerLayer, layerStarts, transitions, recordStride, initial, accepting) {
-                state.assignment.intValue(seq[it])
-            }.toLong(),
-            state.violationSoftCap,
-        )
-        return after - state.factorDegree[factorId]
+    /** Accept distance with [intVar] set to [newValue]. A single-position variable recombines its DP
+     *  layer in O(Q·Σ); a repeated variable falls back to a full recompute. */
+    private fun distanceWith(state: LocalSearchState, st: MddLsState, intVar: Int, newValue: Int): Int {
+        val positions = positionsByVar[intVar]
+        if (positions == null || positions.size != 1) {
+            return mddAcceptDistance(
+                seq,
+                numStatesPerLayer,
+                layerStarts,
+                transitions,
+                recordStride,
+                initial,
+                accepting,
+            ) {
+                if (seq[it] == intVar) newValue else state.assignment.intValue(seq[it])
+            }
+        }
+        val p = positions[0]
+        val inf = seq.size + 1
+        var best = inf
+        var rec = layerStarts[p]
+        val end = layerStarts[p + 1]
+        while (rec < end) {
+            val from = transitions[rec]
+            val sym = transitions[rec + 1]
+            val to = transitions[rec + 2]
+            val fq = st.forward[p][from]
+            val bq = st.backward[p + 1][to]
+            if (fq < inf && bq < inf) {
+                val cand = fq + (if (sym == newValue) 0 else 1) + bq
+                if (cand < best) best = cand
+            }
+            rec += recordStride
+        }
+        return best
+    }
+
+    private fun acceptingDistance(forward: Array<IntArray>): Int {
+        val n = seq.size
+        var best = n + 1
+        for (s in accepting) if (s < forward[n].size && forward[n][s] < best) best = forward[n][s]
+        return best
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -413,4 +481,70 @@ internal fun mddRepairPath(
         s = parentState[i][s]
     }
     return out
+}
+
+/** Maintained accept-distance DP for an MDD factor: forward and backward layers over the current
+ *  assignment plus the resulting accept distance, so a single-symbol move recombines one layer in
+ *  O(Q·Σ) instead of resweeping the whole DP. */
+internal class MddLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int)
+
+/** `forward[i][q]` = min symbol changes over layers `0 until i` to reach state `q` from [initial],
+ *  where [getSym] is layer i's current symbol. */
+internal fun mddForwardLayers(
+    n: Int,
+    numStatesPerLayer: IntArray,
+    layerStarts: IntArray,
+    transitions: IntArray,
+    recordStride: Int,
+    initial: Int,
+    getSym: (Int) -> Int,
+): Array<IntArray> {
+    val inf = n + 1
+    val fwd = Array(n + 1) { IntArray(numStatesPerLayer[it]) { inf } }
+    if (initial < fwd[0].size) fwd[0][initial] = 0
+    for (i in 0 until n) {
+        val cur = getSym(i)
+        var p = layerStarts[i]
+        val end = layerStarts[i + 1]
+        while (p < end) {
+            val from = transitions[p]
+            val base = fwd[i][from]
+            if (base < inf) {
+                val cost = base + (if (transitions[p + 1] == cur) 0 else 1)
+                val to = transitions[p + 2]
+                if (cost < fwd[i + 1][to]) fwd[i + 1][to] = cost
+            }
+            p += recordStride
+        }
+    }
+    return fwd
+}
+
+/** `backward[i][q]` = min symbol changes over layers `i until n` to drive state `q` to an accepting
+ *  state, where [getSym] is layer i's current symbol. */
+internal fun mddBackwardLayers(
+    n: Int,
+    numStatesPerLayer: IntArray,
+    layerStarts: IntArray,
+    transitions: IntArray,
+    recordStride: Int,
+    accepting: IntArray,
+    getSym: (Int) -> Int,
+): Array<IntArray> {
+    val inf = n + 1
+    val bwd = Array(n + 1) { IntArray(numStatesPerLayer[it]) { inf } }
+    for (s in accepting) if (s < bwd[n].size) bwd[n][s] = 0
+    for (i in n - 1 downTo 0) {
+        val cur = getSym(i)
+        var p = layerStarts[i]
+        val end = layerStarts[i + 1]
+        while (p < end) {
+            val from = transitions[p]
+            val to = transitions[p + 2]
+            val c = (if (transitions[p + 1] == cur) 0 else 1) + bwd[i + 1][to]
+            if (c < bwd[i][from]) bwd[i][from] = c
+            p += recordStride
+        }
+    }
+    return bwd
 }
