@@ -203,6 +203,51 @@ class LpHarvestTest {
     }
 
     @Test
+    fun `harvest drops a lower-bound constraint the LP proves implied by a combination of the others`() {
+        // x+y>=3, y+z>=3, x+z>=3 sum to 2(x+y+z)>=9, i.e. x+y+z>=4.5, so x+y+z>=4 is redundant — implied by
+        // the *min* over the others (LP min 4.5), the >= mirror of the <= combination case. Each var is only
+        // forced >=0 by propagation, so neither it nor single-constraint subsumption catches the GE row.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 4), // implied by the three above
+            ),
+        )
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        assertTrue(harvested.factors.none { it is Linear && it.vars.size == 3 }, "the implied x+y+z>=4 must be dropped")
+        assertEquals(3, harvested.factors.count { it is Linear }, "the three irredundant pairwise covers stay")
+        assertSameFeasibleSet(problem, harvested, hi = 10)
+    }
+
+    @Test
+    fun `harvest adds an equality the LP proves pins a difference to a constant`() {
+        // x<=y, y<=z, z<=x chain to x=y=z, so x-y is pinned to 0 — provable only by *combining* the rows
+        // (transitivity), which bound propagation does not derive as a relation. The harvest emits the
+        // proven `=` so the next round's affine elimination can substitute it out.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0), // x - y <= 0
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0), // y - z <= 0
+                Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0), // z - x <= 0
+            ),
+        )
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        assertTrue(
+            harvested.factors.any { it is Linear && it.op == LinearOp.EQ && it.vars.size == 2 },
+            "the LP-pinned difference must be added as a two-term equality",
+        )
+        assertSameFeasibleSet(problem, harvested, hi = 5)
+    }
+
+    @Test
     fun `redundant-constraint removal preserves the feasible set`() {
         val rng = Random(20260702)
         var dropped = 0
@@ -225,8 +270,8 @@ class LpHarvestTest {
     }
 
     /** Assert [original] and [harvested] admit exactly the same points of the declared box `[0, hi]^n` —
-     *  membership is domains AND the (LE [Linear]) factors, so it catches a row dropped without its effect
-     *  surviving in the bounds. */
+     *  membership is domains AND the [Linear] factors, so it catches a row dropped (or an equality added)
+     *  without its effect surviving in the bounds. */
     private fun assertSameFeasibleSet(original: Problem, harvested: Problem, hi: Int) {
         val n = original.numIntVars
         val point = IntArray(n)
@@ -235,7 +280,12 @@ class LpHarvestTest {
             return p.factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
                 for (i in f.vars.indices) s += f.coeffs[i].toLong() * point[f.vars[i]]
-                s <= f.bound
+                when (f.op) {
+                    LinearOp.LE -> s <= f.bound
+                    LinearOp.GE -> s >= f.bound
+                    LinearOp.EQ -> s == f.bound.toLong()
+                    else -> true
+                }
             }
         }
         fun rec(idx: Int) {

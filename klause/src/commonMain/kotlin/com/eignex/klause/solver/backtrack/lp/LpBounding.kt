@@ -302,29 +302,91 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
     for (i in problem.factors.indices) {
         if (probes >= SHAVE_MAX_ITERS || token()) break
         val f = problem.factors[i]
-        if (f !is Linear || f.op != LinearOp.LE) continue
+        if (f !is Linear || f.op == LinearOp.NE) continue
         probes++
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && idx !in removed }
         val others = Problem(problem.numBoolVars, problem.numIntVars, problem.intDomains.copyOf(), kept)
-        val session = PropagationSession(others)
-        if (session.isUnsatAtRoot) continue
-        // Maximise a·x (minimise −a·x) over the others' relaxation.
-        val negCoeffs = LongArray(problem.numIntVars)
-        for (k in f.vars.indices) negCoeffs[f.vars[k]] = negCoeffs[f.vars[k]] - f.coeffs[k].toLong()
-        val relaxation = CpToLpRelaxation(others, LinearObjective(intCoefficients = negCoeffs)).build(session)
-        if (relaxation.model.n == 0) continue
-        // Primal only — the dual cannot maximise; a null solve (failed / unbounded) keeps the constraint.
-        val result = try {
-            dualSimplex(relaxation.model, token).solvePrimal()
-        } catch (_: LpOverflowException) {
-            continue
-        } ?: continue
-        val safeLb = safeObjectiveLowerBound(relaxation.model, result.duals) ?: continue
-        // safeLb ≤ min(−a·x) = −max(a·x), so max(a·x) ≤ −(safeLb + objConstant). Redundant when ≤ b.
-        if (-(safeLb + relaxation.objectiveConstant.toDouble()) <= f.bound.toDouble()) removed.add(i)
+        val a = LongArray(problem.numIntVars)
+        for (k in f.vars.indices) a[f.vars[k]] += f.coeffs[k].toLong()
+        val b = f.bound.toDouble()
+        // `≤ b` is redundant when the others' max of a·x is already ≤ b; `≥ b` when their min is ≥ b; an
+        // `=` only when both hold. Safe bounds (over-/under-estimates) keep it sound — a loose bound just
+        // misses a removal. Each drop is judged against the kept set, so two mutually-implied rows are
+        // never both removed (implication is transitive).
+        val redundant = when (f.op) {
+            LinearOp.LE -> safeMax(others, a, token)?.let { it <= b } ?: false
+
+            LinearOp.GE -> safeMin(others, a, token)?.let { it >= b } ?: false
+
+            LinearOp.EQ -> {
+                val mx = safeMax(others, a, token)
+                mx != null && mx <= b && (safeMin(others, a, token)?.let { it >= b } ?: false)
+            }
+
+            else -> false
+        }
+        if (redundant) removed.add(i)
     }
     return removed.toList()
 }
+
+/**
+ * Linear equalities the LP proves implied — a two-term difference `±(x − y)` pinned by the relaxation to
+ * a single integer `c`. Returns them as [Linear] `= c` factors for the affine-elimination pass to fold
+ * out (substituting `x` for `y + c`), shrinking the variable space, not just the constraint set. Sound:
+ * the safe min/max bracket the real range, so a single integer inside it means every integer-feasible
+ * point shares that value. Candidates are existing two-term unit-difference rows (so the pair is already
+ * coupled — no `O(n²)` pair scan); each pair is probed once. Bounded by [SHAVE_MAX_ITERS] and [token].
+ */
+internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
+    if (lpRelaxer == null) return emptyList()
+    val out = ArrayList<Linear>()
+    val probed = HashSet<Long>()
+    var probes = 0
+    for (f in problem.factors) {
+        if (probes >= SHAVE_MAX_ITERS || token()) break
+        if (f !is Linear || f.op == LinearOp.EQ || f.vars.size != 2) continue
+        val c0 = f.coeffs[0]
+        val c1 = f.coeffs[1]
+        if (!((c0 == 1 && c1 == -1) || (c0 == -1 && c1 == 1))) continue // a unit difference ±(v0 − v1)
+        val v0 = f.vars[0]
+        val v1 = f.vars[1]
+        if (v0 == v1 || !probed.add((minOf(v0, v1).toLong() shl Int.SIZE_BITS) or maxOf(v0, v1).toLong())) continue
+        probes++
+        val e = LongArray(problem.numIntVars)
+        e[v0] = c0.toLong()
+        e[v1] = c1.toLong()
+        val lo = safeMin(problem, e, token) ?: continue
+        val hi = safeMax(problem, e, token) ?: continue
+        // The difference is an integer in [lo, hi]; when exactly one integer fits, it is pinned to it.
+        val cLo = ceil(lo - EQ_PIN_TOL)
+        if (cLo != floor(hi + EQ_PIN_TOL) || !cLo.isFinite()) continue
+        out.add(Linear(intArrayOf(c0, c1), intArrayOf(v0, v1), LinearOp.EQ, cLo.toInt()))
+    }
+    return out
+}
+
+/** Safe (Neumaier–Shcherbina) lower bound on `min(coeffs·x)` over [prob]'s base relaxation, or null when
+ *  it is empty / infeasible / unbounded / fails. Uses the primal pass — the dual simplex cannot optimise
+ *  an arbitrary objective (it leaves its dual-feasible start). */
+private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellation): Double? {
+    val session = PropagationSession(prob)
+    if (session.isUnsatAtRoot) return null
+    val relaxation = CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs)).build(session)
+    if (relaxation.model.n == 0) return null
+    val result = try {
+        dualSimplex(relaxation.model, token).solvePrimal()
+    } catch (_: LpOverflowException) {
+        return null
+    } ?: return null
+    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return null
+    return safe + relaxation.objectiveConstant.toDouble()
+}
+
+/** Safe upper bound on `max(coeffs·x)` over [prob] — `max(c·x) = −min(−c·x)`, so [safeMin] of the negated
+ *  objective negated back. Null on the same failure cases. */
+private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellation): Double? =
+    safeMin(prob, LongArray(coeffs.size) { -coeffs[it] }, token)?.let { -it }
 
 /** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an
  *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
@@ -1112,6 +1174,9 @@ private const val LP_BRANCH_SCAN_CAP = 8192
 
 /** Max upward probes for objective shaving before it stops (each probe is one propagation + LP solve). */
 private const val SHAVE_MAX_ITERS = 64
+
+/** Slack on the safe min/max bracket when counting integers inside it — widening it only drops removals. */
+private const val EQ_PIN_TOL = 1e-6
 
 /** Node-expansion budget for the best-bound tree-search subsolver (each expansion is one node LP). */
 private const val LB_TREE_BUDGET = 256
