@@ -1,12 +1,15 @@
 package com.eignex.klause.solver.backtrack.lp
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.CUT_POOL_ROUNDS
 import com.eignex.klause.solver.backtrack.GOMORY_CUTS_PER_ROUND
 import com.eignex.klause.solver.backtrack.SEARCH_CUT_ROUNDS
 import com.eignex.klause.solver.backtrack.selector.VarRef
 import com.eignex.klause.solver.backtrack.snapshotAssignment
+import com.eignex.klause.solver.factor.arithmetic.Linear
+import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.lp.Basis
 import com.eignex.klause.solver.lp.FloatLpResult
 import com.eignex.klause.solver.lp.IntegerCertificate
@@ -276,8 +279,55 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
     return out
 }
 
+/**
+ * Factor indices of [Linear] `≤` constraints the LP relaxation proves redundant — implied by the *other*
+ * constraints, so dropping them preserves the solution set. For each candidate `a·x ≤ b`, the relaxation
+ * of the others (a fresh problem omitting this one and any already dropped) is maximised over `a·x`; a
+ * Neumaier–Shcherbina *safe upper bound* on that maximum at or below `b` certifies redundancy. The safe
+ * bound over-estimates the true maximum, so `≤ b` guarantees no feasible point can violate the constraint
+ * — sound; a too-loose bound only misses a removal, never makes a wrong one. Sound regardless of the
+ * folded domains: the harvested problem keeps them (shaving only tightens), so a dropped row's effect
+ * persists in the bounds. Sequential: each drop is judged against the constraints still kept, so two
+ * mutually-implied constraints are never both removed (implication is transitive). Bounded by
+ * [SHAVE_MAX_ITERS] and [token].
+ *
+ * The maximisation uses the primal pass ([RevisedSimplex.solvePrimal], phase-1 included): the dual simplex
+ * cannot optimise this `−a·x` objective (it leaves the dual-feasible start, so [RevisedSimplex.solve]
+ * returns the trivial point). A failed/unbounded primal solve just keeps the constraint.
+ */
+internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
+    if (lpRelaxer == null) return emptyList()
+    val removed = LinkedHashSet<Int>()
+    var probes = 0
+    for (i in problem.factors.indices) {
+        if (probes >= SHAVE_MAX_ITERS || token()) break
+        val f = problem.factors[i]
+        if (f !is Linear || f.op != LinearOp.LE) continue
+        probes++
+        val kept = problem.factors.filterIndexed { idx, _ -> idx != i && idx !in removed }
+        val others = Problem(problem.numBoolVars, problem.numIntVars, problem.intDomains.copyOf(), kept)
+        val session = PropagationSession(others)
+        if (session.isUnsatAtRoot) continue
+        // Maximise a·x (minimise −a·x) over the others' relaxation.
+        val negCoeffs = LongArray(problem.numIntVars)
+        for (k in f.vars.indices) negCoeffs[f.vars[k]] = negCoeffs[f.vars[k]] - f.coeffs[k].toLong()
+        val relaxation = CpToLpRelaxation(others, LinearObjective(intCoefficients = negCoeffs)).build(session)
+        if (relaxation.model.n == 0) continue
+        // Primal only — the dual cannot maximise; a null solve (failed / unbounded) keeps the constraint.
+        val result = try {
+            dualSimplex(relaxation.model, token).solvePrimal()
+        } catch (_: LpOverflowException) {
+            continue
+        } ?: continue
+        val safeLb = safeObjectiveLowerBound(relaxation.model, result.duals) ?: continue
+        // safeLb ≤ min(−a·x) = −max(a·x), so max(a·x) ≤ −(safeLb + objConstant). Redundant when ≤ b.
+        if (-(safeLb + relaxation.objectiveConstant.toDouble()) <= f.bound.toDouble()) removed.add(i)
+    }
+    return removed.toList()
+}
+
 /** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an
- *  infinite incumbent, so [pruneNode] fires only on a genuine, certified infeasibility (the same sound
+ *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
  *  oracle [shaveVariableBounds] leans on). A true result proves the whole problem has no solution. Bake
  *  propagation already reports its own infeasibility, so a root already Unsat is left to that path. */
 internal fun LpEngine.rootInfeasible(token: Cancellation): Boolean {

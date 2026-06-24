@@ -11,6 +11,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -177,5 +178,76 @@ class LpHarvestTest {
         assertTrue(problem.baked !is PropagationResult.Unsat, "propagation alone must not catch this infeasibility")
         val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
         assertTrue(harvested.baked is PropagationResult.Unsat, "the LP-certified infeasibility must bake to Unsat")
+    }
+
+    @Test
+    fun `harvest drops a constraint the LP proves implied by a combination of the others`() {
+        // x+y<=3, y+z<=3, x+z<=3 sum to 2(x+y+z)<=9, i.e. x+y+z<=4.5, so x+y+z<=5 is redundant — implied
+        // by a *combination* of the others (LP max 4.5), which bound propagation (each var only <=3 ⇒
+        // sum <=9) and single-constraint subsumption both miss. Needs the simplex over the kept rows.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5), // implied by the three above
+            ),
+        )
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        assertTrue(harvested.factors.none { it is Linear && it.vars.size == 3 }, "the implied x+y+z<=5 must be dropped")
+        assertEquals(3, harvested.factors.count { it is Linear }, "the three irredundant pairwise covers stay")
+        assertSameFeasibleSet(problem, harvested, hi = 10)
+    }
+
+    @Test
+    fun `redundant-constraint removal preserves the feasible set`() {
+        val rng = Random(20260702)
+        var dropped = 0
+        repeat(300) { _ ->
+            val n = rng.nextInt(2, 4)
+            val hi = rng.nextInt(2, 5)
+            val domains = Array(n) { IntDomain(0, hi) }
+            val factors = ArrayList<Factor>()
+            repeat(rng.nextInt(2, 5)) { _ ->
+                val coeffs = IntArray(n) { rng.nextInt(0, 3) }
+                if (coeffs.all { it == 0 }) return@repeat
+                factors.add(Linear(coeffs, IntArray(n) { it }, LinearOp.LE, rng.nextInt(0, hi * n + 1)))
+            }
+            val problem = Problem(0, n, domains, factors.toTypedArray())
+            val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+            if (harvested.factors.size < problem.factors.size) dropped++
+            assertSameFeasibleSet(problem, harvested, hi)
+        }
+        assertTrue(dropped > 0, "redundant-constraint removal never engaged across 300 instances")
+    }
+
+    /** Assert [original] and [harvested] admit exactly the same points of the declared box `[0, hi]^n` —
+     *  membership is domains AND the (LE [Linear]) factors, so it catches a row dropped without its effect
+     *  surviving in the bounds. */
+    private fun assertSameFeasibleSet(original: Problem, harvested: Problem, hi: Int) {
+        val n = original.numIntVars
+        val point = IntArray(n)
+        fun feasible(p: Problem): Boolean {
+            for (v in 0 until n) if (point[v] !in p.intDomains[v]) return false
+            return p.factors.filterIsInstance<Linear>().all { f ->
+                var s = 0L
+                for (i in f.vars.indices) s += f.coeffs[i].toLong() * point[f.vars[i]]
+                s <= f.bound
+            }
+        }
+        fun rec(idx: Int) {
+            if (idx == n) {
+                assertEquals(feasible(original), feasible(harvested), "feasibility differs at ${point.toList()}")
+                return
+            }
+            for (value in 0..hi) {
+                point[idx] = value
+                rec(idx + 1)
+            }
+        }
+        rec(0)
     }
 }
