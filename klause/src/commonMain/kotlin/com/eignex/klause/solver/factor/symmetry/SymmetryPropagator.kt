@@ -74,8 +74,26 @@ internal class SymmetryPropagator(
                 val jBool = j >= nInt
                 val jVar = if (jBool) j - nInt else j
                 // x_k ≤ x_j: tighten x_k's max down to x_j's max, and x_j's min up to x_k's min.
-                if (!tightenHi(state, kVar, kBool, hi(state, jVar, jBool), boundReason(state, jVar, jBool))) return false
-                if (!tightenLo(state, jVar, jBool, lo(state, kVar, kBool), boundReason(state, kVar, kBool))) return false
+                if (!tightenHi(
+                        state,
+                        kVar,
+                        kBool,
+                        hi(state, jVar, jBool),
+                        boundReason(state, jVar, jBool),
+                    )
+                ) {
+                    return false
+                }
+                if (!tightenLo(
+                        state,
+                        jVar,
+                        jBool,
+                        lo(state, kVar, kBool),
+                        boundReason(state, kVar, kBool),
+                    )
+                ) {
+                    return false
+                }
             }
             return true // only the frontier position; deeper positions resolve as it fixes
         }
@@ -84,13 +102,12 @@ internal class SymmetryPropagator(
 
     /** The premise of an `x ≤ y` bound transfer: the cited variable's current bound (an integer
      *  order-atom, or the Boolean's current literal). A superset is sound. */
-    private fun boundReason(state: PropagationState, v: Int, isBool: Boolean): IntArray? =
-        if (isBool) {
-            val value = state.boolValues[v] ?: return null
-            intArrayOf(Lit.make(v, !value))
-        } else {
-            state.composeIntVarAtomAntecedents(intArrayOf(v))
-        }
+    private fun boundReason(state: PropagationState, v: Int, isBool: Boolean): IntArray? = if (isBool) {
+        val value = state.boolValues[v] ?: return null
+        intArrayOf(Lit.make(v, !value))
+    } else {
+        state.composeIntVarAtomAntecedents(intArrayOf(v))
+    }
 
     /**
      * The clause-form reason for a lex-leader conflict (`propagate` returned `false` on the

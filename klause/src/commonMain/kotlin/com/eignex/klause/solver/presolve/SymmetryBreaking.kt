@@ -84,13 +84,24 @@ internal object SymmetryBreaking {
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
             val orbitSet = orbit.toHashSet()
-            val minValue = orbit.min()
-            for (x in 0 until problem.numIntVars) {
-                if (x in objectiveIntVars) continue
-                if (domainWithin(problem.intDomains[x], orbitSet)) {
-                    extra.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.EQ, minValue))
-                    break
+            val internal = (0 until problem.numIntVars)
+                .filter { it !in objectiveIntVars && domainWithin(problem.intDomains[it], orbitSet) }
+            when {
+                // Law–Lee value precedence (the default value break): introduce the orbit's values in
+                // sorted order across the interchangeable variables — one representative per value-symmetry
+                // class survives, strictly stronger than pinning a single variable. Needs ≥ 2 variables to
+                // chain; with one it degrades to the single-variable pin (the only sound break available).
+                internal.size >= 2 -> {
+                    val sortedValues = orbit.sorted()
+                    val seq = internal.toIntArray()
+                    for (i in 0 until sortedValues.size - 1) {
+                        extra.add(ValuePrecede(sortedValues[i], sortedValues[i + 1], seq))
+                    }
                 }
+
+                internal.size == 1 -> extra.add(
+                    Linear(intArrayOf(1), intArrayOf(internal[0]), LinearOp.EQ, orbit.min()),
+                )
             }
         }
         return extra

@@ -102,14 +102,16 @@ class SymmetryPropagatorTest {
         // permutation symmetry makes orbital fixing fire on the whole orbit). The full BacktrackSolver
         // (with clause learning) exercises the inline antecedents and the orbital-fixing reasons.
         val rng = Random(0x0B17A1L)
-        repeat(60) {
+        repeat(60) { iter ->
             val n = rng.nextInt(3, 5)
             val d = rng.nextInt(1, 3)
             val xs = IntArray(n) { it }
             val factors = ArrayList<Factor>()
             when (rng.nextInt(3)) {
                 0 -> factors.add(AllDifferent(xs, domainMin = 0, domainSize = d + 1))
+
                 1 -> factors.add(Linear(IntArray(n) { 1 }, xs, LinearOp.LE, rng.nextInt(0, n * d + 1)))
+
                 else -> {
                     factors.add(Linear(IntArray(n) { 1 }, xs, LinearOp.GE, rng.nextInt(0, n * d + 1)))
                     factors.add(Linear(IntArray(n) { 1 }, xs, LinearOp.LE, rng.nextInt(0, n * d + 1)))
@@ -119,7 +121,7 @@ class SymmetryPropagatorTest {
             val broken = Presolve.breakSymmetries(problem)
             val origSat = BruteForceSolver(problem).solve(BruteForceParams(randomSeed = 0L)) is SolveResult.Sat
             val brokenSat = BacktrackSolver(broken).solve(BacktrackParams(randomSeed = 1L)) is SolveResult.Sat
-            assertEquals(origSat, brokenSat, "random#$it(n=$n,d=$d): breaking changed satisfiability")
+            assertEquals(origSat, brokenSat, "random#$iter(n=$n,d=$d): breaking changed satisfiability")
         }
     }
 
