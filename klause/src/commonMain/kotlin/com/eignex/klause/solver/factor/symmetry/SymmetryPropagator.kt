@@ -9,7 +9,7 @@ import com.eignex.klause.util.IntArrayList
  * Dynamic symmetry handling: one global propagator for the whole automorphism group, replacing the
  * static enumeration of lex-leader factors. Holds the verified generators (each a kind-preserving
  * permutation of the variables); at every search node it enforces the lex-leader predicate
- * `V ≤lex σ(V)` for each generator [g], pruning the symmetric completions the prefix already rules
+ * `V ≤lex σ(V)` for each generator, pruning the symmetric completions the prefix already rules
  * out. The lex-minimum of every orbit satisfies `V ≤lex σ(V)` for every group element, so each
  * predicate is a sound symmetry break and at least one representative per orbit always survives.
  *
