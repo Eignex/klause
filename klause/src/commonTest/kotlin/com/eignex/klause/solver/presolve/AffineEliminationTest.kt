@@ -10,6 +10,8 @@ import com.eignex.klause.solver.backtrack.BacktrackSolver
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.global.AllDifferent
+import com.eignex.klause.solver.factor.table.Element
+import com.eignex.klause.solver.factor.table.Table
 import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -162,6 +164,55 @@ class AffineEliminationTest {
             ),
         )
         checkRoundTrip("alias-into-global", problem, expectEliminated = true, expectSat = true)
+    }
+
+    @Test
+    fun `affine-substitutes a shifted index out of an element`() {
+        // x = y + 1 and x is an Element index. The shift folds into the element's offset
+        // (idx − offset becomes y − (offset − 1)), so x is projected out of the non-linear global.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 3), IntDomain(5, 7), IntDomain(0, 2)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1), // x = y + 1
+                Element(idx = 0, result = 1, arr = intArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
+            ),
+        )
+        checkFeasibleSetPreserved("element-index-shift", problem)
+    }
+
+    @Test
+    fun `does not affine-substitute a scaled element index`() {
+        // x = 2y + 1 as an Element index would reindex the array, which Element cannot represent, so
+        // the substitution declines and x is left in place. The extra `y <= 1` keeps y non-contained
+        // so the residue-class pass can't eliminate it instead (isolating the Element decline).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 3), IntDomain(5, 7), IntDomain(0, 1)),
+            factors = listOf(
+                Linear(intArrayOf(1, -2), intArrayOf(0, 2), LinearOp.EQ, 1), // x = 2y + 1
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1), // y <= 1 (keeps y non-contained)
+                Element(idx = 0, result = 1, arr = intArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
+            ),
+        )
+        checkRoundTrip("element-scaled-index", problem, expectEliminated = false, expectSat = true)
+    }
+
+    @Test
+    fun `affine-substitutes a shifted variable out of a table column`() {
+        // x = y + 1 and x is a Table column; each row's x value shifts by -1 so the table constrains y.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 2)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1), // x = y + 1
+                Table(intArrayOf(0, 1), intArrayOf(1, 1, 2, 2, 3, 3)), // (x, z) in {(1,1),(2,2),(3,3)}
+            ),
+        )
+        checkFeasibleSetPreserved("table-column-shift", problem)
     }
 
     @Test

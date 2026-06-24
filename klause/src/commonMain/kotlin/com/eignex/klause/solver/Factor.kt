@@ -42,6 +42,24 @@ interface Factor {
     fun remap(boolMap: IntArray, intMap: IntArray): Factor
 
     /**
+     * A copy of this factor with integer variable [x] replaced by the affine expression
+     * `scale·replacement + offset`, or `null` when this factor cannot represent that substitution
+     * exactly. Lets affine variable elimination (`AffineSingletons`) project out an `x` defined by
+     * `x = scale·y + offset` even when it appears in a non-linear global — provided the global can
+     * absorb the affine view (e.g. an [com.eignex.klause.solver.factor.table.Element] index shift
+     * folds into its offset). The default declines (`null`): substituting an affine expression for a
+     * bare variable is unsound for a factor that reasons over the variable's value directly, so a
+     * factor opts in only for forms it can rewrite faithfully. Must replace **every** occurrence of
+     * [x] (or return `null`); the pure-rename case (`scale = 1, offset = 0`) is handled by [remap].
+     */
+    fun substituteAffine(
+        @Suppress("UNUSED_PARAMETER") x: Int,
+        @Suppress("UNUSED_PARAMETER") scale: Int,
+        @Suppress("UNUSED_PARAMETER") offset: Int,
+        @Suppress("UNUSED_PARAMETER") replacement: Int,
+    ): Factor? = null
+
+    /**
      * A canonical [StructuralKey] identifying this constraint up to variable identity: same factor
      * type, same constants (coefficients, bounds, polarities), and the same multiset of variables — in
      * a representation that does not depend on internal ordering — produce equal keys. Used by symmetry

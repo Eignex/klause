@@ -27,10 +27,12 @@ internal object AffineSingletons {
      *
      * For the **alias** case `x = y` (`n = 2`, `A = 1`, `B = 0`) the substitution `x → y` is a plain
      * variable rename, applied to *every* factor via [Factor.remap] regardless of type (#364).
-     * Otherwise the relation can only fold into a weighted sum, so `x` is eliminated only when its
-     * other occurrences are all [Linear] — a global constraint (AllDifferent, Element, …) needs `x` as
-     * a genuine variable and cannot absorb `B + Σ A_j·y_j`. The #318 contained slice (`x` in no other
-     * factor) is the zero-fold special case, and is what lets an `n`-term definition be projected out.
+     * Otherwise the relation folds into every other [Linear]; a **single-partner** `x = a·y + b`
+     * additionally projects out of any non-linear factor that can represent the affine view via
+     * [Factor.substituteAffine] (an Element index shift, a Table column rewrite). A multi-partner
+     * `B + Σ A_j·y_j` only folds into [Linear] factors — a global keyed on `x`'s value as a sum can't
+     * represent it. The #318 contained slice (`x` in no other factor) is the zero-fold special case,
+     * and is what lets an `n`-term definition be projected out.
      *
      * Variables in [objectiveIntVars] are never eliminated: the objective reads them directly and
      * the engine optimises over the presolved problem where an eliminated variable is unconstrained.
@@ -193,7 +195,12 @@ internal object AffineSingletons {
                 // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
                 // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
                 val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
-                if (isAlias || otherOccurrencesAllLinear(factors, di, x)) {
+                // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
+                // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
+                // only folds into Linear factors.
+                val singlePartnerSubstitutable = termVars.size == 1 &&
+                    otherOccurrencesAffineSubstitutable(factors, di, x, termCoeffs[0], constTerm, termVars[0])
+                if (isAlias || otherOccurrencesAllLinear(factors, di, x) || singlePartnerSubstitutable) {
                     return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
                 }
             }
@@ -220,6 +227,26 @@ internal object AffineSingletons {
         return true
     }
 
+    /** Whether every factor other than [defIdx] that mentions [x] can take the substitution
+     *  `x = scale·y + offset`: a [Linear] folds it directly, any other factor must opt in via
+     *  [Factor.substituteAffine] (a global that can represent the affine view, e.g. an Element index
+     *  shift). */
+    private fun otherOccurrencesAffineSubstitutable(
+        factors: List<Factor>,
+        defIdx: Int,
+        x: Int,
+        scale: Int,
+        offset: Int,
+        y: Int,
+    ): Boolean {
+        for (i in factors.indices) {
+            if (i == defIdx || x !in factors[i].intVars) continue
+            val f = factors[i]
+            if (f !is Linear && f.substituteAffine(x, scale, offset, y) == null) return false
+        }
+        return true
+    }
+
     /** Drop the defining equality and remove `x`: for the alias case `x = y`, substitute `x → y`
      *  into every other factor via [Factor.remap] (any factor type); otherwise fold
      *  `x = constTerm + Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases
@@ -232,10 +259,23 @@ internal object AffineSingletons {
             intMap[c.x] = c.termVars[0]
             for (i in factors.indices) if (i != c.defIdx) out.add(factors[i].remap(boolMap, intMap))
         } else {
+            val singlePartner = c.termVars.size == 1
             for (i in factors.indices) {
                 if (i == c.defIdx) continue
                 val f = factors[i]
-                out.add(if (f is Linear && c.x in f.vars) foldAffineIntoLinear(f, c) else f)
+                out.add(
+                    when {
+                        f is Linear && c.x in f.vars -> foldAffineIntoLinear(f, c)
+
+                        // Single-partner affine into a global the gate accepted (non-null substitute).
+                        singlePartner && c.x in f.intVars ->
+                            requireNotNull(f.substituteAffine(c.x, c.termCoeffs[0], c.constTerm, c.termVars[0])) {
+                                "substituteAffine returned null for a factor accepted by the candidate gate"
+                            }
+
+                        else -> f
+                    },
+                )
             }
         }
         out.addAll(domainBoundsOnTerms(problem.intDomains[c.x], c))
