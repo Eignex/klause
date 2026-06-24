@@ -32,6 +32,48 @@ internal class SymmetryPropagator(private val generators: List<Generator>) : Pro
         return true
     }
 
+    /**
+     * The clause-form reason for a lex-leader conflict (`propagate` returned `false` on the
+     * direct-conflict path): re-scan the generators, find the one whose fixed-equal prefix forces
+     * `V >lex σ(V)` with no equal-tail rescue, and cite the prefix and the scanned suffix that
+     * established it. Every solution surviving the symmetry break has `V ≤lex σ(V)`, so the clause is
+     * entailed. `null` (chronological backtrack) when no generator is in that direct-conflict state —
+     * a conflict reached only through a failed tightening already carries that pin's antecedents.
+     */
+    @Suppress("ReturnCount", "NestedBlockDepth")
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        for (g in generators) {
+            val len = g.leftVar.size
+            var a = 0
+            while (a < len) {
+                val lLo = lo(state, g.leftVar[a], g.isBool[a])
+                val lHi = hi(state, g.leftVar[a], g.isBool[a])
+                val rLo = lo(state, g.rightVar[a], g.isBool[a])
+                val rHi = hi(state, g.rightVar[a], g.isBool[a])
+                if (lLo == lHi && rLo == rHi && lLo == rLo) a++ else break
+            }
+            if (a == len) continue
+            if (hi(state, g.leftVar[a], g.isBool[a]) < lo(state, g.rightVar[a], g.isBool[a])) continue
+            var i = a
+            var b = -1
+            while (i < len) {
+                val liLo = lo(state, g.leftVar[i], g.isBool[i])
+                val riHi = hi(state, g.rightVar[i], g.isBool[i])
+                if (liLo > riHi) break
+                if (liLo == riHi) {
+                    if (b == -1) b = i
+                } else {
+                    b = -1
+                }
+                i++
+            }
+            val betaInfinite = i == len
+            if (!betaInfinite && b == -1) b = i
+            if (!betaInfinite && b <= a) return reason(state, g, a, i, strictHere = true)
+        }
+        return null
+    }
+
     /** `V ≤lex σ(V)` filtering for one generator. Returns `false` on contradiction. */
     @Suppress("ReturnCount", "CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     private fun propagateLexLeader(state: PropagationState, g: Generator): Boolean {
