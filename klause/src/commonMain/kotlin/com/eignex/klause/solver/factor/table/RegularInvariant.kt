@@ -18,41 +18,90 @@ internal class RegularInvariant(
 
     private val acceptingSet: IntHashSet = buildAcceptingSet(accepting)
 
+    /** Positions in [seq] each variable occupies — usually one, so a single-symbol move recombines a
+     *  single DP column. A variable repeated across positions falls back to a full recompute. */
+    private val positionsByVar: Map<Int, IntArray> = run {
+        val tmp = HashMap<Int, MutableList<Int>>()
+        for (i in seq.indices) tmp.getOrPut(seq[i]) { mutableListOf() }.add(i)
+        tmp.mapValues { it.value.toIntArray() }
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        state.factorDegree[factorId] = violationDegree(state, factorId)
+        val st = buildState(state)
+        state.refPayload[factorId] = st
+        state.factorDegree[factorId] = compressViolation(st.distance.toLong(), state.violationSoftCap)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         !regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, acceptingSet)
 
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = compressViolation(
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+        val st = state.refPayload[factorId] as? RegularLsState ?: return fullDegree(state)
+        return compressViolation(st.distance.toLong(), state.violationSoftCap)
+    }
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+        val st = state.refPayload[factorId] as RegularLsState
+        val newDist = distanceWith(state, st, intVar, newValue)
+        return compressViolation(newDist.toLong(), state.violationSoftCap) - state.factorDegree[factorId]
+    }
+
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+        if (state.assignment.intValue(intVar) == oldValue) return 0
+        // Apply is once per accepted move; rebuild both layers (O(n·Q·Σ), the order the old full
+        // recompute already cost) so the per-candidate delta stays O(Q·Σ).
+        val before = state.factorDegree[factorId]
+        val rebuilt = buildState(state)
+        state.refPayload[factorId] = rebuilt
+        return compressViolation(rebuilt.distance.toLong(), state.violationSoftCap) - before
+    }
+
+    private fun fullDegree(state: LocalSearchState): Int = compressViolation(
         regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
             state.assignment.intValue(seq[it])
         }.toLong(),
         state.violationSoftCap,
     )
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
-        val after = compressViolation(
-            regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
-                val v = seq[it]
-                if (v == intVar) newValue else state.assignment.intValue(v)
-            }.toLong(),
-            state.violationSoftCap,
-        )
-        return after - state.factorDegree[factorId]
+    private fun buildState(state: LocalSearchState): RegularLsState {
+        val getSym = { i: Int -> state.assignment.intValue(seq[i]) }
+        val forward = regularForwardLayers(seq.size, numStates, alphabetSize, transitions, q0, getSym)
+        val backward = regularBackwardLayers(seq.size, numStates, alphabetSize, transitions, acceptingSet, getSym)
+        return RegularLsState(forward, backward, acceptingDistance(forward))
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
-        val newValue = state.assignment.intValue(intVar)
-        if (newValue == oldValue) return 0
-        val after = compressViolation(
-            regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
-                state.assignment.intValue(seq[it])
-            }.toLong(),
-            state.violationSoftCap,
-        )
-        return after - state.factorDegree[factorId]
+    /** Accept distance with [intVar] set to [newValue]. A single-position variable recombines its DP
+     *  column in O(Q·Σ); a repeated variable falls back to a full recompute. */
+    private fun distanceWith(state: LocalSearchState, st: RegularLsState, intVar: Int, newValue: Int): Int {
+        val positions = positionsByVar[intVar]
+        if (positions == null || positions.size != 1) {
+            return regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
+                if (seq[it] == intVar) newValue else state.assignment.intValue(seq[it])
+            }
+        }
+        val p = positions[0]
+        val inf = seq.size + 1
+        var best = inf
+        for (q in 1..numStates) {
+            val fq = st.forward[p][q]
+            if (fq >= inf) continue
+            for (s in 1..alphabetSize) {
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                if (nq == 0) continue
+                val bq = st.backward[p + 1][nq]
+                if (bq >= inf) continue
+                val cand = fq + (if (s == newValue) 0 else 1) + bq
+                if (cand < best) best = cand
+            }
+        }
+        return best
+    }
+
+    private fun acceptingDistance(forward: Array<IntArray>): Int {
+        val n = seq.size
+        var best = n + 1
+        for (q in accepting) if (q in 1..numStates && forward[n][q] < best) best = forward[n][q]
+        return best
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -309,4 +358,67 @@ internal fun regularRepairPath(
         q = parentState[i][q]
     }
     return out
+}
+
+/** Maintained accept-distance DP for a Regular factor: forward and backward layers over the current
+ *  assignment plus the resulting accept distance, so a single-symbol move recombines one column in
+ *  O(Q·Σ) instead of resweeping the whole DP. */
+internal class RegularLsState(val forward: Array<IntArray>, val backward: Array<IntArray>, var distance: Int)
+
+/** `forward[i][q]` = min symbol changes over positions `0 until i` to reach state `q` from `q0`,
+ *  where [getSym] is position i's current symbol. */
+internal fun regularForwardLayers(
+    n: Int,
+    numStates: Int,
+    alphabetSize: Int,
+    transitions: IntArray,
+    q0: Int,
+    getSym: (Int) -> Int,
+): Array<IntArray> {
+    val inf = n + 1
+    val fwd = Array(n + 1) { IntArray(numStates + 1) { inf } }
+    if (q0 in 1..numStates) fwd[0][q0] = 0
+    for (i in 0 until n) {
+        val cur = getSym(i)
+        for (q in 1..numStates) {
+            val base = fwd[i][q]
+            if (base >= inf) continue
+            for (s in 1..alphabetSize) {
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                if (nq == 0) continue
+                val cost = base + (if (s == cur) 0 else 1)
+                if (cost < fwd[i + 1][nq]) fwd[i + 1][nq] = cost
+            }
+        }
+    }
+    return fwd
+}
+
+/** `backward[i][q]` = min symbol changes over positions `i until n` to drive state `q` to an
+ *  accepting state, where [getSym] is position i's current symbol. */
+internal fun regularBackwardLayers(
+    n: Int,
+    numStates: Int,
+    alphabetSize: Int,
+    transitions: IntArray,
+    acceptingSet: IntHashSet,
+    getSym: (Int) -> Int,
+): Array<IntArray> {
+    val inf = n + 1
+    val bwd = Array(n + 1) { IntArray(numStates + 1) { inf } }
+    for (q in 1..numStates) if (q in acceptingSet) bwd[n][q] = 0
+    for (i in n - 1 downTo 0) {
+        val cur = getSym(i)
+        for (q in 1..numStates) {
+            var best = inf
+            for (s in 1..alphabetSize) {
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                if (nq == 0) continue
+                val c = (if (s == cur) 0 else 1) + bwd[i + 1][nq]
+                if (c < best) best = c
+            }
+            bwd[i][q] = best
+        }
+    }
+    return bwd
 }
