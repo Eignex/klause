@@ -59,7 +59,9 @@ fun lpHarvest(
     val objLb = obj?.let { o ->
         engine.shaveObjectiveLb(o.varId, o.ascending, cancellation)?.let { lb -> o.varId to lb }
     }
-    if (shaved.isEmpty() && objLb == null) return problem
+    // Constraints the LP proves implied by the rest — dropped permanently (solution-set-preserving).
+    val redundant = if (plan.variableShaving) engine.redundantConstraints(cancellation).toHashSet() else emptySet()
+    if (shaved.isEmpty() && objLb == null && redundant.isEmpty()) return problem
 
     val domains = problem.intDomains.copyOf()
     for (sb in shaved) {
@@ -70,11 +72,17 @@ fun lpHarvest(
     // The proven LB never exceeds any feasible objective value, so raising the variable's min to it
     // cannot empty the domain.
     objLb?.let { (varId, lb) -> domains[varId] = domains[varId].withMinAtLeast(lb) }
+    // Dropping LP-redundant constraints keeps the variable space, so no reconstruct is needed.
+    val factors = if (redundant.isEmpty()) {
+        problem.factors
+    } else {
+        problem.factors.filterIndexed { idx, _ -> idx !in redundant }.toTypedArray()
+    }
     return Problem(
         numBoolVars = problem.numBoolVars,
         numIntVars = problem.numIntVars,
         intDomains = domains,
-        factors = problem.factors,
+        factors = factors,
         probeFailedLiterals = problem.probeFailedLiterals,
         probeIntBounds = problem.probeIntBounds,
         probeIntHoles = problem.probeIntHoles,
