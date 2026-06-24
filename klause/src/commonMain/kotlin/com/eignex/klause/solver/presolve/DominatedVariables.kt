@@ -5,7 +5,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.Cardinality
 import com.eignex.klause.solver.factor.bool.Clause
@@ -22,9 +21,10 @@ internal object DominatedVariables {
      *    the objective), an optimum exists with `xⱼ` at its lower bound, so pin it there.
      *  - **up-safe**: the mirror (`≤`/negative or `≥`/positive, and `cⱼ ≤ 0`) → pin to the upper bound.
      *
-     * Integers: a variable whose every occurrence is a `≤`/`≥` [Linear] (an `=`/`≠` row or non-[Linear]
-     * global makes the safety undecidable, so it is excluded) is pinned by tightening its domain to a
-     * singleton. Booleans (#469/#470): the pure-literal mirror, extended past [Clause] to every
+     * Integers: a variable whose every occurrence is a monotone `≤`/`≥` row exposed by
+     * [Factor.linearRows] (an `=`/`≠` row, or a factor with no exact linear form, makes the safety
+     * undecidable, so it is excluded) is pinned by tightening its domain to a singleton.
+     * Booleans (#469/#470): the pure-literal mirror, extended past [Clause] to every
      * *monotone* pseudo-Boolean row — a [Cardinality] `min ≤ Σ ≤ max` (each active side fixes a safe
      * direction per literal) and a [PseudoBoolean] `≤`/`≥`. In all of these, flipping a literal moves
      * the row's sum one known way, so one value of the variable is safe; an `=` pseudo-Boolean, a
@@ -33,9 +33,10 @@ internal object DominatedVariables {
      * the pass idempotent). Coefficients come from [objectiveIntCoeffs] / [objectiveBoolCoeffs]
      * (minimize sense, absent ⇒ 0).
      *
-     * The integer side stays `≤`/`≥` [Linear] only: klause's reified rows are full biconditionals
-     * (their inner vars affect feasibility both ways) and its globals aren't monotone in a single int
-     * var, so there is no sound monotone int factor to add — see #470.
+     * The integer side reasons only over monotone `≤`/`≥` rows from [Factor.linearRows] — plain linear
+     * comparators and the increasing chain both qualify; reified rows are full biconditionals (their
+     * inner vars affect feasibility both ways) and other globals expose no exact linear rows, so they
+     * exclude their vars — see #470.
      *
      * No elimination, identity reconstruction. Solution-set altering (discards optimum-equivalent and
      * feasible-but-suboptimal assignments), so the engine runs it only for non-solution-set-sensitive
@@ -56,16 +57,21 @@ internal object DominatedVariables {
         val boolEligible = BooleanArray(nb) { true }
         val alreadyPinned = IntHashSet() // bool vars already forced by a unit clause
         for (f in problem.factors) {
-            if (f is Linear && (f.op == LinearOp.LE || f.op == LinearOp.GE)) {
-                for (i in f.vars.indices) {
-                    val a = f.coeffs[i]
-                    if (a == 0) continue
-                    // For a nonzero coefficient in a ≤/≥ row exactly one direction is safe: lowering is
-                    // safe iff (LE ∧ a>0) ∨ (GE ∧ a<0); raising is the complement.
-                    val loweringSafe = if (f.op == LinearOp.LE) a > 0 else a < 0
-                    if (loweringSafe) upSafe[f.vars[i]] = false else downSafe[f.vars[i]] = false
+            val rows = f.linearRows()
+            if (rows != null && rows.all { it.op == LinearOp.LE || it.op == LinearOp.GE }) {
+                // Every exact row is monotone ≤/≥, so each variable has one safe direction per row.
+                for (row in rows) {
+                    for (i in row.vars.indices) {
+                        val a = row.coeffs[i]
+                        if (a == 0) continue
+                        // Lowering is safe iff (LE ∧ a>0) ∨ (GE ∧ a<0); raising is the complement.
+                        val loweringSafe = if (row.op == LinearOp.LE) a > 0 else a < 0
+                        if (loweringSafe) upSafe[row.vars[i]] = false else downSafe[row.vars[i]] = false
+                    }
                 }
             } else {
+                // An =/≠ row, a factor with no exact linear form, or any other global makes the
+                // single-variable safety undecidable.
                 for (v in f.intVars) intEligible[v] = false
             }
             markBoolSafety(f, trueSafe, falseSafe, boolEligible, alreadyPinned)

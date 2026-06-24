@@ -4,6 +4,7 @@ import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
+import com.eignex.klause.solver.LinearRow
 import com.eignex.klause.solver.Linearizer
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
@@ -66,4 +67,7 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
 
     override fun asLinearizer(): Linearizer = LinearLinearizer(op, vars, coeffs, bound)
+
+    // A Linear *is* a single exact linear row — its own inequality, no relaxation.
+    override fun linearRows(): List<LinearRow> = listOf(LinearRow(coeffs, vars, op, bound.toLong()))
 }
