@@ -276,6 +276,17 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
     return out
 }
 
+/** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an
+ *  infinite incumbent, so [pruneNode] fires only on a genuine, certified infeasibility (the same sound
+ *  oracle [shaveVariableBounds] leans on). A true result proves the whole problem has no solution. Bake
+ *  propagation already reports its own infeasibility, so a root already Unsat is left to that path. */
+internal fun LpEngine.rootInfeasible(token: Cancellation): Boolean {
+    if (lpRelaxer == null || token()) return false
+    val s = PropagationSession(problem)
+    if (s.isUnsatAtRoot) return false
+    return pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
+}
+
 /** Whether a fresh root with `v ≤ bound` (or `v ≥ bound` when not [atMost]) is provably infeasible —
  *  propagation Unsat, or an LP infeasibility at an infinite incumbent (so `pruneNode` fires only on a
  *  genuine infeasibility). Sound: a true result proves every solution lies strictly past [bound]. */
