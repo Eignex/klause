@@ -15,9 +15,22 @@ class StructuralKey internal constructor(private val kind: FactorKind, private v
 
     override fun hashCode(): Int = 31 * kind.ordinal + payload.contentHashCode()
 
-    /** A stable, injective rendering (`kind:p0,p1,…`). Distinct keys render distinctly, so it is a
-     *  sound canonical token for the heuristic colour-refinement signatures that compose keys. */
+    /** A stable, injective rendering (`kind:p0,p1,…`) for diagnostics; distinct keys render distinctly. */
     override fun toString(): String = "${kind.ordinal}:" + payload.joinToString(",")
+
+    /** The number of `Long` words [writeWordsInto] emits — the kind discriminator, the payload length,
+     *  then the payload — so a composite key can pre-size one flat `LongArray`. */
+    internal val wordCount: Int get() = 2 + payload.size
+
+    /** Write this key's words into [dst] starting at [at] and return the next free index. Lets a
+     *  composite key (e.g. a colour-refinement signature) fold in factor keys as integers — into a
+     *  single pre-sized array, with no boxing and no decimal rendering. */
+    internal fun writeWordsInto(dst: LongArray, at: Int): Int {
+        dst[at] = kind.ordinal.toLong()
+        dst[at + 1] = payload.size.toLong()
+        payload.copyInto(dst, at + 2)
+        return at + 2 + payload.size
+    }
 
     override fun compareTo(other: StructuralKey): Int {
         if (kind != other.kind) return kind.ordinal - other.kind.ordinal
@@ -37,6 +50,14 @@ class StructuralKey internal constructor(private val kind: FactorKind, private v
          */
         fun of(kind: FactorKind, block: StructuralKeyBuilder.() -> Unit): StructuralKey =
             StructuralKeyBuilder().apply(block).build(kind)
+
+        /**
+         * Build a standalone payload fragment (no kind) for [StructuralKeyBuilder.words] to splice in.
+         * Lets a factor compute the variable-independent part of its key **once** and reuse it across
+         * the many remapped copies symmetry refinement keys — the expensive constant work (e.g. a
+         * table's sorted tuple set) is hoisted out of the per-round hot path.
+         */
+        fun words(block: StructuralKeyBuilder.() -> Unit): LongArray = StructuralKeyBuilder().apply(block).buildWords()
     }
 }
 
@@ -74,43 +95,89 @@ internal enum class FactorKind {
     SYMMETRY_HANDLING,
 }
 
-/** Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments. */
+/** Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a
+ *  primitive `long` buffer — no per-word boxing, since these keys are rebuilt in symmetry refinement's
+ *  per-round inner loop. */
 internal class StructuralKeyBuilder {
-    private val buf = ArrayList<Long>()
+    private var buf = LongArray(INITIAL_CAPACITY)
+    private var size = 0
 
-    fun int(value: Int) {
-        buf.add(value.toLong())
+    private fun reserve(extra: Int) {
+        if (size + extra <= buf.size) return
+        var capacity = buf.size * 2
+        while (capacity < size + extra) capacity *= 2
+        buf = buf.copyOf(capacity)
     }
 
-    fun bool(value: Boolean) {
-        buf.add(if (value) 1L else 0L)
+    private fun append(word: Long) {
+        reserve(1)
+        buf[size++] = word
     }
 
-    fun enum(value: Enum<*>) {
-        buf.add(value.ordinal.toLong())
-    }
+    fun int(value: Int) = append(value.toLong())
+
+    fun bool(value: Boolean) = append(if (value) 1L else 0L)
+
+    fun enum(value: Enum<*>) = append(value.ordinal.toLong())
 
     /** A positional int array (order significant): length, then elements in order. */
     fun ints(xs: IntArray) {
-        buf.add(xs.size.toLong())
-        for (x in xs) buf.add(x.toLong())
+        append(xs.size.toLong())
+        reserve(xs.size)
+        for (x in xs) buf[size++] = x.toLong()
     }
 
     /** A set-semantics int array (order insignificant): length, then elements ascending. */
     fun sortedInts(xs: IntArray) {
-        buf.add(xs.size.toLong())
-        for (x in xs.sorted()) buf.add(x.toLong())
+        append(xs.size.toLong())
+        val sorted = xs.copyOf()
+        sorted.sort()
+        reserve(sorted.size)
+        for (x in sorted) buf[size++] = x.toLong()
     }
 
     /** `(key, value)` pairs ordered by key ascending, where the value for the entry at original index
      *  `i` is `valueOf(i)`: length, then `key, value` per pair. */
     fun pairsByKey(keys: IntArray, valueOf: (Int) -> Long) {
-        buf.add(keys.size.toLong())
-        for (i in keys.indices.sortedBy { keys[it] }) {
-            buf.add(keys[i].toLong())
-            buf.add(valueOf(i))
+        append(keys.size.toLong())
+        val order = IntArray(keys.size) { it }
+        sortIndicesByKey(order, keys)
+        reserve(keys.size * 2)
+        for (i in order) {
+            buf[size++] = keys[i].toLong()
+            buf[size++] = valueOf(i)
         }
     }
 
-    fun build(kind: FactorKind): StructuralKey = StructuralKey(kind, buf.toLongArray())
+    /** Splice a fragment of already-built words verbatim (from [StructuralKey.words]) — the cached,
+     *  variable-independent part of a factor's key. */
+    fun words(fragment: LongArray) {
+        reserve(fragment.size)
+        fragment.copyInto(buf, size)
+        size += fragment.size
+    }
+
+    fun build(kind: FactorKind): StructuralKey = StructuralKey(kind, buf.copyOf(size))
+
+    fun buildWords(): LongArray = buf.copyOf(size)
+
+    private companion object {
+        const val INITIAL_CAPACITY = 16
+    }
+}
+
+/** Insertion-sort [order] (a permutation of its own indices) by `keys[order[i]]` ascending, without
+ *  boxing — the index counterpart of `indices.sortedBy { keys[it] }`. Index arrays here are short
+ *  (a constraint's arity), so insertion sort beats a boxed comparator sort. */
+private fun sortIndicesByKey(order: IntArray, keys: IntArray) {
+    for (i in 1 until order.size) {
+        val cur = order[i]
+        val key = keys[cur]
+        var j = i - 1
+        while (j >= 0 && keys[order[j]] > key) {
+            order[j + 1] = order[j]
+            j--
+        }
+        order[j + 1] = cur
+    }
 }
