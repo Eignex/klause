@@ -113,6 +113,20 @@ interface Factor {
      */
     fun structuralReduce(domains: Array<IntDomain>): FactorReduction = FactorReduction.Unchanged
 
+    /**
+     * This factor's constraint as one or more **solution-set-exact** [LinearRow]s over its integer
+     * variables, or `null` (the default) when the factor has no exact linear form. "Exact" means the
+     * conjunction of the returned rows accepts exactly the assignments this factor accepts — it *is*
+     * the constraint, not a relaxation. A factor whose only linear form is a relaxation (big-M,
+     * convex hull) must return `null` here and expose that through [asLinearizer] instead.
+     *
+     * Lets presolve analyses (redundancy, domination) read the linear content of any factor
+     * uniformly instead of pattern-matching the concrete
+     * [com.eignex.klause.solver.factor.arithmetic.Linear] type. Read-only: it carries no write-back, so
+     * passes that *rewrite* a factor still go through [structuralReduce] / [substituteAffine].
+     */
+    fun linearRows(): List<LinearRow>? = null
+
     /** The [Propagator] the CP engine uses for this constraint. */
     fun asPropagator(): Propagator
 
