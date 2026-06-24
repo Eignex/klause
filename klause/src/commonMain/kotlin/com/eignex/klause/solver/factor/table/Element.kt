@@ -49,6 +49,18 @@ class Element(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         Element(intMap[idx], intMap[result], if (arrIsVars) arr.remapVars(intMap) else arr, arrIsVars, indexOffset)
 
+    // Affine substitution `idx = replacement + offset` (a pure shift, scale 1) folds into [indexOffset]:
+    // reading `arr(idx − indexOffset)` becomes `arr(replacement − (indexOffset − offset))`. Only the
+    // index in this shift form is representable; a scaled index would reindex the array, and the result
+    // / array-variable roles read a value directly, so those decline. Requires `x` to appear solely as
+    // the index (no double role) so the rewrite removes every occurrence.
+    override fun substituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Factor? =
+        if (x == idx && scale == 1 && x != result && (!arrIsVars || x !in arr)) {
+            Element(replacement, result, arr, arrIsVars, indexOffset - offset)
+        } else {
+            null
+        }
+
     // Positional: the array is ordered (idx selects by position), so the key keeps array order
     // rather than sorting. Encodes every distinguishing field — array kind, offset, idx, result,
     // and the ordered array (var ids when [arrIsVars], else constant values) — so two non-equivalent

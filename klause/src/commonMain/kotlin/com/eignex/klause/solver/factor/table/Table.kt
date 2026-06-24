@@ -40,6 +40,28 @@ class Table(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(xs.remapVars(intMap), tuples)
 
+    // Affine substitution `x = scale·replacement + offset` rewrites every column holding x: a row's
+    // required value v for x means replacement = (v − offset) / scale, so rows where (v − offset) is
+    // not divisible by scale can never match and drop, and surviving rows store the replacement value.
+    // Representable for any non-zero scale (a shift, negation, or stride). Declines (null) only when no
+    // row survives — leaving the original table for propagation to refute.
+    override fun substituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Factor? {
+        if (scale == 0 || x !in xs) return null
+        val cols = xs.indices.filter { xs[it] == x }
+        val kept = (0 until numTuples).filter { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0 } }
+        if (kept.isEmpty()) return null
+        val newXs = IntArray(arity) { if (xs[it] == x) replacement else xs[it] }
+        val newTuples = IntArray(kept.size * arity)
+        var w = 0
+        for (r in kept) {
+            for (c in 0 until arity) {
+                val v = tuples[r * arity + c]
+                newTuples[w++] = if (xs[c] == x) (v - offset) / scale else v
+            }
+        }
+        return Table(newXs, newTuples)
+    }
+
     // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so row strings are sorted.
     // Encodes the full var sequence and tuple set — collision-free up to variable identity.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.TABLE) {
