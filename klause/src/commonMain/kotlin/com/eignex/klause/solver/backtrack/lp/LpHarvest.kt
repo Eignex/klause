@@ -61,7 +61,10 @@ fun lpHarvest(
     }
     // Constraints the LP proves implied by the rest — dropped permanently (solution-set-preserving).
     val redundant = if (plan.variableShaving) engine.redundantConstraints(cancellation).toHashSet() else emptySet()
-    if (shaved.isEmpty() && objLb == null && redundant.isEmpty()) return problem
+    // Differences the LP proves pinned to a constant — added as `=` factors for the next presolve round's
+    // affine elimination to fold out, shrinking the variable space (this transform only adds the factor).
+    val equalities = if (plan.variableShaving) engine.impliedEqualities(cancellation) else emptyList()
+    if (shaved.isEmpty() && objLb == null && redundant.isEmpty() && equalities.isEmpty()) return problem
 
     val domains = problem.intDomains.copyOf()
     for (sb in shaved) {
@@ -72,11 +75,12 @@ fun lpHarvest(
     // The proven LB never exceeds any feasible objective value, so raising the variable's min to it
     // cannot empty the domain.
     objLb?.let { (varId, lb) -> domains[varId] = domains[varId].withMinAtLeast(lb) }
-    // Dropping LP-redundant constraints keeps the variable space, so no reconstruct is needed.
-    val factors = if (redundant.isEmpty()) {
+    // Dropping redundant rows and appending proven equalities both keep the variable space (the affine
+    // pass that consumes an equality runs later and carries its own reconstruct), so none is needed here.
+    val factors = if (redundant.isEmpty() && equalities.isEmpty()) {
         problem.factors
     } else {
-        problem.factors.filterIndexed { idx, _ -> idx !in redundant }.toTypedArray()
+        (problem.factors.filterIndexed { idx, _ -> idx !in redundant } + equalities).toTypedArray()
     }
     return Problem(
         numBoolVars = problem.numBoolVars,
