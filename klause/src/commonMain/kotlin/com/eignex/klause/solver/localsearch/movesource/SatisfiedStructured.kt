@@ -27,6 +27,9 @@ class SatisfiedStructured private constructor(
     private val scope: Scope,
     /** Factors to sample per call in [Scope.Sampled] / [Scope.Elected] (ignored for [Scope.All]). */
     private val sampleCount: Int,
+    /** When true, draws each factor's opt-in extended structured moves (richer coordinated moves)
+     *  instead of the default structured moves. */
+    private val extended: Boolean = false,
 ) : MoveSource {
 
     /** Which satisfied factors a [SatisfiedStructured] consults. */
@@ -41,7 +44,7 @@ class SatisfiedStructured private constructor(
         Elected,
     }
 
-    override val id: MoveSourceId = ID
+    override val id: MoveSourceId = if (extended) EXTENDED_ID else ID
     override val phase: Phase = Phase.Feasible
     override val pool: Pool = Pool.NoiseEligible
 
@@ -75,7 +78,8 @@ class SatisfiedStructured private constructor(
      *  filter (a non-owner's moves on those variables are dropped). */
     private fun proposeAsOwner(state: LocalSearchState, fid: Int, sink: MoveSink) {
         sink.proposer = fid
-        state.factors[fid].proposeStructuredMoves(state, fid, sink)
+        val f = state.factors[fid]
+        if (extended) f.proposeExtendedStructuredMoves(state, fid, sink) else f.proposeStructuredMoves(state, fid, sink)
         sink.proposer = MoveSink.NO_PROPOSER
     }
 
@@ -83,6 +87,9 @@ class SatisfiedStructured private constructor(
     companion object {
         /** Catalog id for this source. */
         val ID: MoveSourceId = MoveSourceId("satisfied-structured")
+
+        /** Catalog id for the extended variant (opt-in richer structured moves). */
+        val EXTENDED_ID: MoveSourceId = MoveSourceId("extended-structured")
 
         /** Random-sampling variant: keep [sampleCount] (≥ 0) random non-violated factors. */
         fun sampled(sampleCount: Int): SatisfiedStructured {
@@ -98,6 +105,18 @@ class SatisfiedStructured private constructor(
         fun elected(sampleCount: Int): SatisfiedStructured {
             require(sampleCount >= 0) { "sampleCount >= 0, got $sampleCount" }
             return SatisfiedStructured(Scope.Elected, sampleCount)
+        }
+
+        /** Extended (opt-in) random-sampling variant — draws each factor's extended structured moves. */
+        fun sampledExtended(sampleCount: Int): SatisfiedStructured {
+            require(sampleCount >= 0) { "sampleCount >= 0, got $sampleCount" }
+            return SatisfiedStructured(Scope.Sampled, sampleCount, extended = true)
+        }
+
+        /** Extended (opt-in) elected-implicit variant — draws each factor's extended structured moves. */
+        fun electedExtended(sampleCount: Int): SatisfiedStructured {
+            require(sampleCount >= 0) { "sampleCount >= 0, got $sampleCount" }
+            return SatisfiedStructured(Scope.Elected, sampleCount, extended = true)
         }
     }
 }

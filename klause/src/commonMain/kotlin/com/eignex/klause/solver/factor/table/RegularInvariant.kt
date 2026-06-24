@@ -57,16 +57,6 @@ internal class RegularInvariant(
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (seq.isEmpty() || regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, acceptingSet)) return
-        // DP-optimal repair: a minimum-change in-domain accepting run. Each position where it differs
-        // from the current symbol is a move that strictly reduces the accept distance, so the search
-        // can walk straight to feasibility instead of chasing one dead-state fix at a time.
-        val target = regularRepairPath(state, seq, numStates, alphabetSize, transitions, q0, acceptingSet)
-        if (target != null) {
-            for (i in seq.indices) {
-                if (target[i] != state.assignment.intValue(seq[i])) sink.addChannelingIntSet(state, seq[i], target[i])
-            }
-            return
-        }
         val path = IntArray(seq.size + 1)
         path[0] = q0
         for (i in seq.indices) {
@@ -91,6 +81,17 @@ internal class RegularInvariant(
                 val target = regularDelta(transitions, numStates, alphabetSize, path[last], sym)
                 if (sym != curLast && target in acceptingSet) sink.addChannelingIntSet(state, seq[last], sym)
             }
+        }
+    }
+
+    override fun proposeExtendedRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (seq.isEmpty() || regularAccepts(state, seq, q0, transitions, numStates, alphabetSize, acceptingSet)) return
+        // DP-optimal repair: a minimum-change in-domain accepting run. Each position where it differs
+        // from the current symbol is a move that strictly reduces the accept distance, so the search
+        // can walk straight to feasibility instead of chasing one dead-state fix at a time.
+        val target = regularRepairPath(state, seq, numStates, alphabetSize, transitions, q0, acceptingSet) ?: return
+        for (i in seq.indices) {
+            if (target[i] != state.assignment.intValue(seq[i])) sink.addChannelingIntSet(state, seq[i], target[i])
         }
     }
 

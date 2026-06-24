@@ -246,6 +246,12 @@ object LsCatalog {
         LsArm.CblsHotpairFixed ->
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(pairSwapHotSpotCap = 8, tabu = cblsTabu()) }
 
+        // Implicit-solving + the opt-in extended structured/repair moves (circuit 2-opt, all-different
+        // 3-cycle, Regular DP-repair). A niche layered on cbls-implicit; bench-gated, kept last.
+        LsArm.CblsExtendedFixed -> cblsRecipe(arm.label, FixedCadenceRestart(), seedImplicitOnRestart = true) {
+            Cbls(implicitStructuredCap = 8, extendedStructuredCap = 8, extendedRepair = true, tabu = cblsTabu())
+        }
+
         // SA with periodic reheating: the schedule re-diversifies a cooled-and-stuck run without
         // discarding the incumbent. Restart epoch (100k) spans several reheat periods (20k) so the
         // reheats fire before a restart resets the schedule.
@@ -294,6 +300,8 @@ object LsCatalog {
         LsArm.CblsFlipPropFixed,
         // Objective-hot-spot pair-swap niche; kept last pending its cross-seed credit pass.
         LsArm.CblsHotpairFixed,
+        // Extended structured/repair moves niche; kept last pending its cross-seed credit pass.
+        LsArm.CblsExtendedFixed,
         // Schedule-diversity SA arms; kept last pending their cross-seed credit pass.
         LsArm.SaReheatFixed, LsArm.SaPhasedFixed,
     )
@@ -355,6 +363,7 @@ internal enum class LsArm(val label: String) {
     FeasibilityJumpFixed("fjump/fixed"),
     CblsFlipPropFixed("cbls-flipprop/fixed"),
     CblsHotpairFixed("cbls-hotpair/fixed"),
+    CblsExtendedFixed("cbls-extended/fixed"),
     SaReheatFixed("sa-reheat/fixed"),
     SaPhasedFixed("sa-phased/fixed"),
 }

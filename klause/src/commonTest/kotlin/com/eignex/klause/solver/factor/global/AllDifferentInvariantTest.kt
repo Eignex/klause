@@ -70,7 +70,7 @@ class AllDifferentInvariantTest {
             val state = seeded(seed)
             assertTrue(state.cost == 0L, "the identity permutation must be feasible")
             val sink = MoveSink()
-            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
             for (m in sink.list) {
                 if (m is Compound && m.parts.size == 3) sawRotation = true
                 val check = seeded(0)

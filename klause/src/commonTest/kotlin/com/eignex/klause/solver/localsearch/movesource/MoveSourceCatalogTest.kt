@@ -27,6 +27,9 @@ class MoveSourceCatalogTest {
             "pair-swap" to PairSwap.ID,
             "clique-swap" to CliqueSwap.ID,
             "flip-propagate" to FlipAndPropagate.ID,
+            "extended-structured" to SatisfiedStructured.EXTENDED_ID,
+            "extended-elected" to SatisfiedStructured.EXTENDED_ID,
+            "extended-repairs" to ViolatedRepairs.EXTENDED_ID,
         )
         assertEquals(expected.keys, MoveSourceCatalog.labels.toSet(), "catalog labels drifted")
         for ((label, id) in expected) {

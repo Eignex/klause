@@ -85,7 +85,7 @@ class RegularInvariantTest {
         val state = seeded()
         assertTrue(state.factors[0].isViolated(state, 0))
         val sink = MoveSink()
-        state.factors[0].proposeRepairMoves(state, 0, sink)
+        state.factors[0].proposeExtendedRepairMoves(state, 0, sink)
         assertTrue(sink.list.isNotEmpty(), "repair must propose moves")
         val check = seeded()
         for (move in sink.list) check.apply(move)

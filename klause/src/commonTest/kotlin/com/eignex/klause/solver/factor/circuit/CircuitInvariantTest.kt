@@ -167,7 +167,7 @@ class CircuitInvariantTest {
             seedTour(state, n)
             assertEquals(0, state.cost, "the seed tour must be feasible")
             val sink = MoveSink()
-            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
             for (move in sink.list) {
                 val check = LocalSearchState(nNodeCircuit(n), Random(0))
                 seedTour(check, n)
@@ -185,7 +185,7 @@ class CircuitInvariantTest {
             val state = LocalSearchState(nNodeCircuit(n), Random(seed))
             seedTour(state, n)
             val sink = MoveSink()
-            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
             for (m in sink.list) if (m is Move.Compound) maxParts = maxOf(maxParts, m.parts.size)
         }
         assertTrue(maxParts > 3, "reversals must emit compounds longer than a 3-edge swap, got max $maxParts")
@@ -293,7 +293,7 @@ class CircuitInvariantTest {
             val state = seededSubcircuit(seed)
             assertEquals(0, state.cost, "active 5-cycle with one excluded node must be feasible")
             val sink = MoveSink()
-            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            state.factors[0].proposeExtendedStructuredMoves(state, 0, sink)
             for (move in sink.list) {
                 val check = seededSubcircuit(0)
                 check.apply(move)

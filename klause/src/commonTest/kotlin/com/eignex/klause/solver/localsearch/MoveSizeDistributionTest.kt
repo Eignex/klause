@@ -15,7 +15,7 @@ class MoveSizeDistributionTest {
         repeat(2) { cycle ->
             val counts = HashMap<Int, Int>()
             repeat(6) {
-                val s = dist.nextSize(rng);
+                val s = dist.nextSize(rng)
                 counts[s] = (counts[s] ?: 0) + 1
             }
             assertEquals(3, counts[1], "cycle $cycle size 1")
