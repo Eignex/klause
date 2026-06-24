@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.Contribution
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Linearizer
+import com.eignex.klause.solver.LinearizerEstimate
 import com.eignex.klause.solver.RelaxationBuilder
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.util.IntArrayList
@@ -30,28 +32,11 @@ internal class MddLinearizer(
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
+        val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val n = seq.size
         val stride = recordStride
         val trans = transitions
         val starts = layerStarts
-        // Forward-reachable states per layer over the declared domains; bail if a layer empties.
-        val reach = Array(n + 1) { IntHashSet() }
-        reach[0].add(initial)
-        var arcCount = 0L
-        for (layer in 0 until n) {
-            val dom = builder.declaredDomain(seq[layer])
-            var p = starts[layer]
-            val end = starts[layer + 1]
-            while (p < end) {
-                if (trans[p] in reach[layer] && trans[p + 1] in dom) {
-                    reach[layer + 1].add(trans[p + 2])
-                    arcCount++
-                }
-                p += stride
-            }
-            if (reach[layer + 1].isEmpty()) return // no accepting path under declared domains
-        }
-        if (arcCount == 0L || arcCount > MAX_MDD_ARCS) return
 
         // States are layer-local dense ids in `[0, numStatesPerLayer(layer))`, so the per-layer
         // state→arc-columns maps are arrays indexed straight by the state id (#678).
@@ -145,6 +130,42 @@ internal class MddLinearizer(
             vals[k] = -1L
             builder.row(cols, vals, LinearOp.EQ, 0L, Contribution.HULL)
         }
+    }
+
+    override fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+        val reach = forwardReach { domains[it] } ?: return null
+        // arc columns + conservation (≤ arcs) + value channel (n) + source + acceptance + cost.
+        return LinearizerEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 3L)
+    }
+
+    private class Reach(val states: Array<IntHashSet>, val arcCount: Long)
+
+    /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count,
+     *  or null when a layer empties (no accepting path) or the arc count is 0 or over [MAX_MDD_ARCS].
+     *  Shared by [linearize] (which needs the states to lay out columns) and [sizeEstimate] (the count). */
+    private fun forwardReach(domainOf: (Int) -> IntDomain): Reach? {
+        val n = seq.size
+        val stride = recordStride
+        val trans = transitions
+        val starts = layerStarts
+        val reach = Array(n + 1) { IntHashSet() }
+        reach[0].add(initial)
+        var arcCount = 0L
+        for (layer in 0 until n) {
+            val dom = domainOf(seq[layer])
+            var p = starts[layer]
+            val end = starts[layer + 1]
+            while (p < end) {
+                if (trans[p] in reach[layer] && trans[p + 1] in dom) {
+                    reach[layer + 1].add(trans[p + 2])
+                    arcCount++
+                }
+                p += stride
+            }
+            if (reach[layer + 1].isEmpty()) return null // no accepting path under these domains
+        }
+        if (arcCount == 0L || arcCount > MAX_MDD_ARCS) return null
+        return Reach(reach, arcCount)
     }
 
     companion object {

@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.factor.table
 
 import com.eignex.klause.solver.Contribution
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Linearizer
+import com.eignex.klause.solver.LinearizerEstimate
 import com.eignex.klause.solver.RelaxationBuilder
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.util.IntArrayList
@@ -31,6 +33,17 @@ internal class ElementLinearizer(
         val k = selCols.size
         if (k == 0) return
         if (arrIsVars) resultBigM(builder, selCols, positions) else resultChannel(builder, selCols, positions)
+    }
+
+    override fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+        if (arr.size > MAX_ELEM) return null
+        val declared = domains[idx]
+        var k = 0L
+        for (p in arr.indices) if ((p + indexOffset) in declared) k++
+        if (k == 0L) return null
+        // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
+        // Σ y = 1 + index channel + two big-M rows per selector (2 + 2k).
+        return LinearizerEstimate(cols = k, rows = if (arrIsVars) 2L + 2L * k else 3L)
     }
 
     /** The shared one-hot selectors `Σ_p y_p = 1` and index channel `Σ_p (p + off)·y_p = idx`. */
