@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Invariant
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.NoInvariant
 import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 
@@ -35,8 +36,7 @@ import com.eignex.klause.solver.StructuralKey
 class GaussianXor(
     /** The individual parity constraints forming this Gaussian system. */
     val constraints: List<Xor>,
-) : Factor,
-    Invariant {
+) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         GaussianXor(constraints.map { it.remap(boolMap, intMap) as Xor })
@@ -64,5 +64,5 @@ class GaussianXor(
 
     override fun asPropagator(): Propagator = GaussianXorPropagator(constraints, boolVars)
 
-    override fun asInvariant(): Invariant = this
+    override fun asInvariant(): Invariant = NoInvariant
 }

@@ -61,12 +61,12 @@ class StallKick(
                         budget--
                     }
                 }
-                occ = problem.intOccurrences[v]
+                occ = problem.lsIntOccurrences[v]
             } else {
                 val v = scope.boolVars[pick - nInts]
                 scratch.addBoolFlip(v)
                 budget--
-                occ = problem.boolOccurrences[v]
+                occ = problem.lsBoolOccurrences[v]
             }
             // Step 2: hop to a random factor sharing that variable and continue the walk.
             if (occ.isEmpty()) break

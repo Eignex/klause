@@ -112,3 +112,12 @@ interface Propagator {
      */
     fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
 }
+
+/**
+ * The absence of a deductive role. A factor whose [Factor.asPropagator] returns this is
+ * **invariant-only** (#896): it participates in local search but never filters domains. The CP
+ * engine skips such factors entirely — they are dropped from the deductive occurrence lists
+ * ([Problem.boolOccurrences] / [Problem.intOccurrences]) so propagation never wakes them. All
+ * methods keep the no-op [Propagator] defaults (propagate is a no-op, no watches, no reason).
+ */
+object NoPropagator : Propagator

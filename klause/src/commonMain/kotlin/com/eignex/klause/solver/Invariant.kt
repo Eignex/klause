@@ -188,3 +188,12 @@ interface Invariant {
      *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
     fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {}
 }
+
+/**
+ * The absence of a local-search role. A factor whose [Factor.asInvariant] returns this is
+ * **propagator-only** (#896): it participates in CP propagation but contributes nothing to local
+ * search. The LS engine skips such factors entirely — they are dropped from the LS occurrence lists
+ * ([Problem.lsBoolOccurrences] / [Problem.lsIntOccurrences]) so a move never queries them and they
+ * add no violation. All methods keep the no-op [Invariant] defaults (never violated, zero delta).
+ */
+object NoInvariant : Invariant

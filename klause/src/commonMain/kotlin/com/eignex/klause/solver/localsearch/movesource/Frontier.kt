@@ -37,14 +37,14 @@ class Frontier(
             val fid = state.violated.random(state.rng)
             val f = state.problem.factors[fid]
             for (v in f.intVars) {
-                for (nf in problem.intOccurrences[v]) {
+                for (nf in problem.lsIntOccurrences[v]) {
                     if (nf == fid) continue
                     budget = addNeighbourMoves(state, sink, nf, budget)
                     if (budget <= 0) return
                 }
             }
             for (v in f.boolVars) {
-                for (nf in problem.boolOccurrences[v]) {
+                for (nf in problem.lsBoolOccurrences[v]) {
                     if (nf == fid) continue
                     budget = addNeighbourMoves(state, sink, nf, budget)
                     if (budget <= 0) return
