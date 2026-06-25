@@ -9,6 +9,7 @@ import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.SolveStatsSink
 
 /**
@@ -43,14 +44,29 @@ fun lpHarvest(
     objective: LinearObjective,
     params: BacktrackParams,
     cancellation: Cancellation = Cancellation.Never,
-): Problem {
+): Problem = lpHarvestReporting(problem, objective, params, cancellation).problem
+
+/** [lpHarvest]'s transformed [problem] paired with the [report] of what the LP harvest contributed. */
+class LpHarvestResult(val problem: Problem, val report: LpHarvestReport)
+
+/** [lpHarvest] returning, alongside the transformed problem, a breakdown of the LP harvest's own effect
+ *  (root infeasibility, bounds shaved, objective floor, constraints removed, equalities added) so a
+ *  caller can isolate it from the surrounding combinatorial passes. */
+fun lpHarvestReporting(
+    problem: Problem,
+    objective: LinearObjective,
+    params: BacktrackParams,
+    cancellation: Cancellation = Cancellation.Never,
+): LpHarvestResult {
     val engine = LpEngine(problem, objective, params, SolveStatsSink(backend = "lp-harvest"))
-    if (engine.lpRelaxer == null) return problem
+    if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport())
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
-    if (engine.rootInfeasible(cancellation)) return provenInfeasible(problem)
+    if (engine.rootInfeasible(cancellation)) {
+        return LpHarvestResult(provenInfeasible(problem), LpHarvestReport(rootInfeasible = true))
+    }
     val plan = engine.params.lpPlan
-    if (!plan.variableShaving && !plan.objectiveShaving) return problem
+    if (!plan.variableShaving && !plan.objectiveShaving) return LpHarvestResult(problem, LpHarvestReport())
 
     val shaved = if (plan.variableShaving) engine.shaveVariableBounds(cancellation) else emptyList()
     // The objective LB binds only a single ascending (minimised) objective variable; shaveObjectiveLb
@@ -64,7 +80,15 @@ fun lpHarvest(
     // Differences the LP proves pinned to a constant — added as `=` factors for the next presolve round's
     // affine elimination to fold out, shrinking the variable space (this transform only adds the factor).
     val equalities = if (plan.variableShaving) engine.impliedEqualities(cancellation) else emptyList()
-    if (shaved.isEmpty() && objLb == null && redundant.isEmpty() && equalities.isEmpty()) return problem
+    if (shaved.isEmpty() && objLb == null && redundant.isEmpty() && equalities.isEmpty()) {
+        return LpHarvestResult(problem, LpHarvestReport())
+    }
+    val report = LpHarvestReport(
+        boundsShaved = shaved.size,
+        objectiveLbRaised = objLb != null,
+        constraintsRemoved = redundant.size,
+        equalitiesAdded = equalities.size,
+    )
 
     val domains = problem.intDomains.copyOf()
     for (sb in shaved) {
@@ -82,7 +106,7 @@ fun lpHarvest(
     } else {
         (problem.factors.filterIndexed { idx, _ -> idx !in redundant } + equalities).toTypedArray()
     }
-    return Problem(
+    val transformed = Problem(
         numBoolVars = problem.numBoolVars,
         numIntVars = problem.numIntVars,
         intDomains = domains,
@@ -94,6 +118,7 @@ fun lpHarvest(
         probeTotalBudget = problem.probeTotalBudget,
         probeSeed = problem.probeSeed,
     )
+    return LpHarvestResult(transformed, report)
 }
 
 /**

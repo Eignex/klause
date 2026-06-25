@@ -5,7 +5,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.lp.LpEmphasis
-import com.eignex.klause.solver.backtrack.lp.lpHarvest
+import com.eignex.klause.solver.backtrack.lp.lpHarvestReporting
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -15,6 +15,7 @@ import com.eignex.klause.solver.presolve.PresolveEmphasis
 import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.solver.presolve.Presolver
 import com.eignex.klause.solver.propagation.PropagationResult
+import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 
@@ -273,18 +274,19 @@ internal fun Solvable.presolved(
     var current = problem
     val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
     val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
-    var harvestFired = false
+    var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
     var round = 0
     while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
         val pre = Presolver.run(current, config, context, cancellation)
-        val harvested = harvestParams?.let { lpHarvest(pre.problem, objective, it, cancellation) } ?: pre.problem
+        val harvestResult = harvestParams?.let { lpHarvestReporting(pre.problem, objective, it, cancellation) }
+        val harvested = harvestResult?.problem ?: pre.problem
         // Neither presolve nor the harvest changed anything this round → fixpoint.
         if (pre.problem === current && harvested === pre.problem) break
         pre.passesFired.forEach { firedPasses.add(it.id) }
+        harvestResult?.let { harvest += it.report }
         // The harvest only narrows domains, so it contributes no reconstruct; add presolve's only when it
         // actually transformed the problem (else it is the identity).
         if (pre.problem !== current) reconstructs.add(pre.reconstruct)
-        if (harvested !== pre.problem) harvestFired = true
         current = harvested
         // A no-op harvest means the next round's presolve would re-derive the same fixpoint with no new
         // domain tightenings to chew on, so stop here rather than spend another LP solve to prove it.
@@ -292,13 +294,14 @@ internal fun Solvable.presolved(
     }
     if (current === problem) return this
 
-    // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when shaving tightened domains)
-    // and the net constraint drop / proven infeasibility.
-    val passes = firedPasses.toList() + (if (harvestFired) listOf("lp-harvest") else emptyList())
+    // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)
+    // and the net constraint drop / proven infeasibility, with the LP harvest's own breakdown attached.
+    val passes = firedPasses.toList() + (if (!harvest.isEmpty) listOf("lp-harvest") else emptyList())
     val presolveStats = PresolveStats(
         passes = passes,
         constraintsRemoved = problem.factors.size - current.factors.size,
         infeasible = current.baked is PropagationResult.Unsat,
+        lpHarvest = harvest.takeUnless { it.isEmpty },
     )
     val reconstruct: (Sample) -> Sample = { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
     return Solvable(
