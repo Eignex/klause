@@ -68,6 +68,22 @@ fun lpHarvestReporting(
     val plan = engine.params.lpPlan
     if (!plan.variableShaving && !plan.objectiveShaving) return LpHarvestResult(problem, LpHarvestReport())
 
+    // Self-limit on the built relaxation's size. The shave / redundancy / equality probes each rebuild and
+    // re-solve the relaxation (up to SHAVE_MAX_ITERS of each), so on a large relaxation that per-candidate
+    // cost dominates the time budget and loses instances the search would otherwise solve. Measure the root
+    // relaxation once (cols / rows / nnz) and, above the budget, skip the probe work — the harvest's gains
+    // are on small / medium models.
+    val size = engine.rootRelaxationSize()
+    if (size != null && size.cost > LP_HARVEST_MAX_RELAXATION_COST) {
+        val report = LpHarvestReport(
+            relaxationCols = size.cols,
+            relaxationRows = size.rows,
+            relaxationNnz = size.nnz,
+            skipped = true,
+        )
+        return LpHarvestResult(problem, report)
+    }
+
     val shaved = if (plan.variableShaving) engine.shaveVariableBounds(cancellation) else emptyList()
     // The objective LB binds only a single ascending (minimised) objective variable; shaveObjectiveLb
     // returns null otherwise, so a maximise / multi-term objective harvests nothing here.
@@ -88,6 +104,9 @@ fun lpHarvestReporting(
         objectiveLbRaised = objLb != null,
         constraintsRemoved = redundant.size,
         equalitiesAdded = equalities.size,
+        relaxationCols = size?.cols ?: 0,
+        relaxationRows = size?.rows ?: 0,
+        relaxationNnz = size?.nnz ?: 0,
     )
 
     val domains = problem.intDomains.copyOf()

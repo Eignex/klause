@@ -399,6 +399,28 @@ internal fun LpEngine.rootInfeasible(token: Cancellation): Boolean {
     return pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
 }
 
+/** The built root relaxation's columns, rows and nonzeros, plus a per-solve cost proxy. */
+internal class RootRelaxationSize(val cols: Int, val rows: Int, val nnz: Int) {
+    /** A sparse revised-simplex solve runs ~`O(rows)` iterations, each touching ~`nnz`, over a tableau of
+     *  ~`rows·(cols + rows)`; the harvest pays one such solve per shave / redundancy probe (up to
+     *  [SHAVE_MAX_ITERS] of each), so this proxy is what its total cost scales with. */
+    val cost: Long get() = rows.toLong() * (cols + rows) + nnz
+}
+
+/** Size of [LpEngine]'s root relaxation, or null when none is built / the root is already infeasible /
+ *  the build overflows — used to gate the harvest's per-candidate probes on the real LP dimensions. */
+internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
+    val relaxer = lpRelaxer ?: return null
+    val session = PropagationSession(problem)
+    if (session.isUnsatAtRoot) return null
+    val model = try {
+        relaxer.build(session).model
+    } catch (_: LpOverflowException) {
+        return null
+    }
+    return RootRelaxationSize(model.n, model.m, model.csc.colPtr[model.n])
+}
+
 /** Whether a fresh root with `v ≤ bound` (or `v ≥ bound` when not [atMost]) is provably infeasible —
  *  propagation Unsat, or an LP infeasibility at an infinite incumbent (so `pruneNode` fires only on a
  *  genuine infeasibility). Sound: a true result proves every solution lies strictly past [bound]. */
@@ -1177,6 +1199,13 @@ private const val SHAVE_MAX_ITERS = 64
 
 /** Slack on the safe min/max bracket when counting integers inside it — widening it only drops removals. */
 private const val EQ_PIN_TOL = 1e-6
+
+/** [RootRelaxationSize.cost] ceiling above which the harvest skips its shave/redundancy/equality probes:
+ *  on a relaxation this large the per-candidate solves dominate the time budget and lose instances the
+ *  search would otherwise solve. Calibrated from an mzn-bench A/B with a wide margin — the helped models
+ *  measured ≤ ~48k (evilshop 155×155, the largest gain) while the cost regressions were ≥ ~1.6M
+ *  (fast-food 501×1048, diameterc-mst 1797×4066), so the gap is two orders of magnitude. */
+internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L
 
 /** Node-expansion budget for the best-bound tree-search subsolver (each expansion is one node LP). */
 private const val LB_TREE_BUDGET = 256

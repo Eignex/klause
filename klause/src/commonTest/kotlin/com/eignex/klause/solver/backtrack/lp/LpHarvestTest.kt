@@ -265,6 +265,7 @@ class LpHarvestTest {
         val report = lpHarvestReporting(problem, LinearObjective(), shavingParams, Cancellation.Never).report
         assertEquals(1, report.constraintsRemoved, "the LP-redundant row must be counted")
         assertTrue(!report.rootInfeasible && report.equalitiesAdded == 0, "no other LP action fired here")
+        assertTrue(!report.skipped && report.relaxationNnz > 0, "the built relaxation's size must be reported")
     }
 
     @Test
