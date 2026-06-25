@@ -25,6 +25,8 @@ import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
@@ -57,11 +59,13 @@ internal object SolveCore {
         // LP root build/solve inside the engine, and the search loop. Building it per-phase would let
         // each phase restart the clock and blow the limit cumulatively.
         val (deadline, cancel) = deadlineCancellation(common)
+        val presolveStart = TimeSource.Monotonic.markNow()
         val solvable = rawSolvable.presolved(config, solutionSetSensitive, cancel)
+        val presolveElapsed = presolveStart.elapsedNow()
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
         // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
         if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
-            printPresolved(rawSolvable.problem, solvable.problem, solvable.presolve?.passes.orEmpty())
+            printPresolved(rawSolvable.problem, solvable.problem, solvable.presolve?.passes.orEmpty(), presolveElapsed)
             return
         }
         cliLogger(common.verbose).v {
@@ -181,11 +185,14 @@ internal object SolveCore {
         }
     }
 
-    /** Print what presolve did (`dry-run-presolve`) to stderr: variable/constraint counts, total
-     *  integer-domain span, the per-factor-kind histogram delta, and any proven infeasibility — so the
-     *  effect of a `--presolve` config can be inspected and A/B-compared without solving. */
-    private fun printPresolved(original: Problem, presolved: Problem, passes: List<String>) {
+    /** Print what presolve did (`dry-run-presolve`) to stderr: the presolve-phase wall time,
+     *  variable/constraint counts, total integer-domain span, the per-factor-kind histogram delta, and
+     *  any proven infeasibility — so the effect (and cost) of a `--presolve` config can be inspected and
+     *  A/B-compared without solving. The elapsed time is the presolve phase alone, excluding JVM startup
+     *  and parsing, so it is the figure to watch when tuning presolve cost. */
+    private fun printPresolved(original: Problem, presolved: Problem, passes: List<String>, elapsed: Duration) {
         errPrintln("presolve dry-run:")
+        errPrintln("  elapsed: $elapsed")
         errPrintln("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
         errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
         errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")
