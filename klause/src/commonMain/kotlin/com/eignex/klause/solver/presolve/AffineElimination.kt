@@ -87,6 +87,7 @@ internal object AffineSingletons {
         objectiveIntVars: Set<Int>,
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
+        val occ = buildOccurrenceIndex(factors, eliminated.size)
         for (di in factors.indices) {
             val f = factors[di]
             if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) continue
@@ -101,7 +102,7 @@ internal object AffineSingletons {
                 // pass leaves every objective variable untouched.
                 if (a == 0 || a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
                 if (x in objectiveIntVars || y in objectiveIntVars) continue
-                if (!isContained(factors, di, x)) continue
+                if (!isContained(occ, di, x)) continue
                 val domY = domains[y]
                 if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
                 val restricted = restrictPartnerDomain(domY, domains[x], a, b, f.bound) ?: continue
@@ -120,8 +121,8 @@ internal object AffineSingletons {
     }
 
     /** Whether [x] occurs in no factor other than [defIdx]. */
-    private fun isContained(factors: List<Factor>, defIdx: Int, x: Int): Boolean {
-        for (i in factors.indices) if (i != defIdx && x in factors[i].intVars) return false
+    private fun isContained(occ: OccurrenceIndex, defIdx: Int, x: Int): Boolean {
+        for (k in occ.offsets[x] until occ.offsets[x + 1]) if (occ.flat[k] != defIdx) return false
         return true
     }
 
@@ -160,6 +161,13 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
     ): AffineCandidate? {
+        // Occurrence index (variable id → the factor indices that mention it), built once per scan so
+        // the per-candidate "where else does x occur" checks are O(occurrences-of-x) instead of a fresh
+        // O(factors) linear scan each. On a large model that quadratic scan dominated affine
+        // elimination; the index makes it linear in x's actual degree. Result-identical — purely a
+        // faster lookup of the same factor membership. CSR layout (counts → offsets → flat) avoids a
+        // per-variable list allocation, which matters when there are hundreds of thousands of variables.
+        val occ = buildOccurrenceIndex(factors, eliminated.size)
         for (di in factors.indices) {
             val f = factors[di]
             if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) continue
@@ -175,7 +183,7 @@ internal object AffineSingletons {
                 // so it is left for the residue-class doubleton pass or for propagation.
                 val isUnit = cx == 1 || cx == -1
                 if (!isUnit && !dividesAllPartnersAndBound(f, xi)) continue
-                if (!isUnit && !isContained(factors, di, x)) continue
+                if (!isUnit && !isContained(occ, di, x)) continue
                 // x = B + Σ A_j·y_j, with B = bound / c_x and A_j = −c_j / c_x for the other terms y_j;
                 // for a unit pivot the divisions are exact by definition.
                 val termVars = IntArray(f.vars.size - 1)
@@ -199,8 +207,8 @@ internal object AffineSingletons {
                 // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
                 // only folds into Linear factors.
                 val singlePartnerSubstitutable = termVars.size == 1 &&
-                    otherOccurrencesAffineSubstitutable(factors, di, x, termCoeffs[0], constTerm, termVars[0])
-                if (isAlias || otherOccurrencesAllLinear(factors, di, x) || singlePartnerSubstitutable) {
+                    otherOccurrencesAffineSubstitutable(factors, occ, di, x, termCoeffs[0], constTerm, termVars[0])
+                if (isAlias || otherOccurrencesAllLinear(factors, occ, di, x) || singlePartnerSubstitutable) {
                     return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
                 }
             }
@@ -219,10 +227,27 @@ internal object AffineSingletons {
         return true
     }
 
+    /** Variable id → the factor indices mentioning it, as a flat CSR (compressed sparse row): the
+     *  factors for `x` are `flat[offsets[x] until offsets[x + 1]]`. A factor mentioning `x` more than
+     *  once lists it once per occurrence, which the membership checks tolerate (a redundant, identical
+     *  test). One allocation pair regardless of variable count — no per-variable list. */
+    private class OccurrenceIndex(val offsets: IntArray, val flat: IntArray)
+
+    private fun buildOccurrenceIndex(factors: List<Factor>, nVars: Int): OccurrenceIndex {
+        val offsets = IntArray(nVars + 1)
+        for (f in factors) for (v in f.intVars) offsets[v + 1]++
+        for (v in 0 until nVars) offsets[v + 1] += offsets[v]
+        val flat = IntArray(offsets[nVars])
+        val cursor = offsets.copyOf()
+        factors.forEachIndexed { i, f -> for (v in f.intVars) flat[cursor[v]++] = i }
+        return OccurrenceIndex(offsets, flat)
+    }
+
     /** Whether every factor other than [defIdx] that mentions [x] is a [Linear] (foldable). */
-    private fun otherOccurrencesAllLinear(factors: List<Factor>, defIdx: Int, x: Int): Boolean {
-        for (i in factors.indices) {
-            if (i != defIdx && x in factors[i].intVars && factors[i] !is Linear) return false
+    private fun otherOccurrencesAllLinear(factors: List<Factor>, occ: OccurrenceIndex, defIdx: Int, x: Int): Boolean {
+        for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+            val i = occ.flat[k]
+            if (i != defIdx && factors[i] !is Linear) return false
         }
         return true
     }
@@ -233,14 +258,16 @@ internal object AffineSingletons {
      *  shift). */
     private fun otherOccurrencesAffineSubstitutable(
         factors: List<Factor>,
+        occ: OccurrenceIndex,
         defIdx: Int,
         x: Int,
         scale: Int,
         offset: Int,
         y: Int,
     ): Boolean {
-        for (i in factors.indices) {
-            if (i == defIdx || x !in factors[i].intVars) continue
+        for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+            val i = occ.flat[k]
+            if (i == defIdx) continue
             val f = factors[i]
             if (f !is Linear && f.substituteAffine(x, scale, offset, y) == null) return false
         }
