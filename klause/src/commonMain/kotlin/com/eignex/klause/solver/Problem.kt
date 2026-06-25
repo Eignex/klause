@@ -707,12 +707,13 @@ class Problem(
                 iMaxKeys.add(v)
                 iMaxVals.add(d.max)
             }
-            // Interior holes: values strictly between current (d.min, d.max) that are in
-            // [orig] but absent from [d]. Skip values already in the seed assumption's
-            // hole set so we only emit newly-derived ones.
-            for (value in (d.min + 1) until d.max) {
-                if (value in orig && value !in d) {
-                    // Cheap O(n) skip if same hole present in seed.
+            // Interior holes: values [d] excludes strictly inside its bounds that [orig] still held.
+            // Walk [d]'s actual holes — span-independent for the wide reps — instead of every value
+            // in `(d.min, d.max)`: a wide contiguous domain (spans reaching billions here) has none,
+            // so this is O(holes) rather than O(max − min), which otherwise dominates the whole bake.
+            // Skip values already in the seed assumption's hole set so only newly-derived holes emit.
+            d.forEachHole { value ->
+                if (value in orig) {
                     var preExisting = false
                     for (i in 0 until assumptions.intHoleVarIds.size) {
                         if (assumptions.intHoleVarIds[i] == v &&
