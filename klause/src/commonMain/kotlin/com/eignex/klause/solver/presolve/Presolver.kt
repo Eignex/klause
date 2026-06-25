@@ -39,6 +39,13 @@ class PresolveContext(
      *  hand-written one is redundant and the two can interact. An explicit override still forces it on. */
     val modelBreaksSymmetry: Boolean = false,
 ) {
+    /** Set once [PresolvePass.BREAK_SYMMETRIES] runs a full search and finds nothing to break. The
+     *  round engine re-enables the pass whenever another pass changes the problem, but the search is
+     *  expensive and overwhelmingly fruitless on a model that carries no symmetry, so it is not worth
+     *  repeating after every reduction. The dual of the one-shot `SymmetryHandling`-factor guard, which
+     *  short-circuits a model where symmetry *was* found. */
+    internal var symmetrySearchedEmpty: Boolean = false
+
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
 
@@ -235,8 +242,14 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars))
+        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
+            if (ctx.symmetrySearchedEmpty) return PassResult(problem)
+            val result = Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars)
+            // A full search that posted nothing returns the input unchanged; cache that so the round
+            // engine does not repeat the same fruitless search after every later pass fires.
+            if (result === problem) ctx.symmetrySearchedEmpty = true
+            return PassResult(result)
+        }
     },
 
     /** Law–Lee value precedence (#374 / #432) — the strong value-symmetry break. Opt-in: stacking it
