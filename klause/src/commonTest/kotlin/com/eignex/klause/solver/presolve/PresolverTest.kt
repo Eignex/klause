@@ -72,18 +72,14 @@ class PresolverTest {
     }
 
     @Test
-    fun `lp-harvest auto-disables on a large model but an explicit override forces it on`() {
-        // EXHAUSTIVE-tier, so the aggressive level enables it — but only when the model is small enough
-        // that its per-candidate relaxation solves do not dominate; on a large model auto resolution turns
-        // it off (mirroring symmetry's structural auto-off), while an explicit `+lp-harvest` still forces it.
-        val aggressive = PresolveConfig.parse("aggressive")
-        val small = PresolveContext(largeForLpHarvest = false)
-        val large = PresolveContext(largeForLpHarvest = true)
-        assertTrue(aggressive.resolved(PresolvePass.LP_HARVEST, small))
-        assertEquals(false, aggressive.resolved(PresolvePass.LP_HARVEST, large))
-        assertTrue(PresolveConfig.parse("aggressive,+lp-harvest").resolved(PresolvePass.LP_HARVEST, large))
-        // Off in the default level (EXHAUSTIVE tier), unaffected by size.
-        assertEquals(false, PresolveConfig.parse("default").resolved(PresolvePass.LP_HARVEST, small))
+    fun `lp-harvest is an aggressive-tier pass off at the default level`() {
+        // EXHAUSTIVE-tier, so the aggressive level turns it on and the default level leaves it off; an
+        // explicit delta toggles it either way. (Its own size self-limit lives in the harvest, not here.)
+        val ctx = PresolveContext.EMPTY
+        assertTrue(PresolveConfig.parse("aggressive").resolved(PresolvePass.LP_HARVEST, ctx))
+        assertEquals(false, PresolveConfig.parse("default").resolved(PresolvePass.LP_HARVEST, ctx))
+        assertTrue(PresolveConfig.parse("default,+lp-harvest").resolved(PresolvePass.LP_HARVEST, ctx))
+        assertEquals(false, PresolveConfig.parse("aggressive,-lp-harvest").resolved(PresolvePass.LP_HARVEST, ctx))
     }
 
     @Test
@@ -374,8 +370,12 @@ class PresolverTest {
             0,
             6,
             arrayOf(
-                IntDomain(1, 2), IntDomain(0, 1), IntDomain(5, 6),
-                IntDomain(0, 2), IntDomain(9, 10), IntDomain(0, 2),
+                IntDomain(1, 2),
+                IntDomain(0, 1),
+                IntDomain(5, 6),
+                IntDomain(0, 2),
+                IntDomain(9, 10),
+                IntDomain(0, 2),
             ),
             listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),

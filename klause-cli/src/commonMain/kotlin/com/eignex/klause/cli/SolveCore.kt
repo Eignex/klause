@@ -210,14 +210,19 @@ internal object SolveCore {
         // The LP harvest's own contribution, isolated from the combinatorial passes whose net effect the
         // counts above conflate — the point of inspecting the LP presolve specifically.
         stats?.lpHarvest?.let { lp ->
-            val parts = buildList {
-                if (lp.rootInfeasible) add("root-infeasible")
-                if (lp.boundsShaved > 0) add("shaved ${lp.boundsShaved} bound(s)")
-                if (lp.objectiveLbRaised) add("raised objective lb")
-                if (lp.constraintsRemoved > 0) add("removed ${lp.constraintsRemoved} redundant constraint(s)")
-                if (lp.equalitiesAdded > 0) add("added ${lp.equalitiesAdded} implied equality(ies)")
+            val dims = "relaxation ${lp.relaxationCols} cols / ${lp.relaxationRows} rows / ${lp.relaxationNnz} nnz"
+            if (lp.skipped) {
+                errPrintln("  lp-harvest: skipped ($dims over the size budget)")
+            } else {
+                val parts = buildList {
+                    if (lp.rootInfeasible) add("root-infeasible")
+                    if (lp.boundsShaved > 0) add("shaved ${lp.boundsShaved} bound(s)")
+                    if (lp.objectiveLbRaised) add("raised objective lb")
+                    if (lp.constraintsRemoved > 0) add("removed ${lp.constraintsRemoved} redundant constraint(s)")
+                    if (lp.equalitiesAdded > 0) add("added ${lp.equalitiesAdded} implied equality(ies)")
+                }
+                errPrintln("  lp-harvest: ${parts.joinToString(", ")} ($dims)")
             }
-            errPrintln("  lp-harvest: ${parts.joinToString(", ")}")
         }
         if (presolved.baked is PropagationResult.Unsat) {
             errPrintln("  INFEASIBLE: presolve proved the problem unsatisfiable")

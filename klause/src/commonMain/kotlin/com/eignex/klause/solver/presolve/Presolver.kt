@@ -38,12 +38,6 @@ class PresolveContext(
      *  [PresolveConfig.resolved] decision: stacking klause's automorphism break on the model's
      *  hand-written one is redundant and the two can interact. An explicit override still forces it on. */
     val modelBreaksSymmetry: Boolean = false,
-    /** The model is large enough that the LP harvest's per-candidate relaxation solves would dominate the
-     *  time budget (it rebuilds the relaxation per shaved bound / redundancy probe). Turns off
-     *  [PresolvePass.LP_HARVEST] in the [PresolveConfig.resolved] auto decision — the harvest's gains are
-     *  on small/medium models, while on large ones its cost loses instances the search would otherwise
-     *  solve. An explicit `+lp-harvest` override still forces it on. */
-    val largeForLpHarvest: Boolean = false,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -61,13 +55,11 @@ class PresolveContext(
             objective: LinearObjective?,
             solutionSetSensitive: Boolean = false,
             modelBreaksSymmetry: Boolean = false,
-            largeForLpHarvest: Boolean = false,
         ): PresolveContext {
             if (objective == null) {
                 return PresolveContext(
                     solutionSetSensitive = solutionSetSensitive,
                     modelBreaksSymmetry = modelBreaksSymmetry,
-                    largeForLpHarvest = largeForLpHarvest,
                 )
             }
             val intCoeffs = HashMap<Int, Long>()
@@ -80,13 +72,7 @@ class PresolveContext(
                 val w = objective.boolWeights[b]
                 if (w != 0L) boolCoeffs[b] = w
             }
-            return PresolveContext(
-                solutionSetSensitive,
-                intCoeffs,
-                boolCoeffs,
-                modelBreaksSymmetry,
-                largeForLpHarvest,
-            )
+            return PresolveContext(solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry)
         }
     }
 }
@@ -332,10 +318,10 @@ enum class PresolvePass(
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
      *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so its [apply] is
      *  a no-op marker and the work lives in the CLI's presolve↔harvest fixpoint, gated on this entry.
-     *  `EXHAUSTIVE` (it does an LP solve per shave/redundancy probe), so the aggressive level turns it on;
-     *  and it auto-disables on large models ([PresolveContext.largeForLpHarvest]) where that per-candidate
-     *  cost would lose instances the search would otherwise solve — its gains are on small/medium models.
-     *  An explicit `--presolve …,+lp-harvest` forces it on regardless of size. */
+     *  `EXHAUSTIVE` (it does an LP solve per shave/redundancy probe), so the aggressive level turns it on.
+     *  The harvest itself then self-limits on the *built relaxation's* size (cols/rows/nnz): on a large
+     *  relaxation, where the per-candidate cost would lose instances the search would otherwise solve, it
+     *  no-ops — its gains are on small/medium models. */
     LP_HARVEST(
         "lp-harvest",
         Stage.EXTERNAL,
@@ -474,8 +460,7 @@ class PresolveConfig(
     private fun auto(pass: PresolvePass, context: PresolveContext): Boolean = pass.autoEligible &&
         pass.timing in emphasis.timings &&
         (pass.preservesSolutionSet || !context.solutionSetSensitive) &&
-        !(pass == PresolvePass.BREAK_SYMMETRIES && context.modelBreaksSymmetry) &&
-        !(pass == PresolvePass.LP_HARVEST && context.largeForLpHarvest)
+        !(pass == PresolvePass.BREAK_SYMMETRIES && context.modelBreaksSymmetry)
 
     /** The [PresolvePass.Stage.PROBLEM] passes that run under [context], in enum (priority) order. */
     fun problemPasses(context: PresolveContext): List<PresolvePass> =

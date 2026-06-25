@@ -470,19 +470,32 @@ data class LpHarvestReport(
     val objectiveLbRaised: Boolean = false,
     val constraintsRemoved: Int = 0,
     val equalitiesAdded: Int = 0,
+    /** Built root relaxation columns — part of the size the cost gate weighs (0 when none was built). */
+    val relaxationCols: Int = 0,
+    /** Built root relaxation rows. */
+    val relaxationRows: Int = 0,
+    /** Built root relaxation nonzeros. */
+    val relaxationNnz: Int = 0,
+    /** The harvest was enabled but the relaxation size exceeded the budget, so it ran no probe work. */
+    val skipped: Boolean = false,
 ) {
-    /** True when the harvest did nothing — used to drop the field rather than report an all-zero row. */
+    /** True when the harvest neither acted nor was size-skipped — drop the field rather than report it. */
     val isEmpty: Boolean
         get() = !rootInfeasible && boundsShaved == 0 && !objectiveLbRaised &&
-            constraintsRemoved == 0 && equalitiesAdded == 0
+            constraintsRemoved == 0 && equalitiesAdded == 0 && !skipped
 
-    /** Accumulate two rounds' reports: counts add, flags or together. */
+    /** Accumulate two rounds' reports: counts add, flags or together, the relaxation size takes the
+     *  larger (the round that paid the most). */
     operator fun plus(o: LpHarvestReport): LpHarvestReport = LpHarvestReport(
         rootInfeasible || o.rootInfeasible,
         boundsShaved + o.boundsShaved,
         objectiveLbRaised || o.objectiveLbRaised,
         constraintsRemoved + o.constraintsRemoved,
         equalitiesAdded + o.equalitiesAdded,
+        maxOf(relaxationCols, o.relaxationCols),
+        maxOf(relaxationRows, o.relaxationRows),
+        maxOf(relaxationNnz, o.relaxationNnz),
+        skipped || o.skipped,
     )
 }
 
