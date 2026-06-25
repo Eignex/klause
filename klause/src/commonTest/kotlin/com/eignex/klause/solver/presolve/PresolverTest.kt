@@ -72,6 +72,21 @@ class PresolverTest {
     }
 
     @Test
+    fun `lp-harvest auto-disables on a large model but an explicit override forces it on`() {
+        // EXHAUSTIVE-tier, so the aggressive level enables it — but only when the model is small enough
+        // that its per-candidate relaxation solves do not dominate; on a large model auto resolution turns
+        // it off (mirroring symmetry's structural auto-off), while an explicit `+lp-harvest` still forces it.
+        val aggressive = PresolveConfig.parse("aggressive")
+        val small = PresolveContext(largeForLpHarvest = false)
+        val large = PresolveContext(largeForLpHarvest = true)
+        assertTrue(aggressive.resolved(PresolvePass.LP_HARVEST, small))
+        assertEquals(false, aggressive.resolved(PresolvePass.LP_HARVEST, large))
+        assertTrue(PresolveConfig.parse("aggressive,+lp-harvest").resolved(PresolvePass.LP_HARVEST, large))
+        // Off in the default level (EXHAUSTIVE tier), unaffected by size.
+        assertEquals(false, PresolveConfig.parse("default").resolved(PresolvePass.LP_HARVEST, small))
+    }
+
+    @Test
     fun `auto resolution is intent-aware and SAC is opt-in`() {
         val auto = PresolveConfig.AUTO
         // Symmetry breaking is solution-set-altering: auto-on for solve, auto-off when the query

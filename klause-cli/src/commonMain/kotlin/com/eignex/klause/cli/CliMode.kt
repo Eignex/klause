@@ -244,6 +244,12 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
  *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
 private const val MAX_PRESOLVE_HARVEST_ROUNDS = 4
 
+/** Factor-count above which the LP harvest auto-disables (see [PresolveContext.largeForLpHarvest]). The
+ *  harvest rebuilds the relaxation per shave/redundancy probe, so its cost grows with the model; above
+ *  this it loses more (timed-out instances) than it gains. Calibrated from an mzn-bench A/B: the helped
+ *  models sit well under it, the cost regressions (≥770 factors) well over. An explicit delta bypasses it. */
+private const val LP_HARVEST_MAX_FACTORS = 400
+
 /**
  * Apply a presolve [config] to this Solvable, returning one whose [Solvable.problem] is the
  * transformed problem and whose [Solvable.render] / [Solvable.objectiveValue] reconstruct the
@@ -263,7 +269,16 @@ internal fun Solvable.presolved(
     solutionSetSensitive: Boolean,
     cancellation: Cancellation = Cancellation.Never,
 ): Solvable {
-    val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
+    // The LP harvest auto-disables above this factor count: it rebuilds the relaxation per shave /
+    // redundancy probe, so on a large model that per-candidate cost dominates the time budget and loses
+    // instances the search would otherwise solve, while its gains are on small/medium models. An explicit
+    // `--presolve …,+lp-harvest` bypasses this (the override wins over the auto decision).
+    val context = PresolveContext.of(
+        linearObjective,
+        solutionSetSensitive,
+        problem.hasSymmetryBreaking,
+        largeForLpHarvest = problem.factors.size > LP_HARVEST_MAX_FACTORS,
+    )
     // LP-relaxation harvest (#10): fold the LP's proven domain tightenings, redundant-row removals and
     // implied equalities into the problem permanently so every backend (local search included) sees them —
     // the backtrack solver's own root shave reaches only its search session. It is a presolve concern, so
