@@ -321,6 +321,7 @@ class CliTest {
         val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
         assertTrue("presolve dry-run:" in out, out)
         assertTrue("factors:" in out, out)
+        assertTrue("elapsed:" in out, out)
     }
 
     @Test
