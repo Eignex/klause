@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
 import com.eignex.klause.solver.backtrack.lp.LpEmphasis
+import com.eignex.klause.solver.backtrack.lp.LpPlan
 import com.eignex.klause.solver.backtrack.lp.lpHarvestReporting
 import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -263,12 +264,18 @@ internal fun Solvable.presolved(
     cancellation: Cancellation = Cancellation.Never,
 ): Solvable {
     val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
-    // LP-relaxation harvest (#10): when LP shaving is configured, fold the LP's proven domain tightenings
-    // into the problem permanently so every backend (local search included) sees them — the backtrack
-    // solver's own root shave reaches only its search session. Solution-set-preserving (every shaved value
-    // is proven infeasible), so it is safe even for solution-set-sensitive queries.
-    val harvestParams = annotatedBacktrackParams
-        ?.takeIf { it.lpConfig != null || it.lpPlan.variableShaving || it.lpPlan.objectiveShaving }
+    // LP-relaxation harvest (#10): fold the LP's proven domain tightenings, redundant-row removals and
+    // implied equalities into the problem permanently so every backend (local search included) sees them —
+    // the backtrack solver's own root shave reaches only its search session. It is a presolve concern, so
+    // it is gated by the `lp-harvest` presolve pass (`--presolve …+lp-harvest`), independent of the
+    // solver-side `--lp` emphasis. Solution-set-preserving (every shaved value is proven infeasible), so it
+    // is safe even for solution-set-sensitive queries. The harvest's own LP relaxation+shaving is enabled
+    // here directly, not drawn from the search params, since those carry the solver's LP intent, not this.
+    val harvestParams = if (config.resolved(PresolvePass.LP_HARVEST, context)) {
+        BacktrackParams(lpPlan = LpPlan(bounding = true, variableShaving = true, objectiveShaving = true))
+    } else {
+        null
+    }
     val objective = linearObjective ?: LinearObjective()
 
     var current = problem

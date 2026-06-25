@@ -5,7 +5,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.lp.LpPlan
 import com.eignex.klause.solver.factor.arithmetic.Linear
 import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.objective.LinearObjective
@@ -72,9 +71,10 @@ class PresolveLoopTest {
     @Test
     fun `the harvested problem is left at a joint presolve-harvest fixpoint`() {
         // Covering objective: minimise z = x0 + x1 + x2 with the three pairwise covers; the LP-harvest
-        // objective shave proves z >= 2. After presolving once, re-presolving must be a no-op — the loop
-        // leaves no further harvest or reduction on the table.
-        val params = BacktrackParams(lpPlan = LpPlan(bounding = true, objectiveShaving = true))
+        // objective shave proves z >= 2. The harvest is gated by the `lp-harvest` presolve pass, enabled
+        // here as a delta. After presolving once, re-presolving must be a no-op — the loop leaves no
+        // further harvest or reduction on the table.
+        val config = PresolveConfig.parse("default,+lp-harvest")
         val problem = Problem(
             0,
             4,
@@ -87,9 +87,9 @@ class PresolveLoopTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
-        val once = solvableOf(problem, obj, params).presolved(PresolveConfig.DEFAULT, false)
+        val once = solvableOf(problem, obj).presolved(config, false)
         assertTrue(once.problem.intDomains[3].min >= 2, "the harvest should have raised the objective floor")
-        val again = solvableOf(once.problem, obj, params).presolved(PresolveConfig.DEFAULT, false)
+        val again = solvableOf(once.problem, obj).presolved(config, false)
         assertSame(again.problem, once.problem, "the harvested problem must already be at the joint fixpoint")
     }
 }
