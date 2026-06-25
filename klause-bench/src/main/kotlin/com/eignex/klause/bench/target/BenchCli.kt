@@ -33,6 +33,7 @@ import java.io.File
  * `backend=choco|gecode|yuck` (the solver; default klause) `timeout=<ms>`
  * `engine=fixed|cp|mixed|ls|cp-single|ls-single` `processors=N` `fixed=true` (references) `param=key=value`
  * `lp=off|conservative|balanced|aggressive[±id…]` (klause-cli `--lp` LP-relaxation emphasis)
+ * `presolve=off|conservative|default|aggressive[,±pass…]` (klause-cli `--presolve` presolve emphasis + deltas)
  * `label=<name>` (tag the run — e.g. a klause version — so re-runs coexist instead of overwriting)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
@@ -182,7 +183,8 @@ object BenchCli {
      *  to the cli `-e`/`--param`; `fixed=true` is the reference (`-f`) toggle. The cli owns the engine
      *  model; the bench just forwards. */
     private fun parseKlauseSearch(f: Map<String, String>, params: List<String>): KlauseSearch? {
-        val anySet = listOf("engine", "processors", "fixed", "lp").any { f[it] != null } || params.isNotEmpty()
+        val anySet = listOf("engine", "processors", "fixed", "lp", "presolve").any { f[it] != null } ||
+            params.isNotEmpty()
         if (!anySet) return null
         return KlauseSearch(
             engine = f["engine"]?.let(::parseEngine),
@@ -190,6 +192,7 @@ object BenchCli {
             fixed = f["fixed"]?.toBoolean() ?: false,
             params = params,
             lp = f["lp"],
+            presolve = f["presolve"],
         )
     }
 
@@ -299,6 +302,7 @@ object BenchCli {
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
             |         engine=fixed|cp|mixed|ls|cp-single|ls-single processors=N (klause search for solve)
             |         lp=off|conservative|balanced|aggressive[±id] (klause-cli --lp LP emphasis)
+            |         presolve=off|conservative|default|aggressive[,±pass] (klause-cli --presolve)
             |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; cp-single only for var-/val-selector)
             |         label=<name> (tag the run, e.g. a klause version, so re-runs coexist as distinct dirs)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N

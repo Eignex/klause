@@ -44,6 +44,8 @@ internal object SolverInvocation {
         val params: List<String> = emptyList(),
         /** klause-cli `--lp CEILING` (LP-relaxation emphasis); klause only, null = unset. */
         val lp: String? = null,
+        /** klause-cli `--presolve` (presolve emphasis + per-pass deltas); klause only, null = unset. */
+        val presolve: String? = null,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -137,6 +139,10 @@ internal object SolverInvocation {
             }
             s.lp?.let {
                 add("--lp")
+                add(it)
+            }
+            s.presolve?.let {
+                add("--presolve")
                 add(it)
             }
             for (param in s.params) {
