@@ -69,6 +69,16 @@ interface Factor {
     fun structuralKey(): StructuralKey
 
     /**
+     * An estimate of [structuralKey]'s size — the cost of building and hashing it once. Symmetry
+     * detection's colour refinement rebuilds a factor's key once per incident variable each round, so a
+     * factor with a large constant payload (a [com.eignex.klause.solver.factor.table.Table]'s tuple set,
+     * an Element constant array) costs `Θ(weight)` per such rebuild; the search uses `Σ degree·weight`
+     * to decide when refinement is too expensive to attempt. The default — the variable count — fits
+     * factors whose key is just their variables; data-heavy factors override to add their constant size.
+     */
+    val structuralKeyWeight: Int get() = intVars.size + boolVars.size
+
+    /**
      * Whether this factor's meaning is invariant under *any* relabeling of domain values — i.e. it
      * treats values as interchangeable symbols (AllDifferent: distinctness ignores which values).
      * Used by value-symmetry detection: a value permutation is a symmetry only if every

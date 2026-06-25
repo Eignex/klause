@@ -30,7 +30,7 @@ import com.eignex.klause.solver.factor.remapVars
  * snap `result` to the selected element, snap the selected element to `result`, or re-point
  * `idx` at a position whose value already equals `result`.
  */
-class Element(
+class Element private constructor(
     /** Index variable id. */
     val idx: Int,
     /** Result variable id (`result = arr(idx - indexOffset)`). */
@@ -40,15 +40,32 @@ class Element(
     /** Whether [arr] holds variable ids (true) or constants (false). */
     val arrIsVars: Boolean,
     /** Integer representing index 0 of [arr]. */
-    val indexOffset: Int = 1,
+    val indexOffset: Int,
+    /** Cached array-key fragment carried from a factor over the *same* [arr] (a constant-array
+     *  [remap], which leaves [arr] untouched); `null` forces a fresh computation when [arr] differs. */
+    cachedArrKey: LongArray?,
 ) : Factor {
+
+    constructor(idx: Int, result: Int, arr: IntArray, arrIsVars: Boolean, indexOffset: Int = 1) :
+        this(idx, result, arr, arrIsVars, indexOffset, null)
 
     init {
         require(arr.isNotEmpty()) { "element: empty array" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        Element(intMap[idx], intMap[result], if (arrIsVars) arr.remapVars(intMap) else arr, arrIsVars, indexOffset)
+    // The array part of the key is invariant under a *constant*-array remap (only idx/result move), so
+    // it is computed once and carried across those remaps — keeping the O(|arr|) encode of a large
+    // constant table (a crossword dictionary) out of symmetry refinement's per-round hot path. A
+    // variable-array remap rewrites [arr], so its key is recomputed (cache not forwarded).
+    private var cachedArrKey: LongArray? = cachedArrKey
+
+    private fun arrKey(): LongArray = cachedArrKey ?: StructuralKey.words { ints(arr) }.also { cachedArrKey = it }
+
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = if (arrIsVars) {
+        Element(intMap[idx], intMap[result], arr.remapVars(intMap), arrIsVars, indexOffset, null)
+    } else {
+        Element(intMap[idx], intMap[result], arr, arrIsVars, indexOffset, arrKey())
+    }
 
     // Affine substitution `idx = replacement + offset` (a pure shift, scale 1) folds into [indexOffset]:
     // reading `arr(idx − indexOffset)` becomes `arr(replacement − (indexOffset − offset))`. Only the
@@ -71,7 +88,7 @@ class Element(
         int(indexOffset)
         int(idx)
         int(result)
-        ints(arr)
+        words(arrKey())
     }
 
     // No remapValues override (value symmetry stays blocked when an Element is present, #536): the
@@ -85,6 +102,10 @@ class Element(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
         if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)
+
+    // A constant array is embedded in the key but is not part of [intVars], so its size must be added
+    // explicitly; a variable array is already counted via [intVars].
+    override val structuralKeyWeight: Int get() = intVars.size + if (arrIsVars) 0 else arr.size
 
     // Structural reduction to a plain equality when the selection is pinned (propagation only filters
     // domains, it never removes the global). Both cases are solution-set exact:

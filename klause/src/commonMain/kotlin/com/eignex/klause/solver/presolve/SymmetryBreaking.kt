@@ -37,6 +37,13 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
     ): Problem {
+        // Symmetry breaking is a one-shot transformation: once a [SymmetryHandling] factor is present
+        // the generators have been found and posted. The presolve round engine re-enables this pass
+        // whenever another pass changes the problem, but re-running would (a) re-search from scratch and
+        // (b) have to remap (conjugate every generator) and re-key the heavy [SymmetryHandling] factor it
+        // just added — an O(rounds) blow-up that dominated presolve on symmetric models. So detect once.
+        if (problem.factors.any { it is SymmetryHandling }) return problem
+
         // Generator-based detection: individualization–refinement over the unified variable+factor
         // colouring yields verified automorphism generators (catching composite and bool/int-mixed
         // symmetries the per-kind heuristics miss). The whole group is handled dynamically by one
@@ -353,8 +360,17 @@ internal object SymmetryBreaking {
     }
 
     /** WL signature of variable [v] this round: its [oldColour] plus the sorted multiset of incident
-     *  factor keys, each computed with [v] remapped to [WL_FOCAL] (the focal marker) and every other
-     *  variable to its current colour (already loaded into [intMap]/[boolMap]). */
+     *  factor-key *hashes*, each computed with [v] remapped to [WL_FOCAL] (the focal marker) and every
+     *  other variable to its current colour (already loaded into [intMap]/[boolMap]).
+     *
+     *  Each port contributes a single hash word rather than its full [StructuralKey] words. A factor
+     *  with large constant data (a table's tuple set, an element's array) has a large key, and
+     *  embedding it verbatim into every incident variable's signature each round made the copy/hash of
+     *  those long arrays dominate presolve. The hash is sufficient for refinement — colour refinement
+     *  only needs to tell ports apart, and a hash collision merely merges two colours (a coarser
+     *  partition, never a finer one). Soundness never rests on the colouring: every candidate the search
+     *  produces is re-checked by [isAutomorphism], so a collision can only cost extra verification, never
+     *  admit a false symmetry. */
     private fun portSignature(
         problem: Problem,
         incident: List<Int>,
@@ -364,7 +380,8 @@ internal object SymmetryBreaking {
         boolMap: IntArray,
         oldColour: Int,
     ): RefineKey {
-        val ports = ArrayList<StructuralKey>(incident.size)
+        val portHashes = LongArray(incident.size)
+        var n = 0
         for (fi in incident) {
             val saved: Int
             if (isBool) {
@@ -374,21 +391,17 @@ internal object SymmetryBreaking {
                 saved = intMap[v]
                 intMap[v] = WL_FOCAL
             }
-            ports.add(problem.factors[fi].remap(boolMap, intMap).structuralKey())
+            portHashes[n++] = problem.factors[fi].remap(boolMap, intMap).structuralKey().hashCode().toLong()
             if (isBool) boolMap[v] = saved else intMap[v] = saved
         }
-        ports.sort()
-        // space | SIG_PORT | oldColour | port count | each port's words, in canonical order — built
-        // into one pre-sized LongArray (no per-word boxing, the WL inner-loop hot path).
-        var size = 4
-        for (port in ports) size += port.wordCount
-        val words = LongArray(size)
+        portHashes.sort() // canonical order: the signature is the multiset of port hashes
+        // space | SIG_PORT | oldColour | port count | each port's key hash, in canonical order.
+        val words = LongArray(4 + portHashes.size)
         words[0] = if (isBool) SPACE_BOOL else SPACE_INT
         words[1] = SIG_PORT
         words[2] = oldColour.toLong()
-        words[3] = ports.size.toLong()
-        var at = 4
-        for (port in ports) at = port.writeWordsInto(words, at)
+        words[3] = portHashes.size.toLong()
+        portHashes.copyInto(words, 4)
         return RefineKey(words)
     }
 
@@ -424,16 +437,20 @@ internal object SymmetryBreaking {
     // All three are sound: skipping or stopping early only ever finds *fewer* symmetries, never invents
     // one (every returned permutation is still verified by [isAutomorphism]).
 
-    /** Skip the search when the problem is huge: both the variable and the factor count exceed this —
-     *  CP-SAT skips at 1e6 of each (`cp_model_symmetries.cc:665`). The work budget bounds the normal
-     *  case; this is the coarse guard against models where even building the graph does not pay off. */
-    private const val SKIP_VARS = 1_000_000
-    private const val SKIP_FACTORS = 1_000_000
-
-    /** Skip when the refinement graph is huge: both its node count (variables + factors) and its arc
-     *  count (variable–factor incidences) exceed this — CP-SAT's graph guard (`:685`). */
-    private const val SKIP_GRAPH_NODES = 1_000_000
-    private const val SKIP_GRAPH_ARCS = 1_000_000
+    /** Skip the search when a single colour-refinement round is too expensive. One round remaps every
+     *  factor once per incident variable and rebuilds its [Factor.structuralKey], so a factor of degree
+     *  `d` and key weight `w` costs `Θ(d·w)` per round and the round costs `Σ_f d_f·w_f` (for a plain
+     *  factor `w ≈ d`, so this reduces to `Σ d²`; a data-heavy factor like a wide table has `w ≫ d`).
+     *  CP-SAT skips on raw node/arc counts (`cp_model_symmetries.cc:665,685`); klause's per-arc work is
+     *  far heavier (a structural-key rebuild, not a graph-edge walk), so the realistic guard is on that
+     *  weighted work, not a 1e6 node count. Above this even the first round cannot complete within
+     *  [GENERATOR_WORK_BUDGET], and such large models empirically carry no verifiable variable symmetry,
+     *  so the search is skipped outright. Sound — skipping only finds fewer symmetries. Calibrated
+     *  against the corpus: instances that carry verifiable symmetry have a round cost up to a few
+     *  hundred thousand (a crossword grid is ≈ 3.5·10⁵), while a model that only burns the search — a
+     *  wide-table preference problem, a thousands-of-rows linear system — runs into the tens of millions
+     *  and beyond, so this cap cleanly separates the two. */
+    private const val GENERATOR_ROUND_COST_BUDGET = 1_000_000L
 
     /** Deterministic work budget for the whole generator search, charged per refinement arc visited
      *  (a variable's incident factor, the unit of [equitablePartition] work) — the analog of CP-SAT's
@@ -465,15 +482,19 @@ internal object SymmetryBreaking {
         val nBool = problem.numBoolVars
         if (nInt + nBool == 0) return emptyList()
 
-        // Size skip (CP-SAT `cp_model_symmetries.cc:665,685`): for a model — or its refinement graph —
-        // too large to pay off, do not even start. Graph nodes are variables + factors; arcs are the
-        // variable–factor incidences. Both dimensions must exceed the cap (a wide-but-shallow model
-        // still refines cheaply), so this only fires on the genuinely huge.
-        val numFactors = problem.factors.size
-        if (nInt + nBool > SKIP_VARS && numFactors > SKIP_FACTORS) return emptyList()
-        var arcs = 0
-        for (f in problem.factors) arcs += f.intVars.size + f.boolVars.size
-        if (nInt + nBool + numFactors > SKIP_GRAPH_NODES && arcs > SKIP_GRAPH_ARCS) return emptyList()
+        // Cost skip: estimate one refinement round's work as Σ_f degree·keyWeight — a factor is remapped
+        // and re-keyed once per incident variable, and each rebuild costs its [Factor.structuralKeyWeight]
+        // (the variables for a plain factor, plus the constant payload for a data-heavy one like a wide
+        // table). Bail before starting when a single round cannot fit [GENERATOR_WORK_BUDGET]. A
+        // wide-but-shallow model stays cheap; a model whose factors carry large constant data — where the
+        // search would burn the budget rebuilding huge keys without finding a verifiable symmetry — is
+        // skipped.
+        var roundCost = 0L
+        for (f in problem.factors) {
+            val deg = (f.intVars.size + f.boolVars.size).toLong()
+            roundCost += deg * f.structuralKeyWeight
+        }
+        if (roundCost > GENERATOR_ROUND_COST_BUDGET) return emptyList()
 
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
@@ -687,7 +708,18 @@ internal class RefineKey(private val words: LongArray) : Comparable<RefineKey> {
     override fun equals(other: Any?): Boolean =
         this === other || (other is RefineKey && words.contentEquals(other.words))
 
-    override fun hashCode(): Int = words.contentHashCode()
+    // Immutable, so the content hash is memoised — a colour signature is hashed once per `assignColours`
+    // HashSet/HashMap pass and re-hashed every WL round. `0` is the not-yet-computed sentinel.
+    private var cachedHash = 0
+
+    override fun hashCode(): Int {
+        var h = cachedHash
+        if (h == 0) {
+            h = words.contentHashCode()
+            cachedHash = h
+        }
+        return h
+    }
 
     override fun compareTo(other: RefineKey): Int {
         val shared = minOf(words.size, other.words.size)
