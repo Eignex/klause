@@ -13,24 +13,22 @@ class StructuralKey internal constructor(private val kind: FactorKind, private v
     override fun equals(other: Any?): Boolean =
         this === other || (other is StructuralKey && kind == other.kind && payload.contentEquals(other.payload))
 
-    override fun hashCode(): Int = 31 * kind.ordinal + payload.contentHashCode()
+    // Immutable, so the content hash is computed once and memoised — these keys are hashed repeatedly
+    // as multiset and hash-bucket keys across presolve rounds. `0` is the not-yet-computed sentinel; a
+    // key that genuinely hashes to 0 simply recomputes (harmless).
+    private var cachedHash = 0
+
+    override fun hashCode(): Int {
+        var h = cachedHash
+        if (h == 0) {
+            h = 31 * kind.ordinal + payload.contentHashCode()
+            cachedHash = h
+        }
+        return h
+    }
 
     /** A stable, injective rendering (`kind:p0,p1,…`) for diagnostics; distinct keys render distinctly. */
     override fun toString(): String = "${kind.ordinal}:" + payload.joinToString(",")
-
-    /** The number of `Long` words [writeWordsInto] emits — the kind discriminator, the payload length,
-     *  then the payload — so a composite key can pre-size one flat `LongArray`. */
-    internal val wordCount: Int get() = 2 + payload.size
-
-    /** Write this key's words into [dst] starting at [at] and return the next free index. Lets a
-     *  composite key (e.g. a colour-refinement signature) fold in factor keys as integers — into a
-     *  single pre-sized array, with no boxing and no decimal rendering. */
-    internal fun writeWordsInto(dst: LongArray, at: Int): Int {
-        dst[at] = kind.ordinal.toLong()
-        dst[at + 1] = payload.size.toLong()
-        payload.copyInto(dst, at + 2)
-        return at + 2 + payload.size
-    }
 
     override fun compareTo(other: StructuralKey): Int {
         if (kind != other.kind) return kind.ordinal - other.kind.ordinal
@@ -166,18 +164,36 @@ internal class StructuralKeyBuilder {
     }
 }
 
-/** Insertion-sort [order] (a permutation of its own indices) by `keys[order[i]]` ascending, without
- *  boxing — the index counterpart of `indices.sortedBy { keys[it] }`. Index arrays here are short
- *  (a constraint's arity), so insertion sort beats a boxed comparator sort. */
+/** Above this arity the index sort switches from in-place insertion sort to the O(n log n) packed
+ *  sort; below it insertion sort's lack of allocation wins. A high-arity factor (a wide linear row or
+ *  knapsack) whose [StructuralKey] is rebuilt for every incident variable each WL-refinement round
+ *  made the quadratic sort dominate presolve, so the crossover bounds that to `n log n`. */
+private const val INDEX_SORT_INSERTION_MAX = 32
+
+/** Sort [order] (a permutation of its own indices) by `keys[order[i]]` ascending, without boxing — the
+ *  index counterpart of `indices.sortedBy { keys[it] }`. Short arrays use in-place insertion sort (no
+ *  allocation); longer ones pack `(key, index)` into a `Long` (key high, index low so equal keys keep
+ *  ascending-index order) and use the primitive `O(n log n)` sort. */
 private fun sortIndicesByKey(order: IntArray, keys: IntArray) {
-    for (i in 1 until order.size) {
-        val cur = order[i]
-        val key = keys[cur]
-        var j = i - 1
-        while (j >= 0 && keys[order[j]] > key) {
-            order[j + 1] = order[j]
-            j--
+    if (order.size <= INDEX_SORT_INSERTION_MAX) {
+        for (i in 1 until order.size) {
+            val cur = order[i]
+            val key = keys[cur]
+            var j = i - 1
+            while (j >= 0 && keys[order[j]] > key) {
+                order[j + 1] = order[j]
+                j--
+            }
+            order[j + 1] = cur
         }
-        order[j + 1] = cur
+        return
     }
+    val packed = LongArray(
+        order.size,
+    ) { (keys[order[it]].toLong() shl Int.SIZE_BITS) or (order[it].toLong() and LOW_WORD) }
+    packed.sort()
+    for (i in order.indices) order[i] = (packed[i] and LOW_WORD).toInt()
 }
+
+/** Low 32 bits mask for unpacking the index half of a `(key, index)` packed `Long`. */
+private const val LOW_WORD = 0xFFFFFFFFL

@@ -103,6 +103,10 @@ class Table private constructor(
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
 
+    // The key embeds the full sorted tuple set, so its cost is dominated by the flat tuple count, not
+    // the variable count — a wide table is far more expensive to key than its arity suggests.
+    override val structuralKeyWeight: Int get() = xs.size + tuples.size
+
     /** Var id → the single tuple column it occupies (the common case). Vars that appear in more than
      *  one column are absent here and listed in [multiColumnsByVar] instead. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
