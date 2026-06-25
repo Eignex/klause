@@ -93,5 +93,13 @@ internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")
     if (p.constraintsRemoved != 0) out += "presolveConstraintsRemoved" to "${p.constraintsRemoved}"
     if (p.infeasible) out += "presolveInfeasible" to "true"
+    // The LP harvest's own contribution, broken out so it can be measured apart from the net counts above.
+    p.lpHarvest?.let { lp ->
+        if (lp.rootInfeasible) out += "lpHarvestRootInfeasible" to "true"
+        if (lp.boundsShaved != 0) out += "lpHarvestBoundsShaved" to "${lp.boundsShaved}"
+        if (lp.objectiveLbRaised) out += "lpHarvestObjectiveLb" to "true"
+        if (lp.constraintsRemoved != 0) out += "lpHarvestConstraintsRemoved" to "${lp.constraintsRemoved}"
+        if (lp.equalitiesAdded != 0) out += "lpHarvestEqualitiesAdded" to "${lp.equalitiesAdded}"
+    }
     return out
 }

@@ -248,6 +248,44 @@ class LpHarvestTest {
     }
 
     @Test
+    fun `harvest report breaks out the LP's own contribution`() {
+        // The same combination-redundant system as above: the report must attribute the dropped row to the
+        // LP harvest specifically (one redundant constraint), isolating it from the combinatorial passes.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 3),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5),
+            ),
+        )
+        val report = lpHarvestReporting(problem, LinearObjective(), shavingParams, Cancellation.Never).report
+        assertEquals(1, report.constraintsRemoved, "the LP-redundant row must be counted")
+        assertTrue(!report.rootInfeasible && report.equalitiesAdded == 0, "no other LP action fired here")
+    }
+
+    @Test
+    fun `harvest report flags a root-infeasible relaxation`() {
+        // The LP-infeasible cover system: the report must record that the LP certified root infeasibility.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
+            ),
+        )
+        val report = lpHarvestReporting(problem, LinearObjective(), shavingParams, Cancellation.Never).report
+        assertTrue(report.rootInfeasible, "root-LP infeasibility must be recorded in the report")
+    }
+
+    @Test
     fun `redundant-constraint removal preserves the feasible set`() {
         val rng = Random(20260702)
         var dropped = 0

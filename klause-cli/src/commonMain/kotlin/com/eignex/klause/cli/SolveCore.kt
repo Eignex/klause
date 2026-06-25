@@ -23,6 +23,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.presolve.PresolveConfig
 import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import kotlin.time.Duration
@@ -65,7 +66,7 @@ internal object SolveCore {
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
         // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
         if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
-            printPresolved(rawSolvable.problem, solvable.problem, solvable.presolve?.passes.orEmpty(), presolveElapsed)
+            printPresolved(rawSolvable.problem, solvable.problem, solvable.presolve, presolveElapsed)
             return
         }
         cliLogger(common.verbose).v {
@@ -186,11 +187,13 @@ internal object SolveCore {
     }
 
     /** Print what presolve did (`dry-run-presolve`) to stderr: the presolve-phase wall time,
-     *  variable/constraint counts, total integer-domain span, the per-factor-kind histogram delta, and
-     *  any proven infeasibility — so the effect (and cost) of a `--presolve` config can be inspected and
-     *  A/B-compared without solving. The elapsed time is the presolve phase alone, excluding JVM startup
-     *  and parsing, so it is the figure to watch when tuning presolve cost. */
-    private fun printPresolved(original: Problem, presolved: Problem, passes: List<String>, elapsed: Duration) {
+     *  variable/constraint counts, total integer-domain span, the per-factor-kind histogram delta, the LP
+     *  harvest's own contribution, and any proven infeasibility — so the effect (and cost) of a
+     *  `--presolve` config can be inspected and A/B-compared without solving. The elapsed time is the
+     *  presolve phase alone, excluding JVM startup and parsing, so it is the figure to watch when tuning
+     *  presolve cost. */
+    private fun printPresolved(original: Problem, presolved: Problem, stats: PresolveStats?, elapsed: Duration) {
+        val passes = stats?.passes.orEmpty()
         errPrintln("presolve dry-run:")
         errPrintln("  elapsed: $elapsed")
         errPrintln("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
@@ -203,6 +206,18 @@ internal object SolveCore {
             val b = before[kind] ?: 0
             val a = after[kind] ?: 0
             if (b != a) errPrintln("  $kind: $b -> $a")
+        }
+        // The LP harvest's own contribution, isolated from the combinatorial passes whose net effect the
+        // counts above conflate — the point of inspecting the LP presolve specifically.
+        stats?.lpHarvest?.let { lp ->
+            val parts = buildList {
+                if (lp.rootInfeasible) add("root-infeasible")
+                if (lp.boundsShaved > 0) add("shaved ${lp.boundsShaved} bound(s)")
+                if (lp.objectiveLbRaised) add("raised objective lb")
+                if (lp.constraintsRemoved > 0) add("removed ${lp.constraintsRemoved} redundant constraint(s)")
+                if (lp.equalitiesAdded > 0) add("added ${lp.equalitiesAdded} implied equality(ies)")
+            }
+            errPrintln("  lp-harvest: ${parts.joinToString(", ")}")
         }
         if (presolved.baked is PropagationResult.Unsat) {
             errPrintln("  INFEASIBLE: presolve proved the problem unsatisfiable")

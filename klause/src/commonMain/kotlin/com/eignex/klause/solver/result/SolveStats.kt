@@ -455,14 +455,48 @@ internal class SolveStatsSink(val backend: String) {
 }
 
 /**
+ * What the LP-relaxation harvest contributed during presolve, summed over the presolve↔harvest fixpoint
+ * rounds — isolating the LP's effect from the combinatorial passes (whose net effect the surrounding
+ * [PresolveStats] counts conflate). [rootInfeasible] flags that the root relaxation was certified
+ * infeasible (the whole problem is UNSAT); [boundsShaved] counts integer variables whose bounds the LP
+ * tightened; [objectiveLbRaised] flags an objective lower-bound harvest; [constraintsRemoved] counts rows
+ * the LP proved redundant (max/min over the others); [equalitiesAdded] counts differences the LP proved
+ * pinned to a constant and emitted as `=` for affine elimination.
+ */
+@Serializable
+data class LpHarvestReport(
+    val rootInfeasible: Boolean = false,
+    val boundsShaved: Int = 0,
+    val objectiveLbRaised: Boolean = false,
+    val constraintsRemoved: Int = 0,
+    val equalitiesAdded: Int = 0,
+) {
+    /** True when the harvest did nothing — used to drop the field rather than report an all-zero row. */
+    val isEmpty: Boolean
+        get() = !rootInfeasible && boundsShaved == 0 && !objectiveLbRaised &&
+            constraintsRemoved == 0 && equalitiesAdded == 0
+
+    /** Accumulate two rounds' reports: counts add, flags or together. */
+    operator fun plus(o: LpHarvestReport): LpHarvestReport = LpHarvestReport(
+        rootInfeasible || o.rootInfeasible,
+        boundsShaved + o.boundsShaved,
+        objectiveLbRaised || o.objectiveLbRaised,
+        constraintsRemoved + o.constraintsRemoved,
+        equalitiesAdded + o.equalitiesAdded,
+    )
+}
+
+/**
  * Terse presolve outcome for `-s`: just enough to show presolve did something and which techniques —
  * deliberately small so it doesn't dominate the solve counters (the verbose readout is
  * `dry-run-presolve`). [passes] are the ids of the presolve passes that changed the problem;
- * [constraintsRemoved] is the net drop in factor count; [infeasible] flags presolve-proven UNSAT.
+ * [constraintsRemoved] is the net drop in factor count; [infeasible] flags presolve-proven UNSAT;
+ * [lpHarvest] breaks out the LP harvest's own contribution when it fired.
  */
 @Serializable
 data class PresolveStats(
     val passes: List<String> = emptyList(),
     val constraintsRemoved: Int = 0,
     val infeasible: Boolean = false,
+    val lpHarvest: LpHarvestReport? = null,
 )
