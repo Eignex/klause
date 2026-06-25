@@ -325,6 +325,30 @@ class CliTest {
     }
 
     @Test
+    fun `the lp-harvest presolve pass reports its contribution when enabled`() {
+        // x+y<=3, y+z<=3, x+z<=3 imply x+y+z<=5 (LP max 4.5), so the lp-harvest pass drops it. The pass is
+        // opt-in, so it fires only with the +lp-harvest delta; the dry-run must then report the removal.
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText(
+                "array[1..3] of var 0..10: x;\n" +
+                    "constraint int_lin_le([1,1],[x[1],x[2]],3);\n" +
+                    "constraint int_lin_le([1,1],[x[2],x[3]],3);\n" +
+                    "constraint int_lin_le([1,1],[x[1],x[3]],3);\n" +
+                    "constraint int_lin_le([1,1,1],[x[1],x[2],x[3]],5);\n" +
+                    "solve satisfy;\n",
+            )
+            deleteOnExit()
+        }
+        val off = captureErr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
+        assertTrue("lp-harvest:" !in off, "the opt-in pass must stay off by default: $off")
+        val on = captureErr {
+            main(arrayOf("--presolve", "default,+lp-harvest", "--param", "dry-run-presolve=on", fzn.absolutePath))
+        }
+        assertTrue("lp-harvest:" in on, on)
+        assertTrue("redundant constraint" in on, on)
+    }
+
+    @Test
     fun `ls arm selects exactly one curated arm in isolation`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")

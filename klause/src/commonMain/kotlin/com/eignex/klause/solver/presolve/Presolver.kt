@@ -139,8 +139,8 @@ class PassResult(val problem: Problem, val reconstruct: ((Sample) -> Sample)? = 
  *
  * @property id serializable form for [PresolveConfig.parse] and the CLI `--presolve` flag.
  * @property stage [Stage.PROBLEM] passes are run by the [Presolver] round engine; [Stage.CONSTRUCTION]
- *  passes (SAC probing) are folded into `Problem.baked` at build time and only read via
- *  [PresolveConfig.resolved].
+ *  passes (SAC probing) are folded into `Problem.baked` at build time; [Stage.EXTERNAL] passes (the LP
+ *  harvest) run in the CLI's presolve↔harvest fixpoint — both are only read via [PresolveConfig.resolved].
  * @property timing cost tier — a [PresolveEmphasis] enables a set of tiers.
  * @property preservesSolutionSet whether the pass leaves the model's solution **set and count**
  *  exactly intact (true), or may alter them (false) — by collapsing the set (e.g. symmetry breaking,
@@ -313,6 +313,22 @@ enum class PresolvePass(
             return PassResult(reduction.problem, reduction::reconstruct)
         }
     },
+
+    /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
+     *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
+     *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so its [apply] is
+     *  a no-op marker and the work lives in the CLI's presolve↔harvest fixpoint, gated on this entry.
+     *  Opt-in (`autoEligible = false`): expensive (an LP solve per shave/redundancy probe) and not yet
+     *  shown to pay off on the corpus, so it stays off until requested with `--presolve …+lp-harvest`. */
+    LP_HARVEST(
+        "lp-harvest",
+        Stage.EXTERNAL,
+        PresolveTiming.EXHAUSTIVE,
+        preservesSolutionSet = true,
+        autoEligible = false,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(problem)
+    },
     ;
 
     /** Transform [problem] under [ctx]. The returned [PassResult.problem] is `=== problem` when the
@@ -326,6 +342,10 @@ enum class PresolvePass(
 
         /** A problem-to-problem transform run before solving, via [Presolver.run]. */
         PROBLEM,
+
+        /** Run outside [Presolver.run] — by the CLI's presolve↔LP-harvest fixpoint, which alone bridges
+         *  to the backtrack-layer LP engine; this enum only carries the config toggle. */
+        EXTERNAL,
     }
 
     /** Lookup by serializable [id] and the id listing for spec parsing / errors. */
