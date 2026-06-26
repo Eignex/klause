@@ -10,6 +10,7 @@ import com.eignex.klause.solver.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.factor.bool.Clause
 import com.eignex.klause.solver.factor.global.ValuePrecede
 import com.eignex.klause.solver.factor.symmetry.SymmetryHandling
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet
 
 internal object SymmetryBreaking {
@@ -260,16 +261,19 @@ internal object SymmetryBreaking {
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
     private fun domainSeed(d: IntDomain): RefineKey {
-        val words = ArrayList<Long>()
-        words.add(SPACE_INT)
-        words.add(SEED_DOMAIN)
-        words.add(d.min.toLong())
-        words.add(d.max.toLong())
-        val holes = ArrayList<Long>()
-        d.forEachHole { holes.add(it.toLong()) }
-        words.add(holes.size.toLong())
-        words.addAll(holes)
-        return RefineKey(words.toLongArray())
+        // Build the word array directly — this is computed for every int variable on every symmetry
+        // search, and a boxed `ArrayList<Long>` per variable (one box per bound and per hole) was a
+        // measurable cost on wide, holey domains. Holes collect into a primitive list first.
+        val holes = IntArrayList()
+        d.forEachHole { holes.add(it) }
+        val words = LongArray(5 + holes.size)
+        words[0] = SPACE_INT
+        words[1] = SEED_DOMAIN
+        words[2] = d.min.toLong()
+        words[3] = d.max.toLong()
+        words[4] = holes.size.toLong()
+        for (i in 0 until holes.size) words[5 + i] = holes[i].toLong()
+        return RefineKey(words)
     }
 
     /** A distinguished-fixpoint seed for objective variable [v] in [space] (each is its own colour). */
