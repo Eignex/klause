@@ -139,7 +139,7 @@ internal object RedundantConstraints {
     /** A `Σ coeffs·x ≤ bound` row as a reduced per-variable coefficient map (GCD-normalised), or `null`
      *  for non-(`≤`/`≥`) Linear factors. The map keys are variable ids; the value is the reduced
      *  coefficient. */
-    private class LeRow(val factorIndex: Int, val coeffByVar: Map<Int, Int>, val bound: Long)
+    private class LeRow(val factorIndex: Int, val coeffByVar: MutableIntIntMap, val bound: Long)
 
     /** A `≤`-normalised, GCD-reduced [LeRow] for an exact [LinearRow] (from any factor's
      *  [Factor.linearRows]); `null` for a non-(`≤`/`≥`) row. Coalesced terms have distinct vars, so a
@@ -152,10 +152,10 @@ internal object RedundantConstraints {
             else -> return null
         }
         val g = PresolveShared.gcdOf(coeffs)
-        val map = HashMap<Int, Int>(row.vars.size)
+        val map = MutableIntIntMap(row.vars.size)
         for (i in row.vars.indices) {
             if (coeffs[i] == 0) continue
-            map[row.vars[i]] = if (g <= 1) coeffs[i] else coeffs[i] / g
+            map.put(row.vars[i], if (g <= 1) coeffs[i] else coeffs[i] / g)
         }
         return LeRow(factorIndex, map, if (g <= 1) bound else bound.floorDiv(g.toLong()))
     }
@@ -207,8 +207,9 @@ internal object RedundantConstraints {
      *  positive integer multiple `k` on the shared variables, and `k·boundA + maxExtra ≤ boundB`. */
     private fun dominates(problem: Problem, a: LeRow, b: LeRow): Boolean {
         var k = 0L
-        for ((v, ca) in a.coeffByVar) {
-            val cb = b.coeffByVar[v] ?: return false // a's support must be ⊆ b's
+        a.coeffByVar.forEach { v, ca ->
+            if (!b.coeffByVar.containsKey(v)) return false // a's support must be ⊆ b's
+            val cb = b.coeffByVar.getOrDefault(v, 0)
             if (cb % ca != 0) return false
             val ratio = (cb / ca).toLong()
             if (ratio <= 0) return false // k must be a single positive multiple
@@ -220,13 +221,14 @@ internal object RedundantConstraints {
         }
         if (k == 0L) return false
         var maxExtra = 0L
-        for ((v, cb) in b.coeffByVar) {
-            if (v in a.coeffByVar) continue
-            val d = problem.intDomains[v]
-            maxExtra += if (cb >= 0) cb.toLong() * d.max else cb.toLong() * d.min
-            // Conservative overflow guard: an extra activity this large can't be dominated by a
-            // small-bound row anyway, so bail rather than risk a wrapped Long comparison.
-            if (maxExtra > OVERFLOW_GUARD || maxExtra < -OVERFLOW_GUARD) return false
+        b.coeffByVar.forEach { v, cb ->
+            if (!a.coeffByVar.containsKey(v)) {
+                val d = problem.intDomains[v]
+                maxExtra += if (cb >= 0) cb.toLong() * d.max else cb.toLong() * d.min
+                // Conservative overflow guard: an extra activity this large can't be dominated by a
+                // small-bound row anyway, so bail rather than risk a wrapped Long comparison.
+                if (maxExtra > OVERFLOW_GUARD || maxExtra < -OVERFLOW_GUARD) return false
+            }
         }
         return k * a.bound + maxExtra <= b.bound
     }
