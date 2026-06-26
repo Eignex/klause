@@ -39,13 +39,6 @@ class PresolveContext(
      *  hand-written one is redundant and the two can interact. An explicit override still forces it on. */
     val modelBreaksSymmetry: Boolean = false,
 ) {
-    /** Set once [PresolvePass.BREAK_SYMMETRIES] runs a full search and finds nothing to break. The
-     *  round engine re-enables the pass whenever another pass changes the problem, but the search is
-     *  expensive and overwhelmingly fruitless on a model that carries no symmetry, so it is not worth
-     *  repeating after every reduction. The dual of the one-shot `SymmetryHandling`-factor guard, which
-     *  short-circuits a model where symmetry *was* found. */
-    internal var symmetrySearchedEmpty: Boolean = false
-
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
 
@@ -158,6 +151,11 @@ class PassResult(val problem: Problem, val reconstruct: ((Sample) -> Sample)? = 
  * @property autoEligible whether emphasis may turn it on automatically; opt-in passes (value
  *  precedence, which interacts with variable-symmetry breaking) are `false` and need an explicit
  *  override.
+ * @property skipAfterEmpty whether the round engine stops re-running this pass once it has run and
+ *  changed nothing. The engine re-enables every pass when another pass changes the problem; for an
+ *  expensive search that overwhelmingly finds nothing to add (symmetry detection, xor unit
+ *  derivation) repeating it after each reduction is wasted work, so it runs at most until its first
+ *  empty result. Cheap reductions leave it `false` — they must re-run as the problem shrinks.
  */
 enum class PresolvePass(
     val id: String,
@@ -165,6 +163,7 @@ enum class PresolvePass(
     val timing: PresolveTiming,
     val preservesSolutionSet: Boolean,
     val autoEligible: Boolean,
+    val skipAfterEmpty: Boolean = false,
 ) {
     /** GCD + bounded-integer coefficient strengthening (#319 / #372). */
     STRENGTHEN_COEFFICIENTS("strengthen", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
@@ -173,7 +172,14 @@ enum class PresolvePass(
     },
 
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
-    DERIVE_XOR_UNITS("xor-units", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+    DERIVE_XOR_UNITS(
+        "xor-units",
+        Stage.PROBLEM,
+        PresolveTiming.FAST,
+        true,
+        autoEligible = true,
+        skipAfterEmpty = true,
+    ) {
         override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.deriveXorUnits(problem))
     },
 
@@ -241,15 +247,10 @@ enum class PresolvePass(
         PresolveTiming.MEDIUM,
         preservesSolutionSet = false,
         autoEligible = true,
+        skipAfterEmpty = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
-            if (ctx.symmetrySearchedEmpty) return PassResult(problem)
-            val result = Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars)
-            // A full search that posted nothing returns the input unchanged; cache that so the round
-            // engine does not repeat the same fruitless search after every later pass fires.
-            if (result === problem) ctx.symmetrySearchedEmpty = true
-            return PassResult(result)
-        }
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            PassResult(Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars))
     },
 
     /** Law–Lee value precedence (#374 / #432) — the strong value-symmetry break. Opt-in: stacking it
@@ -581,12 +582,17 @@ object Presolver {
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()
         val fired = LinkedHashSet<PresolvePass>() // passes that changed the problem, in first-fire order
+        // Run-local (never on the shared [PresolveContext.EMPTY]): a [PresolvePass.skipAfterEmpty] pass
+        // that ran and changed nothing is parked here so the round engine does not re-run its expensive,
+        // overwhelmingly fruitless search after every later reduction.
+        val exhausted = HashSet<PresolvePass>()
         var round = 0
         var roundStartComplexity = complexity(current)
         while (round < maxRounds && !cancellation()) {
             var ranAny = false
             for (pass in passes) {
                 if (cancellation()) break
+                if (pass in exhausted) continue
                 if (ranAtVersion[pass] == version) continue
                 ranAtVersion[pass] = version
                 ranAny = true
@@ -597,6 +603,8 @@ object Presolver {
                     result.reconstruct?.let { reconstructs.add(it) }
                     fired.add(pass)
                     version++
+                } else if (pass.skipAfterEmpty) {
+                    exhausted.add(pass)
                 }
             }
             if (!ranAny) break // every enabled pass has run at the current version → fixpoint
