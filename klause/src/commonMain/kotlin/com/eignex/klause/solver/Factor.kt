@@ -69,6 +69,19 @@ interface Factor {
     fun structuralKey(): StructuralKey
 
     /**
+     * `hashCode` of `remap(boolMap, intMap).structuralKey()`, the per-incidence port signature symmetry
+     * refinement computes for every variable–factor arc each round. The default builds the remapped
+     * factor and its key; a hot factor type overrides to fold the same hash directly from its remapped
+     * variables, skipping the intermediate [Factor] and [StructuralKey] allocations. An override must
+     * return a value that *discriminates* ports as well as the key's hash — soundness never rests on it
+     * (every candidate is re-checked by an automorphism test), so a collision only coarsens the
+     * colouring, but the result should match the key hash to keep the colouring (and the symmetries
+     * found) unchanged.
+     */
+    fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        remap(boolMap, intMap).structuralKey().hashCode()
+
+    /**
      * An estimate of [structuralKey]'s size — the cost of building and hashing it once. Symmetry
      * detection's colour refinement rebuilds a factor's key once per incident variable each round, so a
      * factor with a large constant payload (a [com.eignex.klause.solver.factor.table.Table]'s tuple set,

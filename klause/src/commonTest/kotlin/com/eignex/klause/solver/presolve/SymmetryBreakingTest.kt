@@ -839,4 +839,23 @@ class SymmetryBreakingTest {
         val e = Element(idx = 0, result = 1, arr = intArrayOf(7, 8), arrIsVars = false, indexOffset = 1)
         assertNull(e.remapValues { it })
     }
+
+    @Test
+    fun `remapStructuralHash equals the remapped structural key hash`() {
+        // The port hash symmetry refinement uses for each variable-factor arc must reproduce
+        // remap().structuralKey().hashCode() exactly, or the colouring (and the symmetries found) would
+        // change. The map sends one variable to the billion-valued focal marker (high-bit packing), two
+        // to a shared image (coalescing), and the linear carries negative coefficients and bound.
+        val map = intArrayOf(1_000_000_000, 5, 5, 7)
+        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(1, true)))
+        assertEquals(
+            clause.remap(map, map).structuralKey().hashCode(),
+            clause.remapStructuralHash(map, map),
+        )
+        val linear = Linear(intArrayOf(2, -3, 4), intArrayOf(1, 2, 3), LinearOp.LE, -8)
+        assertEquals(
+            linear.remap(map, map).structuralKey().hashCode(),
+            linear.remapStructuralHash(map, map),
+        )
+    }
 }
