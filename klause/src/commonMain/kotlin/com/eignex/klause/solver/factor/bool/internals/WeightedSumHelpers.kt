@@ -12,6 +12,7 @@ import com.eignex.klause.solver.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableIntIntMap
 
 internal fun linearHolds(sum: Long, op: LinearOp, bound: Int): Boolean = when (op) {
     LinearOp.LE -> sum <= bound
@@ -63,16 +64,26 @@ internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTer
     }
     if (!hasDuplicate) return CoalescedTerms(vars, coeffs)
 
+    // Coalesce in first-occurrence order with primitive maps. A boxed `HashMap<Int, Long>` here
+    // dominated presolve on dense linear systems, where affine folding builds one coalesced row per
+    // eliminated-variable incidence. `slotOf` maps a variable to its slot in [order]; [sums] accumulates
+    // per slot. A zero-sum term is kept (a variable that appears stays), matching the boxed version.
     val order = IntArrayList(vars.size)
-    val sums = HashMap<Int, Long>(vars.size)
+    val slotOf = MutableIntIntMap(vars.size * 2)
+    val sums = LongArray(vars.size)
     for (i in vars.indices) {
         val v = vars[i]
-        if (v !in sums) order.add(v)
-        sums[v] = (sums[v] ?: 0L) + coeffs[i].toLong()
+        var slot = slotOf.getOrDefault(v, -1)
+        if (slot < 0) {
+            slot = order.size
+            slotOf.put(v, slot)
+            order.add(v)
+        }
+        sums[slot] += coeffs[i].toLong()
     }
     val outVars = order.toIntArray()
     val outCoeffs = IntArray(outVars.size) { idx ->
-        val s = sums.getValue(outVars[idx])
+        val s = sums[idx]
         require(s in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
             "coalesced coefficient overflow for var ${outVars[idx]}: $s"
         }
