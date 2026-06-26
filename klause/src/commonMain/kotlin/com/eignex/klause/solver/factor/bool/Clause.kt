@@ -33,6 +33,21 @@ class Clause(val literals: IntArray) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
 
+    // Folds `Clause(literals.remapLits(boolMap)).structuralKey().hashCode()` without allocating the
+    // remapped clause or its key. The key payload is `[size, sorted remapped lits]` and
+    // `FactorKind.CLAUSE.ordinal == 0`, so the key hash is exactly the `LongArray` content-hash of that
+    // payload; the words are small non-negative lit ids, each contributing its own value. Symmetry
+    // refinement runs this once per incident variable each round, so the saved allocations add up.
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int {
+        val remapped = IntArray(literals.size) {
+            Lit.make(boolMap[Lit.variable(literals[it])], Lit.isPositive(literals[it]))
+        }
+        remapped.sort()
+        var h = 31 + remapped.size // content-hash seed 1, folded with the leading size word
+        for (lit in remapped) h = 31 * h + lit
+        return h
+    }
+
     override val boolVars: IntArray = literals.litVars()
     override val intVars: IntArray = EmptyIntArray
 

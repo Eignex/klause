@@ -45,6 +45,48 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
 
+    // Folds `Linear(coeffs, vars.remapVars(intMap), op, bound).structuralKey().hashCode()` without
+    // allocating the remapped Linear or its key. The key coalesces coefficients of variables sharing
+    // an image (matching `coalesceLinearTerms`) and sorts the (image, coeff) pairs, so pack each pair
+    // into a `Long` (image high, coeff low), sort, and fold the key's `LongArray` content-hash over the
+    // merged runs. Symmetry refinement runs this once per incident variable each round.
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int {
+        val n = vars.size
+        val packed = LongArray(n)
+        for (k in 0 until n) {
+            packed[k] = (intMap[vars[k]].toLong() shl Int.SIZE_BITS) or (coeffs[k].toLong() and LOW_WORD)
+        }
+        packed.sort()
+        var distinct = 0
+        var i = 0
+        while (i < n) {
+            val img = packed[i] ushr Int.SIZE_BITS
+            var j = i + 1
+            while (j < n && packed[j] ushr Int.SIZE_BITS == img) j++
+            distinct++
+            i = j
+        }
+        // Payload order: op.ordinal, bound, pair count, then each (image, summed coeff) ascending.
+        var h = 1
+        h = 31 * h + longHashWord(op.ordinal.toLong())
+        h = 31 * h + longHashWord(bound.toLong())
+        h = 31 * h + longHashWord(distinct.toLong())
+        i = 0
+        while (i < n) {
+            val img = (packed[i] ushr Int.SIZE_BITS).toInt()
+            var sum = 0L
+            var j = i
+            while (j < n && (packed[j] ushr Int.SIZE_BITS).toInt() == img) {
+                sum += (packed[j] and LOW_WORD).toInt().toLong()
+                j++
+            }
+            h = 31 * h + longHashWord(img.toLong())
+            h = 31 * h + longHashWord(sum.toInt().toLong())
+            i = j
+        }
+        return 31 * FactorKind.LINEAR.ordinal + h
+    }
+
     /**
      * A pure binary value relation `c·x ⟨=|≠⟩ c·y` — two terms with opposite-equal coefficients and a
      * zero bound, comparing for equality or distinctness. Its allowed-tuple set (`{x = y}` / `{x ≠ y}`)
@@ -71,3 +113,10 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     // A Linear *is* a single exact linear row — its own inequality, no relaxation.
     override fun linearRows(): List<LinearRow> = listOf(LinearRow(coeffs, vars, op, bound.toLong()))
 }
+
+/** Low 32 bits mask for packing/unpacking a `(image, coeff)` pair in [Linear.remapStructuralHash]. */
+private const val LOW_WORD = 0xFFFFFFFFL
+
+/** `Long.hashCode()` (the per-word step of `LongArray.contentHashCode`), so the folded hash matches
+ *  the one [StructuralKey] computes from its payload. */
+private fun longHashWord(w: Long): Int = (w xor (w ushr Int.SIZE_BITS)).toInt()

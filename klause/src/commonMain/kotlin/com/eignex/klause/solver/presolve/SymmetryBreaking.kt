@@ -391,7 +391,7 @@ internal object SymmetryBreaking {
                 saved = intMap[v]
                 intMap[v] = WL_FOCAL
             }
-            portHashes[n++] = problem.factors[fi].remap(boolMap, intMap).structuralKey().hashCode().toLong()
+            portHashes[n++] = problem.factors[fi].remapStructuralHash(boolMap, intMap).toLong()
             if (isBool) boolMap[v] = saved else intMap[v] = saved
         }
         portHashes.sort() // canonical order: the signature is the multiset of port hashes
