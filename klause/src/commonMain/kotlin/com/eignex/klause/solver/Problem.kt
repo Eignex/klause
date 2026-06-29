@@ -125,8 +125,11 @@ class Problem(
 
     /** Invariant objects for the LS engine, one per factor. Factors that have been structurally
      *  split return a dedicated invariant instance from [Factor.asInvariant]; unsplit factors
-     *  return themselves. Computed once at construction. */
-    val invariants: Array<out Invariant> = Array(factors.size) { factors[it].asInvariant() }
+     *  return themselves. Built lazily on first access: only the local-search engine reads them, so
+     *  presolve (which rebuilds a [Problem] after every pass) and the backtrack/CP solver never pay
+     *  to allocate one invariant per factor — material on a model with hundreds of thousands of
+     *  factors. Computed once, then cached. */
+    val invariants: Array<out Invariant> by lazy { Array(factors.size) { factors[it].asInvariant() } }
 
     init {
         require(intDomains.size == numIntVars) {
@@ -172,11 +175,13 @@ class Problem(
         hasSymmetryBreaking = hasSymmetryBreaking,
     )
 
-    /** True iff some factor is invariant-only ([NoPropagator]) — skipped by the CP occurrence lists. */
-    private val anyPropagatorAbsent: Boolean = propagators.any { it === NoPropagator }
+    /** True iff some factor is invariant-only ([NoPropagator]) — skipped by the CP occurrence lists.
+     *  Lazy: only the LS occurrence lists below consult it, so a presolve/CP-only [Problem] never scans. */
+    private val anyPropagatorAbsent: Boolean by lazy { propagators.any { it === NoPropagator } }
 
-    /** True iff some factor is propagator-only ([NoInvariant]) — skipped by the LS occurrence lists. */
-    private val anyInvariantAbsent: Boolean = invariants.any { it === NoInvariant }
+    /** True iff some factor is propagator-only ([NoInvariant]) — skipped by the LS occurrence lists.
+     *  Lazy (and triggers [invariants]): only the LS occurrence lists below consult it. */
+    private val anyInvariantAbsent: Boolean by lazy { invariants.any { it === NoInvariant } }
 
     /** Deductive occurrence lists: factor ids mentioning each Boolean variable, indexed by bool var id,
      *  excluding invariant-only factors ([NoPropagator]) so CP propagation never wakes them. */
@@ -187,21 +192,24 @@ class Problem(
 
     /** Local-search occurrence lists over Boolean variables, excluding propagator-only factors
      *  ([NoInvariant]) so a move never touches them. Aliases [boolOccurrences] when no factor splits
-     *  its roles (the common case — both lists are then every factor). */
-    val lsBoolOccurrences: Array<IntArray> =
+     *  its roles (the common case — both lists are then every factor). Lazy: only the LS engine reads
+     *  these, so a presolve/CP-only [Problem] never builds the LS-side lists. */
+    val lsBoolOccurrences: Array<IntArray> by lazy {
         if (!anyPropagatorAbsent && !anyInvariantAbsent) {
             boolOccurrences
         } else {
             invert(numBoolVars, { invariants[it] !== NoInvariant }) { it.boolVars }
         }
+    }
 
     /** Local-search occurrence lists over integer variables; see [lsBoolOccurrences]. */
-    val lsIntOccurrences: Array<IntArray> =
+    val lsIntOccurrences: Array<IntArray> by lazy {
         if (!anyPropagatorAbsent && !anyInvariantAbsent) {
             intOccurrences
         } else {
             invert(numIntVars, { invariants[it] !== NoInvariant }) { it.intVars }
         }
+    }
 
     /**
      * [boolOccurrences] minus factors that use per-literal wakeup (see
