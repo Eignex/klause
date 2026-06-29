@@ -20,8 +20,11 @@ object Presolve {
     fun deriveXorUnits(problem: Problem): Problem = XorUnits.deriveXorUnits(problem)
 
     /** Affine variable elimination. See [AffineSingletons]. */
-    fun eliminateAffineSingletons(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): AffineElimination =
-        AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars)
+    fun eliminateAffineSingletons(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): AffineElimination = AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars, cancellation)
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): Problem = RedundantConstraints.removeRedundantConstraints(problem)
@@ -44,7 +47,8 @@ object Presolve {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
-    ): Problem = SymmetryBreaking.breakSymmetries(problem, objectiveIntVars, objectiveBoolVars)
+        cancellation: Cancellation = Cancellation.Never,
+    ): Problem = SymmetryBreaking.breakSymmetries(problem, objectiveIntVars, objectiveBoolVars, cancellation)
 
     /** Value-precedence breaking over interchangeable value orbits. See [SymmetryBreaking]. */
     fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): Problem =
