@@ -50,9 +50,7 @@ class Table private constructor(
     // symmetry refinement's per-round hot path. Cleared (recomputed) only when the tuples change.
     private var cachedTupleKey: LongArray? = cachedTupleKey
 
-    private fun tupleKey(): LongArray = cachedTupleKey ?: StructuralKey.words {
-        int(arity)
-        int(numTuples)
+    private fun tupleKey(): LongArray = cachedTupleKey ?: run {
         val order = argsortBy(numTuples) { r1, r2 ->
             var c = 0
             var d = 0
@@ -62,7 +60,19 @@ class Table private constructor(
             }
             d
         }
-        for (r in order) for (c in 0 until arity) int(tuples[r * arity + c])
+        // Fill the key fragment (arity, count, then the row-sorted tuple ints) straight into its backing
+        // array. The equivalent StructuralKeyBuilder form appends one element at a time, each with a
+        // capacity/grow check; a wide table's key is the dominant cost when presolve keys a table-heavy
+        // model, so the inner loop stays a flat array write.
+        val words = LongArray(2 + numTuples * arity)
+        words[0] = arity.toLong()
+        words[1] = numTuples.toLong()
+        var w = 2
+        for (r in order) {
+            val base = r * arity
+            for (c in 0 until arity) words[w++] = tuples[base + c].toLong()
+        }
+        words
     }.also { cachedTupleKey = it }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(xs.remapVars(intMap), tuples, tupleKey())
