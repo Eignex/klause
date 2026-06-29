@@ -14,6 +14,11 @@ import com.eignex.klause.solver.factor.bool.PseudoBoolean
 import com.eignex.klause.solver.factor.global.AllDifferent
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.kumulant.math.splitmix64
+
+/** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
+ *  variable-set sum, so a bool var and an int var of the same id don't cancel or alias. */
+private const val BOOL_VAR_MARK = 1L shl 40
 
 internal object RedundantConstraints {
 
@@ -41,13 +46,29 @@ internal object RedundantConstraints {
      */
     fun removeRedundantConstraints(problem: Problem): Problem {
         val factors = problem.factors
-        // Phase 1: exact-duplicate removal by structural key.
+        // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
+        // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
+        // is built only when it can matter. A cheap shallow key (factor type + arity + variable ids,
+        // never the tuple payload) buckets the factors; the full [Factor.structuralKey] is computed and
+        // compared only for factors that collide on the shallow key (true duplicates always do). A
+        // factor with a unique shallow key — the common case — is kept without ever building its key.
         val deduped = ArrayList<Factor>(factors.size)
-        val seenKeys = HashSet<StructuralKey>()
+        val firstByShallow = HashMap<Long, Factor>()
+        val keysByShallow = HashMap<Long, HashSet<StructuralKey>>()
         for (f in factors) {
-            val k = f.structuralKey()
-            if (k != null && !seenKeys.add(k)) continue
-            deduped.add(f)
+            val sk = shallowKey(f)
+            val first = firstByShallow[sk]
+            if (first == null) {
+                // First factor with this shallow key — no kept factor can be a duplicate of it, so keep
+                // it without ever building its (possibly huge) full key.
+                firstByShallow[sk] = f
+                deduped.add(f)
+                continue
+            }
+            // Shallow collision: now the full keys decide. Seed the set with the first factor's key
+            // (built once here, not on every comparison), then keep f only if its key is new.
+            val keys = keysByShallow.getOrPut(sk) { hashSetOf(first.structuralKey()) }
+            if (keys.add(f.structuralKey())) deduped.add(f)
         }
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
         // tightest bound (and whether an `=` provides it) decides which inequalities are implied.
@@ -373,6 +394,20 @@ internal object RedundantConstraints {
             terms.add((sign * coeffs[i]).toLong())
         }
         return TermKey(isPb, terms)
+    }
+
+    /** A cheap discriminator for Phase-1 duplicate bucketing: a commutative splitmix sum of the variable
+     *  ids (bool ids marked into a disjoint range) plus the arity-derived [Factor.structuralKeyWeight] —
+     *  never a Table's tuple payload, the whole point of the two-tier dedup. It is **order-invariant** so
+     *  it is implied by full structural-key equality (a [Linear]'s key compares its terms as a var→coeff
+     *  map, not positionally, so an order-sensitive hash would split genuine duplicates into different
+     *  buckets and miss them). True duplicates therefore always share it; unrelated collisions are
+     *  harmless — they only fall through to the exact full-key comparison. */
+    private fun shallowKey(f: Factor): Long {
+        var vsum = 0L
+        for (v in f.intVars) vsum += splitmix64(v.toLong())
+        for (v in f.boolVars) vsum += splitmix64(v.toLong() or BOOL_VAR_MARK)
+        return vsum * 31 + f.structuralKeyWeight
     }
 
     private fun leKey(vars: IntArray, coeffs: IntArray, negate: Boolean): TermKey =
