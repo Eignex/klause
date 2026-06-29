@@ -10,6 +10,12 @@ import com.eignex.klause.util.MutableIntIntMap
 
 internal object XorUnits {
 
+    /** Work budget for the one-shot GF(2) elimination, as `rows × pivots × words` (its asymptotic cost).
+     *  Past it the elimination is skipped — on a system this large it would dominate presolve and rarely
+     *  pays off, while small parity systems (where xor-derived units matter) stay orders of magnitude
+     *  below it. */
+    private const val XOR_ELIMINATION_WORK_CAP = 100_000_000L
+
     /**
      * One-shot GF(2) elimination over all [Xor] factors. Reduces the root xor system once and emits
      * only its global consequences: forced literals as unit [Clause]s and, on contradiction (`0 = 1`),
@@ -29,6 +35,12 @@ internal object XorUnits {
         val colOfVar = MutableIntIntMap(vars.size * 2)
         for (i in vars.indices) colOfVar.put(vars[i], i)
         val words = (vars.size + 63) ushr 6
+        // The dense GF(2) elimination below is O(rows × pivots × words). On a large xor system that work
+        // dominates presolve, so skip it past a budget (sound — the xor factors still propagate normally,
+        // only their globally-implied root units go underived), mirroring the size guards on the other
+        // presolve searches (clique merge, SAC probing). The reduction matters on small parity systems,
+        // which stay far under the cap.
+        if (xors.size.toLong() * minOf(xors.size, vars.size) * words > XOR_ELIMINATION_WORK_CAP) return problem
         val rows = Array(xors.size) { LongArray(words) }
         val rhs = IntArray(xors.size)
 
