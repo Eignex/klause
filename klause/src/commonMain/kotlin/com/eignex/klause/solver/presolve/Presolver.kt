@@ -38,12 +38,28 @@ class PresolveContext(
      *  [PresolveConfig.resolved] decision: stacking klause's automorphism break on the model's
      *  hand-written one is redundant and the two can interact. An explicit override still forces it on. */
     val modelBreaksSymmetry: Boolean = false,
+    /** Cooperative cancellation polled inside the expensive passes (the affine-elimination fixpoint and
+     *  symmetry generator search), so a presolve work/time budget bounds an otherwise-unbounded loop:
+     *  the pass bails with the reductions it has made so far. Every pass is individually sound, so a
+     *  partial run only forgoes further reduction, never correctness. [Presolver.run] injects the
+     *  round-engine's cancellation here. */
+    val cancellation: Cancellation = Cancellation.Never,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
 
     /** Boolean variables the objective reads — the nonzero-weight indices. */
     val objectiveBoolVars: Set<Int> get() = objectiveBoolCoeffs.keys
+
+    /** This context with [cancellation] set — used by [Presolver.run] to hand the round-engine's
+     *  cancellation to the passes without changing the public [of] factories. */
+    fun withCancellation(cancellation: Cancellation): PresolveContext = PresolveContext(
+        solutionSetSensitive,
+        objectiveIntCoeffs,
+        objectiveBoolCoeffs,
+        modelBreaksSymmetry,
+        cancellation,
+    )
 
     /** Factories for the common contexts. */
     companion object {
@@ -196,7 +212,7 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
-            val elim = Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars)
+            val elim = Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars, ctx.cancellation)
             return PassResult(elim.problem, elim::reconstruct)
         }
     },
@@ -250,7 +266,7 @@ enum class PresolvePass(
         skipAfterEmpty = true,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars))
+            PassResult(Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars, ctx.cancellation))
     },
 
     /** Law–Lee value precedence (#374 / #432) — the strong value-symmetry break. Opt-in: stacking it
@@ -574,6 +590,10 @@ object Presolver {
         val passes = config.problemPasses(context)
         val maxRounds = config.emphasis.maxRounds
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
+        // Hand the round-engine cancellation to the passes so the long-running ones (affine fixpoint,
+        // symmetry search) poll it internally — a presolve budget then bounds them, not just the gaps
+        // between passes.
+        val ctx = context.withCancellation(cancellation)
 
         var current = problem
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
@@ -597,7 +617,7 @@ object Presolver {
                 ranAtVersion[pass] = version
                 ranAny = true
                 val before = current
-                val result = pass.apply(current, context)
+                val result = pass.apply(current, ctx)
                 if (result.problem !== before) {
                     current = result.problem
                     result.reconstruct?.let { reconstructs.add(it) }

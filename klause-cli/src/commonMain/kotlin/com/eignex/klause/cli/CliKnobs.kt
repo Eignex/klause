@@ -17,4 +17,14 @@ internal object CliKnobs {
 
     /** Default LP relaxation ceiling spec (parsed by `LpConfig.parse`): `klause.lp` / `KLAUSE_LP`. */
     val lp by propertyKnob()
+
+    /** Soft wall-clock budget (milliseconds) for the presolve phase: `klause.presolve.budget.ms` /
+     *  `KLAUSE_PRESOLVE_BUDGET_MS`. The presolve round engine and its long-running passes poll it and
+     *  bail with the reductions made so far, so a pathologically large model can't spend unbounded time
+     *  in presolve. `0` or negative disables the cap. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
+    val presolveBudgetMs by propertyKnob()
+
+    /** Default presolve wall-clock budget: bounds presolve on the largest models while every ordinary
+     *  instance finishes far under it (so its reductions are unaffected). */
+    const val DEFAULT_PRESOLVE_BUDGET_MS = 450L
 }

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -37,6 +38,7 @@ internal object SymmetryBreaking {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
     ): Problem {
         // Symmetry breaking is a one-shot transformation: once a [SymmetryHandling] factor is present
         // the generators have been found and posted. The presolve round engine re-enables this pass
@@ -51,7 +53,7 @@ internal object SymmetryBreaking {
         // [SymmetryHandling] factor whose [SymmetryPropagator] enforces every generator's lex-leader
         // `V ≤lex σ(V)` at each search node — sound (the orbit lex-minimum satisfies it) and with no
         // static enumeration of group elements.
-        val generators = findGenerators(problem, objectiveIntVars, objectiveBoolVars)
+        val generators = findGenerators(problem, objectiveIntVars, objectiveBoolVars, cancellation)
         // For an orbit whose members are *individually* interchangeable (each single transposition is
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
@@ -321,6 +323,7 @@ internal object SymmetryBreaking {
         seedInt: Array<RefineKey>,
         seedBool: Array<RefineKey>,
         budget: IntArray? = null,
+        cancellation: Cancellation = Cancellation.Never,
     ): Pair<IntArray, IntArray> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -345,7 +348,7 @@ internal object SymmetryBreaking {
             // Bail before a fresh round once the search's work budget is spent — returning the current
             // (possibly not-yet-stable) partition. Callers treat a spent budget as "stop", so a partial
             // colouring is never mistaken for a discrete one.
-            if (budget != null && budget[0] <= 0) return intColour to boolColour
+            if ((budget != null && budget[0] <= 0) || cancellation()) return intColour to boolColour
             for (v in 0 until nInt) intMap[v] = intColour[v]
             for (v in 0 until nBool) boolMap[v] = boolColour[v]
             val sigInt = Array(
@@ -481,6 +484,7 @@ internal object SymmetryBreaking {
         problem: Problem,
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
+        cancellation: Cancellation = Cancellation.Never,
     ): List<Pair<IntArray, IntArray>> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -513,7 +517,7 @@ internal object SymmetryBreaking {
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)
 
         // Cells of the base equitable partition: only same-colour variables can be interchangeable.
-        val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase, budget)
+        val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase, budget, cancellation)
         val cells = HashMap<Int, MutableList<Int>>()
         for (v in 0 until nInt) if (v !in objectiveIntVars) cells.getOrPut(intColour[v]) { ArrayList() }.add(v)
         for (v in 0 until nBool) {
@@ -522,19 +526,20 @@ internal object SymmetryBreaking {
 
         val gens = ArrayList<Pair<IntArray, IntArray>>()
         for (members in cells.values) {
+            if (cancellation()) break
             if (members.size < 2 || members.size > MAX_VERIFIED_GROUP) continue
             val sorted = members.sorted()
             val r = sorted[0]
-            val refLeaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, r, budget) ?: continue
+            val refLeaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, r, budget, cancellation) ?: continue
             // Disjoint set over this cell's members tracks r's orbit under generators found so far, so
             // a member already in the orbit is skipped (it would only re-derive an existing element).
             val index = HashMap<Int, Int>()
             sorted.forEachIndexed { i, g -> index[g] = i }
             val orbit = IntDisjointSet(sorted.size)
             for (v in sorted) {
-                if (v == r || budget[0] <= 0) continue
+                if (v == r || budget[0] <= 0 || cancellation()) continue
                 if (orbit.connected(index.getValue(r), index.getValue(v))) continue
-                val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget) ?: continue
+                val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget, cancellation) ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
                 gens.add(perm)
@@ -561,6 +566,7 @@ internal object SymmetryBreaking {
         seedBoolBase: Array<RefineKey>,
         firstIndiv: Int,
         budget: IntArray,
+        cancellation: Cancellation = Cancellation.Never,
     ): IntArray? {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
@@ -577,9 +583,9 @@ internal object SymmetryBreaking {
         individualize(firstIndiv, 0)
         var step = 1
         while (true) {
-            // The refinement itself charges the budget per arc; a spent budget means the partition
-            // below may be partial, so abandon this leaf (the search then bails with what it has).
-            if (budget[0] <= 0) return null
+            // The refinement itself charges the budget per arc; a spent budget (or a fired presolve
+            // cancellation) means the partition below may be partial, so abandon this leaf.
+            if (budget[0] <= 0 || cancellation()) return null
             val (ic, bc) = equitablePartition(problem, seedInt, seedBool, budget)
             val leaf = IntArray(n) { -1 }
             val cellSize = IntArray(n)

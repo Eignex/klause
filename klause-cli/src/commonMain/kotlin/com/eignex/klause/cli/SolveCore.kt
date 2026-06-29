@@ -61,7 +61,7 @@ internal object SolveCore {
         // each phase restart the clock and blow the limit cumulatively.
         val (deadline, cancel) = deadlineCancellation(common)
         val presolveStart = TimeSource.Monotonic.markNow()
-        val solvable = rawSolvable.presolved(config, solutionSetSensitive, cancel)
+        val solvable = rawSolvable.presolved(config, solutionSetSensitive, presolveCancellation(cancel, deadline))
         val presolveElapsed = presolveStart.elapsedNow()
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
         // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
@@ -117,6 +117,19 @@ internal object SolveCore {
         val deadline = common.deadlineAtMs ?: common.timeLimitMs?.let { nowMillis() + it }
         val cancel = if (deadline != null) Cancellation { nowMillis() > deadline } else Cancellation.Never
         return deadline to cancel
+    }
+
+    /** Presolve sees [solveCancel] (the `-t` deadline) tightened by a soft per-phase wall-clock budget
+     *  ([CliKnobs.presolveBudgetMs], default [CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS]). The round engine and
+     *  its long-running passes poll it and stop with the reductions made so far, so presolve stays
+     *  bounded on a pathologically large model while every ordinary instance finishes far under it (and
+     *  is unaffected). A budget `≤ 0` disables the cap, leaving only the solve deadline. */
+    private fun presolveCancellation(solveCancel: Cancellation, solveDeadline: Long?): Cancellation {
+        val budgetMs = cliProp(CliKnobs.presolveBudgetMs)?.toLongOrNull() ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS
+        if (budgetMs <= 0) return solveCancel
+        val presolveDeadline = nowMillis() + budgetMs
+        val cap = solveDeadline?.let { minOf(it, presolveDeadline) } ?: presolveDeadline
+        return Cancellation { nowMillis() > cap }
     }
 
     // --- single-engine paths ---

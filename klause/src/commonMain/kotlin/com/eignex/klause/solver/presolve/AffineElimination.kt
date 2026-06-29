@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.presolve
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -37,12 +38,20 @@ internal object AffineSingletons {
      * Variables in [objectiveIntVars] are never eliminated: the objective reads them directly and
      * the engine optimises over the presolved problem where an eliminated variable is unconstrained.
      */
-    fun eliminateAffineSingletons(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): AffineElimination {
+    fun eliminateAffineSingletons(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): AffineElimination {
         if (problem.numIntVars == 0) return AffineElimination(problem, emptyList())
         var factors = problem.factors.toList()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
-        while (true) {
+        // Each elimination rescans and re-indexes the factor set and folds the pivot into every factor
+        // mentioning it; on a model with a wide row absorbing eliminations the loop turns quadratic.
+        // Poll the budget so it stops with the eliminations made so far — sound (the remaining
+        // affine-defined variables simply stay and are solved directly).
+        while (!cancellation()) {
             val cand = findAffineCandidate(factors, eliminated, objectiveIntVars) ?: break
             factors = foldOutVariable(problem, factors, cand)
             eliminated[cand.x] = true
@@ -54,7 +63,7 @@ internal object AffineSingletons {
         // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
         // is always a surviving variable.
         val domains = problem.intDomains.copyOf()
-        while (true) {
+        while (!cancellation()) {
             val r = findResidueCandidate(factors, eliminated, objectiveIntVars, domains) ?: break
             factors = factors.filterIndexed { i, _ -> i != r.defIdx }
             domains[r.y] = r.restrictedY
