@@ -7,6 +7,7 @@ import com.eignex.klause.solver.propagation.extractConflictBools
 import com.eignex.klause.solver.propagation.extractConflictFactors
 import com.eignex.klause.solver.propagation.extractConflictInts
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
 
 /**
@@ -251,11 +252,21 @@ class Problem(
     val nonIntEventWatcherIntOccurrences: Array<IntArray> = if (!usesIntEventWatchers) {
         intOccurrences
     } else {
+        // Per factor, the set of int vars it subscribes to an event on — built once in O(Σ watches).
+        // The per-`(var, factor)` exclusion below is then an O(1) membership test, not a linear scan of
+        // the factor's whole watch list: a single wide factor (a linear over thousands of vars watches
+        // every one of them) appears in each of its vars' occurrence lists, so the naive scan was
+        // O(arity²) per such factor — the construction-time wedge that dominated presolve's repeated
+        // problem rebuilds on wide-linear instances.
+        val watchedVarsByFactor = arrayOfNulls<IntHashSet>(factors.size)
+        for (fid in propagators.indices) {
+            val watches = propagators[fid].initialIntEventWatches ?: continue
+            val set = IntHashSet(watches.size)
+            for (w in watches) set.add(IntEvent.intVarOf(w))
+            watchedVarsByFactor[fid] = set
+        }
         Array(numIntVars) { v ->
-            intOccurrences[v].filter { fid ->
-                val watches = propagators[fid].initialIntEventWatches
-                watches == null || watches.none { IntEvent.intVarOf(it) == v }
-            }.toIntArray()
+            intOccurrences[v].filter { fid -> watchedVarsByFactor[fid]?.contains(v) != true }.toIntArray()
         }
     }
 
