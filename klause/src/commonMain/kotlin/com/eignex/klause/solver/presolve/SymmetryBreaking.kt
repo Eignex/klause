@@ -136,6 +136,17 @@ internal object SymmetryBreaking {
     ): List<List<Int>>? {
         if (problem.numIntVars == 0 || cancellation()) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
+        // Verifying value swaps re-keys the whole factor set, so on a model whose factors carry large
+        // constant data (wide tables) the keying dominates while almost never yielding a value symmetry —
+        // the value-side analog of the generator search's [GENERATOR_ROUND_COST_BUDGET] skip. Bail before
+        // keying when the multiset would be that expensive (sound — skipping only forgoes value pins).
+        if (!allAnonymous) {
+            var keyCost = 0L
+            for (f in problem.factors) {
+                keyCost += f.structuralKeyWeight.toLong()
+                if (keyCost > VALUE_ORBIT_KEY_BUDGET) return null
+            }
+        }
         // The anonymous fast path needs no multiset; otherwise key every factor — but lazily, so a
         // candidate-free model (or a fired budget) never pays for the (wide-table-) expensive keying.
         val base: Map<StructuralKey, Int> by lazy { PresolveShared.structuralKeyMultiset(problem.factors.asList()) }
@@ -485,6 +496,12 @@ internal object SymmetryBreaking {
      *  so a model with a wide value span across many variables is skipped rather than scanned. Sound —
      *  skipping only forgoes value-symmetry pins, never adds an unsound one. */
     private const val VALUE_ORBIT_SCAN_BUDGET = 50_000_000L
+
+    /** Skip value-symmetry verification when keying the factor set (summed [Factor.structuralKeyWeight])
+     *  would exceed this — a wide-table model where the per-swap re-keying dominates and a value symmetry
+     *  is almost never found, the value-side analog of [GENERATOR_ROUND_COST_BUDGET]. Sound: skipping
+     *  only forgoes value pins. */
+    private const val VALUE_ORBIT_KEY_BUDGET = 1_000_000L
 
     /**
      * Generators of the constraint-graph automorphism group, found by individualization–refinement
