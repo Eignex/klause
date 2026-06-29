@@ -10,13 +10,9 @@
 
 # Klause
 
-Klause is a Kotlin constraint programming library. Variables are bounded
-integers, Booleans, floats (bucketed to integers), nominals (one-hot
-encoded as Booleans), and sets over either an int range or a nominal
-universe. Any variable can be declared optional, with constraints lowered
-to reified or aggregation-aware forms automatically. The DSL covers
-arithmetic, logic, comparisons, and a range of global constraints.
-MiniZinc models can use klause as a backend through klause-mzn-lib.
+Klause is a Kotlin constraint programming library and CLI tool. It can optimize arbitrary problems that can be expressed in the MiniZinc language. Klause can also be used independently of MiniZinc embedded in JVM or native targets through KMP.
+
+The engine supports boolean the and bounded int variables natively. There are wrappers to encode floats and sets of either ints and nominal universes too. Any variable can be declared optional, with constraints lowered to reified or aggregation-aware forms automatically.
 
 Two native engines, both implementing Solver and Optimizer:
 
