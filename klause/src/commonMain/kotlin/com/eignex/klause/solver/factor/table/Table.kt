@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.factor.remapVars
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.argsortBy
 
 /**
  * `table_int(xs, tuples)` — the vector of `xs(i)` values must equal one of the rows of
@@ -52,7 +53,7 @@ class Table private constructor(
     private fun tupleKey(): LongArray = cachedTupleKey ?: StructuralKey.words {
         int(arity)
         int(numTuples)
-        val order = (0 until numTuples).sortedWith { r1, r2 ->
+        val order = argsortBy(numTuples) { r1, r2 ->
             var c = 0
             var d = 0
             while (c < arity && d == 0) {
