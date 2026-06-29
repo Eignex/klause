@@ -58,7 +58,7 @@ internal object SymmetryBreaking {
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
         val scalarLex = scalarTotalOrders(problem, generators, objectiveIntVars, objectiveBoolVars)
-        val valuePins = breakValueSymmetry(problem, objectiveIntVars)
+        val valuePins = breakValueSymmetry(problem, objectiveIntVars, cancellation)
         if (generators.isEmpty() && scalarLex.isEmpty() && valuePins.isEmpty()) {
             return problem
         }
@@ -89,8 +89,12 @@ internal object SymmetryBreaking {
      * The stronger Law–Lee value precedence (ordering first-occurrences across all variables) needs
      * auxiliary variables and a var-growing reconstruction, and is a follow-up.
      */
-    private fun breakValueSymmetry(problem: Problem, objectiveIntVars: Set<Int>): List<Factor> {
-        val orbits = verifiedValueOrbits(problem) ?: return emptyList()
+    private fun breakValueSymmetry(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        cancellation: Cancellation = Cancellation.Never,
+    ): List<Factor> {
+        val orbits = verifiedValueOrbits(problem, cancellation) ?: return emptyList()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
             val orbitSet = orbit.toHashSet()
@@ -126,15 +130,15 @@ internal object SymmetryBreaking {
      * `null` to its own "post nothing" result. Objective-variable exclusion happens at each caller's
      * per-orbit action, not here.
      */
-    private fun verifiedValueOrbits(problem: Problem): List<List<Int>>? {
-        if (problem.numIntVars == 0) return null
+    private fun verifiedValueOrbits(
+        problem: Problem,
+        cancellation: Cancellation = Cancellation.Never,
+    ): List<List<Int>>? {
+        if (problem.numIntVars == 0 || cancellation()) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
-        // The anonymous fast path skips the multiset entirely; otherwise key every factor.
-        val base: Map<StructuralKey, Int>? = if (allAnonymous) {
-            null
-        } else {
-            PresolveShared.structuralKeyMultiset(problem.factors.asList())
-        }
+        // The anonymous fast path needs no multiset; otherwise key every factor — but lazily, so a
+        // candidate-free model (or a fired budget) never pays for the (wide-table-) expensive keying.
+        val base: Map<StructuralKey, Int> by lazy { PresolveShared.structuralKeyMultiset(problem.factors.asList()) }
         var lo = Int.MAX_VALUE
         var hi = Int.MIN_VALUE
         for (d in problem.intDomains) {
@@ -150,16 +154,20 @@ internal object SymmetryBreaking {
         // ascending order, are the signature words.
         val incidence = HashMap<RefineKey, MutableList<Int>>()
         for (value in lo..hi) {
+            // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
+            // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
+            if (cancellation()) return null
             val sig = ArrayList<Long>()
             for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.add(x.toLong())
             if (sig.isNotEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }
         val orbits = ArrayList<List<Int>>()
         for (candidate in incidence.values) {
+            if (cancellation()) break
             if (candidate.size < 2) continue
             // Anonymous: the whole group is one orbit. Otherwise refine into verified-equal orbits.
             val refined =
-                if (allAnonymous) listOf(candidate) else verifyValueOrbits(problem, requireNotNull(base), candidate)
+                if (allAnonymous) listOf(candidate) else verifyValueOrbits(problem, base, candidate, cancellation)
             for (orbit in refined) if (orbit.size >= 2) orbits.add(orbit)
         }
         return orbits
@@ -214,11 +222,18 @@ internal object SymmetryBreaking {
      *  the value pairs whose transposition is verified a symmetry ([verifyValueSwap]). Transpositions
      *  generate the full symmetric group on each resulting orbit. Groups beyond [MAX_VERIFIED_GROUP]
      *  are skipped (the O(n²·factors) guard, as for variables). */
-    private fun verifyValueOrbits(problem: Problem, base: Map<StructuralKey, Int>, values: List<Int>): List<List<Int>> {
+    private fun verifyValueOrbits(
+        problem: Problem,
+        base: Map<StructuralKey, Int>,
+        values: List<Int>,
+        cancellation: Cancellation = Cancellation.Never,
+    ): List<List<Int>> {
         val n = values.size
         if (n > MAX_VERIFIED_GROUP) return emptyList()
         val ds = IntDisjointSet(n)
-        unionVerifiedPairs(ds, IntArray(n) { it }) { i, j -> verifyValueSwap(problem, base, values[i], values[j]) }
+        unionVerifiedPairs(ds, IntArray(n) { it }, cancellation) { i, j ->
+            verifyValueSwap(problem, base, values[i], values[j])
+        }
         return ds.groups().map { group -> group.map { values[it] } }
     }
 
@@ -645,6 +660,10 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int>,
         objectiveBoolVars: Set<Int>,
     ): List<Factor> {
+        // Orbits come only from the generators' variable unions, so with no generators there is nothing
+        // to order — return before building the (potentially expensive, e.g. wide-table) structural-key
+        // multiset that the per-swap automorphism check would need.
+        if (generators.isEmpty()) return emptyList()
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val dsInt = IntDisjointSet(problem.numIntVars)
         val dsBool = IntDisjointSet(problem.numBoolVars)
@@ -695,9 +714,18 @@ internal object SymmetryBreaking {
 
     /** Test every unordered pair within [scope] with [verify] (skipping pairs already connected) and
      *  union the verified ones in [ds]. The shared inner step of every verified-orbit grouping. */
-    private inline fun unionVerifiedPairs(ds: IntDisjointSet, scope: IntArray, verify: (Int, Int) -> Boolean) {
+    private inline fun unionVerifiedPairs(
+        ds: IntDisjointSet,
+        scope: IntArray,
+        cancellation: Cancellation = Cancellation.Never,
+        verify: (Int, Int) -> Boolean,
+    ) {
         for (i in scope.indices) {
             for (j in i + 1 until scope.size) {
+                // Each pair re-keys the whole factor set; on a wide orbit this is the dominant symmetry
+                // cost, so bail on a fired budget with the unions found so far (sound — fewer merged
+                // orbits). Polled per pair, not per row, so the bail is prompt on a wide candidate.
+                if (cancellation()) return
                 val u = scope[i]
                 val v = scope[j]
                 if (!ds.connected(u, v) && verify(u, v)) ds.union(u, v)
