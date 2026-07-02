@@ -1001,6 +1001,7 @@ class PropagationState(
     internal fun runToFixpoint(
         allFactors: Boolean,
         initialFactor: Int = -1,
+        initialFactors: IntArray = EmptyIntArray,
         cancellation: Cancellation = Cancellation.Never,
     ): IntArray? {
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
@@ -1032,6 +1033,9 @@ class PropagationState(
             // otherwise sit dormant since the watcher index only wakes on false-going
             // literals, and a freshly-added clause's watches haven't been triggered yet).
             if (initialFactor in 0 until factorCount) propEnq(initialFactor)
+            // Seed a batch of freshly-added mid-life factors so each fires once on the next cycle;
+            // like [initialFactor], their watches haven't been triggered yet so they'd sit dormant.
+            for (fid in initialFactors) if (fid in 0 until factorCount) propEnq(fid)
         }
         while (propQueue.isNotEmpty()) {
             if (allFactors && (fireCount++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
