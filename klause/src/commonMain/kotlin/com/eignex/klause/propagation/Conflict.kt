@@ -5,19 +5,20 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-/** Boolean vars for factor [fid]: regular factors read from `problem.factors`; learned clauses
- *  (fid ≥ baseFactorCount) read from the ClausePropagator in `learnedClauseStore`. */
-private fun PropagationState.factorBoolVars(fid: Int): IntArray = if (fid < baseFactorCount) {
-    problem.factors[fid].boolVars
-} else {
-    learnedClauseStore[fid - baseFactorCount].boolVars
+/** Boolean vars for factor [fid]: base factors read from `problem.factors`; tail factors
+ *  (fid ≥ baseFactorCount) from `midlifeFactorList` in incremental mode, else from the
+ *  ClausePropagator in `learnedClauseStore`. */
+private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
+    fid < baseFactorCount -> problem.factors[fid].boolVars
+    incremental -> midlifeFactorList[fid - baseFactorCount].boolVars
+    else -> learnedClauseStore[fid - baseFactorCount].boolVars
 }
 
 /** Integer vars for factor [fid]: same routing as [factorBoolVars]. */
-private fun PropagationState.factorIntVars(fid: Int): IntArray = if (fid < baseFactorCount) {
-    problem.factors[fid].intVars
-} else {
-    learnedClauseStore[fid - baseFactorCount].intVars
+private fun PropagationState.factorIntVars(fid: Int): IntArray = when {
+    fid < baseFactorCount -> problem.factors[fid].intVars
+    incremental -> midlifeFactorList[fid - baseFactorCount].intVars
+    else -> learnedClauseStore[fid - baseFactorCount].intVars
 }
 
 /** Fallback conflict-levels collection for a failing propagator, routed through [factorBoolVars]/[factorIntVars]. */

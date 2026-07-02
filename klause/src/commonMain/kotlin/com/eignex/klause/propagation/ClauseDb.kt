@@ -30,12 +30,14 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
     }
 }
 
-/** Unified factor accessor; routes static factor ids to [Problem.factors] and learned
- *  factor ids (≥ `problem.numFactors`) to [PropagationState.learnedClauses]. */
-internal fun PropagationState.factorAt(fid: Int): Propagator = if (fid < baseFactorCount) {
-    baseFactors[fid]
-} else {
-    learnedClauseStore[fid - baseFactorCount]
+/** Unified factor accessor; routes static factor ids to [Problem.factors], and tail ids
+ *  (≥ `baseFactorCount`) to the mid-life presolve store in [PropagationState.incremental] mode
+ *  (a tombstoned factor reads [NoPropagator]) or to [PropagationState.learnedClauses] otherwise. */
+internal fun PropagationState.factorAt(fid: Int): Propagator = when {
+    incremental && !factorAliveAt(fid) -> NoPropagator
+    fid < baseFactorCount -> baseFactors[fid]
+    incremental -> midlifeFactorStore[fid - baseFactorCount]
+    else -> learnedClauseStore[fid - baseFactorCount]
 }
 
 /**

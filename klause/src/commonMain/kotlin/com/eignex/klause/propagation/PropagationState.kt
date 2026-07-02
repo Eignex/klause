@@ -47,6 +47,15 @@ class PropagationState(
     /** The problem being propagated. */
     val problem: Problem,
     assumptions: Assumptions,
+    /**
+     * Incremental-presolve mode. When `true` the state supports mid-life factors — the
+     * presolve session appends factors and tombstones others between rounds via [addMidlifeFactor] /
+     * [tombstoneFactor] instead of rebuilding a fresh [Problem] each pass. The int-event
+     * machinery is forced on so a mid-life factor that subscribes to typed events wakes correctly even
+     * when the initial problem had no such factor. Defaults to `false`: a search state never adds
+     * presolve factors, so every allocation and branch below reduces to the exact prior behaviour.
+     */
+    internal val incremental: Boolean = false,
 ) {
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
@@ -92,6 +101,11 @@ class PropagationState(
     internal val dirtyInts: IntArrayDeque =
         IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
 
+    /** Whether the typed int-event machinery ([dirtyIntKinds] / [intEventWatchersBySlot]) is live.
+     *  On for any problem whose factors opt into it, and forced on in [incremental] mode so a
+     *  mid-life factor subscribing to typed events wakes even when the initial problem had none. */
+    private val eventMachineryOn: Boolean = problem.usesIntEventWatchers || incremental
+
     /**
      * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last
      * drained — recorded by `markIntDirty` alongside [dirtyInts] and consumed (then cleared) by
@@ -105,7 +119,7 @@ class PropagationState(
      * mask already cleared — no stale bits survive a backtrack.
      */
     internal val dirtyIntKinds: IntArray =
-        if (problem.usesIntEventWatchers) IntArray(problem.numIntVars) else EmptyIntArray
+        if (eventMachineryOn) IntArray(problem.numIntVars) else EmptyIntArray
 
     // -------- Reusable propagation worklist (was allocated fresh per runToFixpoint) --------
     //
@@ -376,9 +390,41 @@ class PropagationState(
      *  to promote reused clauses and demote idle ones, then clears it for survivors. */
     internal val learnedUsedFlags: IntArrayList = IntArrayList()
 
+    // ---- Mid-life presolve factors ----
+    // A dedicated append-only store for factors added during an incremental presolve bake. Distinct
+    // from [learnedClauseStore]: a presolve state ([incremental]) never learns clauses and a search
+    // state never adds presolve factors, so at most one of the two tail stores is non-empty and both
+    // occupy the id range `[baseFactorCount, totalFactorCount)`. Ids are stable and never renumbered;
+    // dropping a factor (base or mid-life) tombstones its id ([tombstonedFactors]) and clears its
+    // [refPayload] slot. A tombstoned slot is NEVER reused by a later add — reuse would resurrect a
+    // stale propagator payload under a new factor id and silently corrupt a deduction (the
+    // wrong-optimum guard).
+    internal val midlifeFactorStore: ArrayList<Propagator> = ArrayList()
+
+    /** The [Factor] behind each mid-life propagator, parallel to [midlifeFactorStore]. Carried because
+     *  [Propagator] exposes no `boolVars` / `intVars`; the conflict and level machinery reads them here
+     *  for a mid-life factor the way it reads [Problem.factors] for a base one. */
+    internal val midlifeFactorList: ArrayList<Factor> = ArrayList()
+
+    /** Tombstoned factor ids (base or mid-life). [factorAt] returns [NoPropagator] for a member, so a
+     *  dropped factor is inert without removing it from the watcher indices — its id stays stable and
+     *  is never reused. Empty until the first drop, so a state that only appends allocates nothing. */
+    private val tombstonedFactors: IntHashSet = IntHashSet()
+
+    /** Delta overlay for occurrence-list bool wakeup of mid-life factors: `[v]` lists mid-life factor
+     *  ids that wake on any change to bool var `v` (those NOT using per-literal watchers). `null` until
+     *  the first such factor is added — a search state and a watcher-only presolve never allocate it,
+     *  so [enqueueForBoolChange] pays a single null-check. Complements [Problem.nonBoolWatcherBoolOccurrences]. */
+    private var midlifeBoolOccurrences: Array<IntArrayList>? = null
+
+    /** Int-side analog of [midlifeBoolOccurrences]: `[v]` lists mid-life factor ids that wake on any
+     *  change to int var `v` and do not subscribe to a typed int-event on `v`. Complements
+     *  [Problem.nonIntEventWatcherIntOccurrences]. */
+    private var midlifeIntOccurrences: Array<IntArrayList>? = null
+
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
-    val totalFactorCount: Int get() = problem.numFactors + learnedClauseStore.size
+    val totalFactorCount: Int get() = problem.numFactors + learnedClauseStore.size + midlifeFactorStore.size
 
     /**
      * Per-literal wakeup index for factors opting into [Propagator.initialBoolWatchers].
@@ -441,7 +487,7 @@ class PropagationState(
      * the wake, which is sound).
      */
     internal val intEventWatchersBySlot: Array<IntArrayList> =
-        if (problem.usesIntEventWatchers) {
+        if (eventMachineryOn) {
             Array(problem.numIntVars * IntEvent.COUNT) { IntArrayList(initialCapacity = 1) }
         } else {
             emptyArray()
@@ -774,12 +820,80 @@ class PropagationState(
             val blockers = propagator.initialBoolWatcherBlockers
             for (i in watchers.indices) installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
         }
-        if (problem.usesIntEventWatchers) {
+        if (eventMachineryOn) {
             propagator.initialIntEventWatches?.let { for (packed in it) intEventWatchersBySlot[packed].add(fid) }
         }
         if (problem.usesIntEventDeltaConsumers && propagator.consumesIntEventDelta) {
             eventDirtyVars[fid] = IntArrayList()
             eventDirtyMark[fid] = IntHashSet()
+        }
+    }
+
+    /** True iff factor id [fid] has not been tombstoned. */
+    internal fun factorAliveAt(fid: Int): Boolean = fid !in tombstonedFactors
+
+    /**
+     * Append presolve [factor] to the live state as a mid-life factor and return its stable id.
+     * Installs its watcher subscriptions ([registerFactor]) and its occurrence-list wakeup overlay
+     * ([registerMidlifeOccurrences]), and grows [refPayload] by one slot so the factor's
+     * `state.refPayload[fid]` access stays in bounds. The factor does NOT fire here; the session drives
+     * a [runToFixpoint] afterwards (seeding it via `initialFactor` or `allFactors`).
+     *
+     * Only valid in [incremental] mode. Int-event-delta consumers (Table / GCC / Régin / …) are
+     * rejected: presolve never adds one, and supporting one would require growing the per-factor delta
+     * accumulators, which are sized to the initial [Problem.numFactors].
+     */
+    internal fun addMidlifeFactor(factor: Factor): Int {
+        require(incremental) { "mid-life factors require an incremental PropagationState" }
+        val prop = factor.asPropagator()
+        require(!prop.consumesIntEventDelta) { "presolve must not add an int-event-delta consumer" }
+        val fid = totalFactorCount
+        midlifeFactorStore.add(prop)
+        midlifeFactorList.add(factor)
+        refPayloadStore.add(null)
+        if (prop is ClausePropagator && prop.literals.size == 2) binaryClauseCount++
+        registerFactor(fid, prop)
+        registerMidlifeOccurrences(fid, factor, prop)
+        return fid
+    }
+
+    /**
+     * Tombstone factor [fid] (base or mid-life): mark it dropped ([factorAt] then returns [NoPropagator],
+     * so it never fires again) and clear its [refPayload] slot. The id is retired, never reused — the
+     * slot must stay cleared so a later add can't inherit a stale payload (the wrong-optimum guard). The
+     * factor's entries linger in the watcher indices and occurrence lists; they wake a [NoPropagator],
+     * a no-op.
+     */
+    internal fun tombstoneFactor(fid: Int) {
+        require(incremental) { "tombstoning requires an incremental PropagationState" }
+        if (!tombstonedFactors.add(fid)) return
+        refPayloadStore[fid] = null
+    }
+
+    /**
+     * Register mid-life factor [fid]'s occurrence-list wakeup, mirroring [Problem.nonBoolWatcherBoolOccurrences]
+     * / [Problem.nonIntEventWatcherIntOccurrences]: a factor using per-literal bool watchers is excluded
+     * from every bool var's overlay (it wakes through [boolWatchersByLit]); on the int side a var is
+     * excluded only when the factor subscribes to a typed event on *that* var. The overlays are allocated
+     * lazily on first need.
+     */
+    private fun registerMidlifeOccurrences(fid: Int, factor: Factor, prop: Propagator) {
+        if (prop === NoPropagator) return
+        if (prop.initialBoolWatchers == null) {
+            val occ = midlifeBoolOccurrences ?: Array(
+                problem.numBoolVars,
+            ) { IntArrayList() }.also { midlifeBoolOccurrences = it }
+            for (v in factor.boolVars) occ[v].add(fid)
+        }
+        val intVars = factor.intVars
+        if (intVars.isNotEmpty()) {
+            val watched: IntHashSet? = prop.initialIntEventWatches?.let { ws ->
+                IntHashSet(ws.size).apply { for (w in ws) add(IntEvent.intVarOf(w)) }
+            }
+            val occ = midlifeIntOccurrences ?: Array(
+                problem.numIntVars,
+            ) { IntArrayList() }.also { midlifeIntOccurrences = it }
+            for (v in intVars) if (watched?.contains(v) != true) occ[v].add(fid)
         }
     }
 
@@ -941,7 +1055,15 @@ class PropagationState(
                     maxLevelForClause(f.literals)
                 }
             } else {
-                val factor = problem.factors[fid]
+                // A base factor reads its vars from the immutable problem; a mid-life presolve factor
+                // (fid >= baseFactorCount, only in [incremental] mode) from [midlifeFactorList].
+                val factor = if (fid <
+                    baseFactorCount
+                ) {
+                    problem.factors[fid]
+                } else {
+                    midlifeFactorList[fid - baseFactorCount]
+                }
                 maxLevelForVars(factor.boolVars, factor.intVars)
             }
             currentFactor = fid
@@ -981,6 +1103,11 @@ class PropagationState(
      */
     private fun enqueueForBoolChange(v: Int) {
         for (fid in problem.nonBoolWatcherBoolOccurrences[v]) propEnq(fid)
+        // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
+        midlifeBoolOccurrences?.let {
+            val list = it[v]
+            for (i in 0 until list.size) propEnq(list[i])
+        }
         // The literal that just became false is the one whose polarity opposes the pin.
         // The var is assigned here (added to dirtyBools only after a successful pin), so read
         // the packed value bit directly instead of the boxing `boolValues[v]` accessor.
@@ -1024,6 +1151,11 @@ class PropagationState(
      */
     private fun enqueueForIntChange(v: Int) {
         for (fid in problem.nonIntEventWatcherIntOccurrences[v]) propEnq(fid)
+        // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
+        midlifeIntOccurrences?.let {
+            val list = it[v]
+            for (i in 0 until list.size) propEnq(list[i])
+        }
         if (dirtyIntKinds.isEmpty()) return
         val mask = dirtyIntKinds[v]
         if (mask == 0) return
