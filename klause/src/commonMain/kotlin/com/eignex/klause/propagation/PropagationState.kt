@@ -760,33 +760,26 @@ class PropagationState(
     val undoTop: Int get() = undoTag.size
 
     init {
-        for (fid in 0 until problem.numFactors) {
-            val propagator = problem.propagators[fid]
-            val watchers = propagator.initialBoolWatchers ?: continue
+        for (fid in 0 until problem.numFactors) registerFactor(fid, problem.propagators[fid])
+    }
+
+    /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
+     *  indices and its delta-consumer accumulators. Factored out of the constructor loops so an
+     *  incremental presolve session can register a factor added mid-run without rebuilding the whole
+     *  state; the constructor just calls it once per initial factor. Order-preserving: appending in
+     *  factor-id order reproduces the original three-pass construction exactly. */
+    private fun registerFactor(fid: Int, propagator: Propagator) {
+        val watchers = propagator.initialBoolWatchers
+        if (watchers != null) {
             val blockers = propagator.initialBoolWatcherBlockers
-            for (i in watchers.indices) {
-                installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
-            }
+            for (i in watchers.indices) installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
         }
-    }
-
-    init {
         if (problem.usesIntEventWatchers) {
-            for (fid in 0 until problem.numFactors) {
-                val watches = problem.propagators[fid].initialIntEventWatches ?: continue
-                for (packed in watches) intEventWatchersBySlot[packed].add(fid)
-            }
+            propagator.initialIntEventWatches?.let { for (packed in it) intEventWatchersBySlot[packed].add(fid) }
         }
-    }
-
-    init {
-        if (problem.usesIntEventDeltaConsumers) {
-            for (fid in 0 until problem.numFactors) {
-                if (problem.propagators[fid].consumesIntEventDelta) {
-                    eventDirtyVars[fid] = IntArrayList()
-                    eventDirtyMark[fid] = IntHashSet()
-                }
-            }
+        if (problem.usesIntEventDeltaConsumers && propagator.consumesIntEventDelta) {
+            eventDirtyVars[fid] = IntArrayList()
+            eventDirtyMark[fid] = IntHashSet()
         }
     }
 
