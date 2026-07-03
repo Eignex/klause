@@ -101,6 +101,14 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     private var occView: SharedIntOccurrence? = null
     private var occDirty: Boolean = true
 
+    // The [Problem] view [passInput] last built, reused until the working state changes. A pass that finds
+    // nothing to do emits an empty delta and never calls [applyDelta], so the state is byte-for-byte what
+    // the previous pass already saw — the next pass gets the same view instead of rebuilding the live-factor
+    // list and domain snapshot. On a large model iterated to a fixpoint over many rounds, most pass calls
+    // fire nothing, so this removes the bulk of the per-pass input reconstruction the round engine repeats.
+    private var cachedInput: Problem? = null
+    private var inputDirty: Boolean = true
+
     init {
         for (id in base.factors.indices) recordOccurrences(id, base.factors[id])
         // The base [Problem] already ran its root bake at construction (outside presolve). If that
@@ -214,6 +222,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      * factor indices back to stable ids.
      */
     fun passInput(): Problem {
+        cachedInput?.let { if (!inputDirty) return it }
         val live = ArrayList<Factor>(factors.size)
         val ids = IntArrayList(factors.size)
         for (id in factors.indices) {
@@ -224,7 +233,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         }
         liveIds = ids.toIntArray()
         rebuildOccViewIfDirty()
-        return Problem(
+        val input = Problem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
             // Once infeasible, expose the clean pre-conflict domains — not the partially-tightened live ones
@@ -234,6 +243,9 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             factors = live,
             preFolded = true,
         )
+        cachedInput = input
+        inputDirty = false
+        return input
     }
 
     /** The int-variable occurrence index over the factor list [passInput] last returned — the dense CSR
@@ -277,6 +289,8 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      * `false` iff this proved infeasibility.
      */
     fun applyDelta(delta: PassDelta): Boolean {
+        // Any delta may tombstone/append factors or tighten domains, so the cached [passInput] view is stale.
+        inputDirty = true
         val stableDropped = IntArray(delta.droppedIndices.size) { liveIds[delta.droppedIndices[it]] }
         // A domain *widen* (dup-columns' aggregate variable) can't be reached by monotone re-propagation,
         // so it triggers a from-scratch reseed — but only while feasible; on an already-infeasible problem

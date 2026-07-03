@@ -384,7 +384,14 @@ internal object SymmetryBreaking {
                 Array(
                     nBool,
                 ) { v -> portSignature(problem, boolInc[v], v, isBool = true, intMap, boolMap, boolColour[v]) }
-            if (budget != null) budget[0] -= arcsPerRound
+            // Charge the real per-round work, not just the arc count: each round also builds an
+            // O(nInt + nBool) signature array per variable space and re-groups them in [assignColours]
+            // (a sort over the distinct colours). On a sparse model — few factors over many variables,
+            // so arcs per round is tiny while the per-variable work dominates — charging arcs alone
+            // vastly under-counts, letting the refinement run thousands of rounds (hundred_doors:
+            // 10 factors, 10394 vars, ~23s at budget=0). Including the per-variable term bounds the
+            // round count by the work budget as intended.
+            if (budget != null) budget[0] -= arcsPerRound + nInt + nBool
             val next = assignColours(sigInt, sigBool, intColour, boolColour)
             if (next == numColours) return intColour to boolColour // partition stable
             numColours = next
