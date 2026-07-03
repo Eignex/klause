@@ -42,20 +42,27 @@ internal object AffineSingletons {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
+        sharedIntOcc: SharedIntOccurrence? = null,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
         var factors = problem.factors.toList()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
+        // The session-maintained index matches the pristine input factor order, so the first candidate
+        // search reads it instead of rebuilding an O(factors) index; once [foldOutVariable] rewrites the
+        // list the intra-pass fixpoint rebuilds a local one (the win is the per-round search rebuild).
+        var occ = sharedIntOcc?.let { OccurrenceIndex(it.offsets, it.flat) }
+            ?: buildOccurrenceIndex(factors, eliminated.size)
         // Each elimination rescans and re-indexes the factor set and folds the pivot into every factor
         // mentioning it; on a model with a wide row absorbing eliminations the loop turns quadratic.
         // Poll the budget so it stops with the eliminations made so far — sound (the remaining
         // affine-defined variables simply stay and are solved directly).
         while (!cancellation()) {
-            val cand = findAffineCandidate(factors, eliminated, objectiveIntVars) ?: break
+            val cand = findAffineCandidate(factors, occ, eliminated, objectiveIntVars) ?: break
             factors = foldOutVariable(problem, factors, cand)
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
+            occ = buildOccurrenceIndex(factors, eliminated.size)
         }
         // Residue-class doubletons (#522): a 2-term `a·x + b·y = c` with no unit pivot, where `x` is
         // contained, determines `x = (c − b·y)/a` only for the `y` values keeping it an in-domain
@@ -64,11 +71,12 @@ internal object AffineSingletons {
         // is always a surviving variable.
         val domains = problem.intDomains.copyOf()
         while (!cancellation()) {
-            val r = findResidueCandidate(factors, eliminated, objectiveIntVars, domains) ?: break
+            val r = findResidueCandidate(factors, occ, eliminated, objectiveIntVars, domains) ?: break
             factors = factors.filterIndexed { i, _ -> i != r.defIdx }
             domains[r.y] = r.restrictedY
             eliminated[r.x] = true
             subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), intArrayOf(r.coeffY), divisor = r.divisor))
+            occ = buildOccurrenceIndex(factors, eliminated.size)
         }
         if (subs.isEmpty()) return PassDelta()
         // The eliminations rebuilt the factor list in place; recover the delta against the input by
@@ -95,11 +103,11 @@ internal object AffineSingletons {
 
     private fun findResidueCandidate(
         factors: List<Factor>,
+        occ: OccurrenceIndex,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
-        val occ = buildOccurrenceIndex(factors, eliminated.size)
         for (di in factors.indices) {
             val f = factors[di]
             if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) continue
@@ -170,16 +178,16 @@ internal object AffineSingletons {
 
     private fun findAffineCandidate(
         factors: List<Factor>,
+        occ: OccurrenceIndex,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
     ): AffineCandidate? {
-        // Occurrence index (variable id → the factor indices that mention it), built once per scan so
+        // [occ] maps variable id → the factor indices that mention it (CSR: counts → offsets → flat), so
         // the per-candidate "where else does x occur" checks are O(occurrences-of-x) instead of a fresh
-        // O(factors) linear scan each. On a large model that quadratic scan dominated affine
-        // elimination; the index makes it linear in x's actual degree. Result-identical — purely a
-        // faster lookup of the same factor membership. CSR layout (counts → offsets → flat) avoids a
-        // per-variable list allocation, which matters when there are hundreds of thousands of variables.
-        val occ = buildOccurrenceIndex(factors, eliminated.size)
+        // O(factors) linear scan each. On a large model that quadratic scan dominated affine elimination;
+        // the index makes it linear in x's actual degree. The caller supplies the session-maintained index
+        // for the pristine input and a freshly-built one after each elimination — result-identical, purely
+        // a faster lookup of the same factor membership.
         for (di in factors.indices) {
             val f = factors[di]
             if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) continue

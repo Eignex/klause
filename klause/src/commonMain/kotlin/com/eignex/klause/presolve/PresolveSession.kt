@@ -28,6 +28,16 @@ internal class PresolveDelta(
 }
 
 /**
+ * Int-variable occurrence index over a pass's live factor list, in the [Factor.intVars] CSR layout the
+ * affine / dup-columns candidate searches consume: the factors mentioning var `v` are the dense indices
+ * `flat[offsets(v) until offsets(v + 1)]`, in ascending dense-index order — matching what a fresh
+ * per-pass rebuild over `problem.factors` would produce. [PresolveSession] maintains the underlying
+ * stable-id lists incrementally on each delta and derives this dense view once per firing, so a
+ * non-firing round pays no O(factors) rebuild.
+ */
+class SharedIntOccurrence internal constructor(internal val offsets: IntArray, internal val flat: IntArray)
+
+/**
  * Owns the persistent state of an incremental presolve run so the round engine never rebuilds a
  * [Problem] per firing pass. Holds the working factor set as a stable-id, append-only list (a
  * tombstoned slot becomes `null` and its id is never reused) and one persistent [PropagationState]
@@ -77,7 +87,22 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     // a [PassDelta]'s droppedIndices (into that list) map back to the stable ids [apply] tombstones.
     private var liveIds: IntArray = IntArray(0)
 
+    // Int-variable occurrence index keyed by stable factor id: `intOcc[v]` holds the stable ids of every
+    // live factor whose [Factor.intVars] contains `v`, in ascending-stable-id (= append) order. Built
+    // once from the base factors and maintained O(delta) in [apply] — an added factor's stable id is
+    // appended to its vars' lists; a tombstoned factor's id stays (filtered on read, its slot is null).
+    // The affine / dup-columns per-round candidate search reads the dense view derived in [passInput],
+    // never rebuilding an occurrence index of its own.
+    private val intOcc: Array<IntArrayList> = Array(base.numIntVars) { IntArrayList(0) }
+
+    // The dense [SharedIntOccurrence] view [passInput] last handed out, and whether the factor set has
+    // changed since it was built. Rebuilt (O(occurrences)) only once per firing; a non-firing stretch of
+    // passes reuses it, so a round that changes nothing pays no occurrence-index rebuild at all.
+    private var occView: SharedIntOccurrence? = null
+    private var occDirty: Boolean = true
+
     init {
+        for (id in base.factors.indices) recordOccurrences(id, base.factors[id])
         // The base [Problem] already ran its root bake at construction (outside presolve). If that
         // proved infeasibility, adopt it directly — re-propagating the whole factor set just to
         // rediscover a known root conflict is pure waste, and catastrophic on wide domains (a 2M-span
@@ -89,6 +114,12 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         } else if (state.runToFixpoint(allFactors = false) != null) {
             infeasible = true
         }
+    }
+
+    /** Append stable factor id [id] to the occurrence list of each int var factor [f] mentions, so the
+     *  index carries [f] once per occurrence in its [Factor.intVars] (mirroring a fresh CSR rebuild). */
+    private fun recordOccurrences(id: Int, f: Factor) {
+        for (v in f.intVars) intOcc[v].add(id)
     }
 
     /** Live (non-tombstoned) factors in stable-id order — the current working constraint set. */
@@ -121,14 +152,17 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      */
     fun apply(delta: PresolveDelta): Boolean {
         if (!infeasible) snapshotFeasibleDomains()
+        if (delta.droppedIds.isNotEmpty() || delta.addedFactors.isNotEmpty()) occDirty = true
         for (id in delta.droppedIds) {
             state.tombstoneFactor(id)
             factors[id] = null
         }
         val addedIds = IntArrayList(delta.addedFactors.size)
         for (f in delta.addedFactors) {
-            addedIds.add(state.addMidlifeFactor(f)) // fid == factors.size at this point
+            val fid = state.addMidlifeFactor(f) // fid == factors.size at this point
+            addedIds.add(fid)
             factors.add(f)
+            recordOccurrences(fid, f)
         }
         // Once infeasible, the factor changes above are still recorded (the materialized problem's bake
         // resurfaces the infeasibility) but the conflicted state must not be re-propagated. Thread the
@@ -189,6 +223,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             }
         }
         liveIds = ids.toIntArray()
+        rebuildOccViewIfDirty()
         return Problem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
@@ -199,6 +234,40 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             factors = live,
             preFolded = true,
         )
+    }
+
+    /** The int-variable occurrence index over the factor list [passInput] last returned — the dense CSR
+     *  the affine / dup-columns candidate search would otherwise rebuild itself. Kept in sync with the
+     *  live factors by [passInput]; call it only after [passInput]. */
+    fun passOccurrence(): SharedIntOccurrence = requireNotNull(occView) { "passOccurrence before passInput" }
+
+    /** Derive the dense [SharedIntOccurrence] over the current [liveIds] from the stable-id [intOcc]
+     *  lists, but only when the factor set changed since the last build. Ascending stable id maps to
+     *  ascending dense index (both follow stable-id order), so a var's factors come out in the same
+     *  ascending-dense-index order a fresh `for f in factors for v in f.intVars` CSR would produce —
+     *  byte-identical to the per-pass rebuild the passes drop. Tombstoned ids (dense = -1) are skipped. */
+    private fun rebuildOccViewIfDirty() {
+        if (!occDirty && occView != null) return
+        val denseOf = IntArray(factors.size) { -1 }
+        for (dense in liveIds.indices) denseOf[liveIds[dense]] = dense
+        val offsets = IntArray(base.numIntVars + 1)
+        for (v in 0 until base.numIntVars) {
+            var live = 0
+            val list = intOcc[v]
+            for (k in 0 until list.size) if (denseOf[list[k]] >= 0) live++
+            offsets[v + 1] = offsets[v] + live
+        }
+        val flat = IntArray(offsets[base.numIntVars])
+        val cursor = offsets.copyOf()
+        for (v in 0 until base.numIntVars) {
+            val list = intOcc[v]
+            for (k in 0 until list.size) {
+                val dense = denseOf[list[k]]
+                if (dense >= 0) flat[cursor[v]++] = dense
+            }
+        }
+        occView = SharedIntOccurrence(offsets, flat)
+        occDirty = false
     }
 
     /**
@@ -245,6 +314,10 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         stateProblem = eager
         factors.clear()
         factors.addAll(eager.factors)
+        // The stable-id space was rebuilt from scratch, so the occurrence lists must be too.
+        for (v in 0 until base.numIntVars) intOcc[v].clear()
+        for (id in eager.factors.indices) recordOccurrences(id, eager.factors[id])
+        occDirty = true
         state = PropagationState(eager, Assumptions.None, incremental = true)
         if (state.runToFixpoint(allFactors = true) != null) {
             infeasible = true

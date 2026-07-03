@@ -46,10 +46,14 @@ internal object DuplicateColumns {
      * re-signs against the widened aggregate and is picked up on a later round, keeping every merge a
      * two-variable aggregate over *declared* domains that the contiguous split reconstructs exactly.
      */
-    fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta {
+    fun mergeDuplicateColumns(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        sharedIntOcc: SharedIntOccurrence? = null,
+    ): PassDelta {
         if (problem.numIntVars < 2) return PassDelta()
-        val eligible = eligibleColumns(problem, objectiveIntVars)
-        val signatures = columnSignatures(problem, eligible)
+        val eligible = eligibleColumns(problem, objectiveIntVars, sharedIntOcc)
+        val signatures = columnSignatures(problem, eligible, sharedIntOcc)
         // Group eligible variables by column signature; equal signatures are duplicate columns. Fold
         // at most one duplicate into each representative this pass (a third re-signs next round).
         val repBySignature = HashMap<List<Long>, Int>()
@@ -119,10 +123,28 @@ internal object DuplicateColumns {
 
     /** Per-variable eligibility: every occurrence is a [Linear] factor (a global / reified row reads a
      *  variable value-wise, not as a column coefficient), the domain is contiguous (the reconstruction
-     *  split must not land in a hole), and the variable is not read by the objective. */
-    private fun eligibleColumns(problem: Problem, objectiveIntVars: Set<Int>): BooleanArray {
+     *  split must not land in a hole), and the variable is not read by the objective. With the
+     *  session-maintained [occ] the non-[Linear] test is a per-var walk of its factors; otherwise the
+     *  factor list is scanned once to mark every variable a non-[Linear] factor mentions. */
+    private fun eligibleColumns(
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+        occ: SharedIntOccurrence?,
+    ): BooleanArray {
         val eligible = BooleanArray(problem.numIntVars) { v ->
             v !in objectiveIntVars && problem.intDomains[v].isContiguous()
+        }
+        if (occ != null) {
+            for (v in 0 until problem.numIntVars) {
+                if (!eligible[v]) continue
+                for (k in occ.offsets[v] until occ.offsets[v + 1]) {
+                    if (problem.factors[occ.flat[k]] !is Linear) {
+                        eligible[v] = false
+                        break
+                    }
+                }
+            }
+            return eligible
         }
         for (f in problem.factors) {
             if (f is Linear) continue
@@ -135,8 +157,28 @@ internal object DuplicateColumns {
      *  with its coefficient there, sorted by factor id. Two eligible variables share a signature iff
      *  they occur in exactly the same factors with the same coefficient in each — duplicate columns.
      *  Ineligible variables, and variables in no factor, get a `null` signature and never match. */
-    private fun columnSignatures(problem: Problem, eligible: BooleanArray): Array<List<Long>?> {
+    private fun columnSignatures(
+        problem: Problem,
+        eligible: BooleanArray,
+        occ: SharedIntOccurrence?,
+    ): Array<List<Long>?> {
         val entries = Array(problem.numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
+        if (occ != null) {
+            // Per eligible variable, walk its factors from the shared index in ascending factor id (the
+            // CSR flat order) — the same order the factor scan below appends — so the signature list is
+            // identical. Every occurrence of an eligible variable is a [Linear] (a non-[Linear] one made
+            // it ineligible), so its coefficient is always present in that row.
+            for (v in 0 until problem.numIntVars) {
+                val list = entries[v] ?: continue
+                for (k in occ.offsets[v] until occ.offsets[v + 1]) {
+                    val fid = occ.flat[k]
+                    val f = problem.factors[fid] as Linear
+                    list.add(fid.toLong())
+                    list.add(f.coeffs[f.vars.indexOf(v)].toLong())
+                }
+            }
+            return Array(problem.numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
+        }
         problem.factors.forEachIndexed { fid, f ->
             if (f !is Linear) return@forEachIndexed
             val coeffByVar = MutableIntIntMap(f.vars.size)

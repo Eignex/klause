@@ -57,6 +57,11 @@ class PresolveContext(
      *  factor set. The relocation of the kernel's former `probe*` flags into the presolve lane;
      *  [BakeConfig.NONE] (the default) leaves the bake a plain base bake. */
     val bakeConfig: BakeConfig = BakeConfig.NONE,
+    /** The session-maintained int-variable occurrence index over the current pass input, threaded in by
+     *  the incremental round engine so the affine / dup-columns candidate search reads it instead of
+     *  rebuilding an O(factors) index per round. `null` on the fresh path (and outside those passes),
+     *  where each pass falls back to building its own. */
+    val sharedIntOcc: SharedIntOccurrence? = null,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -73,6 +78,7 @@ class PresolveContext(
         modelBreaksSymmetry,
         cancellation,
         bakeConfig,
+        sharedIntOcc,
     )
 
     /** This context with [bakeConfig] set — the presolve lane threads the resolved root-bake probing
@@ -84,6 +90,19 @@ class PresolveContext(
         modelBreaksSymmetry,
         cancellation,
         bakeConfig,
+        sharedIntOcc,
+    )
+
+    /** This context carrying the incremental round engine's session-maintained occurrence index for the
+     *  current pass input, so the affine / dup-columns candidate search reuses it. */
+    fun withSharedIntOcc(sharedIntOcc: SharedIntOccurrence?): PresolveContext = PresolveContext(
+        solutionSetSensitive,
+        objectiveIntCoeffs,
+        objectiveBoolCoeffs,
+        modelBreaksSymmetry,
+        cancellation,
+        bakeConfig,
+        sharedIntOcc,
     )
 
     /** Factories for the common contexts. */
@@ -257,7 +276,7 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars, ctx.cancellation)
+            Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars, ctx.cancellation, ctx.sharedIntOcc)
     },
 
     /** Constraint subsumption / redundant-constraint removal (#447) — drops duplicate factors and
@@ -293,7 +312,7 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars)
+            Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.sharedIntOcc)
     },
 
     /** Interchangeable-variable / block / value symmetry breaking (#317 / #367 / #373 / #366). */
@@ -731,7 +750,10 @@ object Presolver {
                 ranAtVersion[pass] = version
                 ranAny = true
                 val input = session.passInput()
-                val delta = pass.apply(input, ctx)
+                // Hand the session's incrementally-maintained occurrence index to the pass so the affine
+                // / dup-columns candidate search reads it instead of rebuilding an O(factors) index; the
+                // view matches [input]'s factor order exactly, so decisions are unchanged.
+                val delta = pass.apply(input, ctx.withSharedIntOcc(session.passOccurrence()))
                 if (!delta.isEmpty) {
                     delta.reconstruct?.let { reconstructs.add(it) }
                     session.applyDelta(delta)
