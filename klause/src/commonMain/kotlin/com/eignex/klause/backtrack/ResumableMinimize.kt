@@ -86,20 +86,7 @@ internal class ResumableMinimize(
         baseCancellation()
     }
 
-    /** Steer [cancelCheckInterval] so the wall-clock gap between deadline polls hovers around
-     *  [CANCEL_CHECK_TARGET_MS]: grow (to the [CANCEL_CHECK_INTERVAL] ceiling) when polls are cheap,
-     *  shrink (to 1) when a few nodes already exceed the target. */
-    private fun adaptCancelInterval() {
-        val now = TimeSource.Monotonic.markNow()
-        val prev = lastCancelCheckMark
-        lastCancelCheckMark = now
-        val elapsedMs = if (prev == null) 0L else (now - prev).inWholeMilliseconds
-        if (elapsedMs > CANCEL_CHECK_TARGET_MS) {
-            if (cancelCheckInterval > 1) cancelCheckInterval = maxOf(1, cancelCheckInterval / 2)
-        } else if (cancelCheckInterval < CANCEL_CHECK_INTERVAL) {
-            cancelCheckInterval = minOf(CANCEL_CHECK_INTERVAL, cancelCheckInterval * 2)
-        }
-    }
+    private val poller = DeadlinePoller()
 
     /** Root-level infeasibility core (bake / seed), carried into the Infeasible terminal. */
     private var rootCore: UnsatCore? = null
@@ -158,15 +145,6 @@ internal class ResumableMinimize(
     private var descend = true
     private var decisionsThisRun = 0L
     private var perRunBudget = Long.MAX_VALUE
-    private var cancelCheckCountdown = 0
-
-    // Time-adaptive cancellation cadence: the deadline is polled every [cancelCheckInterval] nodes,
-    // and the interval is steered so the wall-clock gap between polls hovers around
-    // [CANCEL_CHECK_TARGET_MS]. A fixed node count can't bound that gap — per-node cost spans sub-µs
-    // (pure SAT) to ~0.5s (heavy global propagation). Starts at 1 so the first gap can't be a full
-    // batch of expensive nodes; fast instances grow it to the [CANCEL_CHECK_INTERVAL] ceiling.
-    private var cancelCheckInterval = 1
-    private var lastCancelCheckMark: TimeSource.Monotonic.ValueTimeMark? = null
     private var runActive = false
     private var started = false
 
@@ -469,7 +447,7 @@ internal class ResumableMinimize(
                 runActive = true
             }
             inner@ while (true) {
-                if (cancelCheckCountdown-- <= 0) {
+                if (poller.due()) {
                     if (sliceCancelled()) {
                         // Cancellation fired: publish trailing glue clauses, then either pause (a slice
                         // boundary the caller can resume past — every field is retained, and a later
@@ -480,8 +458,7 @@ internal class ResumableMinimize(
                         done = t
                         return StepEvent.Terminal(t)
                     }
-                    adaptCancelInterval()
-                    cancelCheckCountdown = cancelCheckInterval
+                    poller.rearm()
                 }
                 if (decisionsThisRun >= perRunBudget || restartRequested) {
                     val term = doRestart()

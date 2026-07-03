@@ -16,7 +16,6 @@ import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
-import kotlin.time.TimeSource
 
 // ---------------------------------------------------------------------------------------
 // Engine.
@@ -306,16 +305,11 @@ internal fun BacktrackSolver.driveSearch(
 
         val trail: MutableList<TrailNode> = ArrayList()
         var descend = true
-        // Time-adaptive cancellation cadence (mirrors ResumableMinimize): poll the deadline every
-        // [cancelCheckInterval] nodes, steering the interval so the wall-clock gap between polls hovers
-        // around [CANCEL_CHECK_TARGET_MS]. Termination fires only once the token is set, so this can
-        // overshoot `-t` by ~one gap but never undershoot. Starts at 1; fast instances grow to the ceiling.
-        var cancelCheckCountdown = 0
-        var cancelCheckInterval = 1
-        var lastCancelCheckMark: TimeSource.Monotonic.ValueTimeMark? = null
+        // Time-adaptive deadline polling (mirrors ResumableMinimize); see [DeadlinePoller].
+        val poller = DeadlinePoller()
 
         inner@ while (true) {
-            if (cancelCheckCountdown-- <= 0) {
+            if (poller.due()) {
                 if (params.cancellation()) {
                     // Slice truncated: publish this segment's trailing glue clauses so the next
                     // segment (this arm or a sibling) imports them at its start (#381).
@@ -323,16 +317,7 @@ internal fun BacktrackSolver.driveSearch(
                     yield(SearchOutcome.BudgetCapped)
                     return@sequence
                 }
-                val now = TimeSource.Monotonic.markNow()
-                val prev = lastCancelCheckMark
-                lastCancelCheckMark = now
-                val elapsedMs = if (prev == null) 0L else (now - prev).inWholeMilliseconds
-                if (elapsedMs > CANCEL_CHECK_TARGET_MS) {
-                    if (cancelCheckInterval > 1) cancelCheckInterval = maxOf(1, cancelCheckInterval / 2)
-                } else if (cancelCheckInterval < CANCEL_CHECK_INTERVAL) {
-                    cancelCheckInterval = minOf(CANCEL_CHECK_INTERVAL, cancelCheckInterval * 2)
-                }
-                cancelCheckCountdown = cancelCheckInterval
+                poller.rearm()
             }
             // Restart trigger: Luby budget hit, or the adaptive policy asked to re-pick.
             // Either way pop back to root and restart.
