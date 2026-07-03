@@ -1,15 +1,15 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.Profiler
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.backtrack.BacktrackPresets
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File

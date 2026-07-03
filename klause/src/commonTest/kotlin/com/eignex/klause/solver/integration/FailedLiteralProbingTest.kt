@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.integration
 
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.factor.bool.Cardinality
-import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.propagation.PropagationResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

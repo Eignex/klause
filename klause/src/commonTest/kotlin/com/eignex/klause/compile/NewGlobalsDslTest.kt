@@ -1,11 +1,11 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.costMdd
 import com.eignex.klause.schema.costRegular
 import com.eignex.klause.schema.mdd
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

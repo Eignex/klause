@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.compile.compile
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.atLeast
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.le
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.maximizeBool
 import com.eignex.klause.solver.objective.minimizeBool

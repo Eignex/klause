@@ -1,6 +1,14 @@
 package com.eignex.klause.schema
 
 import com.eignex.klause.compile.compile
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.global.NValue
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Disjunctive
+import com.eignex.klause.localsearch.FixedCadenceRestart
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.PresenceSpec
 import com.eignex.klause.schema.allDifferentOpt
@@ -12,14 +20,6 @@ import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.le
 import com.eignex.klause.schema.nValueOpt
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.factor.global.AllDifferent
-import com.eignex.klause.solver.factor.global.GlobalCardinality
-import com.eignex.klause.solver.factor.global.NValue
-import com.eignex.klause.solver.factor.scheduling.Cumulative
-import com.eignex.klause.solver.factor.scheduling.Disjunctive
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

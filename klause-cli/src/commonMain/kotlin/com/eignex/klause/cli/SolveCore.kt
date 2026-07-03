@@ -1,12 +1,19 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.localsearch.strategy.LsCatalog
+import com.eignex.klause.localsearch.strategy.LsRecipe
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -14,14 +21,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.backtrack.BacktrackPresets
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.lp.LpConfig
-import com.eignex.klause.solver.localsearch.strategy.LsCatalog
-import com.eignex.klause.solver.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.presolve.PresolveConfig
-import com.eignex.klause.solver.propagation.PropagationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent

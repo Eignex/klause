@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
 

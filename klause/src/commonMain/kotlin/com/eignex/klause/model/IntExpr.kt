@@ -143,7 +143,7 @@ data class SetCard(
 // Each *Opt node mirrors its non-opt sibling but carries a parallel [presents] list of
 // Boolean expressions. The compiler reads each [BoolExpr] as a presence literal, threads
 // it into the corresponding factor's `presents: IntArray`, and the factor handles the
-// rest natively (see [com.eignex.klause.solver.factor.OptPresence]).
+// rest natively (see [com.eignex.klause.factor.OptPresence]).
 //
 // AllDifferentOpt over zero or one present element is trivially true and emits no factor;
 // the constructor still requires `terms.size >= 2` because the compiler uses the same

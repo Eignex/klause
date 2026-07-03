@@ -1,12 +1,12 @@
 package com.eignex.klause.schema
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.model.MultipleSpec
 import com.eignex.klause.model.SetSpec
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.iff
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

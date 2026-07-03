@@ -1,17 +1,17 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.localsearch.FixedCadenceRestart
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.le
 import com.eignex.klause.schema.not
-import com.eignex.klause.solver.factor.arithmetic.Linear
-import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.bool.Cardinality
-import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

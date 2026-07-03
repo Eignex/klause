@@ -1,5 +1,18 @@
 package com.eignex.klause.formats.xcsp3
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.Inverse
+import com.eignex.klause.factor.global.LexLess
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.Regular
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
@@ -10,19 +23,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.solver.factor.arithmetic.Linear
-import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.factor.circuit.Circuit
-import com.eignex.klause.solver.factor.global.AllDifferent
-import com.eignex.klause.solver.factor.global.Inverse
-import com.eignex.klause.solver.factor.global.LexLess
-import com.eignex.klause.solver.factor.scheduling.Cumulative
-import com.eignex.klause.solver.factor.table.Element
-import com.eignex.klause.solver.factor.table.Regular
-import com.eignex.klause.solver.factor.table.Table
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals

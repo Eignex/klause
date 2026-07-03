@@ -1,11 +1,11 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.localsearch.FixedCadenceRestart
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.gt
 import com.eignex.klause.schema.lt
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.Move
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import com.eignex.klause.solver.objective.FunctionalObjective
 import kotlin.math.abs
 import kotlin.random.Random

@@ -15,8 +15,8 @@ import com.eignex.klause.solver.result.MinimizeResult
  * params it runs under. The param type is **erased** behind plain `(Cancellation) -> …`
  * closures, so a single portfolio can hold a *heterogeneous* mix of workers — e.g. several
  * local-search workers racing alongside a backtrack worker — even though their param types
- * ([com.eignex.klause.solver.localsearch.LocalSearchParams] vs
- * [com.eignex.klause.solver.backtrack.BacktrackParams]) differ. Construct via [of], which
+ * ([com.eignex.klause.localsearch.LocalSearchParams] vs
+ * [com.eignex.klause.backtrack.BacktrackParams]) differ. Construct via [of], which
  * closes over the concrete `Session<P>`/`P` so the only unchecked cast is the
  * already-idiomatic `withCancellation` covariant-return one.
  */

@@ -1,18 +1,18 @@
 package com.eignex.klause.solver.integration
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.Table
+import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.Invariant
-import com.eignex.klause.solver.Propagator
 import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.selector.Vsids
-import com.eignex.klause.solver.factor.arithmetic.ArrayMinMax
-import com.eignex.klause.solver.factor.global.AllDifferent
-import com.eignex.klause.solver.factor.global.GlobalCardinality
-import com.eignex.klause.solver.factor.table.Element
-import com.eignex.klause.solver.factor.table.Table
-import com.eignex.klause.solver.propagation.PropagationState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

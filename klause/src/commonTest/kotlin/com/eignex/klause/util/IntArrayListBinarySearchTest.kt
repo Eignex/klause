@@ -1,13 +1,13 @@
 package com.eignex.klause.util
 
-import com.eignex.klause.solver.backtrack.lp.linearLowerBound
+import com.eignex.klause.backtrack.lp.linearLowerBound
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
  * Coverage for [IntArrayList.lowerBound] / [IntArrayList.lowerBoundDescending] — the
  * O(log n) replacements for the linear monotone-history scans in
- * [com.eignex.klause.solver.propagation.PropagationState.minLevelForGe] /
+ * [com.eignex.klause.propagation.PropagationState.minLevelForGe] /
  * `maxLevelForLe` (#97). Each is checked against a brute-force linear lower bound over
  * randomised sorted inputs so the binary search provably matches the scan it replaced.
  */

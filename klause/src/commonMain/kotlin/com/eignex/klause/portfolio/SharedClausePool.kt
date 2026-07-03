@@ -1,8 +1,8 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.propagation.ClauseExchange
-import com.eignex.klause.solver.propagation.PropagationSession
-import com.eignex.klause.solver.propagation.SharedClause
+import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.SharedClause
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock

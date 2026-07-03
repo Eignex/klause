@@ -1,10 +1,10 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.count.ApproxCountConfig
-import com.eignex.klause.solver.count.Count
-import com.eignex.klause.solver.count.CountConfig
-import com.eignex.klause.solver.count.ExactCountConfig
-import com.eignex.klause.solver.count.SamplingConfig
+import com.eignex.klause.count.ApproxCountConfig
+import com.eignex.klause.count.Count
+import com.eignex.klause.count.CountConfig
+import com.eignex.klause.count.ExactCountConfig
+import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult

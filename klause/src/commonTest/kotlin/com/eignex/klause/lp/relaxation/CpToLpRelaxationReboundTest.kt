@@ -1,0 +1,239 @@
+package com.eignex.klause.lp.relaxation
+
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.global.NValue
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.Element
+import com.eignex.klause.factor.table.Table
+import com.eignex.klause.lp.LpModel
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.objective.LinearObjective
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+/**
+ * #39: a node-invariant relaxation is built once and re-bound to live column bounds, which must yield
+ * exactly the model a per-node rebuild would — the persistent LP's bit-identity guarantee — and only
+ * for relaxations whose layout does not depend on the live domains (no auxiliary columns, no live-M
+ * rows).
+ */
+class CpToLpRelaxationReboundTest {
+
+    private fun assertSameModel(expected: LpModel, actual: LpModel) {
+        assertEquals(expected.n, actual.n, "n")
+        assertEquals(expected.m, actual.m, "m")
+        assertContentEquals(expected.csc.colPtr, actual.csc.colPtr, "colPtr")
+        assertContentEquals(expected.csc.rowIdx, actual.csc.rowIdx, "rowIdx")
+        assertContentEquals(expected.csc.colVal, actual.csc.colVal, "colVal")
+        assertContentEquals(expected.rhs, actual.rhs, "rhs")
+        assertContentEquals(expected.cost, actual.cost, "cost")
+        assertContentEquals(expected.upper, actual.upper, "upper")
+        assertContentEquals(expected.hasUpper, actual.hasUpper, "hasUpper")
+        assertContentEquals(expected.loShift, actual.loShift, "loShift")
+        assertContentEquals(expected.tag, actual.tag, "tag")
+        assertEquals(expected.objConstant, actual.objConstant, "objConstant")
+        assertEquals(expected.sense, actual.sense, "sense")
+    }
+
+    @Test
+    fun `rebound reproduces a per-node rebuild bit-for-bit`() {
+        // x0 + 2·x1 + 3·x2 ≥ 5 over [0,10], minimize x0 + x1 + x2 — a pure-linear, persistent-eligible
+        // relaxation. Build once from declared domains, then re-bind to a branch-tightened session and
+        // compare against a fresh build of that same session.
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 10) },
+            arrayOf<Factor>(Linear(intArrayOf(1, 2, 3), intArrayOf(0, 1, 2), LinearOp.GE, 5)),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val relaxer = CpToLpRelaxation(problem, obj)
+
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a pure-linear relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtLeast(0, 2)
+        node.implyIntAtMost(1, 6)
+        node.implyIntAtMost(2, 4)
+
+        val fresh = relaxer.build(node)
+        val reboundModel = base.rebound(node).model
+        assertSameModel(fresh.model, reboundModel)
+    }
+
+    @Test
+    fun `rebound tracks a pinned column`() {
+        // Pinning x1 to a point must give the same shifted bounds and rhs as a rebuild sees.
+        val problem = Problem(
+            0,
+            2,
+            Array(2) { IntDomain(0, 8) },
+            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 9)),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        val relaxer = CpToLpRelaxation(problem, obj)
+        val base = relaxer.build(PropagationSession(problem))
+
+        val node = PropagationSession(problem)
+        node.pinInt(1, 5)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `rebound reproduces a circuit arc relaxation when an arc is pruned`() {
+        // A 3-node circuit: arc columns are laid out from the declared domains and pinned live, so the
+        // relaxation is persistent-eligible. Pruning value 2 from succ[0] drops arc 0->2; re-binding
+        // must pin that arc column to 0 exactly as a per-node rebuild does.
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
+            arrayOf<Factor>(Circuit(intArrayOf(0, 1, 2))),
+        )
+        val relaxer = CpToLpRelaxation(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(0, 0, 0)),
+            circuitArcs = true,
+        )
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a circuit arc relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 1) // drop value 2 from succ[0]
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `a live-M reified relaxation is not persistent-eligible`() {
+        val problem = Problem(
+            1,
+            3,
+            Array(3) { IntDomain(0, 10) },
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1, 1),
+                    vars = intArrayOf(0, 1),
+                    op = LinearOp.LE,
+                    bound = 4,
+                ),
+            ),
+        )
+        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)))
+        assertFalse(
+            relaxer.build(PropagationSession(problem)).persistentEligible,
+            "a relaxation with live-M reified rows varies per node and must not be persisted",
+        )
+    }
+
+    @Test
+    fun `rebound reproduces a table hull when a tuple becomes infeasible`() {
+        // Table {(0,5),(2,2),(4,0)}: each tuple's selector is present while every entry stays live.
+        // Pruning value 5 from x1 drops the (0,5) selector; re-binding must pin it to 0 like a rebuild.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 4), IntDomain(0, 5)),
+            arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 5, 2, 2, 4, 0))),
+        )
+        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0)), tableHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a table hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(1, 4) // value 5 leaves x1 — tuple (0,5) infeasible
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `rebound reproduces an nvalue hull when a value is pruned`() {
+        // var n = |distinct(x0,x1,x2)| over [0,3]; pruning value 3 from x0 drops its z selector.
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
+            arrayOf<Factor>(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
+        )
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), nValueHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "an nvalue hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 2)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `rebound reproduces a gcc count hull when a value is pruned`() {
+        // counts of cover values 1,2 over x0,x1; count vars are 2,3. Pruning value 2 from x0 drops a z.
+        val problem = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
+            arrayOf<Factor>(
+                GlobalCardinality(xs = intArrayOf(0, 1), cover = intArrayOf(1, 2), countVars = intArrayOf(2, 3)),
+            ),
+        )
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)), gccCountHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a gcc count hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 1)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `rebound reproduces an element hull when an index value is pruned`() {
+        // result = arr[idx], arr = [7,3,9,5]; pruning index 3 drops the p=3 selector.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 3), IntDomain(0, 9)),
+            arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = intArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
+            ),
+        )
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 1)), elementHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "an element hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, 2)
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
+    fun `a cumulative energetic relaxation is not persistent-eligible`() {
+        // The energetic makespan row's right-hand side is recomputed from the live starts, so its
+        // coefficients/rhs vary per node — not re-bindable, it stays on the per-node rebuild.
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.GE, 3),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.GE, 3),
+            Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1),
+        )
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 20) }, factors)
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), cumulative = true)
+        assertFalse(
+            relaxer.build(PropagationSession(problem)).persistentEligible,
+            "a live-coefficient energetic row varies per node and must not be persisted",
+        )
+    }
+}

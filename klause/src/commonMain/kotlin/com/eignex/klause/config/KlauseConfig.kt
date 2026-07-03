@@ -1,8 +1,8 @@
 package com.eignex.klause.config
 
-import com.eignex.klause.solver.presolve.PresolveConfig
-import com.eignex.klause.solver.presolve.PresolveEmphasis
-import com.eignex.klause.solver.presolve.PresolvePass
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolveEmphasis
+import com.eignex.klause.presolve.PresolvePass
 
 /** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries
  *  with no explicit range). Wide enough to absorb typical CP arithmetic without overflow in

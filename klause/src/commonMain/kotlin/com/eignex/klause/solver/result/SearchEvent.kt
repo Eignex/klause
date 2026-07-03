@@ -2,8 +2,8 @@ package com.eignex.klause.solver.result
 
 /**
  * Coarse-grained live search events, reported through the caller-supplied `onEvent` hook
- * on [com.eignex.klause.solver.backtrack.BacktrackParams] and
- * [com.eignex.klause.solver.localsearch.LocalSearchParams] (default `null` — no
+ * on [com.eignex.klause.backtrack.BacktrackParams] and
+ * [com.eignex.klause.localsearch.LocalSearchParams] (default `null` — no
  * observation, no cost beyond one null check at each event site).
  *
  * Events fire only at points that are already rare relative to the engine's hot loop —

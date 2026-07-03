@@ -2,15 +2,15 @@
 
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.localsearch.CostShaping
+import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSession
+import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.strategy.LsCatalog
+import com.eignex.klause.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.localsearch.CostShaping
-import com.eignex.klause.solver.localsearch.DefinitionalSweep
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSession
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.strategy.LsCatalog
-import com.eignex.klause.solver.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent

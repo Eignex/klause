@@ -1,11 +1,15 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.propagation.IntEvent
-import com.eignex.klause.solver.propagation.PropagationResult
-import com.eignex.klause.solver.propagation.PropagationState
-import com.eignex.klause.solver.propagation.extractConflictBools
-import com.eignex.klause.solver.propagation.extractConflictFactors
-import com.eignex.klause.solver.propagation.extractConflictInts
+import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.localsearch.NoInvariant
+import com.eignex.klause.propagation.IntEvent
+import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.extractConflictBools
+import com.eignex.klause.propagation.extractConflictFactors
+import com.eignex.klause.propagation.extractConflictInts
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
@@ -100,7 +104,7 @@ class Problem(
     val impliedFactorMask: BooleanArray? = null,
     /**
      * True when the model declared at least one `symmetry_breaking_constraint`. Presolve uses
-     * it to skip its own symmetry breaking ([com.eignex.klause.solver.presolve.PresolvePass.BREAK_SYMMETRIES])
+     * it to skip its own symmetry breaking ([com.eignex.klause.presolve.PresolvePass.BREAK_SYMMETRIES])
      * by default — stacking klause's automorphism break on top of the model's hand-written one
      * is redundant and the two can interact.
      */
@@ -215,7 +219,7 @@ class Problem(
      * [boolOccurrences] minus factors that use per-literal wakeup (see
      * [Propagator.initialBoolWatchers]). The propagation engine walks this list for
      * occurrence-driven wakeup, while watcher-using factors are woken via the
-     * per-state [com.eignex.klause.solver.propagation.PropagationState.boolWatchersByLit]
+     * per-state [com.eignex.klause.propagation.PropagationState.boolWatchersByLit]
      * index instead. Identical to [boolOccurrences] when no factor opts in.
      */
     val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
@@ -250,7 +254,7 @@ class Problem(
      * *that* variable (see [Propagator.initialIntEventWatches]). The propagation engine walks this list
      * for occurrence-driven int wakeup; a subscribing factor is woken for its subscribed variables
      * via the per-`(var, kind)`
-     * [com.eignex.klause.solver.propagation.PropagationState.intEventWatchersBySlot] index instead.
+     * [com.eignex.klause.propagation.PropagationState.intEventWatchersBySlot] index instead.
      *
      * Exclusion is per `(factor, variable)`, not all-or-nothing: a factor that subscribes to events
      * on variable `a` but not `b` (both in its [Factor.intVars]) is dropped from `a`'s list yet kept

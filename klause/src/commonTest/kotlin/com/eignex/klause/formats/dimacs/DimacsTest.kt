@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.dimacs
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails

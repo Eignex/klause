@@ -15,7 +15,7 @@ import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
-import com.eignex.klause.solver.localsearch.strategy.LsCatalog
+import com.eignex.klause.localsearch.strategy.LsCatalog
 import kotlinx.serialization.decodeFromString
 import java.io.File
 

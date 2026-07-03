@@ -63,7 +63,7 @@ interface FloatTerm {
 /**
  * DSL handle for a declared float variable. Combines and compares via the shared [FloatTerm]
  * operators, lowering to a [FloatLinearConstraint] AST node (the compiler turns that into a
- * `com.eignex.klause.solver.factor.FloatLinear` factor). The historical `buckets` parameter is kept
+ * `com.eignex.klause.factor.FloatLinear` factor). The historical `buckets` parameter is kept
  * for source compatibility but ignored — bucketing is a per-backend solve-time concern.
  */
 class FloatHandle(

@@ -1,15 +1,15 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.backtrack.TierVarSelect
-import com.eignex.klause.solver.backtrack.TieredValueSelector
-import com.eignex.klause.solver.backtrack.TieredVariableSelector
-import com.eignex.klause.solver.backtrack.selector.IndomainMax
-import com.eignex.klause.solver.backtrack.selector.IndomainMedian
-import com.eignex.klause.solver.backtrack.selector.IndomainMin
-import com.eignex.klause.solver.backtrack.selector.IndomainSplit
-import com.eignex.klause.solver.backtrack.selector.SmallestDomain
-import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
-import com.eignex.klause.solver.backtrack.selector.SolutionGuided
+import com.eignex.klause.backtrack.TierVarSelect
+import com.eignex.klause.backtrack.TieredValueSelector
+import com.eignex.klause.backtrack.TieredVariableSelector
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.IndomainMedian
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.IndomainSplit
+import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.backtrack.selector.SmallestLowerBound
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
