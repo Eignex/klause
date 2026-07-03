@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
