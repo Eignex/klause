@@ -514,10 +514,11 @@ class LocalSearchSolver(
                 if (ratchetBound != null) {
                     // Objective-as-constraint ratchet: reaching cost==0 means the objective already meets
                     // the bound. Tighten it below this incumbent so "beat it" re-enters the violation set,
-                    // then reconcile the incrementally-maintained cost (a bound change moves the bound
-                    // factor's violation with no move) and drop back into the feasibility fight to repair it.
+                    // then reconcile just the bound factor — its degree shifts with no move, and the
+                    // overlay appends it last, so it is the final factor — and drop back into the
+                    // feasibility fight to repair it. Surgical, not a full recompute over every factor.
                     ratchetBound.tightenBelow(obj)
-                    state.recompute()
+                    state.reevaluateFactor(problem.numFactors - 1)
                     totalFlips++
                     continue
                 }

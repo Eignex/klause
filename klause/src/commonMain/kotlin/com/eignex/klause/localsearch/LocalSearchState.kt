@@ -874,4 +874,21 @@ class LocalSearchState(
         cost += delta
         if (newDegree > 0) violated.add(factorId) else violated.remove(factorId)
     }
+
+    /**
+     * Reconcile a single factor after an *external* change to its violation semantics that left the
+     * assignment — and thus the factor's payload — untouched: the objective-bound ratchet tightening its
+     * shared bound between moves. Mirrors [applyMove]'s per-factor break/make retract → [updateViolation]
+     * → re-add, so [cost], [factorDegree], [violated], and the break/make vectors stay exact without a
+     * full [recompute] over every factor. The factor must maintain break/make brute-force (no flip
+     * occurred, so there is no incremental update to drive) — true for the objective-bound factor.
+     */
+    internal fun reevaluateFactor(factorId: Int) {
+        require(!factors[factorId].maintainsBreakMakeIncrementally) {
+            "reevaluateFactor expects a brute-force break/make factor (no flip to drive an incremental update)"
+        }
+        adjustBoolBreakMake(factorId, -1)
+        updateViolation(factorId)
+        adjustBoolBreakMake(factorId, +1)
+    }
 }
