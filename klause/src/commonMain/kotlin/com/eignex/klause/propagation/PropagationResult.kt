@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.EmptyIntArray
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -44,6 +44,15 @@ sealed interface PropagationResult {
         val intHoleVarIds: IntArray = IntArray(0),
         /** Forbidden values aligned with [intHoleVarIds]. */
         val intHoleValues: IntArray = IntArray(0),
+        /** Set-restrictions `v ∈ {survivors}` for variables reduced to a sparse survivor set — recorded
+         *  instead of one interior hole per excluded value, which is O(span) for a wide-but-sparse domain.
+         *  CSR: var `intSetKeys[i]`'s survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i+1]]`
+         *  ([intSetOffsets] size `intSetKeys.size + 1`, or empty when there are none). Disjoint from [intKeys]. */
+        val intSetKeys: IntArray = EmptyIntArray,
+        /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
+        val intSetOffsets: IntArray = EmptyIntArray,
+        /** Concatenated ascending survivor values, sliced per variable by [intSetOffsets]. */
+        val intSetValues: IntArray = EmptyIntArray,
     ) : PropagationResult {
 
         /** True iff nothing was forced. */
@@ -104,6 +113,15 @@ sealed interface PropagationResult {
             for (i in intKeys.indices) action(intKeys[i], intValues[i])
         }
 
+        /** Invoke [action] for each survivor-set restriction `(id, sortedSurvivors)` — the compact
+         *  form of a wide-but-sparse reduction. The survivors are the exact surviving values in
+         *  ascending order; callers restrict the variable's domain to them. */
+        inline fun forEachIntSet(action: (id: Int, survivors: IntArray) -> Unit) {
+            for (i in intSetKeys.indices) {
+                action(intSetKeys[i], intSetValues.copyOfRange(intSetOffsets[i], intSetOffsets[i + 1]))
+            }
+        }
+
         /** Reinterpret this implied set as an [Assumptions].
          *  Both share the same key-sorted parallel-array layout, so the conversion is
          *  three [copyOf] calls (one per primitive array) — no rebuild, no boxing. */
@@ -118,6 +136,9 @@ sealed interface PropagationResult {
             intMaxValues = intMaxValues.copyOf(),
             intHoleVarIds = intHoleVarIds.copyOf(),
             intHoleValues = intHoleValues.copyOf(),
+            intSetKeys = intSetKeys.copyOf(),
+            intSetOffsets = intSetOffsets.copyOf(),
+            intSetValues = intSetValues.copyOf(),
         )
 
         /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like

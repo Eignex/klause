@@ -10,12 +10,12 @@ import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random

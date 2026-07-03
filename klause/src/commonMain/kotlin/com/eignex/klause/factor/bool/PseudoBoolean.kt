@@ -6,10 +6,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when

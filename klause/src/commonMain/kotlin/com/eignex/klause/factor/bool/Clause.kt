@@ -5,11 +5,11 @@ import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * Disjunction of Boolean literals.

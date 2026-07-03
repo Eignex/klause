@@ -4,10 +4,10 @@ import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `XOR(lit_1, ..., lit_n) == targetParity`. `targetParity = 1` means an odd number of literals

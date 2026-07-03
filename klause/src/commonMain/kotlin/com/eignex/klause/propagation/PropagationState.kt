@@ -5,12 +5,12 @@ import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -115,7 +115,7 @@ class PropagationState(
      * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last
      * drained — recorded by `markIntDirty` alongside [dirtyInts] and consumed (then cleared) by
      * [enqueueForIntChange] to wake exactly the subscribed advisors. Empty (aliasing the shared
-     * [com.eignex.klause.solver.EmptyIntArray]) when no factor subscribes to typed int events, so
+     * [com.eignex.klause.util.EmptyIntArray]) when no factor subscribes to typed int events, so
      * the common case allocates nothing and skips the bookkeeping entirely.
      *
      * Sound to over-set (extra bit ⇒ harmless extra wake) but never under-set (a missing bit drops

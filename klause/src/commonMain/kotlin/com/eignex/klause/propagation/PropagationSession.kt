@@ -3,10 +3,10 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */

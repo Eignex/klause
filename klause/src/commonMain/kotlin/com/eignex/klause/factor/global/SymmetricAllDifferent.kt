@@ -3,10 +3,10 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `symmetric_all_different(xs)` — `xs` is a self-inverse permutation: `xs(xs(i)) = i` for

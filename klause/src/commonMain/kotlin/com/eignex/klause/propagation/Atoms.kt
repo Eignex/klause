@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.binarySearchInt
 
 /** Register [atomId] in the watched index (idempotent per threshold/kind). */
 internal fun PropagationState.markAtomWatched(atomId: Int) {
@@ -403,6 +404,45 @@ internal fun PropagationState.propagateAtomsForExclusionBatch(
             val x = interiorVals[i]
             visitAtomRange(idx.eqKeys, idx.eqIds, x, x) { id -> wakeAtom(id, false) }
         }
+    }
+    if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
+        visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
+    }
+}
+
+/**
+ * Wake the atoms invalidated by restricting `v`'s domain to [survivors] (a set-restriction seed, whose
+ * excluded values are the domain's holes). The bound moves fire exactly as [propagateAtomsForExclusionBatch];
+ * the interior is driven off the value-sorted eq-atom index rather than the (potentially span-sized) hole
+ * list — only eq-atoms whose value is not a survivor are woken false. Cost is O(eq-atoms in range), never
+ * O(span), which is the point of recording the reduction as a survivor set. [ant] is the (root-seed) reason.
+ */
+internal fun PropagationState.propagateAtomsForSetRestriction(
+    v: Int,
+    oldMin: Int,
+    oldMax: Int,
+    survivors: IntArray,
+    ant: IntArray?,
+) {
+    val idx = atomsByIntVar[v] ?: return
+    val d = intDomains[v]
+    val newMin = d.min
+    val newMax = d.max
+    if (newMin > oldMin) {
+        pendingMoveAnt = ant
+        visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
+        visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+        visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+    }
+    if (newMax < oldMax) {
+        pendingMoveAnt = ant
+        visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
+        visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+        visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+    }
+    pendingMoveAnt = ant
+    visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMax) { id ->
+        if (survivors.binarySearchInt(atomThreshold[id]) < 0) wakeAtom(id, false)
     }
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
         visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }

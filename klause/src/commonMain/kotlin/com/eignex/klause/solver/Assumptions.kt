@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
@@ -54,7 +55,26 @@ class Assumptions internal constructor(
     val intHoleVarIds: IntArray = IntArray(0),
     /** Forbidden values aligned with [intHoleVarIds]. */
     val intHoleValues: IntArray = IntArray(0),
+    /** Compact set-restrictions `v ∈ {survivors}` for variables the bake reduced to a sparse survivor
+     *  set — recorded here instead of one interior hole per excluded value, which for a wide-but-sparse
+     *  domain (few survivors over a huge span) is O(span) to record and to seed. Var ids ascending;
+     *  disjoint from [intKeys]. CSR layout: variable `intSetKeys[i]`'s ascending survivors are
+     *  `intSetValues[intSetOffsets[i] until intSetOffsets[i + 1]]`. [intSetOffsets] has size
+     *  `intSetKeys.size + 1` (or is empty when there are no set-restrictions). */
+    val intSetKeys: IntArray = EmptyIntArray,
+    /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
+    val intSetOffsets: IntArray = EmptyIntArray,
+    /** Concatenated ascending survivor values, sliced per variable by [intSetOffsets]. */
+    val intSetValues: IntArray = EmptyIntArray,
 ) {
+
+    /** Survivors of set-restricted var at index [i] into [intSetKeys], as an ascending array. */
+    fun intSetSurvivorsAt(i: Int): IntArray = intSetValues.copyOfRange(intSetOffsets[i], intSetOffsets[i + 1])
+
+    /** Invoke [action] once per set-restricted variable with its ascending survivor array. */
+    inline fun forEachIntSet(action: (id: Int, survivors: IntArray) -> Unit) {
+        for (i in intSetKeys.indices) action(intSetKeys[i], intSetSurvivorsAt(i))
+    }
 
     /** True iff no bool or int variable is pinned. */
     val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
@@ -129,12 +149,14 @@ class Assumptions internal constructor(
      */
     fun mergedWith(other: Assumptions): Assumptions {
         if (other.isEmpty &&
-            other.intMinKeys.isEmpty() && other.intMaxKeys.isEmpty() && other.intHoleVarIds.isEmpty()
+            other.intMinKeys.isEmpty() && other.intMaxKeys.isEmpty() &&
+            other.intHoleVarIds.isEmpty() && other.intSetKeys.isEmpty()
         ) {
             return this
         }
         if (this.isEmpty &&
-            intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()
+            intMinKeys.isEmpty() && intMaxKeys.isEmpty() &&
+            intHoleVarIds.isEmpty() && intSetKeys.isEmpty()
         ) {
             return other
         }
@@ -187,6 +209,18 @@ class Assumptions internal constructor(
         val holes = holeSet.toLongArray().also { it.sort() }
         val holeIds = IntArray(holes.size) { (holes[it] ushr 32).toInt() }
         val holeVals = IntArray(holes.size) { holes[it].toInt() }
+        // Set-restrictions: per-var survivor sets, [other] winning on overlap (last-write, as with
+        // pins), dropping any var now exactly pinned (the pin subsumes). Survivors are already ascending.
+        val setMap = LinkedHashMap<Int, IntArray>()
+        forEachIntSet { id, sv -> if (id !in pinned) setMap[id] = sv }
+        other.forEachIntSet { id, sv -> if (id !in pinned) setMap[id] = sv }
+        val setK = setMap.keys.toIntArray().also { it.sort() }
+        val setOffsets = IntArray(setK.size + 1)
+        val setVals = IntArrayList(setK.size)
+        for (i in setK.indices) {
+            for (x in setMap.getValue(setK[i])) setVals.add(x)
+            setOffsets[i + 1] = setVals.size
+        }
         return Assumptions(
             boolKeys = mergedBoolKeys.toIntArray(),
             boolValues = BooleanArray(mergedBoolValues.size) { mergedBoolValues[it] },
@@ -198,8 +232,34 @@ class Assumptions internal constructor(
             intMaxValues = IntArray(maxK.size) { maxMap.getValue(maxK[it]) },
             intHoleVarIds = holeIds,
             intHoleValues = holeVals,
+            intSetKeys = setK,
+            intSetOffsets = if (setK.isEmpty()) EmptyIntArray else setOffsets,
+            intSetValues = setVals.toIntArray(),
         )
     }
+
+    /** Rebuild with a subset of fields replaced; every unspecified field is carried over unchanged.
+     *  The set-restriction fields ([intSetKeys] / [intSetOffsets] / [intSetValues]) default to the
+     *  current values, so the `with*` builders preserve them exactly as they preserve holes. */
+    private fun copy(
+        boolKeys: IntArray = this.boolKeys,
+        boolValues: BooleanArray = this.boolValues,
+        intKeys: IntArray = this.intKeys,
+        intValues: IntArray = this.intValues,
+        intMinKeys: IntArray = this.intMinKeys,
+        intMinValues: IntArray = this.intMinValues,
+        intMaxKeys: IntArray = this.intMaxKeys,
+        intMaxValues: IntArray = this.intMaxValues,
+        intHoleVarIds: IntArray = this.intHoleVarIds,
+        intHoleValues: IntArray = this.intHoleValues,
+        intSetKeys: IntArray = this.intSetKeys,
+        intSetOffsets: IntArray = this.intSetOffsets,
+        intSetValues: IntArray = this.intSetValues,
+    ): Assumptions = Assumptions(
+        boolKeys, boolValues, intKeys, intValues,
+        intMinKeys, intMinValues, intMaxKeys, intMaxValues,
+        intHoleVarIds, intHoleValues, intSetKeys, intSetOffsets, intSetValues,
+    )
 
     /** Return a fresh [Assumptions] that also pins bool [id] to [value]. Existing
      *  bool pin on [id] is overwritten. */
@@ -208,18 +268,7 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = boolValues.copyOf()
             nv[idx] = value
-            Assumptions(
-                boolKeys,
-                nv,
-                intKeys,
-                intValues,
-                intMinKeys,
-                intMinValues,
-                intMaxKeys,
-                intMaxValues,
-                intHoleVarIds,
-                intHoleValues,
-            )
+            copy(boolValues = nv)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(boolKeys.size + 1)
@@ -230,18 +279,7 @@ class Assumptions internal constructor(
             nv[insert] = value
             boolKeys.copyInto(nk, insert + 1, insert)
             boolValues.copyInto(nv, insert + 1, insert)
-            Assumptions(
-                nk,
-                nv,
-                intKeys,
-                intValues,
-                intMinKeys,
-                intMinValues,
-                intMaxKeys,
-                intMaxValues,
-                intHoleVarIds,
-                intHoleValues,
-            )
+            copy(boolKeys = nk, boolValues = nv)
         }
     }
 
@@ -281,17 +319,12 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = intValues.copyOf()
             nv[idx] = value
-            Assumptions(
-                boolKeys,
-                boolValues,
-                intKeys,
-                nv,
-                newMinK,
-                newMinV,
-                newMaxK,
-                newMaxV,
-                intHoleVarIds,
-                intHoleValues,
+            copy(
+                intValues = nv,
+                intMinKeys = newMinK,
+                intMinValues = newMinV,
+                intMaxKeys = newMaxK,
+                intMaxValues = newMaxV,
             )
         } else {
             val insert = -(idx + 1)
@@ -303,7 +336,14 @@ class Assumptions internal constructor(
             nv[insert] = value
             intKeys.copyInto(nk, insert + 1, insert)
             intValues.copyInto(nv, insert + 1, insert)
-            Assumptions(boolKeys, boolValues, nk, nv, newMinK, newMinV, newMaxK, newMaxV, intHoleVarIds, intHoleValues)
+            copy(
+                intKeys = nk,
+                intValues = nv,
+                intMinKeys = newMinK,
+                intMinValues = newMinV,
+                intMaxKeys = newMaxK,
+                intMaxValues = newMaxV,
+            )
         }
     }
 
@@ -314,18 +354,7 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = intMinValues.copyOf()
             nv[idx] = maxOf(nv[idx], value)
-            Assumptions(
-                boolKeys,
-                boolValues,
-                intKeys,
-                intValues,
-                intMinKeys,
-                nv,
-                intMaxKeys,
-                intMaxValues,
-                intHoleVarIds,
-                intHoleValues,
-            )
+            copy(intMinValues = nv)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intMinKeys.size + 1)
@@ -336,18 +365,7 @@ class Assumptions internal constructor(
             nv[insert] = value
             intMinKeys.copyInto(nk, insert + 1, insert)
             intMinValues.copyInto(nv, insert + 1, insert)
-            Assumptions(
-                boolKeys,
-                boolValues,
-                intKeys,
-                intValues,
-                nk,
-                nv,
-                intMaxKeys,
-                intMaxValues,
-                intHoleVarIds,
-                intHoleValues,
-            )
+            copy(intMinKeys = nk, intMinValues = nv)
         }
     }
 
@@ -378,10 +396,7 @@ class Assumptions internal constructor(
         nv[insert] = value
         intHoleVarIds.copyInto(nk, insert + 1, insert)
         intHoleValues.copyInto(nv, insert + 1, insert)
-        return Assumptions(
-            boolKeys, boolValues, intKeys, intValues,
-            intMinKeys, intMinValues, intMaxKeys, intMaxValues, nk, nv,
-        )
+        return copy(intHoleVarIds = nk, intHoleValues = nv)
     }
 
     /** Return a fresh [Assumptions] with [id]'s upper bound tightened to at most [value]. */
@@ -390,18 +405,7 @@ class Assumptions internal constructor(
         return if (idx >= 0) {
             val nv = intMaxValues.copyOf()
             nv[idx] = minOf(nv[idx], value)
-            Assumptions(
-                boolKeys,
-                boolValues,
-                intKeys,
-                intValues,
-                intMinKeys,
-                intMinValues,
-                intMaxKeys,
-                nv,
-                intHoleVarIds,
-                intHoleValues,
-            )
+            copy(intMaxValues = nv)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intMaxKeys.size + 1)
@@ -412,18 +416,7 @@ class Assumptions internal constructor(
             nv[insert] = value
             intMaxKeys.copyInto(nk, insert + 1, insert)
             intMaxValues.copyInto(nv, insert + 1, insert)
-            Assumptions(
-                boolKeys,
-                boolValues,
-                intKeys,
-                intValues,
-                intMinKeys,
-                intMinValues,
-                nk,
-                nv,
-                intHoleVarIds,
-                intHoleValues,
-            )
+            copy(intMaxKeys = nk, intMaxValues = nv)
         }
     }
 
@@ -460,7 +453,10 @@ class Assumptions internal constructor(
             intMaxKeys.contentEquals(other.intMaxKeys) &&
             intMaxValues.contentEquals(other.intMaxValues) &&
             intHoleVarIds.contentEquals(other.intHoleVarIds) &&
-            intHoleValues.contentEquals(other.intHoleValues)
+            intHoleValues.contentEquals(other.intHoleValues) &&
+            intSetKeys.contentEquals(other.intSetKeys) &&
+            intSetOffsets.contentEquals(other.intSetOffsets) &&
+            intSetValues.contentEquals(other.intSetValues)
     }
 
     override fun hashCode(): Int {
@@ -474,6 +470,9 @@ class Assumptions internal constructor(
         h = 31 * h + intMaxValues.contentHashCode()
         h = 31 * h + intHoleVarIds.contentHashCode()
         h = 31 * h + intHoleValues.contentHashCode()
+        h = 31 * h + intSetKeys.contentHashCode()
+        h = 31 * h + intSetOffsets.contentHashCode()
+        h = 31 * h + intSetValues.contentHashCode()
         return h
     }
 

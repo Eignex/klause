@@ -1,9 +1,10 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
 /** Push every pin in `a` as a fresh decision; return `false` (so [PropagationState.seeded] becomes
@@ -46,6 +47,13 @@ internal fun PropagationState.seedAssumptions(a: Assumptions): Boolean {
         currentLevel = levelToDecisionVar.size
         currentFactor = -1
         if (!excludeIntValueImpl(holeIds[i], holeVals[i], null)) return false
+    }
+    val setKeys = a.intSetKeys
+    for (i in setKeys.indices) {
+        levelToDecisionVar.add(problem.numBoolVars + setKeys[i])
+        currentLevel = levelToDecisionVar.size
+        currentFactor = -1
+        if (!restrictIntToSurvivors(setKeys[i], a.intSetSurvivorsAt(i))) return false
     }
     return true
 }
@@ -474,6 +482,58 @@ internal fun PropagationState.seedConflictFactor(fid: Int) {
 
 internal fun PropagationState.setIntImpl(v: Int, value: Int, antecedents: IntArray?): Boolean =
     tightenIntMinImpl(v, value, antecedents) && tightenIntMaxImpl(v, value, antecedents)
+
+/**
+ * Restrict `v`'s domain to [survivors] (ascending, the bake's folded fixpoint for a sparse variable) as
+ * one seed decision — the compact counterpart to excluding each hole individually. Sets the domain in a
+ * single step and wakes the affected order/eq atoms off the value-sorted atom index
+ * ([propagateAtomsForSetRestriction]), so both the domain write and the atom wakeups are O(survivors +
+ * eq-atoms) rather than O(span). It is a root-seed input (no antecedents; presolve does not learn), so
+ * per-hole reasons are not recorded — the excluded values are unconditional facts of the folded domain.
+ */
+internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: IntArray): Boolean {
+    val d = intDomains[v]
+    var kept = 0
+    for (s in survivors) if (s in d) kept++
+    if (kept == 0) { // the restriction empties the domain
+        recordConflictLevels(intLevel[v], currentLevel)
+        seedConflictFactor(intMinReason[v])
+        seedConflictFactor(intMaxReason[v])
+        seedConflictFactor(currentFactor)
+        return false
+    }
+    if (kept == d.size) return true // survivors already cover every live value — no restriction
+    val filtered = if (kept == survivors.size) {
+        survivors
+    } else {
+        IntArray(kept).also { out ->
+            var j = 0
+            for (s in survivors) if (s in d) out[j++] = s
+        }
+    }
+    val oldMin = d.min
+    val oldMax = d.max
+    if (undoLogging) logIntChange(v) // one record restores the full prior domain + bound atoms
+    val newDomain = intDomainFromSurvivors(filtered)
+    intDomains[v] = newDomain
+    intLevel[v] = maxOf(intLevel[v], currentLevel)
+    var kindMask = IntEvent.VALUE_REMOVED_BIT
+    if (newDomain.min != oldMin) {
+        intMinLevel[v] = currentLevel
+        intMinReason[v] = currentFactor
+        intMinAntecedents[v] = null
+        kindMask = kindMask or IntEvent.LB_RAISED_BIT
+    }
+    if (newDomain.max != oldMax) {
+        intMaxLevel[v] = currentLevel
+        intMaxReason[v] = currentFactor
+        intMaxAntecedents[v] = null
+        kindMask = kindMask or IntEvent.UB_LOWERED_BIT
+    }
+    markIntDirty(v, kindMask)
+    propagateAtomsForSetRestriction(v, oldMin, oldMax, filtered, null)
+    return true
+}
 
 internal fun PropagationState.recordConflictLevels(a: Int, b: Int) {
     conflictLevels = when {
