@@ -50,7 +50,7 @@ class LpReducedCostFixingTest {
             BacktrackParams(randomSeed = 1L, objectiveBoundSupplier = { 6.0 }, lpPlan = LpPlan(bounding = true)),
         )
         assertTrue(result.objectiveValue == 5.0, "optimum should still be reached, got ${result.objectiveValue}")
-        assertTrue(result.stats.lpFixed.sum > 0.0, "expected reduced-cost fixings, got ${result.stats.lpFixed.sum}")
+        assertTrue(result.stats.lp.fixed.sum > 0.0, "expected reduced-cost fixings, got ${result.stats.lp.fixed.sum}")
     }
 
     @Test

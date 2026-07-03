@@ -49,7 +49,7 @@ class LpCutTest {
         ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)))
         assertTrue(on is MinimizeResult.Optimal)
         assertEquals(6.0, on.objectiveValue)
-        assertTrue(on.stats.lpCuts.sum > 0.0, "expected AllDifferent cuts, got ${on.stats.lpCuts.sum}")
+        assertTrue(on.stats.lp.cuts.sum > 0.0, "expected AllDifferent cuts, got ${on.stats.lp.cuts.sum}")
     }
 
     @Test
@@ -73,6 +73,6 @@ class LpCutTest {
         )
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(off.objectiveValue, on.objectiveValue, "Gomory cuts changed the optimum")
-        assertTrue(on.stats.lpCuts.sum > 0.0, "expected Gomory cuts, got ${on.stats.lpCuts.sum}")
+        assertTrue(on.stats.lp.cuts.sum > 0.0, "expected Gomory cuts, got ${on.stats.lp.cuts.sum}")
     }
 }

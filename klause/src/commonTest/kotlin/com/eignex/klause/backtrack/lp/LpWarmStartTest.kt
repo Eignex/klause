@@ -57,7 +57,7 @@ class LpWarmStartTest {
         )
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(11.0, result.objectiveValue)
-        assertTrue(result.stats.lpPivots.sum > 0.0, "expected LP pivots to be recorded")
+        assertTrue(result.stats.lp.pivots.sum > 0.0, "expected LP pivots to be recorded")
     }
 
     @Test

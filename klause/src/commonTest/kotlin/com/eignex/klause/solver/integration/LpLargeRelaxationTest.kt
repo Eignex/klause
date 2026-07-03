@@ -293,7 +293,7 @@ class LpLargeRelaxationTest {
             val unbudgeted = resolved.copy(lpPlan = resolved.lpPlan.copy(rootBudgetFraction = 0.0))
             val res = BacktrackSolver(problem).minimize(obj, unbudgeted)
             assertTrue(res is MinimizeResult.Optimal && res.objective == 5.0, "expected optimum 5, got $res")
-            assertTrue(res.stats.rootLpBound.isFinite(), "the unbudgeted root LP must capture a finite root bound")
+            assertTrue(res.stats.lp.rootBound.isFinite(), "the unbudgeted root LP must capture a finite root bound")
         } finally {
             KlauseConfig.current = saved
         }

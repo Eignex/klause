@@ -63,7 +63,7 @@ class LpBoundingTest {
         )
 
         // The LP bound fires (telemetry records it) and never explores more nodes than the baseline.
-        assertTrue(on.stats.lpPruned.sum > 0.0, "expected LP-bound prunes, got ${on.stats.lpPruned.sum}")
+        assertTrue(on.stats.lp.pruned.sum > 0.0, "expected LP-bound prunes, got ${on.stats.lp.pruned.sum}")
         assertTrue(
             on.stats.nodes.sum <= off.stats.nodes.sum,
             "LP bounding explored more nodes: ${on.stats.nodes.sum} vs ${off.stats.nodes.sum}",

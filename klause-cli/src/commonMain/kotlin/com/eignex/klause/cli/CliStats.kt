@@ -1,16 +1,17 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStats
 import kotlin.math.round
 
 /**
  * LP-relaxation success metrics for `-s`, as ordered `key`/`value` pairs each mode prints with its
  * own comment prefix. Returns empty when no LP-family technique ran (so non-LP solves print nothing
- * extra), keyed off [SolveStats.lpSolves] plus the standalone Lagrangian / energetic prunes.
+ * extra), keyed off [LpStats.solves] plus the standalone Lagrangian / energetic prunes.
  *
  * The headline measure is the prune *rate* (`lpPruneRate = lpPruned / lpSolves`) against the cost
  * (`lpPivotsPerSolve`, `lpMs`): a relaxation earns its place only if it prunes often enough to repay
- * the pivots it spends. [SolveStats.rootLpBound] versus the reported objective is the integrality
+ * the pivots it spends. [LpStats.rootBound] versus the reported objective is the integrality
  * gap — the direct measure of how tight the relaxation is. The technique split (`lpInfeasible`,
  * `lpBoundPruned`, `lpLagrangianPruned`, `lpEnergeticPruned`, `lpBackjumps`) attributes the wins as
  * far as the engine can soundly separate them; cuts/hull columns feed the same `lpPruned` bound and
@@ -18,13 +19,13 @@ import kotlin.math.round
  * `lp`-prefixed so the block is unambiguously LP even in the flat `key=value` stat stream.
  */
 internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
-    val solves = stats.lpSolves.sum
+    val solves = stats.lp.solves.sum
     val lagrangian = stats.lagrangianPruned.sum
     val energetic = stats.energeticPruned.sum
     if (solves == 0.0 && lagrangian == 0.0 && energetic == 0.0) return emptyList()
 
-    val pruned = stats.lpPruned.sum
-    val infeasible = stats.lpInfeasible.sum
+    val pruned = stats.lp.pruned.sum
+    val infeasible = stats.lp.infeasible.sum
     val out = ArrayList<Pair<String, String>>()
     out += "lpSolves" to "${solves.toLong()}"
     out += "lpPruned" to "${pruned.toLong()}"
@@ -32,19 +33,19 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpBoundPruned" to "${(pruned - infeasible).toLong()}"
     if (solves > 0.0) {
         out += "lpPruneRate" to round4(pruned / solves)
-        out += "lpPivotsPerSolve" to round4(stats.lpPivots.sum / solves)
-        out += "lpSeededRate" to round4(stats.lpSeeded.sum / solves)
+        out += "lpPivotsPerSolve" to round4(stats.lp.pivots.sum / solves)
+        out += "lpSeededRate" to round4(stats.lp.seeded.sum / solves)
     }
-    out += "lpFixed" to "${stats.lpFixed.sum.toLong()}"
-    out += "lpCuts" to "${stats.lpCuts.sum.toLong()}"
-    out += "lpPivots" to "${stats.lpPivots.sum.toLong()}"
-    if (stats.lpLuMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lpLuMaxFill.max)
-    if (stats.lpLuMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lpLuMaxDensity.max)
-    out += "lpBackjumps" to "${stats.lpBackjumps.sum.toLong()}"
+    out += "lpFixed" to "${stats.lp.fixed.sum.toLong()}"
+    out += "lpCuts" to "${stats.lp.cuts.sum.toLong()}"
+    out += "lpPivots" to "${stats.lp.pivots.sum.toLong()}"
+    if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
+    if (stats.lp.luMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lp.luMaxDensity.max)
+    out += "lpBackjumps" to "${stats.lp.backjumps.sum.toLong()}"
     out += "lpLagrangianPruned" to "${lagrangian.toLong()}"
     out += "lpEnergeticPruned" to "${energetic.toLong()}"
-    out += "lpMs" to "${stats.lpMs}"
-    if (stats.rootLpBound.isFinite()) out += "lpRootBound" to round4(stats.rootLpBound)
+    out += "lpMs" to "${stats.lp.ms}"
+    if (stats.lp.rootBound.isFinite()) out += "lpRootBound" to round4(stats.lp.rootBound)
     return out
 }
 

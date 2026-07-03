@@ -265,10 +265,10 @@ internal class ResumableMinimize(
                     token,
                 ),
             )
-            sink.observeLpCuts(lpEngine.lpGlobalCuts.size)
+            sink.lp.observeCuts(lpEngine.lpGlobalCuts.size)
         }
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token)
-        sink.observeRootLpBound(0, rootBound)
+        sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound
         // global lower bound on the optimum, so a peer arm can pair it with its own incumbent to prove
         // optimality. A NaN (no LP structure) carries no information and the sink ignores it.

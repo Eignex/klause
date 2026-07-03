@@ -261,7 +261,7 @@ internal fun LpEngine.lpBoundAndFix(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome = try {
-    sink.lpClockStart()
+    sink.lp.clockStart()
     sparseSafePrune(
         relaxer, session, bound, sink, cancellation, objectiveVar, objectiveAscending, hints, learn, warm,
         cutsAllowed,
@@ -271,7 +271,7 @@ internal fun LpEngine.lpBoundAndFix(
     // integer-multiplier 128-bit certification. A failure just keeps the node.
     sparseCertifiedPrune(relaxer, session, bound, sink, cancellation)
 } finally {
-    sink.lpClockStop()
+    sink.lp.clockStop()
 }
 
 /**
@@ -300,7 +300,7 @@ private fun LpEngine.foldSelectedCuts(
         return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
     }
     val r = dualSimplex(tightened.model, cancellation).solve() ?: return base to res
-    sink.observeLpSolve()
+    sink.lp.observeSolve()
     return tightened to r
 }
 
@@ -328,7 +328,7 @@ internal fun LpEngine.sparseSafePrune(
 ): LpNodeOutcome {
     val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
-    sink.observeLpSolve()
+    sink.lp.observeSolve()
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
     val simplex = dualSimplex(relaxation.model, cancellation)
     val result = simplex.solve(warm) ?: run {
@@ -338,7 +338,7 @@ internal fun LpEngine.sparseSafePrune(
         val floatRay = simplex.infeasibleRay
         val ray = if (floatRay != null) integerFarkasRay(relaxation.model, floatRay) else null
         if (ray != null) {
-            sink.observeLpInfeasiblePrune()
+            sink.lp.observeInfeasiblePrune()
             // With learning, the Farkas ray becomes a bound-atom nogood (#247) for a 1UIP backjump;
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
             val clause = if (learn) LpExplanation.infeasibilityClause(relaxation, ray, session) else null
@@ -346,8 +346,8 @@ internal fun LpEngine.sparseSafePrune(
         }
         return LpNodeOutcome(false, null)
     }
-    sink.observeLpPivots(result.pivots)
-    sink.observeLpLuFill(result.luMaxFill, result.luMaxDensity)
+    sink.lp.observePivots(result.pivots)
+    sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity)
     // LP-guided branching (#287): record the fractional primal + reduced costs so the descent can order
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.
@@ -397,7 +397,7 @@ internal fun LpEngine.sparseSafePrune(
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
             val r = dualSimplex(tightened.model, cancellation).solve() ?: break
-            sink.observeLpSolve()
+            sink.lp.observeSolve()
             boundRel = tightened
             boundRes = r
         }
@@ -405,7 +405,7 @@ internal fun LpEngine.sparseSafePrune(
     val safe = safeObjectiveLowerBound(boundRel.model, boundRes.duals) ?: return LpNodeOutcome(false, optimalBasis)
     val full = safe + boundRel.objectiveConstant.toDouble()
     if (canPrune && full >= bound) {
-        sink.observeLpPrune()
+        sink.lp.observePrune()
         return LpNodeOutcome(true, null)
     }
     // The exact basis-certificate backs both the learnable objective-bound reason (#281/#705) and the
@@ -452,7 +452,7 @@ internal fun LpEngine.sparseSafePrune(
                 session.implyIntAtLeast(objectiveVar, rounded.toInt())
             }
             if (res is PropagationResult.Unsat) {
-                sink.observeLpPrune()
+                sink.lp.observePrune()
                 return LpNodeOutcome(true, null)
             }
         }
@@ -588,10 +588,10 @@ internal fun LpEngine.applySparseReducedCostFixing(
             VarStatus.BASIC -> continue
         }
         if (res is PropagationResult.Unsat) {
-            sink.observeLpPrune()
+            sink.lp.observePrune()
             return true
         }
-        sink.observeLpFix()
+        sink.lp.observeFix()
     }
     return false
 }
@@ -614,7 +614,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     // common overflow source, so the base relaxation (no cuts) is what yields a sound — if looser — bound.
     val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
-    sink.observeLpSolve()
+    sink.lp.observeSolve()
     val result = dualSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
     // The integer-multiplier 128-bit bound: round the float duals and evaluate the Lagrangian exactly.
@@ -628,7 +628,7 @@ internal fun LpEngine.sparseCertifiedPrune(
         return LpNodeOutcome(false, null)
     }
     return if (full.toDouble() >= bound) {
-        sink.observeLpPrune()
+        sink.lp.observePrune()
         LpNodeOutcome(true, null)
     } else {
         LpNodeOutcome(false, null)

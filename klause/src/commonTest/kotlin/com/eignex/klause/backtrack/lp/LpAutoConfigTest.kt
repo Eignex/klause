@@ -344,12 +344,12 @@ class LpAutoConfigTest {
         val auto = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
         assertTrue(auto is MinimizeResult.Optimal)
         assertEquals(3.0, auto.objectiveValue)
-        assertTrue(auto.stats.lpSolves.sum > 0.0, "an LP emphasis must engage the node LP")
+        assertTrue(auto.stats.lp.solves.sum > 0.0, "an LP emphasis must engage the node LP")
 
         val plain = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
         assertTrue(plain is MinimizeResult.Optimal)
         assertEquals(3.0, plain.objectiveValue)
-        assertEquals(0.0, plain.stats.lpSolves.sum, "a null lpConfig leaves the LP family off")
+        assertEquals(0.0, plain.stats.lp.solves.sum, "a null lpConfig leaves the LP family off")
 
         // The CONSERVATIVE emphasis (FAST tier only) keeps the per-node simplex off — no solves.
         val conservative = BacktrackSolver(p).minimize(
@@ -357,7 +357,7 @@ class LpAutoConfigTest {
             BacktrackParams(randomSeed = 1L, lpConfig = LpConfig(LpEmphasis.CONSERVATIVE)),
         )
         assertTrue(conservative is MinimizeResult.Optimal && conservative.objectiveValue == 3.0)
-        assertEquals(0.0, conservative.stats.lpSolves.sum, "CONSERVATIVE runs no per-node simplex")
+        assertEquals(0.0, conservative.stats.lp.solves.sum, "CONSERVATIVE runs no per-node simplex")
     }
 
     @Test
