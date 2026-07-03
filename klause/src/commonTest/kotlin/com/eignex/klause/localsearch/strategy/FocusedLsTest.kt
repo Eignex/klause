@@ -1,15 +1,20 @@
 package com.eignex.klause.localsearch.strategy
 
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -81,4 +86,28 @@ class FocusedLsTest {
     @Test
     fun `simulated annealing with fast cooling solves small 3 sat`() =
         assertSolvesSat3("SimulatedAnnealing(fast)", SimulatedAnnealing(coolingRate = 0.99), seed = 1L)
+
+    @Test
+    fun `sa optimizer anneals the objective past first feasible`() {
+        // atLeastOne(b0, b1, b2): feasible ⇔ at least one true; objective = count of trues, so the
+        // optimum is 1. A feasibility finder bails at the first feasible (often 2–3 trues); the SA
+        // optimizer keeps annealing on the objective past feasibility down to the single-true optimum.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
+        )
+        val solver = LocalSearchSolver(
+            problem,
+            strategy = SimulatedAnnealing.optimizer(Geometric()),
+            optimizeStrategy = SimulatedAnnealing.optimizer(Geometric()),
+        )
+        val result = solver.minimize(
+            LinearObjective(boolWeights = longArrayOf(1, 1, 1)),
+            LocalSearchParams(maxFlips = 50_000, randomSeed = 7),
+        )
+        val best = assertIs<MinimizeResult.BestFound>(result, "SA optimizer should reach a feasible incumbent")
+        assertEquals(1.0, best.objective, "SA optimizer should anneal to the optimum (exactly one true)")
+    }
 }

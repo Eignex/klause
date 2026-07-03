@@ -2,6 +2,7 @@
 
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.factor.objective.objectiveBoundOverlay
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -49,14 +50,23 @@ internal class LocalSearchWorkerConfig(val recipe: LsRecipe) : WorkerConfig {
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?, // ignored: local search neither learns nor consumes clauses or cuts
     ): PortfolioWorker {
+        // On a COP, every arm optimizes. A recipe that drives objective descent itself (CBLS, SA) needs
+        // nothing; a violation-native one (probSAT / WalkSAT / feasibility-jump) gets an `objective ≤
+        // incumbent` ratchet overlaid on its problem and the shared bound to tighten — so no arm bails at
+        // feasibility on a COP. A CSP (no objective) leaves every arm a pure feasibility finder.
+        val (effectiveProblem, boundHandle) = if (objective != null && !recipe.drivesObjectiveDescent) {
+            objectiveBoundOverlay(problem, objective) ?: (problem to null)
+        } else {
+            problem to null
+        }
         val session = LocalSearchSolver(
-            problem,
+            effectiveProblem,
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
             definitionalSweep = definitionalSweep,
             perMoveInvariants = definitionalSweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
-        ).session()
+        ).apply { objectiveBound = boundHandle }.session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(
             randomSeed = seed + index,

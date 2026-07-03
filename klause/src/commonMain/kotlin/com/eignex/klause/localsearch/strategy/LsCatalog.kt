@@ -40,6 +40,14 @@ class LsRecipe(
      *  `implicitStructuredCap > 0` on permutation/assignment-shaped models). */
     val seedImplicitOnRestart: Boolean = false,
 ) {
+    /** Whether this recipe drives the objective descent itself (CBLS's unified path, SA's Metropolis
+     *  annealing). When false the recipe is violation-native (probSAT / WalkSAT / feasibility-jump): on a
+     *  COP the portfolio posts an `objective ≤ incumbent` ratchet so it optimizes anyway, and on a CSP it
+     *  is a pure feasibility finder. So no recipe fails to optimize on a COP — a CSP is the only
+     *  non-optimizing case. */
+    val drivesObjectiveDescent: Boolean
+        get() = strategy.drivesObjectiveDescent || optimizeStrategy?.drivesObjectiveDescent == true
+
     /** A copy with [transform] applied to the satisfy strategy and the optimize strategy (if any), so
      *  one axis edit rewrites both halves of the recipe consistently. */
     private inline fun mapStrategies(transform: (SourceDrivenStrategy) -> SourceDrivenStrategy): LsRecipe =
@@ -114,6 +122,15 @@ object LsCatalog {
         seedImplicitOnRestart = seedImplicitOnRestart,
     )
 
+    /** An SA recipe on the unified minimize path so Metropolis anneals on the objective at feasibility
+     *  (rather than bailing to the engine's greedy descent); on a CSP the minimize path is unused, so
+     *  this is identical to plain SA. Independent satisfy/optimize instances (SA carries schedule state). */
+    private fun saRecipe(label: String, schedule: Schedule, restart: RestartPolicy) = LsRecipe(
+        label,
+        SimulatedAnnealing.optimizer(schedule).withRestart(restart),
+        optimizeStrategy = SimulatedAnnealing.optimizer(schedule).withRestart(restart),
+    )
+
     /**
      * Fresh [LsRecipe] for a typed [LsArm] — the catalog's single factory. Exhaustive `when` so every
      * arm in [LsArm] must have a factory (and conversely every factory a typed arm); the per-arm
@@ -163,8 +180,7 @@ object LsCatalog {
 
         // Annealing + adaptive perturbation: the quality closer — adds no coverage but holds the final
         // best on 7 instances, the second-highest in the pool.
-        LsArm.SaAdaptivePerturb ->
-            LsRecipe(arm.label, SimulatedAnnealing().withRestart(AdaptivePerturbationRestart()))
+        LsArm.SaAdaptivePerturb -> saRecipe(arm.label, Geometric(), AdaptivePerturbationRestart())
 
         // Patient stall cadence (+1 uncovered, +3 best, one sole win).
         LsArm.CblsStallslowFixed -> cblsRecipe(arm.label, FixedCadenceRestart()) {
@@ -191,8 +207,7 @@ object LsCatalog {
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(tabu = TabuFilter.Disabled) }
 
         // Plain annealing: 5 raw firsts, all on instances the arms above also solve.
-        LsArm.SaFixed ->
-            LsRecipe(arm.label, SimulatedAnnealing().withRestart(FixedCadenceRestart(maxFlipsBeforeRestart = 50_000)))
+        LsArm.SaFixed -> saRecipe(arm.label, Geometric(), FixedCadenceRestart(maxFlipsBeforeRestart = 50_000))
 
         // Aggressive swap cap (raw 1/2, 191 improvements).
         LsArm.CblsPlateau64Fixed ->
@@ -229,8 +244,8 @@ object LsCatalog {
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(stallCliqueSwapCap = 8, tabu = cblsTabu()) }
 
         // Feasibility-Jump arm: a weighted-violation argmin-jump strategy, orthogonal to the
-        // step-based CBLS/WalkSAT/SA arms. It drives the feasibility fight and returns null at
-        // feasibility, so the engine's built-in objective descent owns the optimize phase.
+        // step-based CBLS/WalkSAT/SA arms. Violation-native (returns null at feasibility), so on a COP
+        // the portfolio's objective-bound ratchet drives its optimize phase, exactly like probSAT/WalkSAT.
         LsArm.FeasibilityJumpFixed ->
             LsRecipe(arm.label, FeasibilityJump().withRestart(FixedCadenceRestart()))
 
@@ -255,24 +270,23 @@ object LsCatalog {
         // SA with periodic reheating: the schedule re-diversifies a cooled-and-stuck run without
         // discarding the incumbent. Restart epoch (100k) spans several reheat periods (20k) so the
         // reheats fire before a restart resets the schedule.
-        LsArm.SaReheatFixed -> LsRecipe(
+        LsArm.SaReheatFixed -> saRecipe(
             arm.label,
-            SimulatedAnnealing.withSchedule(Reheating(Geometric(), period = 20_000, reheatFactor = 4.0))
-                .withRestart(FixedCadenceRestart(maxFlipsBeforeRestart = 100_000)),
+            Reheating(Geometric(), period = 20_000, reheatFactor = 4.0),
+            FixedCadenceRestart(maxFlipsBeforeRestart = 100_000),
         )
 
         // SA with an explore→exploit phased schedule: a hot, fast-cooling exploratory leg then a cool,
         // slow-cooling exploitative leg, looped. Distinct landscape coverage from the fixed-rate arms.
-        LsArm.SaPhasedFixed -> LsRecipe(
+        LsArm.SaPhasedFixed -> saRecipe(
             arm.label,
-            SimulatedAnnealing.withSchedule(
-                LoopSchedule(
-                    listOf(
-                        Segment(Geometric(initialTemperature = 2.0, coolingRate = 0.99), steps = 10_000),
-                        Segment(Geometric(initialTemperature = 0.3, coolingRate = 0.9995), steps = 40_000),
-                    ),
+            LoopSchedule(
+                listOf(
+                    Segment(Geometric(initialTemperature = 2.0, coolingRate = 0.99), steps = 10_000),
+                    Segment(Geometric(initialTemperature = 0.3, coolingRate = 0.9995), steps = 40_000),
                 ),
-            ).withRestart(FixedCadenceRestart(maxFlipsBeforeRestart = 100_000)),
+            ),
+            FixedCadenceRestart(maxFlipsBeforeRestart = 100_000),
         )
     }
 
