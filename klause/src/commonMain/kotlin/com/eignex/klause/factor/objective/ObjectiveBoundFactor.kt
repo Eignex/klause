@@ -28,16 +28,21 @@ internal fun objectiveBoundOverlay(
     return problem.withAppendedFactor(factor) to bound
 }
 
-/** A copy of this problem with [extra] appended to its factors, carrying over the bake inputs (probe
- *  flags default off — the base is already probed). An implied-factor mask grows by one non-implied slot. */
+/** A copy of this problem with [extra] appended to its factors, reusing the base's bake rather than
+ *  paying a fresh one. The appended factor is [NoPropagator], so it changes nothing the bake would
+ *  derive; the base's domains are already folded, so `preFolded` skips the redundant construction-time
+ *  fold and `seedDeductions` carries the base's proven deductions (a no-op on already-tightened domains)
+ *  so the deferred bake stays exact. An implied-factor mask grows by one non-implied slot. */
 private fun Problem.withAppendedFactor(extra: Factor): Problem = Problem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
     intDomains = intDomains,
     factors = factors + extra,
+    seedDeductions = baked,
     cancellation = cancellation,
     impliedFactorMask = impliedFactorMask?.let { it + false },
     hasSymmetryBreaking = hasSymmetryBreaking,
+    preFolded = true,
 )
 
 /**
