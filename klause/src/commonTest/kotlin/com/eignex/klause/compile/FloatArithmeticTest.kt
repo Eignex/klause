@@ -1,5 +1,7 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.gt
@@ -9,8 +11,6 @@ import com.eignex.klause.schema.minus
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
 import com.eignex.klause.schema.unaryMinus
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.solver.Move
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntIntMap
 import kotlin.math.abs
@@ -98,7 +98,7 @@ internal class FunctionalObjective internal constructor(
      * values the cone used to rebuild on every move (the dominant per-move allocation, since
      * [deltaIfApplied] evaluates the cone twice). The slot index is computed once; the value array
      * is allocated per [evaluate], so a single instance stays safe to share across concurrent
-     * local-search workers (the objective is held in [com.eignex.klause.solver.localsearch.LocalSearchParams]).
+     * local-search workers (the objective is held in [com.eignex.klause.localsearch.LocalSearchParams]).
      */
     private class ConeMemo(private val nodes: List<Node>, private val objectiveVar: Int) {
         /** Node-output varId → its value-array slot; an id with no defining node (a leaf) maps to `-1`.

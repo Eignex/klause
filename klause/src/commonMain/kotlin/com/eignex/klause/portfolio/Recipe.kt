@@ -1,19 +1,19 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.localsearch.AdaptivePerturbationRestart
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LubyRestart
-import com.eignex.klause.solver.localsearch.RestartPolicy
-import com.eignex.klause.solver.localsearch.TabuFilter
-import com.eignex.klause.solver.localsearch.acceptance.AcceptanceRule
-import com.eignex.klause.solver.localsearch.movesource.MoveSourceCatalog
-import com.eignex.klause.solver.localsearch.schedule.Geometric
-import com.eignex.klause.solver.localsearch.schedule.Reheating
-import com.eignex.klause.solver.localsearch.schedule.Schedule
-import com.eignex.klause.solver.localsearch.schedule.ScheduleBundle
-import com.eignex.klause.solver.localsearch.scoring.MoveScoring
-import com.eignex.klause.solver.localsearch.strategy.LsRecipe
-import com.eignex.klause.solver.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.localsearch.AdaptivePerturbationRestart
+import com.eignex.klause.localsearch.FixedCadenceRestart
+import com.eignex.klause.localsearch.LubyRestart
+import com.eignex.klause.localsearch.RestartPolicy
+import com.eignex.klause.localsearch.TabuFilter
+import com.eignex.klause.localsearch.acceptance.AcceptanceRule
+import com.eignex.klause.localsearch.movesource.MoveSourceCatalog
+import com.eignex.klause.localsearch.schedule.Geometric
+import com.eignex.klause.localsearch.schedule.Reheating
+import com.eignex.klause.localsearch.schedule.Schedule
+import com.eignex.klause.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import kotlin.random.Random
 
 /**
@@ -22,7 +22,7 @@ import kotlin.random.Random
  * worker, building fresh stateful instances each call (per the portfolio's no-shared-state rule).
  *
  * All four axes fold into the driver's single
- * [com.eignex.klause.solver.localsearch.schedule.ScheduleBundle] schedule axis: the restart cadence
+ * [com.eignex.klause.localsearch.schedule.ScheduleBundle] schedule axis: the restart cadence
  * as its `restart` member, the SA temperature (via [AcceptanceOption.temperature]) as its
  * `temperature` member.
  */

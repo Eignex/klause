@@ -1,5 +1,11 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.lp.LinearRow
+import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.NoLinearizer
+import com.eignex.klause.propagation.Propagator
+
 /** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
  *  the two var spaces (purely-Boolean ones leave [Factor.intVars] empty; purely-integer
  *  ones leave [Factor.boolVars] empty) wire this in instead of allocating their own
@@ -46,7 +52,7 @@ interface Factor {
      * `scale·replacement + offset`, or `null` when this factor cannot represent that substitution
      * exactly. Lets affine variable elimination (`AffineSingletons`) project out an `x` defined by
      * `x = scale·y + offset` even when it appears in a non-linear global — provided the global can
-     * absorb the affine view (e.g. an [com.eignex.klause.solver.factor.table.Element] index shift
+     * absorb the affine view (e.g. an [com.eignex.klause.factor.table.Element] index shift
      * folds into its offset). The default declines (`null`): substituting an affine expression for a
      * bare variable is unsound for a factor that reasons over the variable's value directly, so a
      * factor opts in only for forms it can rewrite faithfully. Must replace **every** occurrence of
@@ -84,7 +90,7 @@ interface Factor {
     /**
      * An estimate of [structuralKey]'s size — the cost of building and hashing it once. Symmetry
      * detection's colour refinement rebuilds a factor's key once per incident variable each round, so a
-     * factor with a large constant payload (a [com.eignex.klause.solver.factor.table.Table]'s tuple set,
+     * factor with a large constant payload (a [com.eignex.klause.factor.table.Table]'s tuple set,
      * an Element constant array) costs `Θ(weight)` per such rebuild; the search uses `Σ degree·weight`
      * to decide when refinement is too expensive to attempt. The default — the variable count — fits
      * factors whose key is just their variables; data-heavy factors override to add their constant size.
@@ -104,8 +110,8 @@ interface Factor {
     /**
      * A copy of this factor with every *value-dependent constant* relabeled through [valueMap]
      * (`newValue = valueMap(oldValue)`) — the value analog of [remap]. Relabels things that
-     * name domain values: an [com.eignex.klause.solver.factor.global.GlobalCardinality] cover, a
-     * [com.eignex.klause.solver.factor.table.Table]'s tuples, an Element constant array, Regular/Mdd
+     * name domain values: an [com.eignex.klause.factor.global.GlobalCardinality] cover, a
+     * [com.eignex.klause.factor.table.Table]'s tuples, an Element constant array, Regular/Mdd
      * symbols. Variable ids, coefficients, and structural positions are unchanged.
      *
      * Used by value-symmetry detection to *verify* that a value permutation maps the factor set to
@@ -113,7 +119,7 @@ interface Factor {
      * permutation is a symmetry, the value analog of the [remap]-based automorphism check.
      *
      * `null` (the default) means "not value-relabelable" — arithmetic / value-meaningful factors
-     * ([com.eignex.klause.solver.factor.arithmetic.Linear], Product) where a value carries magnitude, not just
+     * ([com.eignex.klause.factor.arithmetic.Linear], Product) where a value carries magnitude, not just
      * identity, and a factor whose values live in more than one universe (e.g. a GCC with count
      * *variables*) which can't be relabeled by a single map. A `null` anywhere conservatively blocks
      * value symmetry for the whole problem. A [isValueAnonymous] factor returns `this` (no constant
@@ -145,7 +151,7 @@ interface Factor {
      *
      * Lets presolve analyses (redundancy, domination) read the linear content of any factor
      * uniformly instead of pattern-matching the concrete
-     * [com.eignex.klause.solver.factor.arithmetic.Linear] type. Read-only: it carries no write-back, so
+     * [com.eignex.klause.factor.arithmetic.Linear] type. Read-only: it carries no write-back, so
      * passes that *rewrite* a factor still go through [structuralReduce] / [substituteAffine].
      */
     fun linearRows(): List<LinearRow>? = null

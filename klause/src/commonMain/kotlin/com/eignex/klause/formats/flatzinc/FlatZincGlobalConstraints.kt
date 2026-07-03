@@ -1,28 +1,28 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.circuit.Subcircuit
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.global.Inverse
+import com.eignex.klause.factor.global.LexLess
+import com.eignex.klause.factor.global.NValue
+import com.eignex.klause.factor.global.Sort
+import com.eignex.klause.factor.global.SymmetricAllDifferent
+import com.eignex.klause.factor.global.ValuePrecede
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Diffn
+import com.eignex.klause.factor.scheduling.Disjunctive
+import com.eignex.klause.factor.table.Mdd
+import com.eignex.klause.factor.table.Regular
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.factor.arithmetic.Linear
-import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.solver.factor.bool.Cardinality
-import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.factor.circuit.Circuit
-import com.eignex.klause.solver.factor.circuit.Subcircuit
-import com.eignex.klause.solver.factor.global.AllDifferent
-import com.eignex.klause.solver.factor.global.GlobalCardinality
-import com.eignex.klause.solver.factor.global.Inverse
-import com.eignex.klause.solver.factor.global.LexLess
-import com.eignex.klause.solver.factor.global.NValue
-import com.eignex.klause.solver.factor.global.Sort
-import com.eignex.klause.solver.factor.global.SymmetricAllDifferent
-import com.eignex.klause.solver.factor.global.ValuePrecede
-import com.eignex.klause.solver.factor.scheduling.Cumulative
-import com.eignex.klause.solver.factor.scheduling.Diffn
-import com.eignex.klause.solver.factor.scheduling.Disjunctive
-import com.eignex.klause.solver.factor.table.Mdd
-import com.eignex.klause.solver.factor.table.Regular
-import com.eignex.klause.solver.factor.table.Table
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)

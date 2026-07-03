@@ -1,10 +1,10 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.inverse
 import com.eignex.klause.schema.symmetricAllDifferent
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

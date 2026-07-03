@@ -1,14 +1,14 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.propagation.PropagationResult
-import com.eignex.klause.solver.propagation.PropagationSession
 
 /**
  * Result of [satisfyUnderAssumptions]. Distinguishes a satisfying model, a hypothesis-level
@@ -16,7 +16,7 @@ import com.eignex.klause.solver.propagation.PropagationSession
  * are jointly unsat), a budget cap, and a globally-unsat problem (independent of the
  * assumptions).
  *
- * Used by the core-guided MaxSAT loop ([com.eignex.klause.solver.meta.coreguided.CoreGuidedOptimizer])
+ * Used by the core-guided MaxSAT loop ([com.eignex.klause.meta.coreguided.CoreGuidedOptimizer])
  * which drives a sequence of `satisfy(assumptions)` calls and refines its lower bound off
  * each [UnsatUnderAssumptions.core].
  */

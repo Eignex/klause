@@ -1,10 +1,10 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.bool.Cardinality
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails

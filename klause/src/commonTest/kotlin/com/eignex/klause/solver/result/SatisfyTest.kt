@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

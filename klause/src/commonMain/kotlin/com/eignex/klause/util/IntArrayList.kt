@@ -30,7 +30,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
     /** Find the first occurrence of [value] and swap-remove it (O(1) removal, O(n) find);
      *  returns true if found. Hoists [data] / [size] into locals so the scan is a tight
      *  primitive-array loop with no per-iteration accessor or field reload — this is the
-     *  hot watcher-list removal in [com.eignex.klause.solver.propagation.moveBoolWatcher]. */
+     *  hot watcher-list removal in [com.eignex.klause.propagation.moveBoolWatcher]. */
     fun removeValue(value: Int): Boolean {
         val d = data
         val n = size

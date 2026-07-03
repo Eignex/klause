@@ -1,15 +1,15 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.localsearch.FixedCadenceRestart
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.pbAtLeast
 import com.eignex.klause.schema.pbAtMost
 import com.eignex.klause.schema.pbExactly
-import com.eignex.klause.solver.factor.arithmetic.ReifiedPseudoBoolean
-import com.eignex.klause.solver.factor.bool.PseudoBoolean
-import com.eignex.klause.solver.localsearch.FixedCadenceRestart
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

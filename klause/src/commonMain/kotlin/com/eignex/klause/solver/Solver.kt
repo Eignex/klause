@@ -1,15 +1,15 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.count.AnytimeCounter
-import com.eignex.klause.solver.count.ApproxCountConfig
-import com.eignex.klause.solver.count.ApproxMC
-import com.eignex.klause.solver.count.Count
-import com.eignex.klause.solver.count.CountConfig
-import com.eignex.klause.solver.count.ExactCountConfig
-import com.eignex.klause.solver.count.SampleQuality
-import com.eignex.klause.solver.count.SamplingConfig
-import com.eignex.klause.solver.count.UniGen
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.count.AnytimeCounter
+import com.eignex.klause.count.ApproxCountConfig
+import com.eignex.klause.count.ApproxMC
+import com.eignex.klause.count.Count
+import com.eignex.klause.count.CountConfig
+import com.eignex.klause.count.ExactCountConfig
+import com.eignex.klause.count.SampleQuality
+import com.eignex.klause.count.SamplingConfig
+import com.eignex.klause.count.UniGen
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
@@ -73,7 +73,7 @@ sealed interface SolveResult {
          * UNSAT, the subset of those assumptions whose decision levels were touched by
          * any conflict's 1UIP analysis during the search. Sound (jointly infeasible
          * with the hard constraints) but not guaranteed minimal — populated by
-         * [com.eignex.klause.solver.backtrack.BacktrackSolver]; other backends leave
+         * [com.eignex.klause.backtrack.BacktrackSolver]; other backends leave
          * this `null`. Used by [com.eignex.klause.solver.result.satisfyUnderAssumptions] to surface a tight
          * [com.eignex.klause.solver.result.SatisfyResult.UnsatUnderAssumptions.core] without the
          * `minimizeCore = true` deletion-MUS fallback.

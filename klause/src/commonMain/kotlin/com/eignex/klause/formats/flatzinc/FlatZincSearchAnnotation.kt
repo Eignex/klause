@@ -1,28 +1,28 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackPresets
-import com.eignex.klause.solver.backtrack.SearchTier
-import com.eignex.klause.solver.backtrack.TierVarSelect
-import com.eignex.klause.solver.backtrack.TieredValueSelector
-import com.eignex.klause.solver.backtrack.TieredVariableSelector
-import com.eignex.klause.solver.backtrack.selector.DomWdeg
-import com.eignex.klause.solver.backtrack.selector.DomainMaxRegret
-import com.eignex.klause.solver.backtrack.selector.IndomainMax
-import com.eignex.klause.solver.backtrack.selector.IndomainMedian
-import com.eignex.klause.solver.backtrack.selector.IndomainMiddle
-import com.eignex.klause.solver.backtrack.selector.IndomainMin
-import com.eignex.klause.solver.backtrack.selector.IndomainRandom
-import com.eignex.klause.solver.backtrack.selector.IndomainSplit
-import com.eignex.klause.solver.backtrack.selector.InputOrder
-import com.eignex.klause.solver.backtrack.selector.LargestDomain
-import com.eignex.klause.solver.backtrack.selector.LargestUpperBound
-import com.eignex.klause.solver.backtrack.selector.RandomVariable
-import com.eignex.klause.solver.backtrack.selector.SmallestDomain
-import com.eignex.klause.solver.backtrack.selector.SmallestLowerBound
-import com.eignex.klause.solver.backtrack.selector.SolutionGuided
-import com.eignex.klause.solver.backtrack.selector.ValueSelector
-import com.eignex.klause.solver.backtrack.selector.VariableSelector
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.SearchTier
+import com.eignex.klause.backtrack.TierVarSelect
+import com.eignex.klause.backtrack.TieredValueSelector
+import com.eignex.klause.backtrack.TieredVariableSelector
+import com.eignex.klause.backtrack.selector.DomWdeg
+import com.eignex.klause.backtrack.selector.DomainMaxRegret
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.IndomainMedian
+import com.eignex.klause.backtrack.selector.IndomainMiddle
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.IndomainRandom
+import com.eignex.klause.backtrack.selector.IndomainSplit
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.LargestDomain
+import com.eignex.klause.backtrack.selector.LargestUpperBound
+import com.eignex.klause.backtrack.selector.RandomVariable
+import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.backtrack.selector.SmallestLowerBound
+import com.eignex.klause.backtrack.selector.SolutionGuided
+import com.eignex.klause.backtrack.selector.ValueSelector
+import com.eignex.klause.backtrack.selector.VariableSelector
 
 /** Map `solve :: *_search(...)` annotations to [BacktrackParams]. */
 internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {

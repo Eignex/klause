@@ -1,14 +1,14 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.circuit
 import com.eignex.klause.schema.cumulative
 import com.eignex.klause.schema.disjunctive
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.factor.circuit.Circuit
-import com.eignex.klause.solver.factor.scheduling.Cumulative
-import com.eignex.klause.solver.factor.scheduling.Disjunctive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

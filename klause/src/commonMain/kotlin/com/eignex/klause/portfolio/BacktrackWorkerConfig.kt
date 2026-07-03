@@ -1,15 +1,15 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.lp.LpConfig
+import com.eignex.klause.backtrack.lp.LpEmphasis
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.RegressionVariableSelector
+import com.eignex.klause.backtrack.selector.SolutionGuided
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackPresets
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.backtrack.lp.LpConfig
-import com.eignex.klause.solver.backtrack.lp.LpEmphasis
-import com.eignex.klause.solver.backtrack.selector.IndomainMin
-import com.eignex.klause.solver.backtrack.selector.RegressionVariableSelector
-import com.eignex.klause.solver.backtrack.selector.SolutionGuided
-import com.eignex.klause.solver.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent

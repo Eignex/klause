@@ -1,11 +1,11 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.Not
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

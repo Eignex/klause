@@ -1,9 +1,9 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.factor.arithmetic.Linear
-import com.eignex.klause.solver.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.factor.global.AllDifferent
-import com.eignex.klause.solver.factor.global.Increasing
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.Increasing
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

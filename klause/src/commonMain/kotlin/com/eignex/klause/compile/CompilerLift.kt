@@ -1,5 +1,7 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.factor.IntFunctionLowering
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.model.BoolExpr
 import com.eignex.klause.model.Implies
 import com.eignex.klause.model.IntAbs
@@ -20,8 +22,6 @@ import com.eignex.klause.model.IntSum
 import com.eignex.klause.model.Not
 import com.eignex.klause.model.SetCard
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.factor.IntFunctionLowering
-import com.eignex.klause.solver.factor.arithmetic.Product
 
 /**
  * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the

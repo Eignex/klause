@@ -52,7 +52,7 @@ interface ResumableSearch : AutoCloseable {
 
 /**
  * An [Optimizer] that can hand out a [ResumableSearch] over a given objective — i.e. one whose B&B
- * search state can be paused and resumed across slices. [com.eignex.klause.solver.backtrack.BacktrackSolver]
+ * search state can be paused and resumed across slices. [com.eignex.klause.backtrack.BacktrackSolver]
  * implements this; local search does not (it restarts cheaply from a warm-started incumbent instead).
  */
 interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {

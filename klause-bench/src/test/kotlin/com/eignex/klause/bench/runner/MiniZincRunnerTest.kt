@@ -1,13 +1,13 @@
 package com.eignex.klause.bench.runner
 
+import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.backtrack.BacktrackPresets
-import com.eignex.klause.solver.backtrack.BacktrackSolver
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue

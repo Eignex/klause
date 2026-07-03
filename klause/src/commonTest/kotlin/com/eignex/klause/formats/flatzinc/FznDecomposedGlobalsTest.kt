@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.backtrack.BacktrackParams
-import com.eignex.klause.solver.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

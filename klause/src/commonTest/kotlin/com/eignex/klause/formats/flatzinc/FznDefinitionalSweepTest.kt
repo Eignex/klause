@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.localsearch.LocalSearchParams
-import com.eignex.klause.solver.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.localsearch.LocalSearchState
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

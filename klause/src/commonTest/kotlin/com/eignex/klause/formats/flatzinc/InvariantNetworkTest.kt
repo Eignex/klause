@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.solver.Move
-import com.eignex.klause.solver.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

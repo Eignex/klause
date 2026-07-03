@@ -3,7 +3,7 @@ package com.eignex.klause.bench.catalog
 import com.eignex.klause.bench.OpbFormat
 import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.solver.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.PseudoBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

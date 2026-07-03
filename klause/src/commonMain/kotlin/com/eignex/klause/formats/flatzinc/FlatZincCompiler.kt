@@ -4,14 +4,14 @@ import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.presolve.PresolveContext
+import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.factor.bool.Clause
-import com.eignex.klause.solver.presolve.PresolveContext
-import com.eignex.klause.solver.presolve.PresolvePass
 import com.eignex.klause.util.binarySearchInt
 
 /** Compile parsed FlatZinc AST into solver data structures. */

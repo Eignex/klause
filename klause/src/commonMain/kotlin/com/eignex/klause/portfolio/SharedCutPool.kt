@@ -1,8 +1,8 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.lp.cut.CutExchange
-import com.eignex.klause.solver.lp.cut.CutSharing
-import com.eignex.klause.solver.lp.cut.SharedCut
+import com.eignex.klause.lp.cut.CutExchange
+import com.eignex.klause.lp.cut.CutSharing
+import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
