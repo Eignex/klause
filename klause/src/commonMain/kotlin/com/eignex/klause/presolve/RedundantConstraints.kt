@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.kumulant.math.splitmix64
@@ -44,7 +45,7 @@ internal object RedundantConstraints {
      * (maximal activity already within the bound) are dropped by the strengthen lift, so this pass is
      * purely cross-constraint.
      */
-    fun removeRedundantConstraints(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
+    fun removeRedundantConstraints(problem: Problem): PassDelta {
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
         // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
@@ -129,8 +130,16 @@ internal object RedundantConstraints {
         // Phase 5: drop globals the current domains make vacuously satisfied (#553); removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
         val out5 = out4.filterNot { isVacuousGlobal(it, problem.intDomains) }
-        if (out5.size == factors.size) return problem
-        return PresolveShared.rebuildProblem(problem, out5, bakeConfig = bakeConfig)
+        if (out5.size == factors.size) return PassDelta()
+        // This pass only drops; every survivor in [out5] is identity-equal to an input factor, in input
+        // order, so a two-pointer walk recovers the dropped input indices (correct even with reference
+        // duplicates, which Phase 1 collapses to one survivor).
+        val dropped = IntArrayList(factors.size - out5.size)
+        var p = 0
+        for (i in factors.indices) {
+            if (p < out5.size && factors[i] === out5[p]) p++ else dropped.add(i)
+        }
+        return PassDelta(dropped.toIntArray())
     }
 
     /** Whether [factor] is a global constraint that the current [domains] make *vacuously* satisfied —

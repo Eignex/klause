@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.IntArrayList
 
 internal object CoefficientStrengthening {
 
@@ -27,28 +28,32 @@ internal object CoefficientStrengthening {
      * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
      * Other factor types pass through untouched.
      */
-    fun strengthenCoefficients(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
-        val out = ArrayList<Factor>(problem.factors.size)
-        var changed = false
-        for (factor in problem.factors) {
+    fun strengthenCoefficients(problem: Problem): PassDelta {
+        val dropped = IntArrayList()
+        val added = ArrayList<Factor>()
+        problem.factors.forEachIndexed { i, factor ->
             // An equality whose coefficient GCD does not divide its bound can never hold; replace it by
             // an explicit contradiction (the original is redundant once the problem is infeasible).
             val contradiction = equalityContradiction(factor, problem.intDomains)
             if (contradiction != null) {
-                out.addAll(contradiction)
-                changed = true
-                continue
+                dropped.add(i)
+                added.addAll(contradiction)
+                return@forEachIndexed
             }
             val rewritten = when (factor) {
                 is Linear -> strengthenLinear(factor, problem.intDomains)
                 is PseudoBoolean -> strengthenPb(factor)
                 else -> factor
             }
-            if (rewritten !== factor) changed = true
-            if (rewritten != null) out.add(rewritten)
+            // A rewrite replaces the input factor; a `null` drops it (always satisfied); an unchanged
+            // factor contributes nothing to the delta.
+            if (rewritten !== factor) {
+                dropped.add(i)
+                if (rewritten != null) added.add(rewritten)
+            }
         }
-        if (!changed) return problem
-        return PresolveShared.rebuildProblem(problem, out, problem.intDomains.copyOf(), bakeConfig)
+        if (dropped.isEmpty()) return PassDelta()
+        return PassDelta(dropped.toIntArray(), added)
     }
 
     /** The factors that make the model infeasible when [factor] is an equality whose coefficient GCD

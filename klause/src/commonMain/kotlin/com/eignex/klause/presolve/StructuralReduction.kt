@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.IntArrayList
 
 internal object StructuralReduction {
 
@@ -13,17 +14,17 @@ internal object StructuralReduction {
      * solution-set exact (the hook's contract), so the pass preserves the solution set; the driver only
      * collects the replacements, intersects any returned bound narrowings into the domains, and rebuilds.
      */
-    fun reduce(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
-        var changed = false
+    fun reduce(problem: Problem): PassDelta {
+        val dropped = IntArrayList()
+        val added = ArrayList<Factor>()
         var domains: Array<IntDomain>? = null
-        val out = ArrayList<Factor>(problem.factors.size)
-        for (f in problem.factors) {
+        problem.factors.forEachIndexed { i, f ->
             when (val reduction = f.structuralReduce(problem.intDomains)) {
-                FactorReduction.Unchanged -> out.add(f)
+                FactorReduction.Unchanged -> {}
 
                 is FactorReduction.Rewrite -> {
-                    changed = true
-                    out.addAll(reduction.replacement)
+                    dropped.add(i)
+                    added.addAll(reduction.replacement)
                     for ((v, range) in reduction.tightenedBounds) {
                         val d = domains ?: problem.intDomains.copyOf().also { domains = it }
                         d[v] = d[v].withMinAtLeast(range.first).withMaxAtMost(range.last)
@@ -31,12 +32,7 @@ internal object StructuralReduction {
                 }
             }
         }
-        if (!changed) return problem
-        return PresolveShared.rebuildProblem(
-            problem,
-            out,
-            domains ?: problem.intDomains.copyOf(),
-            bakeConfig = bakeConfig,
-        )
+        if (dropped.isEmpty()) return PassDelta()
+        return PassDelta(dropped.toIntArray(), added, domains)
     }
 }

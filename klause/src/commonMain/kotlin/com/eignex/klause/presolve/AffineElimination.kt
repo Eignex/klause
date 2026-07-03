@@ -42,9 +42,8 @@ internal object AffineSingletons {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-        bakeConfig: BakeConfig = BakeConfig.NONE,
-    ): AffineElimination {
-        if (problem.numIntVars == 0) return AffineElimination(problem, emptyList())
+    ): PassDelta {
+        if (problem.numIntVars == 0) return PassDelta()
         var factors = problem.factors.toList()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
@@ -71,11 +70,11 @@ internal object AffineSingletons {
             eliminated[r.x] = true
             subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), intArrayOf(r.coeffY), divisor = r.divisor))
         }
-        if (subs.isEmpty()) return AffineElimination(problem, emptyList())
-        return AffineElimination(
-            PresolveShared.rebuildProblem(problem, factors, domains, bakeConfig = bakeConfig),
-            subs,
-        )
+        if (subs.isEmpty()) return PassDelta()
+        // The eliminations rebuilt the factor list in place; recover the delta against the input by
+        // identity — every survivor is === an input factor, so the drops are the inputs absent from
+        // [factors] and the adds are the factors [foldOutVariable] introduced (rewrites + domain bounds).
+        return PresolveShared.identityDelta(problem.factors, factors, domains, AffineElimination(subs)::reconstruct)
     }
 
     /** Cap on a residue partner's domain span: scanning each value to build the restricted domain is
@@ -366,16 +365,12 @@ internal class AffineSub(
 )
 
 /**
- * Reduced problem from [Presolve.eliminateAffineSingletons] plus the data to rebuild the
- * eliminated variables. Solve [problem], then pass the solution through [reconstruct] to recover
- * a solution of the original problem.
+ * The affine eliminations [Presolve.eliminateAffineSingletons] made, holding the data to rebuild the
+ * eliminated variables. Pass a solution of the reduced problem through [reconstruct] to recover a
+ * solution of the original.
  */
-class AffineElimination internal constructor(
-    /** The problem with affine-defined variables eliminated. */
-    val problem: Problem,
-    private val subs: List<AffineSub>,
-) {
-    /** Recover the eliminated variables in a solution [sample] of [problem]. Processed in reverse
+internal class AffineElimination(private val subs: List<AffineSub>) {
+    /** Recover the eliminated variables in a solution [sample] of the reduced problem. Processed in reverse
      *  elimination order: an eliminated `x` may depend on a `y` eliminated later (a chain), and a
      *  later elimination never depends on an earlier one (the candidate scan skips already-eliminated
      *  partners), so reverse order guarantees every `y` is reconstructed before the `x` that reads it. */

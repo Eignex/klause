@@ -46,8 +46,7 @@ internal object DominatedVariables {
         problem: Problem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
-        bakeConfig: BakeConfig = BakeConfig.NONE,
-    ): Problem {
+    ): PassDelta {
         val n = problem.numIntVars
         val downSafe = BooleanArray(n) { true }
         val upSafe = BooleanArray(n) { true }
@@ -77,7 +76,7 @@ internal object DominatedVariables {
             }
             markBoolSafety(f, trueSafe, falseSafe, boolEligible, alreadyPinned)
         }
-        var changed = false
+        var domainsNarrowed = false
         val domains = problem.intDomains.copyOf()
         for (v in 0 until n) {
             if (!intEligible[v]) continue
@@ -87,12 +86,12 @@ internal object DominatedVariables {
             when {
                 downSafe[v] && c >= 0L -> {
                     domains[v] = IntDomain(d.min, d.min)
-                    changed = true
+                    domainsNarrowed = true
                 }
 
                 upSafe[v] && c <= 0L -> {
                     domains[v] = IntDomain(d.max, d.max)
-                    changed = true
+                    domainsNarrowed = true
                 }
             }
         }
@@ -105,15 +104,11 @@ internal object DominatedVariables {
                 falseSafe[b] && c >= 0L -> extra.add(Clause(intArrayOf(Lit.make(b, false))))
                 else -> continue
             }
-            changed = true
         }
-        if (!changed) return problem
-        return PresolveShared.rebuildProblem(
-            problem,
-            problem.factors.toList() + extra,
-            domains,
-            bakeConfig = bakeConfig,
-        )
+        if (!domainsNarrowed && extra.isEmpty()) return PassDelta()
+        // Carry the pinned domains only when a pin actually narrowed one, so a bool-only fixing yields a
+        // pure-add delta the fixpoint check reads correctly.
+        return PassDelta(addedFactors = extra, domains = if (domainsNarrowed) domains else null)
     }
 
     /** Fold [f]'s contribution to the Boolean pure-literal safety analysis (#469/#470). A bool var is

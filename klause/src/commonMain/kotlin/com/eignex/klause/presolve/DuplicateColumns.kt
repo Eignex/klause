@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
 internal object DuplicateColumns {
@@ -45,12 +46,8 @@ internal object DuplicateColumns {
      * re-signs against the widened aggregate and is picked up on a later round, keeping every merge a
      * two-variable aggregate over *declared* domains that the contiguous split reconstructs exactly.
      */
-    fun mergeDuplicateColumns(
-        problem: Problem,
-        objectiveIntVars: Set<Int> = emptySet(),
-        bakeConfig: BakeConfig = BakeConfig.NONE,
-    ): DuplicateColumnMerge {
-        if (problem.numIntVars < 2) return DuplicateColumnMerge(problem, emptyList())
+    fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta {
+        if (problem.numIntVars < 2) return PassDelta()
         val eligible = eligibleColumns(problem, objectiveIntVars)
         val signatures = columnSignatures(problem, eligible)
         // Group eligible variables by column signature; equal signatures are duplicate columns. Fold
@@ -76,20 +73,29 @@ internal object DuplicateColumns {
                 repConsumed.add(rep)
             }
         }
-        if (merges.isEmpty()) return DuplicateColumnMerge(problem, emptyList())
+        if (merges.isEmpty()) return PassDelta()
 
         val keepOf = IntArray(problem.numIntVars) { it } // drop → its aggregate representative
         val domains = problem.intDomains.copyOf()
         for (m in merges) {
             keepOf[m.drop] = m.keep
             val keep = domains[m.keep]
+            // Widen the aggregate to the Minkowski sum; the session must reseed on this widen, so it flows
+            // through [PassDelta.domains].
             domains[m.keep] = IntDomain(keep.min + m.dropDomain.min, keep.max + m.dropDomain.max)
         }
-        val factors = problem.factors.map { aggregateColumns(it, keepOf) }
-        return DuplicateColumnMerge(
-            PresolveShared.rebuildProblem(problem, factors, domains, bakeConfig = bakeConfig),
-            merges,
-        )
+        // Each row is rewritten in place; the changed ones become drop+add, the untouched ones (identity
+        // unchanged) contribute nothing.
+        val dropped = IntArrayList()
+        val added = ArrayList<Factor>()
+        problem.factors.forEachIndexed { i, f ->
+            val rewritten = aggregateColumns(f, keepOf)
+            if (rewritten !== f) {
+                dropped.add(i)
+                added.add(rewritten)
+            }
+        }
+        return PassDelta(dropped.toIntArray(), added, domains, DuplicateColumnMerge(merges)::reconstruct)
     }
 
     /** [factor] with every dropped duplicate column folded into its representative: in a [Linear] row,
@@ -154,16 +160,12 @@ internal object DuplicateColumns {
 internal class ColumnMerge(val keep: Int, val drop: Int, val keepDomain: IntDomain, val dropDomain: IntDomain)
 
 /**
- * Reduced problem from [Presolve.mergeDuplicateColumns] plus the data to split each aggregate
- * variable back into its two originals. Solve [problem], then pass the solution through
- * [reconstruct] to recover a solution of the original problem.
+ * The duplicate-column aggregations [Presolve.mergeDuplicateColumns] made, holding the data to split
+ * each aggregate variable back into its two originals. Pass a solution of the reduced problem through
+ * [reconstruct] to recover a solution of the original.
  */
-class DuplicateColumnMerge internal constructor(
-    /** The problem with duplicate columns aggregated. */
-    val problem: Problem,
-    private val merges: List<ColumnMerge>,
-) {
-    /** Recover the dropped variables in a solution [sample] of [problem]. The aggregate `keep` holds
+internal class DuplicateColumnMerge(private val merges: List<ColumnMerge>) {
+    /** Recover the dropped variables in a solution [sample] of the reduced problem. The aggregate `keep` holds
      *  `z = x + y`; a feasible split needs `x ∈ [min(x), max(x)]` and `y = z − x ∈ [min(y), max(y)]`,
      *  i.e. `x ∈ [max(min(x), z − max(y)), min(max(x), z − min(y))]`, non-empty for every `z` the
      *  aggregate admits when both originals are contiguous. Take its lower end. Each merge has a
