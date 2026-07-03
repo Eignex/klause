@@ -8,6 +8,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
@@ -15,7 +16,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -50,12 +50,13 @@ class RedundantConstraintsTest {
     }
 
     private fun checkPreserved(name: String, problem: Problem, expectDrop: Boolean): Problem {
-        val out = Presolve.removeRedundantConstraints(problem)
+        val delta = Presolve.removeRedundantConstraints(problem)
+        val out = problem.withPassDelta(delta, BakeConfig.NONE)
         assertEquals(feasibleCount(problem), feasibleCount(out), "$name: feasible set changed")
         if (expectDrop) {
             assertTrue(out.factors.size < problem.factors.size, "$name: expected a constraint to be dropped")
         } else {
-            assertSame(problem, out, "$name: expected no change")
+            assertTrue(delta.isEmpty, "$name: expected no change")
         }
         return out
     }
@@ -243,12 +244,13 @@ class RedundantConstraintsTest {
     }
 
     private fun checkPbPreserved(name: String, problem: Problem, expectDrop: Boolean): Problem {
-        val out = Presolve.removeRedundantConstraints(problem)
+        val delta = Presolve.removeRedundantConstraints(problem)
+        val out = problem.withPassDelta(delta, BakeConfig.NONE)
         assertEquals(feasibleCountBools(problem), feasibleCountBools(out), "$name: feasible set changed")
         if (expectDrop) {
             assertTrue(out.factors.size < problem.factors.size, "$name: expected a constraint to be dropped")
         } else {
-            assertSame(problem, out, "$name: expected no change")
+            assertTrue(delta.isEmpty, "$name: expected no change")
         }
         return out
     }

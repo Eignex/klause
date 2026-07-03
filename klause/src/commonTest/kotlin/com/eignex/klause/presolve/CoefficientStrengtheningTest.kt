@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
@@ -20,6 +21,9 @@ import kotlin.test.assertTrue
  * enumerating the whole assignment space.
  */
 class CoefficientStrengtheningTest {
+
+    private fun strengthened(problem: Problem): Problem =
+        problem.withPassDelta(Presolve.strengthenCoefficients(problem), BakeConfig.NONE)
 
     @Test
     fun `coefficient lifting is probing-informed - SAC-tightened bounds give a tighter lift`() {
@@ -38,7 +42,7 @@ class CoefficientStrengtheningTest {
                 ),
             )
             val p = RootBaker.reseed(base, BakeConfig(probeIntBounds = probe))
-            val out = Presolve.strengthenCoefficients(p)
+            val out = strengthened(p)
             return out.factors.filterIsInstance<Linear>().single { 0 in it.vars && 2 in it.vars }
         }
         // Probing off: root propagation leaves x0 in [0,3] ⇒ d = 2*3 + 5*1 - 8 = 3, x2's 5 clamps to 3.
@@ -89,7 +93,7 @@ class CoefficientStrengtheningTest {
         // The rewrite may produce one factor (lifted / gcd-reduced), none (dropped ⇒ always-true), or
         // a multi-factor contradiction (an indivisible equality ⇒ infeasible); the feasible set is the
         // conjunction of whatever rewritten factors remain.
-        val rewritten = Presolve.strengthenCoefficients(problem).factors.filterIsInstance<Linear>()
+        val rewritten = strengthened(problem).factors.filterIsInstance<Linear>()
         val values = Array(numVars) { v ->
             val d = problem.intDomains[v]
             IntArray(d.size) { d.valueAt(it) }
@@ -123,7 +127,7 @@ class CoefficientStrengtheningTest {
 
     private fun assertPbEquivalent(numVars: Int, original: PseudoBoolean) {
         val problem = Problem(numVars, 0, emptyArray(), listOf(original))
-        val rewritten = Presolve.strengthenCoefficients(problem).factors.getOrNull(0) as? PseudoBoolean
+        val rewritten = strengthened(problem).factors.getOrNull(0) as? PseudoBoolean
         val bools = BooleanArray(numVars)
         for (mask in 0 until (1 shl numVars)) {
             for (v in 0 until numVars) bools[v] = (mask shr v) and 1 == 1
@@ -144,7 +148,7 @@ class CoefficientStrengtheningTest {
     }
 
     private fun assertInfeasibleAfterStrengthen(problem: Problem) {
-        val out = Presolve.strengthenCoefficients(problem)
+        val out = strengthened(problem)
         assertTrue(
             out.propagate(Assumptions.None) is PropagationResult.Unsat,
             "strengthened problem should be infeasible: ${out.factors}",
@@ -176,7 +180,7 @@ class CoefficientStrengtheningTest {
     @Test
     fun `a divisible equality is not flagged infeasible`() {
         // 2*x0 + 4*x1 = 6 divides through cleanly and stays satisfiable (x0=1, x1=1).
-        val out = Presolve.strengthenCoefficients(
+        val out = strengthened(
             Problem(
                 0,
                 2,
@@ -303,7 +307,7 @@ class CoefficientStrengtheningTest {
         // d = Amax − b = 4 (so no lifting), and not so loose the bound tightens the [0,2] domains.
         val original = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 6)
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(original))
-        assertTrue(Presolve.strengthenCoefficients(problem).factors[0] === original, "coprime factor was rewritten")
+        assertTrue(strengthened(problem).factors[0] === original, "coprime factor was rewritten")
     }
 
     @Test
