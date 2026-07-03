@@ -286,12 +286,31 @@ internal object SymmetryBreaking {
     private const val SEED_BOOL = 2L
     private const val SEED_INDIVIDUALIZED = 3L
     private const val SIG_PORT = 4L
+    private const val SEED_DOMAIN_SURVIVORS = 5L
 
     /** Domain signature so only variables with the *same* domain (bounds and holes) can group. */
     private fun domainSeed(d: IntDomain): RefineKey {
         // Build the word array directly — this is computed for every int variable on every symmetry
         // search, and a boxed `ArrayList<Long>` per variable (one box per bound and per hole) was a
         // measurable cost on wide, holey domains. Holes collect into a primitive list first.
+        //
+        // Fingerprint by whichever of the holes or the survivors is the smaller set: a wide-but-sparse
+        // domain (few survivors over a span reaching millions) has O(span) holes but O(size) survivors, so
+        // the hole form would allocate and hash an O(span) key on every refinement step. The two forms
+        // carry a distinct marker word so they never collide; within a form, equal domains yield equal keys
+        // and distinct domains distinct keys, so the colour partition — and thus every generator found — is
+        // identical to the all-holes seed, at O(min(holes, survivors)) rather than O(span).
+        val holeCount = (d.max.toLong() - d.min + 1) - d.size
+        if (d.size <= holeCount) {
+            val words = LongArray(4 + d.size)
+            words[0] = SPACE_INT
+            words[1] = SEED_DOMAIN_SURVIVORS
+            words[2] = d.min.toLong()
+            words[3] = d.max.toLong()
+            var i = 4
+            d.forEach { words[i++] = it.toLong() }
+            return RefineKey(words)
+        }
         val holes = IntArrayList()
         d.forEachHole { holes.add(it) }
         val words = LongArray(5 + holes.size)
