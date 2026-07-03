@@ -44,6 +44,7 @@ internal object AffineSingletons {
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         sharedIntOcc: SharedIntOccurrence? = null,
+        capWide: Boolean = false,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
         val eliminated = BooleanArray(problem.numIntVars)
@@ -61,7 +62,7 @@ internal object AffineSingletons {
         // Poll the budget so it stops with the eliminations made so far — sound (the remaining
         // affine-defined variables simply stay and are solved directly).
         while (!cancellation()) {
-            val cand = findAffineCandidate(ws, eliminated, objectiveIntVars) ?: break
+            val cand = findAffineCandidate(ws, eliminated, objectiveIntVars, capWide) ?: break
             foldOutVariable(problem, ws, cand)
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
@@ -94,6 +95,11 @@ internal object AffineSingletons {
     /** Cap on a residue partner's domain span: scanning each value to build the restricted domain is
      *  O(span), and a residue class on a very wide domain would flood it with holes, so skip above it. */
     private const val RESIDUE_DOMAIN_SPAN_CAP = 1024
+
+    // In an underdetermined model (see [PresolveContext.affineUnderdetermined]), defer a fold whose fill-in
+    // (pivot degree × substituted terms) exceeds this — it is the runaway dense kind that inflates a few
+    // wide rows without simplifying. The variable stays (sound, solved directly).
+    private const val WIDE_FILL_IN = 64
 
     /** A residue-class doubleton `a·x + b·y = c` (no unit pivot) at [defIdx]: `x` is contained and
      *  reconstructed as `(constTerm + coeffY·y) / divisor` over the [restrictedY] partner domain. */
@@ -179,6 +185,7 @@ internal object AffineSingletons {
         ws: WorkingSet,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
+        capWide: Boolean,
     ): AffineCandidate? {
         // The working set maps variable id → the stable factor ids that mention it, so the per-candidate
         // "where else does x occur" checks are O(occurrences-of-x) instead of a fresh O(factors) linear
@@ -220,6 +227,9 @@ internal object AffineSingletons {
                 // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
                 // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
                 val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
+                // In an underdetermined model, defer a wide fold (leave the variable). Aliases are pure
+                // renames that never inflate, so they always proceed.
+                if (capWide && !isAlias && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
                 // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
                 // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
                 // only folds into Linear factors.
@@ -305,6 +315,9 @@ internal object AffineSingletons {
             slots.add(next)
             for (v in next.intVars) intOcc[v].add(id)
         }
+
+        /** Number of live factors mentioning [x] — the fan-out a fold on [x] would rewrite. */
+        fun degreeOf(x: Int): Int = intOcc[x].size
 
         /** Whether [x] occurs in no factor other than [defIdx]. */
         fun isContained(defIdx: Int, x: Int): Boolean {

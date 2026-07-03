@@ -62,6 +62,11 @@ class PresolveContext(
      *  rebuilding an O(factors) index per round. `null` on the fresh path (and outside those passes),
      *  where each pass falls back to building its own. */
     val sharedIntOcc: SharedIntOccurrence? = null,
+    /** The input model has far more integer variables than factors — it is *underdetermined*, so affine
+     *  elimination folds its many equality-defined variables into a few constraints, inflating them
+     *  without simplifying (dense, unproductive fill-in). Set once from the original problem so it stays
+     *  stable as later rounds shrink the factor set; the affine pass uses it to cap runaway wide folds. */
+    val affineUnderdetermined: Boolean = false,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -79,6 +84,7 @@ class PresolveContext(
         cancellation,
         bakeConfig,
         sharedIntOcc,
+        affineUnderdetermined,
     )
 
     /** This context with [bakeConfig] set — the presolve lane threads the resolved root-bake probing
@@ -91,6 +97,20 @@ class PresolveContext(
         cancellation,
         bakeConfig,
         sharedIntOcc,
+        affineUnderdetermined,
+    )
+
+    /** This context with the [affineUnderdetermined] flag set — the round engine derives it once from the
+     *  original problem and threads it so the affine pass's wide-fold cap is stable across rounds. */
+    fun withAffineUnderdetermined(underdetermined: Boolean): PresolveContext = PresolveContext(
+        solutionSetSensitive,
+        objectiveIntCoeffs,
+        objectiveBoolCoeffs,
+        modelBreaksSymmetry,
+        cancellation,
+        bakeConfig,
+        sharedIntOcc,
+        underdetermined,
     )
 
     /** This context carrying the incremental round engine's session-maintained occurrence index for the
@@ -103,6 +123,7 @@ class PresolveContext(
         cancellation,
         bakeConfig,
         sharedIntOcc,
+        affineUnderdetermined,
     )
 
     /** Factories for the common contexts. */
@@ -154,6 +175,11 @@ enum class PresolveTiming {
 
 /** Round cap for the iterating emphasis levels; the fixpoint is almost always reached well before. */
 private const val MAX_PRESOLVE_ROUNDS = 16
+
+/** Integer-variables-to-factors ratio above which a model is treated as *underdetermined*, so affine
+ *  elimination caps its wide folds ([AffineSingletons]). Well below every model where affine folds
+ *  productively (all observed ≤ ~2.4) and well below the pathological dense case (~23). */
+private const val UNDERDETERMINED_RATIO = 8
 
 /** Bake-time SAC probe budgets (the only EXHAUSTIVE-tier work). The unit is a `propagate` call.
  *  The capped tier bounds an EXHAUSTIVE pass turned on by an explicit override under a non-aggressive
@@ -275,8 +301,13 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars, ctx.cancellation, ctx.sharedIntOcc)
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.eliminateAffineSingletons(
+            problem,
+            ctx.objectiveIntVars,
+            ctx.cancellation,
+            ctx.sharedIntOcc,
+            ctx.affineUnderdetermined,
+        )
     },
 
     /** Constraint subsumption / redundant-constraint removal (#447) — drops duplicate factors and
@@ -652,8 +683,11 @@ object Presolver {
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
         // Hand the round-engine cancellation to the passes so the long-running ones (affine fixpoint,
         // symmetry search) poll it internally — a presolve budget then bounds them, not just the gaps
-        // between passes.
-        val ctx = context.withCancellation(cancellation)
+        // between passes. Derive the underdetermined flag once from the original problem — later rounds
+        // shrink the factor set, so a per-round ratio would spuriously read as underdetermined.
+        val underdetermined = problem.factors.isNotEmpty() &&
+            problem.numIntVars.toLong() > problem.factors.size.toLong() * UNDERDETERMINED_RATIO
+        val ctx = context.withCancellation(cancellation).withAffineUnderdetermined(underdetermined)
 
         // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
         // each pass's delta instead of rebuilding a [Problem] per firing pass. Scoped away from any

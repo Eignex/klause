@@ -25,7 +25,9 @@ object Presolve {
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         sharedIntOcc: SharedIntOccurrence? = null,
-    ): PassDelta = AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars, cancellation, sharedIntOcc)
+        capWide: Boolean = false,
+    ): PassDelta =
+        AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars, cancellation, sharedIntOcc, capWide)
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): PassDelta =
