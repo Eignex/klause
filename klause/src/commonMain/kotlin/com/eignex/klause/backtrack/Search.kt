@@ -161,8 +161,9 @@ internal fun BacktrackSolver.driveSearch(
     // trail is at root, so their bound atoms are no longer all-false. Null when learning is off.
     lpNogoods: LpNogoodPool? = null,
 ): Sequence<SearchOutcome> = sequence {
-    if (problem.baked is PropagationResult.Unsat) {
-        yield(SearchOutcome.Exhausted(coreOf(problem.baked)))
+    val baked = problem.baked
+    if (baked is PropagationResult.Unsat) {
+        yield(SearchOutcome.Exhausted(coreOf(baked)))
         return@sequence
     }
     val session = PropagationSession(problem)

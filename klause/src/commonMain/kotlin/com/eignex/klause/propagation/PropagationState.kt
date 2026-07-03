@@ -353,6 +353,13 @@ class PropagationState(
     internal val baseFactors: Array<out Propagator> = problem.propagators
     internal val baseFactorCount: Int = problem.factors.size
 
+    // Occurrence-list wakeup arrays cached off [problem] once at construction: they are now lazily
+    // built on [Problem] (deferred entirely for a presolve pass-view), so read them here — where a
+    // state is always over a fully-baked problem — to force them once instead of paying a delegated
+    // lazy access on every wakeup in the BCP hot loop.
+    private val nonBoolWatcherOcc: Array<IntArray> = problem.nonBoolWatcherBoolOccurrences
+    private val nonIntEventWatcherOcc: Array<IntArray> = problem.nonIntEventWatcherIntOccurrences
+
     /** Clauses learned during conflict analysis. */
     internal val learnedClauses: List<ClausePropagator> get() = learnedClauseStore
 
@@ -1106,7 +1113,7 @@ class PropagationState(
      * literals satisfy the clause, no propagation needed.
      */
     private fun enqueueForBoolChange(v: Int) {
-        for (fid in problem.nonBoolWatcherBoolOccurrences[v]) propEnq(fid)
+        for (fid in nonBoolWatcherOcc[v]) propEnq(fid)
         // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
         midlifeBoolOccurrences?.let {
             val list = it[v]
@@ -1154,7 +1161,7 @@ class PropagationState(
      * occurrence-list walk over [com.eignex.klause.solver.Problem.intOccurrences].
      */
     private fun enqueueForIntChange(v: Int) {
-        for (fid in problem.nonIntEventWatcherIntOccurrences[v]) propEnq(fid)
+        for (fid in nonIntEventWatcherOcc[v]) propEnq(fid)
         // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
         midlifeIntOccurrences?.let {
             val list = it[v]

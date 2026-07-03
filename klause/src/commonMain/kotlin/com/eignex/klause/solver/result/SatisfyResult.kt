@@ -111,11 +111,12 @@ private fun satisfyUnderAssumptionsBacktrack(
         }
     }
     val problem = solver.problem
-    if (problem.baked is PropagationResult.Unsat) {
-        val core = if (problem.baked.conflictFactors.isEmpty()) {
+    val baked = problem.baked
+    if (baked is PropagationResult.Unsat) {
+        val core = if (baked.conflictFactors.isEmpty()) {
             null
         } else {
-            UnsatCore.of(problem.baked.conflictFactors)
+            UnsatCore.of(baked.conflictFactors)
         }
         return SatisfyResult.GloballyUnsat(core)
     }
