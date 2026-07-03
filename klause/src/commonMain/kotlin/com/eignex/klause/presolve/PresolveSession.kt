@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.EmptyIntArray
@@ -68,10 +69,17 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     private var liveIds: IntArray = IntArray(0)
 
     init {
-        // Establish the base fixpoint on the persistent state. The base [Problem] already folded its
-        // root deductions into [Problem.intDomains] (copied into the state), so this settles at that
-        // same greatest fixpoint; it primes the watcher/dirty machinery for incremental re-propagation.
-        if (state.runToFixpoint(allFactors = true) != null) infeasible = true
+        // The base [Problem] already ran its root bake at construction (outside presolve). If that
+        // proved infeasibility, adopt it directly — re-propagating the whole factor set just to
+        // rediscover a known root conflict is pure waste, and catastrophic on wide domains (a 2M-span
+        // infeasible model spends seconds re-deriving what `base.baked` already holds). Otherwise
+        // establish the fixpoint on the persistent state, priming the watcher/dirty machinery for
+        // incremental re-propagation (the base's folded domains are copied in, so it settles there).
+        if (base.baked is PropagationResult.Unsat) {
+            infeasible = true
+        } else if (state.runToFixpoint(allFactors = true) != null) {
+            infeasible = true
+        }
     }
 
     /** Live (non-tombstoned) factors in stable-id order — the current working constraint set. */
