@@ -20,8 +20,8 @@ import kotlin.math.round
  */
 internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val solves = stats.lp.solves.sum
-    val lagrangian = stats.lagrangianPruned.sum
-    val energetic = stats.energeticPruned.sum
+    val lagrangian = stats.scheduling.lagrangianPruned.sum
+    val energetic = stats.scheduling.energeticPruned.sum
     if (solves == 0.0 && lagrangian == 0.0 && energetic == 0.0) return emptyList()
 
     val pruned = stats.lp.pruned.sum
@@ -63,17 +63,17 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
  * block is unambiguous in the flat stat stream, matching the `lp`-prefix convention.
  */
 internal fun lsStatPairs(stats: SolveStats): List<Pair<String, String>> {
-    val moves = stats.moves.sum
-    if (stats.backend != "ls" && moves == 0.0) return emptyList()
+    val moves = stats.ls.moves.sum
+    if (stats.run.backend != "ls" && moves == 0.0) return emptyList()
 
     val out = ArrayList<Pair<String, String>>()
     out += "lsMoves" to "${moves.toLong()}"
-    out += "lsRestarts" to "${stats.restarts.sum.toLong()}"
-    out += "lsStalls" to "${stats.stalls.sum.toLong()}"
-    if (stats.wallMs > 0L) out += "lsMovesPerSec" to round4(moves / (stats.wallMs / 1000.0))
-    if (stats.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.timeToBestMs / 1000.0)
-    if (stats.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.incumbentObjective)
-    if (stats.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.incumbentViolation)
+    out += "lsRestarts" to "${stats.search.restarts.sum.toLong()}"
+    out += "lsStalls" to "${stats.ls.stalls.sum.toLong()}"
+    if (stats.run.wallMs > 0L) out += "lsMovesPerSec" to round4(moves / (stats.run.wallMs / 1000.0))
+    if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
+    if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
+    if (stats.ls.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.ls.incumbentViolation)
     return out
 }
 

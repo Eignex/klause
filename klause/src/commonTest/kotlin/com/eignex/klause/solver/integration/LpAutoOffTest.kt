@@ -37,7 +37,7 @@ class LpAutoOffTest {
         assertTrue(res is MinimizeResult.Infeasible, "pigeonhole is infeasible, got $res")
         val lpSolves = res.stats.lp.solves.sum
         val lpPruned = res.stats.lp.pruned.sum
-        val nodes = res.stats.nodes.sum
+        val nodes = res.stats.search.nodes.sum
         assertTrue(lpPruned == 0.0, "the row-less LP should never prune, pruned=$lpPruned")
         assertTrue(nodes > 150, "expected a long search, got $nodes nodes")
         assertTrue(lpSolves <= 100, "auto-off should cap lpSolves near the warmup, got $lpSolves over $nodes nodes")

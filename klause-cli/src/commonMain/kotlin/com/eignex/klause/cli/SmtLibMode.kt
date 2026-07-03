@@ -69,10 +69,10 @@ internal class SmtLibOutput : OutputProtocol {
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("; solveTime=${solveTimeMs / 1000.0}")
         println("; solutions=$solutions")
-        if (stats.backend.isNotEmpty()) {
-            println("; nodes=${stats.nodes.sum.toLong()}")
-            println("; failures=${stats.fails.sum.toLong()}")
-            println("; propagations=${stats.propagations.sum.toLong()}")
+        if (stats.run.backend.isNotEmpty()) {
+            println("; nodes=${stats.search.nodes.sum.toLong()}")
+            println("; failures=${stats.search.fails.sum.toLong()}")
+            println("; propagations=${stats.search.propagations.sum.toLong()}")
             for ((k, v) in lpStatPairs(stats)) println("; $k=$v")
         }
     }

@@ -72,12 +72,12 @@ internal class XcspOutput : OutputProtocol {
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("c solveTime=${solveTimeMs / 1000.0}")
         println("c solutions=$solutions")
-        if (stats.backend.isNotEmpty()) {
-            println("c nodes=${stats.nodes.sum.toLong()}")
-            println("c failures=${stats.fails.sum.toLong()}")
-            println("c restarts=${stats.restarts.sum.toLong()}")
-            println("c propagations=${stats.propagations.sum.toLong()}")
-            if (stats.peakDepth.max.isFinite()) println("c peakDepth=${stats.peakDepth.max.toLong()}")
+        if (stats.run.backend.isNotEmpty()) {
+            println("c nodes=${stats.search.nodes.sum.toLong()}")
+            println("c failures=${stats.search.fails.sum.toLong()}")
+            println("c restarts=${stats.search.restarts.sum.toLong()}")
+            println("c propagations=${stats.search.propagations.sum.toLong()}")
+            if (stats.search.peakDepth.max.isFinite()) println("c peakDepth=${stats.search.peakDepth.max.toLong()}")
             for ((k, v) in lpStatPairs(stats)) println("c $k=$v")
         }
     }
