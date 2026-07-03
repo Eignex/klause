@@ -386,165 +386,179 @@ internal class ResumableMinimize(
                     continue@outer
                 }
                 if (descend) {
-                    // Reduced-cost-average branching: prefer the LP's most cost-impactful
-                    // fractional variable; null falls back to the configured selector. Advisory —
-                    // any branch is sound, and the selector's event hooks still fire below.
-                    val varRef = lpEngine.lpBranchPick(session) ?: params.variableSelector.pick(session, rng)
-                    if (varRef == null) {
-                        val snap = snapshotAssignment(session)
-                        params.variableSelector.onSolution(snap)
-                        params.valueSelector.onSolution(snap)
-                        // Always block this leaf and backtrack; surface it as an event only when it
-                        // strictly improves the incumbent.
-                        pendingBlock = snap
-                        descend = false
-                        recordIfImproving(snap, objective.evaluate(snap))?.let { return it }
-                        continue@inner
-                    }
-                    val values = params.valueSelector.values(session, varRef, rng)
-                    val phased = phase.applyPhase(varRef, values, rng)
-                    val ordered = lpEngine.lpHints?.order(varRef, phased) ?: phased
-                    val node = solver.makeNode(varRef, ordered)
-                    val decsBefore = decisionsLeft
-                    val out = solver.advance(
-                        node, session, params, pruneIf,
-                        { decisionsLeft }, { decisionsLeft-- },
-                        sink, relearnTripped, onConflictTick, pruneLearned,
-                    )
-                    decisionsThisRun += decsBefore - decisionsLeft
-                    when (out) {
-                        AdvanceOutcome.Success -> {
-                            phase.capture(varRef, session)
-                            trail.add(node)
-                            sink.observeNode(trail.size)
-                            phase.captureTargetIfDeeper(session, trail.size)
-                        }
-
-                        AdvanceOutcome.Exhausted -> {
-                            descend = false
-                            continue@inner
-                        }
-
-                        AdvanceOutcome.BudgetCapped -> {
-                            val t = terminalBudget()
-                            done = t
-                            return StepEvent.Terminal(t)
-                        }
-
-                        is AdvanceOutcome.Backjump -> {
-                            if (touchedSeedLevels != null) {
-                                for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
-                            }
-                            restart.recordConflict(out.learned.lbd, trail.size)
-                            when (
-                                solver.backjumpAndLearn(
-                                    out.learned, trail, session, params, alignFirst = false,
-                                )
-                            ) {
-                                BackjumpTerm.Resume -> {
-                                    descend = true
-                                    continue@inner
-                                }
-
-                                BackjumpTerm.Exhausted -> {
-                                    val t = terminalExhausted()
-                                    done = t
-                                    return StepEvent.Terminal(t)
-                                }
-
-                                BackjumpTerm.Stuck -> {
-                                    descend = false
-                                    continue@inner
-                                }
-                            }
-                        }
-                    }
+                    descendStep()?.let { return it }
                 } else {
-                    val rootBlock = pendingBlock
-                    if (rootBlock != null) {
-                        pendingBlock = null
-                        while (trail.isNotEmpty()) {
-                            session.popLast()
-                            trail.removeAt(trail.size - 1)
-                        }
-                        val nogood = session.assignmentNogood(rootBlock.bools, rootBlock.ints)
-                        if (nogood.isNotEmpty()) {
-                            val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
-                            if (res is PropagationResult.Unsat) {
-                                val t = terminalExhausted()
-                                done = t
-                                return StepEvent.Terminal(t)
-                            }
-                        }
-                        if (assertObjectiveBoundAtRoot()) {
-                            val t = terminalExhausted()
-                            done = t
-                            return StepEvent.Terminal(t)
-                        }
+                    backtrackStep()?.let { return it }
+                }
+            }
+        }
+    }
+
+    /** One descent step: pick+branch a variable (or record a leaf), advance, and handle the
+     *  outcome. Returns the [StepEvent] to surface from [runUntilEvent], or null to continue the loop. */
+    private fun descendStep(): StepEvent? {
+        // Reduced-cost-average branching: prefer the LP's most cost-impactful
+        // fractional variable; null falls back to the configured selector. Advisory —
+        // any branch is sound, and the selector's event hooks still fire below.
+        val varRef = lpEngine.lpBranchPick(session) ?: params.variableSelector.pick(session, rng)
+        if (varRef == null) {
+            val snap = snapshotAssignment(session)
+            params.variableSelector.onSolution(snap)
+            params.valueSelector.onSolution(snap)
+            // Always block this leaf and backtrack; surface it as an event only when it
+            // strictly improves the incumbent.
+            pendingBlock = snap
+            descend = false
+            recordIfImproving(snap, objective.evaluate(snap))?.let { return it }
+            return null
+        }
+        val values = params.valueSelector.values(session, varRef, rng)
+        val phased = phase.applyPhase(varRef, values, rng)
+        val ordered = lpEngine.lpHints?.order(varRef, phased) ?: phased
+        val node = solver.makeNode(varRef, ordered)
+        val decsBefore = decisionsLeft
+        val out = solver.advance(
+            node, session, params, pruneIf,
+            { decisionsLeft }, { decisionsLeft-- },
+            sink, relearnTripped, onConflictTick, pruneLearned,
+        )
+        decisionsThisRun += decsBefore - decisionsLeft
+        when (out) {
+            AdvanceOutcome.Success -> {
+                phase.capture(varRef, session)
+                trail.add(node)
+                sink.observeNode(trail.size)
+                phase.captureTargetIfDeeper(session, trail.size)
+            }
+
+            AdvanceOutcome.Exhausted -> {
+                descend = false
+                return null
+            }
+
+            AdvanceOutcome.BudgetCapped -> {
+                val t = terminalBudget()
+                done = t
+                return StepEvent.Terminal(t)
+            }
+
+            is AdvanceOutcome.Backjump -> {
+                if (touchedSeedLevels != null) {
+                    for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                }
+                restart.recordConflict(out.learned.lbd, trail.size)
+                when (
+                    solver.backjumpAndLearn(
+                        out.learned, trail, session, params, alignFirst = false,
+                    )
+                ) {
+                    BackjumpTerm.Resume -> {
                         descend = true
-                        continue@inner
+                        return null
                     }
-                    if (trail.isEmpty()) {
+
+                    BackjumpTerm.Exhausted -> {
                         val t = terminalExhausted()
                         done = t
                         return StepEvent.Terminal(t)
                     }
-                    val top = trail.last()
-                    session.popLast()
-                    val decsBefore = decisionsLeft
-                    val out = solver.advance(
-                        top, session, params, pruneIf,
-                        { decisionsLeft }, { decisionsLeft-- },
-                        sink, relearnTripped, onConflictTick, pruneLearned,
-                    )
-                    decisionsThisRun += decsBefore - decisionsLeft
-                    when (out) {
-                        AdvanceOutcome.Success -> {
-                            phase.capture(top.varRef, session)
-                            descend = true
-                        }
 
-                        AdvanceOutcome.Exhausted -> {
-                            trail.removeAt(trail.size - 1)
-                        }
-
-                        AdvanceOutcome.BudgetCapped -> {
-                            val t = terminalBudget()
-                            done = t
-                            return StepEvent.Terminal(t)
-                        }
-
-                        is AdvanceOutcome.Backjump -> {
-                            if (touchedSeedLevels != null) {
-                                for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
-                            }
-                            restart.recordConflict(out.learned.lbd, trail.size)
-                            when (
-                                solver.backjumpAndLearn(
-                                    out.learned, trail, session, params, alignFirst = true,
-                                )
-                            ) {
-                                BackjumpTerm.Resume -> {
-                                    descend = true
-                                    continue@inner
-                                }
-
-                                BackjumpTerm.Exhausted -> {
-                                    val t = terminalExhausted()
-                                    done = t
-                                    return StepEvent.Terminal(t)
-                                }
-
-                                BackjumpTerm.Stuck -> {
-                                    descend = false
-                                    continue@inner
-                                }
-                            }
-                        }
+                    BackjumpTerm.Stuck -> {
+                        descend = false
+                        return null
                     }
                 }
             }
         }
+        return null
+    }
+
+    /** One backtrack step: replay a pending root block, or pop the trail top and re-advance it.
+     *  Returns the [StepEvent] to surface from [runUntilEvent], or null to continue the loop. */
+    private fun backtrackStep(): StepEvent? {
+        val rootBlock = pendingBlock
+        if (rootBlock != null) {
+            pendingBlock = null
+            while (trail.isNotEmpty()) {
+                session.popLast()
+                trail.removeAt(trail.size - 1)
+            }
+            val nogood = session.assignmentNogood(rootBlock.bools, rootBlock.ints)
+            if (nogood.isNotEmpty()) {
+                val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+                if (res is PropagationResult.Unsat) {
+                    val t = terminalExhausted()
+                    done = t
+                    return StepEvent.Terminal(t)
+                }
+            }
+            if (assertObjectiveBoundAtRoot()) {
+                val t = terminalExhausted()
+                done = t
+                return StepEvent.Terminal(t)
+            }
+            descend = true
+            return null
+        }
+        if (trail.isEmpty()) {
+            val t = terminalExhausted()
+            done = t
+            return StepEvent.Terminal(t)
+        }
+        val top = trail.last()
+        session.popLast()
+        val decsBefore = decisionsLeft
+        val out = solver.advance(
+            top, session, params, pruneIf,
+            { decisionsLeft }, { decisionsLeft-- },
+            sink, relearnTripped, onConflictTick, pruneLearned,
+        )
+        decisionsThisRun += decsBefore - decisionsLeft
+        when (out) {
+            AdvanceOutcome.Success -> {
+                phase.capture(top.varRef, session)
+                descend = true
+            }
+
+            AdvanceOutcome.Exhausted -> {
+                trail.removeAt(trail.size - 1)
+            }
+
+            AdvanceOutcome.BudgetCapped -> {
+                val t = terminalBudget()
+                done = t
+                return StepEvent.Terminal(t)
+            }
+
+            is AdvanceOutcome.Backjump -> {
+                if (touchedSeedLevels != null) {
+                    for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+                }
+                restart.recordConflict(out.learned.lbd, trail.size)
+                when (
+                    solver.backjumpAndLearn(
+                        out.learned, trail, session, params, alignFirst = true,
+                    )
+                ) {
+                    BackjumpTerm.Resume -> {
+                        descend = true
+                        return null
+                    }
+
+                    BackjumpTerm.Exhausted -> {
+                        val t = terminalExhausted()
+                        done = t
+                        return StepEvent.Terminal(t)
+                    }
+
+                    BackjumpTerm.Stuck -> {
+                        descend = false
+                        return null
+                    }
+                }
+            }
+        }
+        return null
     }
 
     /** Fold [sample] (objective [o]) into the incumbent when it strictly improves the best; fires
