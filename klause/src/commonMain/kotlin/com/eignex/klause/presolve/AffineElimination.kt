@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.IntArrayList
 
 internal object AffineSingletons {
 
@@ -45,24 +46,25 @@ internal object AffineSingletons {
         sharedIntOcc: SharedIntOccurrence? = null,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
-        var factors = problem.factors.toList()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
+        // The working set holds the factors by stable id (tombstones for drops, appends for the folded
+        // rewrites and bound rows) and a per-variable occurrence index maintained across eliminations.
         // The session-maintained index matches the pristine input factor order, so the first candidate
-        // search reads it instead of rebuilding an O(factors) index; once [foldOutVariable] rewrites the
-        // list the intra-pass fixpoint rebuilds a local one (the win is the per-round search rebuild).
-        var occ = sharedIntOcc?.let { OccurrenceIndex(it.offsets, it.flat) }
-            ?: buildOccurrenceIndex(factors, eliminated.size)
-        // Each elimination rescans and re-indexes the factor set and folds the pivot into every factor
-        // mentioning it; on a model with a wide row absorbing eliminations the loop turns quadratic.
+        // search reads it instead of rebuilding an O(factors) index; each fold then patches only the
+        // occurrence entries of the rewritten factors rather than re-indexing the whole set.
+        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc)
+        // Each elimination rewrites only the factors mentioning the pivot and appends bound rows, so the
+        // per-elimination cost is O(occurrences of x) rather than O(factors). The candidate scan still
+        // walks the live factors in order (the elimination order is selection-order-sensitive), but the
+        // membership predicates it runs are answered from the incremental occurrence index.
         // Poll the budget so it stops with the eliminations made so far — sound (the remaining
         // affine-defined variables simply stay and are solved directly).
         while (!cancellation()) {
-            val cand = findAffineCandidate(factors, occ, eliminated, objectiveIntVars) ?: break
-            factors = foldOutVariable(problem, factors, cand)
+            val cand = findAffineCandidate(ws, eliminated, objectiveIntVars) ?: break
+            foldOutVariable(problem, ws, cand)
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
-            occ = buildOccurrenceIndex(factors, eliminated.size)
         }
         // Residue-class doubletons (#522): a 2-term `a·x + b·y = c` with no unit pivot, where `x` is
         // contained, determines `x = (c − b·y)/a` only for the `y` values keeping it an in-domain
@@ -71,18 +73,22 @@ internal object AffineSingletons {
         // is always a surviving variable.
         val domains = problem.intDomains.copyOf()
         while (!cancellation()) {
-            val r = findResidueCandidate(factors, occ, eliminated, objectiveIntVars, domains) ?: break
-            factors = factors.filterIndexed { i, _ -> i != r.defIdx }
+            val r = findResidueCandidate(ws, eliminated, objectiveIntVars, domains) ?: break
+            ws.drop(r.defIdx)
             domains[r.y] = r.restrictedY
             eliminated[r.x] = true
             subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), intArrayOf(r.coeffY), divisor = r.divisor))
-            occ = buildOccurrenceIndex(factors, eliminated.size)
         }
         if (subs.isEmpty()) return PassDelta()
         // The eliminations rebuilt the factor list in place; recover the delta against the input by
         // identity — every survivor is === an input factor, so the drops are the inputs absent from
         // [factors] and the adds are the factors [foldOutVariable] introduced (rewrites + domain bounds).
-        return PresolveShared.identityDelta(problem.factors, factors, domains, AffineElimination(subs)::reconstruct)
+        return PresolveShared.identityDelta(
+            problem.factors,
+            ws.liveFactors(),
+            domains,
+            AffineElimination(subs)::reconstruct,
+        )
     }
 
     /** Cap on a residue partner's domain span: scanning each value to build the restricted domain is
@@ -102,14 +108,13 @@ internal object AffineSingletons {
     )
 
     private fun findResidueCandidate(
-        factors: List<Factor>,
-        occ: OccurrenceIndex,
+        ws: WorkingSet,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
-        for (di in factors.indices) {
-            val f = factors[di]
+        for (di in 0 until ws.size) {
+            val f = ws.factorAt(di) ?: continue
             if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) continue
             for (xi in 0..1) {
                 val x = f.vars[xi]
@@ -122,7 +127,7 @@ internal object AffineSingletons {
                 // pass leaves every objective variable untouched.
                 if (a == 0 || a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
                 if (x in objectiveIntVars || y in objectiveIntVars) continue
-                if (!isContained(occ, di, x)) continue
+                if (!ws.isContained(di, x)) continue
                 val domY = domains[y]
                 if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
                 val restricted = restrictPartnerDomain(domY, domains[x], a, b, f.bound) ?: continue
@@ -138,12 +143,6 @@ internal object AffineSingletons {
             }
         }
         return null
-    }
-
-    /** Whether [x] occurs in no factor other than [defIdx]. */
-    private fun isContained(occ: OccurrenceIndex, defIdx: Int, x: Int): Boolean {
-        for (k in occ.offsets[x] until occ.offsets[x + 1]) if (occ.flat[k] != defIdx) return false
-        return true
     }
 
     /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
@@ -177,19 +176,17 @@ internal object AffineSingletons {
     )
 
     private fun findAffineCandidate(
-        factors: List<Factor>,
-        occ: OccurrenceIndex,
+        ws: WorkingSet,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
     ): AffineCandidate? {
-        // [occ] maps variable id → the factor indices that mention it (CSR: counts → offsets → flat), so
-        // the per-candidate "where else does x occur" checks are O(occurrences-of-x) instead of a fresh
-        // O(factors) linear scan each. On a large model that quadratic scan dominated affine elimination;
-        // the index makes it linear in x's actual degree. The caller supplies the session-maintained index
-        // for the pristine input and a freshly-built one after each elimination — result-identical, purely
-        // a faster lookup of the same factor membership.
-        for (di in factors.indices) {
-            val f = factors[di]
+        // The working set maps variable id → the stable factor ids that mention it, so the per-candidate
+        // "where else does x occur" checks are O(occurrences-of-x) instead of a fresh O(factors) linear
+        // scan each. On a large model that quadratic scan dominated affine elimination; the index makes it
+        // linear in x's actual degree. The scan still walks the live factors in stable-id order — the same
+        // order a fresh compacted list would present — so it picks candidates in the identical sequence.
+        for (di in 0 until ws.size) {
+            val f = ws.factorAt(di) ?: continue
             if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) continue
             for (xi in f.vars.indices) {
                 val x = f.vars[xi]
@@ -203,7 +200,7 @@ internal object AffineSingletons {
                 // so it is left for the residue-class doubleton pass or for propagation.
                 val isUnit = cx == 1 || cx == -1
                 if (!isUnit && !dividesAllPartnersAndBound(f, xi)) continue
-                if (!isUnit && !isContained(occ, di, x)) continue
+                if (!isUnit && !ws.isContained(di, x)) continue
                 // x = B + Σ A_j·y_j, with B = bound / c_x and A_j = −c_j / c_x for the other terms y_j;
                 // for a unit pivot the divisions are exact by definition.
                 val termVars = IntArray(f.vars.size - 1)
@@ -227,8 +224,8 @@ internal object AffineSingletons {
                 // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
                 // only folds into Linear factors.
                 val singlePartnerSubstitutable = termVars.size == 1 &&
-                    otherOccurrencesAffineSubstitutable(factors, occ, di, x, termCoeffs[0], constTerm, termVars[0])
-                if (isAlias || otherOccurrencesAllLinear(factors, occ, di, x) || singlePartnerSubstitutable) {
+                    ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0], constTerm, termVars[0])
+                if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
                     return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
                 }
             }
@@ -247,86 +244,175 @@ internal object AffineSingletons {
         return true
     }
 
-    /** Variable id → the factor indices mentioning it, as a flat CSR (compressed sparse row): the
-     *  factors for `x` are `flat[offsets[x] until offsets[x + 1]]`. A factor mentioning `x` more than
-     *  once lists it once per occurrence, which the membership checks tolerate (a redundant, identical
-     *  test). One allocation pair regardless of variable count — no per-variable list. */
-    private class OccurrenceIndex(val offsets: IntArray, val flat: IntArray)
+    /**
+     * The working factor set for one [eliminateAffineSingletons] call, keyed by a stable id: ids
+     * `[0, base.size)` are the pristine inputs; each appended factor takes the next id. A dropped id is
+     * tombstoned (its slot becomes `null`) and never reused, so a live factor keeps its id — and hence
+     * its position in stable-id order — for the whole run. The candidate scan walks the slots in id
+     * order, which is exactly the order a fresh compacted list would present, so it selects the same
+     * candidates in the same sequence the full-rebuild path did.
+     *
+     * Alongside the slots it holds a per-variable occurrence index over the stable ids of the
+     * live factors whose [Factor.intVars] contains a variable, one entry per occurrence (mirroring a CSR
+     * rebuild's multiset). It is maintained across eliminations: a fold rewrites only the factors that
+     * mention the pivot, so only those ids' occurrence entries move. Its per-list order is irrelevant —
+     * every reader (`isContained`, `otherOccurrences*`) tests membership, not position.
+     */
+    private class WorkingSet(base: Array<Factor>, nVars: Int, seed: SharedIntOccurrence?) {
+        private val slots = ArrayList<Factor?>(base.size + 1).apply { addAll(base) }
+        private val intOcc = Array(nVars) { IntArrayList(0) }
 
-    private fun buildOccurrenceIndex(factors: List<Factor>, nVars: Int): OccurrenceIndex {
-        val offsets = IntArray(nVars + 1)
-        for (f in factors) for (v in f.intVars) offsets[v + 1]++
-        for (v in 0 until nVars) offsets[v + 1] += offsets[v]
-        val flat = IntArray(offsets[nVars])
-        val cursor = offsets.copyOf()
-        factors.forEachIndexed { i, f -> for (v in f.intVars) flat[cursor[v]++] = i }
-        return OccurrenceIndex(offsets, flat)
-    }
-
-    /** Whether every factor other than [defIdx] that mentions [x] is a [Linear] (foldable). */
-    private fun otherOccurrencesAllLinear(factors: List<Factor>, occ: OccurrenceIndex, defIdx: Int, x: Int): Boolean {
-        for (k in occ.offsets[x] until occ.offsets[x + 1]) {
-            val i = occ.flat[k]
-            if (i != defIdx && factors[i] !is Linear) return false
+        init {
+            // The seed's CSR is over the pristine input in input (= stable-id) order, so its dense indices
+            // are the stable ids; adopt them directly instead of re-scanning every factor's [intVars].
+            if (seed != null) {
+                for (v in 0 until nVars) {
+                    val occ = intOcc[v]
+                    for (k in seed.offsets[v] until seed.offsets[v + 1]) occ.add(seed.flat[k])
+                }
+            } else {
+                for (id in base.indices) for (v in base[id].intVars) intOcc[v].add(id)
+            }
         }
-        return true
-    }
 
-    /** Whether every factor other than [defIdx] that mentions [x] can take the substitution
-     *  `x = scale·y + offset`: a [Linear] folds it directly, any other factor must opt in via
-     *  [Factor.substituteAffine] (a global that can represent the affine view, e.g. an Element index
-     *  shift). */
-    private fun otherOccurrencesAffineSubstitutable(
-        factors: List<Factor>,
-        occ: OccurrenceIndex,
-        defIdx: Int,
-        x: Int,
-        scale: Int,
-        offset: Int,
-        y: Int,
-    ): Boolean {
-        for (k in occ.offsets[x] until occ.offsets[x + 1]) {
-            val i = occ.flat[k]
-            if (i == defIdx) continue
-            val f = factors[i]
-            if (f !is Linear && f.substituteAffine(x, scale, offset, y) == null) return false
+        /** Number of stable slots (live plus tombstoned); the upper bound of the candidate scan. */
+        val size: Int get() = slots.size
+
+        /** The factor at stable id [id], or `null` if it was dropped. */
+        fun factorAt(id: Int): Factor? = slots[id]
+
+        /** The live (non-tombstoned) factors in stable-id order — the working constraint set. */
+        fun liveFactors(): List<Factor> = slots.filterNotNull()
+
+        /** Tombstone stable id [id], removing its occurrence entries. */
+        fun drop(id: Int) {
+            val f = slots[id] ?: return
+            for (v in f.intVars) intOcc[v].removeValue(id)
+            slots[id] = null
         }
-        return true
+
+        /** Replace live stable id [id] — currently holding [prev] — with [next], moving its occurrence
+         *  entries from [prev]'s variables to [next]'s. */
+        private fun replace(id: Int, prev: Factor, next: Factor) {
+            for (v in prev.intVars) intOcc[v].removeValue(id)
+            slots[id] = next
+            for (v in next.intVars) intOcc[v].add(id)
+        }
+
+        /** Append [next] as a fresh stable id and record its occurrences. */
+        private fun append(next: Factor) {
+            val id = slots.size
+            slots.add(next)
+            for (v in next.intVars) intOcc[v].add(id)
+        }
+
+        /** Whether [x] occurs in no factor other than [defIdx]. */
+        fun isContained(defIdx: Int, x: Int): Boolean {
+            val occ = intOcc[x]
+            for (k in 0 until occ.size) if (occ[k] != defIdx) return false
+            return true
+        }
+
+        /** Whether every factor other than [defIdx] that mentions [x] is a [Linear] (foldable). */
+        fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean {
+            val occ = intOcc[x]
+            for (k in 0 until occ.size) {
+                val id = occ[k]
+                if (id != defIdx && slots[id] !is Linear) return false
+            }
+            return true
+        }
+
+        /** Whether every factor other than [defIdx] that mentions [x] can take the substitution
+         *  `x = scale·replacement + offset`: a [Linear] folds it directly, any other factor must opt in
+         *  via [Factor.substituteAffine] (a global that can represent the affine view). */
+        fun otherOccurrencesAffineSubstitutable(
+            defIdx: Int,
+            x: Int,
+            scale: Int,
+            offset: Int,
+            replacement: Int,
+        ): Boolean {
+            val occ = intOcc[x]
+            for (k in 0 until occ.size) {
+                val id = occ[k]
+                if (id == defIdx) continue
+                val f = slots[id] ?: continue
+                if (f !is Linear && f.substituteAffine(x, scale, offset, replacement) == null) return false
+            }
+            return true
+        }
+
+        /**
+         * Fold `x = constTerm + Σ termCoeffs·termVars` out of the working set, dropping the defining
+         * equality [c].`defIdx` and rewriting only the factors that mention `x` in place, then appending
+         * the domain-bound rows. The def id is tombstoned last so the occurrence scan below still sees it.
+         */
+        fun fold(problem: Problem, c: AffineCandidate) {
+            val singlePartner = c.termVars.size == 1
+            // Snapshot the occurrence ids of `x` before mutating them: [replace] rewrites x's occurrence
+            // list as it goes, and the def id must be skipped rather than folded into itself.
+            val occ = intOcc[c.x]
+            val toRewrite = IntArray(occ.size) { occ[it] }
+            for (id in toRewrite) {
+                if (id == c.defIdx) continue
+                val f = slots[id] ?: continue
+                val next = when {
+                    f is Linear && c.x in f.vars -> foldAffineIntoLinear(f, c)
+
+                    // Single-partner affine into a global the gate accepted (non-null substitute).
+                    singlePartner ->
+                        requireNotNull(f.substituteAffine(c.x, c.termCoeffs[0], c.constTerm, c.termVars[0])) {
+                            "substituteAffine returned null for a factor accepted by the candidate gate"
+                        }
+
+                    else -> f
+                }
+                if (next !== f) replace(id, f, next)
+            }
+            drop(c.defIdx)
+            for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
+        }
+
+        /**
+         * Apply the alias rename `x → y` to every live factor via [Factor.remap] (any factor type),
+         * dropping the defining equality and appending the domain-bound rows. Rewriting the whole set is
+         * intrinsic to a rename — [Factor.remap] returns a fresh object for every factor — so this stays
+         * O(live factors); only `x`'s occurrences migrate to `y`, so the index is patched, not rebuilt.
+         */
+        fun alias(problem: Problem, c: AffineCandidate) {
+            val boolMap = IntArray(problem.numBoolVars) { it }
+            val intMap = IntArray(problem.numIntVars) { it }
+            val y = c.termVars[0]
+            intMap[c.x] = y
+            // Snapshot the ids that mention `x` before remapping — their occurrence entries for `x` and
+            // `y` are re-derived from the remapped factor's own [Factor.intVars] below (a factor holding
+            // both `x` and `y` coalesces to a single `y`, matching what a fresh CSR rebuild would list).
+            val occX = intOcc[c.x]
+            val touched = IntArray(occX.size) { occX[it] }
+            for (id in slots.indices) {
+                if (id == c.defIdx) continue
+                val f = slots[id] ?: continue
+                slots[id] = f.remap(boolMap, intMap)
+            }
+            for (id in touched) {
+                if (id == c.defIdx) continue
+                val f = slots[id] ?: continue
+                intOcc[y].removeValue(id)
+                for (v in f.intVars) if (v == y) intOcc[y].add(id)
+            }
+            intOcc[c.x].clear()
+            drop(c.defIdx)
+            for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
+        }
     }
 
     /** Drop the defining equality and remove `x`: for the alias case `x = y`, substitute `x → y`
      *  into every other factor via [Factor.remap] (any factor type); otherwise fold
      *  `x = constTerm + Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases
      *  bounds on the term vars keep `x` within its domain. */
-    private fun foldOutVariable(problem: Problem, factors: List<Factor>, c: AffineCandidate): List<Factor> {
-        val out = ArrayList<Factor>(factors.size + 1)
-        if (c.isAlias) {
-            val boolMap = IntArray(problem.numBoolVars) { it }
-            val intMap = IntArray(problem.numIntVars) { it }
-            intMap[c.x] = c.termVars[0]
-            for (i in factors.indices) if (i != c.defIdx) out.add(factors[i].remap(boolMap, intMap))
-        } else {
-            val singlePartner = c.termVars.size == 1
-            for (i in factors.indices) {
-                if (i == c.defIdx) continue
-                val f = factors[i]
-                out.add(
-                    when {
-                        f is Linear && c.x in f.vars -> foldAffineIntoLinear(f, c)
-
-                        // Single-partner affine into a global the gate accepted (non-null substitute).
-                        singlePartner && c.x in f.intVars ->
-                            requireNotNull(f.substituteAffine(c.x, c.termCoeffs[0], c.constTerm, c.termVars[0])) {
-                                "substituteAffine returned null for a factor accepted by the candidate gate"
-                            }
-
-                        else -> f
-                    },
-                )
-            }
-        }
-        out.addAll(domainBoundsOnTerms(problem.intDomains[c.x], c))
-        return out
+    private fun foldOutVariable(problem: Problem, ws: WorkingSet, c: AffineCandidate) {
+        if (c.isAlias) ws.alias(problem, c) else ws.fold(problem, c)
     }
 
     /** [l] with `x` replaced by `constTerm + Σ A_j·y_j`: drop `x`'s term, add `coeff_x·A_j` to each
