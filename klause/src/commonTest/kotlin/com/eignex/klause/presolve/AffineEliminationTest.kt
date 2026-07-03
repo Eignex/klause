@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
@@ -35,14 +36,16 @@ class AffineEliminationTest {
         BacktrackSolver(problem).solve(BacktrackParams()) is SolveResult.Sat
 
     private fun checkRoundTrip(name: String, original: Problem, expectEliminated: Boolean, expectSat: Boolean) {
-        val elim = Presolve.eliminateAffineSingletons(original)
-        assertEquals(expectEliminated, elim.problem !== original, "$name: elimination expectation wrong")
+        val delta = Presolve.eliminateAffineSingletons(original)
+        assertEquals(expectEliminated, !delta.isEmpty, "$name: elimination expectation wrong")
+        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reconstruct = delta.reconstruct ?: { it }
         assertEquals(expectSat, verdictSat(original), "$name: original verdict unexpected")
-        assertEquals(verdictSat(original), verdictSat(elim.problem), "$name: verdict changed by elimination")
-        if (verdictSat(elim.problem)) {
-            val reduced = BacktrackSolver(elim.problem).solve(BacktrackParams())
-            check(reduced is SolveResult.Sat)
-            val full = elim.reconstruct(reduced.assignment)
+        assertEquals(verdictSat(original), verdictSat(reduced), "$name: verdict changed by elimination")
+        if (verdictSat(reduced)) {
+            val solved = BacktrackSolver(reduced).solve(BacktrackParams())
+            check(solved is SolveResult.Sat)
+            val full = reconstruct(solved.assignment)
             assertTrue(isFeasible(original, full), "$name: reconstructed sample infeasible in original")
         }
     }
@@ -51,13 +54,15 @@ class AffineEliminationTest {
      *  to a feasible assignment of the original, and the reconstructed set is *exactly* the original's
      *  feasible set (no solution lost, none invented). Small domains only — full enumeration. */
     private fun checkFeasibleSetPreserved(name: String, original: Problem) {
-        val elim = Presolve.eliminateAffineSingletons(original)
-        assertTrue(elim.problem !== original, "$name: expected an elimination")
+        val delta = Presolve.eliminateAffineSingletons(original)
+        assertTrue(!delta.isEmpty, "$name: expected an elimination")
+        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reconstruct = delta.reconstruct ?: { it }
         val origFeasible = feasibleSet(original)
         val reconstructed = HashSet<List<Int>>()
-        enumerate(elim.problem.intDomains) { assign ->
-            if (isFeasible(elim.problem, Sample(BooleanArray(0), assign))) {
-                val full = elim.reconstruct(Sample(BooleanArray(0), assign.copyOf()))
+        enumerate(reduced.intDomains) { assign ->
+            if (isFeasible(reduced, Sample(BooleanArray(0), assign))) {
+                val full = reconstruct(Sample(BooleanArray(0), assign.copyOf()))
                 assertTrue(isFeasible(original, full), "$name: reconstructed $full infeasible in original")
                 reconstructed.add(full.ints.toList())
             }
@@ -353,8 +358,8 @@ class AffineEliminationTest {
             intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 3), IntDomain(0, 3)),
             factors = listOf(Linear(intArrayOf(2, -4, -6), intArrayOf(0, 1, 2), LinearOp.EQ, 8)),
         )
-        val elim = Presolve.eliminateAffineSingletons(problem, objectiveIntVars = setOf(0))
-        assertTrue(elim.problem === problem, "objective-protected: must not eliminate x0")
+        val delta = Presolve.eliminateAffineSingletons(problem, objectiveIntVars = setOf(0))
+        assertTrue(delta.isEmpty, "objective-protected: must not eliminate x0")
     }
 
     @Test

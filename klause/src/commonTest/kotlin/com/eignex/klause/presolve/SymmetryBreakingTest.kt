@@ -26,6 +26,7 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -77,8 +78,14 @@ class SymmetryBreakingTest {
         return count
     }
 
+    private fun broken(problem: Problem): Problem =
+        problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
+
+    private fun precedence(problem: Problem): Problem =
+        problem.withPassDelta(Presolve.breakValuePrecedence(problem), BakeConfig.NONE)
+
     private fun checkSound(name: String, problem: Problem, expectReduced: Boolean) {
-        val broken = Presolve.breakSymmetries(problem)
+        val broken = broken(problem)
         val orig = countFeasible(problem)
         val after = countFeasible(broken)
         assertTrue(after <= orig, "$name: breaking ADDED solutions ($orig -> $after)")
@@ -86,7 +93,7 @@ class SymmetryBreakingTest {
         if (expectReduced) {
             assertTrue(after < orig, "$name: expected fewer solutions but $orig -> $after")
         } else {
-            assertSame(problem, broken, "$name: expected no symmetry detected")
+            assertTrue(Presolve.breakSymmetries(problem).isEmpty, "$name: expected no symmetry detected")
         }
     }
 
@@ -116,7 +123,7 @@ class SymmetryBreakingTest {
             Clause(intArrayOf(Lit.make(a, false), Lit.make(b, false))),
         )
         val problem = Problem(4, 0, emptyArray(), eq(0, 3) + eq(1, 2) + neq(0, 1) + neq(2, 3))
-        val broken = Presolve.breakSymmetries(problem)
+        val broken = broken(problem)
         assertEquals(
             countFeasible(problem) > 0,
             countFeasible(broken) > 0,
@@ -162,7 +169,7 @@ class SymmetryBreakingTest {
         // are the Bell(3)=5 set partitions, and the value_precede_chain keeps exactly one canonical
         // (restricted-growth) representative each — far stronger than pinning a single variable.
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, emptyList())
-        val broken = Presolve.breakValuePrecedence(problem)
+        val broken = precedence(problem)
         val orig = countFeasible(problem)
         val after = countFeasible(broken)
         assertTrue(after < orig, "expected reduction: $orig -> $after")
@@ -180,7 +187,7 @@ class SymmetryBreakingTest {
             Array(3) { IntDomain(0, 2) },
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
         )
-        val broken = Presolve.breakValuePrecedence(problem)
+        val broken = precedence(problem)
         assertEquals(6, countFeasible(problem))
         assertEquals(1, countFeasible(broken), "precedence + alldifferent should leave one solution")
     }
@@ -194,7 +201,7 @@ class SymmetryBreakingTest {
             Array(2) { IntDomain(0, 2) },
             listOf(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
         )
-        assertSame(problem, Presolve.breakValuePrecedence(problem), "no value symmetry ⇒ no-op")
+        assertTrue(Presolve.breakValuePrecedence(problem).isEmpty, "no value symmetry ⇒ no-op")
     }
 
     @Test
@@ -212,7 +219,7 @@ class SymmetryBreakingTest {
         assertEquals(6, countFeasible(problem))
         assertEquals(
             1,
-            countFeasible(Presolve.breakValuePrecedence(problem)),
+            countFeasible(precedence(problem)),
             "coloring value symmetry should collapse to one labeling",
         )
     }
@@ -243,7 +250,7 @@ class SymmetryBreakingTest {
             Array(2) { IntDomain(0, 2) },
             listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
         )
-        assertSame(problem, Presolve.breakValuePrecedence(problem), "ordering ⇒ no value symmetry")
+        assertTrue(Presolve.breakValuePrecedence(problem).isEmpty, "ordering ⇒ no value symmetry")
     }
 
     @Test
@@ -264,7 +271,7 @@ class SymmetryBreakingTest {
                 ),
             ),
         )
-        val broken = Presolve.breakValuePrecedence(problem)
+        val broken = precedence(problem)
         val orig = countFeasible(problem)
         val after = countFeasible(broken)
         assertTrue(after < orig, "expected reduction: $orig -> $after")
@@ -342,7 +349,7 @@ class SymmetryBreakingTest {
         )
         checkSound("alldiff", problem, expectReduced = true)
         // 3! permutations collapse to the single sorted one.
-        assertEquals(1, countFeasible(Presolve.breakSymmetries(problem)))
+        assertEquals(1, countFeasible(broken(problem)))
     }
 
     @Test
@@ -426,7 +433,7 @@ class SymmetryBreakingTest {
                 PseudoBoolean(intArrayOf(1, 2, 4), intArrayOf(pos(3), pos(4), pos(5)), PbOp.LE, 5),
             ),
         )
-        val broken = Presolve.breakSymmetries(problem)
+        val broken = broken(problem)
         assertEquals(problem.numIntVars, broken.numIntVars, "dynamic handling must not grow the integer space")
         val symmetry = broken.factors.filterIsInstance<SymmetryHandling>().single()
         assertSame(NoInvariant, symmetry.asInvariant(), "symmetry handling must be propagator-only")
@@ -613,7 +620,7 @@ class SymmetryBreakingTest {
      *  it must never add solutions or flip satisfiability. Guards that a new structuralKey can't make
      *  verified detection unsound (a too-coarse key would). */
     private fun checkBreakingSound(name: String, problem: Problem) {
-        val broken = Presolve.breakSymmetries(problem)
+        val broken = broken(problem)
         val orig = countFeasible(problem)
         val after = countFeasible(broken)
         assertTrue(after <= orig, "$name: breaking ADDED solutions ($orig -> $after)")

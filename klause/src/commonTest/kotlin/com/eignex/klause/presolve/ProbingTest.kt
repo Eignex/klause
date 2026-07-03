@@ -3,20 +3,21 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
  * Probing to fixpoint ([Presolve.probe]). Asserts the pass's observable output — the unit [Clause]s
  * and domain tightenings it derives — for failed literals, both-polarity bound tightening, the no-op
- * identity return, and a one-sided-consequence soundness guard. The cap is large enough that every
+ * empty delta, and a one-sided-consequence soundness guard. The cap is large enough that every
  * fixture is fully probed.
  */
 class ProbingTest {
@@ -25,6 +26,9 @@ class ProbingTest {
 
     private fun units(problem: Problem): List<Int> =
         problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }.map { it.literals[0] }
+
+    private fun probed(problem: Problem): Problem =
+        problem.withPassDelta(Presolve.probe(problem, cap, Cancellation.Never), BakeConfig.NONE)
 
     /** Whether [ints] is feasible against [problem] (every int pinned, propagation not Unsat). */
     private fun isFeasible(problem: Problem, ints: IntArray, bools: BooleanArray): Boolean {
@@ -71,7 +75,7 @@ class ProbingTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
             ),
         )
-        val out = Presolve.probe(problem, cap)
+        val out = probed(problem)
         assertTrue(Lit.make(0, false) in units(out), "fixing b0 = true conflicts ⇒ b0 forced false")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }
@@ -103,7 +107,7 @@ class ProbingTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
             ),
         )
-        val out = Presolve.probe(problem, cap)
+        val out = probed(problem)
         assertEquals(2, out.intDomains[0].min, "the common lower bound x ≥ 2 is folded in")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }
@@ -127,7 +131,7 @@ class ProbingTest {
                 ),
             ),
         )
-        val out = Presolve.probe(problem, cap)
+        val out = probed(problem)
         assertEquals(0, out.intDomains[0].min, "a one-sided bound must not be applied")
         assertTrue(units(out).isEmpty(), "no literal failed")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
@@ -142,6 +146,9 @@ class ProbingTest {
             intDomains = emptyArray(),
             factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
-        assertSame(problem, Presolve.probe(problem, cap), "nothing derivable is the pass's no-op signal")
+        assertTrue(
+            Presolve.probe(problem, cap, Cancellation.Never).isEmpty,
+            "nothing derivable is the pass's no-op signal",
+        )
     }
 }

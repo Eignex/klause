@@ -8,6 +8,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -136,8 +137,8 @@ class PresolverTest {
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
         )
         for (p in PresolvePass.entries.filter { it.stage == PresolvePass.Stage.PROBLEM }) {
-            val result = p.apply(trivial, PresolveContext.EMPTY)
-            assertEquals(trivial.numIntVars, result.problem.numIntVars, "${p.id} returned a malformed problem")
+            val applied = trivial.withPassDelta(p.apply(trivial, PresolveContext.EMPTY), BakeConfig.NONE)
+            assertEquals(trivial.numIntVars, applied.numIntVars, "${p.id} returned a malformed problem")
         }
     }
 

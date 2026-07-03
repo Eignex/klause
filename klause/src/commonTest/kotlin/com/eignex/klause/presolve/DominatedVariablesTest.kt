@@ -7,6 +7,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
@@ -14,7 +15,6 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -53,13 +53,18 @@ class DominatedVariablesTest {
         return best
     }
 
+    private fun fixed(problem: Problem, intCoeffs: Map<Int, Long>, boolCoeffs: Map<Int, Long> = emptyMap()): Problem =
+        problem.withPassDelta(Presolve.fixDominatedVariables(problem, intCoeffs, boolCoeffs), BakeConfig.NONE)
+
     private fun checkDualFix(name: String, problem: Problem, coeffs: Map<Int, Long>, expectFixed: Set<Int>) {
-        val out = Presolve.fixDominatedVariables(problem, coeffs)
+        val out = fixed(problem, coeffs)
         assertEquals(minObjective(problem, coeffs), minObjective(out, coeffs), "$name: optimum changed")
         for (v in expectFixed) {
             assertTrue(out.intDomains[v].min == out.intDomains[v].max, "$name: var $v should be pinned")
         }
-        if (expectFixed.isEmpty()) assertSame(problem, out, "$name: expected no fixing")
+        if (expectFixed.isEmpty()) {
+            assertTrue(Presolve.fixDominatedVariables(problem, coeffs).isEmpty, "$name: expected no fixing")
+        }
     }
 
     @Test
@@ -73,7 +78,7 @@ class DominatedVariablesTest {
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
         )
         checkDualFix("down-safe", problem, emptyMap(), setOf(0, 1))
-        val out = Presolve.fixDominatedVariables(problem, emptyMap())
+        val out = fixed(problem, emptyMap())
         assertEquals(0, out.intDomains[0].min)
         assertEquals(0, out.intDomains[0].max)
     }
@@ -100,7 +105,7 @@ class DominatedVariablesTest {
             Array(2) { IntDomain(0, 5) },
             listOf(Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 4)),
         )
-        val out = Presolve.fixDominatedVariables(problem, mapOf(0 to -1L))
+        val out = fixed(problem, mapOf(0 to -1L))
         assertEquals(minObjective(problem, mapOf(0 to -1L)), minObjective(out, mapOf(0 to -1L)), "optimum changed")
         assertEquals(5, out.intDomains[0].min)
         assertEquals(5, out.intDomains[0].max)
@@ -120,7 +125,7 @@ class DominatedVariablesTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 2),
             ),
         )
-        val out = Presolve.fixDominatedVariables(problem, emptyMap())
+        val out = fixed(problem, emptyMap())
         assertEquals(minObjective(problem, emptyMap()), minObjective(out, emptyMap()), "optimum changed")
         assertTrue(out.intDomains[0].min != out.intDomains[0].max, "x0 must stay free")
     }
@@ -165,7 +170,7 @@ class DominatedVariablesTest {
         // b0, b1 appear only positively (in a single clause) ⇒ setting them true satisfies it and is
         // always safe ⇒ both pinned true with a unit clause; the optimum (no objective) is preserved.
         val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1)))))
-        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        val out = fixed(problem, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
         assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
         assertTrue(hasUnit(out, Lit.make(1, true)), "b1 should be pinned true")
@@ -177,7 +182,7 @@ class DominatedVariablesTest {
         // ⇒ it cannot be pinned either way. b1 (zero cost) is still pinned true.
         val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1)))))
         val coeffs = mapOf(0 to 2L)
-        val out = Presolve.fixDominatedVariables(problem, emptyMap(), coeffs)
+        val out = fixed(problem, emptyMap(), coeffs)
         assertEquals(minObjectiveBools(problem, coeffs), minObjectiveBools(out, coeffs), "optimum changed")
         assertTrue(!hasUnit(out, Lit.make(0, true)) && !hasUnit(out, Lit.make(0, false)), "b0 must stay free")
     }
@@ -187,7 +192,7 @@ class DominatedVariablesTest {
         // c0 = −1 (true is beneficial) and true is safe ⇒ pin b0 true.
         val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0), pos(1)))))
         val coeffs = mapOf(0 to -1L)
-        val out = Presolve.fixDominatedVariables(problem, emptyMap(), coeffs)
+        val out = fixed(problem, emptyMap(), coeffs)
         assertEquals(minObjectiveBools(problem, coeffs), minObjectiveBools(out, coeffs), "optimum changed")
         assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
     }
@@ -202,7 +207,10 @@ class DominatedVariablesTest {
             emptyArray(),
             listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 1)),
         )
-        assertSame(problem, Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()), "expected no fixing")
+        assertTrue(
+            Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()).isEmpty,
+            "expected no fixing",
+        )
     }
 
     @Test
@@ -215,7 +223,7 @@ class DominatedVariablesTest {
             emptyArray(),
             listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 3)),
         )
-        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        val out = fixed(problem, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
         for (b in 0..2) assertTrue(hasUnit(out, Lit.make(b, true)), "b$b should be pinned true")
     }
@@ -230,7 +238,7 @@ class DominatedVariablesTest {
             emptyArray(),
             listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1)),
         )
-        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        val out = fixed(problem, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
         for (b in 0..2) assertTrue(hasUnit(out, Lit.make(b, false)), "b$b should be pinned false")
     }
@@ -244,7 +252,7 @@ class DominatedVariablesTest {
             emptyArray(),
             listOf(PseudoBoolean(intArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.LE, 4)),
         )
-        val outLe = Presolve.fixDominatedVariables(le, emptyMap(), emptyMap())
+        val outLe = fixed(le, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(le, emptyMap()), minObjectiveBools(outLe, emptyMap()), "LE optimum changed")
         assertTrue(hasUnit(outLe, Lit.make(0, false)) && hasUnit(outLe, Lit.make(1, false)), "LE bools pinned false")
     }
@@ -258,7 +266,7 @@ class DominatedVariablesTest {
             emptyArray(),
             listOf(PseudoBoolean(intArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.GE, 1)),
         )
-        val outGe = Presolve.fixDominatedVariables(ge, emptyMap(), emptyMap())
+        val outGe = fixed(ge, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(ge, emptyMap()), minObjectiveBools(outGe, emptyMap()), "GE optimum changed")
         assertTrue(hasUnit(outGe, Lit.make(0, true)) && hasUnit(outGe, Lit.make(1, true)), "GE bools pinned true")
     }
@@ -268,7 +276,7 @@ class DominatedVariablesTest {
         // `-b0 <= 0` (always true): a rising sum violates LE, and with weight -1 the rising value is
         // b0 = false ⇒ false-unsafe ⇒ the safe pin is true. Optimum (no objective) is preserved.
         val problem = Problem(1, 0, emptyArray(), listOf(PseudoBoolean(intArrayOf(-1), intArrayOf(pos(0)), PbOp.LE, 0)))
-        val out = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        val out = fixed(problem, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
         assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
     }
@@ -282,6 +290,9 @@ class DominatedVariablesTest {
             emptyArray(),
             listOf(PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 1)),
         )
-        assertSame(problem, Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()), "expected no fixing")
+        assertTrue(
+            Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()).isEmpty,
+            "expected no fixing",
+        )
     }
 }

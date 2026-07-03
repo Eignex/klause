@@ -10,7 +10,9 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -36,7 +38,7 @@ class SymmetryPropagatorTest {
     private fun key(s: Sample) = s.bools.toList() to s.ints.toList()
 
     private fun assertSoundUnderSearch(name: String, problem: Problem) {
-        val broken = Presolve.breakSymmetries(problem)
+        val broken = problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
         val original = BruteForceSolver(
             problem,
         ).enumerate(BruteForceParams(randomSeed = 0L)).map { key(it) }.toHashSet()
@@ -118,7 +120,7 @@ class SymmetryPropagatorTest {
                 }
             }
             val problem = Problem(0, n, Array(n) { IntDomain(0, d) }, factors)
-            val broken = Presolve.breakSymmetries(problem)
+            val broken = problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
             val origSat = BruteForceSolver(problem).solve(BruteForceParams(randomSeed = 0L)) is SolveResult.Sat
             val brokenSat = BacktrackSolver(broken).solve(BacktrackParams(randomSeed = 1L)) is SolveResult.Sat
             assertEquals(origSat, brokenSat, "random#$iter(n=$n,d=$d): breaking changed satisfiability")

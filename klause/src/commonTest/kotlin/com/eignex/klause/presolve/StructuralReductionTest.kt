@@ -7,12 +7,12 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -33,7 +33,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false)),
         )
-        val out = Presolve.reduceStructural(problem)
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -50,7 +50,7 @@ class StructuralReductionTest {
             Array(5) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(2, 3, 4), arrIsVars = true)),
         )
-        val out = Presolve.reduceStructural(problem)
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
@@ -67,7 +67,7 @@ class StructuralReductionTest {
             Array(3) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(1, 2), arrIsVars = true)),
         )
-        val out = Presolve.reduceStructural(problem)
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.isEmpty(), "the vacuous element drops with no replacement")
     }
 
@@ -80,7 +80,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 10)),
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(7, 7, 7), arrIsVars = false)),
         )
-        val out = Presolve.reduceStructural(problem)
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         assertEquals(7, theLinear(out).bound)
         assertEquals(1, out.intDomains[0].min, "index lower bound clamped to the array's first position")
@@ -95,7 +95,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(1, 3), IntDomain(0, 100)),
             listOf(Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false)),
         )
-        assertSame(problem, Presolve.reduceStructural(problem), "no fixed index and a varied array is the no-op signal")
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "no fixed index and a varied array is the no-op signal")
     }
 
     @Test
@@ -106,7 +106,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
         )
-        val out = Presolve.reduceStructural(problem)
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is AllDifferent }, "the all-different global is removed")
         val ne = theLinear(out)
         assertEquals(LinearOp.NE, ne.op)
@@ -122,7 +122,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4)),
         )
-        assertSame(problem, Presolve.reduceStructural(problem), "a 3-var all-different keeps its global form")
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a 3-var all-different keeps its global form")
     }
 
     @Test
@@ -134,7 +134,8 @@ class StructuralReductionTest {
             emptyArray(),
             listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 3)),
         )
-        assertTrue(Presolve.reduceStructural(problem).factors.isEmpty(), "the vacuous cardinality drops")
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        assertTrue(out.factors.isEmpty(), "the vacuous cardinality drops")
     }
 
     @Test
@@ -145,7 +146,7 @@ class StructuralReductionTest {
             emptyArray(),
             listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 0, max = 1)),
         )
-        assertSame(problem, Presolve.reduceStructural(problem), "an at-most-one still constrains, so it stays")
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "an at-most-one still constrains, so it stays")
     }
 
     @Test
@@ -164,7 +165,7 @@ class StructuralReductionTest {
             ),
             listOf(AllDifferent(intArrayOf(0, 1, 2, 3, 4, 5), domainMin = 0, domainSize = 16)),
         )
-        val out = Presolve.reduceStructural(problem)
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         val groups = out.factors.filterIsInstance<AllDifferent>().map { it.vars.toSet() }
         assertEquals(setOf(setOf(0, 1, 2), setOf(3, 4, 5)), groups.toSet(), "splits into the two value-disjoint groups")
     }
@@ -177,7 +178,7 @@ class StructuralReductionTest {
             arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6)),
         )
-        assertSame(problem, Presolve.reduceStructural(problem), "one connected component does not split")
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "one connected component does not split")
     }
 
     @Test
@@ -196,7 +197,7 @@ class StructuralReductionTest {
                 ),
             ),
         )
-        val out = Presolve.reduceStructural(problem)
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Cumulative }, "the cumulative is removed")
         val disj = out.factors.filterIsInstance<Disjunctive>().single()
         assertEquals(listOf(0, 1, 2), disj.starts.toList())
@@ -217,6 +218,6 @@ class StructuralReductionTest {
                 ),
             ),
         )
-        assertSame(problem, Presolve.reduceStructural(problem), "tasks fit together, so it stays cumulative")
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "tasks fit together, so it stays cumulative")
     }
 }

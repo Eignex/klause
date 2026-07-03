@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
@@ -13,7 +14,6 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -35,14 +35,16 @@ class DuplicateColumnsTest {
         BacktrackSolver(problem).solve(BacktrackParams()) is SolveResult.Sat
 
     private fun checkRoundTrip(name: String, original: Problem, expectMerged: Boolean, expectSat: Boolean) {
-        val merge = Presolve.mergeDuplicateColumns(original)
-        assertEquals(expectMerged, merge.problem !== original, "$name: merge expectation wrong")
+        val delta = Presolve.mergeDuplicateColumns(original)
+        assertEquals(expectMerged, !delta.isEmpty, "$name: merge expectation wrong")
+        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reconstruct = delta.reconstruct ?: { it }
         assertEquals(expectSat, verdictSat(original), "$name: original verdict unexpected")
-        assertEquals(verdictSat(original), verdictSat(merge.problem), "$name: verdict changed by merge")
-        if (verdictSat(merge.problem)) {
-            val reduced = BacktrackSolver(merge.problem).solve(BacktrackParams())
-            check(reduced is SolveResult.Sat)
-            val full = merge.reconstruct(reduced.assignment)
+        assertEquals(verdictSat(original), verdictSat(reduced), "$name: verdict changed by merge")
+        if (verdictSat(reduced)) {
+            val solved = BacktrackSolver(reduced).solve(BacktrackParams())
+            check(solved is SolveResult.Sat)
+            val full = reconstruct(solved.assignment)
             assertTrue(isFeasible(original, full), "$name: reconstructed sample infeasible in original")
         }
     }
@@ -52,13 +54,15 @@ class DuplicateColumnsTest {
      *  not recover *every* original solution — see `preservesSolutionSet = false`), and the reduced
      *  problem is feasible exactly when the original is. Small domains only — full enumeration. */
     private fun checkAllReconstructionsFeasible(name: String, original: Problem) {
-        val merge = Presolve.mergeDuplicateColumns(original)
-        assertTrue(merge.problem !== original, "$name: expected a merge")
+        val delta = Presolve.mergeDuplicateColumns(original)
+        assertTrue(!delta.isEmpty, "$name: expected a merge")
+        val reduced = original.withPassDelta(delta, BakeConfig.NONE)
+        val reconstruct = delta.reconstruct ?: { it }
         var anyReduced = false
-        enumerate(merge.problem.intDomains) { assign ->
-            if (isFeasible(merge.problem, Sample(BooleanArray(0), assign))) {
+        enumerate(reduced.intDomains) { assign ->
+            if (isFeasible(reduced, Sample(BooleanArray(0), assign))) {
                 anyReduced = true
-                val full = merge.reconstruct(Sample(BooleanArray(0), assign.copyOf()))
+                val full = reconstruct(Sample(BooleanArray(0), assign.copyOf()))
                 assertTrue(isFeasible(original, full), "$name: reconstructed $full infeasible in original")
             }
         }
@@ -105,10 +109,10 @@ class DuplicateColumnsTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             ),
         )
-        val merge = Presolve.mergeDuplicateColumns(problem)
-        assertTrue(merge.problem !== problem, "expected a merge")
+        val reduced = problem.withPassDelta(Presolve.mergeDuplicateColumns(problem), BakeConfig.NONE)
+        assertTrue(reduced !== problem, "expected a merge")
         assertTrue(
-            merge.problem.factors.none { 1 in it.intVars },
+            reduced.factors.none { 1 in it.intVars },
             "the dropped duplicate column is absorbed and appears in no factor",
         )
         checkAllReconstructionsFeasible("exact-duplicate", problem)
@@ -143,8 +147,8 @@ class DuplicateColumnsTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             ),
         )
-        val merge = DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars = setOf(1))
-        assertSame(problem, merge.problem, "an objective variable must not be merged")
+        val delta = DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars = setOf(1))
+        assertTrue(delta.isEmpty, "an objective variable must not be merged")
     }
 
     @Test

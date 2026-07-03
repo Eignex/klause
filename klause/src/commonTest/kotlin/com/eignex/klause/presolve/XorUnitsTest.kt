@@ -2,22 +2,25 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
  * GF(2) elimination over the root xor system ([Presolve.deriveXorUnits]). Asserts the pass's
  * observable output — the unit [Clause]s it appends — for forced literals, contradictions, derived
- * cross-row units, idempotence, and the no-op identity return.
+ * cross-row units, idempotence, and the no-op empty delta.
  */
 class XorUnitsTest {
 
     private fun units(problem: Problem): List<Int> =
         problem.factors.filterIsInstance<Clause>().filter { it.literals.size == 1 }.map { it.literals[0] }
+
+    private fun derived(problem: Problem): Problem =
+        problem.withPassDelta(Presolve.deriveXorUnits(problem), BakeConfig.NONE)
 
     @Test
     fun `a single-literal xor forces its variable with the right polarity`() {
@@ -30,7 +33,7 @@ class XorUnitsTest {
         )
         for ((lit, parity, expected) in cases) {
             val problem = Problem(1, 0, emptyArray(), listOf(Xor(intArrayOf(lit), targetParity = parity)))
-            val out = Presolve.deriveXorUnits(problem)
+            val out = derived(problem)
             assertEquals(listOf(expected), units(out), "xor($lit)=$parity should force $expected")
         }
     }
@@ -47,7 +50,7 @@ class XorUnitsTest {
                 Xor(intArrayOf(Lit.make(1, true)), targetParity = 1),
             ),
         )
-        val out = Presolve.deriveXorUnits(problem)
+        val out = derived(problem)
         assertEquals(
             listOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true)),
             units(out),
@@ -67,7 +70,7 @@ class XorUnitsTest {
                 Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), targetParity = 1),
             ),
         )
-        val out = Presolve.deriveXorUnits(problem)
+        val out = derived(problem)
         assertEquals(listOf(Lit.make(2, true)), units(out), "the cross-row residue forces x2 = true")
     }
 
@@ -83,7 +86,7 @@ class XorUnitsTest {
                 Xor(intArrayOf(Lit.make(0, true)), targetParity = 0),
             ),
         )
-        val out = Presolve.deriveXorUnits(problem)
+        val out = derived(problem)
         assertEquals(
             setOf(Lit.make(0, true), Lit.make(0, false)),
             units(out).toSet(),
@@ -102,26 +105,24 @@ class XorUnitsTest {
                 Xor(intArrayOf(Lit.make(1, true)), targetParity = 1),
             ),
         )
-        val once = Presolve.deriveXorUnits(problem)
+        val once = derived(problem)
         assertEquals(
             setOf(Lit.make(0, true), Lit.make(1, true)),
             units(once).toSet(),
             "first run forces both variables",
         )
-        assertSame(once, Presolve.deriveXorUnits(once), "re-running adds no duplicate units")
+        assertTrue(Presolve.deriveXorUnits(once).isEmpty, "re-running adds no duplicate units")
     }
 
     @Test
-    fun `a problem with no xor factors is returned unchanged`() {
+    fun `a problem with no xor factors is a no-op`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,
             intDomains = emptyArray(),
             factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false)))),
         )
-        val out = Presolve.deriveXorUnits(problem)
-        assertSame(problem, out, "no xor factors is the pass's no-op signal")
-        assertEquals(problem.factors, out.factors, "factor set is untouched")
-        assertTrue(out.factors.none { it is Xor }, "still no xor factors")
+        assertTrue(Presolve.deriveXorUnits(problem).isEmpty, "no xor factors is the pass's no-op signal")
+        assertTrue(problem.factors.none { it is Xor }, "still no xor factors")
     }
 }
