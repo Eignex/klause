@@ -275,32 +275,19 @@ internal fun BacktrackSolver.driveSearch(
         return session.assertObjectiveBound(objectiveVar, threshold, atMost = objectiveAscending) is
             PropagationResult.Unsat
     }
-    // Glucose-style adaptive restart policy (#198). When enabled it replaces the Luby
-    // budget: restarts fire on learned-clause quality (recent LBD vs the long-run average),
-    // with trail-size blocking. `restartRequested` is set by the conflict handlers and
-    // consumed at the top of the inner loop; the policy's own stats persist across restarts.
-    val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
-    var restartRequested = false
+    // Restart policy — adaptive (Glucose LBD, #198) or Luby budget; see [RestartController].
+    val restart = RestartController(params)
     // Vivification (#203) walks the learned DB round-robin across restarts; the cursor
     // persists between restart passes so successive passes cover the whole database.
     val vivifyEnabled = params.vivification && params.assumptions.isEmpty
     var vivifyCursor = 0
-    var lubyIdx = 1L
     // Cross-arm clause exchange (portfolio): import nogoods learned by prior segments/arms before
     // the first DFS run, so a re-scheduled backtrack arm starts warm instead of cold-relearning
     // every slice (#381). The session sits at the post-seed root here — the same state a restart
     // pops back to — so imported literals are free and register without an immediate unit/conflict.
     params.clauseExchange?.onSearchStart(session)
     outer@ while (true) {
-        val perRunBudget: Long = if (glucose != null) {
-            Long.MAX_VALUE // adaptive restarts drive the schedule; the Luby budget is off
-        } else {
-            params.lubyRestartBase?.let { base ->
-                // Cap multiplication to avoid overflow on tiny base + huge lubyIdx.
-                val limit = lubyN(lubyIdx)
-                if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
-            } ?: Long.MAX_VALUE
-        }
+        restart.beginRun()
         var decisionsThisRun = 0L
 
         val trail: MutableList<TrailNode> = ArrayList()
@@ -321,8 +308,7 @@ internal fun BacktrackSolver.driveSearch(
             }
             // Restart trigger: Luby budget hit, or the adaptive policy asked to re-pick.
             // Either way pop back to root and restart.
-            if (decisionsThisRun >= perRunBudget || restartRequested) {
-                restartRequested = false
+            if (restart.shouldRestart(decisionsThisRun)) {
                 popTrailToRoot(trail)
                 val restartBlock = pendingBlock
                 if (restartBlock != null) {
@@ -371,9 +357,9 @@ internal fun BacktrackSolver.driveSearch(
                 // Vivification inprocessing: the trail is at root here, so a bounded slice
                 // of the learned DB can be strengthened against clean assumptions (#203).
                 if (vivifyEnabled) vivifyCursor = vivify(session, params, vivifyCursor)
-                lubyIdx++
+                val restartIndex = restart.onRestart()
                 sink?.observeRestart()
-                params.onEvent?.invoke(SearchEvent.Restart(lubyIdx - 1, decisionsThisRun))
+                params.onEvent?.invoke(SearchEvent.Restart(restartIndex, decisionsThisRun))
                 continue@outer
             }
             if (descend) {
@@ -419,9 +405,7 @@ internal fun BacktrackSolver.driveSearch(
                         // Feed the learned clause's LBD and the current depth to the
                         // adaptive restart policy (trail size == decision level here; the
                         // failed pin was self-reverted by the session).
-                        if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
-                            restartRequested = true
-                        }
+                        restart.recordConflict(out.learned.lbd, trail.size)
                         // Execute the backjump + learn sequence. On cascading conflict
                         // during assertion, recurse.
                         val term = backjumpAndLearn(
@@ -495,9 +479,7 @@ internal fun BacktrackSolver.driveSearch(
 
                     is AdvanceOutcome.Backjump -> {
                         recordTouchedSeedLevels(out.learned.decisionLevels)
-                        if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
-                            restartRequested = true
-                        }
+                        restart.recordConflict(out.learned.lbd, trail.size)
                         // Else-path: session has been popped below trail.last; align
                         // first (trail.removeAt) then proceed to backjump + learn.
                         val term = backjumpAndLearn(
@@ -529,26 +511,4 @@ internal fun BacktrackSolver.driveSearch(
 internal fun BacktrackSolver.makeNode(varRef: VarRef, values: Sequence<Int>): TrailNode = when (varRef) {
     is VarRef.Bool -> BoolNode(varRef, values)
     is VarRef.IntVar -> IntNode(varRef, values)
-}
-
-/**
- * Luby sequence (Luby-Sinclair-Zuckerman 1993). Standard CDCL restart schedule:
- * `1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, ...`. Closed form:
- * `lubyN(i) = 2^(k-1)` when `i = 2^k − 1` (i.e. one less than a power of two);
- * otherwise `lubyN(i − 2^(k-1) + 1)` where `k = ⌊log₂(i)⌋ + 1`.
- */
-internal fun BacktrackSolver.lubyN(idxIn: Long): Long {
-    var i = idxIn
-    var k = 1
-    // Find smallest k such that 2^k > i.
-    while ((1L shl k) <= i) k++
-    // Equivalent to the textbook recurrence; iteratively unwound.
-    while (true) {
-        val pow = 1L shl (k - 1)
-        if (i == (pow shl 1) - 1) return pow
-        // Otherwise i < (pow << 1) - 1; recurse on (i - pow + 1).
-        i = i - pow + 1
-        k = 1
-        while ((1L shl k) <= i) k++
-    }
 }

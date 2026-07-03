@@ -135,16 +135,13 @@ internal class ResumableMinimize(
     private val onConflictTick: () -> Unit = phase::onConflictTick
     private var pendingBlock: Sample? = null
     private var lastObjBoundAsserted: Int? = null
-    private val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
-    private var restartRequested = false
+    private val restart = RestartController(params)
     private val vivifyEnabled = params.vivification && params.assumptions.isEmpty
     private var vivifyCursor = 0
-    private var lubyIdx = 1L
 
     private val trail: MutableList<TrailNode> = ArrayList()
     private var descend = true
     private var decisionsThisRun = 0L
-    private var perRunBudget = Long.MAX_VALUE
     private var runActive = false
     private var started = false
 
@@ -434,14 +431,7 @@ internal class ResumableMinimize(
         applySharedObjectiveFloor()
         outer@ while (true) {
             if (!runActive) {
-                perRunBudget = if (glucose != null) {
-                    Long.MAX_VALUE
-                } else {
-                    params.lubyRestartBase?.let { base ->
-                        val limit = solver.lubyN(lubyIdx)
-                        if (limit > Long.MAX_VALUE / base) Long.MAX_VALUE else limit * base
-                    } ?: Long.MAX_VALUE
-                }
+                restart.beginRun()
                 decisionsThisRun = 0
                 descend = true
                 runActive = true
@@ -460,7 +450,7 @@ internal class ResumableMinimize(
                     }
                     poller.rearm()
                 }
-                if (decisionsThisRun >= perRunBudget || restartRequested) {
+                if (restart.shouldRestart(decisionsThisRun)) {
                     val term = doRestart()
                     if (term != null) {
                         done = term
@@ -519,9 +509,7 @@ internal class ResumableMinimize(
                             if (touchedSeedLevels != null) {
                                 for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
                             }
-                            if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
-                                restartRequested = true
-                            }
+                            restart.recordConflict(out.learned.lbd, trail.size)
                             when (
                                 solver.backjumpAndLearn(
                                     out.learned, trail, session, params, alignFirst = false,
@@ -604,9 +592,7 @@ internal class ResumableMinimize(
                             if (touchedSeedLevels != null) {
                                 for (l in out.learned.decisionLevels) if (l in 1..numSeed) touchedSeedLevels.add(l)
                             }
-                            if (glucose != null && glucose.recordConflict(out.learned.lbd, trail.size)) {
-                                restartRequested = true
-                            }
+                            restart.recordConflict(out.learned.lbd, trail.size)
                             when (
                                 solver.backjumpAndLearn(
                                     out.learned, trail, session, params, alignFirst = true,
@@ -650,7 +636,6 @@ internal class ResumableMinimize(
      *  assert the incumbent bound, rotate heuristics, forget, vivify). Returns a terminal verdict
      *  when a root contradiction proves exhaustion, else null. Mirrors driveSearch's restart block. */
     private fun doRestart(): MinimizeResult? {
-        restartRequested = false
         while (trail.isNotEmpty()) {
             session.popLast()
             trail.removeAt(trail.size - 1)
@@ -690,9 +675,9 @@ internal class ResumableMinimize(
         params.valueSelector.onRestart()
         solver.forgetIfOverCap(session, params)
         if (vivifyEnabled) vivifyCursor = solver.vivify(session, params, vivifyCursor)
-        lubyIdx++
+        val restartIndex = restart.onRestart()
         sink.observeRestart()
-        params.onEvent?.invoke(SearchEvent.Restart(lubyIdx - 1, decisionsThisRun))
+        params.onEvent?.invoke(SearchEvent.Restart(restartIndex, decisionsThisRun))
         return null
     }
 }
