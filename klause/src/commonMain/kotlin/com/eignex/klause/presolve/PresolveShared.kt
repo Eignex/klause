@@ -133,6 +133,9 @@ internal object PresolveShared {
         probeBudgetPerVar = problem.probeBudgetPerVar,
         probeTotalBudget = problem.probeTotalBudget,
         probeSeed = problem.probeSeed,
+        // Inherit the pass-view mode: a pass fed a cheap preFolded input returns a cheap preFolded
+        // output (the session re-folds via incremental propagation); a fresh-path rebuild stays eager.
+        preFolded = problem.preFolded,
     )
 
     fun gcdOf(xs: IntArray): Int {

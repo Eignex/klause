@@ -595,6 +595,13 @@ object Presolver {
         // between passes.
         val ctx = context.withCancellation(cancellation)
 
+        // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
+        // each pass's delta instead of rebuilding a [Problem] per firing pass. Scoped away from any
+        // EXHAUSTIVE (SAC / LP-harvest) pass, whose order-sensitive probing keeps the fresh-rebuild path.
+        if (passes.none { it.timing == PresolveTiming.EXHAUSTIVE }) {
+            return runIncremental(problem, passes, maxRounds, ctx, cancellation)
+        }
+
         var current = problem
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
         // A monotone "problem version" bumped on every change; a pass that already ran at the current
@@ -646,5 +653,73 @@ object Presolver {
                 { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
             }
         return Presolved(current, reconstruct, fired.toList())
+    }
+
+    /**
+     * Incremental variant of [run]'s round engine (default FAST+MEDIUM emphasis): identical
+     * scheduling — priority order, version-stamp fixpoint skip, [PresolvePass.skipAfterEmpty] parking,
+     * and the diminishing-returns abort — but a persistent [PresolveSession] absorbs each firing pass's
+     * delta instead of rebuilding a [Problem]. Each pass reads a cheap [PresolveSession.passInput] view
+     * and its output is folded back via [PresolveSession.applyResult]; the heavyweight solver [Problem]
+     * is materialized once at the end.
+     */
+    private fun runIncremental(
+        problem: Problem,
+        passes: List<PresolvePass>,
+        maxRounds: Int,
+        ctx: PresolveContext,
+        cancellation: Cancellation,
+    ): Presolved {
+        val session = PresolveSession(problem)
+        val reconstructs = ArrayList<(Sample) -> Sample>()
+        var version = 0
+        val ranAtVersion = HashMap<PresolvePass, Int>()
+        val fired = LinkedHashSet<PresolvePass>()
+        val exhausted = HashSet<PresolvePass>()
+        var round = 0
+        var roundStartComplexity = session.complexity()
+        // Infeasibility does not stop the loop, mirroring the fresh path: a pass still fires and records
+        // its factors on an already-infeasible problem (e.g. xor-units emitting contradictory units).
+        // [PresolveSession.applyResult] tracks those factor changes but skips re-propagating a conflicted
+        // state, and the final materialized problem's bake surfaces the infeasibility.
+        while (round < maxRounds && !cancellation()) {
+            var ranAny = false
+            for (pass in passes) {
+                if (cancellation()) break
+                if (pass in exhausted) continue
+                if (ranAtVersion[pass] == version) continue
+                ranAtVersion[pass] = version
+                ranAny = true
+                val input = session.passInput()
+                val result = pass.apply(input, ctx)
+                if (result.problem !== input) {
+                    result.reconstruct?.let { reconstructs.add(it) }
+                    session.applyResult(result.problem)
+                    fired.add(pass)
+                    version++
+                } else if (pass.skipAfterEmpty) {
+                    exhausted.add(pass)
+                }
+            }
+            if (!ranAny) break
+            round++
+            val now = session.complexity()
+            val reduced = roundStartComplexity - now
+            if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
+            roundStartComplexity = now
+        }
+
+        // No pass fired: presolve is a no-op, so return the input problem itself (identity) exactly like
+        // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
+        if (fired.isEmpty()) return Presolved(problem, { it }, emptyList())
+
+        val finalProblem = session.materialize()
+        val reconstruct: (Sample) -> Sample =
+            if (reconstructs.isEmpty()) {
+                { it }
+            } else {
+                { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
+            }
+        return Presolved(finalProblem, reconstruct, fired.toList())
     }
 }
