@@ -430,7 +430,7 @@ class PropagationSession(
 
     private fun pushBool(v: Int, value: Boolean): PropagationResult {
         val want = if (value) 1 else 0
-        if (boolPinned[v] == want) return PropagationResult.Implied.Empty
+        if (boolPinned[v] == want) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = state.runToFixpoint(allFactors = false)
@@ -442,7 +442,7 @@ class PropagationSession(
     }
 
     private fun pushInt(v: Int, value: Int): PropagationResult {
-        if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.Empty
+        if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = state.runToFixpoint(allFactors = false)
@@ -600,7 +600,7 @@ class PropagationSession(
      */
     private fun impliedSince(base: Int): PropagationResult.Implied {
         val top = state.undoTop
-        if (top <= base) return PropagationResult.Implied.Empty
+        if (top <= base) return PropagationResult.Implied.EMPTY
         val bRaw = IntArrayList()
         val iRaw = IntArrayList()
         for (i in base until top) {

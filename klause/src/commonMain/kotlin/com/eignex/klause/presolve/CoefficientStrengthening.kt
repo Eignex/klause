@@ -27,7 +27,7 @@ internal object CoefficientStrengthening {
      * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
      * Other factor types pass through untouched.
      */
-    fun strengthenCoefficients(problem: Problem): Problem {
+    fun strengthenCoefficients(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
         val out = ArrayList<Factor>(problem.factors.size)
         var changed = false
         for (factor in problem.factors) {
@@ -48,19 +48,7 @@ internal object CoefficientStrengthening {
             if (rewritten != null) out.add(rewritten)
         }
         if (!changed) return problem
-        return Problem(
-            numBoolVars = problem.numBoolVars,
-            numIntVars = problem.numIntVars,
-            intDomains = problem.intDomains.copyOf(),
-            factors = out,
-            probeFailedLiterals = problem.probeFailedLiterals,
-            probeIntBounds = problem.probeIntBounds,
-            probeIntHoles = problem.probeIntHoles,
-            probeBudgetPerVar = problem.probeBudgetPerVar,
-            probeTotalBudget = problem.probeTotalBudget,
-            probeSeed = problem.probeSeed,
-            preFolded = problem.preFolded,
-        )
+        return PresolveShared.rebuildProblem(problem, out, problem.intDomains.copyOf(), bakeConfig)
     }
 
     /** The factors that make the model infeasible when [factor] is an equality whose coefficient GCD

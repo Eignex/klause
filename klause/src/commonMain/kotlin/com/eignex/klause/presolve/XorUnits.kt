@@ -24,7 +24,7 @@ internal object XorUnits {
      * This is idempotent: units already present are not re-added, so the presolve round engine reaches
      * a fixpoint instead of appending duplicates on each round.
      */
-    fun deriveXorUnits(problem: Problem): Problem {
+    fun deriveXorUnits(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
         val xors = problem.factors.filterIsInstance<Xor>()
         if (xors.isEmpty()) return problem
 
@@ -131,6 +131,6 @@ internal object XorUnits {
         }
 
         if (extra.isEmpty()) return problem
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra)
+        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra, bakeConfig = bakeConfig)
     }
 }

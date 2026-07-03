@@ -27,7 +27,7 @@ class CoefficientStrengtheningTest {
         // to d = (max activity) - bound. SAC probing tightens x0's upper bound, shrinking the activity
         // and so the clamp — i.e. lifting reads the *baked* (probed) domains, not the declared ones.
         fun strengthenedTarget(probe: Boolean): Linear {
-            val p = Problem(
+            val base = Problem(
                 numBoolVars = 0,
                 numIntVars = 3,
                 intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 1)),
@@ -36,8 +36,8 @@ class CoefficientStrengtheningTest {
                     Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4), // x0 + x1 <= 4 (SAC: x0 <= 2)
                     Linear(intArrayOf(2, 5), intArrayOf(0, 2), LinearOp.LE, 8), // lift target
                 ),
-                probeIntBounds = probe,
             )
+            val p = RootBaker.reseed(base, BakeConfig(probeIntBounds = probe))
             val out = Presolve.strengthenCoefficients(p)
             return out.factors.filterIsInstance<Linear>().single { 0 in it.vars && 2 in it.vars }
         }

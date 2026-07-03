@@ -2,6 +2,8 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.*
 import kotlin.test.Test
@@ -64,14 +66,14 @@ class ProblemDomainTighteningTest {
 
     @Test
     fun `interior holes from SAC probing are excluded from the domain`() {
-        val p =
+        val base =
             Problem(
                 0,
                 1,
                 arrayOf(IntDomain(0, 4)),
                 listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 2)),
-                probeIntHoles = true,
             )
+        val p = RootBaker.reseed(base, BakeConfig(probeIntHoles = true))
         assertIs<PropagationResult.Implied>(p.baked)
         assertFalse(2 in p.intDomains[0])
         assertTrue(1 in p.intDomains[0])

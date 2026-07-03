@@ -176,10 +176,102 @@ sealed interface PropagationResult {
             append("})")
         }
 
+        /** Union this implied set with [other] by replaying everything from [other] over this base.
+         *  Bound tightenings take the tighter value; holes union; a variable pinned in the union is
+         *  dropped from the bound and hole sets. Used by root-bake probing to accumulate deductions. */
+        fun merge(other: Implied): Implied {
+            val bools = HashMap(bools)
+            other.forEachBool { k, v -> bools[k] = v }
+            val ints = HashMap(ints)
+            other.forEachInt { k, v -> ints[k] = v }
+            val mins = HashMap<Int, Int>()
+            forEachIntMin { k, v -> mins[k] = v }
+            other.forEachIntMin { k, v -> mins[k] = maxOf(mins[k] ?: Int.MIN_VALUE, v) }
+            val maxes = HashMap<Int, Int>()
+            forEachIntMax { k, v -> maxes[k] = v }
+            other.forEachIntMax { k, v -> maxes[k] = minOf(maxes[k] ?: Int.MAX_VALUE, v) }
+            val holes = HashSet<Long>()
+            forEachIntHole { id, v -> holes.add(packHole(id, v)) }
+            other.forEachIntHole { id, v -> holes.add(packHole(id, v)) }
+            for (k in ints.keys) {
+                mins.remove(k)
+                maxes.remove(k)
+                holes.removeAll { (it ushr HOLE_ID_SHIFT).toInt() == k }
+            }
+            return build(bools, ints, mins, maxes, holes)
+        }
+
+        /** This implied set with int [v]'s lower bound raised to at least [newMin]. */
+        fun withMin(v: Int, newMin: Int): Implied {
+            val mins = HashMap<Int, Int>()
+            forEachIntMin { k, vv -> mins[k] = vv }
+            mins[v] = maxOf(mins[v] ?: Int.MIN_VALUE, newMin)
+            val maxes = HashMap<Int, Int>()
+            forEachIntMax { k, vv -> maxes[k] = vv }
+            return build(bools, ints, mins, maxes, holeSet())
+        }
+
+        /** This implied set with int [v]'s upper bound lowered to at most [newMax]. */
+        fun withMax(v: Int, newMax: Int): Implied {
+            val mins = HashMap<Int, Int>()
+            forEachIntMin { k, vv -> mins[k] = vv }
+            val maxes = HashMap<Int, Int>()
+            forEachIntMax { k, vv -> maxes[k] = vv }
+            maxes[v] = minOf(maxes[v] ?: Int.MAX_VALUE, newMax)
+            return build(bools, ints, mins, maxes, holeSet())
+        }
+
+        /** This implied set with interior [value] excluded from int [v]'s domain (`v ≠ value`). */
+        fun withHole(v: Int, value: Int): Implied {
+            val mins = HashMap<Int, Int>()
+            forEachIntMin { k, vv -> mins[k] = vv }
+            val maxes = HashMap<Int, Int>()
+            forEachIntMax { k, vv -> maxes[k] = vv }
+            val holes = holeSet()
+            holes.add(packHole(v, value))
+            return build(bools, ints, mins, maxes, holes)
+        }
+
+        private fun holeSet(): HashSet<Long> {
+            val holes = HashSet<Long>()
+            forEachIntHole { id, v -> holes.add(packHole(id, v)) }
+            return holes
+        }
+
         /** Shared [PropagationResult] instances. */
         companion object {
+            private const val HOLE_ID_SHIFT = 32
+            private const val HOLE_VALUE_MASK = 0xFFFFFFFFL
+
+            private fun packHole(id: Int, value: Int): Long =
+                (id.toLong() shl HOLE_ID_SHIFT) or (value.toLong() and HOLE_VALUE_MASK)
+
+            /** Materialise an [Implied] from the accumulation maps used by [merge] / [withMin] / [withMax] /
+             *  [withHole], emitting the key-sorted parallel arrays the constructor expects. */
+            private fun build(
+                bools: Map<Int, Boolean>,
+                ints: Map<Int, Int>,
+                mins: Map<Int, Int>,
+                maxes: Map<Int, Int>,
+                holes: Set<Long>,
+            ): Implied {
+                val minK = mins.keys.toIntArray().also { it.sort() }
+                val maxK = maxes.keys.toIntArray().also { it.sort() }
+                val holesSorted = holes.toLongArray().also { it.sort() }
+                return Implied(
+                    bools = bools,
+                    ints = ints,
+                    intMinKeys = minK,
+                    intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+                    intMaxKeys = maxK,
+                    intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+                    intHoleVarIds = IntArray(holesSorted.size) { (holesSorted[it] ushr HOLE_ID_SHIFT).toInt() },
+                    intHoleValues = IntArray(holesSorted.size) { holesSorted[it].toInt() },
+                )
+            }
+
             /** The empty implied set (nothing forced). */
-            val Empty: Implied = Implied(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
+            val EMPTY: Implied = Implied(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
              *  normalises to the primitive sorted-array form. Optional bound-tightening
@@ -197,7 +289,7 @@ sealed interface PropagationResult {
                 if (bools.isEmpty() && ints.isEmpty() &&
                     intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()
                 ) {
-                    return Empty
+                    return EMPTY
                 }
                 val bKeys = bools.keys.toIntArray().also { it.sort() }
                 val bVals = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) }

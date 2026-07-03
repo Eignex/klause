@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
@@ -43,8 +45,9 @@ fun lpHarvest(
     problem: Problem,
     objective: LinearObjective,
     params: BacktrackParams,
+    bakeConfig: BakeConfig = BakeConfig.NONE,
     cancellation: Cancellation = Cancellation.Never,
-): Problem = lpHarvestReporting(problem, objective, params, cancellation).problem
+): Problem = lpHarvestReporting(problem, objective, params, bakeConfig, cancellation).problem
 
 /** [lpHarvest]'s transformed [problem] paired with the [report] of what the LP harvest contributed. */
 class LpHarvestResult(val problem: Problem, val report: LpHarvestReport)
@@ -56,6 +59,7 @@ fun lpHarvestReporting(
     problem: Problem,
     objective: LinearObjective,
     params: BacktrackParams,
+    bakeConfig: BakeConfig = BakeConfig.NONE,
     cancellation: Cancellation = Cancellation.Never,
 ): LpHarvestResult {
     val engine = LpEngine(problem, objective, params, SolveStatsSink(backend = "lp-harvest"))
@@ -63,7 +67,7 @@ fun lpHarvestReporting(
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
     if (engine.rootInfeasible(cancellation)) {
-        return LpHarvestResult(provenInfeasible(problem), LpHarvestReport(rootInfeasible = true))
+        return LpHarvestResult(provenInfeasible(problem, bakeConfig), LpHarvestReport(rootInfeasible = true))
     }
     val plan = engine.params.lpPlan
     if (!plan.variableShaving && !plan.objectiveShaving) return LpHarvestResult(problem, LpHarvestReport())
@@ -125,17 +129,14 @@ fun lpHarvestReporting(
     } else {
         (problem.factors.filterIndexed { idx, _ -> idx !in redundant } + equalities).toTypedArray()
     }
-    val transformed = Problem(
-        numBoolVars = problem.numBoolVars,
-        numIntVars = problem.numIntVars,
-        intDomains = domains,
-        factors = factors,
-        probeFailedLiterals = problem.probeFailedLiterals,
-        probeIntBounds = problem.probeIntBounds,
-        probeIntHoles = problem.probeIntHoles,
-        probeBudgetPerVar = problem.probeBudgetPerVar,
-        probeTotalBudget = problem.probeTotalBudget,
-        probeSeed = problem.probeSeed,
+    val transformed = RootBaker.reseed(
+        Problem(
+            numBoolVars = problem.numBoolVars,
+            numIntVars = problem.numIntVars,
+            intDomains = domains,
+            factors = factors,
+        ),
+        bakeConfig,
     )
     return LpHarvestResult(transformed, report)
 }
@@ -147,7 +148,7 @@ fun lpHarvestReporting(
  * the conflict is witnessed without depending on the LP proof being re-derivable downstream. Sound: an
  * infeasible problem has no solutions, and the relaxation infeasibility certifies there are none.
  */
-private fun provenInfeasible(problem: Problem): Problem {
+private fun provenInfeasible(problem: Problem, bakeConfig: BakeConfig): Problem {
     val factors = ArrayList<Factor>(problem.factors.size + 2)
     factors.addAll(problem.factors)
     when {
@@ -165,16 +166,13 @@ private fun provenInfeasible(problem: Problem): Problem {
 
         else -> return problem // no variable to pin a contradiction on (a variable-free problem)
     }
-    return Problem(
-        numBoolVars = problem.numBoolVars,
-        numIntVars = problem.numIntVars,
-        intDomains = problem.intDomains.copyOf(),
-        factors = factors,
-        probeFailedLiterals = problem.probeFailedLiterals,
-        probeIntBounds = problem.probeIntBounds,
-        probeIntHoles = problem.probeIntHoles,
-        probeBudgetPerVar = problem.probeBudgetPerVar,
-        probeTotalBudget = problem.probeTotalBudget,
-        probeSeed = problem.probeSeed,
+    return RootBaker.reseed(
+        Problem(
+            numBoolVars = problem.numBoolVars,
+            numIntVars = problem.numIntVars,
+            intDomains = problem.intDomains.copyOf(),
+            factors = factors,
+        ),
+        bakeConfig,
     )
 }

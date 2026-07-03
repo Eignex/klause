@@ -45,7 +45,11 @@ internal object DuplicateColumns {
      * re-signs against the widened aggregate and is picked up on a later round, keeping every merge a
      * two-variable aggregate over *declared* domains that the contiguous split reconstructs exactly.
      */
-    fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): DuplicateColumnMerge {
+    fun mergeDuplicateColumns(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): DuplicateColumnMerge {
         if (problem.numIntVars < 2) return DuplicateColumnMerge(problem, emptyList())
         val eligible = eligibleColumns(problem, objectiveIntVars)
         val signatures = columnSignatures(problem, eligible)
@@ -82,7 +86,10 @@ internal object DuplicateColumns {
             domains[m.keep] = IntDomain(keep.min + m.dropDomain.min, keep.max + m.dropDomain.max)
         }
         val factors = problem.factors.map { aggregateColumns(it, keepOf) }
-        return DuplicateColumnMerge(PresolveShared.rebuildProblem(problem, factors, domains), merges)
+        return DuplicateColumnMerge(
+            PresolveShared.rebuildProblem(problem, factors, domains, bakeConfig = bakeConfig),
+            merges,
+        )
     }
 
     /** [factor] with every dropped duplicate column folded into its representative: in a [Linear] row,

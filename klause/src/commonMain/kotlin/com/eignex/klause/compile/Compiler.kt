@@ -60,8 +60,6 @@ import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
-import com.eignex.klause.presolve.PresolveContext
-import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -492,21 +490,15 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
     // contribute dead-value symmetry. Gated by config so it can be turned off.
     if (config.pinAbsentOptVars) emitOptVarPins(def)
 
-    // Construction-time SAC probes are resolved from the presolve config (solution-preserving, so
-    // intent-independent — resolved under EMPTY). Holes imply bounds.
-    val presolve = config.presolveConfig()
-    val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
+    // The compiler builds a plain base-baked [Problem]; the SAC / failed-literal probing tiers, resolved
+    // from the presolve config, now run in the presolve lane via [RootBaker] (kernel → presolve would
+    // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
     return CompiledProblem(
         problem = Problem(
             numBoolVars = numBoolVars,
             numIntVars = numIntVars,
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
-            probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
-            probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
-            probeIntHoles = holes,
-            probeBudgetPerVar = presolve.probeBudgetPerVar(),
-            probeTotalBudget = presolve.probeTotalBudget(),
         ),
         boolVarIdByName = boolVarIdByName.toMap(),
         intVarIdByName = intVarIdByName.toMap(),

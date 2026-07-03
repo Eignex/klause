@@ -13,7 +13,7 @@ internal object StructuralReduction {
      * solution-set exact (the hook's contract), so the pass preserves the solution set; the driver only
      * collects the replacements, intersects any returned bound narrowings into the domains, and rebuilds.
      */
-    fun reduce(problem: Problem): Problem {
+    fun reduce(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
         var changed = false
         var domains: Array<IntDomain>? = null
         val out = ArrayList<Factor>(problem.factors.size)
@@ -32,6 +32,11 @@ internal object StructuralReduction {
             }
         }
         if (!changed) return problem
-        return PresolveShared.rebuildProblem(problem, out, domains ?: problem.intDomains.copyOf())
+        return PresolveShared.rebuildProblem(
+            problem,
+            out,
+            domains ?: problem.intDomains.copyOf(),
+            bakeConfig = bakeConfig,
+        )
     }
 }
