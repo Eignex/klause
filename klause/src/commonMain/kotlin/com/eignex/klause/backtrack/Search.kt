@@ -203,42 +203,10 @@ internal fun BacktrackSolver.driveSearch(
         yield(SearchOutcome.Exhausted(coreOf(seedResult), touchedToArray(touchedSeedLevels)))
         return@sequence
     }
-    // Phase-saving: cache the last value committed for each var (across backtracks
-    // and restarts). Allocated only when enabled. The `boolPhaseSet` parallel array
-    // distinguishes "never committed a value yet" from "saved value happens to be
-    // false" — without it the default-false BooleanArray entries would shadow any
-    // real saves of false.
-    // Boolean phase saving is needed both for plain phase saving and as the fallback
-    // polarity source in target phasing's SAVED rephase mode, so allocate it whenever
-    // either feature is on. Integer phase saving stays gated on [phaseSaving] alone —
-    // target phasing is pure-Boolean and never touches integer value selection.
-    val boolPhaseTracking = params.phaseSaving || params.targetPhasing
-    val boolPhase: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
-    val boolPhaseSet: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
-    val intPhase: IntArray? = if (params.phaseSaving) IntArray(problem.numIntVars) else null
-    val intPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numIntVars) else null
-    // Target phasing (#204): the deepest conflict-free Boolean assignment seen so far and
-    // a rephasing schedule. [boolTarget]/[boolTargetSet] hold the target phase; the target
-    // is refreshed whenever the trail reaches a new maximum depth (a deeper conflict-free
-    // prefix). [rephaseMode] selects the current polarity source and rotates every
-    // [BacktrackParams.rephaseInterval] conflicts. All persist across restarts.
-    val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
-    val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
-    var bestTrailSize = -1
-    var rephaseMode = RephaseMode.TARGET
-    var conflictsSinceRephase = 0L
-    // Counts conflicts as they happen inside [advance] and rotates the rephase mode when
-    // the interval elapses. The mode change takes effect on the next fresh descent — no
-    // need to pop to root, since rephasing only reorders which polarity a new decision
-    // tries first.
-    val onConflictTick: () -> Unit = tick@{
-        if (boolTarget == null) return@tick
-        conflictsSinceRephase++
-        if (conflictsSinceRephase >= params.rephaseInterval) {
-            conflictsSinceRephase = 0
-            rephaseMode = rephaseMode.next()
-        }
-    }
+    // Phase-saving + target-phasing (#204): saved polarities, the deepest conflict-free target phase,
+    // and the rephase schedule — all persisting across restarts. See [PhaseSaving].
+    val phase = PhaseSaving(problem.numBoolVars, problem.numIntVars, params)
+    val onConflictTick: () -> Unit = phase::onConflictTick
 
     // Pop every decision frame, reverting the session in lockstep, back to the post-seed root.
     fun popTrailToRoot(trail: MutableList<TrailNode>) {
@@ -437,25 +405,17 @@ internal fun BacktrackSolver.driveSearch(
                     continue@inner
                 }
                 val values = params.valueSelector.values(session, varRef, rng)
-                val phased = applyPhase(
-                    varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
-                    boolTarget, boolTargetSet, rephaseMode, rng,
-                )
+                val phased = phase.applyPhase(varRef, values, rng)
                 val node = makeNode(varRef, phased)
                 val decsBefore = decisionsLeft
                 val out = runAdvance(node)
                 decisionsThisRun += decsBefore - decisionsLeft
                 when (out) {
                     AdvanceOutcome.Success -> {
-                        capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                        phase.capture(varRef, session)
                         trail.add(node)
                         sink?.observeNode(trail.size)
-                        // Target phasing: a new maximum trail depth is the deepest
-                        // conflict-free assignment seen — snapshot it as the target phase.
-                        if (boolTarget != null && boolTargetSet != null && trail.size > bestTrailSize) {
-                            bestTrailSize = trail.size
-                            captureTargetPhase(session, boolTarget, boolTargetSet)
-                        }
+                        phase.captureTargetIfDeeper(session, trail.size)
                     }
 
                     AdvanceOutcome.Exhausted -> {
@@ -480,8 +440,7 @@ internal fun BacktrackSolver.driveSearch(
                         // Execute the backjump + learn sequence. On cascading conflict
                         // during assertion, recurse.
                         val term = backjumpAndLearn(
-                            out.learned, trail, session, params,
-                            boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false,
+                            out.learned, trail, session, params, alignFirst = false,
                         )
                         when (term) {
                             BackjumpTerm.Resume -> {
@@ -535,7 +494,7 @@ internal fun BacktrackSolver.driveSearch(
                 decisionsThisRun += decsBefore - decisionsLeft
                 when (out) {
                     AdvanceOutcome.Success -> {
-                        capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                        phase.capture(top.varRef, session)
                         descend = true
                     }
 
@@ -557,8 +516,7 @@ internal fun BacktrackSolver.driveSearch(
                         // Else-path: session has been popped below trail.last; align
                         // first (trail.removeAt) then proceed to backjump + learn.
                         val term = backjumpAndLearn(
-                            out.learned, trail, session, params,
-                            boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true,
+                            out.learned, trail, session, params, alignFirst = true,
                         )
                         when (term) {
                             BackjumpTerm.Resume -> {
@@ -580,110 +538,6 @@ internal fun BacktrackSolver.driveSearch(
                 }
             }
         }
-    }
-}
-
-/**
- * If phase-saving is on and a value is cached for [varRef], prepend the cached value
- * to the heuristic's order (and drop it from the rest of the sequence so it isn't
- * tried twice). Otherwise the heuristic's order passes through unchanged.
- */
-internal fun BacktrackSolver.applyPhase(
-    varRef: VarRef,
-    values: Sequence<Int>,
-    boolPhase: BooleanArray?,
-    boolPhaseSet: BooleanArray?,
-    intPhase: IntArray?,
-    intPhaseSet: BooleanArray?,
-    boolTarget: BooleanArray? = null,
-    boolTargetSet: BooleanArray? = null,
-    rephaseMode: RephaseMode = RephaseMode.TARGET,
-    rng: Random? = null,
-): Sequence<Int> = when (varRef) {
-    is VarRef.Bool -> {
-        val v = varRef.varId
-        val savedFirst: Int? = if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[v]) {
-            if (boolPhase[v]) 1 else 0
-        } else {
-            null
-        }
-        // Target phasing rotates the polarity source; plain phase saving just uses the
-        // saved value. The chosen value (if any) is tried first, with the heuristic's
-        // order filling the rest.
-        val preferred: Int? = if (boolTarget != null && boolTargetSet != null) {
-            when (rephaseMode) {
-                // Target: the deepest conflict-free phase, falling back to saved.
-                RephaseMode.TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1 else 0) else savedFirst
-
-                RephaseMode.SAVED -> savedFirst
-
-                RephaseMode.TRUE -> 1
-
-                RephaseMode.FALSE -> 0
-
-                RephaseMode.RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1 else 0
-            }
-        } else {
-            savedFirst
-        }
-        if (preferred != null) sequenceOf(preferred) + values.filter { it != preferred } else values
-    }
-
-    is VarRef.IntVar -> {
-        if (intPhase != null && intPhaseSet != null && intPhaseSet[varRef.varId]) {
-            val saved = intPhase[varRef.varId]
-            sequenceOf(saved) + values.filter { it != saved }
-        } else {
-            values
-        }
-    }
-}
-
-/** Record the variable's currently-pinned value for phase-saving. Called after every
- *  successful pin (descent into a node). */
-internal fun BacktrackSolver.capturePhase(
-    varRef: VarRef,
-    session: PropagationSession,
-    boolPhase: BooleanArray?,
-    boolPhaseSet: BooleanArray?,
-    intPhase: IntArray?,
-    intPhaseSet: BooleanArray?,
-) {
-    when (varRef) {
-        is VarRef.Bool -> {
-            if (boolPhase != null && boolPhaseSet != null) {
-                val v = session.boolValue(varRef.varId)
-                if (v != null) {
-                    boolPhase[varRef.varId] = v
-                    boolPhaseSet[varRef.varId] = true
-                }
-            }
-        }
-
-        is VarRef.IntVar -> {
-            if (intPhase != null && intPhaseSet != null) {
-                val d = session.intDomain(varRef.varId)
-                if (d.min == d.max) {
-                    intPhase[varRef.varId] = d.min
-                    intPhaseSet[varRef.varId] = true
-                }
-            }
-        }
-    }
-}
-
-/** Snapshot the current Boolean assignment as the target phase (the deepest conflict-free
- *  prefix). Variables not yet pinned keep their previous target entry — a deeper later
- *  descent will fill them in. */
-internal fun BacktrackSolver.captureTargetPhase(
-    session: PropagationSession,
-    boolTarget: BooleanArray,
-    boolTargetSet: BooleanArray,
-) {
-    for (v in boolTarget.indices) {
-        val value = session.boolValue(v) ?: continue
-        boolTarget[v] = value
-        boolTargetSet[v] = true
     }
 }
 

@@ -144,24 +144,8 @@ internal class ResumableMinimize(
         if (n > 1) sink.observeRelearn()
         n > RELEARN_FALLBACK_THRESHOLD
     }
-    private val boolPhaseTracking = params.phaseSaving || params.targetPhasing
-    private val boolPhase: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
-    private val boolPhaseSet: BooleanArray? = if (boolPhaseTracking) BooleanArray(problem.numBoolVars) else null
-    private val intPhase: IntArray? = if (params.phaseSaving) IntArray(problem.numIntVars) else null
-    private val intPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(problem.numIntVars) else null
-    private val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
-    private val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(problem.numBoolVars) else null
-    private var bestTrailSize = -1
-    private var rephaseMode = RephaseMode.TARGET
-    private var conflictsSinceRephase = 0L
-    private val onConflictTick: () -> Unit = tick@{
-        if (boolTarget == null) return@tick
-        conflictsSinceRephase++
-        if (conflictsSinceRephase >= params.rephaseInterval) {
-            conflictsSinceRephase = 0
-            rephaseMode = rephaseMode.next()
-        }
-    }
+    private val phase = PhaseSaving(problem.numBoolVars, problem.numIntVars, params)
+    private val onConflictTick: () -> Unit = phase::onConflictTick
     private var pendingBlock: Sample? = null
     private var lastObjBoundAsserted: Int? = null
     private val glucose: GlucoseRestart? = if (params.adaptiveRestart) GlucoseRestart() else null
@@ -525,10 +509,7 @@ internal class ResumableMinimize(
                         continue@inner
                     }
                     val values = params.valueSelector.values(session, varRef, rng)
-                    val phased = solver.applyPhase(
-                        varRef, values, boolPhase, boolPhaseSet, intPhase, intPhaseSet,
-                        boolTarget, boolTargetSet, rephaseMode, rng,
-                    )
+                    val phased = phase.applyPhase(varRef, values, rng)
                     val ordered = lpEngine.lpHints?.order(varRef, phased) ?: phased
                     val node = solver.makeNode(varRef, ordered)
                     val decsBefore = decisionsLeft
@@ -540,13 +521,10 @@ internal class ResumableMinimize(
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
                         AdvanceOutcome.Success -> {
-                            solver.capturePhase(varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                            phase.capture(varRef, session)
                             trail.add(node)
                             sink.observeNode(trail.size)
-                            if (boolTarget != null && boolTargetSet != null && trail.size > bestTrailSize) {
-                                bestTrailSize = trail.size
-                                solver.captureTargetPhase(session, boolTarget, boolTargetSet)
-                            }
+                            phase.captureTargetIfDeeper(session, trail.size)
                         }
 
                         AdvanceOutcome.Exhausted -> {
@@ -569,8 +547,7 @@ internal class ResumableMinimize(
                             }
                             when (
                                 solver.backjumpAndLearn(
-                                    out.learned, trail, session, params,
-                                    boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = false,
+                                    out.learned, trail, session, params, alignFirst = false,
                                 )
                             ) {
                                 BackjumpTerm.Resume -> {
@@ -632,7 +609,7 @@ internal class ResumableMinimize(
                     decisionsThisRun += decsBefore - decisionsLeft
                     when (out) {
                         AdvanceOutcome.Success -> {
-                            solver.capturePhase(top.varRef, session, boolPhase, boolPhaseSet, intPhase, intPhaseSet)
+                            phase.capture(top.varRef, session)
                             descend = true
                         }
 
@@ -655,8 +632,7 @@ internal class ResumableMinimize(
                             }
                             when (
                                 solver.backjumpAndLearn(
-                                    out.learned, trail, session, params,
-                                    boolPhase, boolPhaseSet, intPhase, intPhaseSet, alignFirst = true,
+                                    out.learned, trail, session, params, alignFirst = true,
                                 )
                             ) {
                                 BackjumpTerm.Resume -> {

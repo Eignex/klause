@@ -372,10 +372,6 @@ internal fun BacktrackSolver.backjumpAndLearn(
     trail: MutableList<TrailNode>,
     session: PropagationSession,
     @Suppress("UNUSED_PARAMETER") params: BacktrackParams,
-    @Suppress("UNUSED_PARAMETER") boolPhase: BooleanArray?,
-    @Suppress("UNUSED_PARAMETER") boolPhaseSet: BooleanArray?,
-    @Suppress("UNUSED_PARAMETER") intPhase: IntArray?,
-    @Suppress("UNUSED_PARAMETER") intPhaseSet: BooleanArray?,
     alignFirst: Boolean,
 ): BackjumpTerm {
     if (alignFirst && trail.isNotEmpty()) trail.removeAt(trail.size - 1)
