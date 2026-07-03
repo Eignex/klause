@@ -26,7 +26,6 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
-import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -118,6 +117,7 @@ internal class ResumableMinimize(
 
     // --- Engine / DFS state (was driveSearch locals), all promoted to fields so a slice can pause. ---
     private val session = PropagationSession(problem)
+    private val boundExchange = PortfolioBoundExchange(problem, session, params, singleObj)
     private val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
     private val touchedSeedLevels = if (numSeed > 0) HashSet<Int>() else null
     private val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
@@ -242,80 +242,6 @@ internal class ResumableMinimize(
     }
 
     /**
-     * Tighten the objective variable to the portfolio's shared lower bound. The bound is
-     * a valid global lower bound on the optimum, and every feasible solution has `objVar ≥ optimum`,
-     * so asserting `objVar ≥ ⌈bound⌉` removes no solution — it only strengthens this arm's propagation
-     * and pruning with a floor a peer arm proved. A no-op without a single ascending objective
-     * variable or a shared bound (a satisfaction arm, or a non-portfolio solve).
-     */
-    private fun applySharedObjectiveFloor() {
-        val supplier = params.objectiveLowerBoundSupplier ?: return
-        val obj = singleObj?.takeIf { it.ascending } ?: return
-        val bound = supplier()
-        if (!bound.isFinite()) return
-        val floor = ceil(bound)
-        if (floor in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble()) {
-            session.implyIntAtLeast(obj.varId, floor.toInt())
-        }
-    }
-
-    /** The highest objective floor already published to the shared manager, so a republication only
-     *  fires when the bound has genuinely risen. */
-    private var lastPublishedFloor = Double.NEGATIVE_INFINITY
-
-    /**
-     * Publish this arm's level-0 objective floor to the portfolio's shared lower-bound manager. At
-     * decision level 0 the objective variable's domain minimum is a proven global lower bound on the
-     * optimum — raised since the root by objective shaving, level-0 learned objective bounds, and any
-     * imported floor — so republishing it lets a bound this arm tightens mid-search reach its peers. A
-     * no-op without a single ascending objective variable, off level 0 (where the bound would be
-     * node-local, not global), or when the floor has not risen.
-     */
-    private fun publishObjectiveFloor() {
-        val sink = params.objectiveLowerBoundSink ?: return
-        val obj = singleObj?.takeIf { it.ascending } ?: return
-        if (session.decisionLevel != 0) return
-        val floor = session.intDomain(obj.varId).min.toDouble()
-        if (floor > lastPublishedFloor) {
-            lastPublishedFloor = floor
-            sink(floor)
-        }
-    }
-
-    /**
-     * Import the portfolio's shared globally-valid level-0 variable bounds, tightening this arm's
-     * domains at level 0. Each shared bound holds at every solution, so importing one only ever
-     * soundly tightens — never excludes a solution. A no-op off level 0 or without the suppliers.
-     */
-    private fun importGlobalVarBounds() {
-        val lower = params.globalVarLowerSupplier ?: return
-        val upper = params.globalVarUpperSupplier ?: return
-        if (session.decisionLevel != 0) return
-        for (v in 0 until problem.numIntVars) {
-            val lo = lower(v)
-            if (lo != Int.MIN_VALUE) session.implyIntAtLeast(v, lo)
-            val hi = upper(v)
-            if (hi != Int.MAX_VALUE) session.implyIntAtMost(v, hi)
-        }
-    }
-
-    /**
-     * Publish this arm's globally-valid level-0 variable tightenings — the root domains after
-     * propagation and shaving, before any incumbent-relative reduced-cost fixing — so peers can import
-     * them. Called once at the root (not at restarts, where level-0 domains may carry incumbent-relative
-     * fixings that are not globally valid). A no-op without the sink.
-     */
-    private fun publishGlobalVarBounds() {
-        val sink = params.globalVarBoundSink ?: return
-        if (session.decisionLevel != 0) return
-        for (v in 0 until problem.numIntVars) {
-            val d = session.intDomain(v)
-            val declared = problem.intDomains[v]
-            if (d.min > declared.min || d.max < declared.max) sink(v, d.min, d.max)
-        }
-    }
-
-    /**
      * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation
      * bound for the integrality-gap metric (search only bounds from level 1 down, so this is the
      * sole root capture). Run from [runUntilEvent]'s `started` guard — not at construction — so the
@@ -403,13 +329,13 @@ internal class ResumableMinimize(
                     session.implyIntAtMost(sb.varId, sb.hi)
                 }
             }
-            applySharedObjectiveFloor()
+            boundExchange.applySharedFloor()
             // Publish the root floor (post-shaving) so peers see the bound this arm proved up front.
-            publishObjectiveFloor()
+            boundExchange.publishFloor()
             // Exchange globally-valid level-0 variable tightenings: import peers' first, then publish
             // this arm's (root propagation + shaving), before any incumbent-relative fixing runs.
-            importGlobalVarBounds()
-            publishGlobalVarBounds()
+            boundExchange.importGlobalVarBounds()
+            boundExchange.publishGlobalVarBounds()
             // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound
             // prunes and reduced-cost fixing bite from the first node.
             if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
@@ -428,7 +354,7 @@ internal class ResumableMinimize(
         }
         // Re-read the shared lower bound each slice: a peer arm may have proven a tighter floor since
         // this arm last ran. Monotone and sound, so re-asserting only strengthens pruning.
-        applySharedObjectiveFloor()
+        boundExchange.applySharedFloor()
         outer@ while (true) {
             if (!runActive) {
                 restart.beginRun()
@@ -666,11 +592,11 @@ internal class ResumableMinimize(
         // At level 0 import the shared objective lower bound (tightening this arm's objVar) and
         // republish this arm's own raised floor, so a bound proven mid-search on any arm propagates
         // through the pool.
-        applySharedObjectiveFloor()
-        publishObjectiveFloor()
+        boundExchange.applySharedFloor()
+        boundExchange.publishFloor()
         // Import peers' globally-valid level-0 variable tightenings (import only — not publish, since
         // level-0 domains here may carry this arm's incumbent-relative fixings, which are not global).
-        importGlobalVarBounds()
+        boundExchange.importGlobalVarBounds()
         params.variableSelector.onRestart()
         params.valueSelector.onRestart()
         solver.forgetIfOverCap(session, params)
