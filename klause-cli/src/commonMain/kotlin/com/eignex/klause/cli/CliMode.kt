@@ -5,11 +5,13 @@ import com.eignex.klause.backtrack.lp.LpEmphasis
 import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.backtrack.lp.lpHarvestReporting
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveContext
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.Presolver
+import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
@@ -263,7 +265,13 @@ internal fun Solvable.presolved(
     solutionSetSensitive: Boolean,
     cancellation: Cancellation = Cancellation.Never,
 ): Solvable {
+    // Root-bake probing (failed-literal / SAC), formerly baked into the kernel `Problem` at compile
+    // time, now runs in the presolve lane via [RootBaker]: resolve it from the presolve config once and
+    // thread it through the [PresolveContext] so every rebuild re-derives it, and seed the initial
+    // problem up front so the first presolve round sees the same probed root the old self-bake produced.
+    val bakeConfig = BakeConfig.from(config)
     val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
+        .withBakeConfig(bakeConfig)
     // LP-relaxation harvest (#10): fold the LP's proven domain tightenings, redundant-row removals and
     // implied equalities into the problem permanently so every backend (local search included) sees them —
     // the backtrack solver's own root shave reaches only its search session. It is a presolve concern, so
@@ -278,14 +286,17 @@ internal fun Solvable.presolved(
     }
     val objective = linearObjective ?: LinearObjective()
 
-    var current = problem
+    val seeded = RootBaker.reseed(problem, bakeConfig)
+    var current = seeded
     val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
     val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
     var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
     var round = 0
     while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
         val pre = Presolver.run(current, config, context, cancellation)
-        val harvestResult = harvestParams?.let { lpHarvestReporting(pre.problem, objective, it, cancellation) }
+        val harvestResult = harvestParams?.let {
+            lpHarvestReporting(pre.problem, objective, it, bakeConfig, cancellation)
+        }
         val harvested = harvestResult?.problem ?: pre.problem
         // Neither presolve nor the harvest changed anything this round → fixpoint.
         if (pre.problem === current && harvested === pre.problem) break

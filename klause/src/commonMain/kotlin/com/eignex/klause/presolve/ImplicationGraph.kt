@@ -41,14 +41,15 @@ internal object ImplicationGraph {
         maxCandidates: Int,
         cancellation: Cancellation,
         objectiveBoolVars: Set<Int> = emptySet(),
+        bakeConfig: BakeConfig = BakeConfig.NONE,
     ): ImplicationReduction {
         if (problem.numBoolVars == 0) return ImplicationReduction(problem, emptyList())
 
         val implications = harvestImplications(problem, maxCandidates, cancellation)
         val merges = equivalentVariableMerges(problem.numBoolVars, implications, objectiveBoolVars)
 
-        val substituted = if (merges.isEmpty()) problem else applyMerges(problem, merges)
-        val reduced = dropTransitivelyRedundantBinaries(substituted)
+        val substituted = if (merges.isEmpty()) problem else applyMerges(problem, merges, bakeConfig)
+        val reduced = dropTransitivelyRedundantBinaries(substituted, bakeConfig)
 
         if (reduced === problem) return ImplicationReduction(problem, emptyList())
         return ImplicationReduction(reduced, merges)
@@ -149,7 +150,7 @@ internal object ImplicationGraph {
      *  binary clause that the rename turns into a tautology (`r ⇒ r`). Bool variable count is
      *  preserved; a merged variable simply stops appearing in any factor and is rebuilt on the way
      *  back. */
-    private fun applyMerges(problem: Problem, merges: List<BoolMerge>): Problem {
+    private fun applyMerges(problem: Problem, merges: List<BoolMerge>, bakeConfig: BakeConfig): Problem {
         val boolMap = IntArray(problem.numBoolVars) { it }
         for (m in merges) boolMap[m.from] = m.into
         val intMap = IntArray(problem.numIntVars) { it }
@@ -159,7 +160,7 @@ internal object ImplicationGraph {
             if (remapped is Clause && isTautology(remapped)) continue
             out.add(remapped)
         }
-        return PresolveShared.rebuildProblem(problem, out)
+        return PresolveShared.rebuildProblem(problem, out, bakeConfig = bakeConfig)
     }
 
     /** A clause that holds in every assignment because some variable appears in both polarities. */
@@ -181,7 +182,7 @@ internal object ImplicationGraph {
      * optimum are untouched. Non-binary factors and unit clauses are always kept; when nothing is
      * dropped the input problem is returned unchanged (the pass's no-op signal).
      */
-    private fun dropTransitivelyRedundantBinaries(problem: Problem): Problem {
+    private fun dropTransitivelyRedundantBinaries(problem: Problem, bakeConfig: BakeConfig): Problem {
         val binaryIndices = ArrayList<Int>()
         problem.factors.forEachIndexed { i, f -> if (f is Clause && f.literals.size == 2) binaryIndices.add(i) }
         if (binaryIndices.size < 2) return problem
@@ -206,7 +207,7 @@ internal object ImplicationGraph {
 
         val kept = ArrayList<Factor>(problem.factors.size - drop.size)
         problem.factors.forEachIndexed { i, f -> if (i !in drop) kept.add(f) }
-        return PresolveShared.rebuildProblem(problem, kept)
+        return PresolveShared.rebuildProblem(problem, kept, bakeConfig = bakeConfig)
     }
 
     /** The two implication edges a binary clause `(p ∨ q)` encodes: `¬p -> q` and `¬q -> p`. */

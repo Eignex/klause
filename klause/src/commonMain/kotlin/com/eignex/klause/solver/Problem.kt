@@ -8,7 +8,6 @@ import com.eignex.klause.propagation.extractConflictBools
 import com.eignex.klause.propagation.extractConflictFactors
 import com.eignex.klause.propagation.extractConflictInts
 import com.eignex.klause.util.IntArrayList
-import kotlin.random.Random
 
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
@@ -32,54 +31,14 @@ class Problem(
     /** The constraints over the variables. */
     val factors: Array<Factor>,
     /**
-     * Opt-in failed-literal probing at bake time. When `true`, every free bool variable is
-     * tested with both polarities: if pinning one polarity propagates Unsat, the other
-     * polarity is permanently folded into [baked]. Iterated to a fixed point. Cost is
-     * `O(numFreeBools × propagate)` once at construction; the result is a tighter baseline
-     * for every subsequent session. Off by default — tests construct many small problems
-     * and don't want the construction overhead.
+     * Extra root deductions computed outside the kernel — the failed-literal / SAC probing tiers now
+     * live in [com.eignex.klause.presolve.RootBaker], which runs them against an already-base-baked
+     * [Problem] and feeds the result back here. Merged into the base `propagate(Assumptions.None)`
+     * bake before it folds into [intDomains], so the extra pins / bound tightenings / holes become
+     * part of [baked] and the problem's own domains. Defaults to empty = base bake only; the kernel
+     * never initiates probing itself (that would create a `solver → presolve → solver` cycle).
      */
-    val probeFailedLiterals: Boolean = false,
-    /**
-     * Opt-in bound-SAC (singleton arc consistency) probing at bake time. After
-     * [probeFailedLiterals] settles, every int var with a multi-value domain has its
-     * min and max probed: pin the bound, propagate, and if Unsat, tighten the bound by
-     * one and loop. Captures bound-level deductions the per-call propagator misses
-     * because they require hypothetical reasoning across factors. Cost is
-     * `O(Σ |dom(v)|_extreme × propagate)`; result rides in [baked] as bound
-     * tightenings (non-singleton) and pins (when SAC narrows a var to a single value).
-     * Interior-hole SAC (probing values strictly between min and max) is left for a
-     * follow-up — it needs Implied/Assumptions to carry hole sets too.
-     */
-    val probeIntBounds: Boolean = false,
-    /**
-     * Opt-in interior-hole SAC. Builds on [probeIntBounds]: after bound-SAC settles,
-     * each multi-value int var has its interior values (strictly between current min
-     * and max) probed; on Unsat the value is recorded as an interior hole in [baked].
-     * Cost is `O(Σ |dom(v)| × propagate)` per pass; use sparingly on large domains.
-     * Implies [probeIntBounds].
-     */
-    val probeIntHoles: Boolean = false,
-    /**
-     * Cap on per-var probe calls during bake-time SAC. After this many `propagate` calls
-     * targeting one var (across both bound and hole probing), the loop stops probing
-     * that var for the remainder of the bake. Defaults to unlimited; set to a small
-     * positive number for very wide domains to prevent pathological construction cost.
-     */
-    val probeBudgetPerVar: Int = Int.MAX_VALUE,
-    /**
-     * Cap on total probe calls across all vars and all SAC passes during bake. Once
-     * exceeded, the SAC loops exit gracefully with whatever tightenings they've
-     * accumulated so far. Unlimited by default.
-     */
-    val probeTotalBudget: Int = Int.MAX_VALUE,
-    /**
-     * Seed for the RNG that breaks ties in the wdeg-weighted SAC probe order. Equal-score
-     * vars get a random permutation each outer pass so a fixed-point loop on a flat
-     * weight landscape doesn't keep visiting the same first var. Deterministic for a
-     * given seed.
-     */
-    val probeSeed: Long = 0L,
+    seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
     /**
      * Cooperative-cancellation token for the construction-time bake ([baked]). Polled on the
      * full-propagation fixpoint and between SAC passes so a `-t` deadline can abort an
@@ -162,12 +121,7 @@ class Problem(
         numIntVars: Int,
         intDomains: Array<IntDomain>,
         factors: List<Factor>,
-        probeFailedLiterals: Boolean = false,
-        probeIntBounds: Boolean = false,
-        probeIntHoles: Boolean = false,
-        probeBudgetPerVar: Int = Int.MAX_VALUE,
-        probeTotalBudget: Int = Int.MAX_VALUE,
-        probeSeed: Long = 0L,
+        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
@@ -177,12 +131,7 @@ class Problem(
         numIntVars = numIntVars,
         intDomains = intDomains,
         factors = Array(factors.size) { factors[it] },
-        probeFailedLiterals = probeFailedLiterals,
-        probeIntBounds = probeIntBounds,
-        probeIntHoles = probeIntHoles,
-        probeBudgetPerVar = probeBudgetPerVar,
-        probeTotalBudget = probeTotalBudget,
-        probeSeed = probeSeed,
+        seedDeductions = seedDeductions,
         cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
@@ -227,18 +176,21 @@ class Problem(
     val numFactors: Int get() = factors.size
 
     /**
-     * Result of running [propagate] once with empty assumptions at construction time. Caches
-     * literals/values forced by the constraints alone — every solver call gets a smaller
-     * residual problem with no per-call propagation cost, and trivially-Unsat problems surface
-     * here instead of after a full search budget. May be [PropagationResult.Unsat] for
-     * trivially-infeasible problems; callers that want fail-fast behavior can check this.
+     * Result of running [propagate] once with empty assumptions at construction time, merged with
+     * any [seedDeductions] the presolve-lane probing supplied. Caches literals/values forced by the
+     * constraints alone — every solver call gets a smaller residual problem with no per-call
+     * propagation cost, and trivially-Unsat problems surface here instead of after a full search
+     * budget. May be [PropagationResult.Unsat] for trivially-infeasible problems; callers that want
+     * fail-fast behavior can check this.
      *
      * The deductions recorded here are also folded back into [intDomains], so the diff is
      * expressed relative to the constructor-input domains rather than the tightened ones.
      * Re-seeding it on an already-tightened domain is a no-op, so existing consumers that
      * replay [baked] as assumptions are unaffected.
      */
-    val baked: PropagationResult by lazy(LazyThreadSafetyMode.NONE) { computeBaked() }
+    val baked: PropagationResult by lazy(LazyThreadSafetyMode.NONE) {
+        mergeBase(propagate(Assumptions.None, cancellation), seedDeductions)
+    }
 
     // Force the root bake and fold its deductions into [intDomains] eagerly — except in [preFolded]
     // pass-view mode, where the domains are already folded and the deferred derived structures stay
@@ -273,338 +225,21 @@ class Problem(
         }
     }
 
-    private fun computeBaked(): PropagationResult {
-        val initial = propagate(Assumptions.None, cancellation)
-        if (initial is PropagationResult.Unsat) return initial
-        var result: PropagationResult = initial
-        // SAC probing fires `propagate` repeatedly; stop entering new probe phases once the
-        // bake deadline has passed (each phase below also polls between its own probes).
-        if (cancellation()) return result
-        if (probeFailedLiterals) {
-            result = probeFreeBools(result as PropagationResult.Implied)
-            if (result is PropagationResult.Unsat) return result
-        }
-        if (probeIntBounds || probeIntHoles) {
-            // wdeg state shared across bound-SAC and hole-SAC: a probe failure under bound-SAC
-            // raises factor weights that then steer hole-SAC's first iteration, and vice versa.
-            val factorWeights = DoubleArray(factors.size) { 1.0 }
-            val rng = Random(probeSeed)
-            result = probeBoundSac(result as PropagationResult.Implied, factorWeights, rng)
-            if (result is PropagationResult.Unsat) return result
-            if (probeIntHoles) {
-                result = probeIntHoles(result as PropagationResult.Implied, factorWeights, rng)
-            }
-        }
-        return result
-    }
+    /** Merge the presolve-lane [seed] deductions into the kernel's [base] `propagate` bake. An
+     *  `Unsat` on either side wins (an infeasible base or a probing-proven contradiction), otherwise
+     *  the two implied sets union via [PropagationResult.Implied.merge]. The common no-probe case
+     *  passes [PropagationResult.Implied.EMPTY] and returns [base] unchanged. */
+    private fun mergeBase(base: PropagationResult, seed: PropagationResult): PropagationResult = when {
+        base is PropagationResult.Unsat -> base
 
-    /** Interior-value SAC: probe every value strictly between each multi-value int var's
-     *  current min and max. Iterates with bound-SAC interleaved so that hole-discovered
-     *  tightenings can lift bounds and vice versa. */
-    private fun probeIntHoles(
-        base: PropagationResult.Implied,
-        factorWeights: DoubleArray,
-        rng: Random,
-    ): PropagationResult {
-        var acc: PropagationResult.Implied = base
-        val perVarCalls = IntArray(numIntVars)
-        var totalCalls = 0
-        var changed = true
-        while (changed) {
-            changed = false
-            for (v in sacProbeOrder(acc, factorWeights, rng)) {
-                if (cancellation()) return acc
-                if (acc.intValueOrNull(v) != null) continue
-                if (perVarCalls[v] >= probeBudgetPerVar) continue
-                if (totalCalls >= probeTotalBudget) return acc
-                val orig = intDomains[v]
-                val curMin = acc.intMinOrNullCompat(v) ?: orig.min
-                val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
-                if (curMin >= curMax) continue
-                val accAsAssumptions = acc.toAssumptions()
-                // Build a per-var hole-set once so the `alreadyHole` lookup in the k-loop
-                // is O(1) instead of a linear scan of acc.intHoleVarIds for every probed k.
-                val existingHoles = HashSet<Int>()
-                for (i in 0 until acc.intHoleVarIds.size) {
-                    if (acc.intHoleVarIds[i] == v) existingHoles.add(acc.intHoleValues[i])
-                }
-                for (k in (curMin + 1) until curMax) {
-                    if (perVarCalls[v] >= probeBudgetPerVar) break
-                    if (totalCalls >= probeTotalBudget) return acc
-                    if (k !in orig) continue
-                    if (k in existingHoles) continue
-                    perVarCalls[v]++
-                    totalCalls++
-                    val pin = propagate(accAsAssumptions.withInt(v, k), cancellation)
-                    if (pin is PropagationResult.Unsat) {
-                        bumpFactorWeights(pin, factorWeights)
-                        perVarCalls[v]++
-                        totalCalls++
-                        val r = propagate(accAsAssumptions.withIntHole(v, k), cancellation)
-                        if (r is PropagationResult.Unsat) return r
-                        acc = addHoleToImplied(acc, v, k)
-                        acc = mergeImplied(acc, r as PropagationResult.Implied)
-                        changed = true
-                    }
-                }
-            }
-        }
-        return acc
-    }
+        seed is PropagationResult.Unsat -> seed
 
-    private fun addHoleToImplied(a: PropagationResult.Implied, v: Int, value: Int): PropagationResult.Implied {
-        val holeSet = HashSet<Long>()
-        a.forEachIntHole { id, vv ->
-            holeSet.add((id.toLong() shl 32) or (vv.toLong() and 0xFFFFFFFFL))
-        }
-        holeSet.add((v.toLong() shl 32) or (value.toLong() and 0xFFFFFFFFL))
-        val sorted = holeSet.toLongArray().also { it.sort() }
-        val ids = IntArray(sorted.size) { (sorted[it] ushr 32).toInt() }
-        val vals = IntArray(sorted.size) { sorted[it].toInt() }
-        val mins = HashMap<Int, Int>()
-        a.forEachIntMin { k, vv -> mins[k] = vv }
-        val maxes = HashMap<Int, Int>()
-        a.forEachIntMax { k, vv -> maxes[k] = vv }
-        val minK = mins.keys.toIntArray().also { it.sort() }
-        val maxK = maxes.keys.toIntArray().also { it.sort() }
-        return PropagationResult.Implied(
-            bools = a.bools,
-            ints = a.ints,
-            intMinKeys = minK,
-            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
-            intMaxKeys = maxK,
-            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
-            intHoleVarIds = ids,
-            intHoleValues = vals,
-        )
-    }
+        // The common no-probe case seeds the shared empty sentinel — return the base bake untouched.
+        // A non-sentinel seed can carry bound tightenings / holes with no pins, so `isEmpty` (which only
+        // inspects pins) is not a safe skip: merge unconditionally.
+        seed === PropagationResult.Implied.EMPTY -> base
 
-    /** Probe-order heuristic: wdeg / dom — sort descending by `Σ factorWeights[f] / dom(v)`
-     *  so the budget is spent first on vars that are heavily-constrained relative to their
-     *  remaining domain. Each Unsat probe bumps the weights of the factors in its conflict
-     *  via [bumpFactorWeights], so failing probes steer the next pass toward related vars
-     *  (the classic wdeg adaptation). Ties break by a per-pass random key (deterministic
-     *  for a given [probeSeed]) — this avoids the deterministic-id-order bias that the
-     *  prior dom-sized order would inherit when every var has the same dom and weight. */
-    private fun sacProbeOrder(acc: PropagationResult.Implied, factorWeights: DoubleArray, rng: Random): IntArray {
-        val scores = DoubleArray(numIntVars) { v ->
-            if (acc.intValueOrNull(v) != null) return@DoubleArray Double.NEGATIVE_INFINITY
-            val orig = intDomains[v]
-            val lo = acc.intMinOrNullCompat(v) ?: orig.min
-            val hi = acc.intMaxOrNullCompat(v) ?: orig.max
-            val dom = (hi - lo + 1).coerceAtLeast(1)
-            var wdeg = 0.0
-            val occ = intOccurrences[v]
-            for (i in occ.indices) wdeg += factorWeights[occ[i]]
-            wdeg / dom
-        }
-        val tie = IntArray(numIntVars) { rng.nextInt() }
-        val boxed = Array(numIntVars) { it }
-        boxed.sortWith(
-            Comparator { a, b ->
-                val sa = scores[a]
-                val sb = scores[b]
-                if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
-            },
-        )
-        return IntArray(numIntVars) { boxed[it] }
-    }
-
-    /** Bump every factor implicated in an Unsat conflict by 1.0. This is the wdeg update
-     *  rule: factors that repeatedly fail under hypothetical pins gain weight and steer
-     *  the SAC probe order toward the vars they mention on subsequent passes. */
-    private fun bumpFactorWeights(unsat: PropagationResult.Unsat, factorWeights: DoubleArray) {
-        for (f in unsat.conflictFactors) {
-            if (f in factorWeights.indices) factorWeights[f] += 1.0
-        }
-    }
-
-    /**
-     * Bound-SAC fixed-point loop. Probes the min and max of each multi-value int var
-     * under the current [base]; an Unsat result lets us tighten that bound by one
-     * and re-probe. Returns the strengthened [PropagationResult.Implied], or `Unsat`
-     * if the problem turns out to be infeasible.
-     */
-    private fun probeBoundSac(
-        base: PropagationResult.Implied,
-        factorWeights: DoubleArray,
-        rng: Random,
-    ): PropagationResult {
-        var acc: PropagationResult.Implied = base
-        val perVarCalls = IntArray(numIntVars)
-        var totalCalls = 0
-        var changed = true
-        while (changed) {
-            changed = false
-            for (v in sacProbeOrder(acc, factorWeights, rng)) {
-                if (cancellation()) return acc
-                if (acc.intValueOrNull(v) != null) continue
-                if (perVarCalls[v] >= probeBudgetPerVar) continue
-                if (totalCalls >= probeTotalBudget) return acc
-                val orig = intDomains[v]
-                val curMin = acc.intMinOrNullCompat(v) ?: orig.min
-                val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
-                if (curMin >= curMax) continue
-                val accAsAssumptions = acc.toAssumptions()
-                perVarCalls[v]++
-                totalCalls++
-                val pinMin = propagate(accAsAssumptions.withInt(v, curMin), cancellation)
-                if (pinMin is PropagationResult.Unsat) {
-                    bumpFactorWeights(pinMin, factorWeights)
-                    perVarCalls[v]++
-                    totalCalls++
-                    val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
-                    val r = propagate(tightened, cancellation)
-                    if (r is PropagationResult.Unsat) return r
-                    acc = addMinToImplied(acc, v, curMin + 1)
-                    acc = mergeImplied(acc, r as PropagationResult.Implied)
-                    changed = true
-                    continue
-                }
-                if (perVarCalls[v] >= probeBudgetPerVar) continue
-                if (totalCalls >= probeTotalBudget) return acc
-                perVarCalls[v]++
-                totalCalls++
-                val pinMax = propagate(accAsAssumptions.withInt(v, curMax), cancellation)
-                if (pinMax is PropagationResult.Unsat) {
-                    bumpFactorWeights(pinMax, factorWeights)
-                    perVarCalls[v]++
-                    totalCalls++
-                    val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
-                    val r = propagate(tightened, cancellation)
-                    if (r is PropagationResult.Unsat) return r
-                    acc = addMaxToImplied(acc, v, curMax - 1)
-                    acc = mergeImplied(acc, r as PropagationResult.Implied)
-                    changed = true
-                }
-            }
-        }
-        return acc
-    }
-
-    private fun addMinToImplied(a: PropagationResult.Implied, v: Int, newMin: Int): PropagationResult.Implied {
-        val mins = HashMap<Int, Int>()
-        a.forEachIntMin { k, vv -> mins[k] = vv }
-        mins[v] = maxOf(mins[v] ?: Int.MIN_VALUE, newMin)
-        val maxes = HashMap<Int, Int>()
-        a.forEachIntMax { k, vv -> maxes[k] = vv }
-        val minK = mins.keys.toIntArray().also { it.sort() }
-        val maxK = maxes.keys.toIntArray().also { it.sort() }
-        return PropagationResult.Implied(
-            bools = a.bools,
-            ints = a.ints,
-            intMinKeys = minK,
-            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
-            intMaxKeys = maxK,
-            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
-            intHoleVarIds = a.intHoleVarIds.copyOf(),
-            intHoleValues = a.intHoleValues.copyOf(),
-        )
-    }
-
-    private fun addMaxToImplied(a: PropagationResult.Implied, v: Int, newMax: Int): PropagationResult.Implied {
-        val mins = HashMap<Int, Int>()
-        a.forEachIntMin { k, vv -> mins[k] = vv }
-        val maxes = HashMap<Int, Int>()
-        a.forEachIntMax { k, vv -> maxes[k] = vv }
-        maxes[v] = minOf(maxes[v] ?: Int.MAX_VALUE, newMax)
-        val minK = mins.keys.toIntArray().also { it.sort() }
-        val maxK = maxes.keys.toIntArray().also { it.sort() }
-        return PropagationResult.Implied(
-            bools = a.bools,
-            ints = a.ints,
-            intMinKeys = minK,
-            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
-            intMaxKeys = maxK,
-            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
-            intHoleVarIds = a.intHoleVarIds.copyOf(),
-            intHoleValues = a.intHoleValues.copyOf(),
-        )
-    }
-
-    /** Union two `Implied`s by replaying everything from `b` into the `a` base. */
-    private fun mergeImplied(a: PropagationResult.Implied, b: PropagationResult.Implied): PropagationResult.Implied {
-        val bools = HashMap(a.bools)
-        b.forEachBool { k, v -> bools[k] = v }
-        val ints = HashMap(a.ints)
-        b.forEachInt { k, v -> ints[k] = v }
-        val mins = HashMap<Int, Int>()
-        a.forEachIntMin { k, v -> mins[k] = v }
-        b.forEachIntMin { k, v -> mins[k] = maxOf(mins[k] ?: Int.MIN_VALUE, v) }
-        val maxes = HashMap<Int, Int>()
-        a.forEachIntMax { k, v -> maxes[k] = v }
-        b.forEachIntMax { k, v -> maxes[k] = minOf(maxes[k] ?: Int.MAX_VALUE, v) }
-        // Holes — union.
-        val holes = HashSet<Long>()
-        a.forEachIntHole { id, v -> holes.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
-        b.forEachIntHole { id, v -> holes.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
-        // Drop now-pinned vars from the bound and hole sets.
-        for (k in ints.keys) {
-            mins.remove(k)
-            maxes.remove(k)
-            holes.removeAll { (it ushr 32).toInt() == k }
-        }
-        val minK = mins.keys.toIntArray().also { it.sort() }
-        val maxK = maxes.keys.toIntArray().also { it.sort() }
-        val holesSorted = holes.toLongArray().also { it.sort() }
-        val holeIds = IntArray(holesSorted.size) { (holesSorted[it] ushr 32).toInt() }
-        val holeVals = IntArray(holesSorted.size) { holesSorted[it].toInt() }
-        return PropagationResult.Implied(
-            bools = bools,
-            ints = ints,
-            intMinKeys = minK,
-            intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
-            intMaxKeys = maxK,
-            intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
-            intHoleVarIds = holeIds,
-            intHoleValues = holeVals,
-        )
-    }
-
-    /**
-     * Iteratively strengthens [initial] by probing each free bool with both polarities. If
-     * one polarity is Unsat under the current accumulated base, the opposite polarity is
-     * forced. Repeats until a full pass finds no new forcings.
-     */
-    private fun probeFreeBools(initial: PropagationResult.Implied): PropagationResult {
-        val bools = HashMap(initial.bools)
-        val ints = HashMap(initial.ints)
-        var changed = true
-        while (changed) {
-            changed = false
-            for (v in 0 until numBoolVars) {
-                if (cancellation()) return PropagationResult.Implied(bools, ints)
-                if (v in bools) continue
-                val tryTrue = propagate(Assumptions(bools + (v to true), ints), cancellation)
-                if (tryTrue is PropagationResult.Unsat) {
-                    val r = propagate(Assumptions(bools + (v to false), ints), cancellation)
-                    if (r is PropagationResult.Unsat) return r
-                    foldInto(bools, ints, v, false, r as PropagationResult.Implied)
-                    changed = true
-                    continue
-                }
-                val tryFalse = propagate(Assumptions(bools + (v to false), ints), cancellation)
-                if (tryFalse is PropagationResult.Unsat) {
-                    val r = propagate(Assumptions(bools + (v to true), ints), cancellation)
-                    if (r is PropagationResult.Unsat) return r
-                    foldInto(bools, ints, v, true, r as PropagationResult.Implied)
-                    changed = true
-                }
-            }
-        }
-        return PropagationResult.Implied(bools, ints)
-    }
-
-    private fun foldInto(
-        bools: HashMap<Int, Boolean>,
-        ints: HashMap<Int, Int>,
-        forcedVar: Int,
-        forcedValue: Boolean,
-        implied: PropagationResult.Implied,
-    ) {
-        bools[forcedVar] = forcedValue
-        implied.forEachBool { k, b -> bools[k] = b }
-        implied.forEachInt { k, i -> ints[k] = i }
+        else -> (base as PropagationResult.Implied).merge(seed as PropagationResult.Implied)
     }
 
     /**

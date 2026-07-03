@@ -40,7 +40,7 @@ internal class PresolveDelta(
  * would — no per-pass `computeBaked`. [materialize] builds the heavyweight solver [Problem] once at
  * the end, with the single renumber/remap.
  */
-internal class PresolveSession(private val base: Problem) {
+internal class PresolveSession(private val base: Problem, private val bakeConfig: BakeConfig = BakeConfig.NONE) {
 
     // Working factor set indexed by stable id: `[0, base.factors.size)` are the originals, appended
     // ids are pass-added factors. `null` marks a tombstoned (dropped) id; ids are never renumbered.
@@ -210,6 +210,7 @@ internal class PresolveSession(private val base: Problem) {
             base,
             result.factors.toList(),
             Array(base.numIntVars) { result.intDomains[it] },
+            bakeConfig,
         )
         stateProblem = eager
         factors.clear()
@@ -234,6 +235,6 @@ internal class PresolveSession(private val base: Problem) {
      *  bool pins and any residual tightenings, and surfaces the infeasibility as an Unsat [Problem.baked]. */
     fun materialize(): Problem {
         val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
-        return PresolveShared.rebuildProblem(stateProblem, liveFactors(), domains)
+        return PresolveShared.rebuildProblem(stateProblem, liveFactors(), domains, bakeConfig)
     }
 }

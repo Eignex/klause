@@ -44,6 +44,11 @@ class PresolveContext(
      *  partial run only forgoes further reduction, never correctness. [Presolver.run] injects the
      *  round-engine's cancellation here. */
     val cancellation: Cancellation = Cancellation.Never,
+    /** Root-bake probing policy the passes forward into every rebuilt [Problem] (via
+     *  [PresolveShared.rebuildProblem]) so [RootBaker] re-derives the failed-literal / SAC deductions
+     *  each time the working problem changes — the relocation of the kernel's former `probe*` flags into
+     *  the presolve lane. [BakeConfig.NONE] (the default) leaves every rebuild a plain base bake. */
+    val bakeConfig: BakeConfig = BakeConfig.NONE,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -59,6 +64,18 @@ class PresolveContext(
         objectiveBoolCoeffs,
         modelBreaksSymmetry,
         cancellation,
+        bakeConfig,
+    )
+
+    /** This context with [bakeConfig] set — the presolve lane threads the resolved root-bake probing
+     *  policy in here so every pass rebuild re-derives it via [RootBaker]. */
+    fun withBakeConfig(bakeConfig: BakeConfig): PresolveContext = PresolveContext(
+        solutionSetSensitive,
+        objectiveIntCoeffs,
+        objectiveBoolCoeffs,
+        modelBreaksSymmetry,
+        cancellation,
+        bakeConfig,
     )
 
     /** Factories for the common contexts. */
@@ -184,7 +201,7 @@ enum class PresolvePass(
     /** GCD + bounded-integer coefficient strengthening (#319 / #372). */
     STRENGTHEN_COEFFICIENTS("strengthen", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.strengthenCoefficients(problem))
+            PassResult(Presolve.strengthenCoefficients(problem, ctx.bakeConfig))
     },
 
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
@@ -196,7 +213,8 @@ enum class PresolvePass(
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.deriveXorUnits(problem))
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            PassResult(Presolve.deriveXorUnits(problem, ctx.bakeConfig))
     },
 
     /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated
@@ -212,7 +230,12 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
-            val elim = Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars, ctx.cancellation)
+            val elim = Presolve.eliminateAffineSingletons(
+                problem,
+                ctx.objectiveIntVars,
+                ctx.cancellation,
+                ctx.bakeConfig,
+            )
             return PassResult(elim.problem, elim::reconstruct)
         }
     },
@@ -222,7 +245,7 @@ enum class PresolvePass(
      *  already GCD-normalised. */
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.removeRedundantConstraints(problem))
+            PassResult(Presolve.removeRedundantConstraints(problem, ctx.bakeConfig))
     },
 
     /** Per-factor structural self-reduction — each factor rewrites itself into simpler / lower-arity
@@ -235,7 +258,8 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(Presolve.reduceStructural(problem))
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            PassResult(Presolve.reduceStructural(problem, ctx.bakeConfig))
     },
 
     /** Duplicate / parallel column aggregation — the column-side mirror of [REMOVE_REDUNDANT]. Folds
@@ -251,7 +275,7 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
-            val merge = Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars)
+            val merge = Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.bakeConfig)
             return PassResult(merge.problem, merge::reconstruct)
         }
     },
@@ -265,8 +289,15 @@ enum class PresolvePass(
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.breakSymmetries(problem, ctx.objectiveIntVars, ctx.objectiveBoolVars, ctx.cancellation))
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(
+            Presolve.breakSymmetries(
+                problem,
+                ctx.objectiveIntVars,
+                ctx.objectiveBoolVars,
+                ctx.cancellation,
+                ctx.bakeConfig,
+            ),
+        )
     },
 
     /** Law–Lee value precedence (#374 / #432) — the strong value-symmetry break. Opt-in: stacking it
@@ -280,15 +311,16 @@ enum class PresolvePass(
         autoEligible = false,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars))
+            PassResult(Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars, ctx.bakeConfig))
     },
 
     /** Dual fixing / dominated-variable reductions (#448) — pins a variable to a bound when the
      *  objective and constraint structure guarantee an optimum there. Solution-set altering, so
      *  auto-disabled for solution-set-sensitive queries. */
     DUAL_FIX("dual-fix", Stage.PROBLEM, PresolveTiming.MEDIUM, preservesSolutionSet = false, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs))
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(
+            Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs, ctx.bakeConfig),
+        )
     },
 
     /** Construction-time failed-literal SAC (#146): folded into `Problem.baked` at build, read via
@@ -318,7 +350,7 @@ enum class PresolvePass(
      *  common-bound tightenings. Solution-preserving, so it needs no objective-variable exclusion. */
     PROBE("probe", Stage.PROBLEM, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never))
+            PassResult(Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never, ctx.bakeConfig))
     },
 
     /** Binary implication graph: harvest `lit -> lit` implications by probing-style pinning, collapse
@@ -339,6 +371,7 @@ enum class PresolvePass(
                 IMPLICATION_GRAPH_MAX_CANDIDATES,
                 Cancellation.Never,
                 ctx.objectiveBoolVars,
+                ctx.bakeConfig,
             )
             return PassResult(reduction.problem, reduction::reconstruct)
         }
@@ -670,7 +703,7 @@ object Presolver {
         ctx: PresolveContext,
         cancellation: Cancellation,
     ): Presolved {
-        val session = PresolveSession(problem)
+        val session = PresolveSession(problem, ctx.bakeConfig)
         val reconstructs = ArrayList<(Sample) -> Sample>()
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()

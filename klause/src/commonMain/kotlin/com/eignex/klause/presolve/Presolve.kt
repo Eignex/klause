@@ -14,24 +14,34 @@ object Presolve {
 
     /** GCD coefficient strengthening for [com.eignex.klause.factor.arithmetic.Linear] and
      *  pseudo-Boolean constraints. See [CoefficientStrengthening]. */
-    fun strengthenCoefficients(problem: Problem): Problem = CoefficientStrengthening.strengthenCoefficients(problem)
+    fun strengthenCoefficients(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem =
+        CoefficientStrengthening.strengthenCoefficients(problem, bakeConfig)
 
     /** One-shot GF(2) elimination over all xor factors. See [XorUnits]. */
-    fun deriveXorUnits(problem: Problem): Problem = XorUnits.deriveXorUnits(problem)
+    fun deriveXorUnits(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem =
+        XorUnits.deriveXorUnits(problem, bakeConfig)
 
     /** Affine variable elimination. See [AffineSingletons]. */
     fun eliminateAffineSingletons(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-    ): AffineElimination = AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars, cancellation)
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): AffineElimination = AffineSingletons.eliminateAffineSingletons(
+        problem,
+        objectiveIntVars,
+        cancellation,
+        bakeConfig,
+    )
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
-    fun removeRedundantConstraints(problem: Problem): Problem = RedundantConstraints.removeRedundantConstraints(problem)
+    fun removeRedundantConstraints(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem =
+        RedundantConstraints.removeRedundantConstraints(problem, bakeConfig)
 
     /** Per-factor structural self-reduction via [com.eignex.klause.solver.Factor.structuralReduce].
      *  See [StructuralReduction]. */
-    fun reduceStructural(problem: Problem): Problem = StructuralReduction.reduce(problem)
+    fun reduceStructural(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem =
+        StructuralReduction.reduce(problem, bakeConfig)
 
     /** Maximal at-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s
      *  factors — including those implied by pseudo-Boolean knapsacks — and grown into maximal cliques,
@@ -39,8 +49,11 @@ object Presolve {
     fun amoCliques(problem: Problem): List<Set<Int>> = PresolveShared.maximalAmoCliques(problem.factors.asList())
 
     /** Duplicate / parallel integer-column aggregation. See [DuplicateColumns]. */
-    fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): DuplicateColumnMerge =
-        DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars)
+    fun mergeDuplicateColumns(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): DuplicateColumnMerge = DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars, bakeConfig)
 
     /** Symmetry breaking by detecting interchangeable variables. See [SymmetryBreaking]. */
     fun breakSymmetries(
@@ -48,22 +61,37 @@ object Presolve {
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-    ): Problem = SymmetryBreaking.breakSymmetries(problem, objectiveIntVars, objectiveBoolVars, cancellation)
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): Problem = SymmetryBreaking.breakSymmetries(
+        problem,
+        objectiveIntVars,
+        objectiveBoolVars,
+        cancellation,
+        bakeConfig,
+    )
 
     /** Value-precedence breaking over interchangeable value orbits. See [SymmetryBreaking]. */
-    fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): Problem =
-        SymmetryBreaking.breakValuePrecedence(problem, objectiveIntVars)
+    fun breakValuePrecedence(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): Problem = SymmetryBreaking.breakValuePrecedence(problem, objectiveIntVars, bakeConfig)
 
     /** Dual fixing / dominated-variable reductions. See [DominatedVariables]. */
     fun fixDominatedVariables(
         problem: Problem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
-    ): Problem = DominatedVariables.fixDominatedVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs)
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): Problem = DominatedVariables.fixDominatedVariables(problem, objectiveIntCoeffs, objectiveBoolCoeffs, bakeConfig)
 
     /** Failed-literal and common-bound probing to fixpoint. See [Probing]. */
-    fun probe(problem: Problem, maxCandidates: Int, cancellation: Cancellation = Cancellation.Never): Problem =
-        Probing.probe(problem, maxCandidates, cancellation)
+    fun probe(
+        problem: Problem,
+        maxCandidates: Int,
+        cancellation: Cancellation = Cancellation.Never,
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): Problem = Probing.probe(problem, maxCandidates, cancellation, bakeConfig)
 
     /** Binary implication graph: equivalent-literal substitution and transitive reduction. See
      *  [ImplicationGraph]. */
@@ -72,7 +100,14 @@ object Presolve {
         maxCandidates: Int,
         cancellation: Cancellation = Cancellation.Never,
         objectiveBoolVars: Set<Int> = emptySet(),
-    ): ImplicationReduction = ImplicationGraph.reduce(problem, maxCandidates, cancellation, objectiveBoolVars)
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): ImplicationReduction = ImplicationGraph.reduce(
+        problem,
+        maxCandidates,
+        cancellation,
+        objectiveBoolVars,
+        bakeConfig,
+    )
 
     /** Binary-implication graph (literal-indexed adjacency `lit -> forced lits`) for implication-aware
      *  consumers such as local search. See [ImplicationGraph]. */

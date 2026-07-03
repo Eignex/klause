@@ -39,6 +39,7 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
+        bakeConfig: BakeConfig = BakeConfig.NONE,
     ): Problem {
         // Symmetry breaking is a one-shot transformation: once a [SymmetryHandling] factor is present
         // the generators have been found and posted. The presolve round engine re-enables this pass
@@ -66,7 +67,7 @@ internal object SymmetryBreaking {
         if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
         extra.addAll(scalarLex)
         extra.addAll(valuePins)
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra)
+        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra, bakeConfig = bakeConfig)
     }
 
     /**
@@ -205,7 +206,11 @@ internal object SymmetryBreaking {
      * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns
      * the original problem unchanged when nothing is eligible.
      */
-    fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): Problem {
+    fun breakValuePrecedence(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): Problem {
         val n = problem.numIntVars
         // A verified orbit is interchangeable; ordering its first occurrences is sound. A
         // fully-internal variable (domain ⊆ orbit) exists only when the orbit equals the whole
@@ -226,7 +231,7 @@ internal object SymmetryBreaking {
             }
         }
         if (extra.isEmpty()) return problem
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra)
+        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra, bakeConfig = bakeConfig)
     }
 
     /** Refine a domain-incidence candidate [values] into verified-interchangeable value orbits: union

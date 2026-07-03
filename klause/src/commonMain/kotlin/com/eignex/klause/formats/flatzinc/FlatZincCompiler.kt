@@ -3,10 +3,7 @@ import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.presolve.PresolveContext
-import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -53,23 +50,18 @@ internal class FlatZincCompiler(
             if (redundant || symmetry) for (i in before until factors.size) impliedFactorIds.add(i)
         }
         val solveDirective = compileSolve()
-        val presolve = KlauseConfig.current.presolveConfig()
-        val holes = presolve.resolved(PresolvePass.PROBE_INT_HOLES, PresolveContext.EMPTY)
         val impliedFactorMask = if (impliedFactorIds.isEmpty()) {
             null
         } else {
             BooleanArray(factors.size).also { for (i in impliedFactorIds) it[i] = true }
         }
+        // A plain base-baked [Problem]; the SAC / failed-literal probing resolved from the presolve
+        // config runs later in the presolve lane via [RootBaker] (the kernel never probes itself).
         val problem = Problem(
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
-            probeFailedLiterals = presolve.resolved(PresolvePass.PROBE_FAILED_LITERALS, PresolveContext.EMPTY),
-            probeIntBounds = holes || presolve.resolved(PresolvePass.PROBE_INT_BOUNDS, PresolveContext.EMPTY),
-            probeIntHoles = holes,
-            probeBudgetPerVar = presolve.probeBudgetPerVar(),
-            probeTotalBudget = presolve.probeTotalBudget(),
             cancellation = cancellation,
             impliedFactorMask = impliedFactorMask,
             hasSymmetryBreaking = hasSymmetryBreaking,

@@ -44,7 +44,7 @@ internal object RedundantConstraints {
      * (maximal activity already within the bound) are dropped by the strengthen lift, so this pass is
      * purely cross-constraint.
      */
-    fun removeRedundantConstraints(problem: Problem): Problem {
+    fun removeRedundantConstraints(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
         // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
@@ -130,7 +130,7 @@ internal object RedundantConstraints {
         // a variable contained only in it, which the affine pass then projects out (implied-free).
         val out5 = out4.filterNot { isVacuousGlobal(it, problem.intDomains) }
         if (out5.size == factors.size) return problem
-        return PresolveShared.rebuildProblem(problem, out5)
+        return PresolveShared.rebuildProblem(problem, out5, bakeConfig = bakeConfig)
     }
 
     /** Whether [factor] is a global constraint that the current [domains] make *vacuously* satisfied —

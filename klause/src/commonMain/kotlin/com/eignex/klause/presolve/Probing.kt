@@ -34,7 +34,12 @@ internal object Probing {
      * Booleans cannot blow up presolve time; the round engine re-enters the pass after other passes
      * fire, and a later round picks up where bumping units shifted the free set.
      */
-    fun probe(problem: Problem, maxCandidates: Int, cancellation: Cancellation): Problem {
+    fun probe(
+        problem: Problem,
+        maxCandidates: Int,
+        cancellation: Cancellation,
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): Problem {
         val pinned = IntHashSet()
         for (f in problem.factors) {
             if (f is Clause && f.literals.size == 1) pinned.add(Lit.variable(f.literals[0]))
@@ -75,7 +80,7 @@ internal object Probing {
 
         if (units.isEmpty() && !domainsChanged) return problem
         val factors = if (units.isEmpty()) problem.factors.toList() else problem.factors.toList() + units
-        return PresolveShared.rebuildProblem(problem, factors, domains)
+        return PresolveShared.rebuildProblem(problem, factors, domains, bakeConfig = bakeConfig)
     }
 
     /** Fold the intersection of the bounds implied under each polarity into [domains]; return whether

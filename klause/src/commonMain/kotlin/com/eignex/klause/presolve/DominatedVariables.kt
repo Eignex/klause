@@ -46,6 +46,7 @@ internal object DominatedVariables {
         problem: Problem,
         objectiveIntCoeffs: Map<Int, Long>,
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
+        bakeConfig: BakeConfig = BakeConfig.NONE,
     ): Problem {
         val n = problem.numIntVars
         val downSafe = BooleanArray(n) { true }
@@ -107,7 +108,12 @@ internal object DominatedVariables {
             changed = true
         }
         if (!changed) return problem
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra, domains)
+        return PresolveShared.rebuildProblem(
+            problem,
+            problem.factors.toList() + extra,
+            domains,
+            bakeConfig = bakeConfig,
+        )
     }
 
     /** Fold [f]'s contribution to the Boolean pure-literal safety analysis (#469/#470). A bool var is

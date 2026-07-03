@@ -59,7 +59,7 @@ class LpHarvestTest {
             }
             val problem = Problem(0, n, domains, factors.toTypedArray())
             val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
-            val harvested = lpHarvest(problem, obj, shavingParams, Cancellation.Never)
+            val harvested = lpHarvest(problem, obj, shavingParams, cancellation = Cancellation.Never)
             if (harvested === problem) return@repeat
             engaged++
             // Every assignment feasible under the original constraints must still lie inside the
@@ -115,7 +115,7 @@ class LpHarvestTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
-        val harvested = lpHarvest(problem, obj, objShavingParams, Cancellation.Never)
+        val harvested = lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never)
         assertTrue(harvested !== problem, "objective shaving proved a floor; the harvest must apply it")
         assertTrue(harvested.intDomains[3].min >= 2, "objective floor z>=2 not folded into the domain")
         assertTrue(2 in harvested.intDomains[3], "harvest excluded the attainable optimum z=2")
@@ -134,7 +134,7 @@ class LpHarvestTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, -1L))
         assertSame(
             problem,
-            lpHarvest(problem, obj, objShavingParams, Cancellation.Never),
+            lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never),
             "a maximised objective yields no ascending floor, so the harvest is unchanged",
         )
     }
@@ -152,7 +152,7 @@ class LpHarvestTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
-        val harvested = lpHarvest(problem, obj, shavingParams, Cancellation.Never)
+        val harvested = lpHarvest(problem, obj, shavingParams, cancellation = Cancellation.Never)
         for (v in 0 until problem.numIntVars) {
             assertTrue(harvested.intDomains[v].min >= problem.intDomains[v].min, "lower bound widened for x$v")
             assertTrue(harvested.intDomains[v].max <= problem.intDomains[v].max, "upper bound widened for x$v")
@@ -176,7 +176,7 @@ class LpHarvestTest {
             ),
         )
         assertTrue(problem.baked !is PropagationResult.Unsat, "propagation alone must not catch this infeasibility")
-        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
         assertTrue(harvested.baked is PropagationResult.Unsat, "the LP-certified infeasibility must bake to Unsat")
     }
 
@@ -196,7 +196,7 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5), // implied by the three above
             ),
         )
-        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
         assertTrue(harvested.factors.none { it is Linear && it.vars.size == 3 }, "the implied x+y+z<=5 must be dropped")
         assertEquals(3, harvested.factors.count { it is Linear }, "the three irredundant pairwise covers stay")
         assertSameFeasibleSet(problem, harvested, hi = 10)
@@ -218,7 +218,7 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 4), // implied by the three above
             ),
         )
-        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
         assertTrue(harvested.factors.none { it is Linear && it.vars.size == 3 }, "the implied x+y+z>=4 must be dropped")
         assertEquals(3, harvested.factors.count { it is Linear }, "the three irredundant pairwise covers stay")
         assertSameFeasibleSet(problem, harvested, hi = 10)
@@ -239,7 +239,7 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0), // z - x <= 0
             ),
         )
-        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
         assertTrue(
             harvested.factors.any { it is Linear && it.op == LinearOp.EQ && it.vars.size == 2 },
             "the LP-pinned difference must be added as a two-term equality",
@@ -262,7 +262,12 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5),
             ),
         )
-        val report = lpHarvestReporting(problem, LinearObjective(), shavingParams, Cancellation.Never).report
+        val report = lpHarvestReporting(
+            problem,
+            LinearObjective(),
+            shavingParams,
+            cancellation = Cancellation.Never,
+        ).report
         assertEquals(1, report.constraintsRemoved, "the LP-redundant row must be counted")
         assertTrue(!report.rootInfeasible && report.equalitiesAdded == 0, "no other LP action fired here")
         assertTrue(!report.skipped && report.relaxationNnz > 0, "the built relaxation's size must be reported")
@@ -282,7 +287,12 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
             ),
         )
-        val report = lpHarvestReporting(problem, LinearObjective(), shavingParams, Cancellation.Never).report
+        val report = lpHarvestReporting(
+            problem,
+            LinearObjective(),
+            shavingParams,
+            cancellation = Cancellation.Never,
+        ).report
         assertTrue(report.rootInfeasible, "root-LP infeasibility must be recorded in the report")
     }
 
@@ -301,7 +311,7 @@ class LpHarvestTest {
                 factors.add(Linear(coeffs, IntArray(n) { it }, LinearOp.LE, rng.nextInt(0, hi * n + 1)))
             }
             val problem = Problem(0, n, domains, factors.toTypedArray())
-            val harvested = lpHarvest(problem, LinearObjective(), shavingParams, Cancellation.Never)
+            val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
             if (harvested.factors.size < problem.factors.size) dropped++
             assertSameFeasibleSet(problem, harvested, hi)
         }

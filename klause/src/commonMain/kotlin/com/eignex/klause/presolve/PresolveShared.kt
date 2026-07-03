@@ -122,21 +122,24 @@ internal object PresolveShared {
         problem: Problem,
         factors: List<Factor>,
         intDomains: Array<IntDomain> = problem.intDomains.copyOf(),
-    ): Problem = Problem(
-        numBoolVars = problem.numBoolVars,
-        numIntVars = problem.numIntVars,
-        intDomains = intDomains,
-        factors = factors,
-        probeFailedLiterals = problem.probeFailedLiterals,
-        probeIntBounds = problem.probeIntBounds,
-        probeIntHoles = problem.probeIntHoles,
-        probeBudgetPerVar = problem.probeBudgetPerVar,
-        probeTotalBudget = problem.probeTotalBudget,
-        probeSeed = problem.probeSeed,
+        bakeConfig: BakeConfig = BakeConfig.NONE,
+    ): Problem {
         // Inherit the pass-view mode: a pass fed a cheap preFolded input returns a cheap preFolded
         // output (the session re-folds via incremental propagation); a fresh-path rebuild stays eager.
-        preFolded = problem.preFolded,
-    )
+        val base = Problem(
+            numBoolVars = problem.numBoolVars,
+            numIntVars = problem.numIntVars,
+            intDomains = intDomains,
+            factors = factors,
+            preFolded = problem.preFolded,
+        )
+        // A preFolded pass view never bakes (nothing reads [Problem.baked]), so [RootBaker.reseed] leaves
+        // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs
+        // [RootBaker] against the base-baked problem and returns a fresh eager [Problem] whose
+        // [Problem.baked] carries the failed-literal / SAC deductions — the kernel's former self-bake, now
+        // driven from the presolve lane.
+        return RootBaker.reseed(base, bakeConfig)
+    }
 
     fun gcdOf(xs: IntArray): Int {
         var g = 0

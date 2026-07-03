@@ -42,6 +42,7 @@ internal object AffineSingletons {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
+        bakeConfig: BakeConfig = BakeConfig.NONE,
     ): AffineElimination {
         if (problem.numIntVars == 0) return AffineElimination(problem, emptyList())
         var factors = problem.factors.toList()
@@ -71,7 +72,10 @@ internal object AffineSingletons {
             subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), intArrayOf(r.coeffY), divisor = r.divisor))
         }
         if (subs.isEmpty()) return AffineElimination(problem, emptyList())
-        return AffineElimination(PresolveShared.rebuildProblem(problem, factors, domains), subs)
+        return AffineElimination(
+            PresolveShared.rebuildProblem(problem, factors, domains, bakeConfig = bakeConfig),
+            subs,
+        )
     }
 
     /** Cap on a residue partner's domain span: scanning each value to build the restricted domain is
