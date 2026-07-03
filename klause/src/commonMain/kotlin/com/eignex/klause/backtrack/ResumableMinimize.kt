@@ -128,7 +128,7 @@ internal class ResumableMinimize(
         var h = 0L
         for (lit in learned.literals) h += splitmix64(lit.toLong())
         val n = relearnCounts.addTo(h, 1)
-        if (n > 1) sink.observeRelearn()
+        if (n > 1) sink.search.observeRelearn()
         n > RELEARN_FALLBACK_THRESHOLD
     }
     private val phase = PhaseSaving(problem.numBoolVars, problem.numIntVars, params)
@@ -427,7 +427,7 @@ internal class ResumableMinimize(
             AdvanceOutcome.Success -> {
                 phase.capture(varRef, session)
                 trail.add(node)
-                sink.observeNode(trail.size)
+                sink.search.observeNode(trail.size)
                 phase.captureTargetIfDeeper(session, trail.size)
             }
 
@@ -624,7 +624,7 @@ internal class ResumableMinimize(
         solver.forgetIfOverCap(session, params)
         if (vivifyEnabled) vivifyCursor = solver.vivify(session, params, vivifyCursor)
         val restartIndex = restart.onRestart()
-        sink.observeRestart()
+        sink.search.observeRestart()
         params.onEvent?.invoke(SearchEvent.Restart(restartIndex, decisionsThisRun))
         return null
     }

@@ -580,9 +580,9 @@ internal object SolveCore {
      *  the LS functional gradient view back to the linear objective. No-op for satisfy / infeasible
      *  runs (no incumbent) and non-MiniZinc modes without an objective lambda. */
     private fun withModelObjective(s: SolveStats, solvable: Solvable, sample: Sample?): SolveStats {
-        if (sample == null || s.incumbentObjective.isNaN()) return s
+        if (sample == null || s.ls.incumbentObjective.isNaN()) return s
         val objectiveValue = solvable.objectiveValue ?: return s
-        return s.copy(incumbentObjective = objectiveValue(sample).toDouble())
+        return s.copy(ls = s.ls.copy(incumbentObjective = objectiveValue(sample).toDouble()))
     }
 }
 

@@ -51,10 +51,13 @@ class SolveStatsTest {
         val result = BacktrackSolver(compiled.problem).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "expected SAT for 6-row alldiff")
         val stats = result.stats
-        assertEquals("backtrack", stats.backend)
-        assertTrue(stats.nodes.sum > 0.0, "backtrack should visit at least one decision node; nodes=${stats.nodes.sum}")
-        assertTrue(stats.peakDepth.max >= 1.0, "peak depth should be ≥1; got ${stats.peakDepth.max}")
-        assertTrue(stats.depthMean.totalWeights >= 1.0, "mean depth should have received ≥1 update")
+        assertEquals("backtrack", stats.run.backend)
+        assertTrue(
+            stats.search.nodes.sum > 0.0,
+            "backtrack should visit at least one decision node; nodes=${stats.search.nodes.sum}",
+        )
+        assertTrue(stats.search.peakDepth.max >= 1.0, "peak depth should be ≥1; got ${stats.search.peakDepth.max}")
+        assertTrue(stats.search.depthMean.totalWeights >= 1.0, "mean depth should have received ≥1 update")
     }
 
     @Test
@@ -64,8 +67,8 @@ class SolveStatsTest {
         val result = LocalSearchSolver(compiled.problem).solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 7))
         // Either SAT or Unknown — both should carry the ls backend tag.
         val stats = result.stats
-        assertEquals("ls", stats.backend)
-        assertTrue(stats.wallMs >= 0L, "wallMs should be non-negative")
+        assertEquals("ls", stats.run.backend)
+        assertTrue(stats.run.wallMs >= 0L, "wallMs should be non-negative")
     }
 
     /**
@@ -97,8 +100,8 @@ class SolveStatsTest {
         val result = BacktrackSolver(pigeonhole(4)).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(result, "4-into-3 pigeonhole is infeasible")
         assertTrue(
-            result.stats.fails.sum > 0.0,
-            "an UNSAT proof that branches must record failures; got fails=${result.stats.fails.sum}",
+            result.stats.search.fails.sum > 0.0,
+            "an UNSAT proof that branches must record failures; got fails=${result.stats.search.fails.sum}",
         )
     }
 
@@ -127,9 +130,9 @@ class SolveStatsTest {
         val optimal = assertIs<MinimizeResult.Optimal>(result, "expected a proven optimum")
         assertEquals(6.0, optimal.objective, "minimum of x+y+z under the pairwise sum bounds is 6")
         assertTrue(
-            optimal.stats.fails.sum > 0.0,
+            optimal.stats.search.fails.sum > 0.0,
             "a branch-and-bound optimality proof that searches must record failures; " +
-                "got fails=${optimal.stats.fails.sum}",
+                "got fails=${optimal.stats.search.fails.sum}",
         )
     }
 
@@ -155,19 +158,19 @@ class SolveStatsTest {
         val optimal = assertIs<MinimizeResult.Optimal>(result, "expected a proven optimum")
         assertEquals(0.0, optimal.objective, "minimum of x + y is 0")
         assertTrue(
-            optimal.stats.fails.sum > 0.0,
+            optimal.stats.search.fails.sum > 0.0,
             "a proof that kills subtrees by the objective bound must record those as failures; " +
-                "got fails=${optimal.stats.fails.sum}",
+                "got fails=${optimal.stats.search.fails.sum}",
         )
     }
 
     @Test
     fun `default SolveStats EMPTY is zero everywhere`() {
         val s = SolveStats.EMPTY
-        assertEquals("", s.backend)
-        assertEquals(0.0, s.nodes.sum)
-        assertEquals(0L, s.wallMs)
-        assertEquals(false, s.timedOut)
+        assertEquals("", s.run.backend)
+        assertEquals(0.0, s.search.nodes.sum)
+        assertEquals(0L, s.run.wallMs)
+        assertEquals(false, s.run.timedOut)
     }
 
     @Test
@@ -187,7 +190,7 @@ class SolveStatsTest {
         val compiled = S().compile()
         val r = BacktrackSolver(compiled.problem).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
-        assertEquals("backtrack", r.stats.backend)
-        assertEquals(false, r.stats.timedOut)
+        assertEquals("backtrack", r.stats.run.backend)
+        assertEquals(false, r.stats.run.timedOut)
     }
 }

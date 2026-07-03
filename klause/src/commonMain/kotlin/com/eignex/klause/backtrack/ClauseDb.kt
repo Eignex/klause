@@ -55,7 +55,7 @@ internal fun BacktrackSolver.advance(
         val outcome = node.applyNext(session) ?: return AdvanceOutcome.Exhausted
         // Count every factor-forced assignment this pin triggered — including the
         // propagation done on the way to a conflict (Unsat returns below).
-        sink?.observePropagation(session.propagationCount - propsBefore)
+        sink?.search?.observePropagation(session.propagationCount - propsBefore)
         val r = outcome.result
         if (r is PropagationResult.Unsat) {
             // Every conflict is a failed node — count it here, the one point all
@@ -63,7 +63,7 @@ internal fun BacktrackSolver.advance(
             // branch-and-bound (ResumableMinimize) loops report failures regardless
             // of whether the conflict backjumps or falls through to chronological
             // within-node value enumeration (#509).
-            sink?.observeFail()
+            sink?.search?.observeFail()
             onConflictTick?.invoke()
             // Forward the full conflict reason record so activity-, weight-, and
             // factor-driven heuristics (VSIDS, dom/wdeg) all see exactly what they
@@ -95,16 +95,16 @@ internal fun BacktrackSolver.advance(
                 learned.literals.none { session.litTruth(it) == true } &&
                 relearnTripped?.invoke(learned) != true
             ) {
-                sink?.observeLearn()
+                sink?.search?.observeLearn()
                 return AdvanceOutcome.Backjump(learned)
             }
             // #588 diagnostic: classify why this conflict did NOT learn — the gate breakdown
             // tells us which barrier (no clause / non-asserting / already-true literal) is
             // responsible for the low asserting rate.
             when {
-                learned == null -> sink?.observeCaNotApplicable()
-                !learned.asserting -> sink?.observeCaNonAsserting()
-                learned.literals.any { session.litTruth(it) == true } -> sink?.observeCaRejectedTrueLit()
+                learned == null -> sink?.ca?.observeNotApplicable()
+                !learned.asserting -> sink?.ca?.observeNonAsserting()
+                learned.literals.any { session.litTruth(it) == true } -> sink?.ca?.observeRejectedTrueLit()
             }
             continue
         }
@@ -114,7 +114,7 @@ internal fun BacktrackSolver.advance(
             // (Gecode/Chuffed). This covers the dominant linear objective-bound prune, which has
             // no other counter; the lp/energetic/lagrangian sub-counters set inside pruneIf remain
             // a breakdown of part of this total (#509).
-            sink?.observeFail()
+            sink?.search?.observeFail()
             // Immediate LP backjump (#280): if the prune carried an asserting Farkas 1UIP clause,
             // convert this node into a non-chronological backjump-and-learn. Revert the current
             // pin first (the propagation-conflict path reaches the Backjump return with the failed
@@ -127,7 +127,7 @@ internal fun BacktrackSolver.advance(
                 relearnTripped?.invoke(lpLearned) != true
             ) {
                 sink?.lp?.observeBackjump()
-                sink?.observeLearn()
+                sink?.search?.observeLearn()
                 session.popLast()
                 return AdvanceOutcome.Backjump(lpLearned)
             }
