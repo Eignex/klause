@@ -255,7 +255,16 @@ private fun namedFactory(
     }
 
     "sa", "annealing" -> {
-        { LsRecipe("sa", SimulatedAnnealing(initTemp, coolRate, minTemp, tabu = tabu)) }
+        // The unified minimize path (both halves the optimizer form, independent schedules) so SA
+        // anneals on the objective at feasibility like the catalog sa/* arms, rather than being
+        // ratcheted as a plain finder on a COP.
+        {
+            LsRecipe(
+                "sa",
+                SimulatedAnnealing.optimizer(Geometric(initTemp, coolRate, minTemp), tabu = tabu),
+                optimizeStrategy = SimulatedAnnealing.optimizer(Geometric(initTemp, coolRate, minTemp), tabu = tabu),
+            )
+        }
     }
 
     else -> usageError("ls: strategy expects auto|cbls|feasibilityjump|walksat|probsat|sa|bare, got `$name`")

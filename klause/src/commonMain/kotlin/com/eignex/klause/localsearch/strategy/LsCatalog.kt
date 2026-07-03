@@ -124,11 +124,12 @@ object LsCatalog {
 
     /** An SA recipe on the unified minimize path so Metropolis anneals on the objective at feasibility
      *  (rather than bailing to the engine's greedy descent); on a CSP the minimize path is unused, so
-     *  this is identical to plain SA. Independent satisfy/optimize instances (SA carries schedule state). */
-    private fun saRecipe(label: String, schedule: Schedule, restart: RestartPolicy) = LsRecipe(
+     *  this is identical to plain SA. [makeSchedule] is invoked twice so the satisfy and optimize
+     *  strategies get independent temperature schedules (a [Geometric] carries mutable per-search state). */
+    private fun saRecipe(label: String, restart: RestartPolicy, makeSchedule: () -> Schedule) = LsRecipe(
         label,
-        SimulatedAnnealing.optimizer(schedule).withRestart(restart),
-        optimizeStrategy = SimulatedAnnealing.optimizer(schedule).withRestart(restart),
+        SimulatedAnnealing.optimizer(makeSchedule()).withRestart(restart),
+        optimizeStrategy = SimulatedAnnealing.optimizer(makeSchedule()).withRestart(restart),
     )
 
     /**
@@ -180,7 +181,7 @@ object LsCatalog {
 
         // Annealing + adaptive perturbation: the quality closer — adds no coverage but holds the final
         // best on 7 instances, the second-highest in the pool.
-        LsArm.SaAdaptivePerturb -> saRecipe(arm.label, Geometric(), AdaptivePerturbationRestart())
+        LsArm.SaAdaptivePerturb -> saRecipe(arm.label, AdaptivePerturbationRestart()) { Geometric() }
 
         // Patient stall cadence (+1 uncovered, +3 best, one sole win).
         LsArm.CblsStallslowFixed -> cblsRecipe(arm.label, FixedCadenceRestart()) {
@@ -207,7 +208,7 @@ object LsCatalog {
             cblsRecipe(arm.label, FixedCadenceRestart()) { Cbls(tabu = TabuFilter.Disabled) }
 
         // Plain annealing: 5 raw firsts, all on instances the arms above also solve.
-        LsArm.SaFixed -> saRecipe(arm.label, Geometric(), FixedCadenceRestart(maxFlipsBeforeRestart = 50_000))
+        LsArm.SaFixed -> saRecipe(arm.label, FixedCadenceRestart(maxFlipsBeforeRestart = 50_000)) { Geometric() }
 
         // Aggressive swap cap (raw 1/2, 191 improvements).
         LsArm.CblsPlateau64Fixed ->
@@ -270,24 +271,20 @@ object LsCatalog {
         // SA with periodic reheating: the schedule re-diversifies a cooled-and-stuck run without
         // discarding the incumbent. Restart epoch (100k) spans several reheat periods (20k) so the
         // reheats fire before a restart resets the schedule.
-        LsArm.SaReheatFixed -> saRecipe(
-            arm.label,
-            Reheating(Geometric(), period = 20_000, reheatFactor = 4.0),
-            FixedCadenceRestart(maxFlipsBeforeRestart = 100_000),
-        )
+        LsArm.SaReheatFixed -> saRecipe(arm.label, FixedCadenceRestart(maxFlipsBeforeRestart = 100_000)) {
+            Reheating(Geometric(), period = 20_000, reheatFactor = 4.0)
+        }
 
         // SA with an explore→exploit phased schedule: a hot, fast-cooling exploratory leg then a cool,
         // slow-cooling exploitative leg, looped. Distinct landscape coverage from the fixed-rate arms.
-        LsArm.SaPhasedFixed -> saRecipe(
-            arm.label,
+        LsArm.SaPhasedFixed -> saRecipe(arm.label, FixedCadenceRestart(maxFlipsBeforeRestart = 100_000)) {
             LoopSchedule(
                 listOf(
                     Segment(Geometric(initialTemperature = 2.0, coolingRate = 0.99), steps = 10_000),
                     Segment(Geometric(initialTemperature = 0.3, coolingRate = 0.9995), steps = 40_000),
                 ),
-            ),
-            FixedCadenceRestart(maxFlipsBeforeRestart = 100_000),
-        )
+            )
+        }
     }
 
     /**
