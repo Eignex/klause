@@ -52,7 +52,16 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     // [reseed]. Its factor count is the stable-id boundary between base and mid-life factors.
     private var stateProblem: Problem = base
 
-    private var state = PropagationState(base, Assumptions.None, incremental = true)
+    // Seed the persistent state directly from the base's already-computed root fixpoint
+    // ([Problem.baked], produced once at base construction) rather than re-propagating every factor
+    // inside the presolve window: the seeded pins/bounds are applied through the atom-consistent
+    // mutation API and settle at that same greatest fixpoint. A [PropagationResult.Unsat] base seeds
+    // nothing (the init below adopts its infeasibility).
+    private var state = PropagationState(
+        base,
+        (base.baked as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None,
+        incremental = true,
+    )
 
     /** Set once the base bake or a delta re-propagation derives a root contradiction. */
     var infeasible: Boolean = false
@@ -77,7 +86,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         // incremental re-propagation (the base's folded domains are copied in, so it settles there).
         if (base.baked is PropagationResult.Unsat) {
             infeasible = true
-        } else if (state.runToFixpoint(allFactors = true) != null) {
+        } else if (state.runToFixpoint(allFactors = false) != null) {
             infeasible = true
         }
     }
