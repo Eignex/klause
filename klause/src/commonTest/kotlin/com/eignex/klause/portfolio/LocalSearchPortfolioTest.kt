@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.strategy.LsArm
+import com.eignex.klause.localsearch.strategy.LsCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -28,5 +29,20 @@ class LocalSearchPortfolioTest {
             LocalSearchWorkerConfig.pool().map { it.label }.toSet(),
             "every LsArm must be in `ranked` (and vice versa)",
         )
+    }
+
+    @Test
+    fun `the SA family drives objective descent so it optimizes a COP rather than bailing`() {
+        // On a COP `materialize` optimizes every arm: descent-driving recipes as-is, the rest via the
+        // objective-bound ratchet. SA must be in the descent-driving set (annealing), else it would be
+        // ratcheted — still optimizing, but the intent is Metropolis on the objective. This guards
+        // against an SA arm silently reverting to the plain feasibility-finder form.
+        val byLabel = LsCatalog.auto().associateBy { it.label }
+        for (label in listOf("sa/fixed", "sa-reheat/fixed", "sa-phased/fixed")) {
+            assertTrue(byLabel.getValue(label).drivesObjectiveDescent, "'$label' must drive objective descent")
+        }
+        // The violation-native arms don't drive descent — they are the ratchet's targets on a COP.
+        assertEquals(false, byLabel.getValue("adaptive-probsat/fixed").drivesObjectiveDescent)
+        assertEquals(false, byLabel.getValue("walksat-cc/luby").drivesObjectiveDescent)
     }
 }

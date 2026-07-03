@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.GreedyInit
 import com.eignex.klause.localsearch.movesource.PairSwap
@@ -82,6 +83,13 @@ class LocalSearchSolver(
     val seedImplicitOnRestart: Boolean = false,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
+
+    /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
+     *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each
+     *  feasible incumbent the minimize loop tightens it below the incumbent, so the objective slack
+     *  re-enters the violation set and the feasibility fight repairs it — the SAT→optimization ratchet
+     *  for the violation-native arms (probSAT / WalkSAT). Null leaves objective handling unchanged. */
+    internal var objectiveBound: MutableObjectiveBound? = null
 
     private val satisfiedStructured: SatisfiedStructured = SatisfiedStructured.all()
 
@@ -458,6 +466,8 @@ class LocalSearchSolver(
         // descent) for non-unified strategies that bail at feasibility.
         val descentStrategy = optimizeStrategy
         val unified = descentStrategy?.drivesObjectiveDescent == true
+        // Capture the ratchet handle once: set at construction, read in the feasible-incumbent hook.
+        val ratchetBound = objectiveBound
         // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
         // when one drives both phases, else the satisfy strategy).
         val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
@@ -500,6 +510,41 @@ class LocalSearchSolver(
                     bestFoundAtMs = sink.elapsedMs()
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
+                }
+                if (ratchetBound != null) {
+                    // Objective-as-constraint ratchet: reaching cost==0 means the objective already meets
+                    // the bound. Tighten it below this incumbent so "beat it" re-enters the violation set,
+                    // then reconcile the incrementally-maintained cost (a bound change moves the bound
+                    // factor's violation with no move) and drop back into the feasibility fight to repair it.
+                    ratchetBound.tightenBelow(obj)
+                    state.recompute()
+                    totalFlips++
+                    continue
+                }
+                // An annealing/optimizer strategy that owns the feasible walk: its own acceptance
+                // (SA Metropolis) decides accept/reject, so it steps through worse-objective feasible
+                // states the greedy gate below would revert. Best-feasible is snapshotted above, so
+                // wandering never loses the incumbent. A feasibility-breaking pick is reverted (the
+                // optimize phase stays feasible) and retried; a null pick means no feasible-phase
+                // candidate remains — a local optimum, so restart.
+                if (descentStrategy != null && descentStrategy.ownsFeasibleDescent) {
+                    val m = descentStrategy.pickMove(state)
+                    if (m != null) {
+                        val savedSnap = state.assignment.snapshot()
+                        state.apply(m)
+                        if (state.cost != 0L) revertMove(state, m, savedSnap)
+                        flipsSinceRestart++
+                        totalFlips++
+                        continue
+                    }
+                    restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                    restarts.restart(state, bestSample)
+                    if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                    stallCount++
+                    restartCount++
+                    flipsSinceRestart = 0
+                    totalFlips++
+                    continue
                 }
                 // Descent options in order of informedness; each gets one chance before falling
                 // through to the next, and stalling all of them triggers a restart. Cheapest first:

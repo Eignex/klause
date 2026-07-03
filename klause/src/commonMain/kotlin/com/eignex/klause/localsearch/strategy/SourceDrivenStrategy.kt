@@ -57,7 +57,17 @@ class SourceDrivenStrategy(
      *  sources that score satisfied/objective candidates at `cost == 0`), rather than bailing for the
      *  engine's built-in descent. The unified-minimize path keys off this; the [Cbls] recipe sets it. */
     val drivesObjectiveDescent: Boolean = false,
+    /** Whether this strategy's own [acceptance] rule owns the accept/reject decision in the feasible
+     *  phase, rather than the engine's greedy strict-improvement gate. The annealing (Metropolis) arm
+     *  sets it so it can step through worse-objective feasible states; requires [drivesObjectiveDescent]
+     *  and feasible-phase move sources. Off leaves the engine's greedy descent in charge (CBLS). */
+    val ownsFeasibleDescent: Boolean = false,
 ) {
+    init {
+        require(!ownsFeasibleDescent || drivesObjectiveDescent) {
+            "ownsFeasibleDescent requires drivesObjectiveDescent (the feasible phase must be this strategy's)"
+        }
+    }
 
     /** A copy with selected axes replaced, used by recipe assembly and the axis-edit transform to
      *  swap one dimension while preserving the rest. */
@@ -70,6 +80,7 @@ class SourceDrivenStrategy(
         configurationChecking: Boolean = this.configurationChecking,
         perturbation: ((LocalSearchState) -> Move?)? = this.perturbation,
         drivesObjectiveDescent: Boolean = this.drivesObjectiveDescent,
+        ownsFeasibleDescent: Boolean = this.ownsFeasibleDescent,
     ): SourceDrivenStrategy = SourceDrivenStrategy(
         sources = sources,
         scoring = scoring,
@@ -79,6 +90,7 @@ class SourceDrivenStrategy(
         configurationChecking = configurationChecking,
         perturbation = perturbation,
         drivesObjectiveDescent = drivesObjectiveDescent,
+        ownsFeasibleDescent = ownsFeasibleDescent,
     )
 
     /** Whether round feedback retunes the temperature schedule; off when no temperature schedule is present. */

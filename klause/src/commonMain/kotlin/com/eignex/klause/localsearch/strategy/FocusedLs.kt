@@ -3,6 +3,8 @@ package com.eignex.klause.localsearch.strategy
 import com.eignex.klause.localsearch.TabuFilter
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
+import com.eignex.klause.localsearch.movesource.ObjectiveSeed
+import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.localsearch.schedule.BanditNoiseController
 import com.eignex.klause.localsearch.schedule.Geometric
@@ -178,5 +180,30 @@ object SimulatedAnnealing {
         schedule = ScheduleBundle(temperature = schedule),
         tabu = tabu,
         configurationChecking = configurationChecking,
+    )
+
+    /**
+     * SA as a COP objective-optimizer: the focused feasibility opener plus the feasible-phase objective
+     * sources ([ObjectiveSeed] + [SatisfiedStructured]) so [AcceptanceRule.Metropolis] keeps annealing
+     * at `cost == 0`, stepping through worse-objective feasible states, instead of bailing to the
+     * engine's greedy descent. Sets [SourceDrivenStrategy.drivesObjectiveDescent] and
+     * [SourceDrivenStrategy.ownsFeasibleDescent] so its own Metropolis acceptance — not the engine's
+     * strict-improvement gate — owns the feasible walk.
+     */
+    fun optimizer(
+        schedule: Schedule,
+        satisfiedSampleCount: Int = 4,
+        tabu: TabuFilter = TabuFilter(tenure = 10),
+        configurationChecking: Boolean = false,
+    ): SourceDrivenStrategy = SourceDrivenStrategy(
+        sources = focusedSources() + ConfiguredSource(ObjectiveSeed()) +
+            ConfiguredSource(SatisfiedStructured.sampled(satisfiedSampleCount)),
+        scoring = MoveScoring.Break,
+        acceptance = AcceptanceRule.Metropolis,
+        schedule = ScheduleBundle(temperature = schedule),
+        tabu = tabu,
+        configurationChecking = configurationChecking,
+        drivesObjectiveDescent = true,
+        ownsFeasibleDescent = true,
     )
 }
