@@ -1,9 +1,6 @@
 package com.eignex.klause.solver.result
 
-import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.MaxResult
-import com.eignex.kumulant.stat.summary.MaxStat
-import com.eignex.kumulant.stat.summary.MeanStat
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.kumulant.stat.summary.WeightedMeanResult
 import kotlin.time.TimeMark
@@ -22,149 +19,76 @@ internal inline fun naNDeferring(a: Double, b: Double, reduce: (Double, Double) 
     else -> reduce(a, b)
 }
 
+/** Of two (violation, objective) pairs, return the objective paired with the lower violation (closer to
+ *  feasible); NaN violation defers to the other side, ties keep the left objective. */
+internal fun pickByViolation(violA: Double, objA: Double, violB: Double, objB: Double): Double = when {
+    violA.isNaN() -> objB
+    violB.isNaN() -> objA
+    violB < violA -> objB
+    else -> objA
+}
+
+/** Weight-combine two depth means; an empty side (zero weight) defers to the other. */
+internal fun mergeDepthMean(a: WeightedMeanResult, b: WeightedMeanResult): WeightedMeanResult {
+    val weights = a.totalWeights + b.totalWeights
+    val mean = when {
+        a.totalWeights == 0.0 -> b.mean
+        b.totalWeights == 0.0 -> a.mean
+        else -> (a.mean * a.totalWeights + b.mean * b.totalWeights) / weights
+    }
+    return WeightedMeanResult(totalWeights = weights, mean = mean)
+}
+
 /**
- * Snapshot of solver-side counters and distributions from a single solve. Carried as a
- * sidecar on [com.eignex.klause.solver.SolveResult] (and on the `MinimizeResult` variants for branch-and-bound
- * runs); populated by backends that opt in, left at its zero / empty defaults by ones
- * that don't.
+ * Snapshot of solver-side counters and distributions from a single solve. Carried as a sidecar on
+ * [com.eignex.klause.solver.SolveResult] (and on the `MinimizeResult` variants for branch-and-bound
+ * runs); populated by backends that opt in, left at its empty defaults by ones that don't.
  *
- * Built on kumulant's [com.eignex.kumulant.core.Result] types so two stats from
- * portfolio workers or parallel restarts can be merged by snapshotting the underlying
- * accumulators and combining the result records — same shape kumulant uses everywhere.
- *
- * Field roles:
- *
- *  - **counters**: [nodes], [fails], [restarts], [propagations], [learnedClauses] —
- *    cumulative integer counts. Most of these are kept as [SumResult] so they merge
- *    additively across runs without losing precision.
- *  - **distributions**: [peakDepth], [depthMean] — backend-shaped detail. Peak depth is
- *    the deepest decision level reached; mean depth is the average over visited nodes,
- *    capturing whether the search tree is deep-and-thin or shallow-and-wide.
- *  - **engine fingerprint**: [wallMs] (system clock) and [timedOut] (budget exhausted
- *    before a definitive verdict).
- *  - **backend tag**: [backend] — short identifier (e.g. `"backtrack"`, `"ls"`) so multi-engine
- *    sweeps can attribute numbers without ambiguity.
+ * A composition of per-concern records — the run envelope ([run]), tree search ([search]),
+ * conflict analysis ([ca]), LP bounding ([lp]), scheduling bounds ([scheduling]), local search ([ls]),
+ * and the optional [presolve] summary — each owning its own fields and merge. Built on kumulant's
+ * result types so two snapshots (portfolio workers / parallel restarts) merge additively; [mergedWith]
+ * folds them by delegating to each record.
  */
 data class SolveStats(
-    val backend: String = "",
-    val nodes: SumResult = ZERO_COUNT,
-    val fails: SumResult = ZERO_COUNT,
-    val restarts: SumResult = ZERO_COUNT,
-    val propagations: SumResult = ZERO_COUNT,
-    val learnedClauses: SumResult = ZERO_COUNT,
-    /** Clauses conflict analysis re-derived identically — a livelock indicator when large. */
-    val relearned: SumResult = ZERO_COUNT,
-    /** Conflict-analysis gate breakdown (#588 diagnostic). Conflicts whose analysis produced no
-     *  usable clause (a NotApplicable seed). The sum of these three with [learnedClauses]
-     *  (asserting + taken) ≈ the conflicts that reached analysis. */
-    val caNotApplicable: SumResult = ZERO_COUNT,
-    /** Conflicts whose 1UIP clause was non-asserting (>1 literal at the conflict level), so it
-     *  could not be learned and the search fell back to chronological backtracking. */
-    val caNonAsserting: SumResult = ZERO_COUNT,
-    /** Conflicts whose asserting clause was rejected because it carried an already-true literal. */
-    val caRejectedTrueLit: SumResult = ZERO_COUNT,
-    /** LP-relaxation bounding counters (#20-#280): solves, prunes, fixes, pivots, cuts, and the root
-     *  bound. See [LpStats]. */
+    /** Run envelope: backend tag, wall time, timed-out flag. See [RunStats]. */
+    val run: RunStats = RunStats(),
+    /** Core tree-search counters (nodes, fails, restarts, propagations, learned clauses, depth). See [SearchStats]. */
+    val search: SearchStats = SearchStats(),
+    /** Conflict-analysis gate breakdown (#588). See [ConflictAnalysisStats]. */
+    val ca: ConflictAnalysisStats = ConflictAnalysisStats(),
+    /** LP-relaxation bounding counters (#20-#280). See [LpStats]. */
     val lp: LpStats = LpStats(),
-    /** Nodes pruned by the Lagrangian bound (#23). */
-    val lagrangianPruned: SumResult = ZERO_COUNT,
-    /** Nodes pruned by the Cumulative energetic-reasoning check (#22/#23). */
-    val energeticPruned: SumResult = ZERO_COUNT,
-    /** Local-search moves applied (bool flips / int sets / compounds + restart work units) — the LS
-     *  analogue of [nodes], and the denominator for moves-per-second. Zero for complete backends. */
-    val moves: SumResult = ZERO_COUNT,
-    /** Local-search descents that hit a local optimum / plateau and triggered a restart — the stall rate
-     *  against [moves] tells whether the search is making progress or thrashing. */
-    val stalls: SumResult = ZERO_COUNT,
-    /** Wall ms from solve start to when the best incumbent was found, or -1 when no incumbent was
-     *  established. Against [wallMs] this is the anytime profile: a small ratio means the search found its
-     *  best early and spent the rest stuck. */
-    val timeToBestMs: Long = -1L,
-    /** Objective value at the best incumbent the LS engine reached, or NaN when none was feasible. */
-    val incumbentObjective: Double = Double.NaN,
-    /** Total constraint violation (LS cost) at the best incumbent: 0 once feasible, else the lowest
-     *  residual cost reached — how close an infeasible run got. NaN when unpopulated. */
-    val incumbentViolation: Double = Double.NaN,
-    val peakDepth: MaxResult = NO_MAX,
-    val depthMean: WeightedMeanResult = WeightedMeanResult(totalWeights = 0.0, mean = Double.NaN),
-    val wallMs: Long = 0L,
-    val timedOut: Boolean = false,
+    /** Scheduling bound prunes (Lagrangian / energetic). See [SchedulingStats]. */
+    val scheduling: SchedulingStats = SchedulingStats(),
+    /** Local-search telemetry (moves, stalls, incumbent). See [LocalSearchStats]. */
+    val ls: LocalSearchStats = LocalSearchStats(),
     /** Presolve outcome, set by the CLI after presolve runs (null when presolve was off / a no-op).
      *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
     val presolve: PresolveStats? = null,
 ) {
     /**
-     * Combine two run snapshots: counters add, peak depth maxes, depth means weight-combine,
-     * wall time takes the max (runs are concurrent, not sequential), and timed-out ORs.
-     * [EMPTY] is the identity. Backend tags survive when equal and degrade to `"mixed"`
-     * otherwise — the portfolio folds heterogeneous worker snapshots through this.
+     * Combine two run snapshots by delegating to each record's own merge — counters add, maxes max,
+     * depth means weight-combine, wall time takes the max, backend degrades to `"mixed"` on mismatch,
+     * and `presolve` keeps the first non-null. [EMPTY] is the identity. The portfolio folds
+     * heterogeneous worker snapshots through this.
      */
     fun mergedWith(other: SolveStats): SolveStats {
         if (this == EMPTY) return other
         if (other == EMPTY) return this
-        fun sum(field: SolveStats.() -> SumResult) = SumResult(field().sum + other.field().sum)
-        fun max(field: SolveStats.() -> MaxResult) = MaxResult(maxOf(field().max, other.field().max))
         return SolveStats(
-            backend = if (backend == other.backend) backend else "mixed",
-            nodes = sum { nodes },
-            fails = sum { fails },
-            restarts = sum { restarts },
-            propagations = sum { propagations },
-            learnedClauses = sum { learnedClauses },
-            caNotApplicable = sum { caNotApplicable },
-            caNonAsserting = sum { caNonAsserting },
-            caRejectedTrueLit = sum { caRejectedTrueLit },
+            run = run.mergedWith(other.run),
+            search = search.mergedWith(other.search),
+            ca = ca.mergedWith(other.ca),
             lp = lp.mergedWith(other.lp),
-            lagrangianPruned = sum { lagrangianPruned },
-            energeticPruned = sum { energeticPruned },
-            moves = sum { moves },
-            stalls = sum { stalls },
-            // Earliest time-to-best across workers (the portfolio reports the first to reach its best);
-            // -1 sentinels defer to any real reading.
-            timeToBestMs = when {
-                timeToBestMs < 0L -> other.timeToBestMs
-                other.timeToBestMs < 0L -> timeToBestMs
-                else -> minOf(timeToBestMs, other.timeToBestMs)
-            },
-            // Keep the incumbent fingerprint from whichever worker got closer to feasibility (lower
-            // violation); direction-agnostic so it's sound for both minimise and maximise. NaN defers.
-            incumbentObjective = pickByViolation(
-                incumbentViolation,
-                incumbentObjective,
-                other.incumbentViolation,
-                other.incumbentObjective,
-            ),
-            incumbentViolation = naNDeferring(incumbentViolation, other.incumbentViolation, ::minOf),
-            peakDepth = max { peakDepth },
-            depthMean = mergeDepthMean(depthMean, other.depthMean),
-            wallMs = maxOf(wallMs, other.wallMs),
-            timedOut = timedOut || other.timedOut,
+            scheduling = scheduling.mergedWith(other.scheduling),
+            ls = ls.mergedWith(other.ls),
             presolve = presolve ?: other.presolve,
         )
     }
 
-    /** Shared empty/default [SolveStats] instances. */
+    /** Shared default [SolveStats]. */
     companion object {
-        /** Of two (violation, objective) pairs, return the objective paired with the lower violation
-         *  (closer to feasible); NaN violation defers to the other side, ties keep the left objective. */
-        private fun pickByViolation(violA: Double, objA: Double, violB: Double, objB: Double): Double = when {
-            violA.isNaN() -> objB
-            violB.isNaN() -> objA
-            violB < violA -> objB
-            else -> objA
-        }
-
-        /** Weight-combine two depth means; an empty side (zero weight) defers to the other. */
-        private fun mergeDepthMean(a: WeightedMeanResult, b: WeightedMeanResult): WeightedMeanResult {
-            val weights = a.totalWeights + b.totalWeights
-            val mean = when {
-                a.totalWeights == 0.0 -> b.mean
-                b.totalWeights == 0.0 -> a.mean
-                else -> (a.mean * a.totalWeights + b.mean * b.totalWeights) / weights
-            }
-            return WeightedMeanResult(totalWeights = weights, mean = mean)
-        }
-
         /** Empty stats — the default for backends that don't populate. */
         val EMPTY: SolveStats = SolveStats()
     }
@@ -179,31 +103,13 @@ data class SolveStats(
  * worker and merge their [SolveStats] snapshots after.
  */
 internal class SolveStatsSink(val backend: String) {
-    val nodes: CountStat = CountStat()
-    val fails: CountStat = CountStat()
-    val restarts: CountStat = CountStat()
-    val propagations: CountStat = CountStat()
-    val learnedClauses: CountStat = CountStat()
-    val relearned: CountStat = CountStat()
-    val caNotApplicable: CountStat = CountStat()
-    val caNonAsserting: CountStat = CountStat()
-    val caRejectedTrueLit: CountStat = CountStat()
+    val search: SearchStatsSink = SearchStatsSink()
+    val ca: ConflictAnalysisStatsSink = ConflictAnalysisStatsSink()
 
     /** LP-bounding counters + timing; observe via `sink.lp.observeSolve()`, etc. */
     val lp: LpStatsSink = LpStatsSink()
-    val lagrangianPruned: CountStat = CountStat()
-    val energeticPruned: CountStat = CountStat()
-    val peakDepth: MaxStat = MaxStat()
-    val depthMean: MeanStat = MeanStat()
-
-    // Plain accumulators rather than CountStat: move counts reach the millions, so per-event
-    // CountStat.update would be pure overhead — the LS loop sets these in bulk.
-    private var lsMoves: Long = 0L
-    private var lsRestarts: Long = 0L
-    private var lsStalls: Long = 0L
-    private var lsTimeToBestMs: Long = -1L
-    private var lsIncumbentObjective: Double = Double.NaN
-    private var lsIncumbentViolation: Double = Double.NaN
+    val scheduling: SchedulingStatsSink = SchedulingStatsSink()
+    val ls: LocalSearchStatsSink = LocalSearchStatsSink()
 
     private var startMark: TimeMark? = null
     private var endElapsedMs: Long? = null
@@ -218,113 +124,27 @@ internal class SolveStatsSink(val backend: String) {
         endElapsedMs = mark.elapsedNow().inWholeMilliseconds
     }
 
-    /** Convenience: call on every visited decision node so [nodes] increments and
-     *  [peakDepth]/[depthMean] see the depth observation. */
-    fun observeNode(depth: Int) {
-        nodes.update(1.0)
-        peakDepth.update(depth.toDouble())
-        depthMean.update(depth.toDouble())
-    }
-
-    fun observeFail() {
-        fails.update(1.0)
-    }
-    fun observeRestart() {
-        restarts.update(1.0)
-    }
-    fun observePropagation(count: Long = 1L) {
-        // CountStat is unweighted-count-per-call; for batched propagation events pass count
-        // > 1 by looping or by switching this field to SumStat later. For now batch-as-one.
-        if (count == 1L) {
-            propagations.update(1.0)
-        } else {
-            repeat(count.toInt()) { propagations.update(1.0) }
-        }
-    }
-    fun observeLearn(count: Long = 1L) {
-        if (count == 1L) {
-            learnedClauses.update(1.0)
-        } else {
-            repeat(count.toInt()) { learnedClauses.update(1.0) }
-        }
-    }
-
-    /** Conflict analysis re-derived a clause identical to one it already produced — a
-     *  livelock indicator when it grows large relative to [learnedClauses]. */
-    fun observeRelearn() {
-        relearned.update(1.0)
-    }
-    fun observeCaNotApplicable() {
-        caNotApplicable.update(1.0)
-    }
-    fun observeCaNonAsserting() {
-        caNonAsserting.update(1.0)
-    }
-    fun observeCaRejectedTrueLit() {
-        caRejectedTrueLit.update(1.0)
-    }
-
-    /** A node whose subtree was cut by the Lagrangian bound (#23). */
-    fun observeLagrangianPrune() {
-        lagrangianPruned.update(1.0)
-    }
-
-    /** A node whose subtree was cut by the Cumulative energetic check (#22/#23). */
-    fun observeEnergeticPrune() {
-        energeticPruned.update(1.0)
-    }
-
-    /** Record the LS engine's move / restart / stall totals in one call at loop exit; cheaper than
-     *  per-event updates when moves run to the millions. */
-    fun recordLsWork(moves: Long, restarts: Long, stalls: Long) {
-        lsMoves = moves
-        lsRestarts = restarts
-        lsStalls = stalls
-    }
-
-    /** Record the LS incumbent fingerprint: its objective (NaN if never feasible), its residual
-     *  violation (0 once feasible), and the wall ms at which it was found (-1 if no incumbent). */
-    fun recordLsIncumbent(objective: Double, violation: Double, foundAtMs: Long) {
-        lsIncumbentObjective = objective
-        lsIncumbentViolation = violation
-        lsTimeToBestMs = foundAtMs
-    }
-
     /** Elapsed ms since [start] — used by the LS loop to stamp time-to-best as incumbents land. */
     fun elapsedMs(): Long = startMark?.elapsedNow()?.inWholeMilliseconds ?: 0L
 
-    /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time
-     *  uses the most recent [start] / [stop] window; if [stop] hasn't been called yet, we
-     *  read the elapsed time from now. */
+    /** Snapshot the current accumulator state into an immutable [SolveStats]. Wall time uses the most
+     *  recent [start] / [stop] window; if [stop] hasn't been called yet, elapsed is read from now. */
     fun snapshot(): SolveStats {
         val elapsedMs = endElapsedMs
             ?: startMark?.elapsedNow()?.inWholeMilliseconds
             ?: 0L
+        // LS folds its restart count into the shared search restarts field (it never touches the search
+        // CountStat); complete backends report their own.
+        val searchStats = search.snapshot().let {
+            if (ls.restarts > 0L) it.copy(restarts = SumResult(ls.restarts.toDouble())) else it
+        }
         return SolveStats(
-            backend = backend,
-            nodes = nodes.read(),
-            fails = fails.read(),
-            // LS folds its restart count in here (it never touches the CountStat path); complete
-            // backends report their own restarts CountStat.
-            restarts = if (lsRestarts > 0L) SumResult(lsRestarts.toDouble()) else restarts.read(),
-            propagations = propagations.read(),
-            learnedClauses = learnedClauses.read(),
-            relearned = relearned.read(),
-            caNotApplicable = caNotApplicable.read(),
-            caNonAsserting = caNonAsserting.read(),
-            caRejectedTrueLit = caRejectedTrueLit.read(),
+            run = RunStats(backend = backend, wallMs = elapsedMs, timedOut = timedOut),
+            search = searchStats,
+            ca = ca.snapshot(),
             lp = lp.snapshot(),
-            lagrangianPruned = lagrangianPruned.read(),
-            energeticPruned = energeticPruned.read(),
-            moves = SumResult(lsMoves.toDouble()),
-            stalls = SumResult(lsStalls.toDouble()),
-            timeToBestMs = lsTimeToBestMs,
-            incumbentObjective = lsIncumbentObjective,
-            incumbentViolation = lsIncumbentViolation,
-            peakDepth = peakDepth.read(),
-            depthMean = depthMean.read(),
-            wallMs = elapsedMs,
-            timedOut = timedOut,
+            scheduling = scheduling.snapshot(),
+            ls = ls.snapshot(),
         )
     }
 }

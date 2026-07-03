@@ -320,8 +320,8 @@ class LocalSearchSolver(
                             // Record at first feasibility, not in `finally`: the `firstOrNull` consumer
                             // suspends this coroutine at the `yield` below and never resumes it, so
                             // `finally` would not fire on the success path.
-                            sink?.recordLsWork(moves = moves, restarts = restartCount, stalls = 0L)
-                            sink?.recordLsIncumbent(
+                            sink?.ls?.recordWork(moves = moves, restarts = restartCount, stalls = 0L)
+                            sink?.ls?.recordIncumbent(
                                 objective = Double.NaN,
                                 violation = 0.0,
                                 foundAtMs = sink.elapsedMs(),
@@ -374,8 +374,8 @@ class LocalSearchSolver(
                 // yield above and suspends there). Report the lowest residual cost as the incumbent
                 // violation so an UNKNOWN run still shows how close it got.
                 if (!everFeasible) {
-                    sink?.recordLsWork(moves = moves, restarts = restartCount, stalls = 0L)
-                    sink?.recordLsIncumbent(objective = Double.NaN, violation = bestCost.toDouble(), foundAtMs = -1L)
+                    sink?.ls?.recordWork(moves = moves, restarts = restartCount, stalls = 0L)
+                    sink?.ls?.recordIncumbent(objective = Double.NaN, violation = bestCost.toDouble(), foundAtMs = -1L)
                 }
             }
         }
@@ -592,13 +592,13 @@ class LocalSearchSolver(
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
         sink.stop()
         sink.timedOut = reason == TerminationReason.BudgetExhausted
-        sink.recordLsWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
+        sink.ls.recordWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
         // Feasible incumbent → violation 0 at bestObj; else carry the lowest residual cost reached.
         // Long.MAX_VALUE means we never improved on the initial assignment, so leave violation NaN.
         if (bestSample != null) {
-            sink.recordLsIncumbent(objective = bestObj, violation = 0.0, foundAtMs = bestFoundAtMs)
+            sink.ls.recordIncumbent(objective = bestObj, violation = 0.0, foundAtMs = bestFoundAtMs)
         } else if (bestCostInfeasible != Long.MAX_VALUE) {
-            sink.recordLsIncumbent(
+            sink.ls.recordIncumbent(
                 objective = Double.NaN,
                 violation = bestCostInfeasible.toDouble(),
                 foundAtMs = -1L,

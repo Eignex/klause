@@ -233,7 +233,7 @@ internal fun BacktrackSolver.driveSearch(
         var h = 0L
         for (lit in learned.literals) h += splitmix64(lit.toLong())
         val n = relearnCounts.addTo(h, 1)
-        if (n > 1) sink?.observeRelearn()
+        if (n > 1) sink?.search?.observeRelearn()
         n > RELEARN_FALLBACK_THRESHOLD
     }
 
@@ -359,7 +359,7 @@ internal fun BacktrackSolver.driveSearch(
                 // of the learned DB can be strengthened against clean assumptions (#203).
                 if (vivifyEnabled) vivifyCursor = vivify(session, params, vivifyCursor)
                 val restartIndex = restart.onRestart()
-                sink?.observeRestart()
+                sink?.search?.observeRestart()
                 params.onEvent?.invoke(SearchEvent.Restart(restartIndex, decisionsThisRun))
                 continue@outer
             }
@@ -386,7 +386,7 @@ internal fun BacktrackSolver.driveSearch(
                     AdvanceOutcome.Success -> {
                         phase.capture(varRef, session)
                         trail.add(node)
-                        sink?.observeNode(trail.size)
+                        sink?.search?.observeNode(trail.size)
                         phase.captureTargetIfDeeper(session, trail.size)
                     }
 

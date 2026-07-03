@@ -11,11 +11,12 @@ class SolveStatsMergeTest {
 
     private fun stats(backend: String, nodes: Double, peak: Double, weights: Double, mean: Double, wallMs: Long) =
         SolveStats(
-            backend = backend,
-            nodes = SumResult(nodes),
-            peakDepth = MaxResult(peak),
-            depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
-            wallMs = wallMs,
+            run = RunStats(backend = backend, wallMs = wallMs),
+            search = SearchStats(
+                nodes = SumResult(nodes),
+                peakDepth = MaxResult(peak),
+                depthMean = WeightedMeanResult(totalWeights = weights, mean = mean),
+            ),
         )
 
     @Test
@@ -30,20 +31,20 @@ class SolveStatsMergeTest {
         val a = stats("backtrack", nodes = 10.0, peak = 4.0, weights = 10.0, mean = 2.0, wallMs = 7L)
         val b = stats("ls", nodes = 5.0, peak = 9.0, weights = 30.0, mean = 6.0, wallMs = 3L)
         val m = a.mergedWith(b)
-        assertEquals(15.0, m.nodes.sum)
-        assertEquals(9.0, m.peakDepth.max)
-        assertEquals(40.0, m.depthMean.totalWeights)
+        assertEquals(15.0, m.search.nodes.sum)
+        assertEquals(9.0, m.search.peakDepth.max)
+        assertEquals(40.0, m.search.depthMean.totalWeights)
         // (2*10 + 6*30) / 40 = 5
-        assertEquals(5.0, m.depthMean.mean)
-        assertEquals(7L, m.wallMs)
-        assertEquals("mixed", m.backend)
-        assertEquals("backtrack", a.mergedWith(a).backend)
+        assertEquals(5.0, m.search.depthMean.mean)
+        assertEquals(7L, m.run.wallMs)
+        assertEquals("mixed", m.run.backend)
+        assertEquals("backtrack", a.mergedWith(a).run.backend)
     }
 
     @Test
     fun `lp counters add and root bound takes the tightest finite`() {
         val a = SolveStats(
-            backend = "backtrack",
+            run = RunStats(backend = "backtrack"),
             lp = LpStats(
                 solves = SumResult(8.0),
                 pruned = SumResult(5.0),
@@ -53,7 +54,7 @@ class SolveStatsMergeTest {
             ),
         )
         val b = SolveStats(
-            backend = "backtrack",
+            run = RunStats(backend = "backtrack"),
             lp = LpStats(
                 solves = SumResult(3.0),
                 pruned = SumResult(1.0),
@@ -71,7 +72,9 @@ class SolveStatsMergeTest {
         // NaN root bound defers to the finite side.
         assertEquals(
             12.0,
-            a.mergedWith(SolveStats(backend = "backtrack", lp = LpStats(solves = SumResult(1.0)))).lp.rootBound,
+            a.mergedWith(
+                SolveStats(run = RunStats(backend = "backtrack"), lp = LpStats(solves = SumResult(1.0))),
+            ).lp.rootBound,
         )
     }
 
@@ -80,7 +83,7 @@ class SolveStatsMergeTest {
         val a = stats("ls", nodes = 0.0, peak = Double.NEGATIVE_INFINITY, weights = 0.0, mean = Double.NaN, wallMs = 5L)
         val b = stats("ls", nodes = 2.0, peak = 3.0, weights = 4.0, mean = 1.5, wallMs = 1L)
         val m = a.mergedWith(b)
-        assertEquals(1.5, m.depthMean.mean)
-        assertTrue(m.timedOut.not())
+        assertEquals(1.5, m.search.depthMean.mean)
+        assertTrue(m.run.timedOut.not())
     }
 }

@@ -305,8 +305,8 @@ class PortfolioTest {
             val r = p.minimize(cancellation = { sawOptimum.load() || fallback.hasPassedNow() })
             assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
             // Worker stats fold into the verdict: a mixed pool degrades the backend tag.
-            assertEquals("mixed", r.stats.backend)
-            assertTrue(r.stats.wallMs >= 0L)
+            assertEquals("mixed", r.stats.run.backend)
+            assertTrue(r.stats.run.wallMs >= 0L)
         }
     }
 

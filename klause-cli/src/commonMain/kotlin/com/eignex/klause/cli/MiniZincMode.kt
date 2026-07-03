@@ -155,22 +155,27 @@ internal class MiniZincOutput : OutputProtocol {
         println("%%%mzn-stat: solutions=$solutions")
         // Presolve summary is backend-independent (presolve runs before any engine), so emit it here.
         for ((k, v) in presolveStatPairs(stats)) println("%%%mzn-stat: $k=$v")
-        if (stats.backend.isNotEmpty()) {
+        if (stats.run.backend.isNotEmpty()) {
             // Complete (backtrack/CDCL) counters are meaningful only when the systematic engine did work;
             // a pure-LS solve has none, so its block stays empty rather than a wall of zeros. A `mixed`
             // portfolio with a backtrack arm reports them alongside the LS block below.
-            val complete = stats.nodes.sum > 0.0 || stats.propagations.sum > 0.0 || stats.backend == "backtrack"
+            val complete =
+                stats.search.nodes.sum > 0.0 || stats.search.propagations.sum > 0.0 || stats.run.backend == "backtrack"
             if (complete) {
-                println("%%%mzn-stat: nodes=${stats.nodes.sum.toLong()}")
-                println("%%%mzn-stat: failures=${stats.fails.sum.toLong()}")
-                println("%%%mzn-stat: restarts=${stats.restarts.sum.toLong()}")
-                println("%%%mzn-stat: propagations=${stats.propagations.sum.toLong()}")
-                println("%%%mzn-stat: learned=${stats.learnedClauses.sum.toLong()}")
-                println("%%%mzn-stat: relearned=${stats.relearned.sum.toLong()}")
-                println("%%%mzn-stat: caNotApplicable=${stats.caNotApplicable.sum.toLong()}")
-                println("%%%mzn-stat: caNonAsserting=${stats.caNonAsserting.sum.toLong()}")
-                println("%%%mzn-stat: caRejectedTrueLit=${stats.caRejectedTrueLit.sum.toLong()}")
-                if (stats.peakDepth.max.isFinite()) println("%%%mzn-stat: peakDepth=${stats.peakDepth.max.toLong()}")
+                println("%%%mzn-stat: nodes=${stats.search.nodes.sum.toLong()}")
+                println("%%%mzn-stat: failures=${stats.search.fails.sum.toLong()}")
+                println("%%%mzn-stat: restarts=${stats.search.restarts.sum.toLong()}")
+                println("%%%mzn-stat: propagations=${stats.search.propagations.sum.toLong()}")
+                println("%%%mzn-stat: learned=${stats.search.learnedClauses.sum.toLong()}")
+                println("%%%mzn-stat: relearned=${stats.search.relearned.sum.toLong()}")
+                println("%%%mzn-stat: caNotApplicable=${stats.ca.notApplicable.sum.toLong()}")
+                println("%%%mzn-stat: caNonAsserting=${stats.ca.nonAsserting.sum.toLong()}")
+                println("%%%mzn-stat: caRejectedTrueLit=${stats.ca.rejectedTrueLit.sum.toLong()}")
+                if (stats.search.peakDepth.max.isFinite()) {
+                    println(
+                        "%%%mzn-stat: peakDepth=${stats.search.peakDepth.max.toLong()}",
+                    )
+                }
                 for ((k, v) in lpStatPairs(stats)) println("%%%mzn-stat: $k=$v")
             }
             for ((k, v) in lsStatPairs(stats)) println("%%%mzn-stat: $k=$v")

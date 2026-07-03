@@ -313,7 +313,7 @@ internal class LpEngine(
             if (++energeticCheckCounter % params.lpPlan.energeticEvery != 0 || !energeticBoundL.isInfeasible(session)) {
                 return false
             }
-            sink.observeEnergeticPrune()
+            sink.scheduling.observeEnergeticPrune()
             val lpNogoodsL = lpNogoods
             if (lpNogoodsL != null) energeticBoundL.explain(session)?.let { lpNogoodsL.add(it) }
             return true
@@ -336,7 +336,7 @@ internal class LpEngine(
             ) {
                 return false
             }
-            sink.observeEnergeticPrune() // same scheduling-feasibility-prune family
+            sink.scheduling.observeEnergeticPrune() // same scheduling-feasibility-prune family
             val lpNogoodsL = lpNogoods
             if (lpNogoodsL != null) cumulativeFlowBoundL.explain(session)?.let { lpNogoodsL.add(it) }
             return true
@@ -362,7 +362,7 @@ internal class LpEngine(
             )
             return if (res != null) {
                 lagMultipliers = res.multipliers
-                if (res.prune) sink.observeLagrangianPrune()
+                if (res.prune) sink.scheduling.observeLagrangianPrune()
                 res.prune
             } else {
                 false
@@ -389,7 +389,7 @@ internal class LpEngine(
             )
             return if (res != null) {
                 knapsackLagMultipliers = res.multipliers
-                if (res.prune) sink.observeLagrangianPrune()
+                if (res.prune) sink.scheduling.observeLagrangianPrune()
                 res.prune
             } else {
                 false

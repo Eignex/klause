@@ -101,11 +101,11 @@ class LocalSearchImprovementsTest {
         val result = LocalSearchSolver(problem).minimize(obj, LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L))
         val best = assertIs<MinimizeResult.BestFound>(result)
         val stats = best.stats
-        assertEquals("ls", stats.backend)
-        assertTrue(stats.moves.sum > 0.0, "LS must report the moves it applied")
-        assertEquals(best.objective, stats.incumbentObjective, "incumbent objective mirrors the verdict")
-        assertEquals(0.0, stats.incumbentViolation, "a feasible incumbent has zero violation")
-        assertTrue(stats.timeToBestMs >= 0L, "time-to-best is stamped once an incumbent lands")
+        assertEquals("ls", stats.run.backend)
+        assertTrue(stats.ls.moves.sum > 0.0, "LS must report the moves it applied")
+        assertEquals(best.objective, stats.ls.incumbentObjective, "incumbent objective mirrors the verdict")
+        assertEquals(0.0, stats.ls.incumbentViolation, "a feasible incumbent has zero violation")
+        assertTrue(stats.ls.timeToBestMs >= 0L, "time-to-best is stamped once an incumbent lands")
     }
 
     @Test
@@ -116,9 +116,9 @@ class LocalSearchImprovementsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val result = LocalSearchSolver(problem).solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
         val sat = assertIs<SolveResult.Sat>(result)
-        assertEquals("ls", sat.stats.backend)
-        assertEquals(0.0, sat.stats.incumbentViolation, "a satisfied instance has zero violation")
-        assertTrue(sat.stats.incumbentObjective.isNaN(), "no objective is tracked in satisfy mode")
+        assertEquals("ls", sat.stats.run.backend)
+        assertEquals(0.0, sat.stats.ls.incumbentViolation, "a satisfied instance has zero violation")
+        assertTrue(sat.stats.ls.incumbentObjective.isNaN(), "no objective is tracked in satisfy mode")
     }
 
     @Test

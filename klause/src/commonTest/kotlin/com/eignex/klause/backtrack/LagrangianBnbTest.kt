@@ -34,12 +34,12 @@ class LagrangianBnbTest {
         assertEquals(10.0, off.objectiveValue)
         assertEquals(10.0, on.objectiveValue)
         assertTrue(
-            on.stats.lagrangianPruned.sum > 0.0,
-            "expected Lagrangian prunes, got ${on.stats.lagrangianPruned.sum}",
+            on.stats.scheduling.lagrangianPruned.sum > 0.0,
+            "expected Lagrangian prunes, got ${on.stats.scheduling.lagrangianPruned.sum}",
         )
         assertTrue(
-            on.stats.nodes.sum <= off.stats.nodes.sum,
-            "Lagrangian explored more nodes: ${on.stats.nodes.sum} vs ${off.stats.nodes.sum}",
+            on.stats.search.nodes.sum <= off.stats.search.nodes.sum,
+            "Lagrangian explored more nodes: ${on.stats.search.nodes.sum} vs ${off.stats.search.nodes.sum}",
         )
     }
 
@@ -79,6 +79,6 @@ class LagrangianBnbTest {
         ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(lagrangian = true)))
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)
-        assertEquals(0.0, result.stats.lagrangianPruned.sum)
+        assertEquals(0.0, result.stats.scheduling.lagrangianPruned.sum)
     }
 }
