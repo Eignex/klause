@@ -24,7 +24,8 @@ object Presolve {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-    ): PassDelta = AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars, cancellation)
+        sharedIntOcc: SharedIntOccurrence? = null,
+    ): PassDelta = AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars, cancellation, sharedIntOcc)
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): PassDelta =
@@ -40,8 +41,11 @@ object Presolve {
     fun amoCliques(problem: Problem): List<Set<Int>> = PresolveShared.maximalAmoCliques(problem.factors.asList())
 
     /** Duplicate / parallel integer-column aggregation. See [DuplicateColumns]. */
-    fun mergeDuplicateColumns(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
-        DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars)
+    fun mergeDuplicateColumns(
+        problem: Problem,
+        objectiveIntVars: Set<Int> = emptySet(),
+        sharedIntOcc: SharedIntOccurrence? = null,
+    ): PassDelta = DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars, sharedIntOcc)
 
     /** Symmetry breaking by detecting interchangeable variables. See [SymmetryBreaking]. */
     fun breakSymmetries(
