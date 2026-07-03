@@ -105,6 +105,16 @@ class Problem(
      * is redundant and the two can interact.
      */
     val hasSymmetryBreaking: Boolean = false,
+    /**
+     * Presolve pass-view mode. When `true`, this [Problem] is a cheap carrier of `(factors, intDomains)`
+     * for a presolve pass that reads only those two: the eager derived structures — [propagators],
+     * the occurrence lists, and the root [baked] fold — are deferred to first access and NOT forced at
+     * construction, and [intDomains] are taken to be *already folded* (the incremental
+     * [com.eignex.klause.presolve.PresolveSession] supplies its re-propagated domains). Off by
+     * default: every solver/LS/LP consumer builds a normal [Problem] whose [baked] is forced eagerly at
+     * construction exactly as before, so nothing outside presolve sees a behavioural change.
+     */
+    val preFolded: Boolean = false,
 ) {
     /**
      * Domain (bounds) of each integer variable, indexed by int var id. A defensive copy of
@@ -121,7 +131,9 @@ class Problem(
     /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
      *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
      *  return themselves. Computed once at construction. */
-    val propagators: Array<out Propagator> = Array(factors.size) { factors[it].asPropagator() }
+    val propagators: Array<out Propagator> by lazy(LazyThreadSafetyMode.NONE) {
+        Array(factors.size) { factors[it].asPropagator() }
+    }
 
     /** Invariant objects for the LS engine, one per factor. Factors that have been structurally
      *  split return a dedicated invariant instance from [Factor.asInvariant]; unsplit factors
@@ -159,6 +171,7 @@ class Problem(
         cancellation: Cancellation = Cancellation.Never,
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
+        preFolded: Boolean = false,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -173,6 +186,7 @@ class Problem(
         cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
+        preFolded = preFolded,
     )
 
     /**
@@ -180,7 +194,9 @@ class Problem(
      * LS-side lists force [invariants] lazily, so a presolve/CP-only problem never builds them. The
      * individual lists below delegate here; access them by name or through this index directly.
      */
-    val occurrences: OccurrenceIndex = OccurrenceIndex(numBoolVars, numIntVars, factors, propagators) { invariants }
+    val occurrences: OccurrenceIndex by lazy(LazyThreadSafetyMode.NONE) {
+        OccurrenceIndex(numBoolVars, numIntVars, factors, propagators) { invariants }
+    }
 
     /** Deductive occurrence lists over Boolean variables. See [OccurrenceIndex.boolOccurrences]. */
     val boolOccurrences: Array<IntArray> get() = occurrences.boolOccurrences
@@ -222,7 +238,15 @@ class Problem(
      * Re-seeding it on an already-tightened domain is a no-op, so existing consumers that
      * replay [baked] as assumptions are unaffected.
      */
-    val baked: PropagationResult = computeBaked().also(::foldIntoDomains)
+    val baked: PropagationResult by lazy(LazyThreadSafetyMode.NONE) { computeBaked() }
+
+    // Force the root bake and fold its deductions into [intDomains] eagerly — except in [preFolded]
+    // pass-view mode, where the domains are already folded and the deferred derived structures stay
+    // uncomputed. A non-preFolded [Problem] thus behaves exactly as before (baked + folded at
+    // construction); this init access is what forces the otherwise-lazy propagators/occurrences/baked.
+    init {
+        if (!preFolded) foldIntoDomains(baked)
+    }
 
     /** Folds the root-level int deductions of a successful bake into [intDomains] so the
      *  tightened bounds are part of the problem itself rather than transient solver state.
