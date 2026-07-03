@@ -1,9 +1,6 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.propagation.IntEvent
-import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -11,7 +8,6 @@ import com.eignex.klause.propagation.extractConflictBools
 import com.eignex.klause.propagation.extractConflictFactors
 import com.eignex.klause.propagation.extractConflictInts
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
 
 /**
@@ -179,108 +175,37 @@ class Problem(
         hasSymmetryBreaking = hasSymmetryBreaking,
     )
 
-    /** True iff some factor is invariant-only ([NoPropagator]) — skipped by the CP occurrence lists.
-     *  Lazy: only the LS occurrence lists below consult it, so a presolve/CP-only [Problem] never scans. */
-    private val anyPropagatorAbsent: Boolean by lazy { propagators.any { it === NoPropagator } }
-
-    /** True iff some factor is propagator-only ([NoInvariant]) — skipped by the LS occurrence lists.
-     *  Lazy (and triggers [invariants]): only the LS occurrence lists below consult it. */
-    private val anyInvariantAbsent: Boolean by lazy { invariants.any { it === NoInvariant } }
-
-    /** Deductive occurrence lists: factor ids mentioning each Boolean variable, indexed by bool var id,
-     *  excluding invariant-only factors ([NoPropagator]) so CP propagation never wakes them. */
-    val boolOccurrences: Array<IntArray> = invert(numBoolVars, { propagators[it] !== NoPropagator }) { it.boolVars }
-
-    /** Deductive occurrence lists over integer variables; see [boolOccurrences]. */
-    val intOccurrences: Array<IntArray> = invert(numIntVars, { propagators[it] !== NoPropagator }) { it.intVars }
-
-    /** Local-search occurrence lists over Boolean variables, excluding propagator-only factors
-     *  ([NoInvariant]) so a move never touches them. Aliases [boolOccurrences] when no factor splits
-     *  its roles (the common case — both lists are then every factor). Lazy: only the LS engine reads
-     *  these, so a presolve/CP-only [Problem] never builds the LS-side lists. */
-    val lsBoolOccurrences: Array<IntArray> by lazy {
-        if (!anyPropagatorAbsent && !anyInvariantAbsent) {
-            boolOccurrences
-        } else {
-            invert(numBoolVars, { invariants[it] !== NoInvariant }) { it.boolVars }
-        }
-    }
-
-    /** Local-search occurrence lists over integer variables; see [lsBoolOccurrences]. */
-    val lsIntOccurrences: Array<IntArray> by lazy {
-        if (!anyPropagatorAbsent && !anyInvariantAbsent) {
-            intOccurrences
-        } else {
-            invert(numIntVars, { invariants[it] !== NoInvariant }) { it.intVars }
-        }
-    }
-
     /**
-     * [boolOccurrences] minus factors that use per-literal wakeup (see
-     * [Propagator.initialBoolWatchers]). The propagation engine walks this list for
-     * occurrence-driven wakeup, while watcher-using factors are woken via the
-     * per-state [com.eignex.klause.propagation.PropagationState.boolWatchersByLit]
-     * index instead. Identical to [boolOccurrences] when no factor opts in.
+     * Variable → factor occurrence lists, split by engine (CP vs local search) and wakeup mode. The
+     * LS-side lists force [invariants] lazily, so a presolve/CP-only problem never builds them. The
+     * individual lists below delegate here; access them by name or through this index directly.
      */
-    val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
-        val watcherFid = BooleanArray(factors.size)
-        var any = false
-        for (i in propagators.indices) {
-            if (propagators[i].initialBoolWatchers != null) {
-                watcherFid[i] = true
-                any = true
-            }
-        }
-        if (!any) {
-            boolOccurrences
-        } else {
-            Array(numBoolVars) { v ->
-                boolOccurrences[v].filter { !watcherFid[it] }.toIntArray()
-            }
-        }
-    }
+    val occurrences: OccurrenceIndex = OccurrenceIndex(numBoolVars, numIntVars, factors, propagators) { invariants }
 
-    /** True iff some factor opts into typed int-domain event wakeup
-     *  ([Propagator.initialIntEventWatches]). When false, the engine skips all int-event bookkeeping
-     *  and [nonIntEventWatcherIntOccurrences] aliases [intOccurrences]. */
-    val usesIntEventWatchers: Boolean = propagators.any { it.initialIntEventWatches != null }
+    /** Deductive occurrence lists over Boolean variables. See [OccurrenceIndex.boolOccurrences]. */
+    val boolOccurrences: Array<IntArray> get() = occurrences.boolOccurrences
 
-    /** True iff some factor consumes the per-factor dirty-variable delta ([Propagator.consumesIntEventDelta]).
-     *  When false the engine allocates no delta accumulators and the dirty-var bookkeeping is skipped. */
-    val usesIntEventDeltaConsumers: Boolean = propagators.any { it.consumesIntEventDelta }
+    /** Deductive occurrence lists over integer variables. See [OccurrenceIndex.intOccurrences]. */
+    val intOccurrences: Array<IntArray> get() = occurrences.intOccurrences
 
-    /**
-     * [intOccurrences] minus, per variable, the factors that subscribe to a typed int-event on
-     * *that* variable (see [Propagator.initialIntEventWatches]). The propagation engine walks this list
-     * for occurrence-driven int wakeup; a subscribing factor is woken for its subscribed variables
-     * via the per-`(var, kind)`
-     * [com.eignex.klause.propagation.PropagationState.intEventWatchersBySlot] index instead.
-     *
-     * Exclusion is per `(factor, variable)`, not all-or-nothing: a factor that subscribes to events
-     * on variable `a` but not `b` (both in its [Factor.intVars]) is dropped from `a`'s list yet kept
-     * on `b`'s, so `b` still wakes it the normal way. Identical to [intOccurrences] when no factor
-     * opts in.
-     */
-    val nonIntEventWatcherIntOccurrences: Array<IntArray> = if (!usesIntEventWatchers) {
-        intOccurrences
-    } else {
-        // Per factor, the set of int vars it subscribes to an event on — built once in O(Σ watches).
-        // The per-`(var, factor)` exclusion below is then an O(1) membership test, not a linear scan of
-        // the factor's whole watch list: a single wide factor (a linear over thousands of vars watches
-        // every one of them) appears in each of its vars' occurrence lists, so the naive scan was
-        // O(arity²) per such factor — the construction-time wedge that dominated presolve's repeated
-        // problem rebuilds on wide-linear instances.
-        val watchedVarsByFactor = arrayOfNulls<IntHashSet>(factors.size)
-        for (fid in propagators.indices) {
-            val watches = propagators[fid].initialIntEventWatches ?: continue
-            val set = IntHashSet(watches.size)
-            for (w in watches) set.add(IntEvent.intVarOf(w))
-            watchedVarsByFactor[fid] = set
-        }
-        Array(numIntVars) { v ->
-            intOccurrences[v].filter { fid -> watchedVarsByFactor[fid]?.contains(v) != true }.toIntArray()
-        }
-    }
+    /** Local-search occurrence lists over Boolean variables. See [OccurrenceIndex.lsBoolOccurrences]. */
+    val lsBoolOccurrences: Array<IntArray> get() = occurrences.lsBoolOccurrences
+
+    /** Local-search occurrence lists over integer variables. See [OccurrenceIndex.lsIntOccurrences]. */
+    val lsIntOccurrences: Array<IntArray> get() = occurrences.lsIntOccurrences
+
+    /** Occurrence-driven Boolean wakeup lists. See [OccurrenceIndex.nonBoolWatcherBoolOccurrences]. */
+    val nonBoolWatcherBoolOccurrences: Array<IntArray> get() = occurrences.nonBoolWatcherBoolOccurrences
+
+    /** True iff some factor opts into typed int-domain event wakeup. See [OccurrenceIndex.usesIntEventWatchers]. */
+    val usesIntEventWatchers: Boolean get() = occurrences.usesIntEventWatchers
+
+    /** True iff some factor consumes the per-factor dirty-variable delta.
+     *  See [OccurrenceIndex.usesIntEventDeltaConsumers]. */
+    val usesIntEventDeltaConsumers: Boolean get() = occurrences.usesIntEventDeltaConsumers
+
+    /** Occurrence-driven int wakeup lists. See [OccurrenceIndex.nonIntEventWatcherIntOccurrences]. */
+    val nonIntEventWatcherIntOccurrences: Array<IntArray> get() = occurrences.nonIntEventWatcherIntOccurrences
 
     /** Total number of factors. */
     val numFactors: Int get() = factors.size
@@ -765,16 +690,5 @@ class Problem(
             intHoleVarIds = iHoleIds.toIntArray(),
             intHoleValues = iHoleVals.toIntArray(),
         )
-    }
-
-    private inline fun invert(slots: Int, include: (Int) -> Boolean, vars: (Factor) -> IntArray): Array<IntArray> {
-        val counts = IntArray(slots)
-        factors.forEachIndexed { id, f -> if (include(id)) for (v in vars(f)) counts[v]++ }
-        val out = Array(slots) { IntArray(counts[it]) }
-        val cursor = IntArray(slots)
-        factors.forEachIndexed { id, f ->
-            if (include(id)) for (v in vars(f)) out[v][cursor[v]++] = id
-        }
-        return out
     }
 }
