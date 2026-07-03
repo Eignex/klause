@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * SA arms build by label and are in the full pool, and the credit-ranked pool covers every [LsArm]
  * (so adding an arm to the enum without adding it to `ranked` fails here).
  */
-class LocalSearchPortfolioTest {
+class LocalSearchWorkerConfigTest {
 
     @Test
     fun `schedule-diversity SA arms build by label and are in the pool`() {
