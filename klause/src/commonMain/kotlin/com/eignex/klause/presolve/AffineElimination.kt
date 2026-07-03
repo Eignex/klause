@@ -61,9 +61,15 @@ internal object AffineSingletons {
         // membership predicates it runs are answered from the incremental occurrence index.
         // Poll the budget so it stops with the eliminations made so far — sound (the remaining
         // affine-defined variables simply stay and are solved directly).
+        // The candidate scan is lowest-stable-id-first. A fold only changes the content of the factors it
+        // rewrites, so no factor below their minimum id can newly become a candidate; resume the next scan
+        // from that minimum instead of restarting at 0, turning the loop from O(eliminations · factors) into
+        // O(factors + Σ rewrites). Every factor below [scanFrom] is a confirmed non-candidate (unchanged
+        // since it was last examined), so the selection order — and the eliminations — are unchanged.
+        var scanFrom = 0
         while (!cancellation()) {
-            val cand = findAffineCandidate(ws, eliminated, objectiveIntVars, capWide) ?: break
-            foldOutVariable(problem, ws, cand)
+            val cand = findAffineCandidate(ws, scanFrom, eliminated, objectiveIntVars, capWide) ?: break
+            scanFrom = foldOutVariable(problem, ws, cand)
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
         }
@@ -183,6 +189,7 @@ internal object AffineSingletons {
 
     private fun findAffineCandidate(
         ws: WorkingSet,
+        start: Int,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
         capWide: Boolean,
@@ -192,7 +199,7 @@ internal object AffineSingletons {
         // scan each. On a large model that quadratic scan dominated affine elimination; the index makes it
         // linear in x's actual degree. The scan still walks the live factors in stable-id order — the same
         // order a fresh compacted list would present — so it picks candidates in the identical sequence.
-        for (di in 0 until ws.size) {
+        for (di in start until ws.size) {
             val f = ws.factorAt(di) ?: continue
             if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) continue
             for (xi in f.vars.indices) {
@@ -361,12 +368,14 @@ internal object AffineSingletons {
          * equality [c].`defIdx` and rewriting only the factors that mention `x` in place, then appending
          * the domain-bound rows. The def id is tombstoned last so the occurrence scan below still sees it.
          */
-        fun fold(problem: Problem, c: AffineCandidate) {
+        fun fold(problem: Problem, c: AffineCandidate): Int {
             val singlePartner = c.termVars.size == 1
             // Snapshot the occurrence ids of `x` before mutating them: [replace] rewrites x's occurrence
             // list as it goes, and the def id must be skipped rather than folded into itself.
             val occ = intOcc[c.x]
             val toRewrite = IntArray(occ.size) { occ[it] }
+            var minTouched = c.defIdx
+            for (id in toRewrite) if (id < minTouched) minTouched = id
             for (id in toRewrite) {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
@@ -385,6 +394,10 @@ internal object AffineSingletons {
             }
             drop(c.defIdx)
             for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
+            // The lowest stable id whose candidacy this fold can newly establish: only the rewritten
+            // factors (the pivot's occurrences) change content, so no factor below their minimum can
+            // become a candidate. The candidate scan resumes from here instead of restarting at 0.
+            return minTouched
         }
 
         /**
@@ -393,7 +406,7 @@ internal object AffineSingletons {
          * intrinsic to a rename — [Factor.remap] returns a fresh object for every factor — so this stays
          * O(live factors); only `x`'s occurrences migrate to `y`, so the index is patched, not rebuilt.
          */
-        fun alias(problem: Problem, c: AffineCandidate) {
+        fun alias(problem: Problem, c: AffineCandidate): Int {
             val boolMap = IntArray(problem.numBoolVars) { it }
             val intMap = IntArray(problem.numIntVars) { it }
             val y = c.termVars[0]
@@ -417,16 +430,18 @@ internal object AffineSingletons {
             intOcc[c.x].clear()
             drop(c.defIdx)
             for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
+            // A rename rewrites every live factor, so any factor's candidacy can change: rescan from 0.
+            return 0
         }
     }
 
-    /** Drop the defining equality and remove `x`: for the alias case `x = y`, substitute `x → y`
-     *  into every other factor via [Factor.remap] (any factor type); otherwise fold
-     *  `x = constTerm + Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases
-     *  bounds on the term vars keep `x` within its domain. */
-    private fun foldOutVariable(problem: Problem, ws: WorkingSet, c: AffineCandidate) {
+    // Drop the defining equality and remove `x`: for the alias case `x = y`, substitute `x → y` into
+    // every other factor via Factor.remap (any factor type); otherwise fold `x = constTerm +
+    // Σ termCoeffs·termVars` into every other Linear mentioning `x`. In both cases bounds on the term
+    // vars keep `x` within its domain. Returns the lowest stable id whose candidacy the fold can newly
+    // establish — the point the candidate scan may safely resume from (0 for the whole-set alias rename).
+    private fun foldOutVariable(problem: Problem, ws: WorkingSet, c: AffineCandidate): Int =
         if (c.isAlias) ws.alias(problem, c) else ws.fold(problem, c)
-    }
 
     /** [l] with `x` replaced by `constTerm + Σ A_j·y_j`: drop `x`'s term, add `coeff_x·A_j` to each
      *  term var `y_j`, shift the bound by `−coeff_x·constTerm`. The [Linear] constructor re-coalesces
