@@ -99,6 +99,6 @@ class CpToLpRelaxationObjConeTest {
         assertTrue(cone is MinimizeResult.Optimal, "cone-LP solve should be optimal, got $cone")
         assertEquals(12.0, cone.objective, eps, "minimum makespan is the critical-path length")
         assertEquals(baseline.objective, cone.objective, eps, "the cone relaxation must not change the optimum")
-        assertTrue(cone.stats.lpSolves.sum > 0.0, "the cone LP should actually run, got ${cone.stats.lpSolves.sum}")
+        assertTrue(cone.stats.lp.solves.sum > 0.0, "the cone LP should actually run, got ${cone.stats.lp.solves.sum}")
     }
 }

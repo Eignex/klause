@@ -35,8 +35,8 @@ class LpAutoOffTest {
         val res = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
 
         assertTrue(res is MinimizeResult.Infeasible, "pigeonhole is infeasible, got $res")
-        val lpSolves = res.stats.lpSolves.sum
-        val lpPruned = res.stats.lpPruned.sum
+        val lpSolves = res.stats.lp.solves.sum
+        val lpPruned = res.stats.lp.pruned.sum
         val nodes = res.stats.nodes.sum
         assertTrue(lpPruned == 0.0, "the row-less LP should never prune, pruned=$lpPruned")
         assertTrue(nodes > 150, "expected a long search, got $nodes nodes")

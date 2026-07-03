@@ -44,28 +44,35 @@ class SolveStatsMergeTest {
     fun `lp counters add and root bound takes the tightest finite`() {
         val a = SolveStats(
             backend = "backtrack",
-            lpSolves = SumResult(8.0),
-            lpPruned = SumResult(5.0),
-            lpInfeasible = SumResult(2.0),
-            rootLpBound = 12.0,
-            lpMs = 4L,
+            lp = LpStats(
+                solves = SumResult(8.0),
+                pruned = SumResult(5.0),
+                infeasible = SumResult(2.0),
+                rootBound = 12.0,
+                ms = 4L,
+            ),
         )
         val b = SolveStats(
             backend = "backtrack",
-            lpSolves = SumResult(3.0),
-            lpPruned = SumResult(1.0),
-            lpInfeasible = SumResult(1.0),
-            rootLpBound = 15.0,
-            lpMs = 6L,
+            lp = LpStats(
+                solves = SumResult(3.0),
+                pruned = SumResult(1.0),
+                infeasible = SumResult(1.0),
+                rootBound = 15.0,
+                ms = 6L,
+            ),
         )
         val m = a.mergedWith(b)
-        assertEquals(11.0, m.lpSolves.sum)
-        assertEquals(6.0, m.lpPruned.sum)
-        assertEquals(3.0, m.lpInfeasible.sum)
-        assertEquals(15.0, m.rootLpBound) // same root across workers ⇒ tightest finite bound
-        assertEquals(10L, m.lpMs)
+        assertEquals(11.0, m.lp.solves.sum)
+        assertEquals(6.0, m.lp.pruned.sum)
+        assertEquals(3.0, m.lp.infeasible.sum)
+        assertEquals(15.0, m.lp.rootBound) // same root across workers ⇒ tightest finite bound
+        assertEquals(10L, m.lp.ms)
         // NaN root bound defers to the finite side.
-        assertEquals(12.0, a.mergedWith(SolveStats(backend = "backtrack", lpSolves = SumResult(1.0))).rootLpBound)
+        assertEquals(
+            12.0,
+            a.mergedWith(SolveStats(backend = "backtrack", lp = LpStats(solves = SumResult(1.0)))).lp.rootBound,
+        )
     }
 
     @Test

@@ -112,8 +112,8 @@ class CutSearchSeparationTest {
             val b = BacktrackSolver(problem).minimize(obj, withSearch)
             assertTrue(a is MinimizeResult.Optimal && b is MinimizeResult.Optimal)
             assertEquals(a.objective, b.objective, 1e-9, "search separation changed the optimum")
-            val rootSolves = a.stats.lpSolves.sum
-            val searchSolves = b.stats.lpSolves.sum
+            val rootSolves = a.stats.lp.solves.sum
+            val searchSolves = b.stats.lp.solves.sum
             assertTrue(
                 searchSolves != rootSolves,
                 "during-search separation did not change the search: $searchSolves vs $rootSolves",
@@ -154,7 +154,7 @@ class CutSearchSeparationTest {
                             res.objective,
                             1e-9,
                         )
-                        if (res.stats.lpCuts.sum > 0.0) withPool++
+                        if (res.stats.lp.cuts.sum > 0.0) withPool++
                     }
 
                     is MinimizeResult.Infeasible -> assertTrue(brute == null, "solver Infeasible but brute feasible")

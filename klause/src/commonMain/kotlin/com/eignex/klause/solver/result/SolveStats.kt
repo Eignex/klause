@@ -6,9 +6,21 @@ import com.eignex.kumulant.stat.summary.MaxStat
 import com.eignex.kumulant.stat.summary.MeanStat
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.kumulant.stat.summary.WeightedMeanResult
-import kotlinx.serialization.Serializable
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource.Monotonic
+
+/** Zero-count default for [SumResult] stat fields; shared across the stat records in this package. */
+internal val ZERO_COUNT: SumResult = SumResult(sum = 0.0)
+
+/** Empty-max default for [MaxResult] stat fields (no observation yet). */
+internal val NO_MAX: MaxResult = MaxResult(Double.NEGATIVE_INFINITY)
+
+/** Combine two readings under [reduce], treating NaN as "unpopulated" so it defers to a real value. */
+internal inline fun naNDeferring(a: Double, b: Double, reduce: (Double, Double) -> Double): Double = when {
+    a.isNaN() -> b
+    b.isNaN() -> a
+    else -> reduce(a, b)
+}
 
 /**
  * Snapshot of solver-side counters and distributions from a single solve. Carried as a
@@ -33,7 +45,6 @@ import kotlin.time.TimeSource.Monotonic
  *  - **backend tag**: [backend] — short identifier (e.g. `"backtrack"`, `"ls"`) so multi-engine
  *    sweeps can attribute numbers without ambiguity.
  */
-@Serializable
 data class SolveStats(
     val backend: String = "",
     val nodes: SumResult = ZERO_COUNT,
@@ -52,36 +63,9 @@ data class SolveStats(
     val caNonAsserting: SumResult = ZERO_COUNT,
     /** Conflicts whose asserting clause was rejected because it carried an already-true literal. */
     val caRejectedTrueLit: SumResult = ZERO_COUNT,
-    /** Node LP-bounding passes that built and solved a relaxation — the denominator for the prune /
-     *  fix / pivot rates. `lpPruned` alone is meaningless without knowing how many solves it took. */
-    val lpSolves: SumResult = ZERO_COUNT,
-    /** Nodes pruned by the LP-relaxation bound (#20): infeasible relaxation or bound ≥ incumbent.
-     *  Split into [lpInfeasible] (relaxation infeasible) and the remainder (bound dominated). */
-    val lpPruned: SumResult = ZERO_COUNT,
-    /** Subset of [lpPruned] where the relaxation itself was infeasible (a feasibility filter, not a
-     *  bound); `lpPruned − lpInfeasible` is the bound-dominated count. */
-    val lpInfeasible: SumResult = ZERO_COUNT,
-    /** Root-node LP relaxation objective (the live dual bound at decision level 0), or NaN when the
-     *  LP never solved at the root. Against the final objective this is the integrality gap — the
-     *  most direct measure of relaxation tightness. */
-    val rootLpBound: Double = Double.NaN,
-    /** Wall time (ms) spent inside LP bounding — the cost side of the LP ROI (benefit = prunes/fixes). */
-    val lpMs: Long = 0L,
-    /** Domain reductions applied by LP reduced-cost fixing (#21). */
-    val lpFixed: SumResult = ZERO_COUNT,
-    /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
-    val lpPivots: SumResult = ZERO_COUNT,
-    /** Max sparse-LU fill ratio `(nnz L+U)/nnz B` over all factorizations (#27); >1 = fill-in growth. */
-    val lpLuMaxFill: MaxResult = NO_MAX,
-    /** Max sparse-LU density `(nnz L+U)/m²`; approaching 1.0 means the LU filled in to effectively dense. */
-    val lpLuMaxDensity: MaxResult = NO_MAX,
-    /** LP cuts added by separators (#22). */
-    val lpCuts: SumResult = ZERO_COUNT,
-    /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate (#280). */
-    val lpBackjumps: SumResult = ZERO_COUNT,
-    /** Node LP solves that started from a seeded tableau (the cheapest warm start) instead of a
-     *  basis reload or cold start — the hot-tableau hit rate. */
-    val lpSeeded: SumResult = ZERO_COUNT,
+    /** LP-relaxation bounding counters (#20-#280): solves, prunes, fixes, pivots, cuts, and the root
+     *  bound. See [LpStats]. */
+    val lp: LpStats = LpStats(),
     /** Nodes pruned by the Lagrangian bound (#23). */
     val lagrangianPruned: SumResult = ZERO_COUNT,
     /** Nodes pruned by the Cumulative energetic-reasoning check (#22/#23). */
@@ -130,19 +114,7 @@ data class SolveStats(
             caNotApplicable = sum { caNotApplicable },
             caNonAsserting = sum { caNonAsserting },
             caRejectedTrueLit = sum { caRejectedTrueLit },
-            lpSolves = sum { lpSolves },
-            lpPruned = sum { lpPruned },
-            lpInfeasible = sum { lpInfeasible },
-            // Same root across workers, so the tightest finite bound represents it; NaN defers.
-            rootLpBound = naNDeferring(rootLpBound, other.rootLpBound, ::maxOf),
-            lpMs = lpMs + other.lpMs,
-            lpFixed = sum { lpFixed },
-            lpPivots = sum { lpPivots },
-            lpLuMaxFill = max { lpLuMaxFill },
-            lpLuMaxDensity = max { lpLuMaxDensity },
-            lpCuts = sum { lpCuts },
-            lpBackjumps = sum { lpBackjumps },
-            lpSeeded = sum { lpSeeded },
+            lp = lp.mergedWith(other.lp),
             lagrangianPruned = sum { lagrangianPruned },
             energeticPruned = sum { energeticPruned },
             moves = sum { moves },
@@ -173,9 +145,6 @@ data class SolveStats(
 
     /** Shared empty/default [SolveStats] instances. */
     companion object {
-        internal val ZERO_COUNT: SumResult = SumResult(sum = 0.0)
-        internal val NO_MAX: MaxResult = MaxResult(Double.NEGATIVE_INFINITY)
-
         /** Of two (violation, objective) pairs, return the objective paired with the lower violation
          *  (closer to feasible); NaN violation defers to the other side, ties keep the left objective. */
         private fun pickByViolation(violA: Double, objA: Double, violB: Double, objB: Double): Double = when {
@@ -183,13 +152,6 @@ data class SolveStats(
             violB.isNaN() -> objA
             violB < violA -> objB
             else -> objA
-        }
-
-        /** Combine two readings under [reduce], treating NaN as "unpopulated" so it defers to a real value. */
-        private inline fun naNDeferring(a: Double, b: Double, reduce: (Double, Double) -> Double): Double = when {
-            a.isNaN() -> b
-            b.isNaN() -> a
-            else -> reduce(a, b)
         }
 
         /** Weight-combine two depth means; an empty side (zero weight) defers to the other. */
@@ -226,16 +188,9 @@ internal class SolveStatsSink(val backend: String) {
     val caNotApplicable: CountStat = CountStat()
     val caNonAsserting: CountStat = CountStat()
     val caRejectedTrueLit: CountStat = CountStat()
-    val lpSolves: CountStat = CountStat()
-    val lpPruned: CountStat = CountStat()
-    val lpInfeasible: CountStat = CountStat()
-    val lpFixed: CountStat = CountStat()
-    val lpPivots: CountStat = CountStat()
-    val lpLuMaxFill: MaxStat = MaxStat()
-    val lpLuMaxDensity: MaxStat = MaxStat()
-    val lpCuts: CountStat = CountStat()
-    val lpBackjumps: CountStat = CountStat()
-    val lpSeeded: CountStat = CountStat()
+
+    /** LP-bounding counters + timing; observe via `sink.lp.observeSolve()`, etc. */
+    val lp: LpStatsSink = LpStatsSink()
     val lagrangianPruned: CountStat = CountStat()
     val energeticPruned: CountStat = CountStat()
     val peakDepth: MaxStat = MaxStat()
@@ -253,10 +208,6 @@ internal class SolveStatsSink(val backend: String) {
     private var startMark: TimeMark? = null
     private var endElapsedMs: Long? = null
 
-    /** Root-node LP bound (NaN until the LP solves at decision level 0); accumulated LP wall time. */
-    private var rootLpBound: Double = Double.NaN
-    private var lpMs: Long = 0L
-    private var lpClock: TimeMark? = null
     var timedOut: Boolean = false
 
     fun start() {
@@ -313,71 +264,6 @@ internal class SolveStatsSink(val backend: String) {
         caRejectedTrueLit.update(1.0)
     }
 
-    /** One node LP-bounding pass that built and solved a relaxation (the rate denominator). */
-    fun observeLpSolve() {
-        lpSolves.update(1.0)
-    }
-
-    /** A node whose subtree was cut by the LP-relaxation bound (#20) because its bound dominated the
-     *  incumbent (or an LP-derived deduction emptied a domain). */
-    fun observeLpPrune() {
-        lpPruned.update(1.0)
-    }
-
-    /** A node pruned because the LP relaxation was infeasible — counted in both [lpPruned] (the
-     *  total) and [lpInfeasible] (the feasibility-filter share). */
-    fun observeLpInfeasiblePrune() {
-        lpPruned.update(1.0)
-        lpInfeasible.update(1.0)
-    }
-
-    /** Record the root-node (decision level 0) LP relaxation objective; last write at the root wins,
-     *  so it reflects the strengthened post-cut bound. Ignored off the root or for a non-finite value. */
-    fun observeRootLpBound(decisionLevel: Int, value: Double) {
-        if (decisionLevel == 0 && value.isFinite()) rootLpBound = value
-    }
-
-    /** Bracket LP-bounding wall time: [lpClockStart] then [lpClockStop] adds the interval to [lpMs]. */
-    fun lpClockStart() {
-        lpClock = Monotonic.markNow()
-    }
-    fun lpClockStop() {
-        val mark = lpClock ?: return
-        lpMs += mark.elapsedNow().inWholeMilliseconds
-        lpClock = null
-    }
-
-    /** One domain reduction applied by LP reduced-cost fixing (#21). */
-    fun observeLpFix() {
-        lpFixed.update(1.0)
-    }
-
-    /** Record [count] dual-simplex pivots from one node LP solve. */
-    fun observeLpPivots(count: Int) {
-        repeat(count) { lpPivots.update(1.0) }
-    }
-
-    /** Record one node LP solve's sparse-LU fill ratio and density (#27 sparsity audit). */
-    fun observeLpLuFill(fill: Double, density: Double) {
-        if (fill > 0.0) lpLuMaxFill.update(fill)
-        if (density > 0.0) lpLuMaxDensity.update(density)
-    }
-
-    /** Record [count] cuts added by separators (#22). */
-    fun observeLpCuts(count: Int) {
-        repeat(count) { lpCuts.update(1.0) }
-    }
-
-    /** A non-chronological backjump driven by an LP infeasibility certificate (#280). */
-    fun observeLpBackjump() {
-        lpBackjumps.update(1.0)
-    }
-
-    /** A node LP solve that started from a seeded tableau instead of a basis/cold reload. */
-    fun observeLpSeeded() {
-        lpSeeded.update(1.0)
-    }
-
     /** A node whose subtree was cut by the Lagrangian bound (#23). */
     fun observeLagrangianPrune() {
         lagrangianPruned.update(1.0)
@@ -427,18 +313,7 @@ internal class SolveStatsSink(val backend: String) {
             caNotApplicable = caNotApplicable.read(),
             caNonAsserting = caNonAsserting.read(),
             caRejectedTrueLit = caRejectedTrueLit.read(),
-            lpSolves = lpSolves.read(),
-            lpPruned = lpPruned.read(),
-            lpInfeasible = lpInfeasible.read(),
-            rootLpBound = rootLpBound,
-            lpMs = lpMs,
-            lpFixed = lpFixed.read(),
-            lpPivots = lpPivots.read(),
-            lpLuMaxFill = lpLuMaxFill.read(),
-            lpLuMaxDensity = lpLuMaxDensity.read(),
-            lpCuts = lpCuts.read(),
-            lpBackjumps = lpBackjumps.read(),
-            lpSeeded = lpSeeded.read(),
+            lp = lp.snapshot(),
             lagrangianPruned = lagrangianPruned.read(),
             energeticPruned = energeticPruned.read(),
             moves = SumResult(lsMoves.toDouble()),
@@ -463,7 +338,6 @@ internal class SolveStatsSink(val backend: String) {
  * the LP proved redundant (max/min over the others); [equalitiesAdded] counts differences the LP proved
  * pinned to a constant and emitted as `=` for affine elimination.
  */
-@Serializable
 data class LpHarvestReport(
     val rootInfeasible: Boolean = false,
     val boundsShaved: Int = 0,
@@ -506,7 +380,6 @@ data class LpHarvestReport(
  * [constraintsRemoved] is the net drop in factor count; [infeasible] flags presolve-proven UNSAT;
  * [lpHarvest] breaks out the LP harvest's own contribution when it fired.
  */
-@Serializable
 data class PresolveStats(
     val passes: List<String> = emptyList(),
     val constraintsRemoved: Int = 0,

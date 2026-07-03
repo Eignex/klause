@@ -126,7 +126,7 @@ internal fun BacktrackSolver.advance(
                 lpLearned.literals.none { session.litTruth(it) == true } &&
                 relearnTripped?.invoke(lpLearned) != true
             ) {
-                sink?.observeLpBackjump()
+                sink?.lp?.observeBackjump()
                 sink?.observeLearn()
                 session.popLast()
                 return AdvanceOutcome.Backjump(lpLearned)

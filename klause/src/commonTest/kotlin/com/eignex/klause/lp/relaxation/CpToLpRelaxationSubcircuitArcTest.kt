@@ -61,6 +61,6 @@ class CpToLpRelaxationSubcircuitArcTest {
         // succ[0] >= 1 forces node 0 included; the cheapest is succ[0] = 1 (e.g. the 2-cycle 0->1->0).
         assertEquals(1.0, lp.objective, 1e-9, "minimum succ[0] under the forced inclusion")
         assertEquals(noLp.objective, lp.objective, 1e-9, "the arc relaxation must not change the optimum")
-        assertTrue(lp.stats.lpSolves.sum > 0.0, "the LP should actually run, got ${lp.stats.lpSolves.sum}")
+        assertTrue(lp.stats.lp.solves.sum > 0.0, "the LP should actually run, got ${lp.stats.lp.solves.sum}")
     }
 }

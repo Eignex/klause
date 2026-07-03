@@ -37,18 +37,18 @@ class LpSuccessStatsTest {
         assertTrue(res is MinimizeResult.Optimal, "expected an optimum, got $res")
         val s = res.stats
 
-        assertTrue(s.lpSolves.sum > 0.0, "no LP solves recorded: lpSolves=${s.lpSolves.sum}")
+        assertTrue(s.lp.solves.sum > 0.0, "no LP solves recorded: lpSolves=${s.lp.solves.sum}")
         // Infeasible prunes are a subset of the total prunes.
         assertTrue(
-            s.lpInfeasible.sum <= s.lpPruned.sum,
-            "lpInfeasible ${s.lpInfeasible.sum} exceeds lpPruned ${s.lpPruned.sum}",
+            s.lp.infeasible.sum <= s.lp.pruned.sum,
+            "lpInfeasible ${s.lp.infeasible.sum} exceeds lpPruned ${s.lp.pruned.sum}",
         )
         // The root bound is a sound lower bound on the minimisation optimum.
-        assertTrue(s.rootLpBound.isFinite(), "root LP bound was not captured")
+        assertTrue(s.lp.rootBound.isFinite(), "root LP bound was not captured")
         assertTrue(
-            s.rootLpBound <= res.objective + 1e-6,
-            "root LP bound ${s.rootLpBound} exceeds optimum ${res.objective}",
+            s.lp.rootBound <= res.objective + 1e-6,
+            "root LP bound ${s.lp.rootBound} exceeds optimum ${res.objective}",
         )
-        assertTrue(s.lpMs >= 0L, "negative LP time ${s.lpMs}")
+        assertTrue(s.lp.ms >= 0L, "negative LP time ${s.lp.ms}")
     }
 }

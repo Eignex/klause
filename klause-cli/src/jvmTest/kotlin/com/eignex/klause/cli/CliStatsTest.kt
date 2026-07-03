@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.kumulant.stat.summary.SumResult
@@ -43,15 +44,17 @@ class CliStatsTest {
     fun `every emitted key is lp-prefixed`() {
         val stats = SolveStats(
             backend = "backtrack",
-            lpSolves = SumResult(8.0),
-            lpPruned = SumResult(5.0),
-            lpInfeasible = SumResult(2.0),
-            lpPivots = SumResult(20.0),
-            lpSeeded = SumResult(4.0),
+            lp = LpStats(
+                solves = SumResult(8.0),
+                pruned = SumResult(5.0),
+                infeasible = SumResult(2.0),
+                pivots = SumResult(20.0),
+                seeded = SumResult(4.0),
+                rootBound = 12.5,
+                ms = 7L,
+            ),
             lagrangianPruned = SumResult(1.0),
             energeticPruned = SumResult(3.0),
-            rootLpBound = 12.5,
-            lpMs = 7L,
         )
         val pairs = lpStatPairs(stats)
         assertTrue(pairs.isNotEmpty())
@@ -62,11 +65,13 @@ class CliStatsTest {
     fun `derived split and rates are correct`() {
         val stats = SolveStats(
             backend = "backtrack",
-            lpSolves = SumResult(8.0),
-            lpPruned = SumResult(5.0),
-            lpInfeasible = SumResult(2.0),
-            lpPivots = SumResult(20.0),
-            rootLpBound = 12.5,
+            lp = LpStats(
+                solves = SumResult(8.0),
+                pruned = SumResult(5.0),
+                infeasible = SumResult(2.0),
+                pivots = SumResult(20.0),
+                rootBound = 12.5,
+            ),
         )
         val m = lpStatPairs(stats).toMap()
         assertEquals("8", m["lpSolves"])
