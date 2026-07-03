@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
 
 /**
@@ -11,11 +12,14 @@ import kotlin.time.TimeSource
  *
  * Usage: `if (poller.due()) { if (token()) …stop…; poller.rearm() }`. Shared by the satisfaction
  * path ([BacktrackSolver] `driveSearch`) and the branch-and-bound engine ([ResumableMinimize]).
+ *
+ * [timeSource] defaults to the monotonic clock; tests inject a `TestTimeSource` to drive the cadence
+ * deterministically.
  */
-internal class DeadlinePoller {
+internal class DeadlinePoller(private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic) {
     private var countdown = 0
     private var interval = 1
-    private var lastMark: TimeSource.Monotonic.ValueTimeMark? = null
+    private var lastMark: ComparableTimeMark? = null
 
     /** True when a deadline poll is due; decrements the per-node countdown. Starts due on the first call. */
     fun due(): Boolean = countdown-- <= 0
@@ -26,7 +30,7 @@ internal class DeadlinePoller {
      * cheap — and reset the countdown. Call only when [due] returned true and the token did not fire.
      */
     fun rearm() {
-        val now = TimeSource.Monotonic.markNow()
+        val now = timeSource.markNow()
         val prev = lastMark
         lastMark = now
         val elapsedMs = if (prev == null) 0L else (now - prev).inWholeMilliseconds
