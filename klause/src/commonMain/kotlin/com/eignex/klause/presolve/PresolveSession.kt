@@ -44,13 +44,24 @@ internal class PresolveSession(private val base: Problem) {
 
     // Working factor set indexed by stable id: `[0, base.factors.size)` are the originals, appended
     // ids are pass-added factors. `null` marks a tombstoned (dropped) id; ids are never renumbered.
+    // Refilled in place on a [reseed] (a domain-widening pass the incremental path can't express).
     private val factors: ArrayList<Factor?> = ArrayList<Factor?>(base.factors.size).apply { addAll(base.factors) }
 
-    private val state = PropagationState(base, Assumptions.None, incremental = true)
+    // The problem the current [state] is baked over: [base] initially, a widening pass's output after a
+    // [reseed]. Its factor count is the stable-id boundary between base and mid-life factors.
+    private var stateProblem: Problem = base
+
+    private var state = PropagationState(base, Assumptions.None, incremental = true)
 
     /** Set once the base bake or a delta re-propagation derives a root contradiction. */
     var infeasible: Boolean = false
         private set
+
+    // Domains as of the last point the problem was still feasible. On infeasibility the reported /
+    // materialized domains are these, not the partially-tightened live ones — mirroring the fresh path,
+    // where `foldIntoDomains` skips on an Unsat bake and the reported span stays at the pre-conflict
+    // domains. Snapshotted at each mutation entry (before its narrowings) and initialised to the base.
+    private var lastFeasibleDomains: Array<IntDomain> = Array(base.numIntVars) { base.intDomains[it] }
 
     init {
         // Establish the base fixpoint on the persistent state. The base [Problem] already folded its
@@ -61,6 +72,20 @@ internal class PresolveSession(private val base: Problem) {
 
     /** Live (non-tombstoned) factors in stable-id order — the current working constraint set. */
     fun liveFactors(): List<Factor> = factors.filterNotNull()
+
+    /** Number of live (non-tombstoned) factors. */
+    val liveFactorCount: Int get() = factors.count { it != null }
+
+    /** Cheap problem-complexity measure mirroring [Presolver]'s fresh-path `complexity`: live constraint
+     *  count plus total int-domain span. Drives the round engine's diminishing-returns abort. */
+    fun complexity(): Long {
+        var c = liveFactorCount.toLong()
+        for (v in 0 until base.numIntVars) {
+            val d = state.intDomains[v]
+            c += d.max.toLong() - d.min.toLong()
+        }
+        return c
+    }
 
     /** The current tightened domain of int var [v] on the persistent state. */
     fun intDomainOf(v: Int): IntDomain = state.intDomains[v]
@@ -74,7 +99,7 @@ internal class PresolveSession(private val base: Problem) {
      * (a conflict on a pushed narrowing or during re-propagation); the session latches [infeasible].
      */
     fun apply(delta: PresolveDelta): Boolean {
-        if (infeasible) return false
+        if (!infeasible) snapshotFeasibleDomains()
         for (id in delta.droppedIds) {
             state.tombstoneFactor(id)
             factors[id] = null
@@ -83,6 +108,15 @@ internal class PresolveSession(private val base: Problem) {
         for (f in delta.addedFactors) {
             addedIds.add(state.addMidlifeFactor(f)) // fid == factors.size at this point
             factors.add(f)
+        }
+        // Once infeasible, the factor changes above are still recorded (the materialized problem's bake
+        // resurfaces the infeasibility) but the conflicted state must not be re-propagated. Thread the
+        // pass's output domains forward as the reported domains so a later pass sees this pass's
+        // narrowings — mirroring the fresh path, which carries each pass's fold-skipped domains to the
+        // next, and keeping domain-pinning passes (dual fixing) converging on an infeasible problem.
+        if (infeasible) {
+            delta.domains?.let { d -> lastFeasibleDomains = Array(base.numIntVars) { d[it] } }
+            return false
         }
         var ok = pushDomainNarrowings(delta.domains)
         if (ok && state.runToFixpoint(allFactors = false, initialFactors = addedIds.toIntArray()) != null) ok = false
@@ -117,10 +151,89 @@ internal class PresolveSession(private val base: Problem) {
         return true
     }
 
-    /** Materialize the final solver [Problem] once: the live factors and the state's tightened int
-     *  domains. Its own bake re-derives the bool pins and any residual tightenings from the factors. */
+    /**
+     * A cheap [Problem] for a pass to read: the live factors and the state's current folded domains,
+     * built in [Problem.preFolded] mode so it never bakes or inverts occurrences. The passes read only
+     * `factors` and `intDomains`, so nothing deferred is ever forced — construction is O(live factors).
+     */
+    fun passInput(): Problem = Problem(
+        numBoolVars = base.numBoolVars,
+        numIntVars = base.numIntVars,
+        // Once infeasible, expose the clean pre-conflict domains — not the partially-tightened live ones
+        // a conflicted re-propagation left — so a later pass sees what the fresh path (fold skipped on an
+        // Unsat bake) would and fires identically.
+        intDomains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] },
+        factors = liveFactors(),
+        preFolded = true,
+    )
+
+    /**
+     * Apply a pass's returned [Problem] to the session incrementally. The pass produced a new factor
+     * list + domains; the delta against the working set is recovered by identity ([Factor] uses
+     * reference equality), then applied via [apply]. A pass that *widens* a domain (dup-columns'
+     * aggregate variable) can't be expressed by monotone re-propagation, so it triggers a [reseed] — a
+     * one-off from-scratch bake over the pass's output, which is exactly the prior per-pass behaviour and
+     * therefore byte-identical. Returns `false` iff infeasibility was proved.
+     */
+    fun applyResult(result: Problem): Boolean {
+        // A domain widen needs a from-scratch reseed — but only while still feasible; on an already
+        // infeasible problem the widen is moot and the factor changes are tracked through [apply] below.
+        if (!infeasible && widensAnyDomain(result.intDomains)) return reseed(result)
+        val liveById = HashMap<Factor, Int>(factors.size)
+        for (id in factors.indices) factors[id]?.let { liveById[it] = id }
+        val kept = HashSet<Int>(result.factors.size)
+        val added = ArrayList<Factor>()
+        for (f in result.factors) {
+            val id = liveById[f]
+            if (id != null) kept.add(id) else added.add(f)
+        }
+        val dropped = IntArrayList()
+        for (id in factors.indices) if (factors[id] != null && id !in kept) dropped.add(id)
+        return apply(PresolveDelta(dropped.toIntArray(), added, result.intDomains))
+    }
+
+    /** Whether [domains] widens any variable past the live state — a value the state currently excludes
+     *  becomes allowed. Monotone re-propagation only narrows, so a widen needs a [reseed] instead. */
+    private fun widensAnyDomain(domains: Array<IntDomain>): Boolean {
+        for (v in 0 until base.numIntVars) {
+            val cur = state.intDomains[v]
+            val target = domains[v]
+            if (target.min < cur.min || target.max > cur.max || target.size > cur.size) return true
+        }
+        return false
+    }
+
+    /** Rebuild the persistent state from scratch over [result] (fresh eager bake). Used only when a pass
+     *  widens a domain; correct because it reproduces the exact from-scratch problem for that transition. */
+    private fun reseed(result: Problem): Boolean {
+        val eager = PresolveShared.rebuildProblem(
+            base,
+            result.factors.toList(),
+            Array(base.numIntVars) { result.intDomains[it] },
+        )
+        stateProblem = eager
+        factors.clear()
+        factors.addAll(eager.factors)
+        state = PropagationState(eager, Assumptions.None, incremental = true)
+        if (state.runToFixpoint(allFactors = true) != null) {
+            infeasible = true
+            return false
+        }
+        return true
+    }
+
+    /** Capture the live domains as the last-feasible snapshot, taken before a mutation's narrowings so
+     *  that if the mutation proves infeasible the reported domains are the pre-conflict ones. */
+    private fun snapshotFeasibleDomains() {
+        lastFeasibleDomains = Array(base.numIntVars) { state.intDomains[it] }
+    }
+
+    /** Materialize the final solver [Problem] once: the live factors and the tightened int domains. On
+     *  infeasibility the pre-conflict [lastFeasibleDomains] are used (the fresh path likewise skips
+     *  folding an Unsat bake); otherwise the state's fully-folded domains. Its own bake re-derives the
+     *  bool pins and any residual tightenings, and surfaces the infeasibility as an Unsat [Problem.baked]. */
     fun materialize(): Problem {
-        val domains = Array(base.numIntVars) { state.intDomains[it] }
-        return PresolveShared.rebuildProblem(base, liveFactors(), domains)
+        val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
+        return PresolveShared.rebuildProblem(stateProblem, liveFactors(), domains)
     }
 }

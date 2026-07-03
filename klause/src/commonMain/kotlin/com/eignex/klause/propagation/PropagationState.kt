@@ -106,6 +106,11 @@ class PropagationState(
      *  mid-life factor subscribing to typed events wakes even when the initial problem had none. */
     private val eventMachineryOn: Boolean = problem.usesIntEventWatchers || incremental
 
+    /** Whether the per-factor dirty-variable delta accumulators are live. On for any problem with a
+     *  delta consumer, and forced on in [incremental] mode so a mid-life factor that consumes the delta
+     *  (a symmetry/structural pass can add e.g. a LexLess) gets its accumulator grown on the fly. */
+    private val deltaMachineryOn: Boolean = problem.usesIntEventDeltaConsumers || incremental
+
     /**
      * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last
      * drained — recorded by `markIntDirty` alongside [dirtyInts] and consumed (then cleared) by
@@ -514,10 +519,24 @@ class PropagationState(
      * subscribed variable wakes the consumer and appends), which is the soundness-critical direction.
      * `null` per non-consuming factor; both arrays are empty when the problem has no consumer.
      */
-    private val eventDirtyVars: Array<IntArrayList?> =
-        if (problem.usesIntEventDeltaConsumers) arrayOfNulls(problem.numFactors) else emptyArray()
-    private val eventDirtyMark: Array<IntHashSet?> =
-        if (problem.usesIntEventDeltaConsumers) arrayOfNulls(problem.numFactors) else emptyArray()
+    // Grow-only (parallel to the factor store): [addMidlifeFactor] appends a slot per new factor so a
+    // mid-life delta consumer's accumulator stays in bounds. Empty when no consumer machinery is live.
+    private val eventDirtyVars: ArrayList<IntArrayList?> =
+        if (deltaMachineryOn) {
+            ArrayList<IntArrayList?>(
+                problem.numFactors,
+            ).apply { repeat(problem.numFactors) { add(null) } }
+        } else {
+            ArrayList()
+        }
+    private val eventDirtyMark: ArrayList<IntHashSet?> =
+        if (deltaMachineryOn) {
+            ArrayList<IntHashSet?>(
+                problem.numFactors,
+            ).apply { repeat(problem.numFactors) { add(null) } }
+        } else {
+            ArrayList()
+        }
 
     /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
@@ -830,7 +849,7 @@ class PropagationState(
         if (eventMachineryOn) {
             propagator.initialIntEventWatches?.let { for (packed in it) intEventWatchersBySlot[packed].add(fid) }
         }
-        if (problem.usesIntEventDeltaConsumers && propagator.consumesIntEventDelta) {
+        if (deltaMachineryOn && propagator.consumesIntEventDelta) {
             eventDirtyVars[fid] = IntArrayList()
             eventDirtyMark[fid] = IntHashSet()
         }
@@ -846,18 +865,23 @@ class PropagationState(
      * `state.refPayload[fid]` access stays in bounds. The factor does NOT fire here; the session drives
      * a [runToFixpoint] afterwards (seeding it via `initialFactor` or `allFactors`).
      *
-     * Only valid in [incremental] mode. Int-event-delta consumers (Table / GCC / Régin / …) are
-     * rejected: presolve never adds one, and supporting one would require growing the per-factor delta
-     * accumulators, which are sized to the initial [Problem.numFactors].
+     * Only valid in [incremental] mode. A factor that consumes the int-event delta (a symmetry or
+     * structural pass can add one) is supported: the per-factor accumulators grow by one slot here so
+     * [registerFactor] can install it, and the delta machinery is always live in incremental mode.
      */
     internal fun addMidlifeFactor(factor: Factor): Int {
         require(incremental) { "mid-life factors require an incremental PropagationState" }
         val prop = factor.asPropagator()
-        require(!prop.consumesIntEventDelta) { "presolve must not add an int-event-delta consumer" }
         val fid = totalFactorCount
         midlifeFactorStore.add(prop)
         midlifeFactorList.add(factor)
         refPayloadStore.add(null)
+        // Grow the delta accumulators in lockstep so a mid-life consumer's `eventDirtyVars[fid]` slot
+        // exists before [registerFactor] populates it (delta machinery is always live in incremental mode).
+        if (deltaMachineryOn) {
+            eventDirtyVars.add(null)
+            eventDirtyMark.add(null)
+        }
         if (prop is ClausePropagator && prop.literals.size == 2) binaryClauseCount++
         registerFactor(fid, prop)
         registerMidlifeOccurrences(fid, factor, prop)

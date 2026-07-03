@@ -59,6 +59,7 @@ internal object CoefficientStrengthening {
             probeBudgetPerVar = problem.probeBudgetPerVar,
             probeTotalBudget = problem.probeTotalBudget,
             probeSeed = problem.probeSeed,
+            preFolded = problem.preFolded,
         )
     }
 
