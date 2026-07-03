@@ -45,7 +45,7 @@ internal class RestartController(private val params: BacktrackParams) {
     fun shouldRestart(decisionsThisRun: Long): Boolean = decisionsThisRun >= perRunBudget || restartRequested
 
     /** Consume a restart once the caller has popped to root: clear the pending flag, advance the Luby
-     *  index, and return the completed run's 1-based index (for [com.eignex.klause.solver.result.SearchEvent.Restart]). */
+     *  index, and return the completed run's 1-based index (for the restart telemetry event). */
     fun onRestart(): Long {
         restartRequested = false
         val completed = lubyIdx
