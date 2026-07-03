@@ -24,13 +24,13 @@ internal object XorUnits {
      * This is idempotent: units already present are not re-added, so the presolve round engine reaches
      * a fixpoint instead of appending duplicates on each round.
      */
-    fun deriveXorUnits(problem: Problem, bakeConfig: BakeConfig = BakeConfig.NONE): Problem {
+    fun deriveXorUnits(problem: Problem): PassDelta {
         val xors = problem.factors.filterIsInstance<Xor>()
-        if (xors.isEmpty()) return problem
+        if (xors.isEmpty()) return PassDelta()
 
         val varOrder = LinkedHashSet<Int>()
         for (x in xors) for (lit in x.literals) varOrder.add(Lit.variable(lit))
-        if (varOrder.isEmpty()) return problem
+        if (varOrder.isEmpty()) return PassDelta()
         val vars = varOrder.toIntArray()
         val colOfVar = MutableIntIntMap(vars.size * 2)
         for (i in vars.indices) colOfVar.put(vars[i], i)
@@ -40,7 +40,7 @@ internal object XorUnits {
         // only their globally-implied root units go underived), mirroring the size guards on the other
         // presolve searches (clique merge, SAC probing). The reduction matters on small parity systems,
         // which stay far under the cap.
-        if (xors.size.toLong() * minOf(xors.size, vars.size) * words > XOR_ELIMINATION_WORK_CAP) return problem
+        if (xors.size.toLong() * minOf(xors.size, vars.size) * words > XOR_ELIMINATION_WORK_CAP) return PassDelta()
         val rows = Array(xors.size) { LongArray(words) }
         val rhs = IntArray(xors.size)
 
@@ -130,7 +130,7 @@ internal object XorUnits {
             }
         }
 
-        if (extra.isEmpty()) return problem
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra, bakeConfig = bakeConfig)
+        if (extra.isEmpty()) return PassDelta()
+        return PassDelta(addedFactors = extra)
     }
 }

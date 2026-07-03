@@ -41,18 +41,24 @@ internal object ImplicationGraph {
         maxCandidates: Int,
         cancellation: Cancellation,
         objectiveBoolVars: Set<Int> = emptySet(),
-        bakeConfig: BakeConfig = BakeConfig.NONE,
-    ): ImplicationReduction {
-        if (problem.numBoolVars == 0) return ImplicationReduction(problem, emptyList())
+    ): PassDelta {
+        if (problem.numBoolVars == 0) return PassDelta()
 
         val implications = harvestImplications(problem, maxCandidates, cancellation)
         val merges = equivalentVariableMerges(problem.numBoolVars, implications, objectiveBoolVars)
 
-        val substituted = if (merges.isEmpty()) problem else applyMerges(problem, merges, bakeConfig)
-        val reduced = dropTransitivelyRedundantBinaries(substituted, bakeConfig)
+        val original = problem.factors.asList()
+        val substituted = if (merges.isEmpty()) original else applyMerges(problem, merges)
+        val reduced = dropTransitivelyRedundantBinaries(problem, substituted)
 
-        if (reduced === problem) return ImplicationReduction(problem, emptyList())
-        return ImplicationReduction(reduced, merges)
+        // A rename/drop leaves survivors identity-equal to inputs; a pure no-op keeps the same list, which
+        // [identityDelta] renders as an empty delta (== the fresh path's `=== problem` fixpoint signal).
+        if (merges.isEmpty() && reduced === original) return PassDelta()
+        return PresolveShared.identityDelta(
+            problem.factors,
+            reduced,
+            reconstruct = ImplicationReduction(merges)::reconstruct,
+        )
     }
 
     /**
@@ -150,7 +156,7 @@ internal object ImplicationGraph {
      *  binary clause that the rename turns into a tautology (`r ⇒ r`). Bool variable count is
      *  preserved; a merged variable simply stops appearing in any factor and is rebuilt on the way
      *  back. */
-    private fun applyMerges(problem: Problem, merges: List<BoolMerge>, bakeConfig: BakeConfig): Problem {
+    private fun applyMerges(problem: Problem, merges: List<BoolMerge>): List<Factor> {
         val boolMap = IntArray(problem.numBoolVars) { it }
         for (m in merges) boolMap[m.from] = m.into
         val intMap = IntArray(problem.numIntVars) { it }
@@ -160,7 +166,7 @@ internal object ImplicationGraph {
             if (remapped is Clause && isTautology(remapped)) continue
             out.add(remapped)
         }
-        return PresolveShared.rebuildProblem(problem, out, bakeConfig = bakeConfig)
+        return out
     }
 
     /** A clause that holds in every assignment because some variable appears in both polarities. */
@@ -180,34 +186,34 @@ internal object ImplicationGraph {
      * redundant exactly when `b` is reachable from `a` over the remaining edges without using this
      * clause's own two edges — propagation then still derives `b` from `a`, so satisfiability and the
      * optimum are untouched. Non-binary factors and unit clauses are always kept; when nothing is
-     * dropped the input problem is returned unchanged (the pass's no-op signal).
+     * dropped [factors] is returned unchanged (identity, the pass's no-op signal).
      */
-    private fun dropTransitivelyRedundantBinaries(problem: Problem, bakeConfig: BakeConfig): Problem {
+    private fun dropTransitivelyRedundantBinaries(problem: Problem, factors: List<Factor>): List<Factor> {
         val binaryIndices = ArrayList<Int>()
-        problem.factors.forEachIndexed { i, f -> if (f is Clause && f.literals.size == 2) binaryIndices.add(i) }
-        if (binaryIndices.size < 2) return problem
+        factors.forEachIndexed { i, f -> if (f is Clause && f.literals.size == 2) binaryIndices.add(i) }
+        if (binaryIndices.size < 2) return factors
 
         val adj = Adjacency(2 * problem.numBoolVars)
         for (i in binaryIndices) {
-            val (a, b) = implicationEdges(problem.factors[i] as Clause)
+            val (a, b) = implicationEdges(factors[i] as Clause)
             adj.addEdge(a.first, a.second)
             adj.addEdge(b.first, b.second)
         }
 
         val drop = HashSet<Int>()
         for (i in binaryIndices) {
-            val clause = problem.factors[i] as Clause
+            val clause = factors[i] as Clause
             val (e1, e2) = implicationEdges(clause)
             // Redundant iff the implication has an alternative path that avoids this clause's own two
             // directed edges. Checking one direction suffices: the contrapositive is reachable iff the
             // forward implication is, so a single source→target search settles the clause.
             if (reachableAvoiding(adj, e1.first, e1.second, e1, e2)) drop.add(i)
         }
-        if (drop.isEmpty()) return problem
+        if (drop.isEmpty()) return factors
 
-        val kept = ArrayList<Factor>(problem.factors.size - drop.size)
-        problem.factors.forEachIndexed { i, f -> if (i !in drop) kept.add(f) }
-        return PresolveShared.rebuildProblem(problem, kept, bakeConfig = bakeConfig)
+        val kept = ArrayList<Factor>(factors.size - drop.size)
+        factors.forEachIndexed { i, f -> if (i !in drop) kept.add(f) }
+        return kept
     }
 
     /** The two implication edges a binary clause `(p ∨ q)` encodes: `¬p -> q` and `¬q -> p`. */
@@ -334,14 +340,11 @@ internal object ImplicationGraph {
 internal class BoolMerge(val from: Int, val into: Int)
 
 /**
- * Reduced problem from [ImplicationGraph.reduce] plus the data to rebuild merged variables. Solve
- * [problem], then pass the solution through [reconstruct] to recover a solution of the original.
+ * The equivalent-literal merges [ImplicationGraph.reduce] made, holding the data to rebuild merged
+ * variables. Pass a solution of the reduced problem through [reconstruct] to recover a solution of the
+ * original.
  */
-class ImplicationReduction internal constructor(
-    /** The problem with equivalent literals collapsed and redundant binaries dropped. */
-    val problem: Problem,
-    private val merges: List<BoolMerge>,
-) {
+internal class ImplicationReduction(private val merges: List<BoolMerge>) {
     /** Recover each merged variable in a solution [sample] by copying its representative's value.
      *  Representatives are never themselves merged away (the smallest id in a component is the rep and
      *  only larger ids merge into it), so a single forward pass suffices. */

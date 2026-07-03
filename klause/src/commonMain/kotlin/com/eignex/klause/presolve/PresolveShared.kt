@@ -8,7 +8,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.IntArrayList
 
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
@@ -116,6 +118,48 @@ internal object PresolveShared {
         val kept = ArrayList<Set<Int>>(sorted.size)
         for (c in sorted) if (kept.none { it.size > c.size && it.containsAll(c) }) kept.add(c)
         return kept
+    }
+
+    /**
+     * Materialize the problem that results from applying [delta] to [this] — the fresh-path counterpart
+     * of [PresolveSession.applyDelta]. The next factor list is [this]'s factors with [PassDelta.droppedIndices]
+     * removed (kept in order) followed by [PassDelta.addedFactors]; the domains are the delta's own
+     * ([PassDelta.domains]) or [this]'s when it leaves them alone. Re-baked eagerly through
+     * [rebuildProblem] (the per-firing-pass rebuild the fresh path always did), so it is a plain solver
+     * [Problem] whose `baked` folds the delta's narrowings and any dependent tightenings.
+     */
+    fun Problem.withPassDelta(delta: PassDelta, bakeConfig: BakeConfig): Problem {
+        val kept = ArrayList<Factor>(factors.size - delta.droppedIndices.size + delta.addedFactors.size)
+        val dropped = if (delta.droppedIndices.isEmpty()) null else delta.droppedIndices.toHashSet()
+        for (i in factors.indices) if (dropped == null || i !in dropped) kept.add(factors[i])
+        kept.addAll(delta.addedFactors)
+        return rebuildProblem(this, kept, delta.domains ?: intDomains.copyOf(), bakeConfig)
+    }
+
+    /**
+     * The [PassDelta] taking [inputFactors] to [out] — a rewritten factor list where every survivor is
+     * identity-equal to an input factor ([Factor] uses reference equality, so a plain [HashMap] keys by
+     * identity). Adds every [out] factor absent from the input; drops every input index whose factor is
+     * not among [out]'s survivors. For passes that rebuild their whole factor list (variable renames,
+     * substitutions) rather than deciding keep/drop per input index.
+     */
+    fun identityDelta(
+        inputFactors: Array<Factor>,
+        out: List<Factor>,
+        domains: Array<IntDomain>? = null,
+        reconstruct: ((Sample) -> Sample)? = null,
+    ): PassDelta {
+        val idByFactor = HashMap<Factor, Int>(inputFactors.size)
+        for (i in inputFactors.indices) idByFactor[inputFactors[i]] = i
+        val kept = HashSet<Int>(out.size)
+        val added = ArrayList<Factor>()
+        for (f in out) {
+            val id = idByFactor[f]
+            if (id != null) kept.add(id) else added.add(f)
+        }
+        val dropped = IntArrayList()
+        for (i in inputFactors.indices) if (i !in kept) dropped.add(i)
+        return PassDelta(dropped.toIntArray(), added, domains, reconstruct)
     }
 
     fun rebuildProblem(

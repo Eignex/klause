@@ -12,7 +12,6 @@ import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.presolve.RootBaker
-import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -291,9 +290,13 @@ internal fun Solvable.presolved(
     val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
     val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
     var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
+    // Presolve's infeasibility verdict, taken from [Presolved.infeasible] (the incremental path defers
+    // the materialized problem's lazy bake past presolve timing, so this must not force `current.baked`).
+    var infeasible = false
     var round = 0
     while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
         val pre = Presolver.run(current, config, context, cancellation)
+        infeasible = infeasible || pre.infeasible
         val harvestResult = harvestParams?.let {
             lpHarvestReporting(pre.problem, objective, it, bakeConfig, cancellation)
         }
@@ -318,7 +321,9 @@ internal fun Solvable.presolved(
     val presolveStats = PresolveStats(
         passes = passes,
         constraintsRemoved = problem.factors.size - current.factors.size,
-        infeasible = current.baked is PropagationResult.Unsat,
+        // From presolve's own verdict (or an LP root-infeasibility), not a forced `current.baked` — the
+        // materialized problem's lazy bake stays out of the presolve timing window.
+        infeasible = infeasible || harvest.rootInfeasible,
         lpHarvest = harvest.takeUnless { it.isEmpty },
     )
     val reconstruct: (Sample) -> Sample = { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }

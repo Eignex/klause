@@ -1,6 +1,10 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -16,6 +20,9 @@ class Presolved(
     /** The problem-stage passes that changed the problem at least once during the run, in first-fire
      *  order — surfaced as presolve statistics (which techniques actually did something). */
     val passesFired: List<PresolvePass> = emptyList(),
+    /** Whether presolve proved the problem infeasible. Surfaced here so the caller need not force the
+     *  materialized [problem]'s lazy `baked` — which the incremental path defers past presolve timing. */
+    val infeasible: Boolean = false,
 )
 
 /**
@@ -44,10 +51,11 @@ class PresolveContext(
      *  partial run only forgoes further reduction, never correctness. [Presolver.run] injects the
      *  round-engine's cancellation here. */
     val cancellation: Cancellation = Cancellation.Never,
-    /** Root-bake probing policy the passes forward into every rebuilt [Problem] (via
-     *  [PresolveShared.rebuildProblem]) so [RootBaker] re-derives the failed-literal / SAC deductions
-     *  each time the working problem changes — the relocation of the kernel's former `probe*` flags into
-     *  the presolve lane. [BakeConfig.NONE] (the default) leaves every rebuild a plain base bake. */
+    /** Root-bake probing policy the round engine threads into the materialization of the transformed
+     *  [Problem] — the fresh path's [PresolveShared.withPassDelta] rebuild and the incremental
+     *  [PresolveSession] — so [RootBaker] re-derives the failed-literal / SAC deductions over the final
+     *  factor set. The relocation of the kernel's former `probe*` flags into the presolve lane;
+     *  [BakeConfig.NONE] (the default) leaves the bake a plain base bake. */
     val bakeConfig: BakeConfig = BakeConfig.NONE,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
@@ -161,10 +169,31 @@ private fun complexity(problem: Problem): Long {
     return c
 }
 
-/** What a [PresolvePass] produced: the (possibly identical) [problem] and, if it changed the
- *  variable mapping, the [reconstruct] that lifts a solution back. `problem === input` signals the
- *  pass was a no-op this round (the engine uses identity to detect the fixpoint). */
-class PassResult(val problem: Problem, val reconstruct: ((Sample) -> Sample)? = null)
+/**
+ * A pass's explicit change to the problem it was given: [droppedIndices] into the input's factor list
+ * (factors removed or replaced), [addedFactors] to append (brand-new or rewritten factors), and
+ * [domains] the pass's directly-derived tightened int domains (or `null` when it leaves domains alone).
+ * A factor rewrite is a drop of its index plus an add of the replacement; a no-op pass returns an
+ * empty [PassDelta] ([isEmpty]), which the round engine treats as the fixpoint signal. [reconstruct]
+ * lifts a solution of the transformed problem back when the pass changed the variable mapping.
+ *
+ * The round engine materializes the next problem from the delta (fresh path) or folds it into the
+ * persistent [PresolveSession] (incremental path); neither rebuilds a whole [Problem] inside the pass.
+ */
+class PassDelta(
+    /** Indices into the input [Problem.factors] that were removed or replaced. */
+    val droppedIndices: IntArray = IntArray(0),
+    /** Brand-new or rewritten factors to append after the kept ones. */
+    val addedFactors: List<Factor> = emptyList(),
+    /** The pass's directly-derived tightened int domains, or `null` when it leaves domains alone. */
+    val domains: Array<IntDomain>? = null,
+    /** Lifts a solution of the transformed problem back to the pass's input, when the pass changed the
+     *  variable mapping (affine / dup-columns / implication merges); `null` for a plain transform. */
+    val reconstruct: ((Sample) -> Sample)? = null,
+) {
+    /** Whether the pass changed nothing this round — the round engine's fixpoint signal. */
+    val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && domains == null
+}
 
 /**
  * The catalogue of presolve passes. Each entry co-locates its metadata with [apply], so adding or
@@ -200,8 +229,7 @@ enum class PresolvePass(
 ) {
     /** GCD + bounded-integer coefficient strengthening (#319 / #372). */
     STRENGTHEN_COEFFICIENTS("strengthen", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.strengthenCoefficients(problem, ctx.bakeConfig))
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.strengthenCoefficients(problem)
     },
 
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
@@ -213,8 +241,7 @@ enum class PresolvePass(
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.deriveXorUnits(problem, ctx.bakeConfig))
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.deriveXorUnits(problem)
     },
 
     /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated
@@ -229,23 +256,15 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
-            val elim = Presolve.eliminateAffineSingletons(
-                problem,
-                ctx.objectiveIntVars,
-                ctx.cancellation,
-                ctx.bakeConfig,
-            )
-            return PassResult(elim.problem, elim::reconstruct)
-        }
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            Presolve.eliminateAffineSingletons(problem, ctx.objectiveIntVars, ctx.cancellation)
     },
 
     /** Constraint subsumption / redundant-constraint removal (#447) — drops duplicate factors and
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.removeRedundantConstraints(problem, ctx.bakeConfig))
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.removeRedundantConstraints(problem)
     },
 
     /** Per-factor structural self-reduction — each factor rewrites itself into simpler / lower-arity
@@ -258,8 +277,7 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.reduceStructural(problem, ctx.bakeConfig))
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.reduceStructural(problem)
     },
 
     /** Duplicate / parallel column aggregation — the column-side mirror of [REMOVE_REDUNDANT]. Folds
@@ -274,10 +292,8 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
-            val merge = Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.bakeConfig)
-            return PassResult(merge.problem, merge::reconstruct)
-        }
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars)
     },
 
     /** Interchangeable-variable / block / value symmetry breaking (#317 / #367 / #373 / #366). */
@@ -289,14 +305,11 @@ enum class PresolvePass(
         autoEligible = true,
         skipAfterEmpty = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(
-            Presolve.breakSymmetries(
-                problem,
-                ctx.objectiveIntVars,
-                ctx.objectiveBoolVars,
-                ctx.cancellation,
-                ctx.bakeConfig,
-            ),
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.breakSymmetries(
+            problem,
+            ctx.objectiveIntVars,
+            ctx.objectiveBoolVars,
+            ctx.cancellation,
         )
     },
 
@@ -311,16 +324,15 @@ enum class PresolvePass(
         autoEligible = false,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars, ctx.bakeConfig))
+            Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars)
     },
 
     /** Dual fixing / dominated-variable reductions (#448) — pins a variable to a bound when the
      *  objective and constraint structure guarantee an optimum there. Solution-set altering, so
      *  auto-disabled for solution-set-sensitive queries. */
     DUAL_FIX("dual-fix", Stage.PROBLEM, PresolveTiming.MEDIUM, preservesSolutionSet = false, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(
-            Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs, ctx.bakeConfig),
-        )
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs)
     },
 
     /** Construction-time failed-literal SAC (#146): folded into `Problem.baked` at build, read via
@@ -332,17 +344,17 @@ enum class PresolvePass(
         true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(problem)
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
     },
 
     /** Construction-time bound SAC. */
     PROBE_INT_BOUNDS("probe-int-bounds", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(problem)
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
     },
 
     /** Construction-time interior-hole SAC; implies [PROBE_INT_BOUNDS]. */
     PROBE_INT_HOLES("probe-int-holes", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(problem)
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
     },
 
     /** Probing to fixpoint: tentatively pin each free Boolean, propagate, and keep only the
@@ -350,7 +362,7 @@ enum class PresolvePass(
      *  common-bound tightenings. Solution-preserving, so it needs no objective-variable exclusion. */
     PROBE("probe", Stage.PROBLEM, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            PassResult(Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never, ctx.bakeConfig))
+            Presolve.probe(problem, PROBE_PASS_MAX_CANDIDATES, Cancellation.Never)
     },
 
     /** Binary implication graph: harvest `lit -> lit` implications by probing-style pinning, collapse
@@ -365,16 +377,12 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext): PassResult {
-            val reduction = Presolve.reduceImplicationGraph(
-                problem,
-                IMPLICATION_GRAPH_MAX_CANDIDATES,
-                Cancellation.Never,
-                ctx.objectiveBoolVars,
-                ctx.bakeConfig,
-            )
-            return PassResult(reduction.problem, reduction::reconstruct)
-        }
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.reduceImplicationGraph(
+            problem,
+            IMPLICATION_GRAPH_MAX_CANDIDATES,
+            Cancellation.Never,
+            ctx.objectiveBoolVars,
+        )
     },
 
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
@@ -392,13 +400,13 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassResult(problem)
+        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
     },
     ;
 
-    /** Transform [problem] under [ctx]. The returned [PassResult.problem] is `=== problem` when the
-     *  pass found nothing to do this round. */
-    abstract fun apply(problem: Problem, ctx: PresolveContext): PassResult
+    /** Transform [problem] under [ctx], returning the change as a [PassDelta] against [problem]'s factor
+     *  list. An empty delta ([PassDelta.isEmpty]) signals the pass found nothing to do this round. */
+    abstract fun apply(problem: Problem, ctx: PresolveContext): PassDelta
 
     /** Where a pass runs. */
     enum class Stage {
@@ -656,11 +664,10 @@ object Presolver {
                 if (ranAtVersion[pass] == version) continue
                 ranAtVersion[pass] = version
                 ranAny = true
-                val before = current
-                val result = pass.apply(current, ctx)
-                if (result.problem !== before) {
-                    current = result.problem
-                    result.reconstruct?.let { reconstructs.add(it) }
+                val delta = pass.apply(current, ctx)
+                if (!delta.isEmpty) {
+                    current = current.withPassDelta(delta, ctx.bakeConfig)
+                    delta.reconstruct?.let { reconstructs.add(it) }
                     fired.add(pass)
                     version++
                 } else if (pass.skipAfterEmpty) {
@@ -685,7 +692,7 @@ object Presolver {
             } else {
                 { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
             }
-        return Presolved(current, reconstruct, fired.toList())
+        return Presolved(current, reconstruct, fired.toList(), current.baked is PropagationResult.Unsat)
     }
 
     /**
@@ -693,7 +700,7 @@ object Presolver {
      * scheduling — priority order, version-stamp fixpoint skip, [PresolvePass.skipAfterEmpty] parking,
      * and the diminishing-returns abort — but a persistent [PresolveSession] absorbs each firing pass's
      * delta instead of rebuilding a [Problem]. Each pass reads a cheap [PresolveSession.passInput] view
-     * and its output is folded back via [PresolveSession.applyResult]; the heavyweight solver [Problem]
+     * and its delta is folded back via [PresolveSession.applyDelta]; the heavyweight solver [Problem]
      * is materialized once at the end.
      */
     private fun runIncremental(
@@ -713,7 +720,7 @@ object Presolver {
         var roundStartComplexity = session.complexity()
         // Infeasibility does not stop the loop, mirroring the fresh path: a pass still fires and records
         // its factors on an already-infeasible problem (e.g. xor-units emitting contradictory units).
-        // [PresolveSession.applyResult] tracks those factor changes but skips re-propagating a conflicted
+        // [PresolveSession.applyDelta] tracks those factor changes but skips re-propagating a conflicted
         // state, and the final materialized problem's bake surfaces the infeasibility.
         while (round < maxRounds && !cancellation()) {
             var ranAny = false
@@ -724,10 +731,10 @@ object Presolver {
                 ranAtVersion[pass] = version
                 ranAny = true
                 val input = session.passInput()
-                val result = pass.apply(input, ctx)
-                if (result.problem !== input) {
-                    result.reconstruct?.let { reconstructs.add(it) }
-                    session.applyResult(result.problem)
+                val delta = pass.apply(input, ctx)
+                if (!delta.isEmpty) {
+                    delta.reconstruct?.let { reconstructs.add(it) }
+                    session.applyDelta(delta)
                     fired.add(pass)
                     version++
                 } else if (pass.skipAfterEmpty) {
@@ -753,6 +760,6 @@ object Presolver {
             } else {
                 { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
             }
-        return Presolved(finalProblem, reconstruct, fired.toList())
+        return Presolved(finalProblem, reconstruct, fired.toList(), session.infeasible)
     }
 }

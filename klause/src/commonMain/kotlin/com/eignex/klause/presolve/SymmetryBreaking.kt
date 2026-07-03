@@ -39,14 +39,13 @@ internal object SymmetryBreaking {
         objectiveIntVars: Set<Int> = emptySet(),
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
-        bakeConfig: BakeConfig = BakeConfig.NONE,
-    ): Problem {
+    ): PassDelta {
         // Symmetry breaking is a one-shot transformation: once a [SymmetryHandling] factor is present
         // the generators have been found and posted. The presolve round engine re-enables this pass
         // whenever another pass changes the problem, but re-running would (a) re-search from scratch and
         // (b) have to remap (conjugate every generator) and re-key the heavy [SymmetryHandling] factor it
         // just added — an O(rounds) blow-up that dominated presolve on symmetric models. So detect once.
-        if (problem.factors.any { it is SymmetryHandling }) return problem
+        if (problem.factors.any { it is SymmetryHandling }) return PassDelta()
 
         // Generator-based detection: individualization–refinement over the unified variable+factor
         // colouring yields verified automorphism generators (catching composite and bool/int-mixed
@@ -61,13 +60,13 @@ internal object SymmetryBreaking {
         val scalarLex = scalarTotalOrders(problem, generators, objectiveIntVars, objectiveBoolVars)
         val valuePins = breakValueSymmetry(problem, objectiveIntVars, cancellation)
         if (generators.isEmpty() && scalarLex.isEmpty() && valuePins.isEmpty()) {
-            return problem
+            return PassDelta()
         }
         val extra = ArrayList<Factor>()
         if (generators.isNotEmpty()) extra.add(SymmetryHandling(generators))
         extra.addAll(scalarLex)
         extra.addAll(valuePins)
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra, bakeConfig = bakeConfig)
+        return PassDelta(addedFactors = extra)
     }
 
     /**
@@ -206,16 +205,12 @@ internal object SymmetryBreaking {
      * Variables in [objectiveIntVars] are excluded (ordering them would change the optimum). Returns
      * the original problem unchanged when nothing is eligible.
      */
-    fun breakValuePrecedence(
-        problem: Problem,
-        objectiveIntVars: Set<Int> = emptySet(),
-        bakeConfig: BakeConfig = BakeConfig.NONE,
-    ): Problem {
+    fun breakValuePrecedence(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta {
         val n = problem.numIntVars
         // A verified orbit is interchangeable; ordering its first occurrences is sound. A
         // fully-internal variable (domain ⊆ orbit) exists only when the orbit equals the whole
         // incidence group, so a split orbit simply posts nothing — never unsound.
-        val orbits = verifiedValueOrbits(problem) ?: return problem
+        val orbits = verifiedValueOrbits(problem) ?: return PassDelta()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
             val orbitSet = orbit.toHashSet()
@@ -230,8 +225,8 @@ internal object SymmetryBreaking {
                 extra.add(ValuePrecede(sortedValues[i], sortedValues[i + 1], seqArray))
             }
         }
-        if (extra.isEmpty()) return problem
-        return PresolveShared.rebuildProblem(problem, problem.factors.toList() + extra, bakeConfig = bakeConfig)
+        if (extra.isEmpty()) return PassDelta()
+        return PassDelta(addedFactors = extra)
     }
 
     /** Refine a domain-incidence candidate [values] into verified-interchangeable value orbits: union
