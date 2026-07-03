@@ -4,10 +4,10 @@ import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `regular(seq, Q, S, d, q0, F)` — the sequence `seq` is accepted by the DFA with

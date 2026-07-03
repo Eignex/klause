@@ -6,17 +6,6 @@ import com.eignex.klause.lp.Linearizer
 import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 
-/** Shared singleton for the empty-int-var-set case. Factors with no variables in one of
- *  the two var spaces (purely-Boolean ones leave [Factor.intVars] empty; purely-integer
- *  ones leave [Factor.boolVars] empty) wire this in instead of allocating their own
- *  per-class empty array. */
-internal val EmptyIntArray: IntArray = IntArray(0)
-
-/** Shared singleton empty `LongArray`, for scratch slots that some code paths leave unused
- *  (e.g. the wide-only term-contribution snapshot in `propagateLinearBounds`) so the
- *  common path binds this instead of allocating. */
-internal val EmptyLongArray: LongArray = LongArray(0)
-
 /**
  * Structural contract for a constraint in [Problem]: variable membership, remapping, and
  * structural identity. The deductive half is [Propagator] (returned by [asPropagator]), the

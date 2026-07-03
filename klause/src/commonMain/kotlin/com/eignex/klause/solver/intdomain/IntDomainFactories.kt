@@ -7,9 +7,10 @@ import com.eignex.klause.util.IntArrayList
 
 /**
  * Build a domain from a non-empty sorted-distinct survivor array. Picks the most compact rep:
- * gap-free ⇒ contiguous; span `<=` [KlauseConfig.bitsetThreshold] ⇒ bitset; otherwise the run list
- * when it is at least as compact as the survivor list (`2·runs <= survivors`), else the survivor
- * list. The array is adopted by-reference for the survivor rep, so callers must not mutate it after.
+ * gap-free ⇒ contiguous; span `<=` [KlauseConfig.bitsetThreshold] ⇒ bitset; the run list when
+ * `2·runs <= survivors`; a bitset when no larger than the survivor list (`2·words <= survivors`), whose
+ * O(1) `contains` beats the survivor list's binary search; else the survivor list. The array is adopted
+ * by-reference for the survivor rep, so callers must not mutate it after.
  */
 internal fun intDomainFromSurvivors(sv: IntArray): IntDomain {
     val s = sv.size
@@ -38,6 +39,14 @@ internal fun intDomainFromSurvivors(sv: IntArray): IntDomain {
         runs[ri++] = runLo
         runs[ri] = sv[s - 1]
         return RunsDomain(newMin, newMax, runs)
+    }
+    // A scattered domain the run list can't compact still prefers a bitset when it is no larger than the
+    // survivor array: O(1) `contains` in place of a binary search, at memory parity.
+    val words = (span + 63) ushr 6
+    if (2 * words <= s) {
+        val bits = LongArray(words)
+        for (i in 0 until s) Bits.set(bits, sv[i] - newMin)
+        return BitsetDomain(newMin, newMax, bits, newMin)
     }
     return SurvivorsDomain(newMin, newMax, sv)
 }
@@ -69,6 +78,17 @@ internal fun intDomainFromRuns(runs: IntArrayList): IntDomain {
         return BitsetDomain(newMin, newMax, bits, newMin)
     }
     if (2 * r <= s) return RunsDomain(newMin, newMax, runs.toIntArray())
+    // Same memory-parity bitset preference as [intDomainFromSurvivors], filled straight from the runs.
+    val words = (span + 63) ushr 6
+    if (2 * words <= s) {
+        val bits = LongArray(words)
+        k = 0
+        while (k < runs.size) {
+            Bits.fillRange(bits, runs[k] - newMin, runs[k + 1] - newMin + 1)
+            k += 2
+        }
+        return BitsetDomain(newMin, newMax, bits, newMin)
+    }
     val sv = IntArray(s)
     var idx = 0
     k = 0

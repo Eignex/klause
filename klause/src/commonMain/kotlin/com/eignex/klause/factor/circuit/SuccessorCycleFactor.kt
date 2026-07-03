@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.util.EmptyIntArray
 
 /** Shared scaffolding for the successor-array cycle factors [Circuit] and [Subcircuit]: LS cost
  *  plumbing plus the domain-range / pigeonhole / cycle-scan pruning helpers. */

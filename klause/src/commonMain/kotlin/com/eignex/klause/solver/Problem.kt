@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
@@ -7,6 +8,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.extractConflictBools
 import com.eignex.klause.propagation.extractConflictFactors
 import com.eignex.klause.propagation.extractConflictInts
+import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -223,6 +226,9 @@ class Problem(
                 "baked holes emptied domain $v despite an Implied bake"
             }
         }
+        // Wide-but-sparse reductions fold by rebuilding the domain from its survivor set directly —
+        // O(survivors), never materializing the O(span) hole set the excludeValues path above would.
+        result.forEachIntSet { v, survivors -> intDomains[v] = intDomainFromSurvivors(survivors) }
     }
 
     /** Merge the presolve-lane [seed] deductions into the kernel's [base] `propagate` bake. An
@@ -294,12 +300,31 @@ class Problem(
         val iMaxVals = IntArrayList(initialCapacity = 8)
         val iHoleIds = IntArrayList(initialCapacity = 8)
         val iHoleVals = IntArrayList(initialCapacity = 8)
+        val iSetKeys = IntArrayList(initialCapacity = 4)
+        val iSetOffsets = IntArrayList(initialCapacity = 4).also { it.add(0) }
+        val iSetVals = IntArrayList(initialCapacity = 8)
         for (v in 0 until numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
                 if (assumptions.intValueOrNull(v) == d.min) continue
                 iKeys.add(v)
                 iVals.add(d.min)
+                continue
+            }
+            // A wide-but-sparse reduction (more holes inside [min, max] than surviving values) records
+            // its survivor set compactly instead of one interior hole per excluded value: for a domain
+            // spanning up to millions but holding a handful of values, per-value holes are O(span) to emit
+            // here and to re-apply when seeding. Restricting to the survivors reproduces the identical
+            // folded domain. Gated on a span past [KlauseConfig.bitsetThreshold] — the width klause already
+            // treats as too wide for a bitset — so narrow reductions keep the plain hole path (their holes
+            // are few and cheap, and the hole path carries the pre-existing-seed dedup the survivor path
+            // omits). A full contiguous domain has `size == span`, so `size <= holes` excludes it anyway.
+            val span = d.max.toLong() - d.min + 1
+            val holeCount = span - d.size
+            if (span > KlauseConfig.current.bitsetThreshold && d.size <= holeCount) {
+                iSetKeys.add(v)
+                d.forEach { iSetVals.add(it) }
+                iSetOffsets.add(iSetVals.size)
                 continue
             }
             // Non-singleton: emit bound tightenings relative to the effective seed bounds.
@@ -348,6 +373,9 @@ class Problem(
             intMaxValues = iMaxVals.toIntArray(),
             intHoleVarIds = iHoleIds.toIntArray(),
             intHoleValues = iHoleVals.toIntArray(),
+            intSetKeys = iSetKeys.toIntArray(),
+            intSetOffsets = if (iSetKeys.isEmpty()) EmptyIntArray else iSetOffsets.toIntArray(),
+            intSetValues = iSetVals.toIntArray(),
         )
     }
 }

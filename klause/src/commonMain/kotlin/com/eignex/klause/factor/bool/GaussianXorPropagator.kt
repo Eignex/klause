@@ -5,8 +5,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevLongArray
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * CP propagator for [GaussianXor]. Constructed by [GaussianXor.asPropagator] and holds the

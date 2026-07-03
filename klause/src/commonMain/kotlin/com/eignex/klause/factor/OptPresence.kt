@@ -2,8 +2,8 @@ package com.eignex.klause.factor
 
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyIntArray
 
 // presents is a parallel array of presence literals; empty = every entry unconditionally present.
 // isDefinitelyPresent/Absent use pinned propagation state (conservative); isPresentInAssignment

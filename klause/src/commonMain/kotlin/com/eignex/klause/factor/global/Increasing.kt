@@ -6,10 +6,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.Linearizer
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `increasing(xs)` — the integer chain `xs(0) ⟨≤|<⟩ xs(1) ⟨≤|<⟩ … ⟨≤|<⟩ xs(n−1)`. [strict] selects

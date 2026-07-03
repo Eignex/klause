@@ -3,8 +3,8 @@ package com.eignex.klause.factor.arithmetic.internals
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.EmptyLongArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 

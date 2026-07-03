@@ -5,8 +5,8 @@ import com.eignex.klause.factor.global.internals.GccPropCache
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.RevIntArray
-import com.eignex.klause.solver.EmptyIntArray
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 
