@@ -449,7 +449,11 @@ internal class ResumableMinimize(
                 restart.recordConflict(out.learned.lbd, trail.size)
                 when (
                     solver.backjumpAndLearn(
-                        out.learned, trail, session, params, alignFirst = false,
+                        out.learned,
+                        trail,
+                        session,
+                        params,
+                        alignFirst = false,
                     )
                 ) {
                     BackjumpTerm.Resume -> {
@@ -537,7 +541,11 @@ internal class ResumableMinimize(
                 restart.recordConflict(out.learned.lbd, trail.size)
                 when (
                     solver.backjumpAndLearn(
-                        out.learned, trail, session, params, alignFirst = true,
+                        out.learned,
+                        trail,
+                        session,
+                        params,
+                        alignFirst = true,
                     )
                 ) {
                     BackjumpTerm.Resume -> {

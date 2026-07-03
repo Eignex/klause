@@ -409,7 +409,11 @@ internal fun BacktrackSolver.driveSearch(
                         // Execute the backjump + learn sequence. On cascading conflict
                         // during assertion, recurse.
                         val term = backjumpAndLearn(
-                            out.learned, trail, session, params, alignFirst = false,
+                            out.learned,
+                            trail,
+                            session,
+                            params,
+                            alignFirst = false,
                         )
                         when (term) {
                             BackjumpTerm.Resume -> {
@@ -483,7 +487,11 @@ internal fun BacktrackSolver.driveSearch(
                         // Else-path: session has been popped below trail.last; align
                         // first (trail.removeAt) then proceed to backjump + learn.
                         val term = backjumpAndLearn(
-                            out.learned, trail, session, params, alignFirst = true,
+                            out.learned,
+                            trail,
+                            session,
+                            params,
+                            alignFirst = true,
                         )
                         when (term) {
                             BackjumpTerm.Resume -> {
