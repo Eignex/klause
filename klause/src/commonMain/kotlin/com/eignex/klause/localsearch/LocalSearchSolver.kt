@@ -466,6 +466,45 @@ class LocalSearchSolver(
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         var lastCheckMs = 0L
+
+        // Restart from [anchor] and re-run the greedy repair sweep under the same gate as the
+        // initial restart above — the pairing every restart site must preserve. Counters and
+        // round bookkeeping stay at the call sites so the hot-loop locals aren't captured.
+        fun restartAndRepair(anchor: Sample?) {
+            restarts.restart(state, anchor)
+            if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+        }
+
+        // One feasible-phase descent attempt: the options in order of informedness, each getting
+        // one chance before falling through to the next. Cheapest first: greedy single-flip, then
+        // CBLS weighted scoring, factor-aware structured moves, then the random pair-swap fallback.
+        // True = a move was committed (feasibility kept, objective improved); false = local optimum.
+        fun tryDescend(): Boolean {
+            val descended = if (shaping.feasibilityGated) {
+                greedyObjectiveStep(state, objective, params.cancellation)
+            } else {
+                shapedDescentStep(state, objective, shaping, params.cancellation)
+            }
+            if (descended) return true
+            // CBLS descent: ask the optimizeStrategy for an objective-improving move. SAT-style
+            // strategies return null at feasibility, so this is a no-op for them.
+            if (descentStrategy != null) {
+                val m = descentStrategy.pickMove(state)
+                if (m != null) {
+                    // Commit only if the move keeps feasibility AND improves the objective — CBLS
+                    // may propose feasibility-breaking moves we don't want in the gated phase.
+                    val baseObj = objective.evaluate(state.assignment)
+                    // Snapshot only to undo a rejected move; both objective reads are live.
+                    val savedSnap = state.assignment.snapshot()
+                    state.apply(m)
+                    if (state.cost == 0L && objective.evaluate(state.assignment) < baseObj) return true
+                    revertMove(state, m, savedSnap)
+                }
+            }
+            if (structuredMoveStep(state, objective, params.cancellation)) return true
+            return pairSwapBudget > 0 && largeEnoughForGreedy &&
+                pairSwapStep(state, objective, pairSwapBudget, params.cancellation)
+        }
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
                 if (params.cancellation()) {
@@ -501,47 +540,7 @@ class LocalSearchSolver(
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }
-                // Descent options in order of informedness; each gets one chance before falling
-                // through to the next, and stalling all of them triggers a restart. Cheapest first:
-                // greedy single-flip, then CBLS weighted scoring, factor-aware structured moves, then
-                // the random pair-swap fallback.
-                val descended = if (shaping.feasibilityGated) {
-                    greedyObjectiveStep(state, objective, params.cancellation)
-                } else {
-                    shapedDescentStep(state, objective, shaping, params.cancellation)
-                }
-                if (descended) {
-                    flipsSinceRestart++
-                    totalFlips++
-                    continue
-                }
-                // CBLS descent: ask the optimizeStrategy for an objective-improving move. SAT-style
-                // strategies return null at feasibility, so this is a no-op for them.
-                if (descentStrategy != null) {
-                    val m = descentStrategy.pickMove(state)
-                    if (m != null) {
-                        // Commit only if the move keeps feasibility AND improves the objective — CBLS
-                        // may propose feasibility-breaking moves we don't want in the gated phase.
-                        val baseObj = objective.evaluate(state.assignment)
-                        // Snapshot only to undo a rejected move; both objective reads are live.
-                        val savedSnap = state.assignment.snapshot()
-                        state.apply(m)
-                        if (state.cost == 0L && objective.evaluate(state.assignment) < baseObj) {
-                            flipsSinceRestart++
-                            totalFlips++
-                            continue
-                        }
-                        revertMove(state, m, savedSnap)
-                    }
-                }
-                if (structuredMoveStep(state, objective, params.cancellation)) {
-                    flipsSinceRestart++
-                    totalFlips++
-                    continue
-                }
-                if (pairSwapBudget > 0 && largeEnoughForGreedy &&
-                    pairSwapStep(state, objective, pairSwapBudget, params.cancellation)
-                ) {
+                if (tryDescend()) {
                     flipsSinceRestart++
                     totalFlips++
                     continue
@@ -549,8 +548,7 @@ class LocalSearchSolver(
                 // A local optimum (all descent steps failed) is infrequent, so snapshotting for the
                 // restart policy here stays off the per-iteration hot path.
                 restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                restarts.restart(state, bestSample)
-                if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                restartAndRepair(bestSample)
                 stallCount++
                 restartCount++
                 flipsSinceRestart = 0
@@ -558,8 +556,7 @@ class LocalSearchSolver(
                 continue
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
-                restarts.restart(state, bestSample ?: bestCostSnap)
-                if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                restartAndRepair(bestSample ?: bestCostSnap)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -571,8 +568,7 @@ class LocalSearchSolver(
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restarts.restart(state, bestSample ?: bestCostSnap)
-                if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                restartAndRepair(bestSample ?: bestCostSnap)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
