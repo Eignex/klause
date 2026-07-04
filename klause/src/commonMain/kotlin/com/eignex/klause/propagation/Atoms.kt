@@ -301,6 +301,44 @@ internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Int): Boole
 }
 
 /**
+ * Wake the order literals crossed by a lower-bound move `oldMin → newMin` under reason [ant]:
+ * `[v ≥ t]` atoms in `(oldMin, newMin]` flip true, `[v ≤ t]` atoms in `[oldMin, newMin)` flip
+ * false, and [eqAction] runs for each `[v = t]` atom in `[oldMin, newMin)` — the single variation
+ * point across the three crossing paths (the single-move path also records the value's death
+ * record; the batch and set-restriction paths just wake false). Inline so the eq callback and the
+ * range visits stay allocation-free. Soundness rests on visiting *every* crossed threshold — a
+ * missed wake strands a stale atom truth (see the [IntEvent] contract).
+ */
+private inline fun PropagationState.wakeMinCrossing(
+    idx: VarAtomIndex,
+    oldMin: Int,
+    newMin: Int,
+    ant: IntArray?,
+    eqAction: (atomId: Int) -> Unit,
+) {
+    atoms.pendingMoveAnt = ant
+    visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
+    visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+    visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1, eqAction)
+}
+
+/** Mirror of [wakeMinCrossing] for an upper-bound move `oldMax → newMax`: `[v ≤ t]` in
+ *  `[newMax, oldMax)` flip true, `[v ≥ t]` in `(newMax, oldMax]` flip false, [eqAction] per
+ *  `[v = t]` in `(newMax, oldMax]`. */
+private inline fun PropagationState.wakeMaxCrossing(
+    idx: VarAtomIndex,
+    newMax: Int,
+    oldMax: Int,
+    ant: IntArray?,
+    eqAction: (atomId: Int) -> Unit,
+) {
+    atoms.pendingMoveAnt = ant
+    visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
+    visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+    visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax, eqAction)
+}
+
+/**
  * After a successful [tightenIntMinImpl] / [tightenIntMaxImpl] / [excludeIntValueImpl]
  * on int var `v`, recompute the truth of every atom that depends on `v`. Atoms whose
  * truth flipped get their level / antecedents updated, and watchers on the now-false
@@ -338,19 +376,13 @@ internal fun PropagationState.propagateAtomsForVar(
     val newMin = d.min
     val newMax = d.max
     if (newMin > oldMin) {
-        atoms.pendingMoveAnt = antFar
-        visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
-        visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id ->
+        wakeMinCrossing(idx, oldMin, newMin, antFar) { id ->
             recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] < reqMin, antNear, antFar)
             wakeAtom(id, false)
         }
     }
     if (newMax < oldMax) {
-        atoms.pendingMoveAnt = antFar
-        visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
-        visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id ->
+        wakeMaxCrossing(idx, newMax, oldMax, antFar) { id ->
             recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] > reqMax, antNear, antFar)
             wakeAtom(id, false)
         }
@@ -387,16 +419,10 @@ internal fun PropagationState.propagateAtomsForExclusionBatch(
     val newMin = d.min
     val newMax = d.max
     if (newMin > oldMin) {
-        atoms.pendingMoveAnt = antMin
-        visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
-        visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+        wakeMinCrossing(idx, oldMin, newMin, antMin) { id -> wakeAtom(id, false) }
     }
     if (newMax < oldMax) {
-        atoms.pendingMoveAnt = antMax
-        visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
-        visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+        wakeMaxCrossing(idx, newMax, oldMax, antMax) { id -> wakeAtom(id, false) }
     }
     if (interiorVals != null) {
         atoms.pendingMoveAnt = interiorAnt
@@ -429,16 +455,10 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
     val newMin = d.min
     val newMax = d.max
     if (newMin > oldMin) {
-        atoms.pendingMoveAnt = ant
-        visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
-        visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+        wakeMinCrossing(idx, oldMin, newMin, ant) { id -> wakeAtom(id, false) }
     }
     if (newMax < oldMax) {
-        atoms.pendingMoveAnt = ant
-        visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
-        visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
-        visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+        wakeMaxCrossing(idx, newMax, oldMax, ant) { id -> wakeAtom(id, false) }
     }
     atoms.pendingMoveAnt = ant
     visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMax) { id ->
