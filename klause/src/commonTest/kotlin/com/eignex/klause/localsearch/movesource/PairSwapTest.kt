@@ -12,12 +12,12 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 
 /**
- * Move-set equivalence gate for [PairSwap]. The reference closure inlines the `pairSwapStep`
- * candidate construction (the two-phase draw+validate); the test asserts [PairSwap.generate] emits
- * the identical eager candidate multiset. The minimize engine's lazy first-improving loop, which
- * calls [PairSwap.drawBoolSwap]/[PairSwap.drawIntSwap], is covered by the engine's own tests.
+ * Move-generation coverage for [PairSwap]. The reference closure encodes the expected construction —
+ * up to [cap] validated bool-pair swaps followed by up to [cap] validated int-pair swaps, each drawn
+ * from two RNG ints and kept only when the pair is non-degenerate and domain-legal — and the test pins
+ * [PairSwap.generate] to that multiset. A second test asserts the source yields swaps on a mixed fixture.
  */
-class PairSwapEquivalenceTest {
+class PairSwapTest {
 
     private val cap = 8
 
@@ -38,8 +38,8 @@ class PairSwapEquivalenceTest {
         state.recompute()
     }
 
-    /** The reference `pairSwapStep` candidate construction, eager-filled. */
-    private fun oldPairSwapFill(state: LocalSearchState, sink: MoveSink) {
+    /** The expected two-phase construction: up to [cap] bool-pair swaps, then up to [cap] int-pair swaps. */
+    private fun expectedPairSwapFill(state: LocalSearchState, sink: MoveSink) {
         val rng = state.rng
         val nBool = state.problem.numBoolVars
         repeat(cap) {
@@ -73,16 +73,16 @@ class PairSwapEquivalenceTest {
     }
 
     @Test
-    fun `PairSwap generate matches the old pairSwapStep construction`() {
+    fun `generate emits the capped bool-then-int swap multiset`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
             assertSourceMatchesGenerator(::mixedProblem, seed, PairSwap(cap), prepare = ::prepare) { state, sink ->
-                oldPairSwapFill(state, sink)
+                expectedPairSwapFill(state, sink)
             }
         }
     }
 
     @Test
-    fun `PairSwap yields swap candidates on the mixed fixture`() {
+    fun `generate yields swap candidates on a mixed bool-int fixture`() {
         val state = freshState(mixedProblem(), 7L).also(::prepare)
         val captured = captureFromSink(state) { sink -> PairSwap(cap).generate(state, sink) }
         assertFalse(captured.isEmpty, "mixed bool/int assignment with distinct values must yield swaps")
