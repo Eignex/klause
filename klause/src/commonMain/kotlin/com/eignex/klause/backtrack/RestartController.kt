@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.util.lubyN
+
 /**
  * Restart *policy* for one backtrack run: the per-run decision budget and the decision of when to
  * cut a run short and pop back to root. Two schedules, selected by [BacktrackParams]:
@@ -51,26 +53,5 @@ internal class RestartController(private val params: BacktrackParams) {
         val completed = lubyIdx
         lubyIdx++
         return completed
-    }
-
-    /**
-     * Luby sequence (Luby-Sinclair-Zuckerman 1993): `1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, …`.
-     * `lubyN(i) = 2^(k-1)` when `i = 2^k − 1`; otherwise `lubyN(i − 2^(k-1) + 1)` where
-     * `k = ⌊log₂(i)⌋ + 1`. Iteratively unwound.
-     */
-    private fun lubyN(idxIn: Long): Long {
-        var i = idxIn
-        var k = 1
-        // Find smallest k such that 2^k > i.
-        while ((1L shl k) <= i) k++
-        // Equivalent to the textbook recurrence; iteratively unwound.
-        while (true) {
-            val pow = 1L shl (k - 1)
-            if (i == (pow shl 1) - 1) return pow
-            // Otherwise i < (pow << 1) - 1; recurse on (i - pow + 1).
-            i = i - pow + 1
-            k = 1
-            while ((1L shl k) <= i) k++
-        }
     }
 }
