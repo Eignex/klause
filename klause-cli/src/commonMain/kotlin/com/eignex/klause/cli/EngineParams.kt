@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.backtrack.selector.Chb
 import com.eignex.klause.backtrack.selector.DomainMaxRegret
@@ -41,6 +42,7 @@ import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.localsearch.strategy.WalkSat
+import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
@@ -62,7 +64,8 @@ import com.eignex.klause.portfolio.PortfolioScenario
  *    arm-family selector (`cbls.break`). Axis numerics `noise`/`cb`/`skew-alpha`/`initial-temp`/
  *    `cooling-rate`/`min-temp`/`smooth-prob`/`smooth-factor`/`tabu-tenure`; portfolio knobs `arms`,
  *    `ls`, `bt`, `seed`, `lambda`; `dry-run` lists the resolved arms instead of solving
- *  - `portfolio`: `arms`, `ls`, `bt`, `seed`, `lambda`
+ *  - `portfolio`: `arms`, `ls`, `bt`, `seed`, `lambda`; `bt-arm=label,label` (cp/mixed only) pins the
+ *    backtrack pool to named catalog arms, the backtrack analogue of `ls`'s `arm=`
  */
 internal class EngineParams(pairs: List<String>) {
     private val map: MutableMap<String, String> = mutableMapOf()
@@ -472,6 +475,7 @@ internal fun buildPortfolioScenario(
     defaultArms: Int,
     lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
     lsPool: List<() -> LsRecipe>? = null,
+    btPool: List<() -> BacktrackRecipe>? = null,
     annotationArm: BacktrackParams? = null,
 ): PortfolioScenario {
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
@@ -506,8 +510,30 @@ internal fun buildPortfolioScenario(
         lsLambda = lambda,
         lpCeiling = lpCeiling,
         lsPool = lsPool,
+        btPool = btPool,
         annotationArm = annotationArm,
     )
+}
+
+/**
+ * Resolve a named backtrack arm pool from `--param bt-arm=label,label` into [BacktrackRecipe] factories
+ * for [PortfolioScenario.btPool], the backtrack analogue of [resolveLsRecipes]. Each label is validated
+ * against [BacktrackCatalog] for [kind] (so a CSP rejects the COP-only LP/LinUCB arms); an unknown label
+ * is a hard usage error. `null` when `bt-arm` is unset — the curated pool is used. The pool is the *set*
+ * of arms; the worker *count* still comes from `arms=`/`bt=`/the default and wraps over it, exactly as
+ * `lsPool` does.
+ */
+internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? {
+    val raw = p.string("bt-arm") ?: return null
+    val labels = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    if (labels.isEmpty()) usageError("bt-arm: expected a comma-separated list of backtrack arm labels")
+    val known = BacktrackCatalog.labels(kind).toSet()
+    for (label in labels) {
+        if (label !in known) {
+            usageError("bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})")
+        }
+    }
+    return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
 }
 
 /** Auto-tuned default arm-pool size, scaling with the core count (#406): [ARMS_PER_CORE] arms per

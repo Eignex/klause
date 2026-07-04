@@ -5,6 +5,7 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * Core/arm decoupling (#406): `-p N` is the core count (drives sequential-vs-parallel), the arm pool
@@ -40,6 +41,17 @@ class PortfolioScenarioCliTest {
     fun `--param arms overrides the pool and is clamped up to the core count`() {
         assertEquals(20, scenario(cores = 4, params = listOf("arms=20")).arms, "explicit override wins")
         assertEquals(8, scenario(cores = 8, params = listOf("arms=2")).arms, "never fewer arms than cores")
+    }
+
+    @Test
+    fun `bt-arm resolves a named backtrack recipe pool, null when unset`() {
+        val pool = resolveBtRecipes(EngineParams(listOf("bt-arm=free,conflictDriven")), Kind.COP)
+        assertEquals(
+            listOf("free", "conflictDriven"),
+            pool?.map { it().label },
+            "bt-arm resolves the named arms in order",
+        )
+        assertNull(resolveBtRecipes(EngineParams(emptyList()), Kind.COP), "no bt-arm keeps the curated pool")
     }
 
     @Test
