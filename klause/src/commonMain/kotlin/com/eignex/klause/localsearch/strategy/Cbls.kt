@@ -62,6 +62,15 @@ fun Cbls(
     frontierMoveCap: Int = 32,
     /** Effective noise while stalled — a hotter random walk to step out of the basin. */
     stallNoise: Double = 0.4,
+    /** Generic score-only pair-swap candidates drawn per feasible pick (`0` = off): the coordinated
+     *  2-flip objective-descent fallback for packing/knapsack plateaus a single flip can't cross. */
+    pairSwapCap: Int = 8,
+    /** Feasible-phase re-sample budget: consecutive picks with no sampled objective-improving move
+     *  tolerated before a restart. CBLS samples its sources, so a `null` pick is usually a draw that
+     *  missed an existing improving move, not a true local optimum — re-sampling this many times (while
+     *  the stall machinery engages) before restarting keeps an unlucky draw from discarding a good
+     *  partial solution. `0` reverts to restart-on-first-miss. */
+    feasibleResampleCap: Int = 32,
     /** **Plateau-buster** (opt-in, `0` = off): cap on stall-gated, score-only same-domain pair-swap
      *  moves — the coordinated exchange equal-coefficient-sum (bacp-style) plateaus need. */
     stallSwapCap: Int = 0,
@@ -114,6 +123,10 @@ fun Cbls(
             add(ConfiguredSource(SatisfiedStructured.elected(implicitStructuredCap), phase = Phase.Infeasible))
         }
         add(ConfiguredSource(ObjectiveSeed()))
+        // Generic pair-swaps: coordinated 2-flips that keep feasibility where no single flip can (the
+        // packing/knapsack plateau escape). ScoreOnly, so one is taken only when it out-scores every
+        // single-move candidate — the objective-descent fallback the engine used to run inline.
+        if (pairSwapCap > 0) add(ConfiguredSource(PairSwap(cap = pairSwapCap)))
         if (stallSwapCap > 0) add(ConfiguredSource(StallSwaps(stallSwapCap), stallGated = true))
         if (stallChainCap > 0) {
             add(ConfiguredSource(EjectionChains(stallChainCap, stallChainDepth), stallGated = true))
@@ -149,7 +162,11 @@ fun Cbls(
         ),
         tabu = tabu,
         perturbation = if (stallKickAfter > 0) StallKickPerturbation(stallKickAfter, stallKickVars) else null,
-        feasibleDescent = FeasibleDescent.StrictGreedy,
+        feasibleDescent = FeasibleDescent.SelfOwned,
+        // Fight infeasibility with WalkSAT noise, but descend the objective strictly: take only
+        // objective-improving feasible moves, restart at a local optimum (the old greedy tail's contract).
+        feasibleAcceptance = AcceptanceRule.GreedyDescent,
+        feasibleResampleCap = feasibleResampleCap,
     )
 }
 

@@ -38,11 +38,10 @@ class LocalSearchWorkerConfigTest {
         // a default descent. Pin the mode each family declares so a regression that silently changes how
         // an arm optimizes (e.g. an SA arm reverting to a plain finder) fails here.
         val byLabel = LsCatalog.auto().associateBy { it.label }
-        // CBLS: engine-driven strict-greedy descent.
-        assertEquals(FeasibleDescent.StrictGreedy, byLabel.getValue("cbls/fixed").feasibleDescent)
-        // SA family: self-owned annealing (Metropolis on the objective).
-        for (label in listOf("sa/fixed", "sa-reheat/fixed", "sa-phased/fixed")) {
-            assertEquals(FeasibleDescent.AnnealSelfOwned, byLabel.getValue(label).feasibleDescent, "'$label'")
+        // CBLS and the SA family both self-own their feasible walk (CBLS descends greedily on its
+        // sources, SA anneals); nothing relies on an engine-side descent.
+        for (label in listOf("cbls/fixed", "sa/fixed", "sa-reheat/fixed", "sa-phased/fixed")) {
+            assertEquals(FeasibleDescent.SelfOwned, byLabel.getValue(label).feasibleDescent, "'$label'")
         }
         // Violation-native finders: ratcheted as a constraint on a COP, pure finders on a CSP.
         assertEquals(FeasibleDescent.RatchetAsConstraint, byLabel.getValue("adaptive-probsat/fixed").feasibleDescent)
