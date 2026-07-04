@@ -15,12 +15,7 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
         "float_lin_ne" -> LinearOp.NE
         else -> failHere("unhandled float linear ${c.name}")
     }
-    if (reified) {
-        val aux = resolveBoolLit(c.args[3])
-        factors.add(ReifiedLinear(Lit.variable(aux), scaled.coeffs, scaled.vars, op, scaled.bound.toInt()))
-    } else {
-        factors.add(Linear(scaled.coeffs, scaled.vars, op, scaled.bound.toInt()))
-    }
+    postLinear(scaled.coeffs, scaled.vars, op, scaled.bound.toInt(), if (reified) resolveBoolLit(c.args[3]) else null)
 }
 
 /** Lower `int2float` as a scaled linear equality on bucket indices. */
@@ -115,40 +110,20 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
         vars = intArrayOf(varSide.varId)
     }
     val finalBound = if (op == LinearOp.LE && strict) scaledBound - 1 else scaledBound
-    if (reified) {
-        val r = resolveBoolLit(c.args[2])
-        factors.add(
-            ReifiedLinear(
-                Lit.variable(r),
-                coeffs,
-                vars,
-                op,
-                finalBound.toInt(),
-            ),
-        )
-    } else {
-        factors.add(Linear(coeffs, vars, op, finalBound.toInt()))
-    }
+    postLinear(coeffs, vars, op, finalBound.toInt(), if (reified) resolveBoolLit(c.args[2]) else null)
 }
 
 /** Strict float linear compare lowered to `<= bound - 1` in scaled space. */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
     val scaled = resolveScaledFloatLinear(c, reified)
     val strictBound = scaled.bound - 1
-    if (reified) {
-        val aux = resolveBoolLit(c.args[3])
-        factors.add(
-            ReifiedLinear(
-                Lit.variable(aux),
-                scaled.coeffs,
-                scaled.vars,
-                LinearOp.LE,
-                strictBound.toInt(),
-            ),
-        )
-    } else {
-        factors.add(Linear(scaled.coeffs, scaled.vars, LinearOp.LE, strictBound.toInt()))
-    }
+    postLinear(
+        scaled.coeffs,
+        scaled.vars,
+        LinearOp.LE,
+        strictBound.toInt(),
+        if (reified) resolveBoolLit(c.args[3]) else null,
+    )
 }
 
 /** Lower `float_min`/`float_max` with inequalities plus equality disjunction. */

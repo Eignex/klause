@@ -18,15 +18,9 @@ internal fun FlatZincCompiler.emitBoolClause(c: FznConstraint) {
     factors.add(Clause(pos + neg))
 }
 
-internal fun FlatZincCompiler.evalBoolVarArrayNegated(e: FznExpr): IntArray = when (e) {
-    is FznExpr.ArrayLit -> IntArray(e.elements.size) { Lit.negate(resolveBoolLit(e.elements[it])) }
-
-    is FznExpr.Ident -> when (val arr = arrays[e.name]) {
-        is FlatZincArray.Vars -> IntArray(arr.varIds.size) { Lit.make(arr.varIds[it], false) }
-        else -> failHere("`${e.name}` is not a bool var array")
-    }
-
-    else -> failHere("expected bool var array, got ${e::class.simpleName}")
+internal fun FlatZincCompiler.evalBoolVarArrayNegated(e: FznExpr): IntArray {
+    val pos = evalBoolVarArray(e)
+    return IntArray(pos.size) { Lit.negate(pos[it]) }
 }
 
 internal fun FlatZincCompiler.emitBoolEq(c: FznConstraint, negate: Boolean) {

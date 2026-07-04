@@ -40,6 +40,19 @@ internal fun FlatZincCompiler.resolveIntVarOrConst(e: FznExpr): IntVarRef = when
     else -> IntVarRef(resolveIntVar(e), 0)
 }
 
+/** Post a linear relation as a hard [Linear], or a [ReifiedLinear] onto [reifyLit] when non-null
+ *  ([reifyLit] is a bool literal; its variable channels the relation's truth). The single lowering
+ *  point every `*_lin_*` / linear-compare emitter funnels through, hard or `_reif`. */
+internal fun FlatZincCompiler.postLinear(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int, reifyLit: Int?) {
+    factors.add(
+        if (reifyLit != null) {
+            ReifiedLinear(Lit.variable(reifyLit), coeffs, vars, op, bound)
+        } else {
+            Linear(coeffs, vars, op, bound)
+        },
+    )
+}
+
 internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) {
     require(c.args.size == if (reified) 4 else 3)
     val coeffs = evalIntConstArray(c.args[0])
@@ -51,12 +64,7 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
         "int_lin_ne" -> LinearOp.NE
         else -> failHere("unhandled int linear ${c.name}")
     }
-    if (reified) {
-        val aux = resolveBoolLit(c.args[3])
-        factors.add(ReifiedLinear(Lit.variable(aux), coeffs, vars, op, bound))
-    } else {
-        factors.add(Linear(coeffs, vars, op, bound))
-    }
+    postLinear(coeffs, vars, op, bound, reifyLit = if (reified) resolveBoolLit(c.args[3]) else null)
 }
 
 internal fun FlatZincCompiler.emitBoolLinear(c: FznConstraint) {
