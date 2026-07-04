@@ -422,6 +422,49 @@ internal class GccSeparator : CutSeparator {
 }
 
 /**
+ * At-most-one conflict structure read off a problem's factors: [adjacency] maps a Boolean variable to
+ * the variables mutually exclusive with it — an edge per binary clause `¬a ∨ ¬b`, all pairs of an
+ * at-most-one factor (`Cardinality(max = 1)`, unit-weight `Σ x ≤ 1` PseudoBoolean) over positive
+ * literals — and [baseCliques] lists those at-most-one factors' member variables (pairwise adjacent by
+ * construction). Global by construction: every edge is implied by a factor of the original problem.
+ */
+internal class ConflictGraph(val adjacency: Map<Int, Set<Int>>, val baseCliques: List<IntArray>)
+
+/** Builds the [ConflictGraph] the knapsack-lifting and clique separators share. */
+internal fun conflictGraph(problem: Problem): ConflictGraph {
+    val adj = HashMap<Int, HashSet<Int>>()
+    fun edge(a: Int, b: Int) {
+        if (a == b) return
+        adj.getOrPut(a) { HashSet() }.add(b)
+        adj.getOrPut(b) { HashSet() }.add(a)
+    }
+
+    val baseCliques = ArrayList<IntArray>()
+    fun atMostOne(literals: IntArray) {
+        if (literals.size < 2 || literals.any { !Lit.isPositive(it) }) return
+        val vars = IntArray(literals.size) { Lit.variable(literals[it]) }
+        for (i in vars.indices) for (j in i + 1 until vars.size) edge(vars[i], vars[j])
+        baseCliques.add(vars)
+    }
+    for (factor in problem.factors) {
+        when (factor) {
+            is Clause -> if (factor.literals.size == 2 && factor.literals.none { Lit.isPositive(it) }) {
+                edge(Lit.variable(factor.literals[0]), Lit.variable(factor.literals[1]))
+            }
+
+            is Cardinality -> if (factor.max == 1) atMostOne(factor.literals)
+
+            is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1 && factor.weights.all { it == 1 }) {
+                atMostOne(factor.literals)
+            }
+
+            else -> Unit
+        }
+    }
+    return ConflictGraph(adj, baseCliques)
+}
+
+/**
  * Knapsack cover cuts for a `Σ w_i·x_i ≤ b` PseudoBoolean row with positive weights over
  * 0/1 variables — the shape the dropped `Knapsack` factor decomposes to, so these recover its
  * strength. A *cover* `C` is a set of items with `Σ_{C} w_i > b`: no feasible 0/1 point can set all of
@@ -443,7 +486,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
         val cuts = ArrayList<Cut>()
         // At-most-one conflict graph (binary clauses + AMO factors), shared across all knapsacks. Used
         // for GUB lifting: within a clique at most one item is 1, which strengthens the lift (#552).
-        val conflict = conflictAdjacency(ctx.problem)
+        val conflict = conflictGraph(ctx.problem).adjacency
         for (factor in ctx.problem.factors) {
             if (factor !is PseudoBoolean || factor.op != PbOp.LE) continue
             if (factor.weights.any { it <= 0 } || factor.literals.any { !Lit.isPositive(it) }) continue
@@ -536,39 +579,6 @@ internal class KnapsackCoverSeparator : CutSeparator {
         return cuts
     }
 
-    /** At-most-one conflict graph (variable → mutually-exclusive variables) from binary clauses
-     *  `¬a ∨ ¬b` and at-most-one factors (`Cardinality(max = 1)`, unit `Σ x ≤ 1` pseudo-Boolean) over
-     *  positive literals — the same structure the clique-cut separator reads. */
-    private fun conflictAdjacency(problem: Problem): Map<Int, Set<Int>> {
-        val adj = HashMap<Int, HashSet<Int>>()
-        fun edge(a: Int, b: Int) {
-            if (a == b) return
-            adj.getOrPut(a) { HashSet() }.add(b)
-            adj.getOrPut(b) { HashSet() }.add(a)
-        }
-        fun atMostOne(literals: IntArray) {
-            if (literals.size < 2 || literals.any { !Lit.isPositive(it) }) return
-            val vars = IntArray(literals.size) { Lit.variable(literals[it]) }
-            for (i in vars.indices) for (j in i + 1 until vars.size) edge(vars[i], vars[j])
-        }
-        for (factor in problem.factors) {
-            when (factor) {
-                is Clause -> if (factor.literals.size == 2 && factor.literals.none { Lit.isPositive(it) }) {
-                    edge(Lit.variable(factor.literals[0]), Lit.variable(factor.literals[1]))
-                }
-
-                is Cardinality -> if (factor.max == 1) atMostOne(factor.literals)
-
-                is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1 && factor.weights.all { it == 1 }) {
-                    atMostOne(factor.literals)
-                }
-
-                else -> Unit
-            }
-        }
-        return adj
-    }
-
     /** Greedy clique partition of the `k` knapsack positions over the [conflict] graph: each group is a
      *  set of pairwise mutually-exclusive items. Used as the GUB structure for [gubKnapsackMax]. Using
      *  only a partition's worth of edges (cross-group conflicts are ignored) keeps the lifting max an
@@ -644,35 +654,9 @@ internal class CliqueCutSeparator : CutSeparator {
     private val tol = 1e-6
 
     override fun separate(ctx: CutContext): List<Cut> {
-        val adj = HashMap<Int, MutableSet<Int>>()
-        fun edge(a: Int, b: Int) {
-            if (a == b) return
-            adj.getOrPut(a) { HashSet() }.add(b)
-            adj.getOrPut(b) { HashSet() }.add(a)
-        }
-
-        val baseCliques = ArrayList<IntArray>()
-        fun atMostOne(literals: IntArray) {
-            if (literals.size < 2 || literals.any { !Lit.isPositive(it) }) return
-            val vars = IntArray(literals.size) { Lit.variable(literals[it]) }
-            for (i in vars.indices) for (j in i + 1 until vars.size) edge(vars[i], vars[j])
-            baseCliques.add(vars)
-        }
-        for (factor in ctx.problem.factors) {
-            when (factor) {
-                is Clause -> if (factor.literals.size == 2 && factor.literals.none { Lit.isPositive(it) }) {
-                    edge(Lit.variable(factor.literals[0]), Lit.variable(factor.literals[1]))
-                }
-
-                is Cardinality -> if (factor.max == 1) atMostOne(factor.literals)
-
-                is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1 && factor.weights.all { it == 1 }) {
-                    atMostOne(factor.literals)
-                }
-
-                else -> Unit
-            }
-        }
+        val graph = conflictGraph(ctx.problem)
+        val adj = graph.adjacency
+        val baseCliques = graph.baseCliques
         if (baseCliques.isEmpty()) return emptyList()
 
         // Variables with a Boolean column, ordered by descending fractional value — the extension order.
