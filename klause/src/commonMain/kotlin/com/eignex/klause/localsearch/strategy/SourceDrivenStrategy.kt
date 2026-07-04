@@ -17,6 +17,27 @@ import com.eignex.klause.localsearch.scoring.MoveScoring
 private const val DEFAULT_METROPOLIS_TEMPERATURE = 1.0
 
 /**
+ * How a strategy conducts the feasible (`cost == 0`) phase of a minimize — an explicit per-strategy
+ * choice with no default, so a portfolio arm can never fall into a descent it didn't ask for. The
+ * [com.eignex.klause.localsearch.LocalSearchSolver] dispatches the feasible phase exhaustively on it.
+ */
+enum class FeasibleDescent {
+    /** Violation-native (probSAT / WalkSAT / feasibility-jump): the strategy does not optimize at
+     *  feasibility itself. On a COP the portfolio overlays an `objective ≤ incumbent` factor so the
+     *  objective slack re-enters the violation set and is repaired like any constraint; on a CSP the
+     *  strategy is a pure feasibility finder. */
+    RatchetAsConstraint,
+
+    /** Strict-improvement greedy descent driven by the engine: greedy flip → the strategy's own
+     *  improving move → structured moves → pair-swaps → restart at a local optimum. The [Cbls] recipe. */
+    StrictGreedy,
+
+    /** The strategy's own [AcceptanceRule] owns the feasible walk, stepping through worse-objective
+     *  feasible states (simulated annealing's Metropolis). */
+    AnnealSelfOwned,
+}
+
+/**
  * The shared local-search driver, expressed as *policy over move sources*. It collects candidates
  * from a configured set of [com.eignex.klause.localsearch.movesource.MoveSource]s, then scores
  * and selects, applying two gates once:
@@ -53,21 +74,11 @@ class SourceDrivenStrategy(
     /** Optional perturbation: consulted once per pick before generation; a non-null result is taken
      *  immediately as a diversification kick. The closure owns its own trigger/stall state. */
     val perturbation: ((LocalSearchState) -> Move?)? = null,
-    /** Whether this strategy drives objective descent at feasibility (it has feasibility-phase
-     *  sources that score satisfied/objective candidates at `cost == 0`), rather than bailing for the
-     *  engine's built-in descent. The unified-minimize path keys off this; the [Cbls] recipe sets it. */
-    val drivesObjectiveDescent: Boolean = false,
-    /** Whether this strategy's own [acceptance] rule owns the accept/reject decision in the feasible
-     *  phase, rather than the engine's greedy strict-improvement gate. The annealing (Metropolis) arm
-     *  sets it so it can step through worse-objective feasible states; requires [drivesObjectiveDescent]
-     *  and feasible-phase move sources. Off leaves the engine's greedy descent in charge (CBLS). */
-    val ownsFeasibleDescent: Boolean = false,
+    /** How this strategy conducts the feasible (`cost == 0`) phase of a minimize — see [FeasibleDescent].
+     *  Explicit with no default: every strategy declares it, so no portfolio arm can silently inherit a
+     *  descent it didn't choose (the `LocalSearchSolver` dispatches on it exhaustively). */
+    val feasibleDescent: FeasibleDescent,
 ) {
-    init {
-        require(!ownsFeasibleDescent || drivesObjectiveDescent) {
-            "ownsFeasibleDescent requires drivesObjectiveDescent (the feasible phase must be this strategy's)"
-        }
-    }
 
     /** A copy with selected axes replaced, used by recipe assembly and the axis-edit transform to
      *  swap one dimension while preserving the rest. */
@@ -79,8 +90,7 @@ class SourceDrivenStrategy(
         tabu: TabuFilter = this.tabu,
         configurationChecking: Boolean = this.configurationChecking,
         perturbation: ((LocalSearchState) -> Move?)? = this.perturbation,
-        drivesObjectiveDescent: Boolean = this.drivesObjectiveDescent,
-        ownsFeasibleDescent: Boolean = this.ownsFeasibleDescent,
+        feasibleDescent: FeasibleDescent = this.feasibleDescent,
     ): SourceDrivenStrategy = SourceDrivenStrategy(
         sources = sources,
         scoring = scoring,
@@ -89,8 +99,7 @@ class SourceDrivenStrategy(
         tabu = tabu,
         configurationChecking = configurationChecking,
         perturbation = perturbation,
-        drivesObjectiveDescent = drivesObjectiveDescent,
-        ownsFeasibleDescent = ownsFeasibleDescent,
+        feasibleDescent = feasibleDescent,
     )
 
     /** Whether round feedback retunes the temperature schedule; off when no temperature schedule is present. */

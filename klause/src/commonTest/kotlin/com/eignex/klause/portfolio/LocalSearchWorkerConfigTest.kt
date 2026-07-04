@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LsArm
 import com.eignex.klause.localsearch.strategy.LsCatalog
 import kotlin.test.Test
@@ -32,17 +33,19 @@ class LocalSearchWorkerConfigTest {
     }
 
     @Test
-    fun `the SA family drives objective descent so it optimizes a COP rather than bailing`() {
-        // On a COP `materialize` optimizes every arm: descent-driving recipes as-is, the rest via the
-        // objective-bound ratchet. SA must be in the descent-driving set (annealing), else it would be
-        // ratcheted — still optimizing, but the intent is Metropolis on the objective. This guards
-        // against an SA arm silently reverting to the plain feasibility-finder form.
+    fun `each arm family declares an explicit feasible-descent mode`() {
+        // On a COP `materialize` optimizes every arm per its declared FeasibleDescent — no arm falls into
+        // a default descent. Pin the mode each family declares so a regression that silently changes how
+        // an arm optimizes (e.g. an SA arm reverting to a plain finder) fails here.
         val byLabel = LsCatalog.auto().associateBy { it.label }
+        // CBLS: engine-driven strict-greedy descent.
+        assertEquals(FeasibleDescent.StrictGreedy, byLabel.getValue("cbls/fixed").feasibleDescent)
+        // SA family: self-owned annealing (Metropolis on the objective).
         for (label in listOf("sa/fixed", "sa-reheat/fixed", "sa-phased/fixed")) {
-            assertTrue(byLabel.getValue(label).drivesObjectiveDescent, "'$label' must drive objective descent")
+            assertEquals(FeasibleDescent.AnnealSelfOwned, byLabel.getValue(label).feasibleDescent, "'$label'")
         }
-        // The violation-native arms don't drive descent — they are the ratchet's targets on a COP.
-        assertEquals(false, byLabel.getValue("adaptive-probsat/fixed").drivesObjectiveDescent)
-        assertEquals(false, byLabel.getValue("walksat-cc/luby").drivesObjectiveDescent)
+        // Violation-native finders: ratcheted as a constraint on a COP, pure finders on a CSP.
+        assertEquals(FeasibleDescent.RatchetAsConstraint, byLabel.getValue("adaptive-probsat/fixed").feasibleDescent)
+        assertEquals(FeasibleDescent.RatchetAsConstraint, byLabel.getValue("walksat-cc/luby").feasibleDescent)
     }
 }

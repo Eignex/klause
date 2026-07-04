@@ -49,6 +49,7 @@ object WalkSat {
         acceptance = AcceptanceRule.WalkSatNoise(noise),
         tabu = tabu,
         configurationChecking = configurationChecking,
+        feasibleDescent = FeasibleDescent.RatchetAsConstraint,
     )
 
     /**
@@ -78,6 +79,7 @@ object WalkSat {
         ),
         tabu = tabu,
         configurationChecking = configurationChecking,
+        feasibleDescent = FeasibleDescent.RatchetAsConstraint,
     )
 }
 
@@ -100,6 +102,7 @@ object ProbSat {
         acceptance = AcceptanceRule.ProbSat(cb, eps),
         tabu = tabu,
         configurationChecking = configurationChecking,
+        feasibleDescent = FeasibleDescent.RatchetAsConstraint,
     )
 
     /**
@@ -124,6 +127,7 @@ object ProbSat {
         ),
         tabu = tabu,
         configurationChecking = configurationChecking,
+        feasibleDescent = FeasibleDescent.RatchetAsConstraint,
     )
 
     /**
@@ -144,6 +148,7 @@ object ProbSat {
         schedule = ScheduleBundle(noise = BanditNoiseController.default(baseline = 0.0, seed = seed)),
         tabu = tabu,
         configurationChecking = configurationChecking,
+        feasibleDescent = FeasibleDescent.RatchetAsConstraint,
     )
 }
 
@@ -180,15 +185,15 @@ object SimulatedAnnealing {
         schedule = ScheduleBundle(temperature = schedule),
         tabu = tabu,
         configurationChecking = configurationChecking,
+        feasibleDescent = FeasibleDescent.RatchetAsConstraint,
     )
 
     /**
      * SA as a COP objective-optimizer: the focused feasibility opener plus the feasible-phase objective
      * sources ([ObjectiveSeed] + [SatisfiedStructured]) so [AcceptanceRule.Metropolis] keeps annealing
      * at `cost == 0`, stepping through worse-objective feasible states, instead of bailing to the
-     * engine's greedy descent. Sets [SourceDrivenStrategy.drivesObjectiveDescent] and
-     * [SourceDrivenStrategy.ownsFeasibleDescent] so its own Metropolis acceptance — not the engine's
-     * strict-improvement gate — owns the feasible walk.
+     * engine's greedy descent. Uses [FeasibleDescent.AnnealSelfOwned] so its own Metropolis acceptance —
+     * not the engine's strict-improvement gate — owns the feasible walk.
      */
     fun optimizer(
         schedule: Schedule,
@@ -203,7 +208,6 @@ object SimulatedAnnealing {
         schedule = ScheduleBundle(temperature = schedule),
         tabu = tabu,
         configurationChecking = configurationChecking,
-        drivesObjectiveDescent = true,
-        ownsFeasibleDescent = true,
+        feasibleDescent = FeasibleDescent.AnnealSelfOwned,
     )
 }

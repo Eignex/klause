@@ -27,11 +27,11 @@ import com.eignex.klause.localsearch.scoring.MoveScoring
 class LsRecipe(
     /** External name (CLI / campaign / telemetry). */
     val label: String,
-    /** Drives the feasibility fight (and, when [SourceDrivenStrategy.drivesObjectiveDescent], the
-     *  objective descent too). Restart lives in its `schedule.restart`. */
+    /** Drives the feasibility fight; its [SourceDrivenStrategy.feasibleDescent] also decides the optimize
+     *  phase when there is no separate [optimizeStrategy]. Restart lives in its `schedule.restart`. */
     val strategy: SourceDrivenStrategy,
-    /** Minimize-phase strategy; `null` lets the engine's built-in objective descent own the optimize
-     *  phase. A CBLS arm sets this to a second CBLS instance for the unified minimize path. */
+    /** Minimize-phase strategy; `null` reuses [strategy] for the optimize phase. A CBLS/SA arm sets this
+     *  to a second instance carrying its optimize [SourceDrivenStrategy.feasibleDescent]. */
     val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Per-arm switch for the per-move invariant network; off carves a diversity niche for cyclic
      *  definitional encodings whose reified indicators are otherwise search-excluded. */
@@ -40,13 +40,14 @@ class LsRecipe(
      *  `implicitStructuredCap > 0` on permutation/assignment-shaped models). */
     val seedImplicitOnRestart: Boolean = false,
 ) {
-    /** Whether this recipe drives the objective descent itself (CBLS's unified path, SA's Metropolis
-     *  annealing). When false the recipe is violation-native (probSAT / WalkSAT / feasibility-jump): on a
-     *  COP the portfolio posts an `objective ≤ incumbent` ratchet so it optimizes anyway, and on a CSP it
-     *  is a pure feasibility finder. So no recipe fails to optimize on a COP — a CSP is the only
+    /** How this recipe conducts the optimize phase — the optimize strategy's declared
+     *  [SourceDrivenStrategy.feasibleDescent] (the [optimizeStrategy] when present, else [strategy]).
+     *  [FeasibleDescent.RatchetAsConstraint] is violation-native (probSAT / WalkSAT / feasibility-jump):
+     *  on a COP the portfolio posts an `objective ≤ incumbent` ratchet so it optimizes anyway, and on a
+     *  CSP it is a pure feasibility finder. So no recipe fails to optimize on a COP — a CSP is the only
      *  non-optimizing case. */
-    val drivesObjectiveDescent: Boolean
-        get() = strategy.drivesObjectiveDescent || optimizeStrategy?.drivesObjectiveDescent == true
+    val feasibleDescent: FeasibleDescent
+        get() = (optimizeStrategy ?: strategy).feasibleDescent
 
     /** A copy with [transform] applied to the satisfy strategy and the optimize strategy (if any), so
      *  one axis edit rewrites both halves of the recipe consistently. */

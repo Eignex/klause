@@ -54,6 +54,7 @@ fun FeasibilityJump(
             weights = WeightSchedule.feasibilityJump(weightBumpAfter, weightIncrement, weightDecay),
         ),
         perturbation = if (perturbAfter > 0) StallPerturbation(perturbAfter) else null,
+        feasibleDescent = FeasibleDescent.RatchetAsConstraint,
     )
 }
 

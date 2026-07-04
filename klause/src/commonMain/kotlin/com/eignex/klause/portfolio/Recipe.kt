@@ -12,6 +12,7 @@ import com.eignex.klause.localsearch.schedule.Reheating
 import com.eignex.klause.localsearch.schedule.Schedule
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LsRecipe
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import kotlin.random.Random
@@ -47,6 +48,7 @@ internal class Recipe(
                 acceptance.build(),
                 schedule = ScheduleBundle(temperature = acceptance.temperature?.invoke(), restart = restart.build()),
                 tabu = tabu,
+                feasibleDescent = FeasibleDescent.RatchetAsConstraint,
             ),
         ),
     )

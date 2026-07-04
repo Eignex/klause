@@ -52,6 +52,7 @@ class SourceDrivenStrategyTest {
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
             scoring = MoveScoring.Raw,
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         val state = LocalSearchState(satisfiableProblem(), Random(7))
         assertTrue(driveToFeasible(strategy, state, steps = 200), "ViolatedRepairs-only arm must reach feasibility")
@@ -66,6 +67,7 @@ class SourceDrivenStrategyTest {
                 ConfiguredSource(ObjectiveSeed()),
             ),
             scoring = MoveScoring.Weighted,
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         // A feasible state (the EQ is satisfied at (1,1)) with an objective so ObjectiveSeed fires.
         val state = LocalSearchState(satisfiableProblem(), Random(7))
@@ -84,6 +86,7 @@ class SourceDrivenStrategyTest {
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(StallSwaps(cap = 16))),
             acceptance = AcceptanceRule.WalkSatNoise(1.0),
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         val problem = Problem(
             numBoolVars = 0,
