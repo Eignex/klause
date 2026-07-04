@@ -27,13 +27,13 @@ import com.eignex.klause.util.LongArrayList
  * subproblem via min-cost flow. Those overlap heavily with klause's existing theta-tree / edge-finding
  * propagation; this check is the sound, self-contained slice.
  */
-internal class CumulativeEnergeticBound(problem: Problem) {
+internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilityBound {
     private val factors: List<Cumulative> = problem.factors.filterIsInstance<Cumulative>()
 
     val applicable: Boolean get() = factors.isNotEmpty()
 
     /** True if some Cumulative is energetically infeasible at the current node (⇒ prune the subtree). */
-    fun isInfeasible(session: PropagationSession): Boolean = factors.any { overSubscribed(it, session) }
+    override fun isInfeasible(session: PropagationSession): Boolean = factors.any { overSubscribed(it, session) }
 
     /**
      * A nogood explaining the first energetically over-subscribed window, or null when no
@@ -44,7 +44,7 @@ internal class CumulativeEnergeticBound(problem: Problem) {
      * alone (relaxing any one bound is what could let the schedule fit), hence globally valid, and is
      * registered lazily at a restart like the LP nogoods (it is all-false at the dead node).
      */
-    fun explain(session: PropagationSession): IntArray? {
+    override fun explain(session: PropagationSession): IntArray? {
         for (c in factors) {
             val clause = try {
                 explainChecked(c, session)

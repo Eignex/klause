@@ -38,7 +38,7 @@ import kotlin.math.ceil
  * next λ; every evaluated `L(λ)` is exact, so the reported bound is always valid. Overflow makes the
  * node's bound unavailable, never wrong.
  */
-internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObjective?) {
+internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObjective?) : LagrangianDualBound {
     /** Boolean variable id per local index (the union of the knapsack/link/objective variables). */
     private val varIds: IntArray
 
@@ -156,10 +156,7 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
         f.op == PbOp.LE && f.bound >= 0 && f.literals.all { Lit.isPositive(it) } && f.weights.all { it > 0 }
 
     /** Number of dualized linking constraints; the multiplier vector has this length. */
-    val multiplierCount: Int get() = rowVars.size
-
-    /** Outcome of a node bound: prune plus the best bound found and the multipliers to carry on. */
-    class Result(val prune: Boolean, val boundNumerator: Long, val denominator: Long, val multipliers: LongArray)
+    override val multiplierCount: Int get() = rowVars.size
 
     /** A subproblem evaluation at fixed multipliers: feasibility, scaled cost, and the chosen x. */
     private class Eval(val feasible: Boolean, val num: Long, val x: IntArray)
@@ -169,12 +166,12 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
      * (`+∞` skips the subgradient and reports only the base bound). [startMultipliers] warm-starts λ.
      * Returns null when the bound is unavailable (not applicable, or arithmetic overflow).
      */
-    fun computeBound(
+    override fun computeBound(
         session: PropagationSession,
         incumbent: Double,
         startMultipliers: LongArray,
         iterations: Int,
-    ): Result? {
+    ): LagrangianResult? {
         if (!applicable) return null
         val pinned = IntArray(varIds.size) { i ->
             when (session.boolValue(varIds[i])) {
@@ -191,18 +188,18 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             val steps = if (incumbent.isFinite()) iterations else 1
             repeat(steps) {
                 val eval = evaluate(pinned, p)
-                if (!eval.feasible) return Result(true, 0L, Q, p) // forced items exceed capacity ⇒ infeasible
+                if (!eval.feasible) return LagrangianResult(true, 0L, Q, p) // forced items exceed capacity ⇒ infeasible
                 var num = addExact(eval.num, mulExact(Q, rest))
                 for (r in 0 until multiplierCount) num = subExact(num, mulExact(p[r], rowRhs[r]))
                 if (num > bestNum) bestNum = num
-                if (ceilDiv(num, Q) >= incumbentCeil(incumbent)) return Result(true, num, Q, p)
+                if (ceilDiv(num, Q) >= incumbentCeil(incumbent)) return LagrangianResult(true, num, Q, p)
                 if (!incumbent.isFinite() || multiplierCount == 0) return@repeat
                 if (!subgradientStep(eval.x, p, num, incumbent, prevDir)) return@repeat
             }
         } catch (_: LpOverflowException) {
             if (bestNum == Long.MIN_VALUE) return null
         }
-        return if (bestNum == Long.MIN_VALUE) null else Result(false, bestNum, Q, p)
+        return if (bestNum == Long.MIN_VALUE) null else LagrangianResult(false, bestNum, Q, p)
     }
 
     /** Adjusted cost `Wᵢ = Q·cᵢ + Σ_r p_r·a_ri` of local variable [i] under multipliers [p]. */
