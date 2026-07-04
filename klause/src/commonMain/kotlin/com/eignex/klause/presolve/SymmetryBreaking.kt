@@ -47,6 +47,14 @@ internal object SymmetryBreaking {
         // just added — an O(rounds) blow-up that dominated presolve on symmetric models. So detect once.
         if (problem.factors.any { it is SymmetryHandling }) return PassDelta()
 
+        // A model too large for even one generator-refinement round ([GENERATOR_ROUND_COST_BUDGET]) is
+        // skipped outright — not just for the generator search, but for the value / scalar heuristics too.
+        // Such models empirically carry no verifiable symmetry of any kind, and the value-orbit keying and
+        // the round-cost scan itself are each O(factors); paying them only to post nothing dominates
+        // presolve on the largest models (a 245k-factor routing model spends hundreds of ms here). Sound —
+        // skipping symmetry breaking only ever forgoes a reduction, never changes a solution.
+        if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return PassDelta()
+
         // Generator-based detection: individualization–refinement over the unified variable+factor
         // colouring yields verified automorphism generators (catching composite and bool/int-mixed
         // symmetries the per-kind heuristics miss). The whole group is handled dynamically by one
@@ -510,6 +518,18 @@ internal object SymmetryBreaking {
      *  only forgoes value pins. */
     private const val VALUE_ORBIT_KEY_BUDGET = 1_000_000L
 
+    // Estimated cost of one refinement round: each factor is remapped and re-keyed once per incident
+    // variable, at its Factor.structuralKeyWeight. The [GENERATOR_ROUND_COST_BUDGET] gate on this value is
+    // what breakSymmetries uses to skip the whole pass on a model too large to carry symmetry.
+    private fun generatorRoundCost(problem: Problem): Long {
+        var roundCost = 0L
+        for (f in problem.factors) {
+            val deg = (f.intVars.size + f.boolVars.size).toLong()
+            roundCost += deg * f.structuralKeyWeight
+        }
+        return roundCost
+    }
+
     /**
      * Generators of the constraint-graph automorphism group, found by individualization–refinement
      * (a CP-SAT / nauty-style search) over the unified variable+factor colouring. Unlike the
@@ -536,12 +556,7 @@ internal object SymmetryBreaking {
         // wide-but-shallow model stays cheap; a model whose factors carry large constant data — where the
         // search would burn the budget rebuilding huge keys without finding a verifiable symmetry — is
         // skipped.
-        var roundCost = 0L
-        for (f in problem.factors) {
-            val deg = (f.intVars.size + f.boolVars.size).toLong()
-            roundCost += deg * f.structuralKeyWeight
-        }
-        if (roundCost > GENERATOR_ROUND_COST_BUDGET) return emptyList()
+        if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return emptyList()
 
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
