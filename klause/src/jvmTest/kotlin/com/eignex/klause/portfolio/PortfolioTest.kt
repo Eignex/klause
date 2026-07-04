@@ -45,12 +45,12 @@ class PortfolioTest {
         assertTrue("lp-aggressive" in cop && "lp-default" in cop, "COP palette must carry the LP arms, got $cop")
         assertTrue("lp-conservative" in cop && "lp-lbtree" in cop, "COP palette must spread LP emphasis, got $cop")
         val aggressive = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-aggressive" }
-        assertEquals(LpEmphasis.AGGRESSIVE, aggressive.build(1L, null).lpConfig?.emphasis)
+        assertEquals(LpEmphasis.AGGRESSIVE, aggressive.recipe.build(1L, null).lpConfig?.emphasis)
         val default = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-default" }
-        assertEquals(LpEmphasis.DEFAULT, default.build(1L, null).lpConfig?.emphasis)
+        assertEquals(LpEmphasis.DEFAULT, default.recipe.build(1L, null).lpConfig?.emphasis)
         // The best-bound dive arm carries the lb_tree_search flag on its base plan.
         val lbtree = BacktrackWorkerConfig.ranked(Kind.COP).first { it.label == "lp-lbtree" }
-        assertTrue(lbtree.build(1L, null).lpPlan.lbTreeSearch, "the lp-lbtree arm must enable lb_tree_search")
+        assertTrue(lbtree.recipe.build(1L, null).lpPlan.lbTreeSearch, "the lp-lbtree arm must enable lb_tree_search")
         // The #117 guard stays at slot 0.
         assertEquals("satOptimized", cop.first())
 
@@ -60,22 +60,22 @@ class PortfolioTest {
 
     @Test
     fun `an injected btPool overrides the curated backtrack arms`() {
-        val templates = listOf(
-            BacktrackParams(randomSeed = 0L),
-            BacktrackParams(randomSeed = 0L, lubyRestartBase = 256L),
+        val pool = listOf(
+            { BacktrackWorkerConfig.recipeByLabel("free") },
+            { BacktrackWorkerConfig.recipeByLabel("conflictDriven") },
         )
         val scenario = PortfolioScenario(
             cores = 1,
             arms = 3,
             kind = Kind.CSP,
             engine = EngineMix.BACKTRACK,
-            btPool = templates,
+            btPool = pool,
         )
         val labels = PortfolioComposition.compose(scenario).map { it.label }
-        assertEquals(3, labels.size, "the pool wraps to fill the requested arm count")
-        assertTrue(
-            labels.all { it.startsWith("bt-pool#") },
-            "injected btPool must replace the curated arms, got $labels",
+        assertEquals(
+            listOf("free", "conflictDriven", "free"),
+            labels,
+            "the injected recipe pool replaces the curated arms and wraps by name",
         )
     }
 
@@ -119,8 +119,8 @@ class PortfolioTest {
     @Test
     fun `the selector-switch arm wires a fresh restart-switching portfolio per worker`() {
         val arm = BacktrackWorkerConfig.byLabel("selector-switch")
-        val a = arm.build(1L, null)
-        val b = arm.build(2L, null)
+        val a = arm.recipe.build(1L, null)
+        val b = arm.recipe.build(2L, null)
         assertEquals(100L, a.lubyRestartBase, "Luby restarts drive the bandit's arm switching")
         assertTrue(a.variableSelector !== b.variableSelector, "each worker gets its own switching state")
     }
@@ -128,7 +128,8 @@ class PortfolioTest {
     @Test
     fun `lp ceiling caps and toggles the portfolio arms`() {
         fun lpConfigs(ceiling: LpConfig): List<LpConfig?> =
-            BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = ceiling).map { it.build(1L, null).lpConfig }
+            BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = ceiling)
+                .map { it.recipe.build(1L, null).lpConfig }
 
         // --lp off disables LP across the pool.
         val off = lpConfigs(LpConfig(LpEmphasis.OFF))

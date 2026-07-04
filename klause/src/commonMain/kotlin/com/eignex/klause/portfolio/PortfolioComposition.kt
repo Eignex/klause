@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LsRecipe
@@ -68,11 +69,10 @@ data class PortfolioScenario(
      *  `null` uses the curated `LsCatalog` pool unchanged; a non-null pool is the CLI's resolved
      *  recipes (a named base, or the curated pool with axis edits applied). */
     val lsPool: List<() -> LsRecipe>? = null,
-    /** Optional override of the backtrack arm pool — pre-built [BacktrackParams] templates, one arm
-     *  each (re-seeded and event-wired per slot at materialisation, wrapping past the pool size).
-     *  `null` uses the curated [BacktrackWorkerConfig] pool. The backtrack analogue of [lsPool]; it
-     *  takes templates rather than recipe factories pending a public backtrack recipe boundary. */
-    val btPool: List<BacktrackParams>? = null,
+    /** Optional override of the backtrack arm pool — per-arm [BacktrackRecipe] factories (a fresh
+     *  recipe per slot, wrapping past the pool size), the exact backtrack analogue of [lsPool]. `null`
+     *  uses the curated [BacktrackWorkerConfig] pool. */
+    val btPool: List<() -> BacktrackRecipe>? = null,
     /** Optional model search-annotation arm (#512): the [BacktrackParams] compiled from the model's
      *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), it takes
      *  the last backtrack slot so the free CP portfolio also follows the model's own search order,
@@ -189,15 +189,15 @@ internal object PortfolioComposition {
         kind: Kind,
         count: Int,
         lpCeiling: LpConfig,
-        btPool: List<BacktrackParams>?,
+        btPool: List<() -> BacktrackRecipe>?,
         annotationArm: BacktrackParams?,
     ): List<WorkerConfig> {
         if (btPool != null) {
-            return List(count) { BacktrackWorkerConfig.ofParams("bt-pool#$it", btPool[it % btPool.size]) }
+            return List(count) { BacktrackWorkerConfig(btPool[it % btPool.size]()) }
         }
         val base = BacktrackWorkerConfig.diverse(kind, count, lpCeiling)
         if (annotationArm == null || count < 2) return base
-        return base.dropLast(1) + BacktrackWorkerConfig.ofParams("annotation", annotationArm)
+        return base.dropLast(1) + BacktrackWorkerConfig(BacktrackWorkerConfig.ofParams("annotation", annotationArm))
     }
 
     private fun mixedArms(scenario: PortfolioScenario): List<WorkerConfig> {
