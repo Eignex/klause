@@ -130,6 +130,41 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         for (v in f.intVars) intOcc[v].add(id)
     }
 
+    // Append-only logs of every factor add / drop, in application order, so a pass that reads them at a
+    // saved [ChangeMark] can replay just the factors that changed since — the basis for an inter-round
+    // incremental pass (re-examine the delta instead of rescanning the whole live set each firing). A
+    // drop records both the id and the factor object (captured before its slot is nulled), since the
+    // dropped factor's structural content is needed to retract it from a pass's persistent index.
+    private val addedLog = IntArrayList(0)
+    private val droppedFactorLog = ArrayList<Factor>()
+
+    // Bumped whenever a reseed rebuilds the stable-id space from scratch ([reseedFromDelta]); a
+    // [ChangeMark] taken before it can no longer be replayed (its ids name different factors now), so a
+    // pass holding a stale mark must fall back to a full scan.
+    private var reseedEpoch = 0
+
+    /** A read position into the change logs: the counts of adds and drops seen so far. A pass saves one
+     *  after each run and asks for the changes since it on the next, so a firing sees exactly the factors
+     *  other passes changed in between — including across rounds the pass itself was version-skipped. */
+    class ChangeMark internal constructor(internal val added: Int, internal val dropped: Int, internal val epoch: Int)
+
+    /** The current change-log position. */
+    fun changeMark(): ChangeMark = ChangeMark(addedLog.size, droppedFactorLog.size, reseedEpoch)
+
+    /** Whether [mark] predates a reseed, so the changes since it can't be replayed and the holder must
+     *  rebuild from the full live set instead of applying an incremental delta. */
+    fun markStale(mark: ChangeMark): Boolean = mark.epoch != reseedEpoch
+
+    /** Stable ids of the factors added since [mark], in application order. */
+    fun addedIdsSince(mark: ChangeMark): IntArray = IntArray(addedLog.size - mark.added) { addedLog[mark.added + it] }
+
+    /** The factor objects dropped since [mark], in application order (captured at drop time). */
+    fun droppedFactorsSince(mark: ChangeMark): List<Factor> =
+        droppedFactorLog.subList(mark.dropped, droppedFactorLog.size)
+
+    /** The live factor at stable id [id], or `null` if it was tombstoned. */
+    fun factorAt(id: Int): Factor? = factors[id]
+
     /** Live (non-tombstoned) factors in stable-id order — the current working constraint set. */
     fun liveFactors(): List<Factor> = factors.filterNotNull()
 
@@ -162,6 +197,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         if (!infeasible) snapshotFeasibleDomains()
         if (delta.droppedIds.isNotEmpty() || delta.addedFactors.isNotEmpty()) occDirty = true
         for (id in delta.droppedIds) {
+            factors[id]?.let { droppedFactorLog.add(it) }
             state.tombstoneFactor(id)
             factors[id] = null
         }
@@ -170,6 +206,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             val fid = state.addMidlifeFactor(f) // fid == factors.size at this point
             addedIds.add(fid)
             factors.add(f)
+            addedLog.add(fid)
             recordOccurrences(fid, f)
         }
         // Once infeasible, the factor changes above are still recorded (the materialized problem's bake
@@ -328,9 +365,13 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         stateProblem = eager
         factors.clear()
         factors.addAll(eager.factors)
-        // The stable-id space was rebuilt from scratch, so the occurrence lists must be too.
+        // The stable-id space was rebuilt from scratch, so the occurrence lists — and any pass's replayable
+        // change history — must be too; bumping the epoch forces a stale-marked pass to rescan.
         for (v in 0 until base.numIntVars) intOcc[v].clear()
         for (id in eager.factors.indices) recordOccurrences(id, eager.factors[id])
+        addedLog.clear()
+        droppedFactorLog.clear()
+        reseedEpoch++
         occDirty = true
         state = PropagationState(eager, Assumptions.None, incremental = true)
         if (state.runToFixpoint(allFactors = true) != null) {

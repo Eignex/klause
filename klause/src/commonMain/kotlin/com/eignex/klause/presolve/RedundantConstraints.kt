@@ -21,7 +21,41 @@ import com.eignex.kumulant.math.splitmix64
  *  variable-set sum, so a bool var and an int var of the same id don't cancel or alias. */
 private const val BOOL_VAR_MARK = 1L shl 40
 
+/** Opaque handle for the incremental round engine's persistent subsume state, carried across the module
+ *  boundary by [com.eignex.klause.presolve.PresolveContext]. Its implementation lives in this file. */
+interface SubsumeState
+
 internal object RedundantConstraints {
+
+    /**
+     * Subsumption entry point. On the fresh path (no [incremental]) it recomputes from scratch. Given a
+     * [SubsumeIncremental] it maintains the phase-1/2 indices across rounds in [SubsumeIncremental.memo],
+     * reprocessing only the factors added / dropped since the pass last ran — the whole-set rescan of a
+     * fruitless re-run (the ma-path-finding #937 cost) becomes O(delta). Phases 3–5 run over the phase-2
+     * survivor list either way.
+     */
+    fun removeRedundantConstraints(problem: Problem, incremental: SubsumeIncremental? = null): PassDelta {
+        if (incremental == null) return computeFull(problem)
+        val out = incremental.memo.reconcile(problem, incremental)
+        val delta = finishAfterPhase2(problem, out)
+        // Phases 3–5 drop factors [reconcile] never saw; feed the full drop set back so the memo retracts
+        // every dropped factor's index entry before the next firing.
+        incremental.memo.setPendingSelfDrops(delta.droppedIndices.map { problem.factors[it] })
+        if (SUBSUME_DIFFERENTIAL_CHECK) assertMatchesFull(problem, delta)
+        return delta
+    }
+
+    // Flip on to validate the incremental path: every firing also recomputes the full delta and asserts
+    // the two agree, so a divergence throws on the exact instance/round instead of surfacing as a wrong
+    // presolve output. Off in production (the full recompute defeats the incremental win).
+    private const val SUBSUME_DIFFERENTIAL_CHECK = false
+
+    private fun assertMatchesFull(problem: Problem, delta: PassDelta) {
+        val full = computeFull(problem)
+        val a = delta.droppedIndices.toHashSet()
+        val b = full.droppedIndices.toHashSet()
+        require(a == b) { "incremental subsume delta $a != full $b (nfac=${problem.factors.size})" }
+    }
 
     /**
      * Constraint subsumption / redundant-constraint removal (#447): drop a constraint implied by
@@ -45,7 +79,7 @@ internal object RedundantConstraints {
      * (maximal activity already within the bound) are dropped by the strengthen lift, so this pass is
      * purely cross-constraint.
      */
-    fun removeRedundantConstraints(problem: Problem): PassDelta {
+    private fun computeFull(problem: Problem): PassDelta {
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
         // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
@@ -123,6 +157,13 @@ internal object RedundantConstraints {
             }
             if (keep) out.add(f)
         }
+        return finishAfterPhase2(problem, out)
+    }
+
+    /** Phases 3–5 over the phase-1/2 survivor list [out] (in [Problem.factors] order), recovering the
+     *  dropped input indices. Shared by the fresh recompute and the incremental path. */
+    private fun finishAfterPhase2(problem: Problem, out: List<Factor>): PassDelta {
+        val factors = problem.factors
         // Phase 3: variable-subset / proportional domination across different supports (#466).
         val out3 = dropSubsetDominated(problem, out)
         // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques (#527).
@@ -140,6 +181,202 @@ internal object RedundantConstraints {
             if (p < out5.size && factors[i] === out5[p]) p++ else dropped.add(i)
         }
         return PassDelta(dropped.toIntArray())
+    }
+
+    /** The factors added / dropped since subsume last ran, plus its persistent [memo]. [rebuild] forces a
+     *  full rebuild of the memo from the whole live set (first run, or after a reseed invalidated it). */
+    internal class SubsumeIncremental(
+        val rebuild: Boolean,
+        val addedFactors: List<Factor>,
+        val droppedFactors: List<Factor>,
+        val memo: SubsumeMemo,
+    ) : SubsumeState
+
+    /**
+     * Persistent phase-1 (exact-duplicate) and phase-2 (same-vector domination) indices, maintained
+     * across subsume firings so a re-run reprocesses only the delta instead of rescanning every factor.
+     * Phase 2 keeps at most one representative `≤`-row per coefficient-vector bucket, so per bucket the
+     * only live drop-candidate is that representative — a re-run reconciles it against the delta in O(1).
+     *
+     * A dropped drop-candidate keeps its bucket offer the round it is dropped (the from-scratch pass
+     * offers every deduped row *before* deciding drops), so it is retracted only on the next firing:
+     * other passes' drops arrive via [SubsumeIncremental.droppedFactors]; subsume's own drops fall before
+     * the next change-mark and are carried over to the next firing internally.
+     */
+    internal class SubsumeMemo {
+        private val shallowSingle = HashMap<Long, Factor>()
+        private val shallowMulti = HashMap<Long, HashMap<StructuralKey, Factor>>()
+        private val buckets = HashMap<TermKey, Bucket>()
+
+        // Subsume's own drops from the last firing, retracted before this one (see class doc). Includes
+        // phase-3/4/5 drops (fed in by [setPendingSelfDrops]); excludes phase-1 duplicates, which never
+        // entered the indices.
+        private var pendingSelfDrops: List<Factor> = emptyList()
+
+        // Phase-1 duplicates dropped in the last [reconcile]: they have no index footprint, so they must
+        // be excluded from the self-drops retracted next firing.
+        private var lastDups: Set<Factor> = emptySet()
+
+        /** A coefficient-vector bucket: the multiset of `≤` offer bounds (and which are equalities, for
+         *  the equality-dominates rule) and the single surviving representative row, if any. */
+        private class Bucket {
+            val bounds = HashMap<Long, Int>()
+            val eqBounds = HashMap<Long, Int>()
+            var rep: Factor? = null
+            var repBound = 0L
+
+            fun tightest(): Long? = bounds.keys.minOrNull()
+            fun eqAtMin(): Boolean = tightest()?.let { eqBounds.containsKey(it) } ?: false
+
+            fun addBound(bound: Long, eq: Boolean) {
+                bounds[bound] = (bounds[bound] ?: 0) + 1
+                if (eq) eqBounds[bound] = (eqBounds[bound] ?: 0) + 1
+            }
+
+            fun removeBound(bound: Long, eq: Boolean) {
+                val c = (bounds[bound] ?: 0) - 1
+                if (c <= 0) bounds.remove(bound) else bounds[bound] = c
+                if (eq) {
+                    val e = (eqBounds[bound] ?: 0) - 1
+                    if (e <= 0) eqBounds.remove(bound) else eqBounds[bound] = e
+                }
+            }
+        }
+
+        /** Reconcile the memo with the current live set and return the phase-1/2 survivor list in
+         *  [Problem.factors] order. On [SubsumeIncremental.rebuild] the memo is rebuilt from scratch;
+         *  otherwise only the delta is applied. */
+        fun reconcile(problem: Problem, inc: SubsumeIncremental): List<Factor> {
+            val drops = HashSet<Factor>()
+            val dups = HashSet<Factor>()
+            if (inc.rebuild) {
+                shallowSingle.clear()
+                shallowMulti.clear()
+                buckets.clear()
+                pendingSelfDrops = emptyList()
+                for (f in problem.factors) process(f, drops, dups)
+            } else {
+                for (f in pendingSelfDrops) retract(f)
+                for (f in inc.droppedFactors) retract(f)
+                for (f in inc.addedFactors) process(f, drops, dups)
+            }
+            lastDups = dups
+            return if (drops.isEmpty()) problem.factors.asList() else problem.factors.filterNot { it in drops }
+        }
+
+        /** Record every factor subsume dropped this firing (phases 1–5, by object) so their index entries
+         *  are retracted before the next one. Phase-1 duplicates are filtered out — they never entered the
+         *  indices. Called after phases 3–5, whose drops [reconcile] cannot see. */
+        fun setPendingSelfDrops(allDropped: List<Factor>) {
+            pendingSelfDrops = if (lastDups.isEmpty()) allDropped else allDropped.filterNot { it in lastDups }
+        }
+
+        // Phase 1: register [f], returning true if it is a fresh survivor and false if it duplicates a
+        // kept factor. Mirrors the from-scratch two-tier dedup — the full structural key is built only on
+        // a shallow-key collision — so the lazy single-survivor slot never computes a key.
+        private fun registerP1(f: Factor): Boolean {
+            val sk = shallowKey(f)
+            val multi = shallowMulti[sk]
+            if (multi != null) {
+                val key = f.structuralKey()
+                if (multi.containsKey(key)) return false
+                multi[key] = f
+                return true
+            }
+            val single = shallowSingle[sk]
+            if (single == null) {
+                shallowSingle[sk] = f
+                return true
+            }
+            val singleKey = single.structuralKey()
+            val fKey = f.structuralKey()
+            if (singleKey == fKey) return false
+            shallowMulti[sk] = hashMapOf(singleKey to single, fKey to f)
+            shallowSingle.remove(sk)
+            return true
+        }
+
+        private fun deregisterP1(f: Factor) {
+            val sk = shallowKey(f)
+            val multi = shallowMulti[sk]
+            if (multi != null) {
+                multi.remove(f.structuralKey())
+                if (multi.size == 1) {
+                    shallowSingle[sk] = multi.values.first()
+                    shallowMulti.remove(sk)
+                }
+            } else if (shallowSingle[sk] === f) {
+                shallowSingle.remove(sk)
+            }
+        }
+
+        // Add [f] to the indices, recording into [drops] any factor it drops (itself as a duplicate, or an
+        // existing representative it dominates); a phase-1 duplicate also goes to [dups] (no index entry).
+        private fun process(f: Factor, drops: HashSet<Factor>, dups: HashSet<Factor>) {
+            if (!registerP1(f)) {
+                drops.add(f)
+                dups.add(f)
+                return
+            }
+            val touched = HashSet<TermKey>()
+            forEachOffer(f) { key, bound, eq ->
+                bucketFor(key).addBound(bound, eq)
+                touched.add(key)
+            }
+            val member = ineqNormalForm(f)?.takeIf { !it.fromEq }
+            for (key in touched) {
+                val cand = if (member != null && member.key == key) f else null
+                resolve(buckets.getValue(key), cand, member?.bound ?: 0L, drops)
+            }
+        }
+
+        // Retract a factor that left the live set: remove its offers and phase-1 entry, and clear it as a
+        // representative. Only ever called on factors that were survivors (which always added offers), so
+        // the multiset counts stay balanced; a phase-1 duplicate never added offers and is never retracted.
+        private fun retract(f: Factor) {
+            deregisterP1(f)
+            forEachOffer(f) { key, bound, eq -> buckets[key]?.removeBound(bound, eq) }
+            forEachOffer(f) { key, _, _ -> buckets[key]?.let { if (it.rep === f) it.rep = null } }
+        }
+
+        private fun bucketFor(key: TermKey): Bucket = buckets.getOrPut(key) { Bucket() }
+
+        // Reconcile a bucket's representative against the (at most one) new drop-candidate [cand]: the
+        // earliest row at the tightest bound survives when no equality dominates the bucket, mirroring the
+        // from-scratch `keptRep` rule. The old representative predates [cand], so it wins ties.
+        private fun resolve(bucket: Bucket, cand: Factor?, candBound: Long, drops: HashSet<Factor>) {
+            val t = bucket.tightest() ?: return
+            val dominatedByEq = bucket.eqAtMin()
+            val oldRep = bucket.rep
+            val oldRepQualifies = oldRep != null && !dominatedByEq && bucket.repBound == t
+            val candQualifies = cand != null && !dominatedByEq && candBound == t
+            val newRep = when {
+                oldRepQualifies -> oldRep
+                candQualifies -> cand
+                else -> null
+            }
+            if (oldRep != null && oldRep !== newRep) drops.add(oldRep)
+            if (cand != null && cand !== newRep) drops.add(cand)
+            bucket.rep = newRep
+            if (newRep === cand) bucket.repBound = candBound
+        }
+    }
+
+    /** Replay the from-scratch phase-2 offer sequence for [f]: each exact `≤`-row (a `≥` folded to `≤`,
+     *  an `=` contributing both directions), or the whole-factor normal form when it has no row view. */
+    private inline fun forEachOffer(f: Factor, action: (key: TermKey, bound: Long, eq: Boolean) -> Unit) {
+        val rows = f.linearRows()
+        if (rows != null) {
+            for (row in rows) {
+                val n = rowForm(row) ?: continue
+                action(n.key, n.bound, n.fromEq)
+                n.opposite?.let { action(it.key, it.bound, it.fromEq) }
+            }
+        } else {
+            val n = ineqNormalForm(f) ?: return
+            action(n.key, n.bound, n.fromEq)
+            n.opposite?.let { action(it.key, it.bound, it.fromEq) }
+        }
     }
 
     /** Whether [factor] is a global constraint that the current [domains] make *vacuously* satisfied —
