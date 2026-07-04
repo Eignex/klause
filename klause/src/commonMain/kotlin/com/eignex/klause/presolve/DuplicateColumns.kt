@@ -53,48 +53,44 @@ internal object DuplicateColumns {
     ): PassDelta {
         if (problem.numIntVars < 2) return PassDelta()
         val n = problem.numIntVars
-        // Iterate to the pass's own fixpoint: a chain of ≥ 3 duplicate columns folds one pair per
-        // representative, and the next iteration re-signs the third against the widened aggregate. Doing
-        // this internally instead of firing once per round and leaning on the round engine to re-invoke
-        // collapses the chain in a single pass — so the other passes are not re-run over each intermediate
-        // state. Column duplication is a structural (row-support + coefficient) property, so re-propagation
-        // between the old rounds could not change which columns are duplicates; the fixpoint reached here
-        // is the one the round engine reached across rounds, in the same pairwise order.
-        var workFactors: Array<Factor> = problem.factors
+        // Column duplication is a structural (row-support + coefficient) property, and folding one duplicate
+        // into its representative removes only the dropped column's own term — every surviving column stays
+        // in the same factors with the same coefficient, so no column's signature or eligibility changes.
+        // Eligibility and signatures are therefore computed once over the input rather than re-derived after
+        // each fold: a class of K identical columns collapses in a single O(n) scan instead of K of them,
+        // which is what let numbrix (a ~3950-column class) spend seconds re-scanning 8505 variables per pair.
         val domains = problem.intDomains.copyOf()
+        val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars)
+        val signatures = columnSignatures(problem.factors, n, eligible)
+        // Group eligible columns by signature in ascending-id order; the first is the representative.
+        val classes = LinkedHashMap<List<Long>, MutableList<Int>>()
+        for (v in 0 until n) {
+            if (!eligible[v]) continue
+            val sig = signatures[v] ?: continue
+            classes.getOrPut(sig) { ArrayList() }.add(v)
+        }
+        val maxClassSize = classes.values.maxOfOrNull { it.size } ?: 0
+        if (maxClassSize < 2) return PassDelta()
+        // Reproduce the former per-round fold order exactly: round k folds the k-th duplicate of every class
+        // into its representative (one fold per representative per round), widening the aggregate's domain to
+        // the running Minkowski sum. Batches undo last-first, so the reconstruction split is unchanged.
+        val keepOf = IntArray(n) { it } // drop → its aggregate representative
         val batches = ArrayList<List<ColumnMerge>>() // in application order; reconstruction undoes them last-first
-        while (true) {
-            val eligible = eligibleColumns(workFactors, n, domains, objectiveIntVars)
-            val signatures = columnSignatures(workFactors, n, eligible)
-            // Group eligible variables by column signature; equal signatures are duplicate columns. Fold
-            // at most one duplicate into each representative this iteration (a third re-signs next iteration).
-            val repBySignature = HashMap<List<Long>, Int>()
-            val repConsumed = HashSet<Int>()
+        for (k in 1 until maxClassSize) {
             val merges = ArrayList<ColumnMerge>()
-            for (v in 0 until n) {
-                if (!eligible[v]) continue
-                val sig = signatures[v] ?: continue
-                val rep = repBySignature[sig]
-                if (rep == null) {
-                    repBySignature[sig] = v
-                } else if (rep !in repConsumed) {
-                    merges.add(ColumnMerge(keep = rep, drop = v, keepDomain = domains[rep], dropDomain = domains[v]))
-                    repConsumed.add(rep)
-                }
+            for (members in classes.values) {
+                if (members.size <= k) continue
+                val rep = members[0]
+                val drop = members[k]
+                merges.add(ColumnMerge(keep = rep, drop = drop, keepDomain = domains[rep], dropDomain = domains[drop]))
+                keepOf[drop] = rep
+                val keep = domains[rep]
+                // Widen the aggregate to the Minkowski sum; the session reseeds on this widen via [PassDelta.domains].
+                domains[rep] = IntDomain(keep.min + domains[drop].min, keep.max + domains[drop].max)
             }
-            if (merges.isEmpty()) break
-            val keepOf = IntArray(n) { it } // drop → its aggregate representative
-            for (m in merges) {
-                keepOf[m.drop] = m.keep
-                val keep = domains[m.keep]
-                // Widen the aggregate to the Minkowski sum; the session must reseed on this widen, so it
-                // flows through [PassDelta.domains].
-                domains[m.keep] = IntDomain(keep.min + m.dropDomain.min, keep.max + m.dropDomain.max)
-            }
-            workFactors = Array(workFactors.size) { aggregateColumns(workFactors[it], keepOf) }
             batches.add(merges)
         }
-        if (batches.isEmpty()) return PassDelta()
+        val workFactors = Array(problem.factors.size) { aggregateColumns(problem.factors[it], keepOf) }
         // Delta by identity against the input: a slot whose final rewrite differs from the input factor is
         // a drop+add; an untouched slot contributes nothing.
         val dropped = IntArrayList()
