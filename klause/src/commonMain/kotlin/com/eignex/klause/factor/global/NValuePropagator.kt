@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.global.internals.reginTarjanScc
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -34,14 +35,7 @@ internal class NValuePropagator(
         // (which assumes every counted variable is present) does not apply cleanly.
         if (presents.isNotEmpty()) return propagateGreedy(state)
 
-        val gate = (state.refPayload[factorId] as? NValueCpGate) ?: run {
-            val fresh = NValueCpGate()
-            state.refPayload[factorId] = fresh
-            fresh
-        }
-        val dirty = state.drainIntEventDirtyVars(factorId)
-        if (gate.started && dirty.isEmpty()) return true
-        gate.started = true
+        if (state.cpGateShouldSkip(factorId)) return true
 
         val ant = collectHoleAndBoundAntecedents(state, intVars)
         // atLeast / eq: the distinct count cannot exceed the maximum number of variables that can be
@@ -346,8 +340,4 @@ internal class NValuePropagator(
         }
         return status
     }
-}
-
-internal class NValueCpGate {
-    var started: Boolean = false
 }
