@@ -101,7 +101,10 @@ class SourceDrivenStrategyTest {
         state.shapingLambda = 10.0 // a strong objective pull, as an aggressive linear shaping would supply
         state.recompute()
         assertEquals(0L, state.cost, "fixture must start feasible")
-        assertNull(strategy.pickMove(state), "a feasibility-breaking obj-lowering move must never be picked at cost == 0")
+        assertNull(
+            strategy.pickMove(state),
+            "a feasibility-breaking obj-lowering move must never be picked at cost == 0",
+        )
     }
 
     @Test

@@ -12,12 +12,12 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 
 /**
- * Move-set equivalence gate for [SatisfiedStructured]. The reference closures hold the
- * `Cbls.sampleFromSatisfied` (random-sampled scope) and the fill loop of
- * `LocalSearchSolver.structuredMoveStep` (enumerate-all scope); the test asserts the single
- * [SatisfiedStructured] emits the identical multiset in each scope.
+ * Move-generation coverage for [SatisfiedStructured] across its scopes. The reference closures encode
+ * the expected construction — sampled (draw [sampleCount] factors, propose from the non-violated ones),
+ * enumerate-all (every satisfied factor), and elected (sample the elected implicit factors) — and each
+ * test pins the matching [SatisfiedStructured] scope to that multiset.
  */
-class SatisfiedStructuredEquivalenceTest {
+class SatisfiedStructuredTest {
 
     private val sampleCount = 4
 
@@ -33,9 +33,8 @@ class SatisfiedStructuredEquivalenceTest {
         ),
     )
 
-    /** The reference `Cbls.sampleFromSatisfied` body (sans the cost gate, which stays in the
-     *  strategy). */
-    private fun oldSampleFromSatisfied(state: LocalSearchState, sink: MoveSink) {
+    /** The expected sampled construction: draw [sampleCount] factors, propose from the non-violated ones. */
+    private fun expectedSampled(state: LocalSearchState, sink: MoveSink) {
         val total = state.problem.numFactors
         if (total == 0) return
         repeat(sampleCount) {
@@ -46,8 +45,8 @@ class SatisfiedStructuredEquivalenceTest {
         }
     }
 
-    /** The reference `structuredMoveStep` fill loop. */
-    private fun oldStructuredAll(state: LocalSearchState, sink: MoveSink) {
+    /** The expected enumerate-all construction: propose from every satisfied factor. */
+    private fun expectedAll(state: LocalSearchState, sink: MoveSink) {
         for (fid in 0 until state.problem.numFactors) {
             val f = state.factors[fid]
             if (!f.isViolated(state, fid)) f.proposeStructuredMoves(state, fid, sink)
@@ -71,9 +70,8 @@ class SatisfiedStructuredEquivalenceTest {
         state.recompute()
     }
 
-    /** The reference `Cbls.sampleElectedStructured` body (sans the cap gate, which stays in the
-     *  strategy). */
-    private fun oldElectedStructured(state: LocalSearchState, sink: MoveSink) {
+    /** The expected elected construction: sample the elected implicit factors, propose from the satisfied ones. */
+    private fun expectedElected(state: LocalSearchState, sink: MoveSink) {
         val elected = state.electedImplicit
         if (elected.isEmpty()) return
         repeat(minOf(sampleCount, elected.size)) {
@@ -85,32 +83,32 @@ class SatisfiedStructuredEquivalenceTest {
     }
 
     @Test
-    fun `sampled scope matches the old sampleFromSatisfied`() {
+    fun `sampled scope draws sampleCount satisfied factors' structured moves`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
             assertSourceMatchesGenerator(::feasibleProblem, seed, SatisfiedStructured.sampled(sampleCount)) { s, sink ->
-                oldSampleFromSatisfied(s, sink)
+                expectedSampled(s, sink)
             }
         }
     }
 
     @Test
-    fun `all scope matches the old structuredMoveStep fill loop`() {
+    fun `all scope enumerates every satisfied factor's structured moves`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L)) {
             assertSourceMatchesGenerator(::feasibleProblem, seed, SatisfiedStructured.all()) { s, sink ->
-                oldStructuredAll(s, sink)
+                expectedAll(s, sink)
             }
         }
     }
 
     @Test
-    fun `elected scope matches the implicit-neighbourhood sampleElectedStructured`() {
+    fun `elected scope samples the elected implicit factors' structured moves`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L)) {
             assertSourceMatchesGenerator(
                 ::electedProblem,
                 seed,
                 SatisfiedStructured.elected(sampleCount),
                 prepare = ::seedPermutation,
-            ) { s, sink -> oldElectedStructured(s, sink) }
+            ) { s, sink -> expectedElected(s, sink) }
         }
     }
 
