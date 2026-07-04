@@ -99,16 +99,17 @@ internal class CardinalityPropagator(
         return null
     }
 
-    /** Collect every currently-false literal in [literals] whose variable differs from
-     *  [excludeVar]. Returned as the antecedents array for a pin: their collectively being
-     *  false is exactly what forced the pin. Returns `null` if nothing to record. */
-    private fun antecedentsForTruePin(state: PropagationState, excludeVar: Int): IntArray? {
+    /** Antecedents for a forced pin. For an at-least pin ([collectTrue] = false) the reason is the
+     *  currently-*false* literals (their being false forced the pin), recorded as-is. For an at-most
+     *  pin ([collectTrue] = true) it is the negations of the currently-*true* literals (their being
+     *  true forced the pin to false). Excludes [excludeVar]; returns `null` when nothing to record. */
+    private fun antecedentsForPin(state: PropagationState, excludeVar: Int, collectTrue: Boolean): IntArray? {
         var n = 0
         for (lit in literals) {
             val v = Lit.variable(lit)
             if (v == excludeVar) continue
             val b = state.boolValues[v] ?: continue
-            if (!Lit.evaluate(lit, b)) n++
+            if (Lit.evaluate(lit, b) == collectTrue) n++
         }
         if (n == 0) return null
         val out = IntArray(n)
@@ -117,29 +118,7 @@ internal class CardinalityPropagator(
             val v = Lit.variable(lit)
             if (v == excludeVar) continue
             val b = state.boolValues[v] ?: continue
-            if (!Lit.evaluate(lit, b)) out[w++] = lit
-        }
-        return out
-    }
-
-    /** Mirror of [antecedentsForTruePin] for at-most pins: antecedents are the negations
-     *  of currently-true literals, since their being true forced this pin to false. */
-    private fun antecedentsForFalsePin(state: PropagationState, excludeVar: Int): IntArray? {
-        var n = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == excludeVar) continue
-            val b = state.boolValues[v] ?: continue
-            if (Lit.evaluate(lit, b)) n++
-        }
-        if (n == 0) return null
-        val out = IntArray(n)
-        var w = 0
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            if (v == excludeVar) continue
-            val b = state.boolValues[v] ?: continue
-            if (Lit.evaluate(lit, b)) out[w++] = Lit.negate(lit)
+            if (Lit.evaluate(lit, b) == collectTrue) out[w++] = if (collectTrue) Lit.negate(lit) else lit
         }
         return out
     }
@@ -159,17 +138,18 @@ internal class CardinalityPropagator(
             w
         }
         if (atLeastWatchSize > 0 &&
-            !propagateAtLeastSide(state, factorId, watches, 0, atLeastWatchSize)
+            !propagateSide(state, factorId, watches, 0, atLeastWatchSize, atLeast = true)
         ) {
             return false
         }
         if (atMostWatchSize > 0 &&
-            !propagateAtMostSide(
+            !propagateSide(
                 state,
                 factorId,
                 watches,
                 atLeastWatchSize,
                 atLeastWatchSize + atMostWatchSize,
+                atLeast = false,
             )
         ) {
             return false
@@ -177,75 +157,54 @@ internal class CardinalityPropagator(
         return true
     }
 
-    /** Propagates the at-least side: pins unwatched literals to true when all watchers are false. */
-    private fun propagateAtLeastSide(
+    /**
+     * Propagate one watched side. [atLeast] = true is the at-least side (pins unwatched literals
+     * *true* once every watcher is false); [atLeast] = false is the at-most side (pins them *false*
+     * once every watcher is true). The two are exact mirrors under literal negation: the trigger is
+     * a watcher already assigned to the "bad" value ([atLeast] ⇒ false, else true), the replacement
+     * is any outside literal not yet at that value, and a watch relocates on the plain literal
+     * (at-least) or its negation (at-most).
+     */
+    private fun propagateSide(
         state: PropagationState,
         factorId: Int,
         watches: IntArray,
         start: Int,
         end: Int,
+        atLeast: Boolean,
     ): Boolean {
+        val triggerValue = !atLeast
         for (i in start until end) {
-            if (!litFalseAt(state, watches[i])) continue
-            val rep = findNonFalseOutside(state, watches, start, end)
-            if (rep < 0) {
-                return unitPinWatchedToTrue(state, watches, start, end, i)
-            }
-            state.moveBoolWatcher(factorId, literals[watches[i]], literals[rep])
+            if (!litIs(state, watches[i], triggerValue)) continue
+            val rep = findNonOutside(state, watches, start, end, triggerValue)
+            if (rep < 0) return unitPinWatched(state, watches, start, end, i, pinTrue = atLeast)
+            val from = if (atLeast) literals[watches[i]] else Lit.negate(literals[watches[i]])
+            val to = if (atLeast) literals[rep] else Lit.negate(literals[rep])
+            state.moveBoolWatcher(factorId, from, to)
             watches[i] = rep
         }
         return true
     }
 
-    /** Propagates the at-most side: pins unwatched literals to false when all watchers are true. */
-    private fun propagateAtMostSide(
-        state: PropagationState,
-        factorId: Int,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-    ): Boolean {
-        for (i in start until end) {
-            if (!litTrueAt(state, watches[i])) continue
-            val rep = findNonTrueOutside(state, watches, start, end)
-            if (rep < 0) {
-                return unitPinWatchedToFalse(state, watches, start, end, i)
-            }
-            state.moveBoolWatcher(
-                factorId,
-                Lit.negate(literals[watches[i]]),
-                Lit.negate(literals[rep]),
-            )
-            watches[i] = rep
-        }
-        return true
-    }
-
-    /** Returns the index of a non-false literal outside the watched range, or -1 if none. */
-    private fun findNonFalseOutside(state: PropagationState, watches: IntArray, start: Int, end: Int): Int {
+    /** Index of a literal outside the watched range whose truth is not [value] (unassigned counts),
+     *  or -1 if every outside literal is already assigned [value]. */
+    private fun findNonOutside(state: PropagationState, watches: IntArray, start: Int, end: Int, value: Boolean): Int {
         outer@ for (i in literals.indices) {
             for (w in start until end) if (watches[w] == i) continue@outer
-            if (!litFalseAt(state, i)) return i
+            if (!litIs(state, i, value)) return i
         }
         return -1
     }
 
-    /** Returns the index of a non-true literal outside the watched range, or -1 if none. */
-    private fun findNonTrueOutside(state: PropagationState, watches: IntArray, start: Int, end: Int): Int {
-        outer@ for (i in literals.indices) {
-            for (w in start until end) if (watches[w] == i) continue@outer
-            if (!litTrueAt(state, i)) return i
-        }
-        return -1
-    }
-
-    /** Pins all watched literals except the one at [skipIdx] to true; returns false on conflict. */
-    private fun unitPinWatchedToTrue(
+    /** Pins every watched literal except [skipIdx] to [pinTrue] (true = at-least, false = at-most);
+     *  returns false on conflict. */
+    private fun unitPinWatched(
         state: PropagationState,
         watches: IntArray,
         start: Int,
         end: Int,
         skipIdx: Int,
+        pinTrue: Boolean,
     ): Boolean {
         for (i in start until end) {
             if (i == skipIdx) continue
@@ -253,50 +212,21 @@ internal class CardinalityPropagator(
             val v = Lit.variable(lit)
             val b = state.boolValues[v]
             if (b == null) {
-                val ant = antecedentsForTruePin(state, v)
-                if (!state.pinBool(v, Lit.isPositive(lit), ant)) return false
-            } else if (!Lit.evaluate(lit, b)) {
+                val ant = antecedentsForPin(state, v, collectTrue = !pinTrue)
+                if (!state.pinBool(v, Lit.isPositive(lit) == pinTrue, ant)) return false
+            } else if (Lit.evaluate(lit, b) != pinTrue) {
                 return false
             }
         }
         return true
     }
 
-    /** Pins all watched literals except the one at [skipIdx] to false; returns false on conflict. */
-    private fun unitPinWatchedToFalse(
-        state: PropagationState,
-        watches: IntArray,
-        start: Int,
-        end: Int,
-        skipIdx: Int,
-    ): Boolean {
-        for (i in start until end) {
-            if (i == skipIdx) continue
-            val lit = literals[watches[i]]
-            val v = Lit.variable(lit)
-            val b = state.boolValues[v]
-            if (b == null) {
-                val ant = antecedentsForFalsePin(state, v)
-                if (!state.pinBool(v, !Lit.isPositive(lit), ant)) return false
-            } else if (Lit.evaluate(lit, b)) {
-                return false
-            }
-        }
-        return true
-    }
-
-    /** Returns true iff literal at index [idx] is currently assigned true. */
-    private fun litTrueAt(state: PropagationState, idx: Int): Boolean {
+    /** True iff the literal at index [idx] is currently assigned and evaluates to [value]
+     *  (unassigned ⇒ false for either value). */
+    private fun litIs(state: PropagationState, idx: Int, value: Boolean): Boolean {
         val lit = literals[idx]
         val b = state.boolValues[Lit.variable(lit)] ?: return false
-        return Lit.evaluate(lit, b)
-    }
-
-    /** Returns true iff literal at index [idx] is currently assigned false. */
-    private fun litFalseAt(state: PropagationState, idx: Int): Boolean {
-        val lit = literals[idx]
-        val b = state.boolValues[Lit.variable(lit)] ?: return false
-        return !Lit.evaluate(lit, b)
+        return Lit.evaluate(lit, b) == value
     }
 
     /**
@@ -317,7 +247,7 @@ internal class CardinalityPropagator(
         if (trueCount > max) return false
         if (trueCount + unassigned < min) return false
         if (trueCount == max && unassigned > 0) {
-            val ant = antecedentsForFalsePin(state, excludeVar = -1)
+            val ant = antecedentsForPin(state, excludeVar = -1, collectTrue = true)
             for (lit in literals) {
                 val v = Lit.variable(lit)
                 if (state.boolValues[v] != null) continue
@@ -326,7 +256,7 @@ internal class CardinalityPropagator(
             return true
         }
         if (trueCount + unassigned == min && unassigned > 0) {
-            val ant = antecedentsForTruePin(state, excludeVar = -1)
+            val ant = antecedentsForPin(state, excludeVar = -1, collectTrue = false)
             for (lit in literals) {
                 val v = Lit.variable(lit)
                 if (state.boolValues[v] != null) continue
