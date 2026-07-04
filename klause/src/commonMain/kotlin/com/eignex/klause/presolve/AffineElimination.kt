@@ -49,6 +49,17 @@ internal object AffineSingletons {
         if (problem.numIntVars == 0) return PassDelta()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
+        // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
+        // can read the session's shared occurrence index directly (its CSR is in stable-id order). If no
+        // unit-pivot and no residue candidate exists there, the pass is fruitless and returns without ever
+        // building the mutable [WorkingSet] — skipping its O(occurrences) index copy on every barren firing.
+        if (sharedIntOcc != null) {
+            val seed = SeedOcc(problem.factors, sharedIntOcc)
+            val noUnit = findAffineCandidate(seed, 0, eliminated, objectiveIntVars, capWide) == null
+            if (noUnit && findResidueCandidate(seed, eliminated, objectiveIntVars, problem.intDomains) == null) {
+                return PassDelta()
+            }
+        }
         // The working set holds the factors by stable id (tombstones for drops, appends for the folded
         // rewrites and bound rows) and a per-variable occurrence index maintained across eliminations.
         // The session-maintained index matches the pristine input factor order, so the first candidate
@@ -120,7 +131,7 @@ internal object AffineSingletons {
     )
 
     private fun findResidueCandidate(
-        ws: WorkingSet,
+        ws: FactorOcc,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
         domains: Array<IntDomain>,
@@ -188,7 +199,7 @@ internal object AffineSingletons {
     )
 
     private fun findAffineCandidate(
-        ws: WorkingSet,
+        ws: FactorOcc,
         start: Int,
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
@@ -262,6 +273,62 @@ internal object AffineSingletons {
     }
 
     /**
+     * The read-only occurrence queries the candidate scans ([findAffineCandidate], [findResidueCandidate])
+     * run: walk the factors by stable id and, per pivot, test where else the variable occurs. Both the
+     * mutable [WorkingSet] and the pristine-input [SeedOcc] answer these, so a scan can run over the
+     * session's shared occurrence index without first materialising a mutable working set.
+     */
+    private interface FactorOcc {
+        val size: Int
+        fun factorAt(id: Int): Factor?
+        fun degreeOf(x: Int): Int
+        fun isContained(defIdx: Int, x: Int): Boolean
+        fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean
+        fun otherOccurrencesAffineSubstitutable(defIdx: Int, x: Int, scale: Int, offset: Int, replacement: Int): Boolean
+    }
+
+    /**
+     * A read-only [FactorOcc] over the pristine input [factors] and the session's [SharedIntOccurrence],
+     * whose CSR is in stable-id order so its dense indices *are* the ids into [factors]. Before any fold
+     * the working set equals this, so the first candidate scan reads it directly — a fruitless pass (no
+     * candidate) returns without ever building the mutable [WorkingSet]'s O(occurrences) index.
+     */
+    private class SeedOcc(private val factors: Array<Factor>, private val occ: SharedIntOccurrence) : FactorOcc {
+        override val size: Int get() = factors.size
+        override fun factorAt(id: Int): Factor = factors[id]
+        override fun degreeOf(x: Int): Int = occ.offsets[x + 1] - occ.offsets[x]
+
+        override fun isContained(defIdx: Int, x: Int): Boolean {
+            for (k in occ.offsets[x] until occ.offsets[x + 1]) if (occ.flat[k] != defIdx) return false
+            return true
+        }
+
+        override fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean {
+            for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+                val id = occ.flat[k]
+                if (id != defIdx && factors[id] !is Linear) return false
+            }
+            return true
+        }
+
+        override fun otherOccurrencesAffineSubstitutable(
+            defIdx: Int,
+            x: Int,
+            scale: Int,
+            offset: Int,
+            replacement: Int,
+        ): Boolean {
+            for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+                val id = occ.flat[k]
+                if (id == defIdx) continue
+                val f = factors[id]
+                if (f !is Linear && f.substituteAffine(x, scale, offset, replacement) == null) return false
+            }
+            return true
+        }
+    }
+
+    /**
      * The working factor set for one [eliminateAffineSingletons] call, keyed by a stable id: ids
      * `[0, base.size)` are the pristine inputs; each appended factor takes the next id. A dropped id is
      * tombstoned (its slot becomes `null`) and never reused, so a live factor keeps its id — and hence
@@ -275,7 +342,7 @@ internal object AffineSingletons {
      * mention the pivot, so only those ids' occurrence entries move. Its per-list order is irrelevant —
      * every reader (`isContained`, `otherOccurrences*`) tests membership, not position.
      */
-    private class WorkingSet(base: Array<Factor>, nVars: Int, seed: SharedIntOccurrence?) {
+    private class WorkingSet(base: Array<Factor>, nVars: Int, seed: SharedIntOccurrence?) : FactorOcc {
         private val slots = ArrayList<Factor?>(base.size + 1).apply { addAll(base) }
         private val intOcc = Array(nVars) { IntArrayList(0) }
 
@@ -293,10 +360,10 @@ internal object AffineSingletons {
         }
 
         /** Number of stable slots (live plus tombstoned); the upper bound of the candidate scan. */
-        val size: Int get() = slots.size
+        override val size: Int get() = slots.size
 
         /** The factor at stable id [id], or `null` if it was dropped. */
-        fun factorAt(id: Int): Factor? = slots[id]
+        override fun factorAt(id: Int): Factor? = slots[id]
 
         /** The live (non-tombstoned) factors in stable-id order — the working constraint set. */
         fun liveFactors(): List<Factor> = slots.filterNotNull()
@@ -324,17 +391,17 @@ internal object AffineSingletons {
         }
 
         /** Number of live factors mentioning [x] — the fan-out a fold on [x] would rewrite. */
-        fun degreeOf(x: Int): Int = intOcc[x].size
+        override fun degreeOf(x: Int): Int = intOcc[x].size
 
         /** Whether [x] occurs in no factor other than [defIdx]. */
-        fun isContained(defIdx: Int, x: Int): Boolean {
+        override fun isContained(defIdx: Int, x: Int): Boolean {
             val occ = intOcc[x]
             for (k in 0 until occ.size) if (occ[k] != defIdx) return false
             return true
         }
 
         /** Whether every factor other than [defIdx] that mentions [x] is a [Linear] (foldable). */
-        fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean {
+        override fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean {
             val occ = intOcc[x]
             for (k in 0 until occ.size) {
                 val id = occ[k]
@@ -346,7 +413,7 @@ internal object AffineSingletons {
         /** Whether every factor other than [defIdx] that mentions [x] can take the substitution
          *  `x = scale·replacement + offset`: a [Linear] folds it directly, any other factor must opt in
          *  via [Factor.substituteAffine] (a global that can represent the affine view). */
-        fun otherOccurrencesAffineSubstitutable(
+        override fun otherOccurrencesAffineSubstitutable(
             defIdx: Int,
             x: Int,
             scale: Int,
