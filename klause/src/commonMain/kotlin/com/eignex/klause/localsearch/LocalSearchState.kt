@@ -344,6 +344,14 @@ class LocalSearchState(
     // array-copy path (the dominant LS allocation source). State is per-worker, so no locking.
     private var degScratch: IntArray? = null
 
+    // Per-part probe scratch reused across evaluateCompound calls, grown on demand to the widest
+    // compound seen; only the first `parts.size` entries are live. Probes are strictly nested per
+    // worker (never concurrent, no re-entrancy), so a single set is safe — as with [degScratch].
+    private val inverseScratch = ArrayList<Move>()
+    private var slotScratch: IntArray = IntArray(0)
+    private var savedTouchedScratch: LongArray = LongArray(0)
+    private var savedTouchCountScratch: IntArray = IntArray(0)
+
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
     // degree changes during a probe's forward apply, snapshotting its pre-probe violated status on
     // first touch. The break count is then a scan of only the touched factors: a factor can flip
@@ -811,14 +819,28 @@ class LocalSearchState(
         } else {
             null
         }
-        // Inverse per part (BoolFlip self-inverts; IntSet needs current value).
-        val inverses = ArrayList<Move>(move.parts.size)
+        val n = move.parts.size
+        // Inverse per part (BoolFlip self-inverts; IntSet needs current value). Reused list, refilled.
+        val inverses = inverseScratch
+        inverses.clear()
         for (p in move.parts) inverses += inverseOf(p)
         // Save lastTouched / touchCount for each affected slot; the apply+revert dance overwrites
         // them, and a probe must not register as real cross-epoch activity (ALNS keys on touchCount).
-        val touchedSlots = IntArray(move.parts.size) { slotOf(move.parts[it]) }
-        val savedTouched = LongArray(touchedSlots.size) { lastTouched[touchedSlots[it]] }
-        val savedTouchCount = IntArray(touchedSlots.size) { touchCount[touchedSlots[it]] }
+        // Reused scratch grown to the widest compound; only [0, n) is live.
+        if (slotScratch.size < n) {
+            slotScratch = IntArray(n)
+            savedTouchedScratch = LongArray(n)
+            savedTouchCountScratch = IntArray(n)
+        }
+        val touchedSlots = slotScratch
+        val savedTouched = savedTouchedScratch
+        val savedTouchCount = savedTouchCountScratch
+        for (i in 0 until n) {
+            val slot = slotOf(move.parts[i])
+            touchedSlots[i] = slot
+            savedTouched[i] = lastTouched[slot]
+            savedTouchCount[i] = touchCount[slot]
+        }
 
         probeTouchedList.clear()
         probeActive = true
@@ -848,8 +870,8 @@ class LocalSearchState(
 
         // Conf-change needs no restore — it was left untouched for the whole probe (see probeActive).
         step = oldStep
-        for (i in touchedSlots.indices) lastTouched[touchedSlots[i]] = savedTouched[i]
-        for (i in touchedSlots.indices) touchCount[touchedSlots[i]] = savedTouchCount[i]
+        for (i in 0 until n) lastTouched[touchedSlots[i]] = savedTouched[i]
+        for (i in 0 until n) touchCount[touchedSlots[i]] = savedTouchCount[i]
         bestCostSeen = oldBestCost
 
         return CompoundEval(breakScore = breakCount, netDelta = netDelta, weightedNetDelta = weightedNetDelta)
