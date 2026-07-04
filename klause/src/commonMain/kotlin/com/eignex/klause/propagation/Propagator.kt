@@ -62,7 +62,7 @@ interface Propagator {
      * [com.eignex.klause.propagation.IntEvent.pack], where `kind` is one of
      * `IntEvent.LB_RAISED` / `UB_LOWERED` / `VALUE_REMOVED` / `FIXED`. When non-null, the engine
      * routes wakeup for the subscribed variables through the per-`(var, kind)` index
-     * (`PropagationState.intEvents.watchersBySlot`) instead of through the factor's int vars: the
+     * (`PropagationState.intEvents.forEachWatcher`) instead of through the factor's int vars: the
      * factor fires only when a kind it subscribed to actually occurs on that variable.
      *
      * This is the int-side analog of [initialBoolWatchers] and the scheduling substrate for

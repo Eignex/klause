@@ -552,8 +552,10 @@ class PropagationState(
             val blockers = propagator.initialBoolWatcherBlockers
             for (i in watchers.indices) installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
         }
-        if (intEvents.on) {
-            propagator.initialIntEventWatches?.let { for (packed in it) intEvents.watchersBySlot[packed].add(fid) }
+        // Base factors' int-event subscriptions are prebuilt into the CSR at [IntEventMachinery]
+        // construction; only mid-life factors (fid past the base count) subscribe here, into the overflow.
+        if (intEvents.on && fid >= baseFactorCount) {
+            propagator.initialIntEventWatches?.let { for (packed in it) intEvents.subscribeMidlife(packed, fid) }
         }
         if (intEvents.deltaOn && propagator.consumesIntEventDelta) {
             intEvents.dirtyVars[fid] = IntArrayList()
@@ -886,7 +888,7 @@ class PropagationState(
      * on the int side: the occurrence-list factors that don't subscribe to typed events on `v`
      * ([com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences]), plus — for each
      * [IntEvent] kind that actually occurred (read from [IntEventMachinery.dirtyKinds]) — the advisors registered
-     * in [IntEventMachinery.watchersBySlot]. The kind mask is cleared after dispatch so it doesn't leak into a
+     * in [IntEventMachinery.forEachWatcher]. The kind mask is cleared after dispatch so it doesn't leak into a
      * later change to the same variable. When no factor subscribes this reduces to the plain
      * occurrence-list walk over [com.eignex.klause.solver.Problem.intOccurrences].
      */
@@ -904,9 +906,7 @@ class PropagationState(
         var kind = 0
         while (kind < IntEvent.COUNT) {
             if (mask and (1 shl kind) != 0) {
-                val list = intEvents.watchersBySlot[IntEvent.pack(v, kind)]
-                for (i in 0 until list.size) {
-                    val fid = list[i]
+                intEvents.forEachWatcher(IntEvent.pack(v, kind)) { fid ->
                     propEnq(fid)
                     accumulateDirtyVar(fid, v)
                 }
