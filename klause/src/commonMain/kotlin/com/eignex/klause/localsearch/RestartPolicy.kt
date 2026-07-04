@@ -4,6 +4,7 @@ import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundLog
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.LubyIterator
 
 /**
  * Pluggable restart logic for [LocalSearchSolver]. Decouples *when* to restart
@@ -193,25 +194,14 @@ class StagnationRestart(
  * them); only the assignment, `lastTouched`, and `step` reset.
  */
 class LubyRestart(val unit: Int = 100) : RestartPolicy {
-    private var u: Int = 1
-    private var v: Int = 1
-    private var cadence: Int = unit
+    private val luby = LubyIterator()
+    private var cadence: Int = unit * luby.value
 
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= cadence
 
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         state.restart()
-        advance()
-    }
-
-    /** Knuth's O(1) iterative form of the Luby sequence. */
-    private fun advance() {
-        if ((u and -u) == v) {
-            u += 1
-            v = 1
-        } else {
-            v *= 2
-        }
-        cadence = unit * v
+        luby.advance()
+        cadence = unit * luby.value
     }
 }
