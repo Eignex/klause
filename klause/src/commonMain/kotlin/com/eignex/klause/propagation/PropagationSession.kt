@@ -224,7 +224,7 @@ class PropagationSession(
      * Register a learned [clause] and immediately propagate it. Used by the
      * BacktrackSolver after a CDB backjump to make the analyzer's 1UIP clause stick:
      * the clause stays alive for the rest of the session and participates in every
-     * future propagation cycle through [PropagationState.boolWatchersByLit]. Returns
+     * future propagation cycle through [BoolWatcherIndex.byLit]. Returns
      * the propagation result of asserting it — typically [PropagationResult.Implied]
      * with the UIP literal now forced, or [PropagationResult.Unsat] if the assertion
      * cascades into another conflict (the engine handles that as a fresh CDB round).
@@ -392,9 +392,9 @@ class PropagationSession(
                 bools[bi++] = lit
             } else {
                 val atomId = v - numBool
-                quads[qi++] = state.atomIntVar[atomId]
-                quads[qi++] = state.atomKind[atomId].ordinal
-                quads[qi++] = state.atomThreshold[atomId]
+                quads[qi++] = state.atoms.intVar[atomId]
+                quads[qi++] = state.atoms.kind[atomId].ordinal
+                quads[qi++] = state.atoms.threshold[atomId]
                 quads[qi++] = if (Lit.isPositive(lit)) 0 else 1
             }
         }

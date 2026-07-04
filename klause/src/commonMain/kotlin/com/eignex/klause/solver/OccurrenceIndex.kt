@@ -64,7 +64,7 @@ class OccurrenceIndex(
      * [boolOccurrences] minus factors that use per-literal wakeup (see
      * [Propagator.initialBoolWatchers]). The propagation engine walks this list for
      * occurrence-driven wakeup, while watcher-using factors are woken via the
-     * per-state [com.eignex.klause.propagation.PropagationState.boolWatchersByLit]
+     * per-state [com.eignex.klause.propagation.BoolWatcherIndex.byLit]
      * index instead. Identical to [boolOccurrences] when no factor opts in.
      */
     val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
@@ -99,7 +99,7 @@ class OccurrenceIndex(
      * *that* variable (see [Propagator.initialIntEventWatches]). The propagation engine walks this list
      * for occurrence-driven int wakeup; a subscribing factor is woken for its subscribed variables
      * via the per-`(var, kind)`
-     * [com.eignex.klause.propagation.PropagationState.intEventWatchersBySlot] index instead.
+     * [com.eignex.klause.propagation.IntEventMachinery.watchersBySlot] index instead.
      *
      * Exclusion is per `(factor, variable)`, not all-or-nothing: a factor that subscribes to events
      * on variable `a` but not `b` (both in its [Factor.intVars]) is dropped from `a`'s list yet kept

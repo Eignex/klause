@@ -4,7 +4,7 @@ import com.eignex.klause.util.IntArrayList
 
 // The interior-hole carve record: the per-var (value, level, reason) of each interior hole carved
 // out of a variable's domain during search. Bound atoms carry their establishment level/reason on
-// their own trail slots ([PropagationState.atomLvl] / [PropagationState.atomAnt]); this record is the
+// their own trail slots ([AtomStore.lvl] / [AtomStore.ant]); this record is the
 // equivalent for an eq atom ruled out by a hole — it answers the level and reason of an eq atom
 // materialized after its value was carved, when no trail slot was stamped at carve time. Pushed by
 // [pushHoleHist], truncated on backtrack alongside the carve, read by [holeReasonFor] /

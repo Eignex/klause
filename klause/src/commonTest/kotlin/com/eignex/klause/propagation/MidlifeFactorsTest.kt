@@ -11,12 +11,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * The incremental-presolve mid-life factor API on [PropagationState]: appending a factor and
+ * The incremental-presolve mid-life factor overlay ([MidlifeFactors]), exercised through the
+ * [PropagationState] API: appending a factor and
  * tombstoning another between propagation rounds must reach the same root fixpoint as building the
  * final factor set from scratch. Sound because the propagators are monotone, so the greatest
  * fixpoint is unique regardless of the order factors are introduced or the ids they carry.
  */
-class PropagationStateMidlifeTest {
+class MidlifeFactorsTest {
 
     // Three int vars, each 0..10. A fresh array per call — Problem construction folds root deductions
     // into the domains it is given, so sharing one array across builds would cross-contaminate.

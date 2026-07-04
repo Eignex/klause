@@ -11,12 +11,12 @@ import com.eignex.klause.util.IntArrayList
 /**
  * Invoke [action] with the *other* literal of every binary clause that contains [lit]
  * (#202). Binary clauses watch both their literals and never relocate a watch (there is
- * no third literal to move to), so [PropagationState.boolWatchersByLit] reliably lists every binary clause
+ * no third literal to move to), so [BoolWatcherIndex.byLit] reliably lists every binary clause
  * on [lit]. No-op for atom-literal [lit] (the bool watcher index only covers bool vars).
  */
 internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int) -> Unit) {
     if (Lit.variable(lit) >= problem.numBoolVars) return
-    val list = boolWatchersByLit[lit]
+    val list = watches.byLit[lit]
     for (i in 0 until list.size) {
         val f = factorAt(list[i])
         if (f is ClausePropagator && f.literals.size == 2) {
@@ -36,7 +36,7 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
 internal fun PropagationState.factorAt(fid: Int): Propagator = when {
     incremental && !factorAliveAt(fid) -> NoPropagator
     fid < baseFactorCount -> baseFactors[fid]
-    incremental -> midlifeFactorStore[fid - baseFactorCount]
+    incremental -> midlife.store[fid - baseFactorCount]
     else -> learned.store[fid - baseFactorCount]
 }
 
@@ -46,7 +46,7 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
  *   - record the clause's [lbd] in [LearnedClauseDb.lbds] (parallel array);
  *   - grow [PropagationState.refPayloadStore] by one slot so [ClausePropagator.propagate]'s
  *     `state.refPayload[factorId]` access stays in-bounds;
- *   - install the clause's initial watch literals in [PropagationState.boolWatchersByLit] so it
+ *   - install the clause's initial watch literals in [BoolWatcherIndex.byLit] so it
  *     participates in the wakeup index.
  *
  * Does NOT eagerly propagate — that's the session-level
@@ -114,7 +114,7 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * Three things are rebuilt:
  *   - [LearnedClauseDb.store] / [LearnedClauseDb.lbds] compacted to the kept entries in order;
  *   - the learned-clause tail of [PropagationState.refPayloadStore] compacted similarly;
- *   - every list in [PropagationState.boolWatchersByLit] walked once, with learned factor ids
+ *   - every list in [BoolWatcherIndex.byLit] walked once, with learned factor ids
  *     remapped through `oldFid → newFid` or removed when dropped.
  *
  * Watchers' positions inside each clause's `refPayload[fid]` are watch *indices*
@@ -165,9 +165,9 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
 
     // Remap each per-literal watcher list. Static fids pass through; learned fids
     // either rewrite to their new factor id or get dropped.
-    for (lit in boolWatchersByLit.indices) {
-        val list = boolWatchersByLit[lit]
-        val blockers = boolBlockersByLit[lit] // compacted in lockstep so indices stay aligned
+    for (lit in watches.byLit.indices) {
+        val list = watches.byLit[lit]
+        val blockers = watches.blockersByLit[lit] // compacted in lockstep so indices stay aligned
         var wi = 0
         for (r in 0 until list.size) {
             val fid = list[r]
@@ -191,7 +191,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // bound atom registers here, not in the bool-var lists. Skipping this remap left
     // stale fids pointing past the compacted clause array, crashing the next atom wake
     // on any model whose conflicts learn atom-literal clauses.
-    for (list in atomWatchersByLit) {
+    for (list in atoms.watchersByLit) {
         if (list == null) continue
         var wi = 0
         for (r in 0 until list.size) {
@@ -209,10 +209,10 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // The compaction renumbered learned fids and shifted every list position, so the
     // back-pointer index is stale — rebuild it wholesale from the final lists. Cheap
     // relative to the rest of forget, which is itself infrequent (≈ once per restart).
-    boolWatchPos.clear()
-    for (lit in boolWatchersByLit.indices) {
-        val list = boolWatchersByLit[lit]
-        for (i in 0 until list.size) boolWatchPos.put(packWatch(list[i], lit), i)
+    watches.pos.clear()
+    for (lit in watches.byLit.indices) {
+        val list = watches.byLit[lit]
+        for (i in 0 until list.size) watches.pos.put(packWatch(list[i], lit), i)
     }
 
     // A conflict return leaves the propagation queues holding in-flight fids, and the
@@ -220,7 +220,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
     // fids from before the compaction. Remap them like the watcher lists: a stale fid
     // surviving here indexes past the compacted clause array on the next drain.
     remapQueue(propQueue, remap, refBase)
-    remapQueue(dirtyAtomFactors, remap, refBase)
+    remapQueue(atoms.dirtyFactors, remap, refBase)
 
     // The per-variable reason fields record which factor forced each currently-implied
     // value, learned-clause ids included. Level-0 facts — e.g. a permanent blocking nogood

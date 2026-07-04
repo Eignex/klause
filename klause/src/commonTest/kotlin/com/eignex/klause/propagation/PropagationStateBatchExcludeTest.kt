@@ -50,18 +50,18 @@ class PropagationStateBatchExcludeTest {
 
     private fun assertStatesEquivalent(seq: PropagationState, batch: PropagationState, where: String) {
         assertEquals(seq.intDomains[0], batch.intDomains[0], "domain mismatch at $where")
-        assertEquals(seq.atomIntVar.size, batch.atomIntVar.size)
-        for (id in 0 until seq.atomIntVar.size) {
+        assertEquals(seq.atoms.intVar.size, batch.atoms.intVar.size)
+        for (id in 0 until seq.atoms.intVar.size) {
             assertEquals(
                 seq.atomCurrentTruth(id),
                 batch.atomCurrentTruth(id),
-                "atom truth mismatch at $where: id=$id kind=${seq.atomKind[id]} k=${seq.atomThreshold[id]} " +
+                "atom truth mismatch at $where: id=$id kind=${seq.atoms.kind[id]} k=${seq.atoms.threshold[id]} " +
                     "seqDom=${seq.intDomains[0]} batchDom=${batch.intDomains[0]}",
             )
             assertEquals(
-                seq.atomLvl[id],
-                batch.atomLvl[id],
-                "atom level mismatch at $where: id=$id kind=${seq.atomKind[id]} k=${seq.atomThreshold[id]}",
+                seq.atoms.lvl[id],
+                batch.atoms.lvl[id],
+                "atom level mismatch at $where: id=$id kind=${seq.atoms.kind[id]} k=${seq.atoms.threshold[id]}",
             )
         }
     }
@@ -150,13 +150,13 @@ class PropagationStateBatchExcludeTest {
                         if (s.excludeIntValues(v, values, null)) marks.addLast(s.mark())
                     }
                 }
-                for (id in 0 until s.atomIntVar.size) {
-                    val v = s.atomIntVar[id]
+                for (id in 0 until s.atoms.intVar.size) {
+                    val v = s.atoms.intVar[id]
                     assertEquals(
-                        s.atomTruthOf(v, s.atomKind[id], s.atomThreshold[id]),
+                        s.atomTruthOf(v, s.atoms.kind[id], s.atoms.threshold[id]),
                         s.atomCurrentTruth(id),
                         "stored truth diverged at trial=$trial step=$step pop=$pop: id=$id " +
-                            "(var=$v kind=${s.atomKind[id]} k=${s.atomThreshold[id]}) domain=${s.intDomains[v]}",
+                            "(var=$v kind=${s.atoms.kind[id]} k=${s.atoms.threshold[id]}) domain=${s.intDomains[v]}",
                     )
                 }
             }

@@ -1249,10 +1249,10 @@ class ArithmeticPropagatorTest {
                 true // aux = true
             } else {
                 val a = v - nbv
-                when (state.atomKind[a]) {
-                    AtomKind.GE -> 2 >= state.atomThreshold[a]
-                    AtomKind.LE -> 2 <= state.atomThreshold[a]
-                    AtomKind.EQ -> 2 == state.atomThreshold[a]
+                when (state.atoms.kind[a]) {
+                    AtomKind.GE -> 2 >= state.atoms.threshold[a]
+                    AtomKind.LE -> 2 <= state.atoms.threshold[a]
+                    AtomKind.EQ -> 2 == state.atoms.threshold[a]
                 }
             }
             return holds == Lit.isPositive(lit)

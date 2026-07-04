@@ -53,7 +53,7 @@ class TrailResidentAtomSoundnessTest {
     /**
      * Assert the **stored** truth of every materialized atom equals the truth **derived** from the
      * current domain. This is the soundness-critical invariant: [atomCurrentTruth] reads the stored
-     * [PropagationState.atomState] bit with no domain fallback, so any stale bit (a missed flip on
+     * [PropagationState.atoms.truth] bit with no domain fallback, so any stale bit (a missed flip on
      * undo, an off-by-one widened range, a hole eq atom wrongly cleared) silently corrupts truth.
      *
      * The stored *level* deliberately is NOT checked: the engine treats a level left high by a pop
@@ -61,13 +61,13 @@ class TrailResidentAtomSoundnessTest {
      * live decision count is expected, not a violation.
      */
     private fun assertAtomTruthConsistent(s: PropagationState, where: String) {
-        for (id in 0 until s.atomIntVar.size) {
-            val v = s.atomIntVar[id]
+        for (id in 0 until s.atoms.intVar.size) {
+            val v = s.atoms.intVar[id]
             assertEquals(
-                s.atomTruthOf(v, s.atomKind[id], s.atomThreshold[id]),
+                s.atomTruthOf(v, s.atoms.kind[id], s.atoms.threshold[id]),
                 s.atomCurrentTruth(id),
                 "stored atom truth diverged from the domain at $where: atom id=$id " +
-                    "(var=$v kind=${s.atomKind[id]} k=${s.atomThreshold[id]}) domain=${s.intDomains[v]}",
+                    "(var=$v kind=${s.atoms.kind[id]} k=${s.atoms.threshold[id]}) domain=${s.intDomains[v]}",
             )
         }
     }

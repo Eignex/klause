@@ -268,7 +268,7 @@ class ElementPropagatorTest {
         assertNotNull(ant, "the channeled bound is search-derived; its reason must not be a leaf")
         val citesResult = ant.any { lit ->
             val v = Lit.variable(lit)
-            v >= problem.numBoolVars && state.atomIntVar[v - problem.numBoolVars] == 1
+            v >= problem.numBoolVars && state.atoms.intVar[v - problem.numBoolVars] == 1
         }
         assertTrue(citesResult, "reason must cite the result var's bound; got ${ant.toList()}")
     }

@@ -87,7 +87,7 @@ class DiffnPropagatorTest {
         state.currentFactor = 0
         assertFalse(problem.propagators[0].propagate(state, 0))
         val reason = problem.propagators[0].conflictReason(state, 0)!!
-        val citedVars = reason.map { state.atomIntVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        val citedVars = reason.map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
         assertTrue(citedVars.all { it in setOf(0, 3, 1, 4) }, "reason must cite only the A/B pair, got $citedVars")
         assertTrue(2 !in citedVars && 5 !in citedVars, "idle box C must not appear in the sharp reason")
         ConflictReasonOracle.assertEntailed(problem, state, 0, "diffn-pair")

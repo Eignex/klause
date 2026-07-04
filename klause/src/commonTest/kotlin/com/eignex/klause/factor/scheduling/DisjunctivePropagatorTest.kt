@@ -41,7 +41,7 @@ class DisjunctivePropagatorTest {
         check(state.tightenIntMin(3, 5)) // idle task tightened so a coarse reason would cite it
         assertFalse(problem.propagators[0].propagate(state, 0))
         val reason = problem.propagators[0].conflictReason(state, 0)!!
-        val citedVars = reason.map { state.atomIntVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        val citedVars = reason.map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
         assertTrue(citedVars.all { it in setOf(0, 1, 2) }, "reason must cite only the packed tasks, got $citedVars")
         assertTrue(3 !in citedVars, "idle task 3 must not appear in the sharp reason")
         ConflictReasonOracle.assertEntailed(problem, state, 0, "disjunctive-energetic")
@@ -67,7 +67,7 @@ class DisjunctivePropagatorTest {
         check(state.tightenIntMin(2, 6)) // idle task tightened so a coarse reason would cite it
         assertFalse(problem.propagators[0].propagate(state, 0))
         val reason = problem.propagators[0].conflictReason(state, 0)!!
-        val citedVars = reason.map { state.atomIntVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        val citedVars = reason.map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
         assertTrue(
             citedVars.all { it == 0 || it == 1 },
             "reason must cite only the two conflicting tasks, got $citedVars",

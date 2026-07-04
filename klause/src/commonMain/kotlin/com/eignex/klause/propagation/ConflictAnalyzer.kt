@@ -16,7 +16,7 @@ import com.eignex.klause.util.MutableIntIntMap
  *
  * The implication graph spans **bool vars and int order literals** uniformly: bool antecedents
  * come from [PropagationState.boolAntecedents], order-literal antecedents from each atom's
- * trail-resident reason ([PropagationState.atomAnt], with the [atomAntecedentsDerived] fallback
+ * trail-resident reason ([AtomStore.ant], with the [atomAntecedentsDerived] fallback
  * for atoms materialised mid-analysis). Factors emit per-factor [Propagator.conflictReason]s
  * (the #651 explanation pillar) and record antecedents on every force, so the analyzer resolves
  * over the full reason graph rather than treating non-clause forces as leaves. A variable with
@@ -226,7 +226,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         // selection; an atom materialised mid-analysis has no pin position and is swept from the
         // [seenAtomList] fallback after the trail is exhausted at currentLevel.
         val numBoolVars = state.problem.numBoolVars
-        val atomCount = state.atomIntVar.size
+        val atomCount = state.atoms.intVar.size
         universe = numBoolVars + atomCount
         seen = scratch(seen, universe)
         resolved = scratch(resolved, universe)
@@ -356,7 +356,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (v < 0) null else state.boolAntecedents[v]
         } else {
             val atomId = v - numBoolVars
-            if (atomId < state.atomIntVar.size) state.atomAntecedentsDerived(atomId) else null
+            if (atomId < state.atoms.intVar.size) state.atomAntecedentsDerived(atomId) else null
         }
     }
 
@@ -675,7 +675,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             if (v < numBoolVars) {
                 bumpBoolVars.add(v)
             } else {
-                bumpIntVars.add(state.atomIntVar[v - numBoolVars])
+                bumpIntVars.add(state.atoms.intVar[v - numBoolVars])
                 seenAtomList.add(v) // frontier atom — candidate for the 1UIP atom-pivot scan
             }
             if (lvl == currentLevel) {

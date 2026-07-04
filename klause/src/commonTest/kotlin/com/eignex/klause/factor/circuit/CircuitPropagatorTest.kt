@@ -68,7 +68,7 @@ class CircuitPropagatorTest {
         state.currentFactor = 0
         assertFalse(problem.propagators[0].propagate(state, 0))
         val reason = problem.propagators[0].conflictReason(state, 0)!!
-        val citedVars = reason.map { state.atomIntVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        val citedVars = reason.map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
         assertTrue(citedVars.all { it == 0 || it == 1 }, "reason must cite only the subtour edges, got $citedVars")
         assertTrue(2 !in citedVars, "idle successor var 2 must not appear in the sharp reason")
         ConflictReasonOracle.assertEntailed(problem, state, 0, "circuit-subtour")
