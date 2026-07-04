@@ -286,6 +286,9 @@ internal object SolveCore {
             defaultArms = defaultArms,
             lpCeiling = lpCeiling,
             lsPool = lsResolution.pool,
+            // #512: include the model's search-annotation arm in the backtrack pool when the model
+            // carries one (a no-op for a pure-LS pool, which has no backtrack slot).
+            annotationArm = solvable.annotatedBacktrackParams,
         )
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH

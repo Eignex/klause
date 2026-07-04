@@ -80,6 +80,34 @@ class PortfolioTest {
     }
 
     @Test
+    fun `the annotation arm takes the last backtrack slot and keeps the guard`() {
+        val annotation = BacktrackParams(randomSeed = 0L, lubyRestartBase = 512L)
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 3,
+            kind = Kind.CSP,
+            engine = EngineMix.BACKTRACK,
+            annotationArm = annotation,
+        )
+        val labels = PortfolioComposition.compose(scenario).map { it.label }
+        assertEquals("satOptimized", labels.first(), "the #117 guard keeps slot 0")
+        assertEquals("annotation", labels.last(), "the annotation arm takes the last slot")
+    }
+
+    @Test
+    fun `a lone backtrack slot keeps the guard over the annotation arm`() {
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 1,
+            kind = Kind.CSP,
+            engine = EngineMix.BACKTRACK,
+            annotationArm = BacktrackParams(randomSeed = 0L),
+        )
+        val labels = PortfolioComposition.compose(scenario).map { it.label }
+        assertEquals(listOf("satOptimized"), labels, "one slot stays the guard, not the annotation arm")
+    }
+
+    @Test
     fun `lp ceiling caps and toggles the portfolio arms`() {
         fun lpConfigs(ceiling: LpConfig): List<LpConfig?> =
             BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = ceiling).map { it.build(1L, null).lpConfig }

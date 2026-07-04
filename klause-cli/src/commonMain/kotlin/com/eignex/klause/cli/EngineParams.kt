@@ -472,6 +472,7 @@ internal fun buildPortfolioScenario(
     defaultArms: Int,
     lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
     lsPool: List<() -> LsRecipe>? = null,
+    annotationArm: BacktrackParams? = null,
 ): PortfolioScenario {
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
     val lambda = p.double("lambda") ?: 1.0
@@ -505,6 +506,7 @@ internal fun buildPortfolioScenario(
         lsLambda = lambda,
         lpCeiling = lpCeiling,
         lsPool = lsPool,
+        annotationArm = annotationArm,
     )
 }
 
