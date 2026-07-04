@@ -108,6 +108,16 @@ class Table private constructor(
         return Table(newXs, newTuples)
     }
 
+    // Substitutability test without building the rewritten table: a row survives iff x's value is
+    // divisible (after the offset shift) in every column holding x, and the substitution succeeds iff any
+    // row survives. `any` early-exits on the first survivor and allocates nothing — the affine scan calls
+    // this per candidate check on a wide float-derived bucket table, where the full rewrite is O(tuples).
+    override fun canSubstituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Boolean {
+        if (scale == 0 || x !in xs) return false
+        val cols = xs.indices.filter { xs[it] == x }
+        return (0 until numTuples).any { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0 } }
+    }
+
     // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so rows are sorted. Encodes
     // the full var sequence and tuple set — collision-free up to variable identity. Only `ints(xs)`
     // varies under a remap; the tuple part is the cached [tupleKey] fragment.
