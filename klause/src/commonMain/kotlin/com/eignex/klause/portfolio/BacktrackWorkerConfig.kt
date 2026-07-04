@@ -94,18 +94,18 @@ internal data class BacktrackWorkerConfig(
     companion object {
         /** The strong CDCL/SAT stack (adaptive restarts, target phasing, 3-tier learned DB,
          *  vivification); the #117 guard. Kept at rank 0 for both kinds. */
-        fun satOptimized() = BacktrackWorkerConfig("satOptimized") { seed, onEvent ->
+        private fun satOptimized() = BacktrackWorkerConfig("satOptimized") { seed, onEvent ->
             BacktrackPresets.satOptimized(randomSeed = seed, onEvent = onEvent)
         }
 
         /** LastConflict + VSIDS + solution-guided values — the general-COP bound workhorse. */
-        fun conflictDriven() = BacktrackWorkerConfig("conflictDriven") { seed, onEvent ->
+        private fun conflictDriven() = BacktrackWorkerConfig("conflictDriven") { seed, onEvent ->
             BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
         }
 
         /** The learned LinUCB variable heuristic ([RegressionVariableSelector], #8) on
          *  solution-guided values — the COP routing / feasibility-reach diversity arm. */
-        fun linUcb() = BacktrackWorkerConfig("linucb") { seed, onEvent ->
+        private fun linUcb() = BacktrackWorkerConfig("linucb") { seed, onEvent ->
             BacktrackParams(
                 randomSeed = seed,
                 variableSelector = RegressionVariableSelector.linUcb(seed = seed),
@@ -117,7 +117,7 @@ internal data class BacktrackWorkerConfig(
         }
 
         /** The bare free engine (default heuristics, Luby restarts) — plateau diversity. */
-        fun free() = BacktrackWorkerConfig("free") { seed, onEvent ->
+        private fun free() = BacktrackWorkerConfig("free") { seed, onEvent ->
             BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = onEvent)
         }
 
@@ -126,9 +126,13 @@ internal data class BacktrackWorkerConfig(
          *  `DEFAULT` is simplex bounding + objective propagation without the expensive cut machinery;
          *  `CONSERVATIVE` is the cheap combinatorial bounds only. A no-op on models with no
          *  LP-applicable structure. COP-only: the LP machinery lives on the minimisation path. */
-        fun lpArm(emphasis: LpEmphasis) = BacktrackWorkerConfig("lp-${emphasis.name.lowercase()}") { seed, onEvent ->
-            BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpConfig = LpConfig(emphasis))
-        }
+        private fun lpArm(emphasis: LpEmphasis) =
+            BacktrackWorkerConfig("lp-${emphasis.name.lowercase()}") { seed, onEvent ->
+                BacktrackPresets.conflictDriven(
+                    randomSeed = seed,
+                    onEvent = onEvent,
+                ).copy(lpConfig = LpConfig(emphasis))
+            }
 
         /** A best-bound-dive LP arm: the DEFAULT LP stack plus the `lb_tree_search` primal
          *  subsolver, which explores the branch-and-bound tree best-first before search to land good
@@ -136,9 +140,22 @@ internal data class BacktrackWorkerConfig(
          *  when the LP relaxation is off (so a `--lp off` ceiling neutralises it). The other LP primal
          *  heuristic — the rounding probe and its feasibility-pump fallback — is already auto-on for
          *  every LP arm, so no separate pump arm is needed. */
-        fun lpTreeSearchArm() = BacktrackWorkerConfig("lp-lbtree") { seed, onEvent ->
+        private fun lpTreeSearchArm() = BacktrackWorkerConfig("lp-lbtree") { seed, onEvent ->
             val base = BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent)
             base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT), lpPlan = base.lpPlan.copy(lbTreeSearch = true))
+        }
+
+        /** Build the config for [arm]'s typed identity — the single place each arm's params originate.
+         *  Keeps [BacktrackArm.label] and the produced config's [label] in lockstep. */
+        private fun make(arm: BacktrackArm): BacktrackWorkerConfig = when (arm) {
+            BacktrackArm.SatOptimized -> satOptimized()
+            BacktrackArm.ConflictDriven -> conflictDriven()
+            BacktrackArm.LpAggressive -> lpArm(LpEmphasis.AGGRESSIVE)
+            BacktrackArm.LpDefault -> lpArm(LpEmphasis.DEFAULT)
+            BacktrackArm.LpLbTree -> lpTreeSearchArm()
+            BacktrackArm.LpConservative -> lpArm(LpEmphasis.CONSERVATIVE)
+            BacktrackArm.LinUcb -> linUcb()
+            BacktrackArm.Free -> free()
         }
 
         // COP spread: the OFF arms (satOptimized / conflictDriven / linucb / free) hedge
@@ -146,22 +163,39 @@ internal data class BacktrackWorkerConfig(
         // DEFAULT (simplex bounding), CONSERVATIVE (cheap combinatorial bounds) — plus the best-bound-dive
         // primal arm. A supplied `--lp` ceiling caps every LP arm via [diverse].
         private val copOrder = listOf(
-            satOptimized(),
-            conflictDriven(),
-            lpArm(LpEmphasis.AGGRESSIVE),
-            lpArm(LpEmphasis.DEFAULT),
-            lpTreeSearchArm(),
-            lpArm(LpEmphasis.CONSERVATIVE),
-            linUcb(),
-            free(),
+            BacktrackArm.SatOptimized,
+            BacktrackArm.ConflictDriven,
+            BacktrackArm.LpAggressive,
+            BacktrackArm.LpDefault,
+            BacktrackArm.LpLbTree,
+            BacktrackArm.LpConservative,
+            BacktrackArm.LinUcb,
+            BacktrackArm.Free,
         )
-        private val cspOrder = listOf(satOptimized(), conflictDriven(), free())
+        private val cspOrder = listOf(BacktrackArm.SatOptimized, BacktrackArm.ConflictDriven, BacktrackArm.Free)
 
-        /** The credit-ordered backtrack pool for [kind] (see the class KDoc). */
-        fun ranked(kind: Kind): List<BacktrackWorkerConfig> = when (kind) {
+        private fun rankedArms(kind: Kind): List<BacktrackArm> = when (kind) {
             Kind.COP -> copOrder
             Kind.CSP -> cspOrder
         }
+
+        /** The credit-ordered backtrack pool for [kind] (see the class KDoc). */
+        fun ranked(kind: Kind): List<BacktrackWorkerConfig> = rankedArms(kind).map { make(it) }
+
+        private fun fromLabel(label: String): BacktrackArm = BacktrackArm.entries.firstOrNull { it.label == label }
+            ?: error("unknown backtrack arm '$label' (have ${BacktrackArm.entries.joinToString { it.label }})")
+
+        /** A fresh config for the arm named [label] (the single string boundary — CLI `arm=`, campaigns). */
+        fun byLabel(label: String): BacktrackWorkerConfig = make(fromLabel(label))
+
+        /** Every arm label for [kind], in credit order — for enumerating the pool by name (the CLI
+         *  `arm=` selector, a credit sweep). */
+        fun labels(kind: Kind): List<String> = rankedArms(kind).map { it.label }
+
+        /** Per-arm factories for [kind], in credit order — each builds a fresh config. Symmetric with
+         *  the LS catalog; backtrack arms hold no per-search state, so a shared value would also be
+         *  safe, but a factory keeps the campaign/attribution API uniform across engines. */
+        fun factories(kind: Kind): List<() -> BacktrackWorkerConfig> = rankedArms(kind).map { arm -> { make(arm) } }
 
         /** Cap this arm under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
          *  emphasis lowered and the ceiling's per-technique overrides applied — so no arm runs LP above
@@ -184,4 +218,21 @@ internal data class BacktrackWorkerConfig(
             return List(count) { order[it % order.size].capLp(lpCeiling) }
         }
     }
+}
+
+/**
+ * Typed identity of every backtrack catalog arm — the backtrack counterpart of
+ * [com.eignex.klause.localsearch.strategy.LsArm]. [BacktrackWorkerConfig.ranked] /
+ * [BacktrackWorkerConfig.diverse] order and instantiate these; [label] is the external name (CLI
+ * `arm=` / campaign / telemetry) and is kept in lockstep with the built config's label.
+ */
+internal enum class BacktrackArm(val label: String) {
+    SatOptimized("satOptimized"),
+    ConflictDriven("conflictDriven"),
+    LpAggressive("lp-aggressive"),
+    LpDefault("lp-default"),
+    LpLbTree("lp-lbtree"),
+    LpConservative("lp-conservative"),
+    LinUcb("linucb"),
+    Free("free"),
 }
