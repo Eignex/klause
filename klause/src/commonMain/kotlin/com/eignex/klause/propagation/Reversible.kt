@@ -4,7 +4,7 @@ import com.eignex.klause.util.IntArrayList
 
 /*
  * Backtrackable mutable state for incremental propagators, riding the same O(changes-since-mark)
- * undo trail the engine uses for bool/int domains (see PropagationState.revTrail). Each write,
+ * undo trail the engine uses for bool/int domains (see UndoLog.revTrail). Each write,
  * while PropagationState.undoLogging is on, records the cell's prior value and registers the cell
  * on the reversible trail; PropagationState.undoTo replays the trail top-down so every cell lands
  * back on its mark-time value. This replaces the O(state) SnapshottablePayload.snapshotCopy for
@@ -16,7 +16,7 @@ import com.eignex.klause.util.IntArrayList
  * confined to "did the propagator route all its mutations through a reversible".
  */
 
-/** A cell that can roll back one logged mutation; registered on [PropagationState.revTrail]. */
+/** A cell that can roll back one logged mutation; registered on [UndoLog.revTrail]. */
 internal interface Trailed {
     /** Undo the single most-recent logged mutation (LIFO). Called by [PropagationState.undoTo]. */
     fun restore()

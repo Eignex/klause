@@ -37,13 +37,13 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
     incremental && !factorAliveAt(fid) -> NoPropagator
     fid < baseFactorCount -> baseFactors[fid]
     incremental -> midlifeFactorStore[fid - baseFactorCount]
-    else -> learnedClauseStore[fid - baseFactorCount]
+    else -> learned.store[fid - baseFactorCount]
 }
 
 /**
  * Register a learned clause and return its assigned factor id. Performs four things:
- *   - append to [PropagationState.learnedClauseStore];
- *   - record the clause's [lbd] in [PropagationState.learnedLbds] (parallel array);
+ *   - append to [LearnedClauseDb.store];
+ *   - record the clause's [lbd] in [LearnedClauseDb.lbds] (parallel array);
  *   - grow [PropagationState.refPayloadStore] by one slot so [ClausePropagator.propagate]'s
  *     `state.refPayload[factorId]` access stays in-bounds;
  *   - install the clause's initial watch literals in [PropagationState.boolWatchersByLit] so it
@@ -54,12 +54,12 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
  */
 internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: Int, permanent: Boolean = false): Int {
     val newFid = totalFactorCount
-    learnedClauseStore.add(clause)
-    learnedLbds.add(lbd)
-    learnedPermanent.add(if (permanent) 1 else 0)
-    learnedTier.add(ClauseTier.UNSET.ordinal)
-    learnedUsedFlags.add(0)
-    if (clause.literals.size == 2) binaryClauseCount++ // keep the #202 gate current
+    learned.store.add(clause)
+    learned.lbds.add(lbd)
+    learned.permanent.add(if (permanent) 1 else 0)
+    learned.tier.add(ClauseTier.UNSET.ordinal)
+    learned.usedFlags.add(0)
+    if (clause.literals.size == 2) learned.binaryClauseCount++ // keep the #202 gate current
     refPayloadStore.add(null)
     val watchers = clause.initialBoolWatchers
     val blockers = clause.initialBoolWatcherBlockers
@@ -72,31 +72,31 @@ internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permane
     addLearnedClause(clause.asPropagator() as ClausePropagator, lbd, permanent)
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
-internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int = learnedLbds[learnedIndex]
+internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int = learned.lbds[learnedIndex]
 
 /** True iff learned clause [learnedIndex] must survive every forgetting pass. */
-internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean = learnedPermanent[learnedIndex] == 1
+internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean = learned.permanent[learnedIndex] == 1
 
 /** Three-tier (#201) DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
  *  reduction policy classifies it). */
 internal fun PropagationState.learnedClauseTier(learnedIndex: Int): ClauseTier =
-    ClauseTier.entries[learnedTier[learnedIndex]]
+    ClauseTier.entries[learned.tier[learnedIndex]]
 
 /** Set the three-tier DB tier of learned clause [learnedIndex] (promotion / demotion /
  *  initial classification by the reduction policy). */
 internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: ClauseTier) {
-    learnedTier[learnedIndex] = tier.ordinal
+    learned.tier[learnedIndex] = tier.ordinal
 }
 
 /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
  *  reduction. */
 internal fun PropagationState.learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean =
-    learnedUsedFlags[learnedIndex] == 1
+    learned.usedFlags[learnedIndex] == 1
 
 /** Clear the reuse flag for learned clause [learnedIndex] — called for survivors at the
  *  end of a reduction so the next window measures fresh activity. */
 internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
-    learnedUsedFlags[learnedIndex] = 0
+    learned.usedFlags[learnedIndex] = 0
 }
 
 /** Mark learned clause [fid] (a factor id; ignored when it isn't a learned clause) as
@@ -104,7 +104,7 @@ internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
  *  three-tier promotion (#201). */
 internal fun PropagationState.noteLearnedUse(fid: Int) {
     val idx = fid - problem.numFactors
-    if (idx in 0 until learnedUsedFlags.size) learnedUsedFlags[idx] = 1
+    if (idx in 0 until learned.usedFlags.size) learned.usedFlags[idx] = 1
 }
 
 /**
@@ -112,7 +112,7 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * lbd) whether to retain that clause; dropped clauses' factor ids vanish and the
  * remaining clauses are renumbered contiguously starting at `problem.numFactors`.
  * Three things are rebuilt:
- *   - [PropagationState.learnedClauseStore] / [PropagationState.learnedLbds] compacted to the kept entries in order;
+ *   - [LearnedClauseDb.store] / [LearnedClauseDb.lbds] compacted to the kept entries in order;
  *   - the learned-clause tail of [PropagationState.refPayloadStore] compacted similarly;
  *   - every list in [PropagationState.boolWatchersByLit] walked once, with learned factor ids
  *     remapped through `oldFid → newFid` or removed when dropped.
@@ -122,34 +122,34 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * Cost is amortised across infrequent calls (typical: once per Luby restart).
  */
 internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
-    val n = learnedClauseStore.size
+    val n = learned.size
     if (n == 0) return
     val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
     var newCount = 0
     for (i in 0 until n) {
-        remap[i] = if (keep(i, learnedLbds[i])) newCount++ else -1
+        remap[i] = if (keep(i, learned.lbds[i])) newCount++ else -1
     }
     if (newCount == n) return // nothing dropped
 
-    // Compact learnedClauseStore + learnedLbds in place using a two-pointer walk —
+    // Compact the clause store and its parallel columns in place using a two-pointer walk —
     // every kept entry slides down to its new position; tail beyond newCount is
     // trimmed at the end.
     var w = 0
     for (i in 0 until n) {
         if (remap[i] >= 0) {
-            learnedClauseStore[w] = learnedClauseStore[i]
-            learnedLbds[w] = learnedLbds[i]
-            learnedPermanent[w] = learnedPermanent[i]
-            learnedTier[w] = learnedTier[i]
-            learnedUsedFlags[w] = learnedUsedFlags[i]
+            learned.store[w] = learned.store[i]
+            learned.lbds[w] = learned.lbds[i]
+            learned.permanent[w] = learned.permanent[i]
+            learned.tier[w] = learned.tier[i]
+            learned.usedFlags[w] = learned.usedFlags[i]
             w++
         }
     }
-    while (learnedClauseStore.size > newCount) learnedClauseStore.removeAt(learnedClauseStore.size - 1)
-    learnedLbds.truncateTo(newCount)
-    learnedPermanent.truncateTo(newCount)
-    learnedTier.truncateTo(newCount)
-    learnedUsedFlags.truncateTo(newCount)
+    while (learned.store.size > newCount) learned.store.removeAt(learned.store.size - 1)
+    learned.lbds.truncateTo(newCount)
+    learned.permanent.truncateTo(newCount)
+    learned.tier.truncateTo(newCount)
+    learned.usedFlags.truncateTo(newCount)
 
     // Compact the learned tail of refPayloadStore similarly. Static-factor entries stay
     // at indices [0, problem.numFactors) untouched.
