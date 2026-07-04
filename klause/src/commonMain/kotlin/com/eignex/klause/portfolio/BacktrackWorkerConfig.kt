@@ -12,6 +12,7 @@ import com.eignex.klause.backtrack.selector.DomWdeg
 import com.eignex.klause.backtrack.selector.Impact
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.RegressionVariableSelector
+import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -127,6 +128,43 @@ internal data class BacktrackWorkerConfig(
             BacktrackParams(randomSeed = seed, lubyRestartBase = 256L, onEvent = onEvent)
         }
 
+        /** Classic first-fail: smallest-domain variable + min value — the FD default many models are
+         *  written for. A fixed-order diversity arm distinct from the VSIDS/dom-wdeg workhorses. */
+        private fun firstFail() = BacktrackWorkerConfig("first-fail") { seed, onEvent ->
+            BacktrackParams(
+                randomSeed = seed,
+                variableSelector = SmallestDomain,
+                valueSelector = IndomainMin,
+                lubyRestartBase = 256L,
+                onEvent = onEvent,
+            )
+        }
+
+        /** Weighted-degree branching (dom/wdeg) on solution-guided values — a conflict-history variable
+         *  order distinct from VSIDS, strong on structured CSP/COP. */
+        private fun domWdeg() = BacktrackWorkerConfig("domwdeg") { seed, onEvent ->
+            BacktrackParams(
+                randomSeed = seed,
+                variableSelector = DomWdeg(),
+                valueSelector = SolutionGuided(IndomainMin),
+                phaseSaving = true,
+                lubyRestartBase = 256L,
+                onEvent = onEvent,
+            )
+        }
+
+        /** Activity-based search (ABS) variable order + impact-based value order — a probing-driven
+         *  heuristic that reads the propagation reaction, distinct from the conflict-driven arms. */
+        private fun activity() = BacktrackWorkerConfig("activity") { seed, onEvent ->
+            BacktrackParams(
+                randomSeed = seed,
+                variableSelector = ActivityBasedSearch(),
+                valueSelector = Impact(),
+                lubyRestartBase = 256L,
+                onEvent = onEvent,
+            )
+        }
+
         /** An LP arm: the conflict-driven core with the LP-relaxation family resolved at [emphasis]
          *  (#429). `AGGRESSIVE` is the whole structurally-applicable family (cuts + hulls + probe);
          *  `DEFAULT` is simplex bounding + objective propagation without the expensive cut machinery;
@@ -186,6 +224,9 @@ internal data class BacktrackWorkerConfig(
             BacktrackArm.LinUcb -> linUcb()
             BacktrackArm.Free -> free()
             BacktrackArm.SelectorSwitch -> selectorSwitch()
+            BacktrackArm.FirstFail -> firstFail()
+            BacktrackArm.DomWdeg -> domWdeg()
+            BacktrackArm.Activity -> activity()
         }
 
         // COP spread: the OFF arms (satOptimized / conflictDriven / linucb / free) hedge
@@ -201,14 +242,21 @@ internal data class BacktrackWorkerConfig(
             BacktrackArm.LpConservative,
             BacktrackArm.LinUcb,
             BacktrackArm.Free,
-            // Restart-level selector portfolio (#765): kept last pending its cross-seed credit pass.
+            // Restart-level selector portfolio (#765) + latent-axis heuristic arms: kept last pending
+            // their cross-seed credit pass, so the tuned diverse(N) prefix is unchanged.
             BacktrackArm.SelectorSwitch,
+            BacktrackArm.DomWdeg,
+            BacktrackArm.FirstFail,
+            BacktrackArm.Activity,
         )
         private val cspOrder = listOf(
             BacktrackArm.SatOptimized,
             BacktrackArm.ConflictDriven,
             BacktrackArm.Free,
             BacktrackArm.SelectorSwitch,
+            BacktrackArm.DomWdeg,
+            BacktrackArm.FirstFail,
+            BacktrackArm.Activity,
         )
 
         private fun rankedArms(kind: Kind): List<BacktrackArm> = when (kind) {
@@ -279,4 +327,7 @@ internal enum class BacktrackArm(val label: String) {
     LinUcb("linucb"),
     Free("free"),
     SelectorSwitch("selector-switch"),
+    DomWdeg("domwdeg"),
+    FirstFail("first-fail"),
+    Activity("activity"),
 }
