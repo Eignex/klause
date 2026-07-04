@@ -59,6 +59,27 @@ class PortfolioTest {
     }
 
     @Test
+    fun `an injected btPool overrides the curated backtrack arms`() {
+        val templates = listOf(
+            BacktrackParams(randomSeed = 0L),
+            BacktrackParams(randomSeed = 0L, lubyRestartBase = 256L),
+        )
+        val scenario = PortfolioScenario(
+            cores = 1,
+            arms = 3,
+            kind = Kind.CSP,
+            engine = EngineMix.BACKTRACK,
+            btPool = templates,
+        )
+        val labels = PortfolioComposition.compose(scenario).map { it.label }
+        assertEquals(3, labels.size, "the pool wraps to fill the requested arm count")
+        assertTrue(
+            labels.all { it.startsWith("bt-pool#") },
+            "injected btPool must replace the curated arms, got $labels",
+        )
+    }
+
+    @Test
     fun `lp ceiling caps and toggles the portfolio arms`() {
         fun lpConfigs(ceiling: LpConfig): List<LpConfig?> =
             BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = ceiling).map { it.build(1L, null).lpConfig }
