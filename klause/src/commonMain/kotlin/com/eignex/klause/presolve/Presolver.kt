@@ -1,6 +1,8 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
+import com.eignex.klause.presolve.RedundantConstraints.SubsumeIncremental
+import com.eignex.klause.presolve.RedundantConstraints.SubsumeMemo
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -67,6 +69,10 @@ data class PresolveContext(
      *  without simplifying (dense, unproductive fill-in). Set once from the original problem so it stays
      *  stable as later rounds shrink the factor set; the affine pass uses it to cap runaway wide folds. */
     val affineUnderdetermined: Boolean = false,
+    /** The incremental round engine's persistent subsume state and the factors changed since subsume last
+     *  ran, so [PresolvePass.REMOVE_REDUNDANT] reprocesses only the delta instead of rescanning every
+     *  factor. `null` on the fresh path, where subsume recomputes from scratch each call. */
+    val subsumeIncremental: SubsumeState? = null,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -90,6 +96,10 @@ data class PresolveContext(
     /** This context carrying the incremental round engine's session-maintained occurrence index for the
      *  current pass input, so the affine / dup-columns candidate search reuses it. */
     fun withSharedIntOcc(sharedIntOcc: SharedIntOccurrence?): PresolveContext = copy(sharedIntOcc = sharedIntOcc)
+
+    /** This context carrying the incremental round engine's persistent subsume state + delta. */
+    fun withSubsumeIncremental(subsumeIncremental: SubsumeState?): PresolveContext =
+        copy(subsumeIncremental = subsumeIncremental)
 
     /** Factories for the common contexts. */
     companion object {
@@ -279,7 +289,8 @@ enum class PresolvePass(
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.removeRedundantConstraints(problem)
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            RedundantConstraints.removeRedundantConstraints(problem, ctx.subsumeIncremental as? SubsumeIncremental)
     },
 
     /** Per-factor structural self-reduction — each factor rewrites itself into simpler / lower-arity
@@ -730,6 +741,10 @@ object Presolver {
     ): Presolved {
         val session = PresolveSession(problem, ctx.bakeConfig)
         val reconstructs = ArrayList<(Sample) -> Sample>()
+        // Persistent subsume indices + the change-mark at subsume's last firing, so each re-run reprocesses
+        // only the factors other passes changed in between instead of rescanning the whole live set.
+        val subsumeMemo = SubsumeMemo()
+        var subsumeMark: PresolveSession.ChangeMark? = null
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()
         val fired = LinkedHashSet<PresolvePass>()
@@ -752,7 +767,11 @@ object Presolver {
                 // Hand the session's incrementally-maintained occurrence index to the pass so the affine
                 // / dup-columns candidate search reads it instead of rebuilding an O(factors) index; the
                 // view matches [input]'s factor order exactly, so decisions are unchanged.
-                val delta = pass.apply(input, ctx.withSharedIntOcc(session.passOccurrence()))
+                var passCtx = ctx.withSharedIntOcc(session.passOccurrence())
+                if (pass == PresolvePass.REMOVE_REDUNDANT) {
+                    passCtx = passCtx.withSubsumeIncremental(subsumeIncremental(session, subsumeMark, subsumeMemo))
+                }
+                val delta = pass.apply(input, passCtx)
                 if (!delta.isEmpty) {
                     delta.reconstruct?.let { reconstructs.add(it) }
                     session.applyDelta(delta)
@@ -761,6 +780,9 @@ object Presolver {
                 } else if (pass.skipAfterEmpty) {
                     exhausted.add(pass)
                 }
+                // Advance subsume's mark past its own drops so the next firing sees only what other passes
+                // changed since (its own drops are carried inside the memo).
+                if (pass == PresolvePass.REMOVE_REDUNDANT) subsumeMark = session.changeMark()
             }
             if (!ranAny) break
             round++
@@ -782,5 +804,22 @@ object Presolver {
                 { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
             }
         return Presolved(finalProblem, reconstruct, fired.toList(), session.infeasible)
+    }
+
+    /** Build subsume's incremental input from the session: a full rebuild when it has no prior mark or the
+     *  mark predates a reseed, else the factors added / dropped since. A factor added then dropped between
+     *  firings has a null slot now, so `mapNotNull` omits it — it never entered the memo and needs no
+     *  retraction. */
+    private fun subsumeIncremental(
+        session: PresolveSession,
+        mark: PresolveSession.ChangeMark?,
+        memo: SubsumeMemo,
+    ): SubsumeIncremental = if (mark == null || session.markStale(mark)) {
+        SubsumeIncremental(rebuild = true, emptyList(), emptyList(), memo)
+    } else {
+        val ids = session.addedIdsSince(mark)
+        val added = ArrayList<Factor>(ids.size)
+        for (id in ids) session.factorAt(id)?.let { added.add(it) }
+        SubsumeIncremental(rebuild = false, added, session.droppedFactorsSince(mark), memo)
     }
 }
