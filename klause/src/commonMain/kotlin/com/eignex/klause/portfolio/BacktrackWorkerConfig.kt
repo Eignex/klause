@@ -3,11 +3,17 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.SelectorPortfolio
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.backtrack.lp.LpEmphasis
+import com.eignex.klause.backtrack.selector.ActivityBasedSearch
+import com.eignex.klause.backtrack.selector.ConflictOrdering
+import com.eignex.klause.backtrack.selector.DomWdeg
+import com.eignex.klause.backtrack.selector.Impact
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.backtrack.selector.SolutionGuided
+import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -145,6 +151,29 @@ internal data class BacktrackWorkerConfig(
             base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT), lpPlan = base.lpPlan.copy(lbTreeSearch = true))
         }
 
+        /** A restart-level selector portfolio (#765): one arm that switches its (variable, value)
+         *  heuristic at every Luby restart under a UCB1 bandit — VSIDS / dom-wdeg / activity /
+         *  conflict-ordering paired with min / impact / solution-guided values — so the arm learns
+         *  per instance which complete-search heuristic suits it. A fresh portfolio per worker (it
+         *  holds mutable bandit state); both selector slots reference the one instance to share it. */
+        private fun selectorSwitch() = BacktrackWorkerConfig("selector-switch") { seed, onEvent ->
+            val palette = SelectorPortfolio.ucb1(
+                listOf(
+                    SelectorPortfolio.Arm("vsids+min", Vsids(), IndomainMin),
+                    SelectorPortfolio.Arm("domwdeg+solguided", DomWdeg(), SolutionGuided(IndomainMin)),
+                    SelectorPortfolio.Arm("activity+impact", ActivityBasedSearch(), Impact()),
+                    SelectorPortfolio.Arm("cos-domwdeg+min", ConflictOrdering(DomWdeg()), IndomainMin),
+                ),
+            )
+            BacktrackParams(
+                randomSeed = seed,
+                variableSelector = palette.variableSelector,
+                valueSelector = palette.valueSelector,
+                lubyRestartBase = 100L,
+                onEvent = onEvent,
+            )
+        }
+
         /** Build the config for [arm]'s typed identity — the single place each arm's params originate.
          *  Keeps [BacktrackArm.label] and the produced config's [label] in lockstep. */
         private fun make(arm: BacktrackArm): BacktrackWorkerConfig = when (arm) {
@@ -156,6 +185,7 @@ internal data class BacktrackWorkerConfig(
             BacktrackArm.LpConservative -> lpArm(LpEmphasis.CONSERVATIVE)
             BacktrackArm.LinUcb -> linUcb()
             BacktrackArm.Free -> free()
+            BacktrackArm.SelectorSwitch -> selectorSwitch()
         }
 
         // COP spread: the OFF arms (satOptimized / conflictDriven / linucb / free) hedge
@@ -171,8 +201,15 @@ internal data class BacktrackWorkerConfig(
             BacktrackArm.LpConservative,
             BacktrackArm.LinUcb,
             BacktrackArm.Free,
+            // Restart-level selector portfolio (#765): kept last pending its cross-seed credit pass.
+            BacktrackArm.SelectorSwitch,
         )
-        private val cspOrder = listOf(BacktrackArm.SatOptimized, BacktrackArm.ConflictDriven, BacktrackArm.Free)
+        private val cspOrder = listOf(
+            BacktrackArm.SatOptimized,
+            BacktrackArm.ConflictDriven,
+            BacktrackArm.Free,
+            BacktrackArm.SelectorSwitch,
+        )
 
         private fun rankedArms(kind: Kind): List<BacktrackArm> = when (kind) {
             Kind.COP -> copOrder
@@ -241,4 +278,5 @@ internal enum class BacktrackArm(val label: String) {
     LpConservative("lp-conservative"),
     LinUcb("linucb"),
     Free("free"),
+    SelectorSwitch("selector-switch"),
 }
