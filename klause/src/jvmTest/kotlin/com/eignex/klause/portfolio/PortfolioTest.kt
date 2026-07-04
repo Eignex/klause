@@ -80,6 +80,15 @@ class PortfolioTest {
     }
 
     @Test
+    fun `the selector-switch arm wires a fresh restart-switching portfolio per worker`() {
+        val arm = BacktrackWorkerConfig.byLabel("selector-switch")
+        val a = arm.build(1L, null)
+        val b = arm.build(2L, null)
+        assertEquals(100L, a.lubyRestartBase, "Luby restarts drive the bandit's arm switching")
+        assertTrue(a.variableSelector !== b.variableSelector, "each worker gets its own switching state")
+    }
+
+    @Test
     fun `lp ceiling caps and toggles the portfolio arms`() {
         fun lpConfigs(ceiling: LpConfig): List<LpConfig?> =
             BacktrackWorkerConfig.diverse(Kind.COP, count = 6, lpCeiling = ceiling).map { it.build(1L, null).lpConfig }
