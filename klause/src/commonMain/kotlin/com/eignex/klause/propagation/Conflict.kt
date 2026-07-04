@@ -7,18 +7,18 @@ import com.eignex.klause.util.IntHashSet
 
 /** Boolean vars for factor [fid]: base factors read from `problem.factors`; tail factors
  *  (fid ≥ baseFactorCount) from `midlifeFactorList` in incremental mode, else from the
- *  ClausePropagator in `learnedClauseStore`. */
+ *  ClausePropagator in [LearnedClauseDb.store]. */
 private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].boolVars
     incremental -> midlifeFactorList[fid - baseFactorCount].boolVars
-    else -> learnedClauseStore[fid - baseFactorCount].boolVars
+    else -> learned.store[fid - baseFactorCount].boolVars
 }
 
 /** Integer vars for factor [fid]: same routing as [factorBoolVars]. */
 private fun PropagationState.factorIntVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].intVars
     incremental -> midlifeFactorList[fid - baseFactorCount].intVars
-    else -> learnedClauseStore[fid - baseFactorCount].intVars
+    else -> learned.store[fid - baseFactorCount].intVars
 }
 
 /** Fallback conflict-levels collection for a failing propagator, routed through [factorBoolVars]/[factorIntVars]. */

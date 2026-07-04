@@ -344,13 +344,15 @@ class PropagationState(
         }
     }
 
-    /** Learned clauses accumulated during search (LCG-style nogoods produced by
-     *  [ConflictAnalyzer]). Their factor ids live in `[problem.numFactors, totalFactorCount)` —
-     *  treat them like any other [Clause] via [factorAt];
-     *  they participate in propagation through [boolWatchersByLit] just like static
-     *  clauses. Survives `restore` (clauses are facts about the original problem, not
-     *  trail state); pruned by [forgetLearnedClauses]. */
-    internal val learnedClauseStore: ArrayList<ClausePropagator> = ArrayList()
+    /** Learned-clause database — the [ConflictAnalyzer] nogoods plus their policy columns.
+     *  See [LearnedClauseDb]; registration / lookup / pruning live in `ClauseDb.kt`. */
+    internal val learned: LearnedClauseDb = LearnedClauseDb(
+        binaryClauseCount = run {
+            var n = 0
+            for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
+            n
+        },
+    )
 
     // Cached base factor table — `problem.factors` is immutable after construction, so hoist
     // the array reference and its size out of the per-call `problem.factors` / `.size` getters
@@ -366,45 +368,14 @@ class PropagationState(
     private val nonIntEventWatcherOcc: Array<IntArray> = problem.nonIntEventWatcherIntOccurrences
 
     /** Clauses learned during conflict analysis. */
-    internal val learnedClauses: List<ClausePropagator> get() = learnedClauseStore
-
-    /** Count of binary (2-literal) clauses known — original problem clauses plus learned
-     *  ones. Gates the #202 binary-resolution minimization, which is a no-op without binary
-     *  clauses. Over-approximates after forgetting (never decremented), which only costs a
-     *  harmless no-op pass — never correctness. */
-    internal var binaryClauseCount: Int = run {
-        var n = 0
-        for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
-        n
-    }
+    internal val learnedClauses: List<ClausePropagator> get() = learned.store
 
     /** True iff any binary clause is known — the gate for binary-resolution minimization. */
-    val hasBinaryClauses: Boolean get() = binaryClauseCount > 0
-
-    /** LBD (Literal Block Distance) per learned clause, parallel to [learnedClauseStore].
-     *  Glucose-style glue metric: lower = more re-usable. Forgetting policies key on
-     *  this to decide which clauses to drop. */
-    internal val learnedLbds: IntArrayList = IntArrayList()
-
-    /** 1 for clauses that must survive every forgetting pass, parallel to [learnedClauseStore].
-     *  Solution-blocking nogoods are the main client: dropping one re-opens an already
-     *  reported leaf and the search can revisit it forever. */
-    internal val learnedPermanent: IntArrayList = IntArrayList()
-
-    /** Three-tier database tier per learned clause (#201), parallel to [learnedClauseStore],
-     *  stored as [ClauseTier] ordinals. [ClauseTier.UNSET] until the reduction policy first
-     *  classifies it by LBD; the policy then promotes/demotes clauses between tiers based on
-     *  reuse, so the tier is persistent state rather than a pure function of LBD. */
-    internal val learnedTier: IntArrayList = IntArrayList()
-
-    /** 1 iff the learned clause has detected a conflict or forced a unit since the last
-     *  reduction, parallel to [learnedClauseStore]. The three-tier reduction policy reads this
-     *  to promote reused clauses and demote idle ones, then clears it for survivors. */
-    internal val learnedUsedFlags: IntArrayList = IntArrayList()
+    val hasBinaryClauses: Boolean get() = learned.binaryClauseCount > 0
 
     // ---- Mid-life presolve factors ----
     // A dedicated append-only store for factors added during an incremental presolve bake. Distinct
-    // from [learnedClauseStore]: a presolve state ([incremental]) never learns clauses and a search
+    // from [LearnedClauseDb.store]: a presolve state ([incremental]) never learns clauses and a search
     // state never adds presolve factors, so at most one of the two tail stores is non-empty and both
     // occupy the id range `[baseFactorCount, totalFactorCount)`. Ids are stable and never renumbered;
     // dropping a factor (base or mid-life) tombstones its id ([tombstonedFactors]) and clears its
@@ -436,7 +407,7 @@ class PropagationState(
 
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
-    val totalFactorCount: Int get() = problem.numFactors + learnedClauseStore.size + midlifeFactorStore.size
+    val totalFactorCount: Int get() = problem.numFactors + learned.size + midlifeFactorStore.size
 
     /**
      * Per-literal wakeup index for factors opting into [Propagator.initialBoolWatchers].
@@ -766,47 +737,14 @@ class PropagationState(
     internal val boolPinOrder: IntArrayList =
         IntArrayList(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
 
-    // -------- Undo trail (replaces per-level full-array snapshots) --------
-    //
-    // Each mutation that a pop must rewind appends one record here recording the cell's
-    // *prior* value. A pop replays records from the top down to a [LevelMark]'s [undoSize]
-    // — O(changes-since-mark) instead of the old snapshot/restore's O(numVars) per level.
-    //
-    // Records are stored column-wise across parallel lists (no per-record object alloc).
-    // Two record kinds:
-    //   tag 0 — bool pin: a bool was assigned at this level (prior state is always
-    //           unassigned, since [pinBoolImpl] only proceeds when the var was free), so
-    //           only [undoVar] is needed; the int/obj columns are padding.
-    //   tag 1 — int change: a tighten / exclude replaced the var's domain. The full prior
-    //           int-var state is recorded so replay restores it exactly even when the same
-    //           var is narrowed several times within a level.
-    //
-    // Atom-table slots are *not* logged per-mutation: [undoTo] reconciles them after restoring
-    // each int domain — [resetAtomTrailFor] / [resetAtomTrailForCarve] clear exactly the order
-    // literals whose truth flips back to undetermined over the widened range, leaving every
-    // still-determined atom its trail-resident level / reason (#708). The unified pin trail
-    // [boolPinOrder] is truncated to the mark, so atoms allocated/established after it are dropped
-    // wholesale.
-
     /** Per-variable unassign sink invoked by [undoTo]; see its doc. Null = no subscriber. */
     var unassignListener: ((Int) -> Unit)? = null
-    internal val undoTag = IntArrayList()
-    internal val undoVar = IntArrayList()
-    internal val undoLevel = IntArrayList() // int: prior intLevel
-    internal val undoMinLvl = IntArrayList() // int: prior intMinLevel
-    internal val undoMaxLvl = IntArrayList() // int: prior intMaxLevel
-    internal val undoMinReason = IntArrayList() // int: prior intMinReason
-    internal val undoMaxReason = IntArrayList() // int: prior intMaxReason
-    internal val undoDomain = ArrayList<IntDomain?>() // int: prior intDomains[v]
-    internal val undoMinAnt = ArrayList<IntArray?>() // int: prior intMinAntecedents
-    internal val undoMaxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents
-    internal val undoHoleHistLen = IntArrayList() // int: prior holeHist length for the var
 
-    /** Separate trail for [Trailed] reversible cells (incremental factor state). Kept apart from the
-     *  bool/int undo columns above so the hot domain-mutation path pays nothing; a [LevelMark]
-     *  captures its size, [undoTo] replays it top-down. Each entry is a cell that changed (the cell
-     *  holds its own typed prior-value stack), so restore is box-free. See [Trailed] / `Reversible.kt`. */
-    internal val revTrail = ArrayList<Trailed>()
+    /** Undo trail (replaces per-level full-array snapshots) — see [UndoLog]. Appended to by the
+     *  `log*` functions in `Undo.kt`; the atom-table reconciliation it deliberately omits (#708) is
+     *  [undoTo]'s job via [resetAtomTrailFor] / [resetAtomTrailForCarve], with the unified pin trail
+     *  [boolPinOrder] truncated to the mark so atoms established after it are dropped wholesale. */
+    internal val undo: UndoLog = UndoLog()
 
     /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
      *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
@@ -829,7 +767,7 @@ class PropagationState(
      *  [undoIsBoolAt] over `[base, undoTop)` enumerates exactly the variables mutated since
      *  position `base` — used by [PropagationSession] to compute the implied-fact diff of a
      *  push incrementally instead of scanning every variable. */
-    val undoTop: Int get() = undoTag.size
+    val undoTop: Int get() = undo.size
 
     init {
         for (fid in 0 until problem.numFactors) registerFactor(fid, problem.propagators[fid])
@@ -882,7 +820,7 @@ class PropagationState(
             eventDirtyVars.add(null)
             eventDirtyMark.add(null)
         }
-        if (prop is ClausePropagator && prop.literals.size == 2) binaryClauseCount++
+        if (prop is ClausePropagator && prop.literals.size == 2) learned.binaryClauseCount++
         registerFactor(fid, prop)
         registerMidlifeOccurrences(fid, factor, prop)
         return fid
@@ -991,10 +929,10 @@ class PropagationState(
         fun snapshotCopy(): SnapshottablePayload
     }
 
-    /** Append a reversible cell to [revTrail] so its latest mutation is undone on the next
+    /** Append a reversible cell to [UndoLog.revTrail] so its latest mutation is undone on the next
      *  [undoTo] past this point. Called by [RevInt] / [RevRef] / [RevIntArray] on each logged write. */
     internal fun logReversible(cell: Trailed) {
-        revTrail.add(cell)
+        undo.revTrail.add(cell)
     }
 
     /**
