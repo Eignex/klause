@@ -8,6 +8,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 internal object AffineSingletons {
 
@@ -45,20 +46,35 @@ internal object AffineSingletons {
         cancellation: Cancellation = Cancellation.Never,
         sharedIntOcc: SharedIntOccurrence? = null,
         capWide: Boolean = false,
+        incrementalTouchedVars: IntArray? = null,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
         // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
         // can read the session's shared occurrence index directly (its CSR is in stable-id order). If no
-        // unit-pivot and no residue candidate exists there, the pass is fruitless and returns without ever
-        // building the mutable [WorkingSet] — skipping its O(occurrences) index copy on every barren firing.
+        // candidate exists there, the pass is fruitless and returns without ever building the mutable
+        // [WorkingSet] — skipping its O(occurrences) index copy on every barren firing. On a re-run the
+        // engine supplies the variables the delta touched since the last firing: a candidate can only newly
+        // arise on a touched variable (an untouched variable's factors, and hence its foldability, are
+        // unchanged since the previous run reached its fixpoint), so the scan need only test the factors
+        // those variables appear in — O(delta) instead of O(factors) on the common fruitless re-run.
         if (sharedIntOcc != null) {
             val seed = SeedOcc(problem.factors, sharedIntOcc)
-            val noUnit = findAffineCandidate(seed, 0, eliminated, objectiveIntVars, capWide) == null
-            if (noUnit && findResidueCandidate(seed, eliminated, objectiveIntVars, problem.intDomains) == null) {
-                return PassDelta()
+            val hasCandidate = if (incrementalTouchedVars != null) {
+                anyTouchedVarHeadsCandidate(
+                    seed,
+                    incrementalTouchedVars,
+                    eliminated,
+                    objectiveIntVars,
+                    capWide,
+                    problem.intDomains,
+                )
+            } else {
+                findAffineCandidate(seed, 0, eliminated, objectiveIntVars, capWide) != null ||
+                    findResidueCandidate(seed, eliminated, objectiveIntVars, problem.intDomains) != null
             }
+            if (!hasCandidate) return PassDelta()
         }
         // The working set holds the factors by stable id (tombstones for drops, appends for the folded
         // rewrites and bound rows) and a per-variable occurrence index maintained across eliminations.
@@ -137,33 +153,52 @@ internal object AffineSingletons {
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
         for (di in 0 until ws.size) {
-            val f = ws.factorAt(di) ?: continue
-            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) continue
-            for (xi in 0..1) {
-                val x = f.vars[xi]
-                val y = f.vars[1 - xi]
-                val a = f.coeffs[xi]
-                val b = f.coeffs[1 - xi]
-                // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
-                // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
-                // `y`'s domain is restricted below, so it too must stay clear of the objective — the
-                // pass leaves every objective variable untouched.
-                if (a == 0 || a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
-                if (x in objectiveIntVars || y in objectiveIntVars) continue
-                if (!ws.isContained(di, x)) continue
-                val domY = domains[y]
-                if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
-                val restricted = restrictPartnerDomain(domY, domains[x], a, b, f.bound) ?: continue
-                return ResidueCandidate(
-                    di,
-                    x,
-                    y,
-                    constTerm = f.bound,
-                    coeffY = -b,
-                    divisor = a,
-                    restrictedY = restricted,
-                )
-            }
+            residueCandidateInFactor(
+                ws,
+                di,
+                eliminated,
+                objectiveIntVars,
+                domains,
+            )?.let { return it }
+        }
+        return null
+    }
+
+    /** The residue-class doubleton the 2-term equality at stable id [di] defines, or `null` if it defines
+     *  none. The per-factor body of [findResidueCandidate], reused by the touched-variable re-scan. */
+    private fun residueCandidateInFactor(
+        ws: FactorOcc,
+        di: Int,
+        eliminated: BooleanArray,
+        objectiveIntVars: Set<Int>,
+        domains: Array<IntDomain>,
+    ): ResidueCandidate? {
+        val f = ws.factorAt(di) ?: return null
+        if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) return null
+        for (xi in 0..1) {
+            val x = f.vars[xi]
+            val y = f.vars[1 - xi]
+            val a = f.coeffs[xi]
+            val b = f.coeffs[1 - xi]
+            // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
+            // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
+            // `y`'s domain is restricted below, so it too must stay clear of the objective — the
+            // pass leaves every objective variable untouched.
+            if (a == 0 || a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
+            if (x in objectiveIntVars || y in objectiveIntVars) continue
+            if (!ws.isContained(di, x)) continue
+            val domY = domains[y]
+            if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
+            val restricted = restrictPartnerDomain(domY, domains[x], a, b, f.bound) ?: continue
+            return ResidueCandidate(
+                di,
+                x,
+                y,
+                constTerm = f.bound,
+                coeffY = -b,
+                divisor = a,
+                restrictedY = restricted,
+            )
         }
         return null
     }
@@ -205,60 +240,105 @@ internal object AffineSingletons {
         objectiveIntVars: Set<Int>,
         capWide: Boolean,
     ): AffineCandidate? {
-        // The working set maps variable id → the stable factor ids that mention it, so the per-candidate
-        // "where else does x occur" checks are O(occurrences-of-x) instead of a fresh O(factors) linear
-        // scan each. On a large model that quadratic scan dominated affine elimination; the index makes it
-        // linear in x's actual degree. The scan still walks the live factors in stable-id order — the same
-        // order a fresh compacted list would present — so it picks candidates in the identical sequence.
+        // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
+        // present — so it picks candidates in the identical sequence a full rebuild would.
         for (di in start until ws.size) {
-            val f = ws.factorAt(di) ?: continue
-            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) continue
-            for (xi in f.vars.indices) {
-                val x = f.vars[xi]
-                val cx = f.coeffs[xi]
-                if (eliminated[x] || x in objectiveIntVars) continue
-                // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
-                // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
-                // unit pivot trivially, and for a non-unit pivot exactly when `x` is implied-free
-                // (contained in this equality alone) and `c_x | gcd(c_j, bound)` (#445/#601). A
-                // non-unit pivot that fails the divisibility test would fold non-integral coefficients,
-                // so it is left for the residue-class doubleton pass or for propagation.
-                val isUnit = cx == 1 || cx == -1
-                if (!isUnit && !dividesAllPartnersAndBound(f, xi)) continue
-                if (!isUnit && !ws.isContained(di, x)) continue
-                // x = B + Σ A_j·y_j, with B = bound / c_x and A_j = −c_j / c_x for the other terms y_j;
-                // for a unit pivot the divisions are exact by definition.
-                val termVars = IntArray(f.vars.size - 1)
-                val termCoeffs = IntArray(f.vars.size - 1)
-                var w = 0
-                var partnerEliminated = false
-                for (j in f.vars.indices) {
-                    if (j == xi) continue
-                    if (eliminated[f.vars[j]]) partnerEliminated = true
-                    termVars[w] = f.vars[j]
-                    termCoeffs[w] = -f.coeffs[j] / cx
-                    w++
-                }
-                if (partnerEliminated) continue
-                val constTerm = f.bound / cx
-                // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
-                // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
-                // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
-                val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
-                // In an underdetermined model, defer a wide fold (leave the variable). Aliases are pure
-                // renames that never inflate, so they always proceed.
-                if (capWide && !isAlias && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
-                // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
-                // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
-                // only folds into Linear factors.
-                val singlePartnerSubstitutable = termVars.size == 1 &&
-                    ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0], constTerm, termVars[0])
-                if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
-                    return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
-                }
+            candidateInFactor(
+                ws,
+                di,
+                eliminated,
+                objectiveIntVars,
+                capWide,
+            )?.let { return it }
+        }
+        return null
+    }
+
+    /** The affine candidate the equality at stable id [di] defines (a pivot with unit or divisible
+     *  coefficient and foldable other occurrences), or `null` if it defines none. The per-factor body of
+     *  [findAffineCandidate], reused by the touched-variable re-scan so a fruitless re-run need only test
+     *  the factors mentioning a variable the delta changed. The per-candidate "where else does x occur"
+     *  checks are O(occurrences-of-x) off the occurrence index, not a fresh O(factors) scan. */
+    private fun candidateInFactor(
+        ws: FactorOcc,
+        di: Int,
+        eliminated: BooleanArray,
+        objectiveIntVars: Set<Int>,
+        capWide: Boolean,
+    ): AffineCandidate? {
+        val f = ws.factorAt(di) ?: return null
+        if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) return null
+        for (xi in f.vars.indices) {
+            val x = f.vars[xi]
+            val cx = f.coeffs[xi]
+            if (eliminated[x] || x in objectiveIntVars) continue
+            // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
+            // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
+            // unit pivot trivially, and for a non-unit pivot exactly when `x` is implied-free
+            // (contained in this equality alone) and `c_x | gcd(c_j, bound)` (#445/#601). A
+            // non-unit pivot that fails the divisibility test would fold non-integral coefficients,
+            // so it is left for the residue-class doubleton pass or for propagation.
+            val isUnit = cx == 1 || cx == -1
+            if (!isUnit && !dividesAllPartnersAndBound(f, xi)) continue
+            if (!isUnit && !ws.isContained(di, x)) continue
+            // x = B + Σ A_j·y_j, with B = bound / c_x and A_j = −c_j / c_x for the other terms y_j;
+            // for a unit pivot the divisions are exact by definition.
+            val termVars = IntArray(f.vars.size - 1)
+            val termCoeffs = IntArray(f.vars.size - 1)
+            var w = 0
+            var partnerEliminated = false
+            for (j in f.vars.indices) {
+                if (j == xi) continue
+                if (eliminated[f.vars[j]]) partnerEliminated = true
+                termVars[w] = f.vars[j]
+                termCoeffs[w] = -f.coeffs[j] / cx
+                w++
+            }
+            if (partnerEliminated) continue
+            val constTerm = f.bound / cx
+            // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
+            // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
+            // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
+            val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
+            // In an underdetermined model, defer a wide fold (leave the variable). Aliases are pure
+            // renames that never inflate, so they always proceed.
+            if (capWide && !isAlias && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
+            // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
+            // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
+            // only folds into Linear factors.
+            val singlePartnerSubstitutable = termVars.size == 1 &&
+                ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0], constTerm, termVars[0])
+            if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
+                return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
             }
         }
         return null
+    }
+
+    /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the
+     *  factors those variables appear in (deduplicated). A re-run's new candidates are confined to the
+     *  touched variables, so a `false` result means the pass is fruitless this firing — byte-identical to
+     *  the full scan, which would also find nothing. `true` falls back to the full elimination loop, whose
+     *  stable-id scan order the O(delta) test cannot reproduce. */
+    private fun anyTouchedVarHeadsCandidate(
+        seed: SeedOcc,
+        touchedVars: IntArray,
+        eliminated: BooleanArray,
+        objectiveIntVars: Set<Int>,
+        capWide: Boolean,
+        domains: Array<IntDomain>,
+    ): Boolean {
+        val checked = IntHashSet()
+        for (x in touchedVars) {
+            val degree = seed.degreeOf(x)
+            for (k in 0 until degree) {
+                val di = seed.occurrenceAt(x, k)
+                if (!checked.add(di)) continue
+                if (candidateInFactor(seed, di, eliminated, objectiveIntVars, capWide) != null) return true
+                if (residueCandidateInFactor(seed, di, eliminated, objectiveIntVars, domains) != null) return true
+            }
+        }
+        return false
     }
 
     /** Whether the pivot coefficient `f.coeffs(xi)` divides every other coefficient and the bound of
@@ -297,6 +377,10 @@ internal object AffineSingletons {
         override val size: Int get() = factors.size
         override fun factorAt(id: Int): Factor = factors[id]
         override fun degreeOf(x: Int): Int = occ.offsets[x + 1] - occ.offsets[x]
+
+        /** The stable id of the [k]-th factor mentioning [x] (`0 until degreeOf(x)`) — lets the
+         *  touched-variable re-scan visit only the factors a changed variable appears in. */
+        fun occurrenceAt(x: Int, k: Int): Int = occ.flat[occ.offsets[x] + k]
 
         override fun isContained(defIdx: Int, x: Int): Boolean {
             for (k in occ.offsets[x] until occ.offsets[x + 1]) if (occ.flat[k] != defIdx) return false

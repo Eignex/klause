@@ -8,6 +8,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * A pass's incremental change to the working problem: factors to drop (by stable id), factors to
@@ -164,6 +165,21 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
 
     /** The live factor at stable id [id], or `null` if it was tombstoned. */
     fun factorAt(id: Int): Factor? = factors[id]
+
+    /** Distinct integer variables mentioned by any factor added or dropped since [mark] — the variables
+     *  whose affine candidacy a re-run must re-examine (an untouched variable's factors are unchanged, so
+     *  its candidacy is unchanged since the previous run's fixpoint). */
+    fun touchedIntVarsSince(mark: ChangeMark): IntArray {
+        val vars = IntHashSet()
+        for (i in mark.added until addedLog.size) {
+            val f = factors[addedLog[i]] ?: continue
+            for (v in f.intVars) vars.add(v)
+        }
+        for (i in mark.dropped until droppedFactorLog.size) {
+            for (v in droppedFactorLog[i].intVars) vars.add(v)
+        }
+        return vars.toIntArray()
+    }
 
     /** Live (non-tombstoned) factors in stable-id order — the current working constraint set. */
     fun liveFactors(): List<Factor> = factors.filterNotNull()
