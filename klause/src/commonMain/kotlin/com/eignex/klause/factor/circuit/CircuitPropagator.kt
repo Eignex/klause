@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
-import com.eignex.klause.factor.circuit.internals.CpGate
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
+import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.circuit.internals.shaveClaimedFromEndpoints
 import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
 import com.eignex.klause.factor.circuit.internals.walkPredChain
@@ -61,14 +61,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val gate = (state.refPayload[factorId] as? CpGate) ?: run {
-            val fresh = CpGate()
-            state.refPayload[factorId] = fresh
-            fresh
-        }
-        val dirty = state.drainIntEventDirtyVars(factorId)
-        if (gate.started && dirty.isEmpty()) return true
-        gate.started = true
+        if (state.cpGateShouldSkip(factorId)) return true
         val ant = state.composeIntVarAtomAntecedents(succ)
         if (!tightenSuccToRange(state, succ, n)) return false
         if (n == 1) {
