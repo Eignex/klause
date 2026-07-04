@@ -49,57 +49,63 @@ internal object DuplicateColumns {
     fun mergeDuplicateColumns(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
-        sharedIntOcc: SharedIntOccurrence? = null,
+        @Suppress("UNUSED_PARAMETER") sharedIntOcc: SharedIntOccurrence? = null,
     ): PassDelta {
         if (problem.numIntVars < 2) return PassDelta()
-        val eligible = eligibleColumns(problem, objectiveIntVars, sharedIntOcc)
-        val signatures = columnSignatures(problem, eligible, sharedIntOcc)
-        // Group eligible variables by column signature; equal signatures are duplicate columns. Fold
-        // at most one duplicate into each representative this pass (a third re-signs next round).
-        val repBySignature = HashMap<List<Long>, Int>()
-        val repConsumed = HashSet<Int>()
-        val merges = ArrayList<ColumnMerge>()
-        for (v in 0 until problem.numIntVars) {
-            if (!eligible[v]) continue
-            val sig = signatures[v] ?: continue
-            val rep = repBySignature[sig]
-            if (rep == null) {
-                repBySignature[sig] = v
-            } else if (rep !in repConsumed) {
-                merges.add(
-                    ColumnMerge(
-                        keep = rep,
-                        drop = v,
-                        keepDomain = problem.intDomains[rep],
-                        dropDomain = problem.intDomains[v],
-                    ),
-                )
-                repConsumed.add(rep)
-            }
-        }
-        if (merges.isEmpty()) return PassDelta()
-
-        val keepOf = IntArray(problem.numIntVars) { it } // drop → its aggregate representative
+        val n = problem.numIntVars
+        // Iterate to the pass's own fixpoint: a chain of ≥ 3 duplicate columns folds one pair per
+        // representative, and the next iteration re-signs the third against the widened aggregate. Doing
+        // this internally instead of firing once per round and leaning on the round engine to re-invoke
+        // collapses the chain in a single pass — so the other passes are not re-run over each intermediate
+        // state. Column duplication is a structural (row-support + coefficient) property, so re-propagation
+        // between the old rounds could not change which columns are duplicates; the fixpoint reached here
+        // is the one the round engine reached across rounds, in the same pairwise order.
+        var workFactors: Array<Factor> = problem.factors
         val domains = problem.intDomains.copyOf()
-        for (m in merges) {
-            keepOf[m.drop] = m.keep
-            val keep = domains[m.keep]
-            // Widen the aggregate to the Minkowski sum; the session must reseed on this widen, so it flows
-            // through [PassDelta.domains].
-            domains[m.keep] = IntDomain(keep.min + m.dropDomain.min, keep.max + m.dropDomain.max)
+        val batches = ArrayList<List<ColumnMerge>>() // in application order; reconstruction undoes them last-first
+        while (true) {
+            val eligible = eligibleColumns(workFactors, n, domains, objectiveIntVars)
+            val signatures = columnSignatures(workFactors, n, eligible)
+            // Group eligible variables by column signature; equal signatures are duplicate columns. Fold
+            // at most one duplicate into each representative this iteration (a third re-signs next iteration).
+            val repBySignature = HashMap<List<Long>, Int>()
+            val repConsumed = HashSet<Int>()
+            val merges = ArrayList<ColumnMerge>()
+            for (v in 0 until n) {
+                if (!eligible[v]) continue
+                val sig = signatures[v] ?: continue
+                val rep = repBySignature[sig]
+                if (rep == null) {
+                    repBySignature[sig] = v
+                } else if (rep !in repConsumed) {
+                    merges.add(ColumnMerge(keep = rep, drop = v, keepDomain = domains[rep], dropDomain = domains[v]))
+                    repConsumed.add(rep)
+                }
+            }
+            if (merges.isEmpty()) break
+            val keepOf = IntArray(n) { it } // drop → its aggregate representative
+            for (m in merges) {
+                keepOf[m.drop] = m.keep
+                val keep = domains[m.keep]
+                // Widen the aggregate to the Minkowski sum; the session must reseed on this widen, so it
+                // flows through [PassDelta.domains].
+                domains[m.keep] = IntDomain(keep.min + m.dropDomain.min, keep.max + m.dropDomain.max)
+            }
+            workFactors = Array(workFactors.size) { aggregateColumns(workFactors[it], keepOf) }
+            batches.add(merges)
         }
-        // Each row is rewritten in place; the changed ones become drop+add, the untouched ones (identity
-        // unchanged) contribute nothing.
+        if (batches.isEmpty()) return PassDelta()
+        // Delta by identity against the input: a slot whose final rewrite differs from the input factor is
+        // a drop+add; an untouched slot contributes nothing.
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         problem.factors.forEachIndexed { i, f ->
-            val rewritten = aggregateColumns(f, keepOf)
-            if (rewritten !== f) {
+            if (workFactors[i] !== f) {
                 dropped.add(i)
-                added.add(rewritten)
+                added.add(workFactors[i])
             }
         }
-        return PassDelta(dropped.toIntArray(), added, domains, DuplicateColumnMerge(merges)::reconstruct)
+        return PassDelta(dropped.toIntArray(), added, domains, DuplicateColumnMerges(batches)::reconstruct)
     }
 
     /** [factor] with every dropped duplicate column folded into its representative: in a [Linear] row,
@@ -123,30 +129,18 @@ internal object DuplicateColumns {
 
     /** Per-variable eligibility: every occurrence is a [Linear] factor (a global / reified row reads a
      *  variable value-wise, not as a column coefficient), the domain is contiguous (the reconstruction
-     *  split must not land in a hole), and the variable is not read by the objective. With the
-     *  session-maintained [occ] the non-[Linear] test is a per-var walk of its factors; otherwise the
-     *  factor list is scanned once to mark every variable a non-[Linear] factor mentions. */
+     *  split must not land in a hole), and the variable is not read by the objective. The factor list is
+     *  scanned once to mark every variable a non-[Linear] factor mentions. */
     private fun eligibleColumns(
-        problem: Problem,
+        factors: Array<Factor>,
+        numIntVars: Int,
+        domains: Array<IntDomain>,
         objectiveIntVars: Set<Int>,
-        occ: SharedIntOccurrence?,
     ): BooleanArray {
-        val eligible = BooleanArray(problem.numIntVars) { v ->
-            v !in objectiveIntVars && problem.intDomains[v].isContiguous()
+        val eligible = BooleanArray(numIntVars) { v ->
+            v !in objectiveIntVars && domains[v].isContiguous()
         }
-        if (occ != null) {
-            for (v in 0 until problem.numIntVars) {
-                if (!eligible[v]) continue
-                for (k in occ.offsets[v] until occ.offsets[v + 1]) {
-                    if (problem.factors[occ.flat[k]] !is Linear) {
-                        eligible[v] = false
-                        break
-                    }
-                }
-            }
-            return eligible
-        }
-        for (f in problem.factors) {
+        for (f in factors) {
             if (f is Linear) continue
             for (v in f.intVars) eligible[v] = false
         }
@@ -157,29 +151,9 @@ internal object DuplicateColumns {
      *  with its coefficient there, sorted by factor id. Two eligible variables share a signature iff
      *  they occur in exactly the same factors with the same coefficient in each — duplicate columns.
      *  Ineligible variables, and variables in no factor, get a `null` signature and never match. */
-    private fun columnSignatures(
-        problem: Problem,
-        eligible: BooleanArray,
-        occ: SharedIntOccurrence?,
-    ): Array<List<Long>?> {
-        val entries = Array(problem.numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
-        if (occ != null) {
-            // Per eligible variable, walk its factors from the shared index in ascending factor id (the
-            // CSR flat order) — the same order the factor scan below appends — so the signature list is
-            // identical. Every occurrence of an eligible variable is a [Linear] (a non-[Linear] one made
-            // it ineligible), so its coefficient is always present in that row.
-            for (v in 0 until problem.numIntVars) {
-                val list = entries[v] ?: continue
-                for (k in occ.offsets[v] until occ.offsets[v + 1]) {
-                    val fid = occ.flat[k]
-                    val f = problem.factors[fid] as Linear
-                    list.add(fid.toLong())
-                    list.add(f.coeffs[f.vars.indexOf(v)].toLong())
-                }
-            }
-            return Array(problem.numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
-        }
-        problem.factors.forEachIndexed { fid, f ->
+    private fun columnSignatures(factors: Array<Factor>, numIntVars: Int, eligible: BooleanArray): Array<List<Long>?> {
+        val entries = Array(numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
+        factors.forEachIndexed { fid, f ->
             if (f !is Linear) return@forEachIndexed
             val coeffByVar = MutableIntIntMap(f.vars.size)
             for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i])
@@ -190,7 +164,7 @@ internal object DuplicateColumns {
                 }
             }
         }
-        return Array(problem.numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
+        return Array(numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
     }
 
     private fun IntDomain.isContiguous(): Boolean = size == max - min + 1
@@ -223,5 +197,20 @@ internal class DuplicateColumnMerge(private val merges: List<ColumnMerge>) {
             ints[m.drop] = z - x
         }
         return Sample(sample.bools, ints)
+    }
+}
+
+/**
+ * Reconstruction for a fixpoint run of [DuplicateColumns.mergeDuplicateColumns], which folds a chain of
+ * duplicate columns over several internal iterations. Each iteration's aggregate is built on the previous
+ * iteration's (possibly already-widened) representative domain, so the splits must be undone in reverse
+ * iteration order — the same last-batch-first order the round engine produced when it re-invoked the pass
+ * once per iteration and composed the per-round reconstructions with `foldRight`.
+ */
+internal class DuplicateColumnMerges(private val batches: List<List<ColumnMerge>>) {
+    fun reconstruct(sample: Sample): Sample {
+        var s = sample
+        for (batch in batches.asReversed()) s = DuplicateColumnMerge(batch).reconstruct(s)
+        return s
     }
 }

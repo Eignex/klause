@@ -202,6 +202,30 @@ class DuplicateColumnsTest {
     }
 
     @Test
+    fun `collapses a chain of three duplicate columns in one pass`() {
+        // x (0), y (1), w (2) occur in exactly the same rows with the same coefficient — a chain of
+        // three duplicate columns. A single pass folds all three into one aggregate (the fixpoint
+        // re-signs w against the x+y aggregate), and every reconstruction splits the aggregate back to
+        // a feasible triple. u (3) shares only the first row, so it is not a duplicate and stays.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.LE, 6),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 2),
+            ),
+        )
+        val reduced = problem.withPassDelta(Presolve.mergeDuplicateColumns(problem), BakeConfig.NONE)
+        assertTrue(
+            reduced.factors.none { 1 in it.intVars || 2 in it.intVars },
+            "both dropped duplicates are absorbed in a single pass",
+        )
+        checkRoundTrip("chain-of-three", problem, expectMerged = true, expectSat = true)
+        checkAllReconstructionsFeasible("chain-of-three", problem)
+    }
+
+    @Test
     fun `preserves an unsat verdict`() {
         // x + y + z >= 7 with all domains [0,2]: x and y are duplicate columns of the single row, so
         // they aggregate to z' in [0,4]; z' + z >= 7 with z <= 2 stays unreachable (max 6), preserving
