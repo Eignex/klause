@@ -35,6 +35,19 @@ class AcceptanceRuleTest {
     }
 
     @Test
+    fun `greedy descent takes the best strictly-improving move over both pools`() {
+        // swap (score-only, -0.5) is the only strictly-improving move; deterministic rules see both pools.
+        assertEquals(swap, AcceptanceRule.GreedyDescent.choose(rng(), listOf(a, b), listOf(swap), anyTemp, score))
+    }
+
+    @Test
+    fun `greedy descent returns null at a local optimum`() {
+        // No candidate strictly improves (the minimum is flip at 0.0, not < 0): a local optimum, so the
+        // rule declines rather than committing a non-improving move.
+        assertNull(AcceptanceRule.GreedyDescent.choose(rng(), listOf(a, b), listOf(flip), anyTemp, score))
+    }
+
+    @Test
     fun `walksat noise=1 draws only from the noise pool`() {
         val r = rng()
         repeat(50) {
@@ -95,6 +108,7 @@ class AcceptanceRuleTest {
     fun `all rules return null on empty pools`() {
         for (rule in listOf(
             AcceptanceRule.Greedy,
+            AcceptanceRule.GreedyDescent,
             AcceptanceRule.WalkSatNoise(0.5),
             AcceptanceRule.ProbSat(),
             AcceptanceRule.Skew(0.3),
