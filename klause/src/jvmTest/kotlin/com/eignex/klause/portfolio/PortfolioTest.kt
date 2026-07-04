@@ -61,8 +61,8 @@ class PortfolioTest {
     @Test
     fun `an injected btPool overrides the curated backtrack arms`() {
         val pool = listOf(
-            { BacktrackWorkerConfig.recipeByLabel("free") },
-            { BacktrackWorkerConfig.recipeByLabel("conflictDriven") },
+            { BacktrackCatalog.byLabel("free") },
+            { BacktrackCatalog.byLabel("conflictDriven") },
         )
         val scenario = PortfolioScenario(
             cores = 1,
@@ -109,7 +109,7 @@ class PortfolioTest {
 
     @Test
     fun `the latent-axis heuristic arms are ranked and build`() {
-        val cop = BacktrackWorkerConfig.labels(Kind.COP)
+        val cop = BacktrackCatalog.labels(Kind.COP)
         for (label in listOf("domwdeg", "first-fail", "activity")) {
             assertTrue(label in cop, "$label must be a ranked COP arm")
             assertEquals(label, BacktrackWorkerConfig.byLabel(label).label, "$label must build by label")

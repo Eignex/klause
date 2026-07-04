@@ -277,15 +277,19 @@ internal object SolveCore {
             printLsPool(lsResolution.pool)
             return
         }
+        val kind = if (solvable.optimize) Kind.COP else Kind.CSP
+        // `--param bt-arm=label,label` resolves a named backtrack arm pool (a no-op for a pure-LS pool).
+        val btPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
         val scenario = buildPortfolioScenario(
             params,
             common.randomSeed,
             cores = cores,
-            kind = if (solvable.optimize) Kind.COP else Kind.CSP,
+            kind = kind,
             defaultEngine = mix,
             defaultArms = defaultArms,
             lpCeiling = lpCeiling,
             lsPool = lsResolution.pool,
+            btPool = btPool,
             // #512: include the model's search-annotation arm in the backtrack pool when the model
             // carries one (a no-op for a pure-LS pool, which has no backtrack slot).
             annotationArm = solvable.annotatedBacktrackParams,
