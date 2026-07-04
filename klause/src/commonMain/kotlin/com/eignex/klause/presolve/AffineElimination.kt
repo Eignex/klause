@@ -406,7 +406,7 @@ internal object AffineSingletons {
                 val id = occ.flat[k]
                 if (id == defIdx) continue
                 val f = factors[id]
-                if (f !is Linear && f.substituteAffine(x, scale, offset, replacement) == null) return false
+                if (f !is Linear && !f.canSubstituteAffine(x, scale, offset, replacement)) return false
             }
             return true
         }
@@ -509,7 +509,7 @@ internal object AffineSingletons {
                 val id = occ[k]
                 if (id == defIdx) continue
                 val f = slots[id] ?: continue
-                if (f !is Linear && f.substituteAffine(x, scale, offset, replacement) == null) return false
+                if (f !is Linear && !f.canSubstituteAffine(x, scale, offset, replacement)) return false
             }
             return true
         }

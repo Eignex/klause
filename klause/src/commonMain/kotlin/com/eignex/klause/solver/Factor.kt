@@ -55,6 +55,17 @@ interface Factor {
     ): Factor? = null
 
     /**
+     * Whether [substituteAffine] with these arguments would succeed (return non-null), decided without
+     * materialising the rewritten factor. Affine elimination's candidate scan tests the substitutability
+     * of a candidate's other occurrences repeatedly, but only the *accepted* candidate is ever rewritten;
+     * a factor whose [substituteAffine] is expensive (a [com.eignex.klause.factor.table.Table] rewrites
+     * every tuple) overrides this with a cheap early-exit test so the scan does not pay the full rewrite
+     * per check. The default runs [substituteAffine] and discards the result, so it agrees by construction.
+     */
+    fun canSubstituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Boolean =
+        substituteAffine(x, scale, offset, replacement) != null
+
+    /**
      * A canonical [StructuralKey] identifying this constraint up to variable identity: same factor
      * type, same constants (coefficients, bounds, polarities), and the same multiset of variables — in
      * a representation that does not depend on internal ordering — produce equal keys. Used by symmetry
