@@ -24,9 +24,9 @@ internal object CliKnobs {
      *  in presolve. `0` or negative disables the cap. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
     val presolveBudgetMs by propertyKnob()
 
-    /** Default presolve wall-clock budget: bounds presolve on the largest models while ordinary
-     *  instances finish under it. Tuned against the mzn-bench corpus so that on all but one instance
-     *  presolve lands under half a second, with the long-running passes (affine, symmetry) bailing
-     *  promptly via cooperative cancellation. */
-    const val DEFAULT_PRESOLVE_BUDGET_MS = 350L
+    /** Default presolve wall-clock budget: bounds presolve on pathological models while leaving ordinary
+     *  instances untouched. Set well above the corpus's normal presolve times so the cap only ever fires
+     *  as a runaway backstop — the long-running passes (affine, symmetry) still bail promptly via
+     *  cooperative cancellation once it trips. */
+    const val DEFAULT_PRESOLVE_BUDGET_MS = 5000L
 }
