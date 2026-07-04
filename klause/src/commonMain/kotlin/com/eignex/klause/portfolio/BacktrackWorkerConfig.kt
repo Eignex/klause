@@ -188,6 +188,12 @@ internal data class BacktrackWorkerConfig(
         /** A fresh config for the arm named [label] (the single string boundary — CLI `arm=`, campaigns). */
         fun byLabel(label: String): BacktrackWorkerConfig = make(fromLabel(label))
 
+        /** Wrap a pre-built [BacktrackParams] template as an arm — the injected-`btPool` path. The
+         *  template's seed and event sink are overridden per slot at materialisation, so one template
+         *  is safe to reuse across slots. */
+        fun ofParams(label: String, template: BacktrackParams): BacktrackWorkerConfig =
+            BacktrackWorkerConfig(label) { seed, onEvent -> template.copy(randomSeed = seed, onEvent = onEvent) }
+
         /** Every arm label for [kind], in credit order — for enumerating the pool by name (the CLI
          *  `arm=` selector, a credit sweep). */
         fun labels(kind: Kind): List<String> = rankedArms(kind).map { it.label }

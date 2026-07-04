@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LsRecipe
@@ -67,6 +68,11 @@ data class PortfolioScenario(
      *  `null` uses the curated `LsCatalog` pool unchanged; a non-null pool is the CLI's resolved
      *  recipes (a named base, or the curated pool with axis edits applied). */
     val lsPool: List<() -> LsRecipe>? = null,
+    /** Optional override of the backtrack arm pool — pre-built [BacktrackParams] templates, one arm
+     *  each (re-seeded and event-wired per slot at materialisation, wrapping past the pool size).
+     *  `null` uses the curated [BacktrackWorkerConfig] pool. The backtrack analogue of [lsPool]; it
+     *  takes templates rather than recipe factories pending a public backtrack recipe boundary. */
+    val btPool: List<BacktrackParams>? = null,
     /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool] (#809), the
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
      *  cuts cross arms, so it never changes any arm's optimum). */
@@ -150,8 +156,8 @@ internal object PortfolioComposition {
         val count = scenario.arms
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(count, scenario.lsPool)
-            EngineMix.BACKTRACK -> btArms(scenario.kind, count, scenario.lpCeiling)
-            EngineMix.MIXED -> mixedArms(scenario.kind, count, scenario.lpCeiling, scenario.lsPool)
+            EngineMix.BACKTRACK -> btArms(scenario.kind, count, scenario.lpCeiling, scenario.btPool)
+            EngineMix.MIXED -> mixedArms(scenario.kind, count, scenario.lpCeiling, scenario.lsPool, scenario.btPool)
         }
     }
 
@@ -163,14 +169,25 @@ internal object PortfolioComposition {
         List(count) { LocalSearchWorkerConfig(pool[it % pool.size]()) }
     }
 
-    private fun btArms(kind: Kind, count: Int, lpCeiling: LpConfig): List<WorkerConfig> =
+    /** The [count] backtrack arms — the curated pool ([btPool] == null), else the injected
+     *  [BacktrackParams] templates, each a fresh arm (wrapping past the pool size). */
+    private fun btArms(
+        kind: Kind,
+        count: Int,
+        lpCeiling: LpConfig,
+        btPool: List<BacktrackParams>?,
+    ): List<WorkerConfig> = if (btPool == null) {
         BacktrackWorkerConfig.diverse(kind, count, lpCeiling)
+    } else {
+        List(count) { BacktrackWorkerConfig.ofParams("bt-pool#$it", btPool[it % btPool.size]) }
+    }
 
     private fun mixedArms(
         kind: Kind,
         count: Int,
         lpCeiling: LpConfig,
         pool: List<() -> LsRecipe>?,
+        btPool: List<BacktrackParams>?,
     ): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
         // fast first-incumbent engine).
@@ -178,7 +195,7 @@ internal object PortfolioComposition {
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
         arms += lsArms(lsCount, pool)
-        if (btCount > 0) arms += btArms(kind, btCount, lpCeiling)
+        if (btCount > 0) arms += btArms(kind, btCount, lpCeiling, btPool)
         return arms
     }
 }
