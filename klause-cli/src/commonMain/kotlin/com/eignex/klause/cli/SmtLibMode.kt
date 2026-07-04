@@ -3,7 +3,6 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.SolveStats
 
 /**
  * SMT-LIB 2 **QF_LIA** front-end (`.smt2` / `.smt`). Emits the SMT-LIB convention: a
@@ -46,35 +45,17 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, s: Sam
 }
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
-internal class SmtLibOutput : OutputProtocol {
-    private var best: String? = null
+internal class SmtLibOutput : BufferedBestOutput() {
+    override val commentPrefix: String = ";"
 
-    override fun onSolution(rendered: String, objective: Long?) {
-        best = rendered
+    override fun statusLine(verdict: Verdict): String = when (verdict) {
+        Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "sat"
+        Verdict.UNSATISFIABLE -> "unsat"
+        Verdict.UNKNOWN -> "unknown"
     }
 
-    override fun onComplete(verdict: Verdict) {
-        when (verdict) {
-            Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> {
-                println("sat")
-                best?.let { println(it) }
-            }
-
-            Verdict.UNSATISFIABLE -> println("unsat")
-
-            Verdict.UNKNOWN -> println("unknown")
-        }
-    }
-
-    override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
-        println("; solveTime=${solveTimeMs / 1000.0}")
-        println("; solutions=$solutions")
-        if (stats.run.backend.isNotEmpty()) {
-            // Deliberately lean block: SMT-LIB comments carry only the headline search counters.
-            printStatPairs(";", searchStatPairs(stats).filter { (k, _) -> k in SMT_SEARCH_KEYS })
-            printStatPairs(";", lpStatPairs(stats))
-        }
-    }
+    // Deliberately lean block: SMT-LIB comments carry only the headline search counters.
+    override fun keepStat(key: String): Boolean = key in SMT_SEARCH_KEYS
 
     private companion object {
         private val SMT_SEARCH_KEYS = setOf("nodes", "failures", "propagations")

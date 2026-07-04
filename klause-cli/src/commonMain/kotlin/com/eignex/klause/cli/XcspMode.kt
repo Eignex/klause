@@ -2,7 +2,6 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.SolveStats
 
 /**
  * XCSP3 front-end (`.xml` / `.xcsp` / `.xcsp3`). Emits the XCSP3 competition output protocol:
@@ -43,41 +42,19 @@ internal fun renderInstantiation(names: Map<String, Int>, s: Sample): String {
 
 /** XCSP3 competition output protocol. Incumbent `o` costs stream live; the final `s` status
  *  and `v` instantiation are emitted together at completion, after the best solution is known. */
-internal class XcspOutput : OutputProtocol {
-    private var best: String? = null
+internal class XcspOutput : BufferedBestOutput() {
+    override val commentPrefix: String = "c"
+    override val streamObjective: Boolean = true
 
-    override fun onSolution(rendered: String, objective: Long?) {
-        best = rendered
-        if (objective != null) println("o $objective")
+    override fun statusLine(verdict: Verdict): String = when (verdict) {
+        Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
+        Verdict.OPTIMAL -> "s OPTIMUM FOUND"
+        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+        Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
-    override fun onComplete(verdict: Verdict) {
-        when (verdict) {
-            Verdict.SATISFIABLE, Verdict.BEST_FOUND -> {
-                println("s SATISFIABLE")
-                best?.let { println(it) }
-            }
-
-            Verdict.OPTIMAL -> {
-                println("s OPTIMUM FOUND")
-                best?.let { println(it) }
-            }
-
-            Verdict.UNSATISFIABLE -> println("s UNSATISFIABLE")
-
-            Verdict.UNKNOWN -> println("s UNKNOWN")
-        }
-    }
-
-    override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
-        println("c solveTime=${solveTimeMs / 1000.0}")
-        println("c solutions=$solutions")
-        if (stats.run.backend.isNotEmpty()) {
-            // Deliberately omits the clause-learning counters; XCSP comments track search shape only.
-            printStatPairs("c", searchStatPairs(stats).filter { (k, _) -> k !in XCSP_OMITTED_KEYS })
-            printStatPairs("c", lpStatPairs(stats))
-        }
-    }
+    // Deliberately omits the clause-learning counters; XCSP comments track search shape only.
+    override fun keepStat(key: String): Boolean = key !in XCSP_OMITTED_KEYS
 
     private companion object {
         private val XCSP_OMITTED_KEYS = setOf("learned", "relearned")
