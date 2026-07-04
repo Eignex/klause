@@ -3,8 +3,6 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.GreedyInit
-import com.eignex.klause.localsearch.movesource.PairSwap
-import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.localsearch.strategy.Cbls
@@ -13,7 +11,6 @@ import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -45,8 +42,9 @@ class LocalSearchSolver(
     override val problem: Problem,
     /** SourceDrivenStrategy for the satisfy phase (and, when [optimizeStrategy] is null, the minimize
      *  phase too, via its [SourceDrivenStrategy.feasibleDescent]). Default is [Cbls] — its
-     *  [FeasibleDescent.StrictGreedy] runs the engine's greedy objective descent, so a bare
-     *  `LocalSearchSolver(problem).minimize(...)` optimizes with no extra wiring. Override for a
+     *  [FeasibleDescent.SelfOwned] descent (greedy over its objective / structured / pair-swap sources)
+     *  runs the objective optimize, so a bare `LocalSearchSolver(problem).minimize(...)` optimizes with
+     *  no extra wiring. Override for a
      *  different arm — `ProbSat.adaptive()` for a boolean core (ratcheted on a COP by the portfolio),
      *  `SimulatedAnnealing.optimizer(...)` to anneal. */
     val strategy: SourceDrivenStrategy = Cbls(),
@@ -57,11 +55,6 @@ class LocalSearchSolver(
     val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Restart policy controlling diversification. */
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
-    /** Cap on pair-swap candidates considered before the objective descent gives up at a
-     *  single-flip local minimum. Pair swaps escape plateaus where every single flip
-     *  breaks feasibility but a coordinated 2-flip preserves it (common in
-     *  binary-decision optimization like knapsack / packing). 0 disables pair-swap. */
-    val pairSwapBudget: Int = 256,
     /** When true (default), restarts run a greedy-repair pass after randomizing so the search starts
      *  closer to feasibility. The pass walks vars in randomized order and picks the value that
      *  minimizes immediate violation contribution. Idempotent and bounded by the variable count. */
@@ -91,8 +84,6 @@ class LocalSearchSolver(
      *  re-enters the violation set and the feasibility fight repairs it — the SAT→optimization ratchet
      *  for the violation-native arms (probSAT / WalkSAT). Null leaves objective handling unchanged. */
     internal var objectiveBound: MutableObjectiveBound? = null
-
-    private val satisfiedStructured: SatisfiedStructured = SatisfiedStructured.all()
 
     private val greedyInit: GreedyInit = GreedyInit()
 
@@ -456,15 +447,13 @@ class LocalSearchSolver(
         var stallCount = 0L
         var bestFoundAtMs = -1L
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
-        val shaping = params.costShaping
         var cancelled = false
 
         // Each restart counts as one unit of work against maxFlips; otherwise a degenerate objective
         // on a constraint-free problem would loop forever (cost stays 0, descent never improves, and
         // the restart path wouldn't bump totalFlips).
-        // Phase strategy: when optimizeStrategy is feasibility-aware (gates objective behind cost==0)
-        // it drives both phases. Else split phases (strategy for satisfy, optimizeStrategy for
-        // descent) for non-unified strategies that bail at feasibility.
+        // Phase strategy: an optimizeStrategy (when set) drives both phases; else the satisfy strategy
+        // drives, and the optimize phase follows the strategy's own [FeasibleDescent] mode.
         val descentStrategy = optimizeStrategy
         val unified = descentStrategy != null
         // Capture the ratchet handle once: set at construction, read in the feasible-incumbent hook.
@@ -473,6 +462,10 @@ class LocalSearchSolver(
         // satisfy strategy's. The cost==0 branch dispatches on it exhaustively (no fall-through), so an
         // arm always optimizes the way it declared and never lands in a default descent by accident.
         val feasibleMode = (descentStrategy ?: strategy).feasibleDescent
+        // Sampling-miss tolerance for a SelfOwned feasible walk: how many consecutive null picks to
+        // re-sample before a restart (see [SourceDrivenStrategy.feasibleResampleCap]).
+        val feasibleResampleCap = (descentStrategy ?: strategy).feasibleResampleCap
+        var feasibleMisses = 0
         // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
         // when one drives both phases, else the satisfy strategy).
         val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
@@ -542,13 +535,15 @@ class LocalSearchSolver(
                         continue
                     }
 
-                    // The strategy's own acceptance (SA Metropolis) owns the feasible walk: it steps
-                    // through worse-objective feasible states the strict-greedy gate would revert.
-                    // Best-feasible is snapshotted above, so wandering never loses the incumbent. A
+                    // The strategy's own pickMove (its sources + acceptance) owns the feasible walk: the
+                    // engine commits whatever feasibility-preserving move it picks — CBLS descends greedily
+                    // on its objective / structured / pair-swap sources, SA anneals through worse-objective
+                    // states. Best-feasible is snapshotted above, so wandering never loses the incumbent. A
                     // feasibility-breaking pick is reverted and retried; a null pick is a local optimum.
-                    FeasibleDescent.AnnealSelfOwned -> {
+                    FeasibleDescent.SelfOwned -> {
                         val m = (descentStrategy ?: strategy).pickMove(state)
                         if (m != null) {
+                            feasibleMisses = 0
                             val savedSnap = state.assignment.snapshot()
                             state.apply(m)
                             if (state.cost != 0L) revertMove(state, m, savedSnap)
@@ -556,58 +551,17 @@ class LocalSearchSolver(
                             totalFlips++
                             continue
                         }
-                        restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restarts.restart(state, bestSample)
-                        if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
-                        stallCount++
-                        restartCount++
-                        flipsSinceRestart = 0
-                        totalFlips++
-                        continue
-                    }
-
-                    // Engine-driven strict-improvement greedy descent, in order of informedness; each gets
-                    // one chance before falling through to the next, and stalling all triggers a restart:
-                    // greedy single-flip, then the strategy's weighted move (committed only if it keeps
-                    // feasibility AND strictly improves the objective), factor-aware structured moves, then
-                    // the random pair-swap fallback.
-                    FeasibleDescent.StrictGreedy -> {
-                        val descended = if (shaping.feasibilityGated) {
-                            greedyObjectiveStep(state, objective, params.cancellation)
-                        } else {
-                            shapedDescentStep(state, objective, shaping, params.cancellation)
-                        }
-                        if (descended) {
+                        // No move this draw. For a sampled strategy that is usually an unlucky draw rather
+                        // than a true local optimum, so re-sample (and let the stall machinery engage) up to
+                        // feasibleResampleCap times before diversifying — a restart here discards the current
+                        // feasible solution. cap == 0 restarts immediately (exhaustive-generation semantics).
+                        if (feasibleMisses < feasibleResampleCap) {
+                            feasibleMisses++
                             flipsSinceRestart++
                             totalFlips++
                             continue
                         }
-                        if (descentStrategy != null) {
-                            val m = descentStrategy.pickMove(state)
-                            if (m != null) {
-                                val baseObj = objective.evaluate(state.assignment)
-                                val savedSnap = state.assignment.snapshot()
-                                state.apply(m)
-                                if (state.cost == 0L && objective.evaluate(state.assignment) < baseObj) {
-                                    flipsSinceRestart++
-                                    totalFlips++
-                                    continue
-                                }
-                                revertMove(state, m, savedSnap)
-                            }
-                        }
-                        if (structuredMoveStep(state, objective, params.cancellation)) {
-                            flipsSinceRestart++
-                            totalFlips++
-                            continue
-                        }
-                        if (pairSwapBudget > 0 && largeEnoughForGreedy &&
-                            pairSwapStep(state, objective, pairSwapBudget, params.cancellation)
-                        ) {
-                            flipsSinceRestart++
-                            totalFlips++
-                            continue
-                        }
+                        feasibleMisses = 0
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
                         restarts.restart(state, bestSample)
                         if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
@@ -694,139 +648,6 @@ class LocalSearchSolver(
     }
 
     /**
-     * Greedy hill-climbing on the objective among feasibility-preserving single-variable
-     * moves. Considers a flip on each bool var and a ±1 step on each int var (clamped to
-     * the int's domain). Picks the candidate that strictly lowers the objective the most
-     * while keeping `cost == 0`. Returns `true` if it advanced.
-     *
-     * Bool flips are evaluated by applying-then-reverting on the live state so the
-     * incremental cost path runs naturally; int sets do the same with the saved old
-     * value.
-     */
-    private fun greedyObjectiveStep(
-        state: LocalSearchState,
-        objective: Objective,
-        cancellation: Cancellation,
-    ): Boolean {
-        // Score each candidate via netDelta + objectiveDelta, no snapshot/evaluate per candidate —
-        // only on commit. Every objective reaching the descent is incremental, so no evaluate fallback.
-        val baseCost = state.cost
-        val poll = IntArray(1)
-        var bestDelta = 0.0
-        var bestMove: Move? = null
-
-        var b = 0
-        while (b < problem.numBoolVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = b++
-            if (state.assumptions.isFrozenBool(v)) continue
-            val move = Move.BoolFlip(v)
-            if (baseCost + state.netDelta(move) != 0L) continue // not feasibility-preserving
-            val delta = state.objectiveDelta(objective, move) ?: continue
-            if (delta < bestDelta) {
-                bestDelta = delta
-                bestMove = move
-            }
-        }
-
-        var i = 0
-        while (i < problem.numIntVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = i++
-            if (state.assumptions.isFrozenInt(v)) continue
-            val cur = state.assignment.intValue(v)
-            val d = problem.intDomains[v]
-            for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue // sparse-aware: rejects holes
-                val move = Move.IntSet(v, target)
-                if (baseCost + state.netDelta(move) != 0L) continue
-                val delta = state.objectiveDelta(objective, move) ?: continue
-                if (delta < bestDelta) {
-                    bestDelta = delta
-                    bestMove = move
-                }
-            }
-        }
-
-        return commitBest(state, bestMove)
-    }
-
-    /** Poll [cancellation] once every [CANCEL_CHECK_INTERVAL] candidates, advancing the
-     *  single-element [counter] box so the count carries across calls within one descent scan.
-     *  Returns true when the candidate loop should abort — keeps the O(numVars) descent steps
-     *  deadline-responsive. */
-    private fun pollCancel(counter: IntArray, cancellation: Cancellation): Boolean {
-        if (++counter[0] < CANCEL_CHECK_INTERVAL) return false
-        counter[0] = 0
-        return cancellation()
-    }
-
-    /** Commit [bestMove] if a descent improver was found, returning whether a move was
-     *  applied. Shared tail of the best-improvement descent steps. */
-    private fun commitBest(state: LocalSearchState, bestMove: Move?): Boolean {
-        if (bestMove == null) return false
-        state.apply(bestMove)
-        return true
-    }
-
-    /**
-     * Shaped-cost greedy step. Picks the single-variable move (bool flip / int ±1) whose
-     * post-state shaped score `shape(violationCount, objective)` is strictly less than
-     * the current shaped score. Unlike [greedyObjectiveStep], may step into infeasibility
-     * — the main minimize loop then drives back via the configured strategy.
-     */
-    private fun shapedDescentStep(
-        state: LocalSearchState,
-        objective: Objective,
-        shaping: CostShaping,
-        cancellation: Cancellation,
-    ): Boolean {
-        // Anchor on one baseline evaluate, then score each candidate's shaped value from
-        // (baseCost + netDelta, baselineObj + objectiveDelta) — no per-candidate snapshot/evaluate
-        // and no apply/revert. Every reachable objective is incremental, so no evaluate fallback.
-        val baseCost = state.cost
-        val baselineObj = objective.evaluate(state.assignment)
-        val poll = IntArray(1)
-        var bestShaped = shaping.shape(baseCost, baselineObj)
-        var bestMove: Move? = null
-
-        var b = 0
-        while (b < problem.numBoolVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = b++
-            if (state.assumptions.isFrozenBool(v)) continue
-            val move = Move.BoolFlip(v)
-            val delta = state.objectiveDelta(objective, move) ?: continue
-            val shaped = shaping.shape(baseCost + state.netDelta(move), baselineObj + delta)
-            if (shaped < bestShaped) {
-                bestShaped = shaped
-                bestMove = move
-            }
-        }
-
-        var i = 0
-        while (i < problem.numIntVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = i++
-            if (state.assumptions.isFrozenInt(v)) continue
-            val cur = state.assignment.intValue(v)
-            val d = problem.intDomains[v]
-            for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue // sparse-aware: rejects holes
-                val move = Move.IntSet(v, target)
-                val delta = state.objectiveDelta(objective, move) ?: continue
-                val shaped = shaping.shape(baseCost + state.netDelta(move), baselineObj + delta)
-                if (shaped < bestShaped) {
-                    bestShaped = shaped
-                    bestMove = move
-                }
-            }
-        }
-
-        return commitBest(state, bestMove)
-    }
-
-    /**
      * Greedy-repair pass over [state] right after a restart. Walks vars in randomized order;
      * for each, picks the value that minimizes the current `state.cost` (ties keep the current
      * value). Single forward pass, idempotent on already-feasible states.
@@ -835,64 +656,6 @@ class LocalSearchSolver(
      * low-violation pose so the feasibility-fight phase has fewer hard constraints to chase.
      */
     private fun greedyRepairPass(state: LocalSearchState) = greedyInit.run(state)
-
-    /**
-     * Factor-aware structured descent step. Collects [com.eignex.klause.localsearch.Invariant.proposeStructuredMoves]
-     * from every factor — each factor pushes moves it knows preserve its own satisfaction
-     * (e.g. `Linear EQ` pair-shifts that keep the sum, `Cardinality.exactlyOne` swaps that
-     * keep the count). The engine scores each by objective delta on a temporary apply,
-     * applies the best feasibility-preserving improver, and commits.
-     *
-     * Returns `true` and commits if an improving structured move exists. Returns `false`
-     * if no factor proposed an improving feasibility-preserving move within the collected
-     * set; the caller falls back to random pair-swap.
-     *
-     * Cost: one `proposeStructuredMoves` call per factor (each factor caps its own
-     * proposal count) plus a scoring apply+revert per proposed move. Bounded by the sum
-     * of per-factor caps.
-     */
-    private fun structuredMoveStep(
-        state: LocalSearchState,
-        objective: Objective,
-        cancellation: Cancellation,
-    ): Boolean {
-        val sink = state.moveSink
-        sink.clear()
-        // Only consult currently-satisfied factors; a violated factor proposes repair moves (which
-        // run before objective descent), so the enumerate-all source skips them.
-        satisfiedStructured.generate(state, sink)
-        val proposed = sink.list
-        if (proposed.isEmpty()) return false
-        val poll = IntArray(1)
-        val best = bestStructuredIncremental(state, objective, proposed, poll, cancellation)
-        sink.clear()
-        return commitBest(state, best)
-    }
-
-    /** Incremental scoring of structured [proposed] moves: pick the most objective-improving
-     *  feasibility-preserving move via netDelta + objectiveDelta. Returns the best move, or the
-     *  best found so far on cancellation. */
-    private fun bestStructuredIncremental(
-        state: LocalSearchState,
-        objective: Objective,
-        proposed: List<Move>,
-        poll: IntArray,
-        cancellation: Cancellation,
-    ): Move? {
-        val baseCost = state.cost
-        var bestDelta = 0.0
-        var bestMove: Move? = null
-        for (move in proposed) {
-            if (pollCancel(poll, cancellation)) return bestMove
-            if (baseCost + state.netDelta(move) != 0L) continue
-            val delta = state.objectiveDelta(objective, move) ?: continue
-            if (delta < bestDelta) {
-                bestDelta = delta
-                bestMove = move
-            }
-        }
-        return bestMove
-    }
 
     /** Undo [move] on [state] so it matches [baselineSnap] again. BoolFlip self-inverts;
      *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
@@ -913,64 +676,6 @@ class LocalSearchSolver(
                 for (part in move.parts.reversed()) revertMove(state, part, baselineSnap)
             }
         }
-    }
-
-    /**
-     * Bounded pair-swap descent step on the objective. Considers up to [budget] swap
-     * candidates: pairs of bool vars with opposite current values (one true, one false →
-     * flip both, preserving sum-count constraints) and pairs of int vars (swap values).
-     * Returns `true` and commits if a swap strictly improves the objective while keeping
-     * `cost == 0`. Returns `false` if no improving swap is found within the budget.
-     *
-     * The pair set is large — Θ(n²) for n vars — so the search is randomized: each call
-     * draws fresh random pairs from the RNG until budget exhausted. This is best-fit-ish
-     * not best-improvement, which suits LS where one good step is more valuable than
-     * exhaustive comparison.
-     */
-    private fun pairSwapStep(
-        state: LocalSearchState,
-        objective: Objective,
-        budget: Int,
-        cancellation: Cancellation,
-    ): Boolean {
-        val baseCost = state.cost
-        val poll = IntArray(1)
-        var tried = 0
-        // Bool-pair swaps: pick a true var and a false var, flip both.
-        if (problem.numBoolVars >= 2) {
-            while (tried < budget) {
-                if (pollCancel(poll, cancellation)) return false
-                tried++
-                val swap = PairSwap.drawBoolSwap(state) ?: continue
-                // Score the joint swap without committing: netDelta for feasibility, objectiveDelta
-                // for the improvement test.
-                if (baseCost + state.netDelta(swap) == 0L) {
-                    val od = state.objectiveDelta(objective, swap)
-                    if (od != null && od < 0.0) {
-                        state.apply(swap)
-                        return true
-                    }
-                }
-            }
-        }
-        // Int-pair swaps: pick two int vars with different values whose values fit in the
-        // other's domain; swap them.
-        if (problem.numIntVars >= 2) {
-            tried = 0
-            while (tried < budget) {
-                if (pollCancel(poll, cancellation)) return false
-                tried++
-                val swap = PairSwap.drawIntSwap(state) ?: continue
-                if (baseCost + state.netDelta(swap) == 0L) {
-                    val od = state.objectiveDelta(objective, swap)
-                    if (od != null && od < 0.0) {
-                        state.apply(swap)
-                        return true
-                    }
-                }
-            }
-        }
-        return false
     }
 
     /**

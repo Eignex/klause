@@ -28,13 +28,11 @@ enum class FeasibleDescent {
      *  strategy is a pure feasibility finder. */
     RatchetAsConstraint,
 
-    /** Strict-improvement greedy descent driven by the engine: greedy flip → the strategy's own
-     *  improving move → structured moves → pair-swaps → restart at a local optimum. The [Cbls] recipe. */
-    StrictGreedy,
-
-    /** The strategy's own [AcceptanceRule] owns the feasible walk, stepping through worse-objective
-     *  feasible states (simulated annealing's Metropolis). */
-    AnnealSelfOwned,
+    /** The strategy's own `pickMove` (its sources + [AcceptanceRule]) owns the feasible walk: the engine
+     *  commits whatever feasibility-preserving move it picks. CBLS descends greedily on its objective
+     *  and structured/pair-swap sources; simulated annealing's Metropolis steps through worse-objective
+     *  states. */
+    SelfOwned,
 }
 
 /**
@@ -78,6 +76,18 @@ class SourceDrivenStrategy(
      *  Explicit with no default: every strategy declares it, so no portfolio arm can silently inherit a
      *  descent it didn't choose (the `LocalSearchSolver` dispatches on it exhaustively). */
     val feasibleDescent: FeasibleDescent,
+    /** Acceptance used only in the feasible (`cost == 0`) phase, when the objective is scored, in place
+     *  of [acceptance]. Lets a strategy fight infeasibility with noise but descend the objective
+     *  strictly: CBLS sets [AcceptanceRule.GreedyDescent] so it takes only objective-improving moves and
+     *  otherwise returns `null` (a local optimum → restart). `null` reuses [acceptance] in both phases. */
+    val feasibleAcceptance: AcceptanceRule? = null,
+    /** Re-sample budget for the [FeasibleDescent.SelfOwned] feasible walk: consecutive picks that find no
+     *  move (a `null` pick) tolerated before the engine restarts. `0` restarts on the first miss — correct
+     *  when the strategy generates exhaustively, so a `null` is a genuine local optimum. A positive cap
+     *  suits a *sampled* strategy, where a `null` is usually just a draw that missed an existing improving
+     *  move: re-drawing the same basin this many times (letting the stall machinery engage) keeps one
+     *  unlucky draw from discarding a good partial solution. */
+    val feasibleResampleCap: Int = 0,
 ) {
 
     /** A copy with selected axes replaced, used by recipe assembly and the axis-edit transform to
@@ -91,6 +101,8 @@ class SourceDrivenStrategy(
         configurationChecking: Boolean = this.configurationChecking,
         perturbation: ((LocalSearchState) -> Move?)? = this.perturbation,
         feasibleDescent: FeasibleDescent = this.feasibleDescent,
+        feasibleAcceptance: AcceptanceRule? = this.feasibleAcceptance,
+        feasibleResampleCap: Int = this.feasibleResampleCap,
     ): SourceDrivenStrategy = SourceDrivenStrategy(
         sources = sources,
         scoring = scoring,
@@ -100,6 +112,8 @@ class SourceDrivenStrategy(
         configurationChecking = configurationChecking,
         perturbation = perturbation,
         feasibleDescent = feasibleDescent,
+        feasibleAcceptance = feasibleAcceptance,
+        feasibleResampleCap = feasibleResampleCap,
     )
 
     /** Whether round feedback retunes the temperature schedule; off when no temperature schedule is present. */
@@ -160,11 +174,17 @@ class SourceDrivenStrategy(
         // A NoiseSchedule retunes its level and steers the acceptance rule (WalkSAT noise / probSAT cb);
         // noise-free rules ignore the level.
         val noiseSchedule = schedule.noise as? NoiseSchedule
-        val effectiveAcceptance = if (noiseSchedule != null && (noiseMoves.isNotEmpty() || scoreMoves.isNotEmpty())) {
-            if (stall == null) noiseSchedule.observe(state.cost)
-            acceptance.steered(noiseSchedule.level)
-        } else {
-            acceptance
+        val effectiveAcceptance = when {
+            // Feasible phase: descend the objective with the strategy's own feasible-phase acceptance
+            // (CBLS: strict-improvement greedy) instead of the noisy feasibility-fight acceptance.
+            state.cost == 0L && feasibleAcceptance != null -> feasibleAcceptance
+
+            noiseSchedule != null && (noiseMoves.isNotEmpty() || scoreMoves.isNotEmpty()) -> {
+                if (stall == null) noiseSchedule.observe(state.cost)
+                acceptance.steered(noiseSchedule.level)
+            }
+
+            else -> acceptance
         }
         // The acceptance rule only reads the temperature (Metropolis); the driver advances the schedule
         // once per pick that sampled the noise pool, so acceptance stays pure. A Metropolis rule with
@@ -193,10 +213,23 @@ class SourceDrivenStrategy(
     /** Scored value on the [scoring] basis. Weighted/raw net-delta add the objective change only once
      *  feasible (gated on `cost == 0`, so the infeasibility fight keeps the constraint gradient); the
      *  break basis already folds the shaped objective. */
-    private fun score(state: LocalSearchState, move: Move): Double = when (scoring) {
-        MoveScoring.Break -> state.shapedBreakScore(move)
-        MoveScoring.Weighted -> state.weightedNetDelta(move) + feasibleObjectiveDelta(state, move)
-        MoveScoring.Raw -> state.netDelta(move).toDouble() + feasibleObjectiveDelta(state, move)
+    private fun score(state: LocalSearchState, move: Move): Double {
+        // Feasibility-preserving objective descent (a strategy that sets [feasibleAcceptance], e.g. CBLS's
+        // GreedyDescent): at cost == 0 rank by the *raw* objective delta — independent of the
+        // pre-feasibility shaping lambda, which is zero under the default FeasibilityFirst — and disqualify
+        // any move that re-introduces a violation. Without the disqualification a large objective reward
+        // buys an infeasible single flip that then out-scores the feasibility-preserving swap and is
+        // reverted every step; trading feasibility for objective is the ratchet arm's job, not this one.
+        if (state.cost == 0L && feasibleAcceptance != null) {
+            if (state.netDelta(move) > 0L) return Double.POSITIVE_INFINITY
+            val objective = state.objective ?: return 0.0
+            return state.objectiveDelta(objective, move) ?: 0.0
+        }
+        return when (scoring) {
+            MoveScoring.Break -> state.shapedBreakScore(move)
+            MoveScoring.Weighted -> state.weightedNetDelta(move) + feasibleObjectiveDelta(state, move)
+            MoveScoring.Raw -> state.netDelta(move).toDouble() + feasibleObjectiveDelta(state, move)
+        }
     }
 
     private fun feasibleObjectiveDelta(state: LocalSearchState, move: Move): Double =

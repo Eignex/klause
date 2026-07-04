@@ -50,6 +50,24 @@ sealed interface AcceptanceRule {
         ) = bestBy(rng, noisePool, scorePool, score)
     }
 
+    /** Strict-improvement greedy: the minimum-scored move over both pools, but only when it strictly
+     *  improves (`score < 0`); returns `null` at a local optimum so the engine restarts instead of
+     *  committing a worsening move. The feasible-phase acceptance for CBLS-style objective descent
+     *  (`SourceDrivenStrategy.feasibleAcceptance`) — the "commit only if it improves, else restart" the
+     *  engine's greedy descent used to enforce inline. */
+    data object GreedyDescent : AcceptanceRule {
+        override fun choose(
+            rng: Random,
+            noisePool: List<Move>,
+            scorePool: List<Move>,
+            temperature: Double,
+            score: (Move) -> Double,
+        ): Move? {
+            val best = bestBy(rng, noisePool, scorePool, score) ?: return null
+            return if (score(best) < 0.0) best else null
+        }
+    }
+
     /**
      * WalkSAT-style noisy greedy (Selman 1994): with probability [noise] take a uniformly-random
      * move from the noise pool, otherwise the greedy best over both pools.
