@@ -344,16 +344,25 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      * `false` iff this proved infeasibility.
      */
     fun applyDelta(delta: PassDelta): Boolean {
-        // Any delta may tombstone/append factors or tighten domains, so the cached [passInput] view is stale.
-        inputDirty = true
         val stableDropped = IntArray(delta.droppedIndices.size) { liveIds[delta.droppedIndices[it]] }
         // A domain *widen* (dup-columns' aggregate variable) can't be reached by monotone re-propagation,
         // so it triggers a from-scratch reseed — but only while feasible; on an already-infeasible problem
         // the widen is moot and the factor changes are tracked through [apply].
         if (!infeasible && delta.domains != null && widensAnyDomain(delta.domains)) {
+            // A reseed reassigns [state], so the cached [passInput] view (which aliased the old domain array) is stale.
+            inputDirty = true
             return reseedFromDelta(stableDropped, delta.addedFactors, delta.domains)
         }
-        return apply(PresolveDelta(stableDropped, delta.addedFactors, delta.domains))
+        val wasInfeasible = infeasible
+        val result = apply(PresolveDelta(stableDropped, delta.addedFactors, delta.domains))
+        // The cached [passInput] view aliases the live factor list and the shared [state.intDomains] array,
+        // so a domains-only narrowing (which mutates that array in place) leaves it valid. Invalidate only
+        // when the factor set changed — the live list and [liveIds] must be rebuilt — or when feasibility
+        // flipped, since [passInput] then swaps to [lastFeasibleDomains].
+        if (delta.droppedIndices.isNotEmpty() || delta.addedFactors.isNotEmpty() || infeasible != wasInfeasible) {
+            inputDirty = true
+        }
+        return result
     }
 
     /** Whether [domains] widens any variable past the live state — a value the state currently excludes
