@@ -77,6 +77,38 @@ internal fun lsStatPairs(stats: SolveStats): List<Pair<String, String>> {
     return out
 }
 
+/**
+ * Systematic-search counters for `-s`, as ordered `key`/`value` pairs — the backtrack/CDCL block
+ * every complete solve reports. Modes that deliberately emit a subset (SMT-LIB, XCSP) filter by
+ * key at the call site, so the full group order lives in one place.
+ */
+internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
+    val out = ArrayList<Pair<String, String>>()
+    out += "nodes" to "${stats.search.nodes.sum.toLong()}"
+    out += "failures" to "${stats.search.fails.sum.toLong()}"
+    out += "restarts" to "${stats.search.restarts.sum.toLong()}"
+    out += "propagations" to "${stats.search.propagations.sum.toLong()}"
+    out += "learned" to "${stats.search.learnedClauses.sum.toLong()}"
+    out += "relearned" to "${stats.search.relearned.sum.toLong()}"
+    if (stats.search.peakDepth.max.isFinite()) out += "peakDepth" to "${stats.search.peakDepth.max.toLong()}"
+    return out
+}
+
+/** Conflict-analysis diagnostic counters for `-s` — why 1UIP learning was skipped or rejected.
+ *  Only the MiniZinc mode reports them today; kept apart from [searchStatPairs] so the other
+ *  modes' leaner blocks stay lean. */
+internal fun caStatPairs(stats: SolveStats): List<Pair<String, String>> = listOf(
+    "caNotApplicable" to "${stats.ca.notApplicable.sum.toLong()}",
+    "caNonAsserting" to "${stats.ca.nonAsserting.sum.toLong()}",
+    "caRejectedTrueLit" to "${stats.ca.rejectedTrueLit.sum.toLong()}",
+)
+
+/** Print [pairs] one per line as `<prefix> key=value` — the shared stat-emission loop each mode
+ *  runs with its own comment prefix (`%%%mzn-stat:`, `;`, `c`). */
+internal fun printStatPairs(prefix: String, pairs: List<Pair<String, String>>) {
+    for ((k, v) in pairs) println("$prefix $k=$v")
+}
+
 /** Round to four decimals for the rate / bound lines; integral values render without a fraction. */
 private fun round4(x: Double): String {
     val r = round(x * 10000.0) / 10000.0
