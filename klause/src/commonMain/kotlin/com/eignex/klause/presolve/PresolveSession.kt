@@ -275,8 +275,10 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             numIntVars = base.numIntVars,
             // Once infeasible, expose the clean pre-conflict domains — not the partially-tightened live ones
             // a conflicted re-propagation left — so a later pass sees what the fresh path (fold skipped on an
-            // Unsat bake) would and fires identically.
-            intDomains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] },
+            // Unsat bake) would and fires identically. While feasible, share the state's live domain array
+            // directly: the [Problem.preFolded] view never copies it, and a pass only reads it within one
+            // firing (the next delta rebuilds this view), so the per-firing O(numIntVars) copy is avoided.
+            intDomains = if (infeasible) lastFeasibleDomains else state.intDomains,
             factors = live,
             preFolded = true,
         )
