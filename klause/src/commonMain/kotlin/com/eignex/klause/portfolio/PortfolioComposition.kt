@@ -73,6 +73,11 @@ data class PortfolioScenario(
      *  `null` uses the curated [BacktrackWorkerConfig] pool. The backtrack analogue of [lsPool]; it
      *  takes templates rather than recipe factories pending a public backtrack recipe boundary. */
     val btPool: List<BacktrackParams>? = null,
+    /** Optional model search-annotation arm (#512): the [BacktrackParams] compiled from the model's
+     *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), it takes
+     *  the last backtrack slot so the free CP portfolio also follows the model's own search order,
+     *  while the #117 `satOptimized` guard keeps slot 0. Ignored when [btPool] overrides the pool. */
+    val annotationArm: BacktrackParams? = null,
     /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool] (#809), the
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
      *  cuts cross arms, so it never changes any arm's optimum). */
@@ -156,8 +161,16 @@ internal object PortfolioComposition {
         val count = scenario.arms
         return when (scenario.engine) {
             EngineMix.LOCAL_SEARCH -> lsArms(count, scenario.lsPool)
-            EngineMix.BACKTRACK -> btArms(scenario.kind, count, scenario.lpCeiling, scenario.btPool)
-            EngineMix.MIXED -> mixedArms(scenario.kind, count, scenario.lpCeiling, scenario.lsPool, scenario.btPool)
+
+            EngineMix.BACKTRACK -> btArms(
+                scenario.kind,
+                count,
+                scenario.lpCeiling,
+                scenario.btPool,
+                scenario.annotationArm,
+            )
+
+            EngineMix.MIXED -> mixedArms(scenario)
         }
     }
 
@@ -169,33 +182,35 @@ internal object PortfolioComposition {
         List(count) { LocalSearchWorkerConfig(pool[it % pool.size]()) }
     }
 
-    /** The [count] backtrack arms — the curated pool ([btPool] == null), else the injected
-     *  [BacktrackParams] templates, each a fresh arm (wrapping past the pool size). */
+    /** The [count] backtrack arms. [btPool] (when set) overrides the pool with injected templates.
+     *  Otherwise the curated pool, with the model's [annotationArm] (#512) taking the last slot when
+     *  present and there are ≥ 2 slots (so the #117 `satOptimized` guard keeps slot 0). */
     private fun btArms(
         kind: Kind,
         count: Int,
         lpCeiling: LpConfig,
         btPool: List<BacktrackParams>?,
-    ): List<WorkerConfig> = if (btPool == null) {
-        BacktrackWorkerConfig.diverse(kind, count, lpCeiling)
-    } else {
-        List(count) { BacktrackWorkerConfig.ofParams("bt-pool#$it", btPool[it % btPool.size]) }
+        annotationArm: BacktrackParams?,
+    ): List<WorkerConfig> {
+        if (btPool != null) {
+            return List(count) { BacktrackWorkerConfig.ofParams("bt-pool#$it", btPool[it % btPool.size]) }
+        }
+        val base = BacktrackWorkerConfig.diverse(kind, count, lpCeiling)
+        if (annotationArm == null || count < 2) return base
+        return base.dropLast(1) + BacktrackWorkerConfig.ofParams("annotation", annotationArm)
     }
 
-    private fun mixedArms(
-        kind: Kind,
-        count: Int,
-        lpCeiling: LpConfig,
-        pool: List<() -> LsRecipe>?,
-        btPool: List<BacktrackParams>?,
-    ): List<WorkerConfig> {
+    private fun mixedArms(scenario: PortfolioScenario): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
         // fast first-incumbent engine).
-        val lsCount = (count * lsShare(kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
+        val count = scenario.arms
+        val lsCount = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
-        arms += lsArms(lsCount, pool)
-        if (btCount > 0) arms += btArms(kind, btCount, lpCeiling, btPool)
+        arms += lsArms(lsCount, scenario.lsPool)
+        if (btCount > 0) {
+            arms += btArms(scenario.kind, btCount, scenario.lpCeiling, scenario.btPool, scenario.annotationArm)
+        }
         return arms
     }
 }
