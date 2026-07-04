@@ -18,6 +18,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -77,6 +78,30 @@ class SourceDrivenStrategyTest {
         state.recompute()
         assertEquals(0L, state.cost, "fixture must start feasible so the feasible-phase sources fire")
         assertNotNull(strategy.pickMove(state), "feasible-phase sources must yield a candidate by configuration")
+    }
+
+    @Test
+    fun `feasible descent declines an objective-lowering move that breaks feasibility`() {
+        // At the feasible optimum (1,1) of x0 + x1 = 2, minimizing x0 + x1: every objective-lowering move
+        // ObjectiveSeed proposes (e.g. x0 -> 0) breaks the equality, and none preserving it improves the
+        // objective. Under a strong shaping pull the old shaped score ranked the infeasible move best;
+        // GreedyDescent must disqualify any violation-adding move and report the local optimum (null)
+        // instead of a move the engine would only revert.
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ObjectiveSeed())),
+            scoring = MoveScoring.Weighted,
+            acceptance = AcceptanceRule.WalkSatNoise(0.0),
+            feasibleDescent = FeasibleDescent.SelfOwned,
+            feasibleAcceptance = AcceptanceRule.GreedyDescent,
+        )
+        val state = LocalSearchState(satisfiableProblem(), Random(7))
+        state.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 1)
+        state.shapingLambda = 10.0 // a strong objective pull, as an aggressive linear shaping would supply
+        state.recompute()
+        assertEquals(0L, state.cost, "fixture must start feasible")
+        assertNull(strategy.pickMove(state), "a feasibility-breaking obj-lowering move must never be picked at cost == 0")
     }
 
     @Test
