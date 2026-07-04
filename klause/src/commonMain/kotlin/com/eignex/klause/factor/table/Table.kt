@@ -75,7 +75,16 @@ class Table private constructor(
         words
     }.also { cachedTupleKey = it }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(xs.remapVars(intMap), tuples, tupleKey())
+    // A remap keeps [tuples], so it carries the tuple key forward *if already computed* — but must not
+    // force it: an affine alias-fold (or any remap before the key is first needed) would otherwise pay the
+    // O(tuples) row sort on every table, which on a float-derived table over a wide scaled domain (a
+    // bucket-index table with one row per bucket) is seconds. Pass the cached value (possibly `null`); the
+    // remapped table computes it lazily, and identically, only when something actually reads the key.
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(
+        xs.remapVars(intMap),
+        tuples,
+        cachedTupleKey,
+    )
 
     // Affine substitution `x = scale·replacement + offset` rewrites every column holding x: a row's
     // required value v for x means replacement = (v − offset) / scale, so rows where (v − offset) is
