@@ -505,11 +505,13 @@ internal object SymmetryBreaking {
      *  weighted work, not a 1e6 node count. Above this even the first round cannot complete within
      *  [GENERATOR_WORK_BUDGET], and such large models empirically carry no verifiable variable symmetry,
      *  so the search is skipped outright. Sound — skipping only finds fewer symmetries. Calibrated
-     *  against the corpus: instances that carry verifiable symmetry have a round cost up to a few
-     *  hundred thousand (a crossword grid is ≈ 3.5·10⁵), while a model that only burns the search — a
-     *  wide-table preference problem, a thousands-of-rows linear system — runs into the tens of millions
-     *  and beyond, so this cap cleanly separates the two. */
-    private const val GENERATOR_ROUND_COST_BUDGET = 1_000_000L
+     *  against the corpus: every instance that carries verifiable symmetry has a round cost at or below a
+     *  crossword grid's ≈ 3.5·10⁵, while the many-rows / many-column models that only burn a fruitless
+     *  search (constraint-programming rosters, rack placement, linear systems) sit from ≈ 5·10⁵ into the
+     *  tens of millions. The cap is placed above the former with margin, so it skips the fruitless band
+     *  the old 10⁶ value let through (each was costing ~0.25–0.35s of dead search) without dropping any
+     *  symmetry the corpus actually breaks. */
+    private const val GENERATOR_ROUND_COST_BUDGET = 500_000L
 
     /** Deterministic work budget for the whole generator search, charged per refinement arc visited
      *  (a variable's incident factor, the unit of [equitablePartition] work) — the analog of CP-SAT's
