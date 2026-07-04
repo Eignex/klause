@@ -136,8 +136,7 @@ internal class LongHashSet(initialCapacity: Int = 8) {
         }
     }
 
-    /** Fibonacci-multiplicative hash folded to 32 bits; good distribution for packed long keys. */
-    private fun mix(x: Long): Int = ((x * -0x61c8864680b583ebL) ushr 32).toInt()
+    private fun mix(x: Long): Int = mixLongKey(x)
 
     private companion object {
         // Shared immutable empty table: a single slot that is permanently unoccupied. Every fresh

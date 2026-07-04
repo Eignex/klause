@@ -178,10 +178,5 @@ internal class MutableLongIntMap(initialCapacity: Int = 8) {
         }
     }
 
-    /** 64-bit multiplicative mix (splitmix-style finalizer), folded to an Int slot index. */
-    private fun mix(x: Long): Int {
-        var h = x * -0x61c8864680b583ebL // 2^64 / golden ratio, odd
-        h = h xor (h ushr 32)
-        return h.toInt()
-    }
+    private fun mix(x: Long): Int = mixLongKey(x)
 }
