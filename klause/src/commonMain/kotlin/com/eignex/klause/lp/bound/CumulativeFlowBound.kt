@@ -40,13 +40,13 @@ import com.eignex.klause.util.LongArrayList
  * hold at every node, so they need not be cited), so it is all-false at the dead node and globally
  * valid.
  */
-internal class CumulativeFlowBound(problem: Problem) {
+internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBound {
     private val views: List<SchedulingView> = schedulingViews(problem).filter { it.starts.size in 2..MAX_TASKS }
 
     val applicable: Boolean get() = views.isNotEmpty()
 
     /** True if some scheduling factor is preemptively infeasible at the current node (⇒ prune). */
-    fun isInfeasible(session: PropagationSession): Boolean = views.any { infeasible(it, session) }
+    override fun isInfeasible(session: PropagationSession): Boolean = views.any { infeasible(it, session) }
 
     private fun infeasible(view: SchedulingView, session: PropagationSession): Boolean = try {
         deficit(view, session) > 0L
@@ -55,7 +55,7 @@ internal class CumulativeFlowBound(problem: Problem) {
     }
 
     /** A bound-atom nogood for the first preemptively infeasible factor, or null when none / overflow. */
-    fun explain(session: PropagationSession): IntArray? {
+    override fun explain(session: PropagationSession): IntArray? {
         for (view in views) {
             val clause = try {
                 if (deficit(view, session) > 0L) windowClause(view, session) else null

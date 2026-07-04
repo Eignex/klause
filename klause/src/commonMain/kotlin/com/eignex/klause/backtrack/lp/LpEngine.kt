@@ -8,6 +8,8 @@ import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.bound.CumulativeFlowBound
 import com.eignex.klause.lp.bound.KnapsackLagrangianBound
 import com.eignex.klause.lp.bound.LagrangianBound
+import com.eignex.klause.lp.bound.LagrangianDualBound
+import com.eignex.klause.lp.bound.SchedulingFeasibilityBound
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.AllDifferentSeparator
 import com.eignex.klause.lp.cut.AssignmentObjectiveCut
@@ -161,13 +163,11 @@ internal class LpEngine(
     } else {
         null
     }
-    private var lagMultipliers = LongArray(lagBound?.multiplierCount ?: 0)
     private val knapsackLagBound = if (params.lpPlan.knapsackLagrangian) {
         KnapsackLagrangianBound(problem, objective).takeIf { it.applicable }
     } else {
         null
     }
-    private var knapsackLagMultipliers = LongArray(knapsackLagBound?.multiplierCount ?: 0)
     private val energeticBound = if (params.lpPlan.energeticReasoning) {
         CumulativeEnergeticBound(problem).takeIf { it.applicable }
     } else {
@@ -216,8 +216,6 @@ internal class LpEngine(
         return x
     }
     private var lpCheckCounter = 0
-    private var energeticCheckCounter = 0
-    private var cumulativeFlowCheckCounter = 0
 
     // Adaptive LP effort ladder (#32, generalizing the #614 auto-off): the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
@@ -299,9 +297,15 @@ internal class LpEngine(
         ): Boolean = linearLowerBound(objective, session) >= effectiveBound
     }
 
-    /** Energetic-reasoning scheduling-feasibility bound (#562). */
-    private inner class EnergeticBoundArm : RelaxationBound {
-        override val applicable: Boolean get() = energeticBound != null
+    /** Scheduling-feasibility prune arm (energetic #562, cumulative-flow — same prune family): every
+     *  [checkEvery] visits, prune the node when [bound] proves the schedule infeasible, recording the
+     *  explanation as an LP nogood. One class drives both bounds. */
+    private inner class SchedulingFeasibilityArm(
+        private val bound: SchedulingFeasibilityBound,
+        private val checkEvery: Int,
+    ) : RelaxationBound {
+        private var checkCounter = 0
+        override val applicable: Boolean get() = true
 
         override fun prune(
             session: PropagationSession,
@@ -309,20 +313,19 @@ internal class LpEngine(
             objectiveVar: Int,
             objectiveAscending: Boolean,
         ): Boolean {
-            val energeticBoundL = energeticBound ?: return false
-            if (++energeticCheckCounter % params.lpPlan.energeticEvery != 0 || !energeticBoundL.isInfeasible(session)) {
-                return false
-            }
+            if (++checkCounter % checkEvery != 0 || !bound.isInfeasible(session)) return false
             sink.scheduling.observeEnergeticPrune()
-            val lpNogoodsL = lpNogoods
-            if (lpNogoodsL != null) energeticBoundL.explain(session)?.let { lpNogoodsL.add(it) }
+            lpNogoods?.let { pool -> bound.explain(session)?.let { pool.add(it) } }
             return true
         }
     }
 
-    /** Cumulative-flow scheduling-feasibility bound — same prune family as energetic. */
-    private inner class CumulativeFlowBoundArm : RelaxationBound {
-        override val applicable: Boolean get() = cumulativeFlowBound != null
+    /** Lagrangian dual prune arm (#429, and knapsack-Lagrangian): reassigns its own persistent
+     *  multiplier vector each call and prunes when the dual bound beats the incumbent. One class
+     *  drives both bounds. */
+    private inner class LagrangianArm(private val bound: LagrangianDualBound) : RelaxationBound {
+        private var multipliers = LongArray(bound.multiplierCount)
+        override val applicable: Boolean get() = true
 
         override fun prune(
             session: PropagationSession,
@@ -330,70 +333,11 @@ internal class LpEngine(
             objectiveVar: Int,
             objectiveAscending: Boolean,
         ): Boolean {
-            val cumulativeFlowBoundL = cumulativeFlowBound ?: return false
-            if (++cumulativeFlowCheckCounter % params.lpPlan.cumulativeFlowEvery != 0 ||
-                !cumulativeFlowBoundL.isInfeasible(session)
-            ) {
-                return false
-            }
-            sink.scheduling.observeEnergeticPrune() // same scheduling-feasibility-prune family
-            val lpNogoodsL = lpNogoods
-            if (lpNogoodsL != null) cumulativeFlowBoundL.explain(session)?.let { lpNogoodsL.add(it) }
-            return true
-        }
-    }
-
-    /** Lagrangian dual bound (#429); reassigns the persistent multiplier vector each call. */
-    private inner class LagrangianArm : RelaxationBound {
-        override val applicable: Boolean get() = lagBound != null
-
-        override fun prune(
-            session: PropagationSession,
-            effectiveBound: Double,
-            objectiveVar: Int,
-            objectiveAscending: Boolean,
-        ): Boolean {
-            val lagBoundL = lagBound ?: return false
-            val res = lagBoundL.computeBound(
-                session,
-                effectiveBound,
-                lagMultipliers,
-                params.lpPlan.lagrangianIterations,
-            )
-            return if (res != null) {
-                lagMultipliers = res.multipliers
-                if (res.prune) sink.scheduling.observeLagrangianPrune()
-                res.prune
-            } else {
-                false
-            }
-        }
-    }
-
-    /** Knapsack-Lagrangian dual bound; reassigns the persistent knapsack multiplier vector. */
-    private inner class KnapsackLagrangianArm : RelaxationBound {
-        override val applicable: Boolean get() = knapsackLagBound != null
-
-        override fun prune(
-            session: PropagationSession,
-            effectiveBound: Double,
-            objectiveVar: Int,
-            objectiveAscending: Boolean,
-        ): Boolean {
-            val knapsackLagBoundL = knapsackLagBound ?: return false
-            val res = knapsackLagBoundL.computeBound(
-                session,
-                effectiveBound,
-                knapsackLagMultipliers,
-                params.lpPlan.lagrangianIterations,
-            )
-            return if (res != null) {
-                knapsackLagMultipliers = res.multipliers
-                if (res.prune) sink.scheduling.observeLagrangianPrune()
-                res.prune
-            } else {
-                false
-            }
+            val res = bound.computeBound(session, effectiveBound, multipliers, params.lpPlan.lagrangianIterations)
+                ?: return false
+            multipliers = res.multipliers
+            if (res.prune) sink.scheduling.observeLagrangianPrune()
+            return res.prune
         }
     }
 
@@ -462,12 +406,12 @@ internal class LpEngine(
     /** The per-node prune cascade, in short-circuit order: cheap lower bound → scheduling-feasibility
      *  bounds → Lagrangian bounds → LP relaxation. [pruneNode] tries each in turn; the first true
      *  prune wins, exactly as the former hand-coded `when`. */
-    private val bounds: List<RelaxationBound> = listOf(
+    private val bounds: List<RelaxationBound> = listOfNotNull(
         LinearBound(),
-        EnergeticBoundArm(),
-        CumulativeFlowBoundArm(),
-        LagrangianArm(),
-        KnapsackLagrangianArm(),
+        energeticBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.energeticEvery) },
+        cumulativeFlowBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.cumulativeFlowEvery) },
+        lagBound?.let { LagrangianArm(it) },
+        knapsackLagBound?.let { LagrangianArm(it) },
         LpSimplexBound(),
     )
 

@@ -41,7 +41,7 @@ import kotlin.math.ceil
  * which λ to try — every evaluated `L(λ)` is exact, so the reported bound is always valid. Overflow
  * (large coefficients) makes the node's bound unavailable, never wrong.
  */
-internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
+internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : LagrangianDualBound {
     /** Variables of all chosen AllDifferent blocks, concatenated; empty when none is eligible. */
     private val vars: IntArray
     private val inV: BooleanArray
@@ -140,13 +140,9 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
     }
 
     /** Number of dualized linking constraints; the multiplier vector has this length. */
-    val multiplierCount: Int get() = linkVars.size
+    override val multiplierCount: Int get() = linkVars.size
 
     private val numBlocks: Int get() = blockStart.size - 1
-
-    /** Outcome of a node bound: prune (subtree cannot beat the incumbent / is infeasible) plus the
-     *  best bound found and the multipliers to carry to child nodes. */
-    class Result(val prune: Boolean, val boundNumerator: Long, val denominator: Long, val multipliers: LongArray)
 
     /** A subproblem evaluation at fixed multipliers: combined assignment cost and the value each
      *  block variable took (indexed over [vars]); [feasible] is false when any block has no assignment. */
@@ -158,12 +154,12 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
      * reported). [startMultipliers] warm-starts λ from a parent node. Returns null when the bound is
      * unavailable here (no eligible global, value set too large, or arithmetic overflow).
      */
-    fun computeBound(
+    override fun computeBound(
         session: PropagationSession,
         incumbent: Double,
         startMultipliers: LongArray,
         iterations: Int,
-    ): Result? {
+    ): LagrangianResult? {
         if (!applicable) return null
 
         // Per-block value set = union of the live domains of the block's variables; bail if any block
@@ -184,7 +180,12 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
             val size = blockStart[j + 1] - blockStart[j]
             if (list.size < size) {
                 // Fewer distinct values than variables ⇒ this AllDifferent is infeasible ⇒ node infeasible.
-                return Result(prune = true, boundNumerator = 0L, denominator = Q, multipliers = startMultipliers)
+                return LagrangianResult(
+                    prune = true,
+                    boundNumerator = 0L,
+                    denominator = Q,
+                    multipliers = startMultipliers,
+                )
             }
             if (list.size > MAX_VALUES) return null // too large to assign over here
         }
@@ -201,20 +202,20 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) {
             val steps = if (incumbent.isFinite()) iterations else 1
             repeat(steps) {
                 val eval = evaluate(session, blockValueIndex, blockValueList, p)
-                if (!eval.feasible) return Result(true, 0L, Q, p) // infeasible ⇒ node infeasible
+                if (!eval.feasible) return LagrangianResult(true, 0L, Q, p) // infeasible ⇒ node infeasible
                 // numerator = Σ_blocks M_block − Σ_r p_r·b_r + Q·rest, with L = numerator / Q.
                 var num = eval.cost
                 for (r in 0 until multiplierCount) num = subExact(num, mulExact(p[r], linkRhs[r]))
                 num = addExact(num, mulExact(Q, rest))
                 if (num > bestNum) bestNum = num
-                if (ceilDivLocal(num, Q) >= incumbentCeil(incumbent)) return Result(true, num, Q, p)
+                if (ceilDivLocal(num, Q) >= incumbentCeil(incumbent)) return LagrangianResult(true, num, Q, p)
                 if (!incumbent.isFinite() || multiplierCount == 0) return@repeat
                 if (!subgradientStep(eval.values, p, num, incumbent, prevDir)) return@repeat
             }
         } catch (_: LpOverflowException) {
             if (bestNum == Long.MIN_VALUE) return null
         }
-        return if (bestNum == Long.MIN_VALUE) null else Result(false, bestNum, Q, p)
+        return if (bestNum == Long.MIN_VALUE) null else LagrangianResult(false, bestNum, Q, p)
     }
 
     /**
