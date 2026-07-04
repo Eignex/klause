@@ -2,7 +2,7 @@ package com.eignex.klause.propagation
 
 /**
  * Typed integer-domain change events — the int-side analog of the Boolean two-watched-literal
- * scheme ([PropagationState.boolWatchersByLit]). A factor subscribes to specific `(intVar, kind)`
+ * scheme ([BoolWatcherIndex.byLit]). A factor subscribes to specific `(intVar, kind)`
  * pairs via [com.eignex.klause.propagation.Propagator.initialIntEventWatches] and is then woken *only* when
  * that kind of change happens to that variable, instead of on every change to any of its
  * [com.eignex.klause.solver.Factor.intVars] (the default occurrence-list wakeup). This is the
@@ -20,7 +20,7 @@ package com.eignex.klause.propagation
  *                       subscribe to [FIXED] alone.
  *
  * A `(intVar, kind)` subscription is encoded as a single `Int` via [pack]; the same value is the
- * slot index into [PropagationState.intEventWatchersBySlot]. Encoding is `intVar * COUNT + kind`,
+ * slot index into [IntEventMachinery.watchersBySlot]. Encoding is `intVar * COUNT + kind`,
  * so [intVarOf] / [kindOf] recover the components.
  *
  * **Soundness contract:** the per-variable kind mask the mutators record (see

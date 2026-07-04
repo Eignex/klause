@@ -195,7 +195,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     }
     // Atoms carry no stored state to reconcile: truth, level and antecedents are all
     // derived on demand from the domains and histories restored above.
-    dirtyAtomFactors.clear()
+    atoms.dirtyFactors.clear()
     dirtyBools.clear()
     dirtyInts.clear()
     conflictLevels = null

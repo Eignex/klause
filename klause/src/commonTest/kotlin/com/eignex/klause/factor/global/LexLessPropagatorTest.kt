@@ -181,7 +181,7 @@ class LexLessPropagatorTest {
         // Map each learned literal back to the int var its atom constrains.
         val intVarsInClause = learned.literals
             .map { Lit.variable(it) - problem.numBoolVars }
-            .map { atomId -> state.atomIntVar[atomId] }
+            .map { atomId -> state.atoms.intVar[atomId] }
             .toSet()
         assertTrue(
             0 in intVarsInClause && 3 in intVarsInClause,

@@ -301,7 +301,7 @@ class ConflictAnalyzerTest {
         assertEquals(baseFid + 2, fid2)
         assertEquals(3, state.learnedClauses.size)
         assertTrue(
-            state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
+            state.watches.byLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
             "c1 should be in ¬b watcher list before forget",
         )
 
@@ -314,12 +314,12 @@ class ConflictAnalyzerTest {
         assertContentEquals(c0.literals, state.learnedClauses[0].literals)
         assertContentEquals(c2.literals, state.learnedClauses[1].literals)
         assertTrue(
-            !state.boolWatchersByLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
+            !state.watches.byLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
             "watcher entry for the dropped clause should be removed",
         )
         val newFid2 = baseFid + 1
         assertTrue(
-            state.boolWatchersByLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
+            state.watches.byLit[Lit.make(2, true)].toIntArray().toList().contains(newFid2),
             "c2 should be findable at its new fid ($newFid2) via its watch literal",
         )
     }

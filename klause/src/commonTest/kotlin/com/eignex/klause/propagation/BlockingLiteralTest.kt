@@ -45,10 +45,10 @@ class BlockingLiteralTest {
         assertTrue(state.pinBoolAsDecision(1, false))
         assertEquals(null, state.runToFixpoint(allFactors = false), "x1=false must not conflict")
 
-        for (lit in state.boolWatchersByLit.indices) {
+        for (lit in state.watches.byLit.indices) {
             assertEquals(
-                state.boolWatchersByLit[lit].size,
-                state.boolBlockersByLit[lit].size,
+                state.watches.byLit[lit].size,
+                state.watches.blockersByLit[lit].size,
                 "watcher and blocker lists must stay aligned for lit $lit",
             )
         }

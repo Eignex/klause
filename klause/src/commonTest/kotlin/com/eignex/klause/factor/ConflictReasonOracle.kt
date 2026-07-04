@@ -39,9 +39,9 @@ object ConflictReasonOracle {
         val pos = Lit.isPositive(lit)
         if (v < problem.numBoolVars) return if (pos) s.bools[v] else !s.bools[v]
         val atomId = v - problem.numBoolVars
-        val value = s.ints[state.atomIntVar[atomId]]
-        val k = state.atomThreshold[atomId]
-        val holds = when (state.atomKind[atomId]) {
+        val value = s.ints[state.atoms.intVar[atomId]]
+        val k = state.atoms.threshold[atomId]
+        val holds = when (state.atoms.kind[atomId]) {
             AtomKind.GE -> value >= k
             AtomKind.LE -> value <= k
             AtomKind.EQ -> value == k

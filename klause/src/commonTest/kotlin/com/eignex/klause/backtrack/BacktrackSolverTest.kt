@@ -153,22 +153,22 @@ class BacktrackSolverTest {
         val state = PropagationState(problem, Assumptions.None)
         assertEquals(
             1,
-            state.boolWatchersByLit[Lit.make(0, true)].size,
+            state.watches.byLit[Lit.make(0, true)].size,
             "clause should be in watcher list for +v0",
         )
         assertEquals(
             1,
-            state.boolWatchersByLit[Lit.make(1, true)].size,
+            state.watches.byLit[Lit.make(1, true)].size,
             "clause should be in watcher list for +v1",
         )
         assertEquals(
             0,
-            state.boolWatchersByLit[Lit.make(0, false)].size,
+            state.watches.byLit[Lit.make(0, false)].size,
             "clause should not be woken when -v0 becomes false (i.e., v0 = true)",
         )
         assertEquals(
             0,
-            state.boolWatchersByLit[Lit.make(2, true)].size,
+            state.watches.byLit[Lit.make(2, true)].size,
             "v2 is not yet a watched literal",
         )
     }

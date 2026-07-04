@@ -45,7 +45,7 @@ class HoleEqAtomStaleReasonTest {
 
     /** No determined atom's derived antecedents may cite an undetermined atom (#670). */
     private fun assertReasonsCiteOnlyDeterminedAtoms(s: PropagationState, where: String) {
-        for (id in 0 until s.atomIntVar.size) {
+        for (id in 0 until s.atoms.intVar.size) {
             if (s.atomCurrentTruth(id) == null) continue // undetermined atoms have no live reason
             val reason = s.atomAntecedentsDerived(id) ?: continue
             for (lit in reason) {
@@ -54,9 +54,9 @@ class HoleEqAtomStaleReasonTest {
                 val citedId = v - s.problem.numBoolVars
                 assertNotNull(
                     s.atomCurrentTruth(citedId),
-                    "at $where: determined atom $id (var=${s.atomIntVar[id]} ${s.atomKind[id]} " +
-                        "${s.atomThreshold[id]}) cites undetermined atom $citedId " +
-                        "(var=${s.atomIntVar[citedId]} ${s.atomKind[citedId]} ${s.atomThreshold[citedId]})",
+                    "at $where: determined atom $id (var=${s.atoms.intVar[id]} ${s.atoms.kind[id]} " +
+                        "${s.atoms.threshold[id]}) cites undetermined atom $citedId " +
+                        "(var=${s.atoms.intVar[citedId]} ${s.atoms.kind[citedId]} ${s.atoms.threshold[citedId]})",
                 )
             }
         }

@@ -15,7 +15,6 @@ import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
 
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
 internal const val NO_CARVE: Int = Int.MIN_VALUE
@@ -101,30 +100,9 @@ class PropagationState(
     internal val dirtyInts: IntArrayDeque =
         IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
 
-    /** Whether the typed int-event machinery ([dirtyIntKinds] / [intEventWatchersBySlot]) is live.
-     *  On for any problem whose factors opt into it, and forced on in [incremental] mode so a
-     *  mid-life factor subscribing to typed events wakes even when the initial problem had none. */
-    private val eventMachineryOn: Boolean = problem.usesIntEventWatchers || incremental
-
-    /** Whether the per-factor dirty-variable delta accumulators are live. On for any problem with a
-     *  delta consumer, and forced on in [incremental] mode so a mid-life factor that consumes the delta
-     *  (a symmetry/structural pass can add e.g. a LexLess) gets its accumulator grown on the fly. */
-    private val deltaMachineryOn: Boolean = problem.usesIntEventDeltaConsumers || incremental
-
-    /**
-     * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last
-     * drained — recorded by `markIntDirty` alongside [dirtyInts] and consumed (then cleared) by
-     * [enqueueForIntChange] to wake exactly the subscribed advisors. Empty (aliasing the shared
-     * [com.eignex.klause.util.EmptyIntArray]) when no factor subscribes to typed int events, so
-     * the common case allocates nothing and skips the bookkeeping entirely.
-     *
-     * Sound to over-set (extra bit ⇒ harmless extra wake) but never under-set (a missing bit drops
-     * a wake a subscriber relied on). Mark and drain are paired through [dirtyInts]; since the
-     * driver only marks/undoes between propagation cycles — when [dirtyInts] is empty and thus every
-     * mask already cleared — no stale bits survive a backtrack.
-     */
-    internal val dirtyIntKinds: IntArray =
-        if (eventMachineryOn) IntArray(problem.numIntVars) else EmptyIntArray
+    /** Typed int-event wakeup machinery (advisor index, pending-kind masks, delta accumulators) —
+     *  see [IntEventMachinery]. Empty when no factor opts in; forced live in [incremental] mode. */
+    internal val intEvents: IntEventMachinery = IntEventMachinery(problem, incremental)
 
     // -------- Reusable propagation worklist (was allocated fresh per runToFixpoint) --------
     //
@@ -373,141 +351,16 @@ class PropagationState(
     /** True iff any binary clause is known — the gate for binary-resolution minimization. */
     val hasBinaryClauses: Boolean get() = learned.binaryClauseCount > 0
 
-    // ---- Mid-life presolve factors ----
-    // A dedicated append-only store for factors added during an incremental presolve bake. Distinct
-    // from [LearnedClauseDb.store]: a presolve state ([incremental]) never learns clauses and a search
-    // state never adds presolve factors, so at most one of the two tail stores is non-empty and both
-    // occupy the id range `[baseFactorCount, totalFactorCount)`. Ids are stable and never renumbered;
-    // dropping a factor (base or mid-life) tombstones its id ([tombstonedFactors]) and clears its
-    // [refPayload] slot. A tombstoned slot is NEVER reused by a later add — reuse would resurrect a
-    // stale propagator payload under a new factor id and silently corrupt a deduction (the
-    // wrong-optimum guard).
-    internal val midlifeFactorStore: ArrayList<Propagator> = ArrayList()
-
-    /** The [Factor] behind each mid-life propagator, parallel to [midlifeFactorStore]. Carried because
-     *  [Propagator] exposes no `boolVars` / `intVars`; the conflict and level machinery reads them here
-     *  for a mid-life factor the way it reads [Problem.factors] for a base one. */
-    internal val midlifeFactorList: ArrayList<Factor> = ArrayList()
-
-    /** Tombstoned factor ids (base or mid-life). [factorAt] returns [NoPropagator] for a member, so a
-     *  dropped factor is inert without removing it from the watcher indices — its id stays stable and
-     *  is never reused. Empty until the first drop, so a state that only appends allocates nothing. */
-    private val tombstonedFactors: IntHashSet = IntHashSet()
-
-    /** Delta overlay for occurrence-list bool wakeup of mid-life factors: `[v]` lists mid-life factor
-     *  ids that wake on any change to bool var `v` (those NOT using per-literal watchers). `null` until
-     *  the first such factor is added — a search state and a watcher-only presolve never allocate it,
-     *  so [enqueueForBoolChange] pays a single null-check. Complements [Problem.nonBoolWatcherBoolOccurrences]. */
-    private var midlifeBoolOccurrences: Array<IntArrayList>? = null
-
-    /** Int-side analog of [midlifeBoolOccurrences]: `[v]` lists mid-life factor ids that wake on any
-     *  change to int var `v` and do not subscribe to a typed int-event on `v`. Complements
-     *  [Problem.nonIntEventWatcherIntOccurrences]. */
-    private var midlifeIntOccurrences: Array<IntArrayList>? = null
+    /** Mid-life presolve factor overlay for [incremental] mode — see [MidlifeFactors]. */
+    internal val midlife: MidlifeFactors = MidlifeFactors()
 
     /** `problem.numFactors + learnedClauses.size`. Use this instead of `problem.numFactors`
      *  when iterating or sizing per-factor scratch in the engine. */
-    val totalFactorCount: Int get() = problem.numFactors + learned.size + midlifeFactorStore.size
+    val totalFactorCount: Int get() = problem.numFactors + learned.size + midlife.store.size
 
-    /**
-     * Per-literal wakeup index for factors opting into [Propagator.initialBoolWatchers].
-     * Slot `boolWatchersByLit[lit]` lists factor ids that should fire when literal `lit`
-     * transitions to false. Sized `2 * problem.numBoolVars`; lit ids are the standard
-     * [Lit.make] encoding. Populated at construction from each
-     * factor's initial watch set; factors with dynamic watches (Clause) keep it in sync
-     * via [moveBoolWatcher] as their watches drift during propagation.
-     *
-     * Like [refPayload], the index drifts across snapshot / restore on purpose. After a
-     * pop the watches reflect their state at the deepest level reached — that's still
-     * sound, since the invariant is "watch is on a non-false literal", and pop reverts
-     * pins which only *adds* non-false literals.
-     */
-    internal val boolWatchersByLit: Array<IntArrayList> =
-        Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
-
-    /**
-     * Blocking literals paired index-for-index with [boolWatchersByLit] (#200). Entry `i`
-     * holds a literal that, if currently true, proves the watcher at the same index is
-     * already satisfied — so [enqueueForBoolChange] can skip waking that factor entirely,
-     * removing a large fraction of clause touches in the hot BCP loop on dense instances.
-     * [NO_BLOCKER] means "no blocker, always fire", which is the default for every factor
-     * that doesn't supply [com.eignex.klause.propagation.Propagator.initialBoolWatcherBlockers]
-     * (e.g. cardinality), so behaviour for those is unchanged.
-     *
-     * Held in lockstep with [boolWatchersByLit] through every mutation ([installLitWatch],
-     * [moveBoolWatcher]'s swap-pop, and the [forgetLearnedClauses] compaction). Like the
-     * watcher lists it drifts across snapshot / restore; a stale blocker is always sound
-     * because it is still a real literal of the factor — if true the factor really is
-     * satisfied; if not we simply fire as before.
-     */
-    internal val boolBlockersByLit: Array<IntArrayList> =
-        Array(2 * problem.numBoolVars) { IntArrayList(initialCapacity = 2) }
-
-    /**
-     * Back-pointer index for O(1) [moveBoolWatcher] removal (#42): maps `pack(fid, lit)` to
-     * `fid`'s position inside `boolWatchersByLit[lit]`, so removing a moved watch is a swap-pop
-     * at a known index instead of a linear scan of a possibly-long popular-literal list.
-     *
-     * Kept in sync at every list mutation: [installLitWatch] records the appended position,
-     * [moveBoolWatcher] swap-pops and fixes the swapped element's recorded position, and
-     * [forgetLearnedClauses] rebuilds it wholesale after compacting/remapping the lists. Like
-     * the watcher lists themselves it drifts across snapshot/restore (pop never edits the
-     * lists, so both stay mutually consistent at the deepest level reached).
-     *
-     * Correctness guard: [moveBoolWatcher] verifies `list[pos] == fid` before swap-popping and
-     * falls back to the linear scan on any mismatch — a desynced index can never silently
-     * remove the wrong watcher (the soundness hazard called out in #42).
-     */
-    internal val boolWatchPos: MutableLongIntMap = MutableLongIntMap()
-
-    /**
-     * Per-`(intVar, kind)` advisor index, the int-side analog of [boolWatchersByLit]: slot
-     * `[IntEvent.pack(v, kind)]` lists the factor ids that subscribed to that event via
-     * [com.eignex.klause.propagation.Propagator.initialIntEventWatches], so [enqueueForIntChange] can wake
-     * only the factors that care about the kind of change that just happened. Sized
-     * `numIntVars * IntEvent.COUNT` and populated once at construction; empty when no factor opts in
-     * (the subscriptions are static — a propagator that loses interest in a variable simply ignores
-     * the wake, which is sound).
-     */
-    internal val intEventWatchersBySlot: Array<IntArrayList> =
-        if (eventMachineryOn) {
-            Array(problem.numIntVars * IntEvent.COUNT) { IntArrayList(initialCapacity = 1) }
-        } else {
-            emptyArray()
-        }
-
-    /**
-     * Per-factor dirty-variable delta accumulator (#624): for each [com.eignex.klause.solver.Factor]
-     * with [com.eignex.klause.propagation.Propagator.consumesIntEventDelta], the subscribed variables that
-     * fired since the consumer last drained. [enqueueForIntChange] appends a variable when it wakes
-     * the consumer via the advisor index ([eventDirtyMark] deduplicates), and
-     * [drainIntEventDirtyVars] returns and clears the set on a fire.
-     *
-     * **Drift-tolerant superset.** It is never cleared on backtrack, so after a pop it may list a
-     * variable whose change was undone — harmless, because the consumer diffs its own reversible
-     * baseline and finds no change for a stale variable. It is therefore always a *superset* of
-     * "changed since this consumer last fired": no real change is ever missed (every change to a
-     * subscribed variable wakes the consumer and appends), which is the soundness-critical direction.
-     * `null` per non-consuming factor; both arrays are empty when the problem has no consumer.
-     */
-    // Grow-only (parallel to the factor store): [addMidlifeFactor] appends a slot per new factor so a
-    // mid-life delta consumer's accumulator stays in bounds. Empty when no consumer machinery is live.
-    private val eventDirtyVars: ArrayList<IntArrayList?> =
-        if (deltaMachineryOn) {
-            ArrayList<IntArrayList?>(
-                problem.numFactors,
-            ).apply { repeat(problem.numFactors) { add(null) } }
-        } else {
-            ArrayList()
-        }
-    private val eventDirtyMark: ArrayList<IntHashSet?> =
-        if (deltaMachineryOn) {
-            ArrayList<IntHashSet?>(
-                problem.numFactors,
-            ).apply { repeat(problem.numFactors) { add(null) } }
-        } else {
-            ArrayList()
-        }
+    /** Per-literal bool watcher index (watch lists, #200 blockers, #42 back-pointers) —
+     *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
+    internal val watches: BoolWatcherIndex = BoolWatcherIndex(problem.numBoolVars)
 
     /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
@@ -544,96 +397,11 @@ class PropagationState(
     /** Mirror of [intMinAntecedents] for the upper-bound side. */
     val intMaxAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
 
-    // -------- Bound-atom registry (LCG with virtual int-bound literals) --------
-    //
-    // An "atom" represents a fact like `[x ≥ k]` or `[x ≤ k]`. Each atom gets a virtual
-    // variable id past the bool var space (`numBoolVars + atomId`), so atom *literals*
-    // — encoded with [Lit.make] using that virtual id — slot
-    // into the same array structure the analyzer already understands. Allocation is
-    // lazy: an atom only enters the registry when a factor first references it as an
-    // antecedent or conflict-reason literal.
-    //
-    // Atom truth, level, and antecedents are *snapshotted at allocation time* from the
-    // current `intDomains` / `intLevel` / `intMin/MaxAntecedents`. This avoids the cost
-    // of maintaining a full history of bound changes and matches how factors already
-    // use the current state to derive their reasons. The atom is then immutable for the
-    // life of the snapshot; restore drops atoms allocated after the snapshot point.
-
-    /** Atom id → (intVar, kind = 0 for GE / 1 for LE, threshold). Packed into a single
-     *  long for the reverse lookup; stored separately here for fast iteration. */
-    internal val atomIntVar: IntArrayList = IntArrayList()
-
-    /** The relational form of each atom, parallel to [atomIntVar] / [atomThreshold]. */
-    internal val atomKind: ArrayList<AtomKind> = ArrayList()
-
-    /** Threshold value `k` for the atom. */
-    internal val atomThreshold: IntArrayList = IntArrayList()
-
-    // -------- Per-atom trail slots (LCG: order literals are trail-resident) --------
-    //
-    // Each materialized order literal carries the same trail metadata a bool var does:
-    // the decision level it was established at and the literal-form antecedents of the
-    // force. Truth is still read from the int-domain view (the two are kept in sync by
-    // channeling), but level / antecedents are *stored* at the moment the bound crosses
-    // the threshold rather than re-derived from a bound-change history. Parallel to
-    // [atomIntVar]; one slot appended per [allocAtom]. Undone on backtrack alongside the
-    // int-domain change that set them.
-    //
-    // [atomLvl] = -1 means "not established on the current path" (truth undetermined, or
-    // a root/bake fact).
-
-    /** Stored truth of this order literal — the canonical, BCP-cheap replacement for deriving it
-     *  from [intDomains] on every clause touch (the #588 profile's dominant cost, `atomTruthOf`).
-     *  0 = unassigned, 1 = true, 2 = false. Set by [wakeAtom] the instant a bound move crosses the
-     *  threshold (which is exactly when the truth flips, since [propagateAtomsForVar] now visits
-     *  every materialized atom of the var), cleared to 0 on backtrack by [resetAtomTrailFor]. A 0 slot
-     *  on a determined atom (one materialized *after* its bound already crossed) falls back to the
-     *  domain-derived [atomTruthOf] — sound, just not cached. */
-    internal val atomState: IntArrayList = IntArrayList()
-
-    /** Decision level at which this atom's current truth was established (-1 = none). */
-    internal val atomLvl: IntArrayList = IntArrayList()
-
-    /** Literal-form antecedents of this atom's current truth (null = leaf / root). */
-    internal val atomAnt: ArrayList<IntArray?> = ArrayList()
-
-    /** The reason of the bound move currently being channeled by [propagateAtomsForVar] — the
-     *  literals whose conjunction forced it. [wakeAtom] stores it on each crossed atom's
-     *  [atomAnt] slot (the trail-resident reason, recorded at the atom's establishment level —
-     *  the canonical replacement for re-deriving it from the bound histories at conflict time). */
-    internal var pendingMoveAnt: IntArray? = null
-
-    /** Reverse lookup: packed key `(intVar << 33) | (kind << 32) | (threshold + INT_MAX)`
-     *  → atomId. Allows O(1) re-allocation checks. */
-    internal val atomByKey: MutableLongIntMap = MutableLongIntMap()
-
-    /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions
-     *  to false. Mirrors [boolWatchersByLit] for atoms; keyed by atom-lit id rather than
-     *  fixed-array indexed because atoms are allocated dynamically. */
-    // Array-indexed by atom-lit (two slots per atom: positive at `atomId*2`, negative at
-    // `atomId*2+1`), grown two slots per [allocAtom]. Replaces the former HashMap<lit, list>:
-    // bool-var watchers are array-indexed ([boolWatchersByLit]), and order literals are now a
-    // canonical representation, so they get the same O(1) array access in the BCP hot path
-    // instead of a boxed-Int hash probe per wake. A null slot means "no watchers".
-    internal val atomWatchersByLit: ArrayList<IntArrayList?> = ArrayList()
-
-    /** For each int variable, the atoms whose truth depends on it — used to recompute
-     *  atom truth and fire watchers after a successful tighten / exclude. Dense-indexed by the
-     *  int-var id (always `0 until numIntVars`) so the post-tighten wake path pays no boxed-Int
-     *  hash probe; a null slot means "no atoms materialised for this var yet". */
-    internal val atomsByIntVar: Array<VarAtomIndex?> = arrayOfNulls(problem.numIntVars)
-
-    /** Per-var sorted thresholds that some factor actually watches (either polarity of
-     *  the atom's literal). Bound moves wake watchers by walking only this index — the
-     *  full atom table grows with every reason ever materialised, but only watched atoms
-     *  need eager transition wakeups; everything else is derived on demand. Dense-indexed by the
-     *  int-var id like [atomsByIntVar]. */
-    internal val watchedAtomsByVar: Array<VarAtomIndex?> = arrayOfNulls(problem.numIntVars)
-
-    /** Factor ids woken by atom-lit transitions during the current propagation step.
-     *  Drained alongside dirty-int / dirty-bool processing in [runToFixpoint]. */
-    internal val dirtyAtomFactors: IntArrayDeque =
-        IntArrayDeque(initialCapacity = 8)
+    /** Bound-atom registry (LCG with virtual int-bound literals) — see [AtomStore]. Atom truth,
+     *  level, and antecedents are snapshotted when the bound crosses (never re-derived from a
+     *  bound-change history); restore drops atoms established after the snapshot point.
+     *  Allocation is lazy via [allocAtom]; the channeling and wake logic lives in `Atoms.kt`. */
+    internal val atoms: AtomStore = AtomStore(problem.numIntVars)
 
     /** Allocate (or look up) the atom for `[intVar ≥ threshold]` and return its virtual
      *  variable id (past the bool var space). Pair with [Lit.make]
@@ -703,9 +471,9 @@ class PropagationState(
         val pos = Lit.isPositive(lit)
         if (v < problem.numBoolVars) return pinBoolImpl(v, pos, antecedents)
         val atomId = atomIdOf(v)
-        val intVar = atomIntVar[atomId]
-        val k = atomThreshold[atomId]
-        return when (atomKind[atomId]) {
+        val intVar = atoms.intVar[atomId]
+        val k = atoms.threshold[atomId]
+        return when (atoms.kind[atomId]) {
             AtomKind.GE -> if (pos) {
                 tightenIntMinImpl(intVar, k, antecedents) // [v ≥ k] true → v.min ≥ k
             } else {
@@ -784,17 +552,17 @@ class PropagationState(
             val blockers = propagator.initialBoolWatcherBlockers
             for (i in watchers.indices) installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
         }
-        if (eventMachineryOn) {
-            propagator.initialIntEventWatches?.let { for (packed in it) intEventWatchersBySlot[packed].add(fid) }
+        if (intEvents.on) {
+            propagator.initialIntEventWatches?.let { for (packed in it) intEvents.watchersBySlot[packed].add(fid) }
         }
-        if (deltaMachineryOn && propagator.consumesIntEventDelta) {
-            eventDirtyVars[fid] = IntArrayList()
-            eventDirtyMark[fid] = IntHashSet()
+        if (intEvents.deltaOn && propagator.consumesIntEventDelta) {
+            intEvents.dirtyVars[fid] = IntArrayList()
+            intEvents.dirtyMark[fid] = IntHashSet()
         }
     }
 
     /** True iff factor id [fid] has not been tombstoned. */
-    internal fun factorAliveAt(fid: Int): Boolean = fid !in tombstonedFactors
+    internal fun factorAliveAt(fid: Int): Boolean = fid !in midlife.tombstoned
 
     /**
      * Append presolve [factor] to the live state as a mid-life factor and return its stable id.
@@ -811,14 +579,14 @@ class PropagationState(
         require(incremental) { "mid-life factors require an incremental PropagationState" }
         val prop = factor.asPropagator()
         val fid = totalFactorCount
-        midlifeFactorStore.add(prop)
-        midlifeFactorList.add(factor)
+        midlife.store.add(prop)
+        midlife.factors.add(factor)
         refPayloadStore.add(null)
-        // Grow the delta accumulators in lockstep so a mid-life consumer's `eventDirtyVars[fid]` slot
+        // Grow the delta accumulators in lockstep so a mid-life consumer's `intEvents.dirtyVars[fid]` slot
         // exists before [registerFactor] populates it (delta machinery is always live in incremental mode).
-        if (deltaMachineryOn) {
-            eventDirtyVars.add(null)
-            eventDirtyMark.add(null)
+        if (intEvents.deltaOn) {
+            intEvents.dirtyVars.add(null)
+            intEvents.dirtyMark.add(null)
         }
         if (prop is ClausePropagator && prop.literals.size == 2) learned.binaryClauseCount++
         registerFactor(fid, prop)
@@ -835,23 +603,23 @@ class PropagationState(
      */
     internal fun tombstoneFactor(fid: Int) {
         require(incremental) { "tombstoning requires an incremental PropagationState" }
-        if (!tombstonedFactors.add(fid)) return
+        if (!midlife.tombstoned.add(fid)) return
         refPayloadStore[fid] = null
     }
 
     /**
      * Register mid-life factor [fid]'s occurrence-list wakeup, mirroring [Problem.nonBoolWatcherBoolOccurrences]
      * / [Problem.nonIntEventWatcherIntOccurrences]: a factor using per-literal bool watchers is excluded
-     * from every bool var's overlay (it wakes through [boolWatchersByLit]); on the int side a var is
+     * from every bool var's overlay (it wakes through [BoolWatcherIndex.byLit]); on the int side a var is
      * excluded only when the factor subscribes to a typed event on *that* var. The overlays are allocated
      * lazily on first need.
      */
     private fun registerMidlifeOccurrences(fid: Int, factor: Factor, prop: Propagator) {
         if (prop === NoPropagator) return
         if (prop.initialBoolWatchers == null) {
-            val occ = midlifeBoolOccurrences ?: Array(
+            val occ = midlife.boolOccurrences ?: Array(
                 problem.numBoolVars,
-            ) { IntArrayList() }.also { midlifeBoolOccurrences = it }
+            ) { IntArrayList() }.also { midlife.boolOccurrences = it }
             for (v in factor.boolVars) occ[v].add(fid)
         }
         val intVars = factor.intVars
@@ -859,9 +627,9 @@ class PropagationState(
             val watched: IntHashSet? = prop.initialIntEventWatches?.let { ws ->
                 IntHashSet(ws.size).apply { for (w in ws) add(IntEvent.intVarOf(w)) }
             }
-            val occ = midlifeIntOccurrences ?: Array(
+            val occ = midlife.intOccurrences ?: Array(
                 problem.numIntVars,
-            ) { IntArrayList() }.also { midlifeIntOccurrences = it }
+            ) { IntArrayList() }.also { midlife.intOccurrences = it }
             for (v in intVars) if (watched?.contains(v) != true) occ[v].add(fid)
         }
     }
@@ -993,8 +761,8 @@ class PropagationState(
                 enqueueForIntChange(v)
             }
             // Atom-lit watchers woken by int tightens before runToFixpoint was called.
-            while (dirtyAtomFactors.isNotEmpty()) {
-                val fid = dirtyAtomFactors.removeFirst()
+            while (atoms.dirtyFactors.isNotEmpty()) {
+                val fid = atoms.dirtyFactors.removeFirst()
                 if (fid in 0 until factorCount) propEnq(fid)
             }
             // Optional seed — used by [PropagationSession.addLearnedClause] to force the
@@ -1029,13 +797,13 @@ class PropagationState(
                 }
             } else {
                 // A base factor reads its vars from the immutable problem; a mid-life presolve factor
-                // (fid >= baseFactorCount, only in [incremental] mode) from [midlifeFactorList].
+                // (fid >= baseFactorCount, only in [incremental] mode) from [MidlifeFactors.factors].
                 val factor = if (fid <
                     baseFactorCount
                 ) {
                     problem.factors[fid]
                 } else {
-                    midlifeFactorList[fid - baseFactorCount]
+                    midlife.factors[fid - baseFactorCount]
                 }
                 maxLevelForVars(factor.boolVars, factor.intVars)
             }
@@ -1060,8 +828,8 @@ class PropagationState(
                 enqueueForIntChange(v)
             }
             // Wake factors registered as atom-lit watchers whose atom truth just flipped.
-            while (dirtyAtomFactors.isNotEmpty()) {
-                propEnq(dirtyAtomFactors.removeFirst())
+            while (atoms.dirtyFactors.isNotEmpty()) {
+                propEnq(atoms.dirtyFactors.removeFirst())
             }
         }
         return null
@@ -1077,7 +845,7 @@ class PropagationState(
     private fun enqueueForBoolChange(v: Int) {
         for (fid in nonBoolWatcherOcc[v]) propEnq(fid)
         // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
-        midlifeBoolOccurrences?.let {
+        midlife.boolOccurrences?.let {
             val list = it[v]
             for (i in 0 until list.size) propEnq(list[i])
         }
@@ -1085,8 +853,8 @@ class PropagationState(
         // The var is assigned here (added to dirtyBools only after a successful pin), so read
         // the packed value bit directly instead of the boxing `boolValues[v]` accessor.
         val falseLit = Lit.make(v, !boolValueBits.get(v))
-        val watchers = boolWatchersByLit[falseLit]
-        val blockers = boolBlockersByLit[falseLit]
+        val watchers = watches.byLit[falseLit]
+        val blockers = watches.blockersByLit[falseLit]
         for (i in 0 until watchers.size) {
             // Blocking-literal short-cut (#200): if the cached blocker for this watch is
             // already true, the factor is satisfied and waking it would be a no-op — skip
@@ -1100,43 +868,43 @@ class PropagationState(
 
     /**
      * Record that int var [v] just changed: add it to [dirtyInts] and, when typed int-event
-     * watchers are active, OR the [kindMask] (one or more `IntEvent.*_BIT`s) into [dirtyIntKinds]`[v]`
+     * watchers are active, OR the [kindMask] (one or more `IntEvent.*_BIT`s) into [IntEventMachinery.dirtyKinds]`[v]`
      * so [enqueueForIntChange] wakes the right advisors. [IntEvent.FIXED_BIT] is added automatically
      * when the post-mutation domain is a singleton, so a mutator only passes the bound/value kind it
      * caused. No-op beyond the dirty enqueue when no factor subscribes (the mask array is empty).
      */
     internal fun markIntDirty(v: Int, kindMask: Int) {
         dirtyInts.addLast(v)
-        if (dirtyIntKinds.isEmpty()) return
+        if (intEvents.dirtyKinds.isEmpty()) return
         val d = intDomains[v]
         val mask = if (d.min == d.max) kindMask or IntEvent.FIXED_BIT else kindMask
-        dirtyIntKinds[v] = dirtyIntKinds[v] or mask
+        intEvents.dirtyKinds[v] = intEvents.dirtyKinds[v] or mask
     }
 
     /**
      * Enqueue every factor that should fire on `v`'s domain change, mirroring [enqueueForBoolChange]
      * on the int side: the occurrence-list factors that don't subscribe to typed events on `v`
      * ([com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences]), plus — for each
-     * [IntEvent] kind that actually occurred (read from [dirtyIntKinds]) — the advisors registered
-     * in [intEventWatchersBySlot]. The kind mask is cleared after dispatch so it doesn't leak into a
+     * [IntEvent] kind that actually occurred (read from [IntEventMachinery.dirtyKinds]) — the advisors registered
+     * in [IntEventMachinery.watchersBySlot]. The kind mask is cleared after dispatch so it doesn't leak into a
      * later change to the same variable. When no factor subscribes this reduces to the plain
      * occurrence-list walk over [com.eignex.klause.solver.Problem.intOccurrences].
      */
     private fun enqueueForIntChange(v: Int) {
         for (fid in nonIntEventWatcherOcc[v]) propEnq(fid)
         // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
-        midlifeIntOccurrences?.let {
+        midlife.intOccurrences?.let {
             val list = it[v]
             for (i in 0 until list.size) propEnq(list[i])
         }
-        if (dirtyIntKinds.isEmpty()) return
-        val mask = dirtyIntKinds[v]
+        if (intEvents.dirtyKinds.isEmpty()) return
+        val mask = intEvents.dirtyKinds[v]
         if (mask == 0) return
-        dirtyIntKinds[v] = 0
+        intEvents.dirtyKinds[v] = 0
         var kind = 0
         while (kind < IntEvent.COUNT) {
             if (mask and (1 shl kind) != 0) {
-                val list = intEventWatchersBySlot[IntEvent.pack(v, kind)]
+                val list = intEvents.watchersBySlot[IntEvent.pack(v, kind)]
                 for (i in 0 until list.size) {
                     val fid = list[i]
                     propEnq(fid)
@@ -1147,31 +915,31 @@ class PropagationState(
         }
     }
 
-    /** Record [v] in [fid]'s dirty-variable delta if [fid] consumes it ([eventDirtyMark] dedups).
+    /** Record [v] in [fid]'s dirty-variable delta if [fid] consumes it ([IntEventMachinery.dirtyMark] dedups).
      *  No-op for non-consumers and when no factor in the problem consumes a delta. */
     private fun accumulateDirtyVar(fid: Int, v: Int) {
-        if (eventDirtyMark.isEmpty()) return
-        val mark = eventDirtyMark[fid] ?: return
-        val vars = eventDirtyVars[fid] ?: return
+        if (intEvents.dirtyMark.isEmpty()) return
+        val mark = intEvents.dirtyMark[fid] ?: return
+        val vars = intEvents.dirtyVars[fid] ?: return
         if (mark.add(v)) vars.add(v)
     }
 
     /**
      * Drain and return the dirty-variable delta accumulated for [factorId] since it last drained —
      * the subscribed variables that fired, a superset of those actually changed since the consumer's
-     * last fire (see [eventDirtyVars]). A consumer ([com.eignex.klause.propagation.Propagator.consumesIntEventDelta])
+     * last fire (see [IntEventMachinery.dirtyVars]). A consumer ([Propagator.consumesIntEventDelta])
      * calls this on a fire and recovers the exact removed values by diffing its own reversible
      * baseline for these variables. Clears the accumulator (keeping it in lockstep with the
      * consumer's baseline update), so call it exactly when the baseline is advanced. Returns an empty
      * array for a non-consuming factor.
      */
     fun drainIntEventDirtyVars(factorId: Int): IntArray {
-        if (eventDirtyVars.isEmpty()) return EmptyIntArray
-        val list = eventDirtyVars[factorId] ?: return EmptyIntArray
+        if (intEvents.dirtyVars.isEmpty()) return EmptyIntArray
+        val list = intEvents.dirtyVars[factorId] ?: return EmptyIntArray
         if (list.size == 0) return EmptyIntArray
         val out = list.toIntArray()
         list.clear()
-        eventDirtyMark[factorId]?.clear()
+        intEvents.dirtyMark[factorId]?.clear()
         return out
     }
 }

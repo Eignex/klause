@@ -23,7 +23,7 @@ interface Propagator {
      * Boolean literals this factor wants per-literal wakeup on, or `null` for the default
      * occurrence-list wakeup (fire on *any* change to a variable in the corresponding
      * [Factor.boolVars]). When non-null, the propagation engine routes bool wakeups through
-     * a per-literal index (`boolWatchersByLit[lit]`) instead of through the factor's bool vars:
+     * a per-literal index (`watches.byLit[lit]`) instead of through the factor's bool vars:
      * the factor fires only when the literal that just became *false* is in this set. The
      * factor is responsible for keeping the index in sync as watches drift, via
      * [com.eignex.klause.propagation.moveBoolWatcher].
@@ -43,7 +43,7 @@ interface Propagator {
      * Optional blocking literals paired index-for-index with [initialBoolWatchers]. Entry
      * `i` is a literal that, if currently true, *proves this factor already satisfied*, so
      * the propagation engine can skip waking the factor when watcher `i`'s literal goes
-     * false (see `PropagationState.boolBlockersByLit`). The standard two-watched-literal
+     * false (see `PropagationState.watches.blockersByLit`). The standard two-watched-literal
      * BCP speedup (MiniSAT): the blocker is typically the other watched literal of the same
      * clause, and a stale blocker only ever costs a missed skip — never correctness.
      *
@@ -62,7 +62,7 @@ interface Propagator {
      * [com.eignex.klause.propagation.IntEvent.pack], where `kind` is one of
      * `IntEvent.LB_RAISED` / `UB_LOWERED` / `VALUE_REMOVED` / `FIXED`. When non-null, the engine
      * routes wakeup for the subscribed variables through the per-`(var, kind)` index
-     * (`PropagationState.intEventWatchersBySlot`) instead of through the factor's int vars: the
+     * (`PropagationState.intEvents.watchersBySlot`) instead of through the factor's int vars: the
      * factor fires only when a kind it subscribed to actually occurs on that variable.
      *
      * This is the int-side analog of [initialBoolWatchers] and the scheduling substrate for

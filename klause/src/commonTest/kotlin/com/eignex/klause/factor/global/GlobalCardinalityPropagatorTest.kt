@@ -286,7 +286,7 @@ class GlobalCardinalityPropagatorTest {
         val citedInts = buildSet {
             for (lit in reason) {
                 val v = Lit.variable(lit)
-                if (v >= problem.numBoolVars) add(state.atomIntVar[v - problem.numBoolVars])
+                if (v >= problem.numBoolVars) add(state.atoms.intVar[v - problem.numBoolVars])
             }
         }
         assertTrue(2 in citedInts && 3 in citedInts, "reason must cite both count vars; cited $citedInts")
