@@ -750,21 +750,9 @@ class PropagationState(
         if (allFactors) {
             for (fid in 0 until factorCount) propEnq(fid)
         } else {
-            while (true) {
-                val v = pollDirtyBool()
-                if (v < 0) break
-                enqueueForBoolChange(v)
-            }
-            while (true) {
-                val v = pollDirtyInt()
-                if (v < 0) break
-                enqueueForIntChange(v)
-            }
-            // Atom-lit watchers woken by int tightens before runToFixpoint was called.
-            while (atoms.dirtyFactors.isNotEmpty()) {
-                val fid = atoms.dirtyFactors.removeFirst()
-                if (fid in 0 until factorCount) propEnq(fid)
-            }
+            // Atom-lit watchers woken by int tightens before runToFixpoint was called are capped:
+            // a stale id from before a forget/renumber may linger in the pre-run queue.
+            drainDirtyIntoQueue(atomFactorCap = factorCount)
             // Optional seed — used by [PropagationSession.addLearnedClause] to force the
             // newly-stored learned clause to fire on the next propagation cycle (it would
             // otherwise sit dormant since the watcher index only wakes on false-going
@@ -779,34 +767,7 @@ class PropagationState(
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
-            // Level for the firing factor. A Clause's effective level is the max decision
-            // level over its literals; its [boolVars] is the deduplicated variable set of
-            // those literals and its [intVars] is empty, so maxLevelForVars is redundant
-            // with maxLevelForClause (a second O(arity) pass over the same variables on
-            // every fire — the BCP hot path). Better still: a *pure-bool* clause only ever
-            // fires when a watched bool literal just went false at the current decision
-            // level (bools are only pinned by decisions or clause propagation, all stamped
-            // at the current level), so its effective level is exactly the current decision
-            // level — no scan at all. Atom-lit clauses can fire on an atom that flipped at a
-            // sub-decision level, so they keep the literal scan.
-            currentLevel = if (f is ClausePropagator) {
-                if (f.allLiteralsBool(problem.numBoolVars)) {
-                    levelToDecisionVar.size
-                } else {
-                    maxLevelForClause(f.literals)
-                }
-            } else {
-                // A base factor reads its vars from the immutable problem; a mid-life presolve factor
-                // (fid >= baseFactorCount, only in [incremental] mode) from [MidlifeFactors.factors].
-                val factor = if (fid <
-                    baseFactorCount
-                ) {
-                    problem.factors[fid]
-                } else {
-                    midlife.factors[fid - baseFactorCount]
-                }
-                maxLevelForVars(factor.boolVars, factor.intVars)
-            }
+            currentLevel = effectiveLevelFor(f, fid)
             currentFactor = fid
             conflictLevels = null
             if (!f.propagate(this, fid)) {
@@ -817,22 +778,55 @@ class PropagationState(
                 seedConflictFactor(fid)
                 return conflictLevels ?: factorVarsConflictLevels(fid)
             }
-            while (true) {
-                val v = pollDirtyBool()
-                if (v < 0) break
-                enqueueForBoolChange(v)
-            }
-            while (true) {
-                val v = pollDirtyInt()
-                if (v < 0) break
-                enqueueForIntChange(v)
-            }
-            // Wake factors registered as atom-lit watchers whose atom truth just flipped.
-            while (atoms.dirtyFactors.isNotEmpty()) {
-                propEnq(atoms.dirtyFactors.removeFirst())
-            }
+            // Post-fire wakes are always in range, so the atom-factor cap is inert here.
+            drainDirtyIntoQueue(atomFactorCap = Int.MAX_VALUE)
         }
         return null
+    }
+
+    /** Drain the dirty bool/int vars and the atom-woken factors into the worklist — run once to
+     *  seed an incremental fixpoint and again after every factor fire. [atomFactorCap] bounds the
+     *  atom-woken factor ids (the seed path caps at the live factor count since a stale id can
+     *  linger in the pre-run queue; post-fire wakes pass [Int.MAX_VALUE]). */
+    private fun drainDirtyIntoQueue(atomFactorCap: Int) {
+        while (true) {
+            val v = pollDirtyBool()
+            if (v < 0) break
+            enqueueForBoolChange(v)
+        }
+        while (true) {
+            val v = pollDirtyInt()
+            if (v < 0) break
+            enqueueForIntChange(v)
+        }
+        while (atoms.dirtyFactors.isNotEmpty()) {
+            val fid = atoms.dirtyFactors.removeFirst()
+            if (fid in 0 until atomFactorCap) propEnq(fid)
+        }
+    }
+
+    /**
+     * Effective decision level for firing factor [f] (id [fid]). A Clause's effective level is the
+     * max decision level over its literals; its `boolVars` is the deduplicated variable set of
+     * those literals and its `intVars` is empty, so [maxLevelForVars] is redundant with
+     * [maxLevelForClause] (a second O(arity) pass over the same variables on every fire — the BCP
+     * hot path). Better still: a *pure-bool* clause only ever fires when a watched bool literal
+     * just went false at the current decision level (bools are only pinned by decisions or clause
+     * propagation, all stamped at the current level), so its effective level is exactly the
+     * current decision level — no scan at all. Atom-lit clauses can fire on an atom that flipped
+     * at a sub-decision level, so they keep the literal scan.
+     */
+    private fun effectiveLevelFor(f: Propagator, fid: Int): Int = if (f is ClausePropagator) {
+        if (f.allLiteralsBool(problem.numBoolVars)) {
+            levelToDecisionVar.size
+        } else {
+            maxLevelForClause(f.literals)
+        }
+    } else {
+        // A base factor reads its vars from the immutable problem; a mid-life presolve factor
+        // (fid >= baseFactorCount, only in [incremental] mode) from [MidlifeFactors.factors].
+        val factor = if (fid < baseFactorCount) problem.factors[fid] else midlife.factors[fid - baseFactorCount]
+        maxLevelForVars(factor.boolVars, factor.intVars)
     }
 
     /**
