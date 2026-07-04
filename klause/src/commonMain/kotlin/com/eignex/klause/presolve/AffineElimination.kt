@@ -134,6 +134,16 @@ internal object AffineSingletons {
     // wide rows without simplifying. The variable stays (sound, solved directly).
     private const val WIDE_FILL_IN = 64
 
+    // Cap on how many folds a single linear row may absorb, applied in every model. Folding a pivot into a
+    // row rebuilds and re-coalesces the whole row; a row that keeps absorbing folds from successive pivots
+    // grows monotonically, so the k-th fold into it costs O(k) — O(folds²) churn that also hands the solver a
+    // denser problem rather than a simpler one (numbrix accumulates one row from 215 to 4560 terms over ~80
+    // folds). Once a row has absorbed this many folds, leave any further pivot that would rewrite it unfolded
+    // (sound — the variable stays and is solved directly), which bounds each row's growth. Set well above the
+    // handful of folds a productively-eliminated variable draws so ordinary models are untouched; only a row
+    // that is a fold sink — the pathological accumulator — is capped.
+    private const val FOLD_ABSORB_CAP = 16
+
     /** A residue-class doubleton `a·x + b·y = c` (no unit pivot) at [defIdx]: `x` is contained and
      *  reconstructed as `(constTerm + coeffY·y) / divisor` over the [restrictedY] partner domain. */
     private class ResidueCandidate(
@@ -300,9 +310,15 @@ internal object AffineSingletons {
             // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
             // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
             val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
-            // In an underdetermined model, defer a wide fold (leave the variable). Aliases are pure
-            // renames that never inflate, so they always proceed.
-            if (capWide && !isAlias && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
+            // Defer a fold that would inflate rather than simplify (leave the variable). Aliases are pure
+            // renames that never inflate, so they always proceed. Otherwise skip a pivot whose fold would
+            // rewrite a row that has already absorbed [FOLD_ABSORB_CAP] folds (bounding the accumulating-row
+            // pathology), and additionally cap total fill-in at the tighter [WIDE_FILL_IN] in underdetermined
+            // models.
+            if (!isAlias) {
+                if (ws.anyOtherLinearAtAbsorbCap(di, x)) continue
+                if (capWide && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
+            }
             // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
             // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
             // only folds into Linear factors.
@@ -365,6 +381,11 @@ internal object AffineSingletons {
         fun isContained(defIdx: Int, x: Int): Boolean
         fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean
         fun otherOccurrencesAffineSubstitutable(defIdx: Int, x: Int, scale: Int, offset: Int, replacement: Int): Boolean
+
+        /** Whether any [Linear] factor other than [defIdx] that mentions [x] has already absorbed
+         *  [FOLD_ABSORB_CAP] folds — a fold on [x] would rewrite that row once more. Always `false` before any
+         *  fold (the pristine seed), so it only ever defers a pivot targeting an established fold sink. */
+        fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean
     }
 
     /**
@@ -410,6 +431,9 @@ internal object AffineSingletons {
             }
             return true
         }
+
+        // The seed is the pristine input before any fold, so no row has absorbed one yet.
+        override fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean = false
     }
 
     /**
@@ -429,6 +453,10 @@ internal object AffineSingletons {
     private class WorkingSet(base: Array<Factor>, nVars: Int, seed: SharedIntOccurrence?) : FactorOcc {
         private val slots = ArrayList<Factor?>(base.size + 1).apply { addAll(base) }
         private val intOcc = Array(nVars) { IntArrayList(0) }
+
+        // Folds absorbed by each stable id (parallel to [slots]): incremented whenever [replace] rewrites it,
+        // read by [anyOtherLinearAtAbsorbCap] to cap a row that has become a fold sink. Appended rows start at 0.
+        private val absorbed = IntArrayList(base.size + 1).apply { repeat(base.size) { add(0) } }
 
         init {
             // The seed's CSR is over the pristine input in input (= stable-id) order, so its dense indices
@@ -460,8 +488,9 @@ internal object AffineSingletons {
         }
 
         /** Replace live stable id [id] — currently holding [prev] — with [next], moving its occurrence
-         *  entries from [prev]'s variables to [next]'s. */
+         *  entries from [prev]'s variables to [next]'s and recording that it absorbed a fold. */
         private fun replace(id: Int, prev: Factor, next: Factor) {
+            absorbed[id] = absorbed[id] + 1
             for (v in prev.intVars) intOcc[v].removeValue(id)
             slots[id] = next
             for (v in next.intVars) intOcc[v].add(id)
@@ -471,6 +500,7 @@ internal object AffineSingletons {
         private fun append(next: Factor) {
             val id = slots.size
             slots.add(next)
+            absorbed.add(0)
             for (v in next.intVars) intOcc[v].add(id)
         }
 
@@ -512,6 +542,17 @@ internal object AffineSingletons {
                 if (f !is Linear && !f.canSubstituteAffine(x, scale, offset, replacement)) return false
             }
             return true
+        }
+
+        override fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean {
+            val occ = intOcc[x]
+            for (k in 0 until occ.size) {
+                val id = occ[k]
+                if (id == defIdx) continue
+                val f = slots[id] ?: continue
+                if (f is Linear && absorbed[id] >= FOLD_ABSORB_CAP) return true
+            }
+            return false
         }
 
         /**
