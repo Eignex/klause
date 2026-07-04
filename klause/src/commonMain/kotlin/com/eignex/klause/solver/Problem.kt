@@ -87,8 +87,12 @@ class Problem(
      * finite domains to every consumer — search engines start from a stronger root and
      * reference backends can represent constraints whose raw reachable ranges would
      * overflow their variable limits.
+     *
+     * A [preFolded] pass view skips the defensive copy: its domains are already the incremental
+     * session's re-propagated array, read (never mutated) by a pass within a single firing and
+     * rebuilt by the session on the next change, so sharing it saves an O(numIntVars) copy per firing.
      */
-    val intDomains: Array<IntDomain> = intDomains.copyOf()
+    val intDomains: Array<IntDomain> = if (preFolded) intDomains else intDomains.copyOf()
 
     /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
      *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
