@@ -80,6 +80,15 @@ class PortfolioTest {
     }
 
     @Test
+    fun `the latent-axis heuristic arms are ranked and build`() {
+        val cop = BacktrackWorkerConfig.labels(Kind.COP)
+        for (label in listOf("domwdeg", "first-fail", "activity")) {
+            assertTrue(label in cop, "$label must be a ranked COP arm")
+            assertEquals(label, BacktrackWorkerConfig.byLabel(label).label, "$label must build by label")
+        }
+    }
+
+    @Test
     fun `the selector-switch arm wires a fresh restart-switching portfolio per worker`() {
         val arm = BacktrackWorkerConfig.byLabel("selector-switch")
         val a = arm.build(1L, null)
