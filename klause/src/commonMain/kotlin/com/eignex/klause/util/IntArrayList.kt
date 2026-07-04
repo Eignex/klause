@@ -23,6 +23,7 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         data[index] = value
     }
 
+    /** Swap-remove the element at [index] (O(1); does not preserve order). */
     fun removeAt(index: Int) {
         data[index] = data[--size]
     }
