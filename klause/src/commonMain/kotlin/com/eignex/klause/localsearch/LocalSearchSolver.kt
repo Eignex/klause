@@ -474,6 +474,15 @@ class LocalSearchSolver(
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         var lastCheckMs = 0L
+
+        // Restart from [anchor] and re-run the greedy repair sweep under the same gate as the
+        // initial restart above — the pairing every restart site must preserve. Counters and
+        // round bookkeeping stay at the call sites so the hot-loop locals aren't captured.
+        fun restartAndRepair(anchor: Sample?) {
+            restarts.restart(state, anchor)
+            if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+        }
+
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
                 if (params.cancellation()) {
@@ -526,8 +535,7 @@ class LocalSearchSolver(
                             continue
                         }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restarts.restart(state, bestSample)
-                        if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                        restartAndRepair(bestSample)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -563,8 +571,7 @@ class LocalSearchSolver(
                         }
                         feasibleMisses = 0
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restarts.restart(state, bestSample)
-                        if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                        restartAndRepair(bestSample)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -574,8 +581,7 @@ class LocalSearchSolver(
                 }
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
-                restarts.restart(state, bestSample ?: bestCostSnap)
-                if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                restartAndRepair(bestSample ?: bestCostSnap)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -587,8 +593,7 @@ class LocalSearchSolver(
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restarts.restart(state, bestSample ?: bestCostSnap)
-                if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                restartAndRepair(bestSample ?: bestCostSnap)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
