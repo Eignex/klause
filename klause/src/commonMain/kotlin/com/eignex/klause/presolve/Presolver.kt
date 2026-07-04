@@ -73,6 +73,10 @@ data class PresolveContext(
      *  ran, so [PresolvePass.REMOVE_REDUNDANT] reprocesses only the delta instead of rescanning every
      *  factor. `null` on the fresh path, where subsume recomputes from scratch each call. */
     val subsumeIncremental: SubsumeState? = null,
+    /** The integer variables changed since affine elimination last ran, so a re-run scans only the factors
+     *  they appear in. `null` on the fresh path and on affine's first firing (a full scan); a non-null
+     *  (possibly empty) array marks a re-run, where an empty array means nothing changed → skip. */
+    val affineTouchedVars: IntArray? = null,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -100,6 +104,10 @@ data class PresolveContext(
     /** This context carrying the incremental round engine's persistent subsume state + delta. */
     fun withSubsumeIncremental(subsumeIncremental: SubsumeState?): PresolveContext =
         copy(subsumeIncremental = subsumeIncremental)
+
+    /** This context carrying the variables changed since affine elimination last ran (`null` = full scan). */
+    fun withAffineTouchedVars(affineTouchedVars: IntArray?): PresolveContext =
+        copy(affineTouchedVars = affineTouchedVars)
 
     /** Factories for the common contexts. */
     companion object {
@@ -282,6 +290,7 @@ enum class PresolvePass(
             ctx.cancellation,
             ctx.sharedIntOcc,
             ctx.affineUnderdetermined,
+            ctx.affineTouchedVars,
         )
     },
 
@@ -745,6 +754,8 @@ object Presolver {
         // only the factors other passes changed in between instead of rescanning the whole live set.
         val subsumeMemo = SubsumeMemo()
         var subsumeMark: PresolveSession.ChangeMark? = null
+        // Affine's change-mark at its last firing; a re-run rescans only the variables touched since.
+        var affineMark: PresolveSession.ChangeMark? = null
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()
         val fired = LinkedHashSet<PresolvePass>()
@@ -771,6 +782,18 @@ object Presolver {
                 if (pass == PresolvePass.REMOVE_REDUNDANT) {
                     passCtx = passCtx.withSubsumeIncremental(subsumeIncremental(session, subsumeMark, subsumeMemo))
                 }
+                if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) {
+                    val mark = affineMark
+                    val touched = if (mark == null || session.markStale(
+                            mark,
+                        )
+                    ) {
+                        null
+                    } else {
+                        session.touchedIntVarsSince(mark)
+                    }
+                    passCtx = passCtx.withAffineTouchedVars(touched)
+                }
                 val delta = pass.apply(input, passCtx)
                 if (!delta.isEmpty) {
                     delta.reconstruct?.let { reconstructs.add(it) }
@@ -780,9 +803,10 @@ object Presolver {
                 } else if (pass.skipAfterEmpty) {
                     exhausted.add(pass)
                 }
-                // Advance subsume's mark past its own drops so the next firing sees only what other passes
-                // changed since (its own drops are carried inside the memo).
+                // Advance each incremental pass's mark past its own delta so the next firing sees only what
+                // other passes changed since (a pass's own output is folded into its persistent index/scan).
                 if (pass == PresolvePass.REMOVE_REDUNDANT) subsumeMark = session.changeMark()
+                if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) affineMark = session.changeMark()
             }
             if (!ranAny) break
             round++

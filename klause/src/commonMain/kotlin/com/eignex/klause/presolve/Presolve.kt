@@ -19,15 +19,23 @@ object Presolve {
     /** One-shot GF(2) elimination over all xor factors. See [XorUnits]. */
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
 
-    /** Affine variable elimination. See [AffineSingletons]. */
+    /** Affine variable elimination. See [AffineSingletons]. [incrementalTouchedVars] (from the incremental
+     *  round engine) restricts a re-run's candidate scan to the variables the delta changed. */
     fun eliminateAffineSingletons(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         sharedIntOcc: SharedIntOccurrence? = null,
         capWide: Boolean = false,
-    ): PassDelta =
-        AffineSingletons.eliminateAffineSingletons(problem, objectiveIntVars, cancellation, sharedIntOcc, capWide)
+        incrementalTouchedVars: IntArray? = null,
+    ): PassDelta = AffineSingletons.eliminateAffineSingletons(
+        problem,
+        objectiveIntVars,
+        cancellation,
+        sharedIntOcc,
+        capWide,
+        incrementalTouchedVars,
+    )
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
     fun removeRedundantConstraints(problem: Problem): PassDelta =
