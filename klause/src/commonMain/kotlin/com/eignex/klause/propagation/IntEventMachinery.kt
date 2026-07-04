@@ -13,7 +13,7 @@ import com.eignex.klause.util.IntHashSet
  * consuming the delta) wakes correctly even when the initial problem had none.
  */
 internal class IntEventMachinery(problem: Problem, incremental: Boolean) {
-    /** Whether the typed int-event machinery ([dirtyKinds] / [watchersBySlot]) is live. */
+    /** Whether the typed int-event machinery ([dirtyKinds] / [baseFlat]) is live. */
     val on: Boolean = problem.usesIntEventWatchers || incremental
 
     /** Whether the per-factor dirty-variable delta accumulators are live. */
@@ -22,17 +22,58 @@ internal class IntEventMachinery(problem: Problem, incremental: Boolean) {
     /**
      * Per-`(intVar, kind)` advisor index, the int-side analog of [BoolWatcherIndex.byLit]: slot
      * `[IntEvent.pack(v, kind)]` lists the factor ids that subscribed to that event via
-     * [Propagator.initialIntEventWatches], so `enqueueForIntChange` can wake only the factors that
-     * care about the kind of change that just happened. Sized `numIntVars * IntEvent.COUNT` and
-     * populated once at construction; the subscriptions are static — a propagator that loses
-     * interest in a variable simply ignores the wake, which is sound.
+     * [Propagator.initialIntEventWatches], read by `enqueueForIntChange` to wake only the factors that
+     * care about the kind of change that just happened. The base factors' subscriptions are held as a
+     * CSR ([baseOffsets] / [baseFlat]) built once at construction rather than one [IntArrayList] per
+     * `numIntVars * IntEvent.COUNT` slot: on a large model most slots have no subscriber, and the wide
+     * array of tiny lists dominated [PropagationState] construction. The CSR is one prefix-sum pass plus
+     * one fill pass over the base propagators, both O(subscriptions); reads are a contiguous slice and the
+     * per-slot subscriber order is ascending base factor id — exactly the order the former per-slot list
+     * appends produced. Mid-life factors ([PropagationState.addMidlifeFactor]) subscribe into [overflow].
      */
-    val watchersBySlot: Array<IntArrayList> =
+    internal val baseOffsets: IntArray
+    internal val baseFlat: IntArray
+
+    /** Mid-life subscriptions (packed slot → factor ids in add order), allocated lazily — the common case
+     *  adds no int-event-watching factor mid-run (presolve appends Linear rows, which watch nothing), so
+     *  this stays `null` and the read pays only a null check past the CSR. */
+    @Suppress("DoubleMutabilityForCollection") // null until the first mid-life subscription; assigned once, lazily
+    internal var overflow: HashMap<Int, IntArrayList>? = null
+
+    init {
         if (on) {
-            Array(problem.numIntVars * IntEvent.COUNT) { IntArrayList(initialCapacity = 1) }
+            val numSlots = problem.numIntVars * IntEvent.COUNT
+            val offsets = IntArray(numSlots + 1)
+            for (fid in 0 until problem.numFactors) {
+                problem.propagators[fid].initialIntEventWatches?.let { for (packed in it) offsets[packed + 1]++ }
+            }
+            for (s in 1..numSlots) offsets[s] += offsets[s - 1]
+            val flat = IntArray(offsets[numSlots])
+            val cursor = offsets.copyOf()
+            for (fid in 0 until problem.numFactors) {
+                problem.propagators[fid].initialIntEventWatches?.let { for (packed in it) flat[cursor[packed]++] = fid }
+            }
+            baseOffsets = offsets
+            baseFlat = flat
         } else {
-            emptyArray()
+            baseOffsets = EmptyIntArray
+            baseFlat = EmptyIntArray
         }
+    }
+
+    /** Subscribe a mid-life factor [fid] to the event [packed] ([IntEvent.pack]); the base CSR is frozen,
+     *  so post-construction subscriptions go to the sparse [overflow]. */
+    fun subscribeMidlife(packed: Int, fid: Int) {
+        val o = overflow ?: HashMap<Int, IntArrayList>().also { overflow = it }
+        o.getOrPut(packed) { IntArrayList(initialCapacity = 1) }.add(fid)
+    }
+
+    /** Visit every factor subscribed to event [packed]: base subscribers (CSR, ascending factor id) then
+     *  mid-life subscribers (overflow, add order) — the order the former single per-slot list held. */
+    inline fun forEachWatcher(packed: Int, action: (Int) -> Unit) {
+        for (k in baseOffsets[packed] until baseOffsets[packed + 1]) action(baseFlat[k])
+        overflow?.get(packed)?.let { list -> for (i in 0 until list.size) action(list[i]) }
+    }
 
     /**
      * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last

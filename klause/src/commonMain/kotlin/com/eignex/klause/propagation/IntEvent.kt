@@ -20,7 +20,7 @@ package com.eignex.klause.propagation
  *                       subscribe to [FIXED] alone.
  *
  * A `(intVar, kind)` subscription is encoded as a single `Int` via [pack]; the same value is the
- * slot index into [IntEventMachinery.watchersBySlot]. Encoding is `intVar * COUNT + kind`,
+ * slot index into [IntEventMachinery.forEachWatcher]. Encoding is `intVar * COUNT + kind`,
  * so [intVarOf] / [kindOf] recover the components.
  *
  * **Soundness contract:** the per-variable kind mask the mutators record (see
