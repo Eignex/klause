@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LsCatalog
 import com.eignex.klause.localsearch.strategy.LsRecipe
 import com.eignex.klause.solver.Problem
@@ -41,7 +42,9 @@ internal class LocalSearchWorkerConfig(val recipe: LsRecipe) : WorkerConfig {
         // nothing; a violation-native one (probSAT / WalkSAT / feasibility-jump) gets an `objective ≤
         // incumbent` ratchet overlaid on its problem and the shared bound to tighten — so no arm bails at
         // feasibility on a COP. A CSP (no objective) leaves every arm a pure feasibility finder.
-        val (effectiveProblem, boundHandle) = if (objective != null && !recipe.drivesObjectiveDescent) {
+        val (effectiveProblem, boundHandle) = if (objective != null &&
+            recipe.feasibleDescent == FeasibleDescent.RatchetAsConstraint
+        ) {
             objectiveBoundOverlay(problem, objective) ?: (problem to null)
         } else {
             problem to null

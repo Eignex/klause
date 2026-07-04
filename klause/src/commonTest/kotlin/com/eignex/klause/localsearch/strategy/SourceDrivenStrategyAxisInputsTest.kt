@@ -55,6 +55,7 @@ class SourceDrivenStrategyAxisInputsTest {
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
             scoring = MoveScoring.Break,
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         val state = LocalSearchState(satisfiable(), Random(7))
         state.recompute()
@@ -79,6 +80,7 @@ class SourceDrivenStrategyAxisInputsTest {
                     weightDecay = 1.0,
                 ),
             ),
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         val state = LocalSearchState(infeasibleRing(), Random(7))
         state.recompute()
@@ -95,6 +97,7 @@ class SourceDrivenStrategyAxisInputsTest {
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
             perturbation = { kick },
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         val state = LocalSearchState(satisfiable(), Random(7))
         state.recompute()
@@ -119,7 +122,11 @@ class SourceDrivenStrategyAxisInputsTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(),
         )
-        val strategy = SourceDrivenStrategy(listOf(ConfiguredSource(twoMoves)), configurationChecking = true)
+        val strategy = SourceDrivenStrategy(
+            listOf(ConfiguredSource(twoMoves)),
+            configurationChecking = true,
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+        )
         val state = LocalSearchState(problem, Random(7))
         state.recompute()
         state.intConfChange[0] = false // var 0 CC-blocked
@@ -143,6 +150,7 @@ class SourceDrivenStrategyAxisInputsTest {
             scoring = MoveScoring.Break,
             acceptance = AcceptanceRule.Metropolis,
             schedule = ScheduleBundle(temperature = temperature),
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         val state = LocalSearchState(infeasibleRing(), Random(7))
         state.recompute()

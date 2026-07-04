@@ -34,6 +34,7 @@ import com.eignex.klause.localsearch.strategy.AxisEdits
 import com.eignex.klause.localsearch.strategy.AxisToken
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibilityJump
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LsCatalog
 import com.eignex.klause.localsearch.strategy.LsRecipe
 import com.eignex.klause.localsearch.strategy.ProbSat
@@ -273,7 +274,7 @@ private fun namedFactory(
 /** A bare driver with no preset axes; its sources are supplied by a force-exactly `sources=` spec. */
 private fun bareRecipe(tabu: TabuFilter): LsRecipe = LsRecipe(
     "bare",
-    SourceDrivenStrategy(sources = emptyList(), tabu = tabu),
+    SourceDrivenStrategy(sources = emptyList(), tabu = tabu, feasibleDescent = FeasibleDescent.RatchetAsConstraint),
 )
 
 private fun applyEdits(

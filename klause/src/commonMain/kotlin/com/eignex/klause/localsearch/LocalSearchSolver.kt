@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.localsearch.strategy.Cbls
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.PropagationResult
@@ -42,17 +43,17 @@ import kotlin.random.Random
  */
 class LocalSearchSolver(
     override val problem: Problem,
-    /** SourceDrivenStrategy used during the satisfy phase. Default is adaptive probSAT with the
-     *  OrImproving tabu aspiration: a continuous-weighted candidate distribution that handles
-     *  mixed-degree factor problems, self-tuning by widening on stalls and re-sharpening on
-     *  progress; the aspiration admits individually improving moves the tenure window would block. */
-    val strategy: SourceDrivenStrategy = ProbSat.adaptive(
-        tabu = TabuFilter(tenure = 10, aspiration = AspirationCriterion.OrImproving),
-    ),
+    /** SourceDrivenStrategy for the satisfy phase (and, when [optimizeStrategy] is null, the minimize
+     *  phase too, via its [SourceDrivenStrategy.feasibleDescent]). Default is [Cbls] — its
+     *  [FeasibleDescent.StrictGreedy] runs the engine's greedy objective descent, so a bare
+     *  `LocalSearchSolver(problem).minimize(...)` optimizes with no extra wiring. Override for a
+     *  different arm — `ProbSat.adaptive()` for a boolean core (ratcheted on a COP by the portfolio),
+     *  `SimulatedAnnealing.optimizer(...)` to anneal. */
+    val strategy: SourceDrivenStrategy = Cbls(),
     /** SourceDrivenStrategy for the feasibility-fight phase of [minimize]. `null` reuses [strategy].
-     *  Override to decouple satisfy-mode and minimize-mode strategies; the common case is satisfy
-     *  [ProbSat.adaptive] + minimize [Cbls] for decomposed CP problems, where CBLS's weighted-violation
-     *  gradient descends the objective on instances where probSAT plateaus. */
+     *  Override to decouple satisfy-mode and minimize-mode strategies; e.g. satisfy [ProbSat.adaptive] +
+     *  minimize [Cbls] for decomposed CP problems, where CBLS's weighted-violation gradient descends the
+     *  objective on instances where probSAT plateaus. */
     val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Restart policy controlling diversification. */
     val restartPolicy: RestartPolicy = FixedCadenceRestart(),
@@ -465,9 +466,13 @@ class LocalSearchSolver(
         // it drives both phases. Else split phases (strategy for satisfy, optimizeStrategy for
         // descent) for non-unified strategies that bail at feasibility.
         val descentStrategy = optimizeStrategy
-        val unified = descentStrategy?.drivesObjectiveDescent == true
+        val unified = descentStrategy != null
         // Capture the ratchet handle once: set at construction, read in the feasible-incumbent hook.
         val ratchetBound = objectiveBound
+        // The explicit feasible-phase descent mode — the optimize strategy's when present, else the
+        // satisfy strategy's. The cost==0 branch dispatches on it exhaustively (no fall-through), so an
+        // arm always optimizes the way it declared and never lands in a default descent by accident.
+        val feasibleMode = (descentStrategy ?: strategy).feasibleDescent
         // The feasibility-fight strategy whose moves form the rounds (the unified descent strategy
         // when one drives both phases, else the satisfy strategy).
         val satisfyStrategy: SourceDrivenStrategy = if (unified) descentStrategy else strategy
@@ -511,97 +516,108 @@ class LocalSearchSolver(
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }
-                if (ratchetBound != null) {
-                    // Objective-as-constraint ratchet: reaching cost==0 means the objective already meets
-                    // the bound. Tighten it below this incumbent so "beat it" re-enters the violation set,
-                    // then reconcile just the bound factor — its degree shifts with no move, and the
-                    // overlay appends it last, so it is the final factor — and drop back into the
-                    // feasibility fight to repair it. Surgical, not a full recompute over every factor.
-                    ratchetBound.tightenBelow(obj)
-                    state.reevaluateFactor(problem.numFactors - 1)
-                    totalFlips++
-                    continue
-                }
-                // An annealing/optimizer strategy that owns the feasible walk: its own acceptance
-                // (SA Metropolis) decides accept/reject, so it steps through worse-objective feasible
-                // states the greedy gate below would revert. Best-feasible is snapshotted above, so
-                // wandering never loses the incumbent. A feasibility-breaking pick is reverted (the
-                // optimize phase stays feasible) and retried; a null pick means no feasible-phase
-                // candidate remains — a local optimum, so restart.
-                if (descentStrategy != null && descentStrategy.ownsFeasibleDescent) {
-                    val m = descentStrategy.pickMove(state)
-                    if (m != null) {
-                        val savedSnap = state.assignment.snapshot()
-                        state.apply(m)
-                        if (state.cost != 0L) revertMove(state, m, savedSnap)
-                        flipsSinceRestart++
+                // Explicit feasible-phase dispatch — exhaustive, no else: every strategy declares its
+                // [FeasibleDescent], so nothing falls into a default descent by accident.
+                when (feasibleMode) {
+                    // Violation-native: the objective is an `objective ≤ incumbent` factor the portfolio
+                    // overlaid on a COP. Reaching cost==0 means it already holds — tighten the bound below
+                    // this incumbent so "beat it" re-enters the violation set, reconcile just the bound
+                    // factor (its degree shifts with no move; the overlay appends it last), and drop back
+                    // into the feasibility fight. Surgical, not a full recompute. With no bound (a var-less
+                    // objective) there is nothing to optimize, so restart to diversify.
+                    FeasibleDescent.RatchetAsConstraint -> {
+                        if (ratchetBound != null) {
+                            ratchetBound.tightenBelow(obj)
+                            state.reevaluateFactor(problem.numFactors - 1)
+                            totalFlips++
+                            continue
+                        }
+                        restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                        restarts.restart(state, bestSample)
+                        if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                        stallCount++
+                        restartCount++
+                        flipsSinceRestart = 0
                         totalFlips++
                         continue
                     }
-                    restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                    restarts.restart(state, bestSample)
-                    if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
-                    stallCount++
-                    restartCount++
-                    flipsSinceRestart = 0
-                    totalFlips++
-                    continue
-                }
-                // Descent options in order of informedness; each gets one chance before falling
-                // through to the next, and stalling all of them triggers a restart. Cheapest first:
-                // greedy single-flip, then CBLS weighted scoring, factor-aware structured moves, then
-                // the random pair-swap fallback.
-                val descended = if (shaping.feasibilityGated) {
-                    greedyObjectiveStep(state, objective, params.cancellation)
-                } else {
-                    shapedDescentStep(state, objective, shaping, params.cancellation)
-                }
-                if (descended) {
-                    flipsSinceRestart++
-                    totalFlips++
-                    continue
-                }
-                // CBLS descent: ask the optimizeStrategy for an objective-improving move. SAT-style
-                // strategies return null at feasibility, so this is a no-op for them.
-                if (descentStrategy != null) {
-                    val m = descentStrategy.pickMove(state)
-                    if (m != null) {
-                        // Commit only if the move keeps feasibility AND improves the objective — CBLS
-                        // may propose feasibility-breaking moves we don't want in the gated phase.
-                        val baseObj = objective.evaluate(state.assignment)
-                        // Snapshot only to undo a rejected move; both objective reads are live.
-                        val savedSnap = state.assignment.snapshot()
-                        state.apply(m)
-                        if (state.cost == 0L && objective.evaluate(state.assignment) < baseObj) {
+
+                    // The strategy's own acceptance (SA Metropolis) owns the feasible walk: it steps
+                    // through worse-objective feasible states the strict-greedy gate would revert.
+                    // Best-feasible is snapshotted above, so wandering never loses the incumbent. A
+                    // feasibility-breaking pick is reverted and retried; a null pick is a local optimum.
+                    FeasibleDescent.AnnealSelfOwned -> {
+                        val m = (descentStrategy ?: strategy).pickMove(state)
+                        if (m != null) {
+                            val savedSnap = state.assignment.snapshot()
+                            state.apply(m)
+                            if (state.cost != 0L) revertMove(state, m, savedSnap)
                             flipsSinceRestart++
                             totalFlips++
                             continue
                         }
-                        revertMove(state, m, savedSnap)
+                        restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                        restarts.restart(state, bestSample)
+                        if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                        stallCount++
+                        restartCount++
+                        flipsSinceRestart = 0
+                        totalFlips++
+                        continue
+                    }
+
+                    // Engine-driven strict-improvement greedy descent, in order of informedness; each gets
+                    // one chance before falling through to the next, and stalling all triggers a restart:
+                    // greedy single-flip, then the strategy's weighted move (committed only if it keeps
+                    // feasibility AND strictly improves the objective), factor-aware structured moves, then
+                    // the random pair-swap fallback.
+                    FeasibleDescent.StrictGreedy -> {
+                        val descended = if (shaping.feasibilityGated) {
+                            greedyObjectiveStep(state, objective, params.cancellation)
+                        } else {
+                            shapedDescentStep(state, objective, shaping, params.cancellation)
+                        }
+                        if (descended) {
+                            flipsSinceRestart++
+                            totalFlips++
+                            continue
+                        }
+                        if (descentStrategy != null) {
+                            val m = descentStrategy.pickMove(state)
+                            if (m != null) {
+                                val baseObj = objective.evaluate(state.assignment)
+                                val savedSnap = state.assignment.snapshot()
+                                state.apply(m)
+                                if (state.cost == 0L && objective.evaluate(state.assignment) < baseObj) {
+                                    flipsSinceRestart++
+                                    totalFlips++
+                                    continue
+                                }
+                                revertMove(state, m, savedSnap)
+                            }
+                        }
+                        if (structuredMoveStep(state, objective, params.cancellation)) {
+                            flipsSinceRestart++
+                            totalFlips++
+                            continue
+                        }
+                        if (pairSwapBudget > 0 && largeEnoughForGreedy &&
+                            pairSwapStep(state, objective, pairSwapBudget, params.cancellation)
+                        ) {
+                            flipsSinceRestart++
+                            totalFlips++
+                            continue
+                        }
+                        restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
+                        restarts.restart(state, bestSample)
+                        if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
+                        stallCount++
+                        restartCount++
+                        flipsSinceRestart = 0
+                        totalFlips++
+                        continue
                     }
                 }
-                if (structuredMoveStep(state, objective, params.cancellation)) {
-                    flipsSinceRestart++
-                    totalFlips++
-                    continue
-                }
-                if (pairSwapBudget > 0 && largeEnoughForGreedy &&
-                    pairSwapStep(state, objective, pairSwapBudget, params.cancellation)
-                ) {
-                    flipsSinceRestart++
-                    totalFlips++
-                    continue
-                }
-                // A local optimum (all descent steps failed) is infrequent, so snapshotting for the
-                // restart policy here stays off the per-iteration hot path.
-                restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                restarts.restart(state, bestSample)
-                if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
-                stallCount++
-                restartCount++
-                flipsSinceRestart = 0
-                totalFlips++
-                continue
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
                 restarts.restart(state, bestSample ?: bestCostSnap)

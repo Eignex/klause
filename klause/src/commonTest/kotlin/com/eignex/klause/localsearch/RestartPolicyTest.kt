@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundLog
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -198,6 +199,7 @@ class RestartPolicyTest {
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 1))),
             schedule = ScheduleBundle(restart = spy),
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         LocalSearchSolver(problem, strategy = strategy, restartPolicy = FixedCadenceRestart(1_000_000))
             .solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 4L))

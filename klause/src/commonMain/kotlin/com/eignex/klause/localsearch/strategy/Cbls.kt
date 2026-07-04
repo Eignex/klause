@@ -149,7 +149,7 @@ fun Cbls(
         ),
         tabu = tabu,
         perturbation = if (stallKickAfter > 0) StallKickPerturbation(stallKickAfter, stallKickVars) else null,
-        drivesObjectiveDescent = true,
+        feasibleDescent = FeasibleDescent.StrictGreedy,
     )
 }
 
