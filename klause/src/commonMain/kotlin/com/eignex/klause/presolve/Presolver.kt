@@ -33,7 +33,7 @@ class Presolved(
  * [solutionSetSensitive] is set when the caller needs every solution (enumeration / counting /
  * sampling), which turns off solution-set-altering passes.
  */
-class PresolveContext(
+data class PresolveContext(
     val solutionSetSensitive: Boolean = false,
     /** Minimize-sense integer objective coefficients (var → nonzero coefficient), used by dual fixing
      *  to decide which bound a dominated variable can be pinned to. */
@@ -76,55 +76,20 @@ class PresolveContext(
 
     /** This context with [cancellation] set — used by [Presolver.run] to hand the round-engine's
      *  cancellation to the passes without changing the public [of] factories. */
-    fun withCancellation(cancellation: Cancellation): PresolveContext = PresolveContext(
-        solutionSetSensitive,
-        objectiveIntCoeffs,
-        objectiveBoolCoeffs,
-        modelBreaksSymmetry,
-        cancellation,
-        bakeConfig,
-        sharedIntOcc,
-        affineUnderdetermined,
-    )
+    fun withCancellation(cancellation: Cancellation): PresolveContext = copy(cancellation = cancellation)
 
     /** This context with [bakeConfig] set — the presolve lane threads the resolved root-bake probing
      *  policy in here so every pass rebuild re-derives it via [RootBaker]. */
-    fun withBakeConfig(bakeConfig: BakeConfig): PresolveContext = PresolveContext(
-        solutionSetSensitive,
-        objectiveIntCoeffs,
-        objectiveBoolCoeffs,
-        modelBreaksSymmetry,
-        cancellation,
-        bakeConfig,
-        sharedIntOcc,
-        affineUnderdetermined,
-    )
+    fun withBakeConfig(bakeConfig: BakeConfig): PresolveContext = copy(bakeConfig = bakeConfig)
 
     /** This context with the [affineUnderdetermined] flag set — the round engine derives it once from the
      *  original problem and threads it so the affine pass's wide-fold cap is stable across rounds. */
-    fun withAffineUnderdetermined(underdetermined: Boolean): PresolveContext = PresolveContext(
-        solutionSetSensitive,
-        objectiveIntCoeffs,
-        objectiveBoolCoeffs,
-        modelBreaksSymmetry,
-        cancellation,
-        bakeConfig,
-        sharedIntOcc,
-        underdetermined,
-    )
+    fun withAffineUnderdetermined(underdetermined: Boolean): PresolveContext =
+        copy(affineUnderdetermined = underdetermined)
 
     /** This context carrying the incremental round engine's session-maintained occurrence index for the
      *  current pass input, so the affine / dup-columns candidate search reuses it. */
-    fun withSharedIntOcc(sharedIntOcc: SharedIntOccurrence?): PresolveContext = PresolveContext(
-        solutionSetSensitive,
-        objectiveIntCoeffs,
-        objectiveBoolCoeffs,
-        modelBreaksSymmetry,
-        cancellation,
-        bakeConfig,
-        sharedIntOcc,
-        affineUnderdetermined,
-    )
+    fun withSharedIntOcc(sharedIntOcc: SharedIntOccurrence?): PresolveContext = copy(sharedIntOcc = sharedIntOcc)
 
     /** Factories for the common contexts. */
     companion object {
