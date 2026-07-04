@@ -649,44 +649,49 @@ class LocalSearchSolver(
         // Score each candidate via netDelta + objectiveDelta, no snapshot/evaluate per candidate —
         // only on commit. Every objective reaching the descent is incremental, so no evaluate fallback.
         val baseCost = state.cost
-        val poll = IntArray(1)
         var bestDelta = 0.0
         var bestMove: Move? = null
-
-        var b = 0
-        while (b < problem.numBoolVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = b++
-            if (state.assumptions.isFrozenBool(v)) continue
-            val move = Move.BoolFlip(v)
-            if (baseCost + state.netDelta(move) != 0L) continue // not feasibility-preserving
-            val delta = state.objectiveDelta(objective, move) ?: continue
+        forEachSingleVarMove(state, cancellation) { move ->
+            if (baseCost + state.netDelta(move) != 0L) return@forEachSingleVarMove // breaks feasibility
+            val delta = state.objectiveDelta(objective, move) ?: return@forEachSingleVarMove
             if (delta < bestDelta) {
                 bestDelta = delta
                 bestMove = move
             }
         }
+        return commitBest(state, bestMove)
+    }
 
+    /**
+     * Enumerate the single-variable descent candidates — a flip per unfrozen bool var, then a ±1
+     * step per unfrozen int var (clamped to the domain, sparse-aware so holes are rejected) —
+     * invoking [consider] on each. A fired [cancellation] stops the scan early; the caller then
+     * commits the best candidate found so far. Inline so the descent hot loops pay no lambda or
+     * captured-variable allocation.
+     */
+    private inline fun forEachSingleVarMove(
+        state: LocalSearchState,
+        cancellation: Cancellation,
+        consider: (Move) -> Unit,
+    ) {
+        val poll = IntArray(1)
+        var b = 0
+        while (b < problem.numBoolVars) {
+            if (pollCancel(poll, cancellation)) return
+            val v = b++
+            if (state.assumptions.isFrozenBool(v)) continue
+            consider(Move.BoolFlip(v))
+        }
         var i = 0
         while (i < problem.numIntVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
+            if (pollCancel(poll, cancellation)) return
             val v = i++
             if (state.assumptions.isFrozenInt(v)) continue
             val cur = state.assignment.intValue(v)
             val d = problem.intDomains[v]
-            for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue // sparse-aware: rejects holes
-                val move = Move.IntSet(v, target)
-                if (baseCost + state.netDelta(move) != 0L) continue
-                val delta = state.objectiveDelta(objective, move) ?: continue
-                if (delta < bestDelta) {
-                    bestDelta = delta
-                    bestMove = move
-                }
-            }
+            if (cur - 1 in d) consider(Move.IntSet(v, cur - 1))
+            if (cur + 1 in d) consider(Move.IntSet(v, cur + 1))
         }
-
-        return commitBest(state, bestMove)
     }
 
     /** Poll [cancellation] once every [CANCEL_CHECK_INTERVAL] candidates, advancing the
@@ -724,43 +729,16 @@ class LocalSearchSolver(
         // and no apply/revert. Every reachable objective is incremental, so no evaluate fallback.
         val baseCost = state.cost
         val baselineObj = objective.evaluate(state.assignment)
-        val poll = IntArray(1)
         var bestShaped = shaping.shape(baseCost, baselineObj)
         var bestMove: Move? = null
-
-        var b = 0
-        while (b < problem.numBoolVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = b++
-            if (state.assumptions.isFrozenBool(v)) continue
-            val move = Move.BoolFlip(v)
-            val delta = state.objectiveDelta(objective, move) ?: continue
+        forEachSingleVarMove(state, cancellation) { move ->
+            val delta = state.objectiveDelta(objective, move) ?: return@forEachSingleVarMove
             val shaped = shaping.shape(baseCost + state.netDelta(move), baselineObj + delta)
             if (shaped < bestShaped) {
                 bestShaped = shaped
                 bestMove = move
             }
         }
-
-        var i = 0
-        while (i < problem.numIntVars) {
-            if (pollCancel(poll, cancellation)) return commitBest(state, bestMove)
-            val v = i++
-            if (state.assumptions.isFrozenInt(v)) continue
-            val cur = state.assignment.intValue(v)
-            val d = problem.intDomains[v]
-            for (target in intArrayOf(cur - 1, cur + 1)) {
-                if (target !in d) continue // sparse-aware: rejects holes
-                val move = Move.IntSet(v, target)
-                val delta = state.objectiveDelta(objective, move) ?: continue
-                val shaped = shaping.shape(baseCost + state.netDelta(move), baselineObj + delta)
-                if (shaped < bestShaped) {
-                    bestShaped = shaped
-                    bestMove = move
-                }
-            }
-        }
-
         return commitBest(state, bestMove)
     }
 
