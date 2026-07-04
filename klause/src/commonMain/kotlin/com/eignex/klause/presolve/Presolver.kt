@@ -681,56 +681,26 @@ object Presolver {
             return runIncremental(problem, passes, maxRounds, ctx, cancellation)
         }
 
-        var current = problem
-        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
-        // A monotone "problem version" bumped on every change; a pass that already ran at the current
-        // version is skipped until some other pass changes the problem — the fixpoint/delay scheme.
-        var version = 0
-        val ranAtVersion = HashMap<PresolvePass, Int>()
-        val fired = LinkedHashSet<PresolvePass>() // passes that changed the problem, in first-fire order
-        // Run-local (never on the shared [PresolveContext.EMPTY]): a [PresolvePass.skipAfterEmpty] pass
-        // that ran and changed nothing is parked here so the round engine does not re-run its expensive,
-        // overwhelmingly fruitless search after every later reduction.
-        val exhausted = HashSet<PresolvePass>()
-        var round = 0
-        var roundStartComplexity = complexity(current)
-        while (round < maxRounds && !cancellation()) {
-            var ranAny = false
-            for (pass in passes) {
-                if (cancellation()) break
-                if (pass in exhausted) continue
-                if (ranAtVersion[pass] == version) continue
-                ranAtVersion[pass] = version
-                ranAny = true
-                val delta = pass.apply(current, ctx)
-                if (!delta.isEmpty) {
-                    current = current.withPassDelta(delta, ctx.bakeConfig)
-                    delta.reconstruct?.let { reconstructs.add(it) }
-                    fired.add(pass)
-                    version++
-                } else if (pass.skipAfterEmpty) {
-                    exhausted.add(pass)
-                }
-            }
-            if (!ranAny) break // every enabled pass has run at the current version → fixpoint
-            round++
-            // Effectiveness-based abort (SCIP `abortfac`): a round that simplified the problem, but by
-            // less than [PRESOLVE_ABORT_FRACTION] of it, isn't worth another full sweep. A round that
-            // grew the problem (e.g. symmetry adding ordering constraints) or left it unchanged is left
-            // to the fixpoint check above.
-            val now = complexity(current)
-            val reduced = roundStartComplexity - now
-            if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
-            roundStartComplexity = now
-        }
+        val host = object : RoundHost {
+            var current = problem
 
-        val reconstruct: (Sample) -> Sample =
-            if (reconstructs.isEmpty()) {
-                { it }
-            } else {
-                { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
+            override fun passInput(): Problem = current
+
+            override fun passContext(pass: PresolvePass): PresolveContext = ctx
+
+            override fun applyDelta(delta: PassDelta) {
+                current = current.withPassDelta(delta, ctx.bakeConfig)
             }
-        return Presolved(current, reconstruct, fired.toList(), current.baked is PropagationResult.Unsat)
+
+            override fun complexity(): Long = complexity(current)
+        }
+        val rounds = runRounds(passes, maxRounds, cancellation, host)
+        return Presolved(
+            host.current,
+            composeReconstructs(rounds.reconstructs),
+            rounds.fired,
+            host.current.baked is PropagationResult.Unsat,
+        )
     }
 
     /**
@@ -749,23 +719,116 @@ object Presolver {
         cancellation: Cancellation,
     ): Presolved {
         val session = PresolveSession(problem, ctx.bakeConfig)
-        val reconstructs = ArrayList<(Sample) -> Sample>()
         // Persistent subsume indices + the change-mark at subsume's last firing, so each re-run reprocesses
         // only the factors other passes changed in between instead of rescanning the whole live set.
         val subsumeMemo = SubsumeMemo()
-        var subsumeMark: PresolveSession.ChangeMark? = null
-        // Affine's change-mark at its last firing; a re-run rescans only the variables touched since.
-        var affineMark: PresolveSession.ChangeMark? = null
-        var version = 0
-        val ranAtVersion = HashMap<PresolvePass, Int>()
-        val fired = LinkedHashSet<PresolvePass>()
-        val exhausted = HashSet<PresolvePass>()
-        var round = 0
-        var roundStartComplexity = session.complexity()
         // Infeasibility does not stop the loop, mirroring the fresh path: a pass still fires and records
         // its factors on an already-infeasible problem (e.g. xor-units emitting contradictory units).
         // [PresolveSession.applyDelta] tracks those factor changes but skips re-propagating a conflicted
         // state, and the final materialized problem's bake surfaces the infeasibility.
+        val host = object : RoundHost {
+            var subsumeMark: PresolveSession.ChangeMark? = null
+
+            // Affine's change-mark at its last firing; a re-run rescans only the variables touched since.
+            var affineMark: PresolveSession.ChangeMark? = null
+
+            override fun passInput(): Problem = session.passInput()
+
+            // Hand the session's incrementally-maintained occurrence index to the pass so the affine
+            // / dup-columns candidate search reads it instead of rebuilding an O(factors) index; the
+            // view matches the pass input's factor order exactly, so decisions are unchanged.
+            override fun passContext(pass: PresolvePass): PresolveContext {
+                var passCtx = ctx.withSharedIntOcc(session.passOccurrence())
+                if (pass == PresolvePass.REMOVE_REDUNDANT) {
+                    passCtx = passCtx.withSubsumeIncremental(subsumeIncremental(session, subsumeMark, subsumeMemo))
+                }
+                if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) {
+                    val mark = affineMark
+                    val touched = if (mark == null || session.markStale(mark)) {
+                        null
+                    } else {
+                        session.touchedIntVarsSince(mark)
+                    }
+                    passCtx = passCtx.withAffineTouchedVars(touched)
+                }
+                return passCtx
+            }
+
+            override fun applyDelta(delta: PassDelta) {
+                session.applyDelta(delta)
+            }
+
+            // Advance each incremental pass's mark past its own delta so the next firing sees only what
+            // other passes changed since (a pass's own output is folded into its persistent index/scan).
+            override fun afterPass(pass: PresolvePass) {
+                if (pass == PresolvePass.REMOVE_REDUNDANT) subsumeMark = session.changeMark()
+                if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) affineMark = session.changeMark()
+            }
+
+            override fun complexity(): Long = session.complexity()
+        }
+        val rounds = runRounds(passes, maxRounds, cancellation, host)
+
+        // No pass fired: presolve is a no-op, so return the input problem itself (identity) exactly like
+        // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
+        if (rounds.fired.isEmpty()) return Presolved(problem, { it }, emptyList())
+
+        return Presolved(
+            session.materialize(),
+            composeReconstructs(rounds.reconstructs),
+            rounds.fired,
+            session.infeasible,
+        )
+    }
+
+    /** The per-path operations the shared [runRounds] scheduler drives: where a pass reads its input,
+     *  how its context is specialised, where a firing pass's delta lands, and the complexity measure
+     *  for the diminishing-returns abort. [run] backs it with a rebuilt [Problem] per firing pass,
+     *  [runIncremental] with a persistent [PresolveSession]. */
+    private interface RoundHost {
+        /** The problem view the next pass reads. */
+        fun passInput(): Problem
+
+        /** The context for [pass] over the current input (occurrence-index / subsume-memo hooks). */
+        fun passContext(pass: PresolvePass): PresolveContext
+
+        /** Fold a firing pass's [delta] into the state. */
+        fun applyDelta(delta: PassDelta)
+
+        /** Post-pass hook, invoked whether or not the pass fired. */
+        fun afterPass(pass: PresolvePass) {}
+
+        /** Current problem complexity, read at round boundaries for the abort check. */
+        fun complexity(): Long
+    }
+
+    /** What a [runRounds] run produced: the passes that changed the problem (first-fire order) and
+     *  the per-pass reconstructs in application order. */
+    private class RoundResult(val fired: List<PresolvePass>, val reconstructs: List<(Sample) -> Sample>)
+
+    /**
+     * The SCIP-style fixpoint scheduler shared by [run] and [runIncremental], order-identical for
+     * both hosts by construction. A monotone "problem version" is bumped on every change; a pass
+     * that already ran at the current version is skipped until some other pass changes the problem —
+     * the fixpoint/delay scheme. A [PresolvePass.skipAfterEmpty] pass that ran and changed nothing is
+     * parked so the engine does not re-run its expensive, overwhelmingly fruitless search after every
+     * later reduction. The effectiveness-based abort (SCIP `abortfac`) stops when a round simplified
+     * the problem by less than [PRESOLVE_ABORT_FRACTION] of it — a round that grew the problem
+     * (e.g. symmetry adding ordering constraints) or left it unchanged is left to the fixpoint check.
+     */
+    private fun runRounds(
+        passes: List<PresolvePass>,
+        maxRounds: Int,
+        cancellation: Cancellation,
+        host: RoundHost,
+    ): RoundResult {
+        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
+        var version = 0
+        val ranAtVersion = HashMap<PresolvePass, Int>()
+        val fired = LinkedHashSet<PresolvePass>() // passes that changed the problem, in first-fire order
+        val exhausted = HashSet<PresolvePass>()
+        var round = 0
+        var roundStartComplexity = host.complexity()
         while (round < maxRounds && !cancellation()) {
             var ranAny = false
             for (pass in passes) {
@@ -774,61 +837,35 @@ object Presolver {
                 if (ranAtVersion[pass] == version) continue
                 ranAtVersion[pass] = version
                 ranAny = true
-                val input = session.passInput()
-                // Hand the session's incrementally-maintained occurrence index to the pass so the affine
-                // / dup-columns candidate search reads it instead of rebuilding an O(factors) index; the
-                // view matches [input]'s factor order exactly, so decisions are unchanged.
-                var passCtx = ctx.withSharedIntOcc(session.passOccurrence())
-                if (pass == PresolvePass.REMOVE_REDUNDANT) {
-                    passCtx = passCtx.withSubsumeIncremental(subsumeIncremental(session, subsumeMark, subsumeMemo))
-                }
-                if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) {
-                    val mark = affineMark
-                    val touched = if (mark == null || session.markStale(
-                            mark,
-                        )
-                    ) {
-                        null
-                    } else {
-                        session.touchedIntVarsSince(mark)
-                    }
-                    passCtx = passCtx.withAffineTouchedVars(touched)
-                }
-                val delta = pass.apply(input, passCtx)
+                val delta = pass.apply(host.passInput(), host.passContext(pass))
                 if (!delta.isEmpty) {
                     delta.reconstruct?.let { reconstructs.add(it) }
-                    session.applyDelta(delta)
+                    host.applyDelta(delta)
                     fired.add(pass)
                     version++
                 } else if (pass.skipAfterEmpty) {
                     exhausted.add(pass)
                 }
-                // Advance each incremental pass's mark past its own delta so the next firing sees only what
-                // other passes changed since (a pass's own output is folded into its persistent index/scan).
-                if (pass == PresolvePass.REMOVE_REDUNDANT) subsumeMark = session.changeMark()
-                if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) affineMark = session.changeMark()
+                host.afterPass(pass)
             }
-            if (!ranAny) break
+            if (!ranAny) break // every enabled pass has run at the current version → fixpoint
             round++
-            val now = session.complexity()
+            val now = host.complexity()
             val reduced = roundStartComplexity - now
             if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
             roundStartComplexity = now
         }
-
-        // No pass fired: presolve is a no-op, so return the input problem itself (identity) exactly like
-        // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
-        if (fired.isEmpty()) return Presolved(problem, { it }, emptyList())
-
-        val finalProblem = session.materialize()
-        val reconstruct: (Sample) -> Sample =
-            if (reconstructs.isEmpty()) {
-                { it }
-            } else {
-                { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
-            }
-        return Presolved(finalProblem, reconstruct, fired.toList(), session.infeasible)
+        return RoundResult(fired.toList(), reconstructs)
     }
+
+    /** Compose per-pass reconstructs (application order) into the single solution-mapping function,
+     *  applied in reverse so a final-problem solution maps all the way back to the original. */
+    private fun composeReconstructs(reconstructs: List<(Sample) -> Sample>): (Sample) -> Sample =
+        if (reconstructs.isEmpty()) {
+            { it }
+        } else {
+            { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
+        }
 
     /** Build subsume's incremental input from the session: a full rebuild when it has no prior mark or the
      *  mark predates a reseed, else the factors added / dropped since. A factor added then dropped between
