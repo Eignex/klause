@@ -73,12 +73,13 @@ internal class XcspOutput : OutputProtocol {
         println("c solveTime=${solveTimeMs / 1000.0}")
         println("c solutions=$solutions")
         if (stats.run.backend.isNotEmpty()) {
-            println("c nodes=${stats.search.nodes.sum.toLong()}")
-            println("c failures=${stats.search.fails.sum.toLong()}")
-            println("c restarts=${stats.search.restarts.sum.toLong()}")
-            println("c propagations=${stats.search.propagations.sum.toLong()}")
-            if (stats.search.peakDepth.max.isFinite()) println("c peakDepth=${stats.search.peakDepth.max.toLong()}")
-            for ((k, v) in lpStatPairs(stats)) println("c $k=$v")
+            // Deliberately omits the clause-learning counters; XCSP comments track search shape only.
+            printStatPairs("c", searchStatPairs(stats).filter { (k, _) -> k !in XCSP_OMITTED_KEYS })
+            printStatPairs("c", lpStatPairs(stats))
         }
+    }
+
+    private companion object {
+        private val XCSP_OMITTED_KEYS = setOf("learned", "relearned")
     }
 }

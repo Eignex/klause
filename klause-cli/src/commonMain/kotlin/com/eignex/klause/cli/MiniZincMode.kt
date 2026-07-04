@@ -154,7 +154,7 @@ internal class MiniZincOutput : OutputProtocol {
         println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
         println("%%%mzn-stat: solutions=$solutions")
         // Presolve summary is backend-independent (presolve runs before any engine), so emit it here.
-        for ((k, v) in presolveStatPairs(stats)) println("%%%mzn-stat: $k=$v")
+        printStatPairs("%%%mzn-stat:", presolveStatPairs(stats))
         if (stats.run.backend.isNotEmpty()) {
             // Complete (backtrack/CDCL) counters are meaningful only when the systematic engine did work;
             // a pure-LS solve has none, so its block stays empty rather than a wall of zeros. A `mixed`
@@ -162,23 +162,11 @@ internal class MiniZincOutput : OutputProtocol {
             val complete =
                 stats.search.nodes.sum > 0.0 || stats.search.propagations.sum > 0.0 || stats.run.backend == "backtrack"
             if (complete) {
-                println("%%%mzn-stat: nodes=${stats.search.nodes.sum.toLong()}")
-                println("%%%mzn-stat: failures=${stats.search.fails.sum.toLong()}")
-                println("%%%mzn-stat: restarts=${stats.search.restarts.sum.toLong()}")
-                println("%%%mzn-stat: propagations=${stats.search.propagations.sum.toLong()}")
-                println("%%%mzn-stat: learned=${stats.search.learnedClauses.sum.toLong()}")
-                println("%%%mzn-stat: relearned=${stats.search.relearned.sum.toLong()}")
-                println("%%%mzn-stat: caNotApplicable=${stats.ca.notApplicable.sum.toLong()}")
-                println("%%%mzn-stat: caNonAsserting=${stats.ca.nonAsserting.sum.toLong()}")
-                println("%%%mzn-stat: caRejectedTrueLit=${stats.ca.rejectedTrueLit.sum.toLong()}")
-                if (stats.search.peakDepth.max.isFinite()) {
-                    println(
-                        "%%%mzn-stat: peakDepth=${stats.search.peakDepth.max.toLong()}",
-                    )
-                }
-                for ((k, v) in lpStatPairs(stats)) println("%%%mzn-stat: $k=$v")
+                printStatPairs("%%%mzn-stat:", searchStatPairs(stats))
+                printStatPairs("%%%mzn-stat:", caStatPairs(stats))
+                printStatPairs("%%%mzn-stat:", lpStatPairs(stats))
             }
-            for ((k, v) in lsStatPairs(stats)) println("%%%mzn-stat: $k=$v")
+            printStatPairs("%%%mzn-stat:", lsStatPairs(stats))
         }
         println("%%%mzn-stat-end")
     }

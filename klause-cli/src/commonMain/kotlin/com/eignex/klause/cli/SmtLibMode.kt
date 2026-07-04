@@ -70,10 +70,13 @@ internal class SmtLibOutput : OutputProtocol {
         println("; solveTime=${solveTimeMs / 1000.0}")
         println("; solutions=$solutions")
         if (stats.run.backend.isNotEmpty()) {
-            println("; nodes=${stats.search.nodes.sum.toLong()}")
-            println("; failures=${stats.search.fails.sum.toLong()}")
-            println("; propagations=${stats.search.propagations.sum.toLong()}")
-            for ((k, v) in lpStatPairs(stats)) println("; $k=$v")
+            // Deliberately lean block: SMT-LIB comments carry only the headline search counters.
+            printStatPairs(";", searchStatPairs(stats).filter { (k, _) -> k in SMT_SEARCH_KEYS })
+            printStatPairs(";", lpStatPairs(stats))
         }
+    }
+
+    private companion object {
+        private val SMT_SEARCH_KEYS = setOf("nodes", "failures", "propagations")
     }
 }
