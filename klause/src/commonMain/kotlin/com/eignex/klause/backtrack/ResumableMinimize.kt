@@ -24,6 +24,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
@@ -119,7 +120,7 @@ internal class ResumableMinimize(
     private val session = PropagationSession(problem)
     private val boundExchange = PortfolioBoundExchange(problem, session, params, singleObj)
     private val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
-    private val touchedSeedLevels = if (numSeed > 0) HashSet<Int>() else null
+    private val touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
     private val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
     private val rng = Random(baseSeed)
     private var decisionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)

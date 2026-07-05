@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.util.LongArrayList
+
 /**
  * A learned CDCL nogood in a **session-portable** form, for sharing across backtrack arms of one
  * [com.eignex.klause.solver.Problem] (a parallel or single-threaded portfolio). All arms share the
@@ -23,7 +25,7 @@ class SharedClause internal constructor(
     /** Order-independent content key for pool de-duplication. A hash collision only drops a *share*
      *  (the clause is simply not propagated to one arm); it is never unsound. */
     internal val key: Long = run {
-        val tokens = ArrayList<Long>(boolLits.size + atomQuads.size / QUAD)
+        val tokens = LongArrayList(boolLits.size + atomQuads.size / QUAD)
         for (l in boolLits) tokens.add(l.toLong())
         var i = 0
         while (i < atomQuads.size) {
@@ -35,7 +37,7 @@ class SharedClause internal constructor(
         }
         tokens.sort()
         var h = SEED
-        for (t in tokens) h = h * MULT + t
+        tokens.forEach { t -> h = h * MULT + t }
         h
     }
 

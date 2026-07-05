@@ -2,6 +2,9 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -160,7 +163,7 @@ class Assumptions internal constructor(
         ) {
             return other
         }
-        val mergedBoolKeys = ArrayList<Int>(boolKeys.size + other.boolKeys.size)
+        val mergedBoolKeys = IntArrayList(boolKeys.size + other.boolKeys.size)
         val mergedBoolValues = ArrayList<Boolean>(boolKeys.size + other.boolKeys.size)
         sortedMergeBools(
             boolKeys,
@@ -182,22 +185,26 @@ class Assumptions internal constructor(
         )
         // Bound tightenings: take max for mins, min for maxes; on overlap with an
         // exact int pin from either side, drop the bound (the pin subsumes).
-        val pinned = HashSet<Int>()
+        val pinned = IntHashSet()
         for (i in 0 until mergedIntKeys.size) pinned.add(mergedIntKeys[i])
-        val minMap = HashMap<Int, Int>()
-        forEachIntMin { k, v -> if (k !in pinned) minMap[k] = v }
+        val minMap = MutableIntIntMap()
+        forEachIntMin { k, v -> if (k !in pinned) minMap.put(k, v) }
         other.forEachIntMin { k, v ->
-            if (k !in pinned) minMap[k] = maxOf(minMap[k] ?: Int.MIN_VALUE, v)
+            if (k !in pinned) minMap.put(k, maxOf(minMap.getOrDefault(k, Int.MIN_VALUE), v))
         }
-        val maxMap = HashMap<Int, Int>()
-        forEachIntMax { k, v -> if (k !in pinned) maxMap[k] = v }
+        val maxMap = MutableIntIntMap()
+        forEachIntMax { k, v -> if (k !in pinned) maxMap.put(k, v) }
         other.forEachIntMax { k, v ->
-            if (k !in pinned) maxMap[k] = minOf(maxMap[k] ?: Int.MAX_VALUE, v)
+            if (k !in pinned) maxMap.put(k, minOf(maxMap.getOrDefault(k, Int.MAX_VALUE), v))
         }
-        val minK = minMap.keys.toIntArray().also { it.sort() }
-        val maxK = maxMap.keys.toIntArray().also { it.sort() }
+        val minKList = IntArrayList(minMap.size)
+        minMap.forEach { k, _ -> minKList.add(k) }
+        val minK = minKList.toIntArray().also { it.sort() }
+        val maxKList = IntArrayList(maxMap.size)
+        maxMap.forEach { k, _ -> maxKList.add(k) }
+        val maxK = maxKList.toIntArray().also { it.sort() }
         // Holes: union of (varId, value) pairs, dropping pinned vars.
-        val holeSet = HashSet<Long>()
+        val holeSet = LongHashSet()
         forEachIntHole { id, v -> if (id !in pinned) holeSet.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
         other.forEachIntHole { id, v ->
             if (id !in pinned) {
@@ -227,9 +234,9 @@ class Assumptions internal constructor(
             intKeys = mergedIntKeys.toIntArray(),
             intValues = mergedIntValues.toIntArray(),
             intMinKeys = minK,
-            intMinValues = IntArray(minK.size) { minMap.getValue(minK[it]) },
+            intMinValues = IntArray(minK.size) { minMap.getOrDefault(minK[it], 0) },
             intMaxKeys = maxK,
-            intMaxValues = IntArray(maxK.size) { maxMap.getValue(maxK[it]) },
+            intMaxValues = IntArray(maxK.size) { maxMap.getOrDefault(maxK[it], 0) },
             intHoleVarIds = holeIds,
             intHoleValues = holeVals,
             intSetKeys = setK,
@@ -516,7 +523,7 @@ class Assumptions internal constructor(
             av: BooleanArray,
             bk: IntArray,
             bv: BooleanArray,
-            outK: ArrayList<Int>,
+            outK: IntArrayList,
             outV: ArrayList<Boolean>,
         ) {
             var i = 0

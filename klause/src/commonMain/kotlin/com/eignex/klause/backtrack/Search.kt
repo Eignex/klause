@@ -14,6 +14,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
@@ -34,7 +35,7 @@ internal fun BacktrackSolver.projectTouchedToAssumptions(input: Assumptions, lev
 
 /** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty
  *  when there were no touches (or no seed in the first place). */
-internal fun BacktrackSolver.touchedToArray(touched: HashSet<Int>?): IntArray {
+internal fun BacktrackSolver.touchedToArray(touched: IntHashSet?): IntArray {
     if (touched == null || touched.isEmpty()) return EmptyIntArray
     val out = touched.toIntArray()
     out.sort()
@@ -187,7 +188,7 @@ internal fun BacktrackSolver.driveSearch(
     // Decision levels 1..numSeed correspond to assumptions; levels > numSeed are
     // post-seed DFS decisions.
     val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
-    val touchedSeedLevels = if (numSeed > 0) HashSet<Int>() else null
+    val touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
 
     // Union the seed-level decision levels referenced by a conflict into the touched set.
     fun recordTouchedSeedLevels(levels: IntArray) {
