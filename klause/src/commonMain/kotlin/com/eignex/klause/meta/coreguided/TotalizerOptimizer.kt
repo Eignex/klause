@@ -14,6 +14,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SatisfyResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.satisfyUnderAssumptions
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Totalizer-encoded core-guided MaxSAT optimiser for **unweighted** problems. Builds
@@ -189,7 +190,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
 
         // Materialised threshold reifications keyed by k (= "Σ wᵢrᵢ ≥ k"); `solver` is
         // rebuilt (set null) whenever a new one is appended.
-        val thresholdVarForK = HashMap<Int, Int>()
+        val thresholdVarForK = MutableIntIntMap()
         val thresholdFactors = ArrayList<Factor>()
         var solver: BacktrackSolver? = null
 
@@ -202,7 +203,10 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
             val thresholdVar: Int? = if (lb < totalWeight) {
                 // Need aux for k = lb+1 ("sum ≥ lb+1"); assuming it false bounds cost ≤ lb.
                 val k = (lb + 1).toInt()
-                thresholdVarForK.getOrPut(k) {
+                val existing = thresholdVarForK.getOrDefault(k, -1)
+                if (existing >= 0) {
+                    existing
+                } else {
                     val aux = nextBoolId++
                     thresholdFactors.add(
                         ReifiedPseudoBoolean(
@@ -214,6 +218,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
                         ),
                     )
                     solver = null // a fresh factor + bool var were added — force a rebuild
+                    thresholdVarForK.put(k, aux)
                     aux
                 }
             } else {

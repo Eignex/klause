@@ -8,6 +8,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -119,7 +120,7 @@ internal fun interface DestroyOperator {
             scratch.recompute()
             val violatedFactors = scratch.violated.toIntArray()
             if (violatedFactors.isEmpty()) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
-            val freedSlots = HashSet<Int>()
+            val freedSlots = IntHashSet()
             for (fid in violatedFactors) {
                 val f = problem.factors[fid]
                 for (v in f.boolVars) freedSlots.add(v)
@@ -127,7 +128,7 @@ internal fun interface DestroyOperator {
             }
             // Subsample down to the fraction-sized target if the violated set is larger.
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
-            val pool = freedSlots.toList()
+            val pool = freedSlots.toIntArray().toList()
             val picked = if (pool.size <= k) pool else pool.shuffled(rng).take(k)
             split(picked, problem.numBoolVars)
         }
@@ -216,8 +217,8 @@ internal fun interface DestroyOperator {
         }
 
         private fun split(ids: List<Int>, numBoolVars: Int): FreedVars {
-            val bools = mutableListOf<Int>()
-            val ints = mutableListOf<Int>()
+            val bools = IntArrayList()
+            val ints = IntArrayList()
             for (v in ids) {
                 if (v < numBoolVars) bools.add(v) else ints.add(v - numBoolVars)
             }

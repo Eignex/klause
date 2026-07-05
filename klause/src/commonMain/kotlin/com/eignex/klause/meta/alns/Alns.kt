@@ -11,6 +11,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.IntHashSet
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
 import kotlin.random.Random
@@ -194,8 +195,8 @@ internal class Alns(
 
     /** Build an [Assumptions] pinning every variable *not* in [freed] to its incumbent value. */
     private fun buildPin(problem: Problem, incumbent: Sample, freed: FreedVars): Assumptions {
-        val freedBoolSet = freed.bools.toHashSet()
-        val freedIntSet = freed.ints.toHashSet()
+        val freedBoolSet = IntHashSet().apply { for (b in freed.bools) add(b) }
+        val freedIntSet = IntHashSet().apply { for (i in freed.ints) add(i) }
         val pinnedBools = HashMap<Int, Boolean>(problem.numBoolVars)
         val pinnedInts = HashMap<Int, Int>(problem.numIntVars)
         for (b in 0 until problem.numBoolVars) {
