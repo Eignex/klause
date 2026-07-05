@@ -1,7 +1,6 @@
 package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 
 /**
@@ -46,20 +45,11 @@ class StallSwaps(
                 if (nvars.isEmpty()) continue
                 nvars[rng.nextInt(nvars.size)]
             }
-            if (w == u) continue
-            // Check frozen vars explicitly: the compound bypasses the state sink's assumption filter.
-            if (state.assumptions.isFrozenInt(u) || state.assumptions.isFrozenInt(w)) continue
-            val du = problem.intDomains[u]
-            val dw = problem.intDomains[w]
-            // Same-shaped domains only: swaps target permutation/assignment structure sharing one
-            // value range. Cross-domain swaps (decision var vs derived load/count var) are
-            // semantically meaningless.
-            if (du.min != dw.min || du.max != dw.max) continue
-            val vu = state.assignment.intValue(u)
-            val vw = state.assignment.intValue(w)
-            if (vu == vw) continue
-            if (vw !in du || vu !in dw) continue
-            sink.addCompound(listOf(Move.IntSet(u, vw), Move.IntSet(w, vu)))
+            // The compound bypasses the state sink's assumption filter, so the shared builder checks
+            // frozen vars explicitly; same-shaped domains required, owner check not (any violated-
+            // factor var is fair game here).
+            val swap = PairSwap.intSwapMove(state, u, w, sameShape = true, checkOwner = false) ?: continue
+            sink.addCompound(swap.parts)
             budget--
         }
     }

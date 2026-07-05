@@ -83,17 +83,43 @@ class PairSwap(
             val hot = if (hotSpot) state.objectiveHotSpotIntVar(rng) else -1
             val a = if (hot >= 0) hot else rng.nextInt(nInt)
             val b = rng.nextInt(nInt)
-            if (a == b) return null
-            if (state.assumptions.isFrozenInt(a) || state.assumptions.isFrozenInt(b)) return null
-            // Owned by an implicitly-solved global: only that global may move it (a blind swap would
-            // break the constraint it was seeded feasible into).
-            val owners = state.ownerInt
-            if (owners != null && (owners[a] >= 0 || owners[b] >= 0)) return null
-            val va = state.assignment.intValue(a)
-            val vb = state.assignment.intValue(b)
-            if (va == vb) return null
-            if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) return null
-            return Move.Compound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
+            return intSwapMove(state, a, b, sameShape = false, checkOwner = true)
+        }
+
+        /**
+         * The value-exchange move for a chosen int-var pair `(u, w)` — the single construction point
+         * for an int pair-swap ([drawIntSwap]'s uniform draw and [StallSwaps]' violated-factor draw
+         * both call it after their own selection, so the RNG sequence stays with the caller). Returns
+         * null (reject) when the pair is equal, either var is frozen, [checkOwner] and either is owned
+         * by an implicitly-solved global, [sameShape] and the domains differ in `[min, max]`, the
+         * values are equal, or a swapped value falls outside the other's domain. None of these draw
+         * RNG, so the gate order is behaviour-irrelevant.
+         */
+        fun intSwapMove(
+            state: LocalSearchState,
+            u: Int,
+            w: Int,
+            sameShape: Boolean,
+            checkOwner: Boolean,
+        ): Move.Compound? {
+            if (u == w) return null
+            if (state.assumptions.isFrozenInt(u) || state.assumptions.isFrozenInt(w)) return null
+            if (checkOwner) {
+                // Owned by an implicitly-solved global: only that global may move it (a blind swap
+                // would break the constraint it was seeded feasible into).
+                val owners = state.ownerInt
+                if (owners != null && (owners[u] >= 0 || owners[w] >= 0)) return null
+            }
+            val du = state.problem.intDomains[u]
+            val dw = state.problem.intDomains[w]
+            // Same-shaped domains only (swaps target permutation/assignment structure over one value
+            // range); cross-domain swaps (decision var vs derived load/count var) are meaningless.
+            if (sameShape && (du.min != dw.min || du.max != dw.max)) return null
+            val vu = state.assignment.intValue(u)
+            val vw = state.assignment.intValue(w)
+            if (vu == vw) return null
+            if (vw !in du || vu !in dw) return null
+            return Move.Compound(listOf(Move.IntSet(u, vw), Move.IntSet(w, vu)))
         }
     }
 }
