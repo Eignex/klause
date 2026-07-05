@@ -27,6 +27,8 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
 class UnsupportedXcsp3Exception(msg: String) : RuntimeException("klause XCSP3: $msg")
@@ -89,14 +91,15 @@ object Xcsp3 {
         override fun newBool(): Int = nextBool++
 
         private fun parseDomain(text: String): IntDomain {
-            val values = HashSet<Int>()
+            val values = IntHashSet()
             for (tok in text.split(Regex("\\s+")).filter { it.isNotBlank() }) {
                 val r = tok.split("..")
                 if (r.size == 2) for (v in r[0].toInt()..r[1].toInt()) values.add(v) else values.add(tok.toInt())
             }
             if (values.isEmpty()) throw UnsupportedXcsp3Exception("empty domain")
-            val lo = values.min()
-            val hi = values.max()
+            val vals = values.toIntArray()
+            val lo = vals.min()
+            val hi = vals.max()
             var dom = IntDomain(lo, hi)
             for (v in lo..hi) if (v !in values) dom = dom.excludeValue(v)
             return dom
@@ -145,13 +148,13 @@ object Xcsp3 {
         }
 
         private fun parseTuples(text: String, arity: Int): IntArray {
-            val tuples = ArrayList<Int>()
+            val tuples = IntArrayList()
             for (m in Regex("""\(([^)]*)\)""").findAll(text)) {
                 val row = m.groupValues[1].split(",").map { it.trim() }
                 if (row.any { it == "*" }) throw UnsupportedXcsp3Exception("wildcard (*) tuples not supported")
                 val ints = row.map { it.toInt() }
                 if (ints.size != arity) throw UnsupportedXcsp3Exception("tuple arity ${ints.size} != $arity")
-                tuples.addAll(ints)
+                ints.forEach { tuples.add(it) }
             }
             return tuples.toIntArray()
         }
@@ -175,14 +178,14 @@ object Xcsp3 {
                 forbidden.add((0 until arity).map { conflicts[i + it] })
                 i += arity
             }
-            val allowed = ArrayList<Int>()
+            val allowed = IntArrayList()
             val cur = IntArray(arity)
             fun rec(p: Int) {
                 if (p == arity) {
                     if (cur.toList() !in forbidden) for (v in cur) allowed.add(v)
                     return
                 }
-                for (v in valuesPer[p]) {
+                valuesPer[p].forEach { v ->
                     cur[p] = v
                     rec(p + 1)
                 }
@@ -495,9 +498,9 @@ object Xcsp3 {
 
         private fun domainMin(vars: IntArray) = vars.minOf { domains[it].min }
         private fun domainSpan(vars: IntArray) = vars.maxOf { domains[it].max } - domainMin(vars) + 1
-        private fun domainValues(v: Int): List<Int> {
+        private fun domainValues(v: Int): IntArrayList {
             val d = domains[v]
-            val out = ArrayList<Int>(d.size)
+            val out = IntArrayList(d.size)
             for (k in 0 until d.size) out.add(d.valueAt(k))
             return out
         }

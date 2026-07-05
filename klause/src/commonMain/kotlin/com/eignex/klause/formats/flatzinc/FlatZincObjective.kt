@@ -5,6 +5,9 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
 
 /** Build an exact [FunctionalObjective] from `defines_var` annotations when possible. */
 internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? {
@@ -18,7 +21,7 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
     if (objId !in byDef) return null
 
     val nodes = ArrayList<FunctionalObjective.Node>()
-    val visited = HashSet<Int>()
+    val visited = IntHashSet()
     var ok = true
     fun visit(id: Int) {
         if (!ok || id in visited) return
@@ -37,7 +40,8 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
     }
     visit(objId)
     if (!ok) return null
-    val defined = nodes.map { it.out }.toHashSet()
+    val defined = IntHashSet()
+    for (n in nodes) defined.add(n.out)
     val leaves = LinkedHashSet<Int>()
     for (n in nodes) for (inId in nodeInputVarIds(n)) if (inId !in defined) leaves.add(inId)
     return FunctionalObjective(objId, minimize, nodes, leaves.toIntArray())
@@ -63,19 +67,19 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
 
     val nodes = ArrayList<DefinitionalSweep.SweepNode>(byIntDef.size + byBoolDef.size)
     // Cycles cannot be topologically swept in one pass, so cycle members are left as searched vars.
-    val grayInt = HashSet<Int>()
-    val grayBool = HashSet<Int>()
-    val doneInt = HashSet<Int>()
-    val doneBool = HashSet<Int>()
-    val cyclicInt = HashSet<Int>()
-    val cyclicBool = HashSet<Int>()
+    val grayInt = IntHashSet()
+    val grayBool = IntHashSet()
+    val doneInt = IntHashSet()
+    val doneBool = IntHashSet()
+    val cyclicInt = IntHashSet()
+    val cyclicBool = IntHashSet()
     var visitBoolRef: ((Int) -> Unit)? = null
     fun finishVisit(
         id: Int,
         built: DefinitionalSweep.SweepNode?,
-        cyclic: Set<Int>,
-        gray: MutableSet<Int>,
-        done: MutableSet<Int>,
+        cyclic: IntHashSet,
+        gray: IntHashSet,
+        done: IntHashSet,
         visitInt: (Int) -> Unit,
     ) {
         if (built != null) {
@@ -160,8 +164,8 @@ private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int)
 @Suppress("CyclomaticComplexMethod")
 private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int): DefinitionalSweep.SweepNode? {
     fun cmp(opName: String, lin: Boolean): DefinitionalSweep.SweepNode? {
-        val coeffs = ArrayList<Long>()
-        val vars = ArrayList<Int>()
+        val coeffs = LongArrayList()
+        val vars = IntArrayList()
         var rhs: Long
         if (lin) {
             val cs = try {
@@ -356,7 +360,7 @@ private fun FlatZincCompiler.buildLinNode(c: FznConstraint, definedId: Int): Fun
     val outCoeff = coeffs[slot].toLong()
     if (outCoeff == 0L) return null
     val ins = ArrayList<Operand>(vars.size - 1)
-    val cf = ArrayList<Long>(vars.size - 1)
+    val cf = LongArrayList(vars.size - 1)
     for (k in vars.indices) {
         if (k != slot) {
             ins.add(vars[k])

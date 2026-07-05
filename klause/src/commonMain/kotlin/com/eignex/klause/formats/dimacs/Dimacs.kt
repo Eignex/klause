@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 
 /** DIMACS CNF/WCNF parser. */
@@ -19,7 +20,7 @@ object Dimacs {
         val clauses = mutableListOf<Clause>()
 
         @Suppress("DoubleMutabilityForCollection") // reset to a new list per clause
-        var current: MutableList<Int>? = null
+        var current: IntArrayList? = null
         for (rawLine in text.lineSequence()) {
             val line = rawLine.trim()
             if (line.isEmpty()) continue
@@ -39,14 +40,14 @@ object Dimacs {
                     ?: error("Unparseable DIMACS token: '$token'")
                 if (lit == 0) {
                     val acc = current
-                    if (acc != null && acc.isNotEmpty()) clauses += Clause(acc.toIntArray())
+                    if (acc != null && !acc.isEmpty()) clauses += Clause(acc.toIntArray())
                     current = null
                 } else {
                     val v = abs(lit) - 1
                     require(v in 0 until numVars) {
                         "Literal $lit out of range [1, $numVars]"
                     }
-                    val accum = current ?: mutableListOf<Int>().also { current = it }
+                    val accum = current ?: IntArrayList().also { current = it }
                     accum.add(Lit.make(v, positive = lit > 0))
                 }
             }
@@ -113,7 +114,7 @@ object Dimacs {
                 isHard = weight >= (top ?: HARD_WEIGHT_SENTINEL)
                 litStart = 1
             }
-            val lits = mutableListOf<Int>()
+            val lits = IntArrayList()
             var terminated = false
             var i = litStart
             while (i < tokens.size) {

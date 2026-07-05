@@ -8,6 +8,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
 /** Emit `array_set_element` and `array_var_set_element`. */
@@ -83,7 +84,7 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
     for (zi in z.elements.indices) {
         val k = z.elements[zi]
         val zBit = z.indicatorBoolIds[zi]
-        val pick = ArrayList<Int>()
+        val pick = IntArrayList()
         for ((rowIdx, row) in rows.withIndex()) {
             if (row.binarySearchInt(k) >= 0) pick.add(rowIdx + 1)
         }
@@ -110,7 +111,8 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
 
             else -> {
                 val orLits = IntArray(pick.size)
-                for ((idx, v) in pick.withIndex()) {
+                for (idx in 0 until pick.size) {
+                    val v = pick[idx]
                     val aux = allocBool("__aseelem_${arrName}_${k}_x${v}_${factors.size}")
                     factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(x), LinearOp.EQ, v))
                     orLits[idx] = Lit.make(aux, true)
@@ -170,26 +172,26 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
         for (i in u.elements.indices) {
             val e = u.elements[i]
             val uBit = u.indicatorBoolIds[i]
-            val parts = ArrayList<Int>()
+            val parts = IntArrayList()
             for (s in sets) {
                 val si = s.elements.binarySearchInt(e)
-                if (si >= 0) parts += Lit.make(s.indicatorBoolIds[si], true)
+                if (si >= 0) parts.add(Lit.make(s.indicatorBoolIds[si], true))
             }
             if (parts.isEmpty()) {
                 factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
             } else {
                 factors.add(Clause(intArrayOf(Lit.make(uBit, false)) + parts.toIntArray()))
-                for (p in parts) factors.add(Clause(intArrayOf(Lit.negate(p), Lit.make(uBit, true))))
+                parts.forEach { p -> factors.add(Clause(intArrayOf(Lit.negate(p), Lit.make(uBit, true)))) }
             }
         }
         u.elements
     } else {
         val uniq = resolveSetLiteral(uExpr)
         for (e in uniq) {
-            val parts = ArrayList<Int>()
+            val parts = IntArrayList()
             for (s in sets) {
                 val si = s.elements.binarySearchInt(e)
-                if (si >= 0) parts += Lit.make(s.indicatorBoolIds[si], true)
+                if (si >= 0) parts.add(Lit.make(s.indicatorBoolIds[si], true))
             }
             if (parts.isEmpty()) {
                 failHere("set_partition_into: element $e in U has no set containing it")
@@ -209,7 +211,7 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
 
 /** Shared `eqLit ↔ (S = T)` channel used by set equality/inequality emitters. */
 internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout, r: Int) {
-    val auxes = ArrayList<Int>()
+    val auxes = IntArrayList()
     val emitEqAux: (Int, Int, Int) -> Unit = { sBit, tBit, aux ->
         factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, true), Lit.make(aux, true))))
         factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(tBit, false), Lit.make(aux, false))))

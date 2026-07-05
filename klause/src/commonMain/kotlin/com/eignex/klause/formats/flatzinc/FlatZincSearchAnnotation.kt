@@ -23,6 +23,7 @@ import com.eignex.klause.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.util.IntArrayList
 
 /** Map `solve :: *_search(...)` annotations to [BacktrackParams]. */
 internal fun FlatZincCompiler.compileSearchAnnotation(): BacktrackParams? {
@@ -67,8 +68,8 @@ internal fun FlatZincCompiler.searchBlocksOf(a: FznAnnotation): List<FznAnnotati
 /** Build one [SearchTier] from one search block. */
 private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): SearchTier? {
     if (a.args.size < 3) return null
-    val bools = ArrayList<Int>()
-    val ints = ArrayList<Int>()
+    val bools = IntArrayList()
+    val ints = IntArrayList()
     collectSearchVars(a.args[0], bools, ints)
     if (bools.isEmpty() && ints.isEmpty()) return null
     val varName = (a.args[1] as? FznExpr.Ident)?.name
@@ -83,7 +84,7 @@ private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): SearchTier? {
 }
 
 /** Resolve a search variable expression to bool/int ids in the listed order. */
-private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: ArrayList<Int>, ints: ArrayList<Int>) {
+private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, ints: IntArrayList) {
     when (e) {
         is FznExpr.Ident -> {
             val name = e.name
