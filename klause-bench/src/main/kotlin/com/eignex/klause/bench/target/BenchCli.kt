@@ -274,7 +274,7 @@ object BenchCli {
             |         engine=fixed|cp|mixed|ls|cp-single|ls-single processors=N (klause search for solve)
             |         lp=off|conservative|balanced|aggressive[±id] (klause-cli --lp LP emphasis)
             |         presolve=off|conservative|default|aggressive[,±pass] (klause-cli --presolve)
-            |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; cp-single only for var-/val-selector)
+            |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; var-/val-selector resolve a cp override arm)
             |         label=<name> (tag the run, e.g. a klause version, so re-runs coexist as distinct dirs)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
@@ -283,7 +283,7 @@ object BenchCli {
             |  bench solve suite=mzn-bench backend=choco timeout=300000        (Choco baseline)
             |  bench solve suite=mzn-bench backend=yuck timeout=300000         (Yuck baseline)
             |  bench solve suite=mzn-bench engine=cp processors=8              (klause parallel backtrack portfolio)
-            |  bench solve suite=mzn-bench engine=cp-single param=var-selector=vsids (heuristic A/B: re-run with =chb, then compare.sh)
+            |  bench solve suite=mzn-bench engine=cp param=var-selector=vsids (heuristic A/B: re-run with =chb, then compare.sh)
             |  bench solve suite=mzn-bench engine=fixed                        (klause follows the model annotation)
             |
             |To compare configs, run `solve` once per config (each writes output/<config>/) and diff dirs offline.

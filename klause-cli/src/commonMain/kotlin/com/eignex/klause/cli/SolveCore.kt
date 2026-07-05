@@ -1,12 +1,14 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackPresets
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.strategy.LsCatalog
 import com.eignex.klause.localsearch.strategy.LsRecipe
 import com.eignex.klause.portfolio.AttributedImprovement
+import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
@@ -78,27 +80,21 @@ internal object SolveCore {
         output.begin(solvable.optimize, solvable.maximize)
 
         // `-p N` is MiniZinc-standard parallelism = the **core** count (#406). The portfolio engines
-        // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The two naked
-        // engines (fixed, cp-single) are inherently single-core.
+        // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
+        // engine (fixed) is inherently single-core.
         val cores = common.parallel ?: 1
         when (engine) {
             // Naked single backtrack following the model's search annotation (FD track). The
             // annotation decides the heuristic, so per-solver selector --params are rejected.
             Engine.FIXED -> {
                 rejectParallel(engine, cores, alt = null)
-                runBacktrack(solvable, common, output, cancel, deadline, useAnnotation = true, allowSelectors = false)
-            }
-
-            // Naked single backtrack, free search — the only engine that takes var-selector/
-            // val-selector --params (for single-solver heuristic A/B).
-            Engine.CP_SINGLE -> {
-                rejectParallel(engine, cores, alt = Engine.CP)
-                runBacktrack(solvable, common, output, cancel, deadline, useAnnotation = false, allowSelectors = true)
+                runBacktrack(solvable, common, output, cancel, deadline)
             }
 
             // The parallel-capable portfolio engines: their mix is carried on the enum. `ls` resolves
-            // a four-axis arm pool from its --params (a `strategy=` base plus per-axis edits); a single
-            // resolved arm runs as a one-arm pool, subsuming the former naked single local search.
+            // a four-axis arm pool from its --params (a `strategy=` base plus per-axis edits); `cp`
+            // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
+            // single resolved arm runs as a one-arm pool, subsuming the former naked single engines.
             Engine.CP, Engine.LS, Engine.MIXED ->
                 runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel)
         }
@@ -134,23 +130,19 @@ internal object SolveCore {
 
     // --- single-engine paths ---
 
-    /** Naked single backtrack solve. [useAnnotation] follows the model's `solve :: *_search`
-     *  annotation (the `fixed`/FD engine); otherwise a default free CDCL config. [allowSelectors]
-     *  lets `var-selector`/`val-selector` --params through (only the `cp-single` engine). */
+    /** Naked single backtrack solve for the `fixed`/FD engine: follows the model's `solve :: *_search`
+     *  annotation. Per-solver `var-selector`/`val-selector` --params are rejected (the annotation
+     *  decides the heuristic); free-search heuristic A/B lives on `-e cp` instead. */
     private fun runBacktrack(
         solvable: Solvable,
         common: CommonOptions,
         output: OutputProtocol,
         cancel: Cancellation,
         deadline: Long?,
-        useAnnotation: Boolean,
-        allowSelectors: Boolean,
     ) {
-        // XCSP/SMT carry no annotation (null), so both naked backtrack engines fall back to
-        // the conflict-driven preset base.
-        // Seed remains unset unless `-r` (or `--param seed=`) pins one.
-        val annotated = if (useAnnotation) solvable.annotatedBacktrackParams else null
-        val base = annotated ?: BacktrackPresets.conflictDriven()
+        // XCSP/SMT carry no annotation (null), so the naked engine falls back to the conflict-driven
+        // preset base. Seed remains unset unless `-r` (or `--param seed=`) pins one.
+        val base = solvable.annotatedBacktrackParams ?: BacktrackPresets.conflictDriven()
         // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
         // LP-success measurement under `-s`); the flag wins, then the `klause.lp` env default, else the
         // base config (LP off for naked CP).
@@ -169,7 +161,6 @@ internal object SolveCore {
                 lpConfig = lpConfig,
             ),
             engineParams,
-            allowSelectors = allowSelectors,
         )
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
@@ -196,6 +187,18 @@ internal object SolveCore {
                 "  ${r.label}: sources=[$sources] scoring=${r.strategy.scoring} " +
                     "acceptance=${r.strategy.acceptance} restart=$restart temperature=$temperature",
             )
+        }
+    }
+
+    /** Print the resolved backtrack arm pool (`dry-run-solver`) to stderr, one `describe` block per
+     *  arm. A null pool prints the credit-ordered curated catalog for [kind]. */
+    private fun printBtPool(problem: Problem, pool: List<() -> BacktrackRecipe>?, kind: Kind) {
+        val recipes = pool?.map { it() } ?: BacktrackCatalog.ranked(kind)
+        errPrintln("solver dry-run: ${recipes.size} backtrack arm(s)")
+        val solver = BacktrackSolver(problem)
+        for (r in recipes) {
+            errPrintln("  ${r.label}:")
+            for (line in solver.describe(r.build(0L, null)).lines()) errPrintln("    $line")
         }
     }
 
@@ -278,8 +281,14 @@ internal object SolveCore {
             return
         }
         val kind = if (solvable.optimize) Kind.COP else Kind.CSP
-        // `--param bt-arm=label,label` resolves a named backtrack arm pool (a no-op for a pure-LS pool).
+        // `--param bt-arm=label,label` pins a named backtrack arm pool, or the per-solver override
+        // --params (var-/val-selector, luby, …) resolve a one-arm pool (a no-op for a pure-LS pool).
         val btPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
+        // A backtrack-only pool has no LS resolution to carry its dry-run flag, so consume it here.
+        if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
+            printBtPool(solvable.problem, btPool, kind)
+            return
+        }
         val scenario = buildPortfolioScenario(
             params,
             common.randomSeed,

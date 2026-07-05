@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.backtrack.selector.Chb
@@ -54,8 +55,10 @@ import com.eignex.klause.portfolio.PortfolioScenario
  * hard usage error (exit 2) so typos never silently fall back to defaults.
  *
  * Keys per engine:
- *  - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
- *    `var-selector` (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind])
+ *  - `cp`: `bt-arm=label,label` pins named catalog arms, or the per-solver overrides `seed`,
+ *    `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`, `var-selector`
+ *    (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind]), … resolve a one-arm pool
+ *    (single-solver heuristic A/B); plus the portfolio knobs below
  *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
  *    | `bare`), or `arm=<catalog-label>` to run one curated arm in isolation (the fair-tester sweep),
  *    plus per-axis edits applied across the pool — `sources` (bare force-exactly list or
@@ -129,6 +132,10 @@ internal class EngineParams(pairs: List<String>) {
         }
     }
 
+    /** Whether any of [keys] is present, without consuming it — a peek used to branch before the
+     *  consuming reads run (e.g. detecting per-solver overrides to resolve a one-arm pool). */
+    fun anyPresent(keys: List<String>): Boolean = keys.any { it in map }
+
     /** Call after an engine consumed its keys: anything left over is a typo or a key for
      *  another engine — reject loudly rather than ignore. */
     fun finish(engine: String, valid: String) {
@@ -143,13 +150,21 @@ internal class EngineParams(pairs: List<String>) {
     }
 }
 
-/** Apply `--param` overrides for a backtrack solve on top of [base]. [allowSelectors] gates the
- *  `var-selector`/`val-selector` keys: they are only meaningful for a **single** naked backtrack
- *  solver (`-e cp-single`), so portfolios and the annotation-following `fixed` engine pass `false`
- *  and reject those keys (the annotation or the per-arm config decides the heuristic instead). */
-internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowSelectors: Boolean): BacktrackParams {
+/** The backtrack override keys consumed by [mergeBacktrackParams], excluding `seed` (owned by the
+ *  naked engine / the portfolio scenario) — the presence set that triggers a one-arm override pool. */
+internal val BACKTRACK_OVERRIDE_KEYS = listOf(
+    "max-decisions", "luby", "adaptive-restart", "phase-saving", "target-phasing", "rephase-interval",
+    "max-learned", "lbd-glue", "tiered-db", "mid-lbd", "vivification", "vivify-batch",
+    "lp-objective-cone", "lp-auto-off-reprobe", "lp-knapsack-lagrangian", "var-selector", "val-selector",
+)
+
+/** Merge the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] onto [base], without touching
+ *  `seed` (the caller owns it) or calling [EngineParams.finish] (the caller gates leftovers). Shared by
+ *  the naked `fixed` engine and the `cp` portfolio's one-arm override resolution. [allowSelectors] gates
+ *  the `var-selector`/`val-selector` keys: they configure a single free backtrack solver, so the
+ *  annotation-following `fixed` engine passes `false` (the annotation decides the heuristic). */
+internal fun mergeBacktrackParams(base: BacktrackParams, p: EngineParams, allowSelectors: Boolean): BacktrackParams {
     var out = base
-    p.long("seed")?.let { out = out.copy(randomSeed = it) }
     p.long("max-decisions")?.let { out = out.copy(maxDecisions = it) }
     p.long("luby")?.let { out = out.copy(lubyRestartBase = it) }
     p.bool("adaptive-restart")?.let { out = out.copy(adaptiveRestart = it) }
@@ -169,13 +184,17 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
         p.varSelector("var-selector", out.randomSeed)?.let { out = out.copy(variableSelector = it) }
         p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }
     }
-    p.finish(
-        "cp",
-        "seed, max-decisions, luby, adaptive-restart, phase-saving, target-phasing, " +
-            "rephase-interval, max-learned, lbd-glue, tiered-db, mid-lbd, vivification, vivify-batch, " +
-            "lp-objective-cone, lp-auto-off-reprobe, lp-knapsack-lagrangian" +
-            (if (allowSelectors) ", var-selector, val-selector" else ""),
-    )
+    return out
+}
+
+/** Apply `--param` overrides for the naked `fixed` backtrack solve on top of [base] and reject any
+ *  leftover keys. Selector keys are not accepted (the annotation decides the heuristic — free-search
+ *  heuristic A/B lives on `-e cp`). */
+internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
+    var out = base
+    p.long("seed")?.let { out = out.copy(randomSeed = it) }
+    out = mergeBacktrackParams(out, p, allowSelectors = false)
+    p.finish("cp", "seed, ${BACKTRACK_OVERRIDE_KEYS.dropLast(2).joinToString()}")
     return out
 }
 
@@ -516,24 +535,44 @@ internal fun buildPortfolioScenario(
 }
 
 /**
- * Resolve a named backtrack arm pool from `--param bt-arm=label,label` into [BacktrackRecipe] factories
- * for [PortfolioScenario.btPool], the backtrack analogue of [resolveLsRecipes]. Each label is validated
- * against [BacktrackCatalog] for [kind] (so a CSP rejects the COP-only LP/LinUCB arms); an unknown label
- * is a hard usage error. `null` when `bt-arm` is unset — the curated pool is used. The pool is the *set*
- * of arms; the worker *count* still comes from `arms=`/`bt=`/the default and wraps over it, exactly as
- * `lsPool` does.
+ * Resolve the `cp`/`mixed` engine's backtrack arm pool from `--param`, the backtrack analogue of
+ * [resolveLsRecipes]. Two mutually-exclusive forms:
+ *  - `bt-arm=label,label` pins named [BacktrackCatalog] arms, each validated for [kind] (so a CSP
+ *    rejects the COP-only LP/LinUCB arms); an unknown label is a hard usage error.
+ *  - the per-solver override keys ([BACKTRACK_OVERRIDE_KEYS] — `var-selector`/`val-selector`/`luby`/…)
+ *    resolve a *one-arm* override pool over the conflict-driven base, for single-solver heuristic A/B
+ *    (subsuming the former `cp-single` engine).
+ *
+ * `null` when neither is set — the curated pool is used. A resolved pool is the *set* of arms; the
+ * worker *count* still comes from `arms=`/`bt=`/the default and wraps over it, exactly as `lsPool` does.
  */
 internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? {
-    val raw = p.string("bt-arm") ?: return null
-    val labels = raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-    if (labels.isEmpty()) usageError("bt-arm: expected a comma-separated list of backtrack arm labels")
-    val known = BacktrackCatalog.labels(kind).toSet()
-    for (label in labels) {
-        if (label !in known) {
-            usageError("bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})")
-        }
+    val btArm = p.string("bt-arm")
+    val hasOverrides = p.anyPresent(BACKTRACK_OVERRIDE_KEYS)
+    if (btArm != null && hasOverrides) {
+        usageError(
+            "cp: bt-arm= pins catalog arms and is mutually exclusive with per-solver overrides " +
+                "(${BACKTRACK_OVERRIDE_KEYS.joinToString()})",
+        )
     }
-    return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
+    if (btArm != null) {
+        val labels = btArm.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (labels.isEmpty()) usageError("bt-arm: expected a comma-separated list of backtrack arm labels")
+        val known = BacktrackCatalog.labels(kind).toSet()
+        for (label in labels) {
+            if (label !in known) {
+                usageError("bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})")
+            }
+        }
+        return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
+    }
+    if (!hasOverrides) return null
+    // A single override arm: bake the overrides once (per-worker seed/sink are copied in the factory,
+    // exactly as BacktrackWorkerConfig.ofParams does for the annotation arm).
+    val template = mergeBacktrackParams(BacktrackPresets.conflictDriven(), p, allowSelectors = true)
+    return listOf({
+        BacktrackRecipe("cp-override") { seed, onEvent -> template.copy(randomSeed = seed, onEvent = onEvent) }
+    })
 }
 
 /** Auto-tuned default arm-pool size, scaling with the core count (#406): [ARMS_PER_CORE] arms per
@@ -545,7 +584,7 @@ internal fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, c
 /** Default arms-per-core oversubscription factor for [autoArms] (a #9 tuning knob). */
 private const val ARMS_PER_CORE = 2
 
-/** `var-selector` `--param` values for the `cp-single` engine (each maps to a [VariableSelector]).
+/** `var-selector` `--param` values for the `cp` engine's override pool (each maps to a [VariableSelector]).
  *  Covers the public no-argument selectors; the objective-/base-parameterised ones (MaxRegret,
  *  IndomainBest, LastConflict, …) and the `internal` ones (DomWdeg, ActivityBasedSearch) are not
  *  exposable as a bare value here. */
@@ -569,7 +608,7 @@ internal enum class VarSelectorKind(val id: String) {
     }
 }
 
-/** `val-selector` `--param` values for the `cp-single` engine (each maps to a [ValueSelector]).
+/** `val-selector` `--param` values for the `cp` engine's override pool (each maps to a [ValueSelector]).
  *  Covers the public no-argument value selectors; IndomainBest (needs the objective) and the
  *  `internal` ones (IndomainSet, MaxSd, Impact) are not exposable as a bare value here. */
 internal enum class ValSelectorKind(val id: String) {
