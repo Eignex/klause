@@ -2,6 +2,7 @@ package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
+import com.eignex.klause.factor.circuit.internals.circuitReachesAll
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.circuit.internals.shaveClaimedFromEndpoints
 import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
@@ -107,46 +108,12 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         for (i in 0 until n) {
             state.intDomains[succ[i]].forEach { j -> if (j != i && j in 0 until n) rev[j].add(i) }
         }
-        return reachesAllMandatory(state, root, mandatory, mandCount, forward = true, rev = rev) &&
-            reachesAllMandatory(state, root, mandatory, mandCount, forward = false, rev = rev)
-    }
-
-    private fun reachesAllMandatory(
-        state: PropagationState,
-        root: Int,
-        mandatory: BooleanArray,
-        mandCount: Int,
-        forward: Boolean,
-        rev: Array<IntArrayList>,
-    ): Boolean {
-        val seen = BooleanArray(n)
-        val stack = IntArrayList()
-        seen[root] = true
-        stack.add(root)
-        var reached = 1
-        while (!stack.isEmpty()) {
-            val u = stack[stack.size - 1]
-            stack.removeAt(stack.size - 1)
-            if (forward) {
-                state.intDomains[succ[u]].forEach { v ->
-                    if (v != u && v in 0 until n && !seen[v]) {
-                        seen[v] = true
-                        if (mandatory[v]) reached++
-                        stack.add(v)
-                    }
-                }
-            } else {
-                val preds = rev[u]
-                for (idx in 0 until preds.size) {
-                    val v = preds[idx]
-                    if (!seen[v]) {
-                        seen[v] = true
-                        if (mandatory[v]) reached++
-                        stack.add(v)
-                    }
-                }
-            }
-        }
-        return reached == mandCount
+        // Only mandatory nodes must be mutually reachable; a self-loop (v == u) is an opt-out, not a
+        // tour edge, so it never carries reachability.
+        val arc = { u: Int, v: Int -> v != u && v in 0 until n }
+        val counts = { node: Int -> mandatory[node] }
+        fun reaches(forward: Boolean) =
+            state.circuitReachesAll(succ, n, root, forward, rev, target = mandCount, arcAllowed = arc, counts = counts)
+        return reaches(forward = true) && reaches(forward = false)
     }
 }

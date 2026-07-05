@@ -2,6 +2,7 @@ package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
+import com.eignex.klause.factor.circuit.internals.circuitReachesAll
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.circuit.internals.shaveClaimedFromEndpoints
 import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
@@ -273,38 +274,20 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         for (i in 0 until n) {
             state.intDomains[succ[i]].forEach { k -> if (k in 0 until n) rev[k].add(i) }
         }
-        return reachesAll(state, forward = true, rev = rev) && reachesAll(state, forward = false, rev = rev)
-    }
-
-    private fun reachesAll(state: PropagationState, forward: Boolean, rev: Array<IntArrayList>): Boolean {
-        val seen = BooleanArray(n)
-        val stack = IntArrayList()
-        seen[0] = true
-        stack.add(0)
-        var count = 1
-        while (!stack.isEmpty()) {
-            val u = stack[stack.size - 1]
-            stack.removeAt(stack.size - 1)
-            if (forward) {
-                state.intDomains[succ[u]].forEach { v ->
-                    if (v in 0 until n && !seen[v]) {
-                        seen[v] = true
-                        count++
-                        stack.add(v)
-                    }
-                }
-            } else {
-                val preds = rev[u]
-                for (idx in 0 until preds.size) {
-                    val v = preds[idx]
-                    if (!seen[v]) {
-                        seen[v] = true
-                        count++
-                        stack.add(v)
-                    }
-                }
-            }
-        }
-        return count == n
+        // A Hamiltonian circuit visits every node, so from node 0 all n must be reachable both
+        // forward (over candidate successors) and backward — any node in range is a tour edge.
+        val arc = { _: Int, v: Int -> v in 0 until n }
+        val counts = { _: Int -> true }
+        fun reaches(forward: Boolean) = state.circuitReachesAll(
+            succ,
+            n,
+            root = 0,
+            forward = forward,
+            rev = rev,
+            target = n,
+            arcAllowed = arc,
+            counts = counts,
+        )
+        return reaches(forward = true) && reaches(forward = false)
     }
 }
