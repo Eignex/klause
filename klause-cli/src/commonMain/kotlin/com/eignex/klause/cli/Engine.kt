@@ -23,15 +23,15 @@ internal enum class Engine(
 
     /** Backtrack-only portfolio (free search). Accepts the per-solver `var-selector`/`val-selector`
      *  (and other backtrack) `--param`s, which resolve a one-arm override pool for single-solver
-     *  heuristic A/B — subsuming the former naked `cp-single` engine (kept as an alias). */
-    CP("cp", mix = EngineMix.BACKTRACK, aliases = listOf("backtrack", "bt", "cp-single", "cpsingle")),
+     *  heuristic A/B — subsuming the former naked `cp-single` engine. */
+    CP("cp", mix = EngineMix.BACKTRACK, aliases = listOf("backtrack", "bt")),
 
     /** Local-search-only portfolio. */
     LS(
         "ls",
         pureLs = true,
         mix = EngineMix.LOCAL_SEARCH,
-        aliases = listOf("localsearch", "local-search", "ls-single", "lssingle"),
+        aliases = listOf("localsearch", "local-search"),
     ),
 
     /** Mixed backtrack + local-search portfolio. */

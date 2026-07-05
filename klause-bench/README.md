@@ -40,7 +40,7 @@ bench list [<suite>]                 list suites, or the problems in one suite
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance solve budget |
 | `label=<name>` | free-form run tag folded into the `<config>` dir name (e.g. a klause version / fix name), so re-running the same config coexists as a distinct dir instead of overwriting — then `compare.sh` the two. References are version-stable, so this is mainly for klause across updates |
-| `engine=fixed\|cp\|mixed\|ls\|cp-single\|ls-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). `engine` unset ⇒ no `-e`, so klause follows the cli's own default engine (the bench has no engine default of its own). `fixed=true` is a *separate* reference-only `-f` toggle |
+| `engine=fixed\|cp\|mixed\|ls` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). `engine` unset ⇒ no `-e`, so klause follows the cli's own default engine (the bench has no engine default of its own). `fixed=true` is a *separate* reference-only `-f` toggle |
 | `lp=off\|conservative\|balanced\|aggressive[±id…]` | klause only: forwarded as klause-cli `--lp` (the LP-relaxation emphasis / per-technique deltas). Folded into the `<config>` dir name, so `lp=off` vs `lp=aggressive` coexist — run twice and `compare.sh` to A/B the LP cost/benefit |
 | `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` resolve a one-arm override pool on `engine=cp` (single-solver heuristic A/B) — run `solve` twice with different selectors, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
@@ -88,7 +88,7 @@ follows the cli's **own** default engine (the bench has no engine default of its
 (the MiniZinc-Challenge FD behaviour) is a single naked backtrack following the model's `int_search`
 annotation; the portfolio engines **`cp`** (backtrack-only), **`mixed`** (bt+ls), **`ls`** run
 sequentially at `-p1` and as a parallel pool at `-p N`. **`cp`** also takes the per-solver
-`var-selector`/`val-selector` `--param`s (a one-arm override pool; `cp-single` is a kept alias).
+`var-selector`/`val-selector` `--param`s (they edit the pool across its arms).
 `processors` defaults to 1, so
 multi-thread tracks request cores explicitly. The Challenge tracks are just `engine`/`processors` combinations (all compose with
 `kind=cop|csp` and `timeout=`):

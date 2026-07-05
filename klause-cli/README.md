@@ -78,12 +78,12 @@ Solver-control flags are common to **every** mode:
   - `fixed` *(default)* — single naked backtrack following the model's `int_search` annotation (FD).
   - `cp` — backtrack-only portfolio (free). `mixed` — bt+ls portfolio. `ls` — local-search portfolio.
   - `cp` also accepts the per-solver `var-selector`/`val-selector` (and `luby`/`phase-saving`/…)
-    `--param`s, which resolve a one-arm override pool for single-solver heuristic experiments
-    (`cp-single` is a kept alias). `--param bt-arm=label,…` instead pins named catalog arms.
-  - `ls-single` — single naked local search; takes the ls strategy `--param`s (`tabu-tenure`,
-    `pair-swap-budget`, `lambda`, `noise`, `max-flips`). With `sources=` it instead builds a
-    composable recipe over the LS axes — `sources` (e.g. `violated,argmin`), `scoring`
-    (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew|sa`) — for A/B-testing each axis.
+    `--param`s: they edit the arm pool across its arms (so `-p8` stays a full pool with the override
+    pinned; single-solver A/B is just `-p1`). `--param bt-arm=label,…` instead pins named catalog arms.
+  - `ls` takes the ls strategy `--param`s (`arm=`, `strategy=`, `tabu-tenure`, `noise`, …). With
+    `sources=`/`strategy=bare` it builds a composable recipe over the LS axes — `sources` (e.g.
+    `violated,argmin`), `scoring` (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew|sa`) —
+    edited across the pool, for A/B-testing each axis.
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):

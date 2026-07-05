@@ -33,7 +33,7 @@ import java.time.Instant
  * another's. When [ProfileConfig] is set, the run instead profiles the klause engine in-process.
  */
 internal data class KlauseSearch(
-    // fixed | cp | mixed | ls | cp-single — forwarded verbatim to klause-cli `-e` (the cli owns the
+    // fixed | cp | mixed | ls — forwarded verbatim to klause-cli `-e` (the cli owns the
     // engine model). null = unset: no `-e` is passed, so the bench follows the cli's own default
     // engine (the bench deliberately has no engine default of its own).
     val engine: String? = null,
@@ -298,7 +298,7 @@ internal object SolveMetric {
             println("profile= profiles the klause engine in-process; '$solverId' is external")
             return
         }
-        if (search.engine !in setOf("cp", "cp-single", "fixed", "ls", "ls-single")) {
+        if (search.engine !in setOf("cp", "fixed", "ls")) {
             println("profile= needs a single-solver engine (not the '${search.engine}' portfolio)")
             return
         }
@@ -314,10 +314,10 @@ internal object SolveMetric {
     }
 
     /** A single in-process klause solve for the profiler: `ls` → local search; `fixed` → backtrack
-     *  on the model's annotated search; `cp`/`cp-single` → conflict-driven backtrack. */
+     *  on the model's annotated search; `cp` → conflict-driven backtrack. */
     private fun solveInProcess(entry: ResolvedProblem, search: KlauseSearch, cancel: Cancellation) {
         when (search.engine) {
-            "ls", "ls-single" -> LocalSearchSolver(entry.problem).solve(
+            "ls" -> LocalSearchSolver(entry.problem).solve(
                 LocalSearchParams(randomSeed = SOLVE_SEED, cancellation = cancel, lsObjective = entry.lsObjective),
             )
 

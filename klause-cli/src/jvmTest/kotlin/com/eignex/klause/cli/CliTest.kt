@@ -313,6 +313,30 @@ class CliTest {
     }
 
     @Test
+    fun `a cp override edits every arm of the pool rather than collapsing to one`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+        // -p8 -e cp with a pinned selector must stay a full pool: the override edits each curated arm,
+        // so a parallel run keeps its per-arm diversity instead of racing eight identical solvers.
+        val out = captureErr {
+            main(
+                arrayOf(
+                    "-e", "cp", "-p", "8", "--param", "var-selector=smallest-domain",
+                    "--param", "dry-run-solver=on", fzn.absolutePath,
+                ),
+            )
+        }
+        val armLines = out.lines().count {
+            it.trimStart().startsWith("conflictDriven:") || it.trimStart().startsWith("free:")
+        }
+        assertEquals(2, armLines, "the curated arms are preserved as distinct pool entries:\n$out")
+        assertTrue("var-select:  SmallestDomain" in out, "the override is pinned across the pool:\n$out")
+        assertTrue("var-select:  Vsids" !in out, "no arm keeps its original selector once overridden:\n$out")
+    }
+
+    @Test
     fun `dry-run-presolve prints the presolved problem`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
