@@ -101,14 +101,15 @@ object BenchCli {
      *  only (pass `kind=cop`).
      *
      *  - `engine=ls` (default): candidates are [LsCatalog] arm labels (or an `arms=a,b` subset), each
-     *    run as `-e ls --param arm=<label>`; scored **incomplete** (LS proves nothing).
+     *    run as `-e ls --param arm=<label>`. LS proves only by reaching the objective bound.
      *  - `engine=cp`: candidates are [BacktrackCatalog] arm labels (or an `arms=a,b` subset), each run
-     *    as `-e cp --param bt-arm=<label>` (a one-arm backtrack pool); scored **complete**.
+     *    as `-e cp --param bt-arm=<label>` (a one-arm backtrack pool).
      *  - `engine=cp-single`: candidates are the `var-selector` heuristics given in `arms=v1,v2`, each
-     *    run as `-e cp-single --param var-selector=<v>`; scored **complete**.
+     *    run as `-e cp-single --param var-selector=<v>`.
      *
-     *  `mode=complete|incomplete` overrides the per-engine default. `jobs=N` sweeps arms across N
-     *  threads (default one per core); use `jobs=1` for contention-free timing when the `faster`
+     *  All engines score on the one cross-engine Challenge key (see [ArmCalibration]), so an LS+CP
+     *  mix is comparable. `jobs=N` sweeps arms across N threads (default one per core); use `jobs=1`
+     *  for contention-free timing when the `faster`
      *  tiebreak matters. */
     private fun calibrate(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
@@ -126,12 +127,6 @@ object BenchCli {
         }
         val arms = f["arms"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?: defaults.ifEmpty { error("engine=$engine needs an arms= list (e.g. arms=vsids,chb,linucb)") }
-        val complete = when (f["mode"]?.lowercase()) {
-            "complete" -> true
-            "incomplete" -> false
-            null -> engine != "ls"
-            else -> error("mode must be complete|incomplete, got '${f["mode"]}'")
-        }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         // Arms are independent isolated subprocesses writing distinct output/cache keys, so we sweep
         // them across `jobs` threads (default: one per core, capped at the arm count). Each arm still
@@ -168,7 +163,7 @@ object BenchCli {
             return
         }
         println()
-        println(ArmCalibration.render(ArmCalibration.score(instances, complete)))
+        println(ArmCalibration.render(ArmCalibration.score(instances)))
     }
 
     /** Read each arm's isolated `solve` output dir back into per-instance [ArmCalibration.Instance]s,
