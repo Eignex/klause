@@ -15,6 +15,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
@@ -220,25 +221,30 @@ internal object RedundantConstraints {
         /** A coefficient-vector bucket: the multiset of `≤` offer bounds (and which are equalities, for
          *  the equality-dominates rule) and the single surviving representative row, if any. */
         private class Bucket {
-            val bounds = HashMap<Long, Int>()
-            val eqBounds = HashMap<Long, Int>()
+            val bounds = MutableLongIntMap()
+            val eqBounds = MutableLongIntMap()
             var rep: Factor? = null
             var repBound = 0L
 
-            fun tightest(): Long? = bounds.keys.minOrNull()
+            fun tightest(): Long? {
+                if (bounds.isEmpty()) return null
+                var min = Long.MAX_VALUE
+                bounds.forEach { key, _ -> if (key < min) min = key }
+                return min
+            }
             fun eqAtMin(): Boolean = tightest()?.let { eqBounds.containsKey(it) } ?: false
 
             fun addBound(bound: Long, eq: Boolean) {
-                bounds[bound] = (bounds[bound] ?: 0) + 1
-                if (eq) eqBounds[bound] = (eqBounds[bound] ?: 0) + 1
+                bounds.addTo(bound, 1)
+                if (eq) eqBounds.addTo(bound, 1)
             }
 
             fun removeBound(bound: Long, eq: Boolean) {
-                val c = (bounds[bound] ?: 0) - 1
-                if (c <= 0) bounds.remove(bound) else bounds[bound] = c
+                val c = bounds.getOrDefault(bound, 0) - 1
+                if (c <= 0) bounds.remove(bound) else bounds.put(bound, c)
                 if (eq) {
-                    val e = (eqBounds[bound] ?: 0) - 1
-                    if (e <= 0) eqBounds.remove(bound) else eqBounds[bound] = e
+                    val e = eqBounds.getOrDefault(bound, 0) - 1
+                    if (e <= 0) eqBounds.remove(bound) else eqBounds.put(bound, e)
                 }
             }
         }

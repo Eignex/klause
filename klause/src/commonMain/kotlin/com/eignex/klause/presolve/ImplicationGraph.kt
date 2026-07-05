@@ -8,7 +8,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Binary implication graph presolve. Harvests `lit -> lit` implications the way [Probing] pins a
@@ -131,14 +133,15 @@ internal object ImplicationGraph {
         val componentOf = stronglyConnectedComponents(adj)
         // Representative variable per literal-SCC: the smallest variable id whose positive literal sits
         // in that component. A component is mergeable only through positive literals (same polarity).
-        val repVarOfComponent = HashMap<Int, Int>()
+        val repVarOfComponent = MutableIntIntMap()
         for (vv in 0 until numBoolVars) {
             if (vv in objectiveBoolVars) continue
             val pos = componentOf[Lit.make(vv, true)]
             val neg = componentOf[Lit.make(vv, false)]
             if (pos == neg) continue // u+ and u- in one SCC ⇒ u ⇔ ¬u: skip (failed-literal territory)
-            val cur = repVarOfComponent[pos]
-            if (cur == null || vv < cur) repVarOfComponent[pos] = vv
+            if (!repVarOfComponent.containsKey(pos) || vv < repVarOfComponent.getOrDefault(pos, 0)) {
+                repVarOfComponent.put(pos, vv)
+            }
         }
         val merges = ArrayList<BoolMerge>()
         for (vv in 0 until numBoolVars) {
@@ -146,7 +149,8 @@ internal object ImplicationGraph {
             val pos = componentOf[Lit.make(vv, true)]
             val neg = componentOf[Lit.make(vv, false)]
             if (pos == neg) continue
-            val rep = repVarOfComponent[pos] ?: continue
+            if (!repVarOfComponent.containsKey(pos)) continue
+            val rep = repVarOfComponent.getOrDefault(pos, 0)
             if (rep != vv) merges.add(BoolMerge(from = vv, into = rep))
         }
         return merges
@@ -189,19 +193,19 @@ internal object ImplicationGraph {
      * dropped [factors] is returned unchanged (identity, the pass's no-op signal).
      */
     private fun dropTransitivelyRedundantBinaries(problem: Problem, factors: List<Factor>): List<Factor> {
-        val binaryIndices = ArrayList<Int>()
+        val binaryIndices = IntArrayList()
         factors.forEachIndexed { i, f -> if (f is Clause && f.literals.size == 2) binaryIndices.add(i) }
         if (binaryIndices.size < 2) return factors
 
         val adj = Adjacency(2 * problem.numBoolVars)
-        for (i in binaryIndices) {
+        binaryIndices.forEach { i ->
             val (a, b) = implicationEdges(factors[i] as Clause)
             adj.addEdge(a.first, a.second)
             adj.addEdge(b.first, b.second)
         }
 
-        val drop = HashSet<Int>()
-        for (i in binaryIndices) {
+        val drop = IntHashSet()
+        binaryIndices.forEach { i ->
             val clause = factors[i] as Clause
             val (e1, e2) = implicationEdges(clause)
             // Redundant iff the implication has an alternative path that avoids this clause's own two
@@ -226,12 +230,13 @@ internal object ImplicationGraph {
     /** Whether [target] is reachable from [source] over [adj] without traversing either [skip1] or
      *  [skip2] (the edges of the clause under test) — a path of length ≥ 2 entailing `source -> target`. */
     private fun reachableAvoiding(adj: Adjacency, source: Int, target: Int, skip1: Edge, skip2: Edge): Boolean {
-        val stack = ArrayList<Int>()
+        val stack = IntArrayList()
         val seen = IntHashSet()
         stack.add(source)
         seen.add(source)
-        while (stack.isNotEmpty()) {
-            val node = stack.removeAt(stack.size - 1)
+        while (!stack.isEmpty()) {
+            val node = stack.last()
+            stack.removeAt(stack.size - 1)
             adj.forEachNeighbor(node) { next ->
                 val skipped = (node == skip1.first && next == skip1.second) ||
                     (node == skip2.first && next == skip2.second)
@@ -255,18 +260,18 @@ internal object ImplicationGraph {
         val low = IntArray(n)
         val onStack = BooleanArray(n)
         val component = IntArray(n) { -1 }
-        val tarjanStack = ArrayList<Int>()
+        val tarjanStack = IntArrayList()
         var nextIndex = 0
         var nextComponent = 0
 
         // Explicit DFS: each frame tracks the node and how far its neighbour list has been walked.
-        val callNode = ArrayList<Int>()
-        val callNeighbour = ArrayList<Int>()
+        val callNode = IntArrayList()
+        val callNeighbour = IntArrayList()
         for (root in 0 until n) {
             if (index[root] != -1) continue
             callNode.add(root)
             callNeighbour.add(0)
-            while (callNode.isNotEmpty()) {
+            while (!callNode.isEmpty()) {
                 val node = callNode[callNode.size - 1]
                 if (callNeighbour[callNeighbour.size - 1] == 0 && index[node] == -1) {
                     index[node] = nextIndex
@@ -294,7 +299,8 @@ internal object ImplicationGraph {
                 if (descended) continue
                 if (index[node] == low[node]) {
                     while (true) {
-                        val w = tarjanStack.removeAt(tarjanStack.size - 1)
+                        val w = tarjanStack.last()
+                        tarjanStack.removeAt(tarjanStack.size - 1)
                         onStack[w] = false
                         component[w] = nextComponent
                         if (w == node) break
@@ -303,7 +309,7 @@ internal object ImplicationGraph {
                 }
                 callNode.removeAt(callNode.size - 1)
                 callNeighbour.removeAt(callNeighbour.size - 1)
-                if (callNode.isNotEmpty()) {
+                if (!callNode.isEmpty()) {
                     val parent = callNode[callNode.size - 1]
                     if (low[node] < low[parent]) low[parent] = low[node]
                 }
@@ -318,7 +324,7 @@ internal object ImplicationGraph {
     /** Adjacency list over literal nodes `0 until [nodeCount]`, built incrementally. Parallel
      *  neighbour lists per node; reads expose a plain [IntArray] view for the SCC walk. */
     private class Adjacency(val nodeCount: Int) {
-        private val out = Array(nodeCount) { ArrayList<Int>() }
+        private val out = Array(nodeCount) { IntArrayList() }
 
         fun addEdge(from: Int, to: Int) {
             if (from == to) return
@@ -330,7 +336,7 @@ internal object ImplicationGraph {
         fun toArrays(): Array<IntArray> = Array(nodeCount) { neighbours(it) }
 
         inline fun forEachNeighbor(node: Int, action: (Int) -> Unit) {
-            for (next in out[node]) action(next)
+            out[node].forEach { next -> action(next) }
         }
     }
 }

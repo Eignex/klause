@@ -216,7 +216,7 @@ internal object AffineSingletons {
     /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
      *  inside [domX], or `null` if no such `y` exists (leave the constraint for propagation to fail). */
     private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Int, b: Int, c: Int): IntDomain? {
-        val valid = ArrayList<Int>()
+        val valid = IntArrayList()
         for (y in domY.min..domY.max) {
             if (y !in domY) continue
             val num = c - b * y
@@ -225,9 +225,10 @@ internal object AffineSingletons {
             if (x in domX) valid.add(y)
         }
         if (valid.isEmpty()) return null
-        var d = domY.withMinAtLeast(valid.first()).withMaxAtMost(valid.last())
-        val keep = valid.toHashSet()
-        for (y in valid.first()..valid.last()) if (y !in keep && y in d) d = d.excludeValue(y)
+        var d = domY.withMinAtLeast(valid[0]).withMaxAtMost(valid.last())
+        val keep = IntHashSet()
+        valid.forEach { keep.add(it) }
+        for (y in valid[0]..valid.last()) if (y !in keep && y in d) d = d.excludeValue(y)
         return d
     }
 

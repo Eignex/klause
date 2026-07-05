@@ -63,11 +63,11 @@ internal object DuplicateColumns {
         val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars)
         val signatures = columnSignatures(problem.factors, n, eligible)
         // Group eligible columns by signature in ascending-id order; the first is the representative.
-        val classes = LinkedHashMap<List<Long>, MutableList<Int>>()
+        val classes = LinkedHashMap<List<Long>, IntArrayList>()
         for (v in 0 until n) {
             if (!eligible[v]) continue
             val sig = signatures[v] ?: continue
-            classes.getOrPut(sig) { ArrayList() }.add(v)
+            classes.getOrPut(sig) { IntArrayList() }.add(v)
         }
         val maxClassSize = classes.values.maxOfOrNull { it.size } ?: 0
         if (maxClassSize < 2) return PassDelta()
@@ -112,8 +112,8 @@ internal object DuplicateColumns {
     private fun aggregateColumns(factor: Factor, keepOf: IntArray): Factor {
         if (factor !is Linear) return factor
         if (factor.vars.none { keepOf[it] != it }) return factor
-        val keptVars = ArrayList<Int>(factor.vars.size)
-        val keptCoeffs = ArrayList<Int>(factor.vars.size)
+        val keptVars = IntArrayList(factor.vars.size)
+        val keptCoeffs = IntArrayList(factor.vars.size)
         for (i in factor.vars.indices) {
             val v = factor.vars[i]
             if (keepOf[v] != v) continue // a dropped duplicate: its term is absorbed by the representative's

@@ -66,6 +66,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.FloatInterval
+import com.eignex.klause.util.IntArrayList
 import com.eignex.skema.SchemaDef
 import kotlin.math.roundToInt
 
@@ -93,8 +94,8 @@ internal class Lowering(val config: KlauseConfig) {
     // float-linear lowering reads to build the scaled-integer factor.
     val floatDecoders = mutableMapOf<String, FloatSpec>()
     val floatMetaIntervals = mutableListOf<FloatInterval>()
-    val floatMetaIntVarIds = mutableListOf<Int>()
-    val floatMetaBuckets = mutableListOf<Int>()
+    val floatMetaIntVarIds = IntArrayList()
+    val floatMetaBuckets = IntArrayList()
     val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
 
     /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
@@ -473,8 +474,8 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
                 val fid = floatMetaIntervals.size
                 floatVarIdByName[name] = fid
                 floatMetaIntervals += FloatInterval(entry.min, entry.max)
-                floatMetaIntVarIds += intId
-                floatMetaBuckets += entry.buckets
+                floatMetaIntVarIds.add(intId)
+                floatMetaBuckets.add(entry.buckets)
             }
 
             is NamedConstraint -> {}

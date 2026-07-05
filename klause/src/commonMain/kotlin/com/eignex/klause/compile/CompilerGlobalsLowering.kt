@@ -14,6 +14,7 @@ import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.util.IntArrayList
 
 /*
  * Decompositions for the "newer" globals. Each [decomposeXxx] returns a [BoolExpr] in
@@ -38,7 +39,7 @@ internal fun Lowering.assertMddNative(
     seqExpr: List<IntExpr>,
     numStatesPerLayer: List<Int>,
     layerStarts: List<Int>,
-    transitions: List<Int>,
+    transitions: IntArray,
     initial: Int,
     accepting: List<Int>,
     recordStride: Int,
@@ -52,7 +53,7 @@ internal fun Lowering.assertMddNative(
             seq = seqIds,
             numStatesPerLayer = numStatesPerLayer.toIntArray(),
             layerStarts = layerStarts.toIntArray(),
-            transitions = transitions.toIntArray(),
+            transitions = transitions,
             initial = initial,
             accepting = accepting.toIntArray(),
             recordStride = recordStride,
@@ -68,7 +69,7 @@ internal fun Lowering.assertMdd(expr: MddExpr) {
             expr.seq,
             expr.numStatesPerLayer,
             expr.layerStarts,
-            expr.transitions,
+            expr.transitions.toIntArray(),
             expr.initial,
             expr.accepting,
             recordStride = 3,
@@ -127,7 +128,7 @@ internal fun Lowering.assertCostMdd(expr: CostMddExpr) {
             expr.seq,
             expr.numStatesPerLayer,
             expr.layerStarts,
-            expr.transitions,
+            expr.transitions.toIntArray(),
             expr.initial,
             expr.accepting,
             recordStride = 4,
@@ -154,14 +155,14 @@ internal fun Lowering.assertCostMddDecomposed(expr: CostMddExpr) {
     assertExpr(Or(expr.accepting.map { a -> IntCompare(stateRefs[n], IntCmpOp.EQ, IntLit(a)) }))
 
     // Allocate per-layer edge-weight var w[i] = weight of the chosen transition.
-    val allWeights = mutableListOf<Int>()
+    val allWeights = IntArrayList()
     var idx = 0
     while (idx < expr.transitions.size) {
-        allWeights += expr.transitions[idx + 3]
+        allWeights.add(expr.transitions[idx + 3])
         idx += 4
     }
-    val wLo = (allWeights.minOrNull() ?: 0)
-    val wHi = (allWeights.maxOrNull() ?: 0)
+    val wLo = (allWeights.toIntArray().minOrNull() ?: 0)
+    val wHi = (allWeights.toIntArray().maxOrNull() ?: 0)
     val weightRefs = Array(n) { IntRef(newAuxIntVar(IntDomain(wLo, wHi))) }
 
     for (i in 0 until n) {
@@ -208,30 +209,30 @@ internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
     val liftedCost = lift(expr.cost)
     if (liftedSeq.all { it is IntRef } && liftedCost is IntRef) {
         // Build a single layer's transition rows then replicate per layer.
-        val baseRows = mutableListOf<Int>()
+        val baseRows = IntArrayList()
         for (q in 0 until numStates) {
             for (s in 0 until numSymbols) {
                 val dst = expr.transitions[q * numSymbols + s]
                 if (dst == 0) continue
-                baseRows += q
-                baseRows += s + off
-                baseRows += dst - 1
-                baseRows += expr.weights[q * numSymbols + s]
+                baseRows.add(q)
+                baseRows.add(s + off)
+                baseRows.add(dst - 1)
+                baseRows.add(expr.weights[q * numSymbols + s])
             }
         }
-        if (baseRows.isNotEmpty()) {
-            val flatTrans = ArrayList<Int>()
+        if (!baseRows.isEmpty()) {
+            val flatTrans = IntArrayList()
             val starts = IntArray(n + 1)
             for (i in 0 until n) {
                 starts[i] = flatTrans.size
-                flatTrans.addAll(baseRows)
+                baseRows.forEach { flatTrans.add(it) }
             }
             starts[n] = flatTrans.size
             assertMddNative(
                 expr.seq,
                 List(n + 1) { numStates },
                 starts.toList(),
-                flatTrans,
+                flatTrans.toIntArray(),
                 expr.initial,
                 expr.accepting,
                 recordStride = 4,

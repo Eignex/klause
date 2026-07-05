@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
 
 internal object XorUnits {
@@ -111,7 +112,7 @@ internal object XorUnits {
             }
         }
 
-        val existingUnits = HashSet<Int>()
+        val existingUnits = IntHashSet()
         for (f in problem.factors) {
             if (f is Clause && f.literals.size == 1) existingUnits.add(f.literals[0])
         }
