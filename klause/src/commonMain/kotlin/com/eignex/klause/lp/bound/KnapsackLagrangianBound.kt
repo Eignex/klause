@@ -10,6 +10,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.ceil
@@ -69,16 +71,16 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
         val subProblem = pbs.filter { cleanCapacity(it) }
             .maxByOrNull { it.literals.size }
         if (objective == null || subProblem == null) {
-            varIds = IntArray(0)
-            cost = LongArray(0)
-            kItems = IntArray(0)
-            kWeights = LongArray(0)
+            varIds = EmptyIntArray
+            cost = EmptyLongArray
+            kItems = EmptyIntArray
+            kWeights = EmptyLongArray
             kCap = 0L
             rowVars = emptyArray()
             rowCoeffs = emptyArray()
-            rowRhs = LongArray(0)
-            rowSign = IntArray(0)
-            intCoef = LongArray(0)
+            rowRhs = EmptyLongArray
+            rowSign = EmptyIntArray
+            intCoef = EmptyLongArray
             objConstant = 0L
             applicable = false
         } else {

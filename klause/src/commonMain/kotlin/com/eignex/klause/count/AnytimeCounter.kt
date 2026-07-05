@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.ceil
 import kotlin.math.min
 
@@ -33,9 +34,9 @@ internal object AnytimeCounter {
 
     fun run(problem: Problem, config: ExactCountConfig): Sequence<Count> = sequence {
         val boolVars = config.samplingSet
-            ?: if (config.intSamplingSet == null) problem.allBoolVars() else IntArray(0)
+            ?: if (config.intSamplingSet == null) problem.allBoolVars() else EmptyIntArray
         val intVars = config.intSamplingSet
-            ?: if (config.samplingSet == null) IntArray(problem.numIntVars) { it } else IntArray(0)
+            ?: if (config.samplingSet == null) IntArray(problem.numIntVars) { it } else EmptyIntArray
         val depth = boolVars.size + intVars.size
 
         // suffix[d] = number of possible value combinations of projection vars d..depth-1.

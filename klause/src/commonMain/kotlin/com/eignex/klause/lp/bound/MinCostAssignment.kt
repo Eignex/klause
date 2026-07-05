@@ -2,6 +2,7 @@ package com.eignex.klause.lp.bound
 
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.addExact
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -60,7 +61,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
     /** A complete assignment (all variables matched) at [cost], or [infeasible] when none exists. */
     class Result(val feasible: Boolean, val cost: Long, val assignedValue: IntArray) {
         companion object {
-            fun infeasible(): Result = Result(false, 0L, IntArray(0))
+            fun infeasible(): Result = Result(false, 0L, EmptyIntArray)
         }
     }
 

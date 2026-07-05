@@ -6,6 +6,7 @@ import com.eignex.klause.lp.Linearizer
 import com.eignex.klause.lp.LinearizerEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
@@ -35,7 +36,7 @@ internal class NValueLinearizer(
             if (existing >= 0) return existing
             // The "used" indicator is free in [0,1] regardless of the live domains — an empty
             // requirement keeps it present so the relaxation stays persistent (#43).
-            val col = builder.auxColumn(0L, 1L, presence = IntArray(0))
+            val col = builder.auxColumn(0L, 1L, presence = EmptyIntArray)
             yCols.add(col)
             yByValue.put(v, col)
             return col

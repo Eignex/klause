@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.scheduling.internals
 
+import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.max
 import kotlin.math.min
 
@@ -25,9 +26,9 @@ import kotlin.math.min
  */
 internal class MandatoryProfile {
     private val events = ArrayList<IntArray>()
-    private var segFromA = IntArray(0)
-    private var segToA = IntArray(0)
-    private var segLevelA = IntArray(0)
+    private var segFromA = EmptyIntArray
+    private var segToA = EmptyIntArray
+    private var segLevelA = EmptyIntArray
 
     /** Number of mandatory segments produced by the most recent [build]. */
     var segCount = 0

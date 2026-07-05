@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * Channels integer variables to fresh Boolean bits so XOR-hash counting / sampling can range over
@@ -66,7 +67,7 @@ internal object IntBitChannel {
             }
             if (width == 0) {
                 // Singleton domain: the value is constant, so it contributes no bits to hash over.
-                bitsPerVar.add(IntArray(0))
+                bitsPerVar.add(EmptyIntArray)
                 continue
             }
 

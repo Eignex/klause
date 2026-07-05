@@ -16,6 +16,7 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
@@ -348,9 +349,9 @@ class LocalSearchState(
     // compound seen; only the first `parts.size` entries are live. Probes are strictly nested per
     // worker (never concurrent, no re-entrancy), so a single set is safe — as with [degScratch].
     private val inverseScratch = ArrayList<Move>()
-    private var slotScratch: IntArray = IntArray(0)
-    private var savedTouchedScratch: LongArray = LongArray(0)
-    private var savedTouchCountScratch: IntArray = IntArray(0)
+    private var slotScratch: IntArray = EmptyIntArray
+    private var savedTouchedScratch: LongArray = EmptyLongArray
+    private var savedTouchCountScratch: IntArray = EmptyIntArray
 
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
     // degree changes during a probe's forward apply, snapshotting its pre-probe violated status on

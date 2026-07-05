@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.*
 import com.eignex.klause.factor.bool.*
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.*
 
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
@@ -79,7 +80,7 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
                     ),
                 )
             } else if (!holds) {
-                factors.add(Clause(IntArray(0)))
+                factors.add(Clause(EmptyIntArray))
             }
             return
         }
@@ -200,7 +201,7 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         }
     }
     if (rows.isEmpty()) {
-        factors.add(Clause(IntArray(0)))
+        factors.add(Clause(EmptyIntArray))
         return
     }
     factors.add(

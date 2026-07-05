@@ -13,6 +13,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 import kotlin.random.Random
@@ -34,7 +35,7 @@ internal fun BacktrackSolver.projectTouchedToAssumptions(input: Assumptions, lev
 /** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty
  *  when there were no touches (or no seed in the first place). */
 internal fun BacktrackSolver.touchedToArray(touched: HashSet<Int>?): IntArray {
-    if (touched == null || touched.isEmpty()) return IntArray(0)
+    if (touched == null || touched.isEmpty()) return EmptyIntArray
     val out = touched.toIntArray()
     out.sort()
     return out
@@ -61,7 +62,7 @@ internal sealed interface SearchOutcome {
      *  search — feeds the assumption-core projection in
      *  [com.eignex.klause.solver.result.satisfyUnderAssumptions]. Empty when no seed was
      *  in play or no conflict referenced a seed level. */
-    data class Exhausted(val core: UnsatCore? = null, val touchedAssumptionLevels: IntArray = IntArray(0)) :
+    data class Exhausted(val core: UnsatCore? = null, val touchedAssumptionLevels: IntArray = EmptyIntArray) :
         SearchOutcome
     data object BudgetCapped : SearchOutcome
 }

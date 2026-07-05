@@ -64,8 +64,8 @@ class Diffn(
         ints(heights)
         ints(xs)
         ints(ys)
-        ints(widthVars ?: IntArray(0))
-        ints(heightVars ?: IntArray(0))
+        ints(widthVars ?: EmptyIntArray)
+        ints(heightVars ?: EmptyIntArray)
     }
 
     override val boolVars: IntArray = EmptyIntArray

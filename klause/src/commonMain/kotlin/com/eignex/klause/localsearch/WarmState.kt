@@ -1,5 +1,7 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.util.EmptyIntArray
+
 /**
  * Mutable container for per-strategy state that survives a [LocalSearchSolver] call boundary. Owned
  * by [LocalSearchSession]; never created directly by callers.
@@ -25,7 +27,7 @@ internal class WarmState {
 
     /** Read-only view onto activity counts for tests / destroy operators. Returns an
      *  empty array when no data has been captured yet. */
-    fun activityTouches(): IntArray = activityTouches ?: IntArray(0)
+    fun activityTouches(): IntArray = activityTouches ?: EmptyIntArray
 
     /** Read-only handle for tests / diagnostics. Returns `Long.MAX_VALUE` if no apply has
      *  happened yet through this session. */

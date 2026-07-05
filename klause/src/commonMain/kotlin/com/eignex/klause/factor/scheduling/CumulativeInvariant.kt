@@ -17,6 +17,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortByIntKey
 import kotlin.math.max
@@ -255,7 +256,7 @@ internal class CumulativeInvariant(
         }
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0
-        val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else IntArray(0)
+        val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else EmptyIntArray
         val maxTargets = 4
         for (i in 0 until n) {
             val v = starts[i]

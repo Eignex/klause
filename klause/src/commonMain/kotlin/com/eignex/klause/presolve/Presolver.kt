@@ -10,6 +10,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * Result of running a presolve pipeline: the transformed [problem] plus the [reconstruct]
@@ -210,7 +211,7 @@ private fun complexity(problem: Problem): Long {
  */
 class PassDelta(
     /** Indices into the input [Problem.factors] that were removed or replaced. */
-    val droppedIndices: IntArray = IntArray(0),
+    val droppedIndices: IntArray = EmptyIntArray,
     /** Brand-new or rewritten factors to append after the kept ones. */
     val addedFactors: List<Factor> = emptyList(),
     /** The pass's directly-derived tightened int domains, or `null` when it leaves domains alone. */

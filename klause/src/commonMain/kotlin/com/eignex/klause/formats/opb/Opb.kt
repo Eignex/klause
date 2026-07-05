@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.EmptyLongArray
 
 /** Parsed OPB instance and optional objective. */
 data class OpbProblem(
@@ -94,7 +95,7 @@ object Opb {
         } else {
             val weights = LongArray(numVars)
             for ((v, w) in objWeights) weights[v] = w.toLong()
-            LinearObjective(boolWeights = weights, intCoefficients = LongArray(0), constant = objConstant.toLong())
+            LinearObjective(boolWeights = weights, intCoefficients = EmptyLongArray, constant = objConstant.toLong())
         }
         val problem = Problem(
             numBoolVars = numVars,

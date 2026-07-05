@@ -2,6 +2,7 @@ package com.eignex.klause.solver.objective
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.EmptyLongArray
 
 /**
  * Anything the local-search internals can score an assignment by; "lower is better".
@@ -67,8 +68,8 @@ interface IncrementalObjective : Objective {
  * objective to an optimiser.
  */
 data class LinearObjective(
-    val boolWeights: LongArray = LongArray(0),
-    val intCoefficients: LongArray = LongArray(0),
+    val boolWeights: LongArray = EmptyLongArray,
+    val intCoefficients: LongArray = EmptyLongArray,
     val constant: Long = 0L,
 ) : Objective {
 

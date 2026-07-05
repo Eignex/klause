@@ -86,7 +86,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
 
     // Stable ids of the live factors [passInput] last returned, parallel to that view's factor list, so
     // a [PassDelta]'s droppedIndices (into that list) map back to the stable ids [apply] tombstones.
-    private var liveIds: IntArray = IntArray(0)
+    private var liveIds: IntArray = EmptyIntArray
 
     // Int-variable occurrence index keyed by stable factor id: `intOcc[v]` holds the stable ids of every
     // live factor whose [Factor.intVars] contains `v`, in ascending-stable-id (= append) order. Built
