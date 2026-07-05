@@ -10,11 +10,12 @@ import kotlin.math.abs
  * highly and unique wins score highest, and the **diverse palette** is a greedy set-cover over the
  * per-problem winners — keep arms that win where others don't, drop the redundant ones.
  *
- * Winners follow the MiniZinc-Challenge comparison (mirrors `compare.sh`), per [complete]:
- *  - **incomplete** (local search): only objective quality counts — best objective among the feasible
- *    arms wins; optimality and time are ignored, so equal-objective arms share the win.
- *  - **complete** (backtrack / CP): the chain solved > proved-optimal > objective > faster — a proved
- *    optimum beats an unproved equal, and among otherwise-equal arms the faster one wins.
+ * Winners follow one cross-engine MiniZinc-Challenge key (mirrors `compare.sh`): the chain
+ * **solved > proved-optimal > objective > faster**. The proof tier credits *any* arm that proves
+ * optimality — a backtrack arm closing the bound, or a local-search arm that reaches the objective
+ * domain's bound (e.g. finding objective 4 when the domain is `[4,10]`) — so a proved optimum outranks
+ * an equal unproved objective; a faster time-to-best breaks an otherwise-equal tie. One key means LS
+ * and backtrack arms are directly comparable, so a mixed pool calibrates in a single campaign.
  * A problem every arm ties on (all reach the same outcome) discriminates nothing and is dropped.
  */
 internal object ArmCalibration {
@@ -42,7 +43,6 @@ internal object ArmCalibration {
      *  slots for a diverse k-arm portfolio. */
     data class Report(
         val instances: Int,
-        val complete: Boolean,
         val totalWon: Int,
         val scores: List<ArmScore>,
         val diverse: List<DiverseSlot>,
@@ -50,22 +50,21 @@ internal object ArmCalibration {
 
     private const val EPS = 1e-9
 
-    /** The win-ranking key (higher is better, compared lexicographically). Infeasible sorts worst; in
-     *  [complete] mode a proved optimum and then a faster time break ties the way the Challenge does. */
-    private fun rankKey(inst: Instance, run: ArmRun, complete: Boolean): DoubleArray {
+    /** The cross-engine win-ranking key (higher is better, compared lexicographically):
+     *  solved > proved-optimal > objective > faster. Infeasible sorts worst. [ArmRun.proven] credits a
+     *  proved optimum from either engine — a backtrack arm closing the bound, or a local-search arm
+     *  reaching the objective domain's bound; time-to-best breaks equal-objective ties (run the final
+     *  campaign at `jobs=1` for contention-free timing). */
+    private fun rankKey(inst: Instance, run: ArmRun): DoubleArray {
         val solved = if (run.feasible) 1.0 else 0.0
         val quality = if (run.feasible && run.finalObjective != null) {
             if (inst.maximize) run.finalObjective else -run.finalObjective
         } else {
             Double.NEGATIVE_INFINITY
         }
-        return if (complete) {
-            val proven = if (run.feasible && run.proven) 1.0 else 0.0
-            val faster = -(run.timeToBestMs?.toDouble() ?: Double.MAX_VALUE)
-            doubleArrayOf(solved, proven, quality, faster)
-        } else {
-            doubleArrayOf(solved, quality)
-        }
+        val proven = if (run.feasible && run.proven) 1.0 else 0.0
+        val faster = -(run.timeToBestMs?.toDouble() ?: Double.MAX_VALUE)
+        return doubleArrayOf(solved, proven, quality, faster)
     }
 
     private fun lexCompare(a: DoubleArray, b: DoubleArray): Int {
@@ -78,20 +77,20 @@ internal object ArmCalibration {
         return 0
     }
 
-    /** The arms that win [inst]: those maximal on the [complete] ranking key (ties shared). Empty when
-     *  no arm is feasible, or when every arm ties (non-discriminating). */
-    private fun winnersOf(inst: Instance, complete: Boolean): Set<String> {
-        val keys = inst.runs.associate { it.arm to rankKey(inst, it, complete) }
+    /** The arms that win [inst]: those maximal on the ranking key (ties shared). Empty when no arm is
+     *  feasible, or when every arm ties (non-discriminating). */
+    private fun winnersOf(inst: Instance): Set<String> {
+        val keys = inst.runs.associate { it.arm to rankKey(inst, it) }
         val best = keys.values.reduce { a, b -> if (lexCompare(a, b) >= 0) a else b }
         if (best[0] == 0.0) return emptySet() // no feasible arm
         val winners = keys.filterValues { lexCompare(it, best) == 0 }.keys
         return if (winners.size == inst.runs.size) emptySet() else winners
     }
 
-    /** Score and recalibrate [instances] under the [complete] (CP) or incomplete (LS) Challenge rules. */
-    fun score(instances: List<Instance>, complete: Boolean): Report {
+    /** Score and recalibrate [instances] under the cross-engine Challenge key (see the class KDoc). */
+    fun score(instances: List<Instance>): Report {
         val arms = instances.flatMap { inst -> inst.runs.map { it.arm } }.distinct()
-        val won = instances.map { winnersOf(it, complete) }.filter { it.isNotEmpty() }
+        val won = instances.map { winnersOf(it) }.filter { it.isNotEmpty() }
 
         val winShare = HashMap<String, Double>()
         val wins = HashMap<String, Int>()
@@ -105,7 +104,7 @@ internal object ArmCalibration {
 
         val scores = arms.map { ArmScore(it, winShare[it] ?: 0.0, wins[it] ?: 0) }
             .sortedByDescending { it.winShare }
-        return Report(instances.size, complete, won.size, scores, greedyDiverse(arms, won, winShare))
+        return Report(instances.size, won.size, scores, greedyDiverse(arms, won, winShare))
     }
 
     /** Rank *every* arm by greedy marginal contribution over the per-problem [won] winner sets: each
@@ -146,9 +145,8 @@ internal object ArmCalibration {
 
     /** Render a [Report] as a plain-text table for the bench console. */
     fun render(report: Report): String = buildString {
-        val mode = if (report.complete) "complete" else "incomplete"
         appendLine(
-            "=== arm calibration ($mode): ${report.instances} instances, ${report.totalWon} discriminating ===",
+            "=== arm calibration: ${report.instances} instances, ${report.totalWon} discriminating ===",
         )
         appendLine("--- win share | problems won ---")
         for (s in report.scores) appendLine("  ${s.arm.padEnd(28)} ${fmt(s.winShare)}  ${s.wins}")
