@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.log2
@@ -257,7 +258,7 @@ internal class SparseLu private constructor(
             val lRowIdx = Array(m) { k -> lRowMap[k].keys.sorted().toIntArray() }
             val lRowVal = Array(m) { k -> DoubleArray(lRowIdx[k].size) { t -> lRowMap[k].getValue(lRowIdx[k][t]) } }
             // Column orientations (pivot space): U strictly-upper by column, L by column.
-            val uColB = Array(m) { ArrayList<Int>() }
+            val uColB = Array(m) { IntArrayList() }
             val uColBv = Array(m) { ArrayList<Double>() }
             for (k in 0 until m) {
                 val idx = uRowIdx[k]
@@ -270,7 +271,7 @@ internal class SparseLu private constructor(
                     }
                 }
             }
-            val lColB = Array(m) { ArrayList<Int>() }
+            val lColB = Array(m) { IntArrayList() }
             val lColBv = Array(m) { ArrayList<Double>() }
             for (k in 0 until m) {
                 val idx = lRowIdx[k]

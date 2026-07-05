@@ -1,5 +1,7 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.util.IntArrayList
+
 /**
  * Maintains a basis factorization across dual-simplex pivots using the **product-form of the inverse**
  * (PFI): a base sparse LU [SparseLu] of the basis `B₀` at the last refactorization, plus a chain of
@@ -19,7 +21,7 @@ package com.eignex.klause.lp
  * densely (length `m`); all index spaces match [SparseLu]'s (basis-slot in, original-row out).
  */
 internal class EtaBasis private constructor(private val m: Int, private val base: SparseLu) {
-    private val etaRow = ArrayList<Int>()
+    private val etaRow = IntArrayList()
     private val etaSpike = ArrayList<DoubleArray>()
 
     /** Number of pivots folded into the chain since the base factorization. */

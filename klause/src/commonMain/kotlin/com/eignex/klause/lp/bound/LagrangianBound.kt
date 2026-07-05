@@ -13,7 +13,9 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 import kotlin.math.ceil
 
 /**
@@ -123,7 +125,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
     /** Greedily pick pairwise variable-disjoint eligible AllDifferents under the total-variable cap. */
     private fun chooseBlocks(problem: Problem): List<IntArray> {
         val chosen = ArrayList<IntArray>()
-        val used = HashSet<Int>()
+        val used = IntHashSet()
         var total = 0
         for (f in problem.factors) {
             if (f !is AllDifferent || f.vars.size !in 2..MAX_VARS) continue
@@ -166,15 +168,15 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
 
         // Per-block value set = union of the live domains of the block's variables; bail if any block
         // is too large to assign over, prune if any has fewer distinct values than variables.
-        val blockValueIndex = Array(numBlocks) { HashMap<Int, Int>() }
+        val blockValueIndex = Array(numBlocks) { MutableIntIntMap() }
         val blockValueList = Array(numBlocks) { IntArrayList() }
         for (j in 0 until numBlocks) {
             val index = blockValueIndex[j]
             val list = blockValueList[j]
             for (pos in blockStart[j] until blockStart[j + 1]) {
                 session.intDomain(vars[pos]).forEach { value ->
-                    if (value !in index) {
-                        index[value] = list.size
+                    if (!index.containsKey(value)) {
+                        index.put(value, list.size)
                         list.add(value)
                     }
                 }
@@ -227,7 +229,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
      */
     private fun evaluate(
         session: PropagationSession,
-        blockValueIndex: Array<HashMap<Int, Int>>,
+        blockValueIndex: Array<MutableIntIntMap>,
         blockValueList: Array<IntArrayList>,
         p: LongArray,
     ): Eval {
@@ -245,7 +247,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                     if (a != 0L) w = addExact(w, mulExact(p[r], a))
                 }
                 session.intDomain(varId).forEach { value ->
-                    assign.addOption(idx, blockValueIndex[j].getValue(value), mulExact(w, value.toLong()))
+                    assign.addOption(idx, blockValueIndex[j].getOrDefault(value, -1), mulExact(w, value.toLong()))
                 }
             }
             val res = assign.solve()
