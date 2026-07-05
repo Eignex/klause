@@ -9,6 +9,7 @@ import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.solver.Lit
 
 internal fun FlatZincCompiler.emitBoolClause(c: FznConstraint) {
@@ -154,16 +155,7 @@ internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: B
 /** Channel bool literals to 0/1 int vars. */
 internal fun FlatZincCompiler.channelBoolsToInts(lits: IntArray, tag: String): IntArray = IntArray(lits.size) { i ->
     val ch = allocInt("__chan_${tag}_$i", 0, 1)
-    val (auxVar, useNegatedTarget) = Lit.variable(lits[i]) to !Lit.isPositive(lits[i])
-    factors.add(
-        ReifiedLinear(
-            auxBoolVar = auxVar,
-            coeffs = intArrayOf(1),
-            vars = intArrayOf(ch),
-            op = LinearOp.EQ,
-            bound = if (useNegatedTarget) 0 else 1,
-        ),
-    )
+    channelBoolTo01(factors, Lit.variable(lits[i]), ch, whenTrue = Lit.isPositive(lits[i]))
     ch
 }
 
