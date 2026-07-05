@@ -1,87 +1,63 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.bench.metric.ArmCalibration.ArmRun
-import com.eignex.klause.bench.metric.ArmCalibration.Instance
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ArmCalibrationTest {
 
-    private fun arm(name: String, objective: Double?, proven: Boolean = false, ms: Long = 100): ArmRun = ArmRun(
-        name,
-        feasible = objective != null,
-        finalObjective = objective,
-        proven = proven,
-        timeToBestMs = if (objective != null) ms else null,
-    )
-
     @Test
-    fun `a proved optimum beats an equal unproved objective`() {
-        val p = Instance(
-            "p",
-            maximize = false,
-            runs = listOf(arm("A", 5.0, proven = true), arm("B", 5.0), arm("C", 9.0)),
+    fun `an arm winning more problems ranks first by win share`() {
+        val report = ArmCalibration.scoreWinnerSets(
+            arms = listOf("A", "B"),
+            won = listOf(setOf("A"), setOf("A"), setOf("B")),
         )
-        val report = ArmCalibration.score(listOf(p))
-        assertEquals(1, report.scores.first { it.arm == "A" }.wins, "the proved optimum wins outright")
-        assertEquals(0, report.scores.first { it.arm == "B" }.wins, "the equal but unproved objective loses")
+        assertEquals("A", report.scores.first().arm)
+        assertEquals(2.0, report.scores.first { it.arm == "A" }.winShare)
+        assertEquals(1.0, report.scores.first { it.arm == "B" }.winShare)
     }
 
     @Test
-    fun `an equal objective is broken by speed`() {
-        val p = Instance(
-            "p",
-            maximize = false,
-            runs = listOf(arm("fast", 5.0, ms = 100), arm("slow", 5.0, ms = 500), arm("bad", 9.0)),
-        )
-        val report = ArmCalibration.score(listOf(p))
-        assertEquals(1, report.scores.first { it.arm == "fast" }.wins, "faster wins the equal-objective tie")
-        assertEquals(0, report.scores.first { it.arm == "slow" }.wins)
+    fun `co-winners split the win share of a shared problem`() {
+        val report = ArmCalibration.scoreWinnerSets(arms = listOf("A", "B"), won = listOf(setOf("A", "B")))
+        assertEquals(0.5, report.scores.first { it.arm == "A" }.winShare)
+        assertEquals(0.5, report.scores.first { it.arm == "B" }.winShare)
+        assertEquals(1, report.scores.first { it.arm == "A" }.wins, "a shared win still counts as a win")
     }
 
     @Test
-    fun `a problem every arm ties on is dropped as non-discriminating`() {
-        val tied = Instance("p", maximize = false, runs = listOf(arm("A", 4.0), arm("B", 4.0), arm("C", 4.0)))
-        val report = ArmCalibration.score(listOf(tied))
-        assertEquals(0, report.totalWon, "an all-tie problem yields no scoring units")
-        assertTrue(report.scores.all { it.winShare == 0.0 })
-    }
-
-    @Test
-    fun `an infeasible arm never wins and is ranked last`() {
-        val p = Instance("p", maximize = false, runs = listOf(arm("good", 5.0), arm("none", null)))
-        val report = ArmCalibration.score(listOf(p))
-        assertEquals(0.0, report.scores.first { it.arm == "none" }.winShare)
-        assertEquals("good", report.diverse.first().arm)
-        assertEquals(0, report.diverse.first { it.arm == "none" }.newlyCovered)
-    }
-
-    @Test
-    fun `maximize direction is honoured`() {
-        val p = Instance("p", maximize = true, runs = listOf(arm("hi", 100.0), arm("lo", 10.0)))
-        val report = ArmCalibration.score(listOf(p))
-        assertEquals(1, report.scores.first { it.arm == "hi" }.wins, "higher objective wins when maximizing")
-        assertEquals(0, report.scores.first { it.arm == "lo" }.wins)
-    }
-
-    @Test
-    fun `scoreWinnerSets ranks a palette from winner sets directly`() {
-        // The portfolio-regime entry point: winner sets (best-holder per problem) fed straight in.
-        val report = ArmCalibration.scoreWinnerSets(arms = listOf("A", "B", "C"), won = listOf(setOf("A"), setOf("B")))
-        assertEquals(2, report.totalWon)
-        assertEquals(setOf("A", "B"), report.diverse.take(2).map { it.arm }.toSet(), "A wins p1, B wins p2")
-        assertEquals(0.0, report.scores.first { it.arm == "C" }.winShare, "a non-winner scores zero")
+    fun `an arm that never wins scores zero and is ranked last`() {
+        val report = ArmCalibration.scoreWinnerSets(arms = listOf("good", "dud"), won = listOf(setOf("good")))
+        assertEquals(0.0, report.scores.first { it.arm == "dud" }.winShare)
+        assertEquals(0, report.diverse.first { it.arm == "dud" }.newlyCovered)
     }
 
     @Test
     fun `the marginal-contribution ranking puts complementary specialists first and the dud last`() {
-        val p1 = Instance("p1", maximize = false, runs = listOf(arm("A", 1.0), arm("B", 5.0), arm("C", 9.0)))
-        val p2 = Instance("p2", maximize = false, runs = listOf(arm("A", 9.0), arm("B", 1.0), arm("C", 5.0)))
-        val report = ArmCalibration.score(listOf(p1, p2))
+        val report = ArmCalibration.scoreWinnerSets(
+            arms = listOf("A", "B", "C"),
+            won = listOf(setOf("A"), setOf("B")),
+        )
         assertEquals(setOf("A", "B"), report.diverse.take(2).map { it.arm }.toSet(), "A wins p1, B wins p2")
         assertEquals(report.totalWon, report.diverse[1].cumulativeCovered, "k=2 covers every discriminating problem")
         assertEquals("C", report.diverse.last().arm)
         assertEquals(0, report.diverse.last().newlyCovered)
+    }
+
+    @Test
+    fun `instances defaults to the discriminating count but can carry the full total`() {
+        val discriminating = ArmCalibration.scoreWinnerSets(arms = listOf("A"), won = listOf(setOf("A")))
+        assertEquals(1, discriminating.instances)
+        val withTotal = ArmCalibration.scoreWinnerSets(arms = listOf("A"), won = listOf(setOf("A")), instances = 10)
+        assertEquals(10, withTotal.instances)
+        assertEquals(1, withTotal.totalWon, "totalWon still tracks only the problems some arm won")
+    }
+
+    @Test
+    fun `an empty winner set yields no palette and no scoring units`() {
+        val report = ArmCalibration.scoreWinnerSets(arms = listOf("A", "B"), won = emptyList())
+        assertEquals(0, report.totalWon)
+        assertTrue(report.scores.all { it.winShare == 0.0 })
+        assertTrue(report.diverse.all { it.newlyCovered == 0 }, "no problems to cover")
     }
 }

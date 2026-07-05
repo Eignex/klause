@@ -10,19 +10,13 @@ import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
-import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
-import com.eignex.klause.localsearch.strategy.LsCatalog
-import com.eignex.klause.portfolio.BacktrackCatalog
-import com.eignex.klause.portfolio.Kind
 import kotlinx.serialization.decodeFromString
 import java.io.File
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -43,8 +37,8 @@ import java.util.concurrent.Executors
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
  *
  * Other commands:
- *  - `calibrate [filters…]` — the fair arm tester: run every LS arm in isolation over the selection
- *    and recalibrate a diverse palette by per-problem wins under the Challenge rules (see [calibrate]).
+ *  - `calibrate [filters…]` — the fair arm tester: run the pool once as a live portfolio and rank
+ *    arms into a diverse palette by per-problem best-holder wins (see [calibrate]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
@@ -96,22 +90,18 @@ object BenchCli {
         )
     }
 
-    /** The fair arm tester: score arms into a diverse palette (see [ArmCalibration]) under a `regime=`:
+    /** The fair arm tester: run the pool **once** as a live portfolio and rank arms by their real
+     *  marginal contribution. Each problem's winner is its **best-holder** — the arm of the final
+     *  incumbent, from the `%%%klause-arm:` attribution — so a greedy set-cover over the per-problem
+     *  winners gives a diverse palette (see [ArmCalibration]). One run measures the arms as they
+     *  actually co-run (with the portfolio's incumbent/bound sharing), so evaluating a new candidate is
+     *  just adding it to the pool; an arm always shadowed by a stronger sibling earns no slot.
      *
-     *  - `regime=isolated` (default): each candidate arm runs in its own subprocess (full budget,
-     *    single core, no shared incumbent) and scores its own per-problem results — unconfounded
-     *    candidate evaluation. Candidates come from `engine=`:
-     *      - `ls` (default): [LsCatalog] labels, run `-e ls --param arm=<label>`.
-     *      - `cp`: [BacktrackCatalog] labels, run `-e cp --param bt-arm=<label>` (a one-arm pool).
-     *      - `cp-single`: the `var-selector` heuristics in `arms=v1,v2`, run `-e cp-single`.
-     *    `jobs=N` sweeps arms across N threads (default one per core); use `jobs=1` for contention-free
-     *    timing when the `faster` tiebreak matters.
-     *  - `regime=portfolio`: one live `-e mixed -p<p>` run (`p=`, default 8), scoring each problem's
-     *    best-holder from the `%%%klause-arm:` attribution — in-situ pool validation (the old
-     *    `credit.sh`).
+     *  - `engine=mixed` (default) `| ls | cp`: which pool to run as `-e <engine> -p<p>` (all emit the
+     *    `%%%klause-arm:` attribution under `-s`).
+     *  - `p=<cores>` (default 8): the portfolio core count.
      *
-     *  Both regimes feed the one cross-engine Challenge key, so an LS+CP mix is comparable. Optimize
-     *  instances only (pass `kind=cop`). */
+     *  Optimize instances only (pass `kind=cop`). */
     private fun calibrate(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
@@ -119,81 +109,22 @@ object BenchCli {
             println("(no problems matched the selection)")
             return
         }
+        val engine = f["engine"]?.lowercase() ?: "mixed"
+        if (engine !in setOf("mixed", "ls", "cp")) error("calibrate engine must be mixed | ls | cp, got '$engine'")
+        val cores = f["p"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         val entries = BenchLoad.resolveRefs(refs)
-        when (f["regime"]?.lowercase() ?: "isolated") {
-            "isolated" -> calibrateIsolated(f, entries, budget)
-            "portfolio" -> calibratePortfolio(f, entries, budget)
-            else -> error("regime must be isolated | portfolio, got '${f["regime"]}'")
-        }
-    }
-
-    /** The **isolated** regime: run each arm in its own subprocess (full budget, single core, no
-     *  shared incumbent) and score its own per-problem results. Unconfounded candidate evaluation. */
-    private fun calibrateIsolated(f: Map<String, String>, entries: List<ResolvedProblem>, budget: Budget) {
-        val engine = f["engine"]?.lowercase() ?: "ls"
-        val (paramKey, defaults) = when (engine) {
-            "ls" -> "arm" to LsCatalog.labels()
-            "cp" -> "bt-arm" to BacktrackCatalog.labels(Kind.COP)
-            "cp-single", "cpsingle" -> "var-selector" to emptyList()
-            else -> error("calibrate supports engine=ls | cp | cp-single, got '$engine'")
-        }
-        val arms = f["arms"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
-            ?: defaults.ifEmpty { error("engine=$engine needs an arms= list (e.g. arms=vsids,chb,linucb)") }
-        // Arms are independent isolated subprocesses writing distinct output/cache keys, so we sweep
-        // them across `jobs` threads (default: one per core, capped at the arm count). Each arm still
-        // runs its instances serially at processors=1. `jobs=1` keeps timing clean when the `faster`
-        // tiebreak matters (small/final runs); jobs>1 trades some timing-under-contention noise for
-        // wall-clock — fine for the quality-dominated win-share ranking.
-        val jobs = (f["jobs"]?.toIntOrNull() ?: minOf(arms.size, Runtime.getRuntime().availableProcessors()))
-            .coerceAtLeast(1)
-        println(
-            "=== calibrate ($engine): ${arms.size} arm(s) × ${entries.size} instance(s), " +
-                "${budget.timeoutMillis}ms each (isolated, jobs=$jobs) ===",
-        )
-        val pool = Executors.newFixedThreadPool(jobs)
-        val armDirs = try {
-            arms.map { arm ->
-                pool.submit(
-                    Callable {
-                        arm to SolveMetric.run(
-                            entries,
-                            budget,
-                            SolverInvocation.KLAUSE,
-                            KlauseSearch(engine = engine, processors = 1, params = listOf("$paramKey=$arm")),
-                        )
-                    },
-                )
-            }.mapNotNull { future -> future.get().let { (arm, dir) -> dir?.let { arm to dir } } }.toMap()
-        } finally {
-            pool.shutdown()
-        }
-        val instances = loadCalibration(armDirs)
-        if (instances.isEmpty()) {
-            println("\n(no optimize instances scored — pass kind=cop)")
-            return
-        }
-        println()
-        println(ArmCalibration.render(ArmCalibration.score(instances)))
-    }
-
-    /** The **portfolio** regime: one live `-e mixed -p<cores>` run (attribution always on under `-s`).
-     *  Each problem's winner is its best-holder — the arm of the final strict improvement — so the
-     *  set-cover palette maximises the pool's virtual-best coverage. In-situ pool validation; this is
-     *  what `credit.sh` did, folded into the harness. `p=` sets the core count (default 8). */
-    private fun calibratePortfolio(f: Map<String, String>, entries: List<ResolvedProblem>, budget: Budget) {
-        val cores = f["p"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
-        println("=== calibrate (portfolio, -p$cores): ${entries.size} instance(s), ${budget.timeoutMillis}ms ===")
+        println("=== calibrate ($engine, -p$cores): ${entries.size} instance(s), ${budget.timeoutMillis}ms ===")
         val dir = SolveMetric.run(
             entries,
             budget,
             SolverInvocation.KLAUSE,
-            KlauseSearch(engine = "mixed", processors = cores),
+            KlauseSearch(engine = engine, processors = cores),
         ) ?: return
         val (arms, won) = portfolioWinners(dir)
         if (won.isEmpty()) {
             println(
-                "\n(no optimize instances with attribution — pass kind=cop; -e mixed emits %%%klause-arm: under -s)",
+                "\n(no optimize instances with attribution — pass kind=cop; klause emits %%%klause-arm: under -s)",
             )
             return
         }
@@ -215,35 +146,6 @@ object BenchCli {
         }
         return arms.toList() to won
     }
-
-    /** Read each arm's isolated `solve` output dir back into per-instance [ArmCalibration.Instance]s,
-     *  grouping by problem. */
-    private fun loadCalibration(armDirs: Map<String, File>): List<ArmCalibration.Instance> {
-        val byProblem = LinkedHashMap<String, MutableList<Pair<String, SolveRecord>>>()
-        for ((arm, dir) in armDirs) {
-            dir.listFiles { file -> file.extension == "json" }?.sortedBy { it.name }?.forEach { jsonFile ->
-                val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
-                if (rec != null && rec.kind == "optimize") {
-                    byProblem.getOrPut(rec.problem) { mutableListOf() }.add(arm to rec)
-                }
-            }
-        }
-        return byProblem.map { (problem, runs) ->
-            ArmCalibration.Instance(
-                problem = problem,
-                maximize = runs.first().second.maximize,
-                runs = runs.map { (arm, rec) -> toArmRun(arm, rec) },
-            )
-        }
-    }
-
-    private fun toArmRun(arm: String, rec: SolveRecord): ArmCalibration.ArmRun = ArmCalibration.ArmRun(
-        arm = arm,
-        feasible = rec.feasible == true,
-        finalObjective = rec.objective,
-        proven = rec.proven,
-        timeToBestMs = rec.timeToBestMs,
-    )
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
      *  Returns null when none are set. Defaults: `engine` unset ⇒ no `-e`, so klause follows the cli's
@@ -363,7 +265,7 @@ object BenchCli {
             |
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
-            |  bench calibrate [filters…]            palette (kind=cop; regime=isolated|portfolio, engine=ls|cp|cp-single, jobs=, p=)
+            |  bench calibrate [filters…]            diverse arm palette from a live pool run (kind=cop; engine=mixed|ls|cp, p=)
             |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |
