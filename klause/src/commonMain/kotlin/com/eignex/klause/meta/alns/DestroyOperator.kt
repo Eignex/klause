@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
@@ -67,7 +68,7 @@ internal fun interface DestroyOperator {
         val AdjacencyRelated: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
-            if (totalVars == 0) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             val freed = BooleanArray(totalVars)
             var freedCount = 0
             val queue = IntArrayDeque()
@@ -109,7 +110,7 @@ internal fun interface DestroyOperator {
          *  when this returns empty. */
         val CurrentlyViolated: DestroyOperator = DestroyOperator { rng, problem, incumbent, _, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
-            if (totalVars == 0) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             // Build a scratch state seeded with the incumbent; ask each factor whether it
             // is violated under that assignment.
             val scratch = LocalSearchState(problem, rng)
@@ -117,7 +118,7 @@ internal fun interface DestroyOperator {
             for (i in 0 until problem.numIntVars) scratch.assignment.setInt(i, incumbent.ints[i])
             scratch.recompute()
             val violatedFactors = scratch.violated.toIntArray()
-            if (violatedFactors.isEmpty()) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            if (violatedFactors.isEmpty()) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             val freedSlots = HashSet<Int>()
             for (fid in violatedFactors) {
                 val f = problem.factors[fid]
@@ -143,7 +144,7 @@ internal fun interface DestroyOperator {
          */
         fun activityBiased(session: LocalSearchSession?): DestroyOperator =
             DestroyOperator { rng, problem, incumbent, objective, fraction ->
-                val touches = session?.warmStateView?.activityTouches() ?: IntArray(0)
+                val touches = session?.warmStateView?.activityTouches() ?: EmptyIntArray
                 if (touches.isEmpty()) {
                     return@DestroyOperator Random.destroy(
                         rng,
@@ -176,7 +177,7 @@ internal fun interface DestroyOperator {
         fun timeWindow(windowSize: Int): DestroyOperator = DestroyOperator { rng, problem, incumbent, _, fraction ->
             require(windowSize > 0) { "windowSize must be > 0, got $windowSize" }
             val n = problem.numIntVars
-            if (n == 0) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            if (n == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             // Pick the window start uniformly across the smallest..largest int var domain.
             var globalLo = Int.MAX_VALUE
             var globalHi = Int.MIN_VALUE
@@ -185,7 +186,7 @@ internal fun interface DestroyOperator {
                 if (d.min < globalLo) globalLo = d.min
                 if (d.max > globalHi) globalHi = d.max
             }
-            if (globalLo > globalHi) return@DestroyOperator FreedVars(IntArray(0), IntArray(0))
+            if (globalLo > globalHi) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             val span = globalHi - globalLo + 1
             val start = if (span <= windowSize) {
                 globalLo
@@ -204,14 +205,14 @@ internal fun interface DestroyOperator {
                 val cap = ((problem.numBoolVars + n) * fraction).toInt().coerceIn(1, n)
                 val all = IntArray(n) { it }.also { it.shuffle(rng) }
                 val ints = IntArray(cap) { all[it] }
-                return@DestroyOperator FreedVars(IntArray(0), ints)
+                return@DestroyOperator FreedVars(EmptyIntArray, ints)
             }
             // Honour `fraction` as a cap on how many of the in-window vars to free.
             val cap = ((problem.numBoolVars + n) * fraction).toInt().coerceAtLeast(1)
             val take = minOf(cap, inWindow.size)
             val idxs = IntArray(inWindow.size) { it }.also { it.shuffle(rng) }
             val ints = IntArray(take) { inWindow[idxs[it]] }
-            FreedVars(IntArray(0), ints)
+            FreedVars(EmptyIntArray, ints)
         }
 
         private fun split(ids: List<Int>, numBoolVars: Int): FreedVars {

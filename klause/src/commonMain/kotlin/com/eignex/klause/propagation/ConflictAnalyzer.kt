@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -47,8 +48,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     // carrying a stored level, which the same atom can hit repeatedly across reasons. Caching by
     // atom id with an epoch stamp keeps those repeats O(1); atomLevelEpoch is bumped per analysis
     // to invalidate.
-    private var atomLevelMemo = IntArray(0)
-    private var atomLevelStamp = IntArray(0)
+    private var atomLevelMemo = EmptyIntArray
+    private var atomLevelStamp = EmptyIntArray
     private var atomLevelEpoch = 0
 
     // Variables already resolved out as a pivot this analysis. Order literals established on the
@@ -382,7 +383,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      *  its scan with `lbdOf` (whose count is just `levels.size`); finalize computes both
      *  in one pass via this helper. */
     private fun distinctLevelsOf(learned: IntArrayList): IntArray {
-        if (learned.size == 0) return IntArray(0)
+        if (learned.size == 0) return EmptyIntArray
         val seen = IntHashSet(learned.size)
         for (i in 0 until learned.size) seen.add(levelOf(Lit.variable(learned[i])))
         val out = seen.toIntArray()

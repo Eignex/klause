@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.EmptyLongArray
 import kotlin.random.Random
 
 /**
@@ -31,8 +32,8 @@ import kotlin.random.Random
 internal class ConflictOrdering(private val base: VariableSelector) : VariableSelector {
 
     private var counter: Long = 0
-    private var boolStamp: LongArray = LongArray(0)
-    private var intStamp: LongArray = LongArray(0)
+    private var boolStamp: LongArray = EmptyLongArray
+    private var intStamp: LongArray = EmptyLongArray
 
     private fun ensureSized(numBool: Int, numInt: Int) {
         if (boolStamp.size < numBool) boolStamp = boolStamp.copyOf(numBool)

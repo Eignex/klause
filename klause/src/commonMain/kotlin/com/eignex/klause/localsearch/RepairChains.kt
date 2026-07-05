@@ -1,13 +1,14 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
 /** Shared empty seed array for one-sided [recordConeDegrees] calls. */
-private val EMPTY_INTS = IntArray(0)
+private val EMPTY_INTS = EmptyIntArray
 
 /**
  * **Directed ejection-chain proposal**: grow a coordinated multi-variable move by chaining repairs

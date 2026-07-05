@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.global.internals
 
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -21,8 +22,8 @@ internal class GccFlowBuilder {
     var numNodes: Int = 0
         private set
 
-    private var parentEdge = IntArray(0)
-    private var bfsQueue = IntArray(0)
+    private var parentEdge = EmptyIntArray
+    private var bfsQueue = EmptyIntArray
 
     fun reset(nodes: Int) {
         if (adj.size < nodes) {

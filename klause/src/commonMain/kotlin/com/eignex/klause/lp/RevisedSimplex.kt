@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.abs
 
 /**
@@ -79,7 +80,7 @@ internal class RevisedSimplex(
         private set
 
     init {
-        colRows = Array(n) { IntArray(0) }
+        colRows = Array(n) { EmptyIntArray }
         colVals = Array(n) { DoubleArray(0) }
         // Read columns through the model's CSC accessor. Two passes (the accessor is inline,
         // so each is a tight loop) — count nnz, then fill.

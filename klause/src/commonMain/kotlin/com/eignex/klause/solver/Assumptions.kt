@@ -39,22 +39,22 @@ class Assumptions internal constructor(
     /** Int var ids with an additional `≥ minValue` lower-bound tightening (no exact pin),
      *  ascending. Disjoint from [intKeys]. Used by SAC-at-root to record bound deductions
      *  that aren't yet singletons. */
-    val intMinKeys: IntArray = IntArray(0),
+    val intMinKeys: IntArray = EmptyIntArray,
     /** Lower-bound values aligned with [intMinKeys]. */
-    val intMinValues: IntArray = IntArray(0),
+    val intMinValues: IntArray = EmptyIntArray,
     /** Int var ids with an additional `≤ maxValue` upper-bound tightening (no exact pin),
      *  ascending. Disjoint from [intKeys]. */
-    val intMaxKeys: IntArray = IntArray(0),
+    val intMaxKeys: IntArray = EmptyIntArray,
     /** Upper-bound values aligned with [intMaxKeys]. */
-    val intMaxValues: IntArray = IntArray(0),
+    val intMaxValues: IntArray = EmptyIntArray,
     /** Interior holes: parallel `(varId, value)` rows, lexicographically sorted by
      *  `(varId, value)`. Each row encodes `v ≠ value` for that var. Disjoint from
      *  [intKeys]; values strictly inside the var's [min, max] bounds (or its assumed
      *  bounds). Used by SAC-at-root to record value-level deductions that fall between
      *  bound shifts. */
-    val intHoleVarIds: IntArray = IntArray(0),
+    val intHoleVarIds: IntArray = EmptyIntArray,
     /** Forbidden values aligned with [intHoleVarIds]. */
-    val intHoleValues: IntArray = IntArray(0),
+    val intHoleValues: IntArray = EmptyIntArray,
     /** Compact set-restrictions `v ∈ {survivors}` for variables the bake reduced to a sparse survivor
      *  set — recorded here instead of one interior hole per excluded value, which for a wide-but-sparse
      *  domain (few survivors over a huge span) is O(span) to record and to seed. Var ids ascending;
@@ -498,7 +498,7 @@ class Assumptions internal constructor(
     companion object {
         /** The empty assumption set (nothing pinned). */
         val None: Assumptions =
-            Assumptions(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
+            Assumptions(EmptyIntArray, BooleanArray(0), EmptyIntArray, EmptyIntArray)
 
         /** Map-based factory. Call sites use `Assumptions(bools = mapOf(0 to true))`;
          *  internally normalises to the primitive sorted-array form. */

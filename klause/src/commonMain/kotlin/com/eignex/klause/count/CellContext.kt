@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * Everything needed to count / sample one family of XOR-hash cells over a fixed projection of a
@@ -85,8 +86,8 @@ internal class CellContext private constructor(
                 bools = base.allBoolVars()
                 ints = IntArray(base.numIntVars) { it }
             } else {
-                bools = boolSet ?: IntArray(0)
-                ints = intSet ?: IntArray(0)
+                bools = boolSet ?: EmptyIntArray
+                ints = intSet ?: EmptyIntArray
             }
             return build(base, bools, ints)
         }

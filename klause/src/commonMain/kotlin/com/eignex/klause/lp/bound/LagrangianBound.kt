@@ -10,6 +10,8 @@ import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.ceil
@@ -65,15 +67,15 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
         val numInt = problem.numIntVars
         val blocks = if (objective == null) emptyList() else chooseBlocks(problem)
         if (blocks.isEmpty()) {
-            vars = IntArray(0)
+            vars = EmptyIntArray
             inV = BooleanArray(numInt)
             blockStart = intArrayOf(0)
             linkVars = emptyArray()
             linkCoeffs = emptyArray()
-            linkRhs = LongArray(0)
-            linkSign = IntArray(0)
-            intCoef = LongArray(0)
-            boolWeight = LongArray(0)
+            linkRhs = EmptyLongArray
+            linkSign = EmptyIntArray
+            intCoef = EmptyLongArray
+            boolWeight = EmptyLongArray
             objConstant = 0L
             applicable = false
         } else {

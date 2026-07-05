@@ -197,8 +197,8 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
         Diffn(
             xs = xs,
             ys = ys,
-            widths = wConst ?: IntArray(0),
-            heights = hConst ?: IntArray(0),
+            widths = wConst ?: EmptyIntArray,
+            heights = hConst ?: EmptyIntArray,
             widthVars = wVars,
             heightVars = hVars,
             nonStrict = nonStrict,
@@ -450,7 +450,7 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
     val xs = evalIntVarArray(c.args[1])
     val setValues = resolveSetLiteral(c.args[2])
     val cover = if (xs.isEmpty()) {
-        IntArray(0)
+        EmptyIntArray
     } else {
         val (lo, hi) = checkNotNull(intVarUnionBounds(xs))
         setValues.filter { it in lo..hi }.toIntArray()

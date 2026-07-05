@@ -36,6 +36,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -83,7 +84,7 @@ internal class LpRelaxation(
     val colPresentUpper: LongArray = LongArray(model.n),
     /** Ids of the factors that emitted at least one [Contribution.HULL] row, in factor order — the
      *  candidates the root pruner (`LpEngine.pruneIneffectiveHulls`) probes for individual removal. */
-    val hullFactorIds: IntArray = IntArray(0),
+    val hullFactorIds: IntArray = EmptyIntArray,
 )
 
 /**

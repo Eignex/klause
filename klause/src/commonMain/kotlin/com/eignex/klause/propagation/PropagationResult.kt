@@ -32,18 +32,18 @@ sealed interface PropagationResult {
         /** Int var ids whose lower bound was tightened (but not yet singleton). Disjoint
          *  from [intKeys]; ascending. Populated by bound-SAC and any future propagation
          *  that wants to expose non-singleton deductions. */
-        val intMinKeys: IntArray = IntArray(0),
+        val intMinKeys: IntArray = EmptyIntArray,
         /** Lower-bound values aligned with [intMinKeys]. */
-        val intMinValues: IntArray = IntArray(0),
+        val intMinValues: IntArray = EmptyIntArray,
         /** Int var ids whose upper bound was tightened, ascending. */
-        val intMaxKeys: IntArray = IntArray(0),
+        val intMaxKeys: IntArray = EmptyIntArray,
         /** Upper-bound values aligned with [intMaxKeys]. */
-        val intMaxValues: IntArray = IntArray(0),
+        val intMaxValues: IntArray = EmptyIntArray,
         /** Interior holes: parallel `(varId, value)` rows in lex order. Each row
          *  encodes `v ≠ value`, with `value` strictly between v's current min and max. */
-        val intHoleVarIds: IntArray = IntArray(0),
+        val intHoleVarIds: IntArray = EmptyIntArray,
         /** Forbidden values aligned with [intHoleVarIds]. */
-        val intHoleValues: IntArray = IntArray(0),
+        val intHoleValues: IntArray = EmptyIntArray,
         /** Set-restrictions `v ∈ {survivors}` for variables reduced to a sparse survivor set — recorded
          *  instead of one interior hole per excluded value, which is O(span) for a wide-but-sparse domain.
          *  CSR: var `intSetKeys[i]`'s survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i+1]]`
@@ -345,7 +345,7 @@ sealed interface PropagationResult {
             }
 
             /** The empty implied set (nothing forced). */
-            val EMPTY: Implied = Implied(IntArray(0), BooleanArray(0), IntArray(0), IntArray(0))
+            val EMPTY: Implied = Implied(EmptyIntArray, BooleanArray(0), EmptyIntArray, EmptyIntArray)
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
              *  normalises to the primitive sorted-array form. Optional bound-tightening
@@ -353,12 +353,12 @@ sealed interface PropagationResult {
             operator fun invoke(
                 bools: Map<Int, Boolean> = emptyMap(),
                 ints: Map<Int, Int> = emptyMap(),
-                intMinKeys: IntArray = IntArray(0),
-                intMinValues: IntArray = IntArray(0),
-                intMaxKeys: IntArray = IntArray(0),
-                intMaxValues: IntArray = IntArray(0),
-                intHoleVarIds: IntArray = IntArray(0),
-                intHoleValues: IntArray = IntArray(0),
+                intMinKeys: IntArray = EmptyIntArray,
+                intMinValues: IntArray = EmptyIntArray,
+                intMaxKeys: IntArray = EmptyIntArray,
+                intMaxValues: IntArray = EmptyIntArray,
+                intHoleVarIds: IntArray = EmptyIntArray,
+                intHoleValues: IntArray = EmptyIntArray,
                 intSetKeys: IntArray = EmptyIntArray,
                 intSetOffsets: IntArray = EmptyIntArray,
                 intSetValues: IntArray = EmptyIntArray,
