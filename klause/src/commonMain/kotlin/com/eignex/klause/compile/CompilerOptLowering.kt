@@ -23,6 +23,7 @@ import com.eignex.klause.model.Not
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.util.IntHashSet
 
 /*
  * Reified (sub-expression-position) lowering for global constraints. Each entry-point
@@ -84,14 +85,14 @@ internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
     // Compute the union of static domains for each x_i. Each xs entry must lift to a
     // bare IntRef so we can look up its domain — non-bare arithmetic on opt vars at this
     // position isn't supported (matches the non-opt convention).
-    val unionSet = HashSet<Int>()
+    val unionSet = IntHashSet()
     for (i in expr.xs.indices) {
         val xLifted = lift(expr.xs[i])
         val d = domainOf(xLifted)
         for (v in d.min..d.max) unionSet.add(v)
     }
     // Iterate in ascending value order (was a sorted set; commonMain has no sortedSetOf).
-    val perValue: List<IntExpr> = unionSet.sorted().map { v ->
+    val perValue: List<IntExpr> = unionSet.toIntArray().sorted().map { v ->
         val anyHolds = expr.xs.indices.map { i ->
             And(listOf(expr.presents[i], IntCompare(expr.xs[i], IntCmpOp.EQ, IntLit(v))))
         }

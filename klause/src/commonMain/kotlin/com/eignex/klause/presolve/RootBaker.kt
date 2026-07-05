@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
 
 /**
@@ -105,7 +106,7 @@ object RootBaker {
                 val accAsAssumptions = acc.toAssumptions()
                 // Build a per-var hole-set once so the `alreadyHole` lookup in the k-loop is O(1)
                 // instead of a linear scan of acc.intHoleVarIds for every probed k.
-                val existingHoles = HashSet<Int>()
+                val existingHoles = IntHashSet()
                 for (i in 0 until acc.intHoleVarIds.size) {
                     if (acc.intHoleVarIds[i] == v) existingHoles.add(acc.intHoleValues[i])
                 }

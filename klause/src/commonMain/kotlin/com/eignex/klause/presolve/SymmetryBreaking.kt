@@ -13,6 +13,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 
 internal object SymmetryBreaking {
 
@@ -105,7 +108,8 @@ internal object SymmetryBreaking {
         val orbits = verifiedValueOrbits(problem, cancellation) ?: return emptyList()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
-            val orbitSet = orbit.toHashSet()
+            val orbitSet = IntHashSet()
+            orbit.forEach { orbitSet.add(it) }
             val internal = (0 until problem.numIntVars)
                 .filter { it !in objectiveIntVars && domainWithin(problem.intDomains[it], orbitSet) }
             when {
@@ -176,9 +180,9 @@ internal object SymmetryBreaking {
             // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
             // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
-            val sig = ArrayList<Long>()
+            val sig = LongArrayList()
             for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.add(x.toLong())
-            if (sig.isNotEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
+            if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }
         val orbits = ArrayList<List<Int>>()
         for (candidate in incidence.values) {
@@ -221,8 +225,9 @@ internal object SymmetryBreaking {
         val orbits = verifiedValueOrbits(problem) ?: return PassDelta()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
-            val orbitSet = orbit.toHashSet()
-            val seq = ArrayList<Int>()
+            val orbitSet = IntHashSet()
+            orbit.forEach { orbitSet.add(it) }
+            val seq = IntArrayList()
             for (x in 0 until n) {
                 if (x !in objectiveIntVars && domainWithin(problem.intDomains[x], orbitSet)) seq.add(x)
             }
@@ -274,7 +279,7 @@ internal object SymmetryBreaking {
     }
 
     /** Whether every value in [d] lies in [values]. */
-    private fun domainWithin(d: IntDomain, values: Set<Int>): Boolean {
+    private fun domainWithin(d: IntDomain, values: IntHashSet): Boolean {
         for (v in d.min..d.max) if (v in d && v !in values) return false
         return true
     }
@@ -380,8 +385,8 @@ internal object SymmetryBreaking {
     ): Pair<IntArray, IntArray> {
         val nInt = problem.numIntVars
         val nBool = problem.numBoolVars
-        val intInc = Array(nInt) { ArrayList<Int>() }
-        val boolInc = Array(nBool) { ArrayList<Int>() }
+        val intInc = Array(nInt) { IntArrayList() }
+        val boolInc = Array(nBool) { IntArrayList() }
         problem.factors.forEachIndexed { fi, f ->
             for (v in f.intVars.distinct()) intInc[v].add(fi)
             for (v in f.boolVars.distinct()) boolInc[v].add(fi)
@@ -440,7 +445,7 @@ internal object SymmetryBreaking {
      *  admit a false symmetry. */
     private fun portSignature(
         problem: Problem,
-        incident: List<Int>,
+        incident: IntArrayList,
         v: Int,
         isBool: Boolean,
         intMap: IntArray,
@@ -449,7 +454,7 @@ internal object SymmetryBreaking {
     ): RefineKey {
         val portHashes = LongArray(incident.size)
         var n = 0
-        for (fi in incident) {
+        incident.forEach { fi ->
             val saved: Int
             if (isBool) {
                 saved = boolMap[v]
@@ -608,19 +613,19 @@ internal object SymmetryBreaking {
             val refLeaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, r, budget, cancellation) ?: continue
             // Disjoint set over this cell's members tracks r's orbit under generators found so far, so
             // a member already in the orbit is skipped (it would only re-derive an existing element).
-            val index = HashMap<Int, Int>()
-            sorted.forEachIndexed { i, g -> index[g] = i }
+            val index = MutableIntIntMap()
+            sorted.forEachIndexed { i, g -> index.put(g, i) }
             val orbit = IntDisjointSet(sorted.size)
             for (v in sorted) {
                 if (v == r || budget[0] <= 0 || cancellation()) continue
-                if (orbit.connected(index.getValue(r), index.getValue(v))) continue
+                if (orbit.connected(index.getOrDefault(r, 0), index.getOrDefault(v, 0))) continue
                 val leaf = refineToDiscrete(problem, seedIntBase, seedBoolBase, v, budget, cancellation) ?: continue
                 val perm = buildPerm(refLeaf, leaf, nInt, nBool) ?: continue
                 if (!isAutomorphism(problem, base, perm.second, perm.first)) continue
                 gens.add(perm)
-                for ((g, gi) in index) {
+                index.forEach { g, gi ->
                     val img = if (g < nInt) perm.first[g] else nInt + perm.second[g - nInt]
-                    index[img]?.let { orbit.union(gi, it) }
+                    if (index.containsKey(img)) orbit.union(gi, index.getOrDefault(img, 0))
                 }
             }
         }

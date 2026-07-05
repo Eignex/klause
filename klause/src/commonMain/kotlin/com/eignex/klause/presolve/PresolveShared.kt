@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
@@ -130,7 +131,11 @@ internal object PresolveShared {
      */
     fun Problem.withPassDelta(delta: PassDelta, bakeConfig: BakeConfig): Problem {
         val kept = ArrayList<Factor>(factors.size - delta.droppedIndices.size + delta.addedFactors.size)
-        val dropped = if (delta.droppedIndices.isEmpty()) null else delta.droppedIndices.toHashSet()
+        val dropped = if (delta.droppedIndices.isEmpty()) {
+            null
+        } else {
+            IntHashSet().apply { for (x in delta.droppedIndices) add(x) }
+        }
         for (i in factors.indices) if (dropped == null || i !in dropped) kept.add(factors[i])
         kept.addAll(delta.addedFactors)
         return rebuildProblem(this, kept, delta.domains ?: intDomains.copyOf(), bakeConfig)
@@ -151,7 +156,7 @@ internal object PresolveShared {
     ): PassDelta {
         val idByFactor = HashMap<Factor, Int>(inputFactors.size)
         for (i in inputFactors.indices) idByFactor[inputFactors[i]] = i
-        val kept = HashSet<Int>(out.size)
+        val kept = IntHashSet()
         val added = ArrayList<Factor>()
         for (f in out) {
             val id = idByFactor[f]
