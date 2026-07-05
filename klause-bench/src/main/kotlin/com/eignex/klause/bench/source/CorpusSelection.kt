@@ -87,8 +87,9 @@ internal object CorpusSelection {
             }
         }
 
-        /** Flat layout: walk [subDir] for self-contained `.mzn` files; family = first path
-         *  component under [subDir]. Used for libminizinc tests and hakank. */
+        /** Flat layout: walk [subDir] for `.mzn` files; family = first path component under
+         *  [subDir]. A parameterized model is paired with a same-named `.dzn` sibling when one
+         *  exists (a self-contained model has none). Used for libminizinc tests and hakank. */
         data class FlatMzn(val subDir: String) : Layout {
             override fun discover(root: File): List<Discovered> {
                 val base = File(root, subDir)
@@ -96,7 +97,14 @@ internal object CorpusSelection {
                 return base.walkTopDown()
                     .filter { it.isFile && it.extension == "mzn" }
                     .sortedBy { it.relativeTo(base).path }
-                    .map { Discovered(it.relativeTo(base).path.removeSuffix(".mzn"), it.relativeTo(root).path) }
+                    .map {
+                        val data = File(it.parentFile, "${it.nameWithoutExtension}.dzn")
+                        Discovered(
+                            it.relativeTo(base).path.removeSuffix(".mzn"),
+                            it.relativeTo(root).path,
+                            if (data.isFile) data.relativeTo(root).path else null,
+                        )
+                    }
                     .toList()
             }
         }
