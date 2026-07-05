@@ -214,12 +214,24 @@ sealed interface PropagationResult {
             val holes = HashSet<Long>()
             forEachIntHole { id, v -> holes.add(packHole(id, v)) }
             other.forEachIntHole { id, v -> holes.add(packHole(id, v)) }
+            // Set-restrictions accumulate by INTERSECTION: v ∈ S and v ∈ T both hold, so v ∈ S ∩ T.
+            // A var restricted on only one side keeps that side's survivors; an empty intersection is
+            // left as-is (an empty survivor set signals infeasibility on apply, exactly as a crossed
+            // min/max bound already does). Preserving these is why the PR #958 wide-sparse fold isn't
+            // silently discarded when root-probing seeds a merge.
+            val sets = HashMap<Int, IntArray>()
+            forEachIntSet { id, s -> sets[id] = s }
+            other.forEachIntSet { id, t ->
+                val existing = sets[id]
+                sets[id] = if (existing == null) t else intersectSorted(existing, t)
+            }
             for (k in ints.keys) {
                 mins.remove(k)
                 maxes.remove(k)
                 holes.removeAll { (it ushr HOLE_ID_SHIFT).toInt() == k }
+                sets.remove(k)
             }
-            return build(bools, ints, mins, maxes, holes)
+            return build(bools, ints, mins, maxes, holes, sets)
         }
 
         /** This implied set with int [v]'s lower bound raised to at least [newMin]. */
@@ -229,7 +241,7 @@ sealed interface PropagationResult {
             mins[v] = maxOf(mins[v] ?: Int.MIN_VALUE, newMin)
             val maxes = HashMap<Int, Int>()
             forEachIntMax { k, vv -> maxes[k] = vv }
-            return build(bools, ints, mins, maxes, holeSet())
+            return build(bools, ints, mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with int [v]'s upper bound lowered to at most [newMax]. */
@@ -239,7 +251,7 @@ sealed interface PropagationResult {
             val maxes = HashMap<Int, Int>()
             forEachIntMax { k, vv -> maxes[k] = vv }
             maxes[v] = minOf(maxes[v] ?: Int.MAX_VALUE, newMax)
-            return build(bools, ints, mins, maxes, holeSet())
+            return build(bools, ints, mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with interior [value] excluded from int [v]'s domain (`v ≠ value`). */
@@ -250,13 +262,42 @@ sealed interface PropagationResult {
             forEachIntMax { k, vv -> maxes[k] = vv }
             val holes = holeSet()
             holes.add(packHole(v, value))
-            return build(bools, ints, mins, maxes, holes)
+            return build(bools, ints, mins, maxes, holes, setMap())
         }
 
         private fun holeSet(): HashSet<Long> {
             val holes = HashSet<Long>()
             forEachIntHole { id, v -> holes.add(packHole(id, v)) }
             return holes
+        }
+
+        /** This set's per-variable survivor sets (var → ascending survivors), for threading through
+         *  [build] unchanged in the single-set [withMin] / [withMax] / [withHole] paths. */
+        private fun setMap(): HashMap<Int, IntArray> {
+            val m = HashMap<Int, IntArray>()
+            forEachIntSet { id, survivors -> m[id] = survivors }
+            return m
+        }
+
+        /** Intersection of two ascending survivor arrays (two-pointer); result stays ascending. */
+        private fun intersectSorted(a: IntArray, b: IntArray): IntArray {
+            val out = ArrayList<Int>(minOf(a.size, b.size))
+            var i = 0
+            var j = 0
+            while (i < a.size && j < b.size) {
+                when {
+                    a[i] < b[j] -> i++
+
+                    a[i] > b[j] -> j++
+
+                    else -> {
+                        out.add(a[i])
+                        i++
+                        j++
+                    }
+                }
+            }
+            return IntArray(out.size) { out[it] }
         }
 
         /** Shared [PropagationResult] instances. */
@@ -268,17 +309,26 @@ sealed interface PropagationResult {
                 (id.toLong() shl HOLE_ID_SHIFT) or (value.toLong() and HOLE_VALUE_MASK)
 
             /** Materialise an [Implied] from the accumulation maps used by [merge] / [withMin] / [withMax] /
-             *  [withHole], emitting the key-sorted parallel arrays the constructor expects. */
+             *  [withHole], emitting the key-sorted parallel arrays the constructor expects. [sets] maps a
+             *  variable to its ascending survivor values; they are emitted as the CSR
+             *  [intSetKeys]/[intSetOffsets]/[intSetValues] (empty when there are none). */
             private fun build(
                 bools: Map<Int, Boolean>,
                 ints: Map<Int, Int>,
                 mins: Map<Int, Int>,
                 maxes: Map<Int, Int>,
                 holes: Set<Long>,
+                sets: Map<Int, IntArray> = emptyMap(),
             ): Implied {
                 val minK = mins.keys.toIntArray().also { it.sort() }
                 val maxK = maxes.keys.toIntArray().also { it.sort() }
                 val holesSorted = holes.toLongArray().also { it.sort() }
+                val setK = sets.keys.toIntArray().also { it.sort() }
+                val setOffsets = IntArray(setK.size + 1)
+                for (i in setK.indices) setOffsets[i + 1] = setOffsets[i] + sets.getValue(setK[i]).size
+                val setVals = IntArray(setOffsets[setK.size])
+                var w = 0
+                for (k in setK) for (sv in sets.getValue(k)) setVals[w++] = sv
                 return Implied(
                     bools = bools,
                     ints = ints,
@@ -288,6 +338,9 @@ sealed interface PropagationResult {
                     intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
                     intHoleVarIds = IntArray(holesSorted.size) { (holesSorted[it] ushr HOLE_ID_SHIFT).toInt() },
                     intHoleValues = IntArray(holesSorted.size) { holesSorted[it].toInt() },
+                    intSetKeys = if (setK.isEmpty()) EmptyIntArray else setK,
+                    intSetOffsets = if (setK.isEmpty()) EmptyIntArray else setOffsets,
+                    intSetValues = if (setK.isEmpty()) EmptyIntArray else setVals,
                 )
             }
 
@@ -306,9 +359,12 @@ sealed interface PropagationResult {
                 intMaxValues: IntArray = IntArray(0),
                 intHoleVarIds: IntArray = IntArray(0),
                 intHoleValues: IntArray = IntArray(0),
+                intSetKeys: IntArray = EmptyIntArray,
+                intSetOffsets: IntArray = EmptyIntArray,
+                intSetValues: IntArray = EmptyIntArray,
             ): Implied {
                 if (bools.isEmpty() && ints.isEmpty() &&
-                    intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty()
+                    intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty() && intSetKeys.isEmpty()
                 ) {
                     return EMPTY
                 }
@@ -320,6 +376,7 @@ sealed interface PropagationResult {
                     bKeys, bVals, iKeys, iVals,
                     intMinKeys, intMinValues, intMaxKeys, intMaxValues,
                     intHoleVarIds, intHoleValues,
+                    intSetKeys, intSetOffsets, intSetValues,
                 )
             }
         }
