@@ -15,6 +15,7 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
@@ -253,7 +254,7 @@ object Xcsp3 {
                 val aux = newBool()
                 factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, values[0]))
                 val ch = newAuxVar(0, 1)
-                factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
+                channelBoolTo01(factors, aux, ch)
                 ch
             }
             val sumCoeffs = IntArray(channels.size + 1) { if (it < channels.size) 1 else -1 }

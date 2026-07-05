@@ -4,11 +4,11 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
@@ -427,15 +427,7 @@ object SmtLibQfLia {
             val wlit = Lit.make(w, true)
             factors.add(Clause(intArrayOf(Lit.negate(wlit), lit)))
             factors.add(Clause(intArrayOf(wlit, Lit.negate(lit))))
-            factors.add(
-                ReifiedLinear(
-                    auxBoolVar = w,
-                    coeffs = intArrayOf(1),
-                    vars = intArrayOf(z),
-                    op = LinearOp.EQ,
-                    bound = 1,
-                ),
-            )
+            channelBoolTo01(factors, w, z)
             return LinComb(mapOf(z to 1), 0)
         }
 

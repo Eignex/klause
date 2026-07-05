@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.binarySearchInt
@@ -260,15 +261,7 @@ internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
             val nVar = resolveIntVar(nExpr)
             val channels = IntArray(s.indicatorBoolIds.size) { i ->
                 val ch = allocInt("__card_chan_${s.name}_${s.elements[i]}", 0, 1)
-                factors.add(
-                    ReifiedLinear(
-                        auxBoolVar = s.indicatorBoolIds[i],
-                        coeffs = intArrayOf(1),
-                        vars = intArrayOf(ch),
-                        op = LinearOp.EQ,
-                        bound = 1,
-                    ),
-                )
+                channelBoolTo01(factors, s.indicatorBoolIds[i], ch)
                 ch
             }
             val coefs = IntArray(channels.size + 1) { if (it < channels.size) 1 else -1 }

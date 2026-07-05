@@ -59,3 +59,23 @@ internal fun CnfLowering.reifyLinear(coeffs: IntArray, vars: IntArray, op: Linea
     factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = coeffs, vars = vars, op = op, bound = bound))
     return Lit.make(aux, true)
 }
+
+/**
+ * Channel Boolean [auxBoolVar]'s truth onto the 0/1 integer [intVar]: posts `x_intVar = 1` iff
+ * [auxBoolVar] holds (or `= 0` when [whenTrue] is false, for a negated-literal channel). The single
+ * `ReifiedLinear(aux, [1], [intVar], EQ, 0|1)` construction the FlatZinc, SMT-LIB, and XCSP3 front-ends
+ * each use to bridge a bool decision into an integer sum. [intVar] must already be allocated with
+ * domain `{0, 1}`; the caller sets up [auxBoolVar] (a raw literal's var, a Tseitin-tied bool, or a
+ * reified equality's indicator).
+ */
+internal fun channelBoolTo01(factors: MutableList<Factor>, auxBoolVar: Int, intVar: Int, whenTrue: Boolean = true) {
+    factors.add(
+        ReifiedLinear(
+            auxBoolVar = auxBoolVar,
+            coeffs = intArrayOf(1),
+            vars = intArrayOf(intVar),
+            op = LinearOp.EQ,
+            bound = if (whenTrue) 1 else 0,
+        ),
+    )
+}
