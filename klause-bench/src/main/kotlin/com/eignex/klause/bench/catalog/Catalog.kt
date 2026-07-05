@@ -79,6 +79,10 @@ internal sealed interface FetchMethod {
     /** Download a `.tar.gz` from [url] and extract it. */
     data object Tarball : FetchMethod
 
+    /** Download a `.tar.zst` (zstd-compressed tar) from [url] and extract it — the format the
+     *  SMT-LIB Zenodo releases ship per-logic archives in. */
+    data object TarballZst : FetchMethod
+
     /** Download a `.zip` from [url] and extract it (instances may stay individually
      *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod

@@ -65,6 +65,27 @@ internal object Suites {
                     Category.CSP,
                 )
             },
+            DynamicSuite(
+                "smtlib-qflia",
+                "SMT-LIB QF_LIA non-incremental set (fetched, ~13k .smt2; 1/family by default)",
+            ) {
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfLia,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_LIA", "smt2"),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.CSP,
+                    format = Format.SMTLIB_QF_LIA,
+                )
+            },
+            DynamicSuite("satcomp-2024", "SAT Competition 2024 main track (fetched, 400 application CNF)") {
+                CorpusSelection.select(
+                    ExternalCollections.satComp2024Main,
+                    CorpusSelection.Layout.Flat("", "cnf"),
+                    CorpusSelection.Selection.fromProps(),
+                    Category.SAT,
+                    format = Format.DIMACS,
+                )
+            },
         )
     }
 
@@ -562,13 +583,15 @@ internal object ExternalCollections {
         xcspAggregate("CSP", 800),
     )
 
-    /** SMT-LIB QF_LIA non-incremental benchmark set (official CLC repository). */
+    /** SMT-LIB QF_LIA non-incremental benchmark set: the per-logic `.tar.zst` archive from the
+     *  SMT-LIB 2024 Zenodo release (record 11061097), extracting to `.smt2` files under
+     *  `non-incremental/QF_LIA/<family>/`. */
     val smtlibQfLia = ExternalCollection(
         id = "smtlib-qf_lia",
-        url = "https://clc-gitlab.cs.uiowa.edu:2443/SMT-LIB-benchmarks/QF_LIA.git",
+        url = "https://zenodo.org/records/11061097/files/QF_LIA.tar.zst?download=1",
         license = "SMT-LIB (per-family licenses)",
-        reason = "large benchmark set; fetched rather than vendored",
-        fetch = FetchMethod.GitClone(depth = 1),
+        reason = "large benchmark set (689MB compressed, ~13k instances); fetched rather than vendored",
+        fetch = FetchMethod.TarballZst,
     )
 
     /** SATLIB random-3SAT phase-transition ladder: `uf<V>-<C>` (SAT) and `uuf<V>-<C>` (UNSAT),
@@ -579,6 +602,16 @@ internal object ExternalCollections {
         license = "SATLIB (public benchmarks)",
         reason = "1000-instance RND3SAT family; fetched rather than vendored",
         fetch = FetchMethod.Tarball,
+    )
+
+    /** SAT Competition 2024 main-track benchmarks: 400 application/crafted DIMACS CNF instances
+     *  (individually `.cnf.xz`-compressed inside the zip) from the Zenodo release (record 15095752). */
+    val satComp2024Main = ExternalCollection(
+        id = "satcomp-2024-main",
+        url = "https://zenodo.org/records/15095752/files/sat-competition-2024-main-benchmarks.zip?download=1",
+        license = "SAT Competition (academic benchmarks)",
+        reason = "4.3GB application-CNF archive (400 instances); fetched rather than vendored",
+        fetch = FetchMethod.Zip,
     )
 
     /** Ordered rungs (low→high vars) of the SAT and UNSAT ladders, keyed by family name. */
