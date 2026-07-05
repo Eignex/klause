@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
@@ -46,7 +47,7 @@ class XorHashFamily(
     }
 
     private fun drawOne(): Xor {
-        val chosen = ArrayList<Int>(samplingSet.size)
+        val chosen = IntArrayList(samplingSet.size)
         for (v in samplingSet) {
             if (rng.nextBoolean()) chosen.add(Lit.make(v, positive = true))
         }

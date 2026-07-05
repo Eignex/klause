@@ -1,6 +1,7 @@
 package com.eignex.klause.count
 
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.LongArrayList
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.ln
@@ -34,7 +35,7 @@ internal object ApproxMC {
 
         val t = iterationCount(config.delta)
         val baseSeed = config.seed ?: Random.Default.nextLong()
-        val estimates = ArrayList<Long>(t)
+        val estimates = LongArrayList(t)
         // Seed each iteration's m-search from the previous iteration's transition point (ApproxMC2).
         var prevM = 1
         for (i in 0 until t) {
@@ -131,8 +132,8 @@ internal object ApproxMC {
         return if (t % 2 == 0) t + 1 else t
     }
 
-    private fun median(values: List<Long>): Long {
-        val sorted = values.sorted()
-        return sorted[sorted.size / 2]
+    private fun median(values: LongArrayList): Long {
+        values.sort()
+        return values[values.size / 2]
     }
 }

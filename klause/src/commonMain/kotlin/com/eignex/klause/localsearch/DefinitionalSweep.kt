@@ -9,6 +9,8 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * A local-search acceleration structure (consumed by [LocalSearchSolver]): the topologically-
@@ -264,8 +266,8 @@ class InvariantNetwork internal constructor(
     private val boolReaders: Array<IntArray>
 
     init {
-        val intLists = Array(numIntVars) { ArrayList<Int>(0) }
-        val boolLists = Array(numBoolVars) { ArrayList<Int>(0) }
+        val intLists = Array(numIntVars) { IntArrayList(0) }
+        val boolLists = Array(numBoolVars) { IntArrayList(0) }
         for (i in nodeArr.indices) {
             val n = nodeArr[i]
             if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
@@ -294,7 +296,7 @@ class InvariantNetwork internal constructor(
      * can reuse fixed-size scratch arrays.
      */
     fun affectedNodes(seedInts: IntArray, seedBools: IntArray): IntArray {
-        val marked = HashSet<Int>()
+        val marked = IntHashSet()
         val work = IntArrayDeque()
         fun seedInt(v: Int) {
             if (v >= 0) for (i in intReaders[v]) if (marked.add(i)) work.addLast(i)
