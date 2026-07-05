@@ -96,6 +96,7 @@ internal object CorpusSelection {
                 if (!base.isDirectory) return emptyList()
                 return base.walkTopDown()
                     .filter { it.isFile && it.extension == "mzn" }
+                    .filterNot { it.relativeTo(base).path.startsWith("lib/") }
                     .sortedBy { it.relativeTo(base).path }
                     .map {
                         val data = File(it.parentFile, "${it.nameWithoutExtension}.dzn")

@@ -94,6 +94,9 @@ internal data class ExternalCollection(
     val license: String,
     val reason: String,
     val fetch: FetchMethod,
+    /** Extra include directories (relative to the fetched root) added to the `minizinc` search
+     *  path via `-I`, for a corpus that keeps shared included files in a common dir. */
+    val includeDirs: List<String> = emptyList(),
 )
 
 /** Where a problem's bytes come from. Resolved to a concrete file by `source.CorpusFetcher`. */

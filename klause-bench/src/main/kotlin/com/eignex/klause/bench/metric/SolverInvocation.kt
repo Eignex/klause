@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
@@ -167,6 +168,13 @@ internal object SolverInvocation {
         }
         val mzn = CorpusFetcher.resolve(entry.ref.source)
         val dzn = entry.ref.data?.let { CorpusFetcher.resolve(it) }
+        val src = entry.ref.source
+        val includeDirs = if (src is ProblemSource.External) {
+            val root = CorpusFetcher.ensure(src.collection)
+            src.collection.includeDirs.map { File(root, it) }.filter { it.isDirectory }
+        } else {
+            emptyList()
+        }
         return buildList {
             add("minizinc")
             add("--solver")
@@ -184,6 +192,10 @@ internal object SolverInvocation {
             s.processors?.takeIf { it > 1 }?.let {
                 add("-p")
                 add(it.toString())
+            }
+            for (dir in includeDirs) {
+                add("-I")
+                add(dir.absolutePath)
             }
             add(mzn.absolutePath)
             if (dzn != null) add(dzn.absolutePath)
