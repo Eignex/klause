@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 /** CP propagation logic for `nvalue`. */
 internal class NValuePropagator(
@@ -108,14 +109,16 @@ internal class NValuePropagator(
     )
 
     private fun buildMatching(state: PropagationState): Matching {
-        val valueId = HashMap<Int, Int>()
+        val valueId = MutableIntIntMap()
         val values = IntArrayList()
         val adj = Array(xs.size) { i ->
             val ids = IntArrayList()
             state.intDomains[xs[i]].forEach { v ->
-                val id = valueId.getOrPut(v) {
+                var id = valueId.getOrDefault(v, -1)
+                if (id < 0) {
+                    id = values.size
                     values.add(v)
-                    values.size - 1
+                    valueId.put(v, id)
                 }
                 ids.add(id)
             }

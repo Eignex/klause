@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAnteced
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.IntArrayList
 
 /**
  * CP propagator for [Diffn]. Constructed by [Diffn.asPropagator] and holds pairwise
@@ -99,7 +100,7 @@ internal class DiffnPropagator(
                 continue
             }
             // Segment starts: pMin plus every compulsory-part entry/exit breakpoint inside (pMin, pMax].
-            val starts = ArrayList<Int>()
+            val starts = IntArrayList()
             starts.add(pMin)
             for (j in 0 until n) {
                 if (j == i || size[j] <= 0 || osize[j] <= 0) continue
@@ -111,10 +112,11 @@ internal class DiffnPropagator(
                 if (enter in (pMin + 1)..pMax) starts.add(enter)
                 if (exit in (pMin + 1)..pMax) starts.add(exit)
             }
-            starts.sort()
+            starts.sortByIntKey { it }
             // First feasible segment start → new lower bound.
             var newMin = Int.MIN_VALUE
-            for (s in starts) {
+            for (k in 0 until starts.size) {
+                val s = starts[k]
                 if (s > newMin && feasibleColumn(state, i, s, pos, size, opos, osize)) {
                     newMin = s
                     break
@@ -124,7 +126,7 @@ internal class DiffnPropagator(
             if (!state.tightenIntMin(pos[i], newMin, ant)) return false
             // Last feasible segment → new upper bound (segment end clamped to pMax).
             var newMax = Int.MAX_VALUE
-            for (k in starts.indices.reversed()) {
+            for (k in starts.size - 1 downTo 0) {
                 val s = starts[k]
                 if (s < newMin) break
                 val segEnd = if (k + 1 < starts.size) starts[k + 1] - 1 else pMax
@@ -155,8 +157,8 @@ internal class DiffnPropagator(
     ): Boolean {
         // Forbidden orthogonal-origin intervals contributed by rectangles whose compulsory primary
         // part overlaps [x, x+size[i]).
-        val lows = ArrayList<Int>()
-        val highs = ArrayList<Int>()
+        val lows = IntArrayList()
+        val highs = IntArrayList()
         for (j in 0 until n) {
             if (j == i || size[j] <= 0 || osize[j] <= 0) continue
             val pcLo = state.intDomains[pos[j]].max
@@ -172,7 +174,7 @@ internal class DiffnPropagator(
         // Scan [oMin, oMax] for an origin not covered by any forbidden interval.
         val oMin = state.intDomains[opos[i]].min
         val oMax = state.intDomains[opos[i]].max
-        val order = lows.indices.sortedBy { lows[it] }
+        val order = (0 until lows.size).sortedBy { lows[it] }
         var cursor = oMin
         for (idx in order) {
             val a = lows[idx]

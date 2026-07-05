@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.PermutationGroup
 
 /**
@@ -41,7 +42,7 @@ class SymmetryHandling(
     override val boolVars: IntArray = support { it.second }
 
     private inline fun support(image: (Pair<IntArray, IntArray>) -> IntArray): IntArray {
-        val moved = HashSet<Int>()
+        val moved = IntHashSet()
         for (g in generators) {
             val map = image(g)
             for (v in map.indices) if (map[v] != v) moved.add(v)

@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAnteced
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /** CP propagation logic for `lex_less` / `lex_lesseq`. */
 internal class LexLessPropagator(
@@ -21,10 +23,11 @@ internal class LexLessPropagator(
      * interior `VALUE_REMOVED` wakes.
      */
     override val initialIntEventWatches: IntArray = run {
-        val distinct = intVars.toHashSet()
+        val distinct = IntHashSet()
+        for (v in intVars) distinct.add(v)
         val out = IntArray(distinct.size * 2)
         var w = 0
-        for (v in distinct) {
+        distinct.forEach { v ->
             out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
             out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
         }
@@ -125,7 +128,7 @@ internal class LexLessPropagator(
      * bounds are level-0 facts and drop out inside [PropagationState.composeIntVarAtomAntecedents].
      */
     private fun reasonVars(a: Int, scanStop: Int, strictHere: Boolean): IntArray {
-        val vars = ArrayList<Int>(2 * (a + 1))
+        val vars = IntArrayList(2 * (a + 1))
         for (j in 0 until a) {
             vars.add(xs[j])
             vars.add(ys[j])

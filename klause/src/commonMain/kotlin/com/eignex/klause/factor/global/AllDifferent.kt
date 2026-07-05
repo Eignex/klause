@@ -14,8 +14,10 @@ import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * `intVars(i) != intVars(j)` for every pair `i < j`. Stored payload:
@@ -180,11 +182,17 @@ class AllDifferent(
      *  common case where each var appears exactly once this is always 1. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
     val occurrencesByVar: IntIntMap = run {
-        val counts = HashMap<Int, Int>()
-        for (v in vars) counts[v] = (counts[v] ?: 0) + 1
+        val counts = MutableIntIntMap()
+        for (v in vars) counts.addTo(v, 1)
+        val keys = IntArrayList(counts.size)
+        val values = IntArrayList(counts.size)
+        counts.forEach { k, count ->
+            keys.add(k)
+            values.add(count)
+        }
         IntIntMap.build(
-            keys = counts.keys.toIntArray(),
-            values = counts.values.toIntArray(),
+            keys = keys.toIntArray(),
+            values = values.toIntArray(),
             absent = 0,
         )
     }

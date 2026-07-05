@@ -143,16 +143,22 @@ internal fun pbDegree(sum: Long, op: PbOp, bound: Int, softCap: Int): Int {
 }
 
 internal fun buildSignedWeightByVar(weights: IntArray, literals: IntArray, exclude: Int = -1): IntIntMap {
-    val signs = HashMap<Int, Int>()
+    val signs = MutableIntIntMap()
     for (i in literals.indices) {
         val v = Lit.variable(literals[i])
         if (v == exclude) continue
         val s = if (Lit.isPositive(literals[i])) weights[i] else -weights[i]
-        signs[v] = (signs[v] ?: 0) + s
+        signs.addTo(v, s)
+    }
+    val keys = IntArrayList(signs.size)
+    val values = IntArrayList(signs.size)
+    signs.forEach { k, value ->
+        keys.add(k)
+        values.add(value)
     }
     return IntIntMap.build(
-        keys = signs.keys.toIntArray(),
-        values = signs.values.toIntArray(),
+        keys = keys.toIntArray(),
+        values = values.toIntArray(),
         absent = 0,
     )
 }
@@ -416,13 +422,19 @@ internal fun buildParityByVar(boolVars: IntArray, literals: IntArray): CoeffLook
 }
 
 internal fun buildSignedLitsByVar(literals: IntArray, exclude: Int = -1): IntIntMap {
-    val signs = HashMap<Int, Int>()
+    val signs = MutableIntIntMap()
     for (lit in literals) {
         val v = Lit.variable(lit)
         if (v == exclude) continue
-        signs[v] = (signs[v] ?: 0) + if (Lit.isPositive(lit)) 1 else -1
+        signs.addTo(v, if (Lit.isPositive(lit)) 1 else -1)
     }
-    return IntIntMap.build(keys = signs.keys.toIntArray(), values = signs.values.toIntArray(), absent = 0)
+    val keys = IntArrayList(signs.size)
+    val values = IntArrayList(signs.size)
+    signs.forEach { k, value ->
+        keys.add(k)
+        values.add(value)
+    }
+    return IntIntMap.build(keys = keys.toIntArray(), values = values.toIntArray(), absent = 0)
 }
 
 internal inline fun nonReifiedBoolUpdateBreakMakeLoop(
