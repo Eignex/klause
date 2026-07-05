@@ -16,8 +16,12 @@ import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
 import com.eignex.klause.localsearch.strategy.LsCatalog
+import com.eignex.klause.portfolio.BacktrackCatalog
+import com.eignex.klause.portfolio.Kind
 import kotlinx.serialization.decodeFromString
 import java.io.File
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -98,10 +102,14 @@ object BenchCli {
      *
      *  - `engine=ls` (default): candidates are [LsCatalog] arm labels (or an `arms=a,b` subset), each
      *    run as `-e ls --param arm=<label>`; scored **incomplete** (LS proves nothing).
+     *  - `engine=cp`: candidates are [BacktrackCatalog] arm labels (or an `arms=a,b` subset), each run
+     *    as `-e cp --param bt-arm=<label>` (a one-arm backtrack pool); scored **complete**.
      *  - `engine=cp-single`: candidates are the `var-selector` heuristics given in `arms=v1,v2`, each
      *    run as `-e cp-single --param var-selector=<v>`; scored **complete**.
      *
-     *  `mode=complete|incomplete` overrides the per-engine default. */
+     *  `mode=complete|incomplete` overrides the per-engine default. `jobs=N` sweeps arms across N
+     *  threads (default one per core); use `jobs=1` for contention-free timing when the `faster`
+     *  tiebreak matters. */
     private fun calibrate(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
@@ -112,8 +120,9 @@ object BenchCli {
         val engine = f["engine"]?.lowercase() ?: "ls"
         val (paramKey, defaults) = when (engine) {
             "ls" -> "arm" to LsCatalog.labels()
+            "cp" -> "bt-arm" to BacktrackCatalog.labels(Kind.COP)
             "cp-single", "cpsingle" -> "var-selector" to emptyList()
-            else -> error("calibrate supports engine=ls | cp-single, got '$engine'")
+            else -> error("calibrate supports engine=ls | cp | cp-single, got '$engine'")
         }
         val arms = f["arms"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?: defaults.ifEmpty { error("engine=$engine needs an arms= list (e.g. arms=vsids,chb,linucb)") }
@@ -124,20 +133,35 @@ object BenchCli {
             else -> error("mode must be complete|incomplete, got '${f["mode"]}'")
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
+        // Arms are independent isolated subprocesses writing distinct output/cache keys, so we sweep
+        // them across `jobs` threads (default: one per core, capped at the arm count). Each arm still
+        // runs its instances serially at processors=1. `jobs=1` keeps timing clean when the `faster`
+        // tiebreak matters (small/final runs); jobs>1 trades some timing-under-contention noise for
+        // wall-clock — fine for the quality-dominated win-share ranking.
+        val jobs = (f["jobs"]?.toIntOrNull() ?: minOf(arms.size, Runtime.getRuntime().availableProcessors()))
+            .coerceAtLeast(1)
         val entries = BenchLoad.resolveRefs(refs)
         println(
             "=== calibrate ($engine): ${arms.size} arm(s) × ${refs.size} instance(s), " +
-                "${budget.timeoutMillis}ms each (isolated) ===",
+                "${budget.timeoutMillis}ms each (isolated, jobs=$jobs) ===",
         )
-        val armDirs = arms.mapNotNull { arm ->
-            val dir = SolveMetric.run(
-                entries,
-                budget,
-                SolverInvocation.KLAUSE,
-                KlauseSearch(engine = engine, processors = 1, params = listOf("$paramKey=$arm")),
-            )
-            dir?.let { arm to it }
-        }.toMap()
+        val pool = Executors.newFixedThreadPool(jobs)
+        val armDirs = try {
+            arms.map { arm ->
+                pool.submit(
+                    Callable {
+                        arm to SolveMetric.run(
+                            entries,
+                            budget,
+                            SolverInvocation.KLAUSE,
+                            KlauseSearch(engine = engine, processors = 1, params = listOf("$paramKey=$arm")),
+                        )
+                    },
+                )
+            }.mapNotNull { future -> future.get().let { (arm, dir) -> dir?.let { arm to dir } } }.toMap()
+        } finally {
+            pool.shutdown()
+        }
         val instances = loadCalibration(armDirs)
         if (instances.isEmpty()) {
             println("\n(no optimize instances scored — pass kind=cop)")
@@ -294,7 +318,7 @@ object BenchCli {
             |
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
-            |  bench calibrate [filters…]            fair-test arms in isolation; per-problem-win diverse palette (kind=cop; engine=ls|cp-single, mode=)
+            |  bench calibrate [filters…]            fair-test arms; diverse palette (kind=cop; engine=ls|cp|cp-single, mode=, jobs=)
             |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |
