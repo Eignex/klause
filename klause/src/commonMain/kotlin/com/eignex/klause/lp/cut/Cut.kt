@@ -19,6 +19,9 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Variable groups that are pairwise all-different, harvested from the LP-relevant globals so the
@@ -233,8 +236,8 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
 
             val assignmentMin = assignmentMin(vars, ctx.session) ?: continue
             // Cut is over the nonzero-cost columns; zero-cost variables only shaped the assignment.
-            val cols = ArrayList<Int>()
-            val coeffs = ArrayList<Long>()
+            val cols = IntArrayList()
+            val coeffs = LongArrayList()
             var lpLhs = 0.0
             for (v in vars) {
                 val c = intCoef.getOrElse(v) { 0L }
@@ -260,12 +263,12 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
      * arithmetic overflows (then no cut is produced — sound, just no strengthening).
      */
     private fun assignmentMin(vars: IntArray, session: PropagationSession): Long? {
-        val valueIndex = HashMap<Int, Int>()
+        val valueIndex = MutableIntIntMap()
         val values = IntArrayList()
         for (v in vars) {
             session.intDomain(v).forEach { value ->
-                if (value !in valueIndex) {
-                    valueIndex[value] = values.size
+                if (!valueIndex.containsKey(value)) {
+                    valueIndex.put(value, values.size)
                     values.add(value)
                 }
             }
@@ -276,7 +279,7 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
             for (i in vars.indices) {
                 val c = intCoef.getOrElse(vars[i]) { 0L }
                 session.intDomain(vars[i]).forEach { value ->
-                    assign.addOption(i, valueIndex.getValue(value), mulExact(c, value.toLong()))
+                    assign.addOption(i, valueIndex.getOrDefault(value, -1), mulExact(c, value.toLong()))
                 }
             }
             val r = assign.solve()
@@ -428,15 +431,15 @@ internal class GccSeparator : CutSeparator {
  * literals — and [baseCliques] lists those at-most-one factors' member variables (pairwise adjacent by
  * construction). Global by construction: every edge is implied by a factor of the original problem.
  */
-internal class ConflictGraph(val adjacency: Map<Int, Set<Int>>, val baseCliques: List<IntArray>)
+internal class ConflictGraph(val adjacency: Map<Int, IntHashSet>, val baseCliques: List<IntArray>)
 
 /** Builds the [ConflictGraph] the knapsack-lifting and clique separators share. */
 internal fun conflictGraph(problem: Problem): ConflictGraph {
-    val adj = HashMap<Int, HashSet<Int>>()
+    val adj = HashMap<Int, IntHashSet>()
     fun edge(a: Int, b: Int) {
         if (a == b) return
-        adj.getOrPut(a) { HashSet() }.add(b)
-        adj.getOrPut(b) { HashSet() }.add(a)
+        adj.getOrPut(a) { IntHashSet() }.add(b)
+        adj.getOrPut(b) { IntHashSet() }.add(a)
     }
 
     val baseCliques = ArrayList<IntArray>()
@@ -536,8 +539,8 @@ internal class KnapsackCoverSeparator : CutSeparator {
             // items, at most one per AMO clique }. The clique cap (GUB lifting) shrinks that max, giving
             // a larger — still valid — αₖ. The max is a small GUB-knapsack solved by DP; skip lifting
             // when the capacity would make the DP too large (emit the bare minimal cover then).
-            val liftedPos = ArrayList<Int>(coverCount)
-            val liftedCoeff = ArrayList<Long>(coverCount)
+            val liftedPos = IntArrayList(coverCount)
+            val liftedCoeff = LongArrayList(coverCount)
             for (i in 0 until k) {
                 if (inCover[i]) {
                     liftedPos.add(i)
@@ -568,7 +571,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
                 }
             }
             var lhs = 0.0
-            for (t in liftedPos.indices) lhs += liftedCoeff[t] * xstar[liftedPos[t]]
+            for (t in 0 until liftedPos.size) lhs += liftedCoeff[t] * xstar[liftedPos[t]]
             if (lhs > r + tol) {
                 val cutCols = IntArray(liftedPos.size) { cols[liftedPos[it]] }
                 val cutCoeff = LongArray(liftedPos.size) { liftedCoeff[it] }
@@ -583,7 +586,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
      *  set of pairwise mutually-exclusive items. Used as the GUB structure for [gubKnapsackMax]. Using
      *  only a partition's worth of edges (cross-group conflicts are ignored) keeps the lifting max an
      *  over-estimate, so the derived coefficients stay valid. */
-    private fun cliquePartition(k: Int, literals: IntArray, conflict: Map<Int, Set<Int>>): IntArray {
+    private fun cliquePartition(k: Int, literals: IntArray, conflict: Map<Int, IntHashSet>): IntArray {
         val vars = IntArray(k) { Lit.variable(literals[it]) }
         fun adjacent(i: Int, j: Int): Boolean = conflict[vars[i]]?.contains(vars[j]) == true
         val group = IntArray(k) { -1 }
@@ -607,20 +610,20 @@ internal class KnapsackCoverSeparator : CutSeparator {
      *  per clique group ([groupOf] over the items' positions). A GUB (generalised-upper-bound) knapsack
      *  solved by DP over the capacity, processing one clique group at a time so each contributes ≤ 1. */
     private fun gubKnapsackMax(
-        lifted: List<Int>,
-        coeff: List<Long>,
+        lifted: IntArrayList,
+        coeff: LongArrayList,
         weights: IntArray,
         groupOf: IntArray,
         cap: Int,
     ): Long {
-        val byGroup = HashMap<Int, MutableList<Int>>()
-        for (t in lifted.indices) byGroup.getOrPut(groupOf[lifted[t]]) { ArrayList() }.add(t)
+        val byGroup = HashMap<Int, IntArrayList>()
+        for (t in 0 until lifted.size) byGroup.getOrPut(groupOf[lifted[t]]) { IntArrayList() }.add(t)
         val dp = LongArray(cap + 1)
         for ((_, idxs) in byGroup) {
             val next = dp.copyOf() // "take none from this group"
-            for (t in idxs) {
+            idxs.forEach { t ->
                 val w = weights[lifted[t]]
-                if (w > cap) continue
+                if (w > cap) return@forEach
                 val v = coeff[t]
                 // dp[c - w] is the pre-group value, so at most one item from the group is taken.
                 for (c in cap downTo w) {
@@ -669,7 +672,8 @@ internal class CliqueCutSeparator : CutSeparator {
         for (base in baseCliques) {
             val clique = base.filter { ctx.relaxation.boolColOf[it] >= 0 }.toMutableList()
             if (clique.size < 2) continue
-            val members = HashSet(clique)
+            val members = IntHashSet()
+            clique.forEach { members.add(it) }
             for (cand in ranked) {
                 if (cand in members) continue
                 val neigh = adj[cand] ?: continue

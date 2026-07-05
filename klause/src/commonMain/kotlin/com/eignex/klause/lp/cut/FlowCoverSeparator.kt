@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.MutableIntIntMap
 import kotlin.math.max
 
 /**
@@ -34,7 +35,7 @@ internal class FlowCoverSeparator : CutSeparator {
         val problem = ctx.problem
         val intColOf = ctx.relaxation.intColOf
         // Explicit VUB per flow variable: yⱼ ≤ uⱼ·xⱼ ⇔ a 2-term Linear `yⱼ − uⱼ·xⱼ ≤ 0`, xⱼ ∈ {0,1}.
-        val indicator = HashMap<Int, Int>()
+        val indicator = MutableIntIntMap()
         val vubCap = HashMap<Int, Long>()
         for (f in problem.factors) {
             if (f !is Linear || f.op != LinearOp.LE || f.vars.size != 2 || f.bound != 0) continue
@@ -42,7 +43,7 @@ internal class FlowCoverSeparator : CutSeparator {
             if (problem.intDomains[x].min != 0 || problem.intDomains[x].max != 1) continue // xⱼ ∈ {0,1}
             val cap = minOf(u, problem.intDomains[y].max.toLong()) // effective flow when xⱼ = 1
             if (cap <= 0L) continue
-            indicator[y] = x
+            indicator.put(y, x)
             vubCap[y] = cap
         }
 
@@ -72,13 +73,13 @@ internal class FlowCoverSeparator : CutSeparator {
      *  a registered VUB, or null when [f] is not that row. */
     private fun explicitArcs(
         f: Linear,
-        indicator: Map<Int, Int>,
+        indicator: MutableIntIntMap,
         vubCap: Map<Int, Long>,
         intColOf: IntArray,
     ): List<Arc>? {
-        if (f.coeffs.any { it != 1 } || f.vars.any { it !in indicator }) return null
+        if (f.coeffs.any { it != 1 } || f.vars.any { !indicator.containsKey(it) }) return null
         return f.vars.map { y ->
-            val x = indicator.getValue(y)
+            val x = indicator.getOrDefault(y, -1)
             if (intColOf[y] < 0 || intColOf[x] < 0) return null
             Arc(flowCol = intColOf[y], flowCoeff = 1L, indicatorCol = intColOf[x], cap = vubCap.getValue(y))
         }

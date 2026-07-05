@@ -14,6 +14,7 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 import kotlin.math.ceil
 
 /**
@@ -86,11 +87,14 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
         } else {
             // Local index space: every bool var that appears in the kept knapsack, a linking row, or the
             // objective. A variable absent from all three contributes nothing and is left out.
-            val index = HashMap<Int, Int>()
+            val index = MutableIntIntMap()
             val ids = IntArrayList()
-            fun local(v: Int): Int = index.getOrPut(v) {
+            fun local(v: Int): Int {
+                if (index.containsKey(v)) return index.getOrDefault(v, -1)
                 ids.add(v)
-                ids.size - 1
+                val idx = ids.size - 1
+                index.put(v, idx)
+                return idx
             }
             for (k in subProblem.literals.indices) local(Lit.variable(subProblem.literals[k]))
             val others = pbs.filter { it !== subProblem }
@@ -98,14 +102,14 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             for (b in objective.boolWeights.indices) if (objective.boolWeights[b] != 0L) local(b)
             varIds = ids.toIntArray()
             index.clear()
-            for (i in varIds.indices) index[varIds[i]] = i
+            for (i in varIds.indices) index.put(varIds[i], i)
 
             cost = LongArray(varIds.size) { objective.boolWeights.getOrElse(varIds[it]) { 0L } }
 
             val kIdx = IntArrayList()
             val kW = LongArrayList()
             for (k in subProblem.literals.indices) {
-                kIdx.add(index.getValue(Lit.variable(subProblem.literals[k])))
+                kIdx.add(index.getOrDefault(Lit.variable(subProblem.literals[k]), -1))
                 kW.add(subProblem.weights[k].toLong())
             }
             kItems = kIdx.toIntArray()
@@ -127,7 +131,7 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
                 var rhs = f.bound.toLong()
                 for (k in f.literals.indices) {
                     val lit = f.literals[k]
-                    cols[k] = index.getValue(Lit.variable(lit))
+                    cols[k] = index.getOrDefault(Lit.variable(lit), -1)
                     val w = f.weights[k].toLong()
                     if (Lit.isPositive(lit)) {
                         vals[k] = w

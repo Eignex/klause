@@ -9,6 +9,7 @@ import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 
 /**
@@ -116,7 +117,7 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
 
     /** Sorted distinct release/deadline values over the active tasks — the interval boundaries. */
     private fun breakpoints(est: IntArray, deadline: IntArray, active: BooleanArray): IntArray {
-        val set = HashSet<Int>()
+        val set = IntHashSet()
         for (i in est.indices) {
             if (!active[i]) continue
             set.add(est[i])

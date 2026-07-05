@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.LongHashSet
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -138,7 +139,7 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
 internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
     if (lpRelaxer == null) return emptyList()
     val out = ArrayList<Linear>()
-    val probed = HashSet<Long>()
+    val probed = LongHashSet()
     var probes = 0
     for (f in problem.factors) {
         if (probes >= SHAVE_MAX_ITERS || token()) break

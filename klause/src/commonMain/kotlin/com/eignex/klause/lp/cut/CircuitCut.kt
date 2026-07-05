@@ -2,6 +2,8 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.util.IntArrayDeque
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongHashSet
 
 /**
  * Arc-indicator model for one [com.eignex.klause.factor.circuit.Circuit]: the LP columns of the
@@ -83,7 +85,7 @@ internal class CircuitSeparator : CutSeparator {
             ec++
         }
         val root = 0
-        val seen = HashSet<Long>()
+        val seen = LongHashSet()
         for (t in 1 until n) {
             val (flow, reach) = maxFlowMinCut(n, eHead, eTo, eNext, capOrig, root, t)
             if (flow >= 1.0 - TOL) continue
@@ -92,7 +94,7 @@ internal class CircuitSeparator : CutSeparator {
             var key = HASH_SEED
             for (i in 0 until n) key = key * HASH_MULT + if (reach[i]) 1L else 0L
             if (!seen.add(key)) continue
-            val cols = ArrayList<Int>()
+            val cols = IntArrayList()
             for (k in model.cols.indices) {
                 if (reach[model.tails[k]] && !reach[model.heads[k]]) cols.add(model.cols[k])
             }

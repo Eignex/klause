@@ -17,6 +17,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Sound LP makespan lower bound for the scheduling globals ([Cumulative] / [Disjunctive]).
@@ -215,7 +216,7 @@ internal class CumulativeRelaxation(
         val cover = HashMap<Int, IntArrayList>()
         for (i in s.starts.indices) {
             if (s.dur[i] <= 0 || s.res[i] <= 0) continue
-            for (m in links.endUpperBoundsOf(s.starts[i], s.dur[i])) {
+            links.endUpperBoundsOf(s.starts[i], s.dur[i]).forEach { m ->
                 cover.getOrPut(m) { IntArrayList() }.add(i)
             }
         }
@@ -310,13 +311,15 @@ internal class CumulativeRelaxation(
         private val geFrom = HashMap<Int, ArrayList<LongArray>>() // value: [w, c]
 
         /** `maxResultsOf[operand]` = `ArrayMinMax(max)` results, each ≥ that operand. */
-        private val maxResultsOf = HashMap<Int, ArrayList<Int>>()
+        private val maxResultsOf = HashMap<Int, IntArrayList>()
 
         init {
             for (f in problem.factors) {
                 when (f) {
                     is Linear -> if (f.vars.size == 2) addLinearLinks(f)
-                    is ArrayMinMax -> if (f.max) for (x in f.xs) maxResultsOf.getOrPut(x) { ArrayList() }.add(f.result)
+                    is ArrayMinMax -> if (f.max) {
+                        for (x in f.xs) maxResultsOf.getOrPut(x) { IntArrayList() }.add(f.result)
+                    }
                     else -> Unit
                 }
             }
@@ -344,8 +347,8 @@ internal class CumulativeRelaxation(
             geFrom.getOrPut(v) { ArrayList() }.add(longArrayOf(w.toLong(), c))
         }
 
-        fun endUpperBoundsOf(start: Int, dur: Int): Set<Int> {
-            val result = HashSet<Int>()
+        fun endUpperBoundsOf(start: Int, dur: Int): IntHashSet {
+            val result = IntHashSet()
             val queue = IntArrayDeque()
             // Seed: vars directly proven ≥ start + c with c ≥ dur are ≥ the task end.
             geFrom[start]?.forEach { wc ->
