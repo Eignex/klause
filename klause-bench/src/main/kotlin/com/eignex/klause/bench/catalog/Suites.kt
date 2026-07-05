@@ -57,7 +57,7 @@ internal object Suites {
                     expected = { LibminizincExpected.parse(it) },
                 )
             },
-            DynamicSuite("hakank", "hakank MiniZinc collection (fetched, sparse minizinc/; 1/family by default)") {
+            DynamicSuite("hakank", "hakank MiniZinc collection (fetched; 1/family by default)") {
                 CorpusSelection.select(
                     ExternalCollections.hakank,
                     CorpusSelection.Layout.FlatMzn("minizinc"),
@@ -506,10 +506,12 @@ internal object ExternalCollections {
     )
     val hakank = ExternalCollection(
         id = "hakank",
-        url = "https://github.com/hakank/hakank.git",
-        license = "GPL (per-file varies)",
-        reason = "large (~1GB); sparse-checkout of the minizinc/ subtree only",
-        fetch = FetchMethod.GitClone(depth = 1, sparsePath = "minizinc"),
+        url = "https://github.com/rasros/hakank.git",
+        license = "MIT (Hakan Kjellerstrand)",
+        reason = "the minizinc/ models from hakank/hakank; upstream is no longer maintained " +
+            "following its author's passing, so fixes for models that no longer flatten under " +
+            "current MiniZinc live in this derived copy",
+        fetch = FetchMethod.GitClone(depth = 1),
     )
     val satlibUf20 = ExternalCollection(
         id = "satlib-uf20-91",
