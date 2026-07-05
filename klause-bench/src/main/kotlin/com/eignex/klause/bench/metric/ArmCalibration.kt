@@ -1,36 +1,19 @@
 package com.eignex.klause.bench.metric
 
-import kotlin.math.abs
-
 /**
- * Fair-tester scoring, aimed at a **complementary, diverse** arm set rather than the single best arm.
- * Each arm is run in **isolation** (one subprocess, full budget, no shared incumbent), so its result
- * on a problem is purely its own. Looking at each problem individually, the best arm(s) *win* it (ties
- * shared); an arm's score is its summed **win share** (`1/co-winners` per problem won) so wins score
- * highly and unique wins score highest, and the **diverse palette** is a greedy set-cover over the
- * per-problem winners — keep arms that win where others don't, drop the redundant ones.
+ * Per-arm credit from **one live portfolio run**, aimed at a **complementary, diverse** arm set rather
+ * than the single best arm. Each problem's winner is its **best-holder** — the arm that produced the
+ * final (best) incumbent, read from the `%%%klause-arm:` attribution of a co-running `-e mixed|ls|cp`
+ * `-p<N>` optimize. An arm's score is its summed **win share** (`1/co-winners` per problem won), and the
+ * **diverse palette** is a greedy set-cover over the per-problem best-holders — keep arms that win where
+ * others don't; an arm always shadowed by a stronger sibling earns no slot.
  *
- * Winners follow one cross-engine MiniZinc-Challenge key (mirrors `compare.sh`): the chain
- * **solved > proved-optimal > objective > faster**. The proof tier credits *any* arm that proves
- * optimality — a backtrack arm closing the bound, or a local-search arm that reaches the objective
- * domain's bound (e.g. finding objective 4 when the domain is `[4,10]`) — so a proved optimum outranks
- * an equal unproved objective; a faster time-to-best breaks an otherwise-equal tie. One key means LS
- * and backtrack arms are directly comparable, so a mixed pool calibrates in a single campaign.
- * A problem every arm ties on (all reach the same outcome) discriminates nothing and is dropped.
+ * This measures each arm's *real marginal contribution* in the pool as it actually runs (with the
+ * portfolio's incumbent/bound sharing), from a single run — so the ranking reflects production, and
+ * evaluating a new candidate is just adding it to the pool. A problem no arm holds a strict incumbent
+ * on contributes nothing and is dropped.
  */
 internal object ArmCalibration {
-
-    /** One arm's isolated run on one optimize instance (model-oriented [finalObjective]). */
-    data class ArmRun(
-        val arm: String,
-        val feasible: Boolean,
-        val finalObjective: Double?,
-        val proven: Boolean,
-        val timeToBestMs: Long?,
-    )
-
-    /** Every arm's run on one optimize instance, with the per-instance direction. */
-    data class Instance(val problem: String, val maximize: Boolean, val runs: List<ArmRun>)
 
     /** Per-arm scores: the summed win share and the count of problems won. */
     data class ArmScore(val arm: String, val winShare: Double, val wins: Int)
@@ -48,58 +31,10 @@ internal object ArmCalibration {
         val diverse: List<DiverseSlot>,
     )
 
-    private const val EPS = 1e-9
-
-    /** The cross-engine win-ranking key (higher is better, compared lexicographically):
-     *  solved > proved-optimal > objective > faster. Infeasible sorts worst. [ArmRun.proven] credits a
-     *  proved optimum from either engine — a backtrack arm closing the bound, or a local-search arm
-     *  reaching the objective domain's bound; time-to-best breaks equal-objective ties (run the final
-     *  campaign at `jobs=1` for contention-free timing). */
-    private fun rankKey(inst: Instance, run: ArmRun): DoubleArray {
-        val solved = if (run.feasible) 1.0 else 0.0
-        val quality = if (run.feasible && run.finalObjective != null) {
-            if (inst.maximize) run.finalObjective else -run.finalObjective
-        } else {
-            Double.NEGATIVE_INFINITY
-        }
-        val proven = if (run.feasible && run.proven) 1.0 else 0.0
-        val faster = -(run.timeToBestMs?.toDouble() ?: Double.MAX_VALUE)
-        return doubleArrayOf(solved, proven, quality, faster)
-    }
-
-    private fun lexCompare(a: DoubleArray, b: DoubleArray): Int {
-        for (i in a.indices) {
-            if (a[i] == b[i]) continue
-            val d = a[i] - b[i]
-            if (d.isFinite() && abs(d) <= EPS) continue
-            return if (a[i] < b[i]) -1 else 1
-        }
-        return 0
-    }
-
-    /** The arms that win [inst]: those maximal on the ranking key (ties shared). Empty when no arm is
-     *  feasible, or when every arm ties (non-discriminating). */
-    private fun winnersOf(inst: Instance): Set<String> {
-        val keys = inst.runs.associate { it.arm to rankKey(inst, it) }
-        val best = keys.values.reduce { a, b -> if (lexCompare(a, b) >= 0) a else b }
-        if (best[0] == 0.0) return emptySet() // no feasible arm
-        val winners = keys.filterValues { lexCompare(it, best) == 0 }.keys
-        return if (winners.size == inst.runs.size) emptySet() else winners
-    }
-
-    /** Score and recalibrate [instances] under the cross-engine Challenge key (see the class KDoc) —
-     *  the **isolated** regime, where each arm's own run yields its per-problem winners. */
-    fun score(instances: List<Instance>): Report {
-        val arms = instances.flatMap { inst -> inst.runs.map { it.arm } }.distinct()
-        val won = instances.map { winnersOf(it) }.filter { it.isNotEmpty() }
-        return scoreWinnerSets(arms, won, instances.size)
-    }
-
-    /** The shared scoring/ranking backend over per-problem winner sets, regime-agnostic: [won] is the
-     *  winner(s) of each discriminating problem (from isolated runs via [winnersOf], or from a live
-     *  portfolio run's best-holder attribution). Emits the win-share tally and the greedy
-     *  marginal-contribution palette. [instances] is the total scored (defaults to the discriminating
-     *  count when the regime has no non-discriminating instances). */
+    /** Score and rank a palette over the per-problem winner sets: [won] is the best-holder(s) of each
+     *  discriminating problem, [arms] every arm that contributed (so a never-winning arm still ranks,
+     *  at zero). Emits the win-share tally and the greedy marginal-contribution palette. [instances] is
+     *  the total scored, defaulting to the discriminating count. */
     fun scoreWinnerSets(arms: List<String>, won: List<Set<String>>, instances: Int = won.size): Report {
         val winShare = HashMap<String, Double>()
         val wins = HashMap<String, Int>()

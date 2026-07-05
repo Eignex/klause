@@ -55,7 +55,7 @@ bench list [<suite>]                 list suites, or the problems in one suite
 
 - **`compare.sh [--incomplete] <dirA> <dirB>`** — score two configs across their shared problems by the [MiniZinc Challenge](https://www.minizinc.org/challenge/2026/rules/) pairwise (Borda) rule: per problem, the better solver scores 1, a tie splits by the time fraction `timeUsed(B)/(timeUsed(A)+timeUsed(B))`, and an unsolved instance scores 0. "Better" is the priority chain solved > optimal > quality, direction-aware. `--complete` (default; the FD/free/parallel/open classes) counts proving optimality as better; `--incomplete` (the local-search class) ignores optimality and flat-scores ties 0.5. Reports each config's total Borda score, strict win/loss/tie counts, the "solves 100% of B's" superset, and any `UNSOUND` clash (A beating a proven optimum, or SAT vs proved-UNSAT).
 
-Per-**arm** credit over one live portfolio config (the old `credit.sh`) is now `bench calibrate regime=portfolio`: it reads the same `%%%klause-arm:` attribution from one `-e mixed -p8` run and ranks arms by best-holder win-share + a greedy marginal-contribution palette.
+Per-**arm** credit over one live portfolio config (the old `credit.sh`) is now `bench calibrate`: it runs the pool once (`engine=mixed|ls|cp`, default `mixed`; `p=` cores, default 8), reads the `%%%klause-arm:` attribution, and ranks arms by best-holder win-share + a greedy marginal-contribution palette. Adding a candidate arm to the pool and re-running is the whole evaluation.
 
 ## Recipes
 
