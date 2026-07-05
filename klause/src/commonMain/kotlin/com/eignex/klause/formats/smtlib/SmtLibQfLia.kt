@@ -8,6 +8,8 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
@@ -64,7 +66,7 @@ object SmtLibQfLia {
         override var trueLitCache: Int = -1
 
         private class Binding(val isBool: Boolean) {
-            var lin: LinTerm? = null
+            var lin: LinComb? = null
             var lit: Int? = null
         }
         private val scopes = ArrayDeque<HashMap<String, Binding>>()
@@ -408,7 +410,7 @@ object SmtLibQfLia {
         }
 
         /** Post pairwise `!=` as linear NE constraints. */
-        private fun assertPairwiseNe(terms: List<LinTerm>) {
+        private fun assertPairwiseNe(terms: List<LinComb>) {
             for ((i, j) in pairs(terms.size)) factors.add(neLinear(terms[i], terms[j]))
         }
 
@@ -419,7 +421,7 @@ object SmtLibQfLia {
         }
 
         /** Channel a bool literal to a fresh 0/1 int term. */
-        private fun litToIntTerm(lit: Int): LinTerm {
+        private fun litToIntTerm(lit: Int): LinComb {
             val z = newInt(0, 1)
             val w = newBool() // w ⇔ lit
             val wlit = Lit.make(w, true)
@@ -434,34 +436,27 @@ object SmtLibQfLia {
                     bound = 1,
                 ),
             )
-            return LinTerm(mapOf(z to 1), 0)
+            return LinComb(mapOf(z to 1), 0)
         }
 
         private fun pairs(n: Int): List<Pair<Int, Int>> =
             buildList { for (i in 0 until n) for (j in i + 1 until n) add(i to j) }
 
-        private fun neLinear(a: LinTerm, b: LinTerm): Linear {
+        private fun neLinear(a: LinComb, b: LinComb): Linear {
             val (vars, coeffs, bound) = diff(a, b)
             return Linear(coeffs, vars, LinearOp.NE, bound)
         }
 
-        private fun reifyNe(a: LinTerm, b: LinTerm): Int = reifyRelTerms(a, b, LinearOp.NE)
-        private fun reifyEq(a: LinTerm, b: LinTerm): Int = reifyRelTerms(a, b, LinearOp.EQ)
+        private fun reifyNe(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.NE)
+        private fun reifyEq(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.EQ)
 
-        private fun reifyRelTerms(a: LinTerm, b: LinTerm, op: LinearOp): Int {
+        private fun reifyRelTerms(a: LinComb, b: LinComb, op: LinearOp): Int {
             val (vars, coeffs, bound) = diff(a, b)
             return reifyLinear(coeffs, vars, op, bound)
         }
 
         /** Build linear coefficients for `a - b op 0`. */
-        private fun diff(a: LinTerm, b: LinTerm): Triple<IntArray, IntArray, Int> {
-            val combined = HashMap(a.coeffs)
-            for ((v, c) in b.coeffs) combined[v] = (combined[v] ?: 0) - c
-            combined.entries.removeAll { it.value == 0 }
-            val bound = b.constant - a.constant
-            val vars = combined.keys.toIntArray()
-            return Triple(vars, IntArray(vars.size) { combined.getValue(vars[it]) }, bound)
-        }
+        private fun diff(a: LinComb, b: LinComb): Triple<IntArray, IntArray, Int> = linCombDiff(a, b)
 
         private fun isArithmeticRelation(t: SExpr.SList): Boolean {
             val arg = t.items.getOrNull(1) ?: return false
@@ -512,23 +507,18 @@ object SmtLibQfLia {
             return Rel(vars, coeffs, linOp, baseBound + delta)
         }
 
-        private data class LinTerm(val coeffs: Map<Int, Int>, val constant: Int) {
-            fun asSimpleVar(): Int? =
-                if (constant == 0 && coeffs.size == 1 && coeffs.values.first() == 1) coeffs.keys.first() else null
-        }
-
-        private fun linearTerm(t: SExpr): LinTerm = when (t) {
+        private fun linearTerm(t: SExpr): LinComb = when (t) {
             is SExpr.Atom -> {
                 val n = t.text.toIntOrNull()
                 when {
-                    n != null -> LinTerm(emptyMap(), n)
+                    n != null -> LinComb(emptyMap(), n)
 
                     isRealLiteral(
                         t.text,
                     ) -> throw UnsupportedSmtException("real literal '${t.text}' (QF_LIA is integer-only)")
 
                     else -> lookup(t.text)?.let { intBinding(t.text, it) }
-                        ?: LinTerm(
+                        ?: LinComb(
                             mapOf(
                                 (intNames[t.text] ?: throw UnsupportedSmtException("unknown int var '${t.text}'")) to 1,
                             ),
@@ -554,7 +544,7 @@ object SmtLibQfLia {
                         val nonConst = parts.filter { it.coeffs.isNotEmpty() }
                         if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
                         val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
-                        if (nonConst.isEmpty()) LinTerm(emptyMap(), k) else scale(nonConst[0], k)
+                        if (nonConst.isEmpty()) LinComb(emptyMap(), k) else scale(nonConst[0], k)
                     }
 
                     "to_real", "to_int" -> linearTerm(args[0])
@@ -568,7 +558,7 @@ object SmtLibQfLia {
             }
         }
 
-        private fun intBinding(name: String, b: Binding): LinTerm {
+        private fun intBinding(name: String, b: Binding): LinComb {
             if (b.isBool) throw UnsupportedSmtException("'$name' used as Int but bound to a Bool term")
             return b.lin ?: throw UnsupportedSmtException("'$name' has no compiled Int value")
         }
@@ -576,13 +566,9 @@ object SmtLibQfLia {
         private fun isRealLiteral(s: String): Boolean =
             s.isNotEmpty() && s.toDoubleOrNull() != null && s.toIntOrNull() == null
 
-        private fun add(a: LinTerm, b: LinTerm): LinTerm {
-            val m = HashMap(a.coeffs)
-            for ((v, c) in b.coeffs) m[v] = (m[v] ?: 0) + c
-            return LinTerm(m, a.constant + b.constant)
-        }
+        private fun add(a: LinComb, b: LinComb): LinComb = a.plus(b)
 
-        private fun scale(a: LinTerm, k: Int): LinTerm = LinTerm(a.coeffs.mapValues { it.value * k }, a.constant * k)
+        private fun scale(a: LinComb, k: Int): LinComb = a.scaled(k)
 
         private fun linearObjective(t: SExpr, negate: Boolean): LinearObjective {
             val lt = linearTerm(t)

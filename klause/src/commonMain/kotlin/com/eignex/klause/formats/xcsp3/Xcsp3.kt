@@ -14,6 +14,8 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
@@ -235,14 +237,8 @@ object Xcsp3 {
         /** Lower `rel(lhs, rhs)` to a [Linear] factor. */
         private fun relationLinear(node: FExpr.Call): Linear {
             val (op, delta) = relOp(node.fn) ?: throw UnsupportedXcsp3Exception("relation '${node.fn}'")
-            val lhs = linear(node.args[0])
-            val rhs = linear(node.args[1])
-            val combined = HashMap(lhs.coeffs)
-            for ((v, c) in rhs.coeffs) combined[v] = (combined[v] ?: 0) - c
-            combined.entries.removeAll { it.value == 0 }
-            val bound = rhs.constant - lhs.constant + delta
-            val vars = combined.keys.toIntArray()
-            return Linear(IntArray(vars.size) { combined.getValue(vars[it]) }, vars, op, bound)
+            val (vars, coeffs, bound) = linCombDiff(linear(node.args[0]), linear(node.args[1]), delta)
+            return Linear(coeffs, vars, op, bound)
         }
 
         private fun count(e: XmlElement) {
@@ -416,12 +412,10 @@ object Xcsp3 {
             }
         }
 
-        private data class Lin(val coeffs: Map<Int, Int>, val constant: Int)
+        private fun linear(e: FExpr): LinComb = when (e) {
+            is FExpr.Num -> LinComb(emptyMap(), e.value)
 
-        private fun linear(e: FExpr): Lin = when (e) {
-            is FExpr.Num -> Lin(emptyMap(), e.value)
-
-            is FExpr.Ref -> Lin(mapOf(ref(e.name) to 1), 0)
+            is FExpr.Ref -> LinComb(mapOf(ref(e.name) to 1), 0)
 
             is FExpr.Call -> when (e.fn) {
                 "add" -> e.args.map { linear(it) }.reduce(::addLin)
@@ -435,19 +429,15 @@ object Xcsp3 {
                     val nonConst = parts.filter { it.coeffs.isNotEmpty() }
                     if (nonConst.size > 1) throw UnsupportedXcsp3Exception("nonlinear mul")
                     val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
-                    if (nonConst.isEmpty()) Lin(emptyMap(), k) else scaleLin(nonConst[0], k)
+                    if (nonConst.isEmpty()) LinComb(emptyMap(), k) else scaleLin(nonConst[0], k)
                 }
 
                 else -> throw UnsupportedXcsp3Exception("arithmetic fn '${e.fn}'")
             }
         }
 
-        private fun addLin(a: Lin, b: Lin): Lin {
-            val m = HashMap(a.coeffs)
-            for ((v, c) in b.coeffs) m[v] = (m[v] ?: 0) + c
-            return Lin(m, a.constant + b.constant)
-        }
-        private fun scaleLin(a: Lin, k: Int) = Lin(a.coeffs.mapValues { it.value * k }, a.constant * k)
+        private fun addLin(a: LinComb, b: LinComb): LinComb = a.plus(b)
+        private fun scaleLin(a: LinComb, k: Int) = a.scaled(k)
 
         /** Resolve one variable/constant term to a var id. */
         private fun singleTermVar(text: String): Int {
