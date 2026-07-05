@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -281,7 +282,7 @@ sealed interface PropagationResult {
 
         /** Intersection of two ascending survivor arrays (two-pointer); result stays ascending. */
         private fun intersectSorted(a: IntArray, b: IntArray): IntArray {
-            val out = ArrayList<Int>(minOf(a.size, b.size))
+            val out = IntArrayList(minOf(a.size, b.size))
             var i = 0
             var j = 0
             while (i < a.size && j < b.size) {
@@ -297,7 +298,7 @@ sealed interface PropagationResult {
                     }
                 }
             }
-            return IntArray(out.size) { out[it] }
+            return out.toIntArray()
         }
 
         /** Shared [PropagationResult] instances. */

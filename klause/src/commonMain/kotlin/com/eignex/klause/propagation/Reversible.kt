@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /*
  * Backtrackable mutable state for incremental propagators, riding the same O(changes-since-mark)
@@ -69,7 +70,7 @@ internal class RevRef<T>(private val state: PropagationState, initial: T) : Trai
 internal class RevLongArray(private val state: PropagationState, size: Int, init: Long = 0L) : Trailed {
     private val data = LongArray(size) { init }
     private val priorIdx = IntArrayList()
-    private val priorVal = ArrayList<Long>()
+    private val priorVal = LongArrayList()
 
     val size: Int get() = data.size
 
@@ -87,7 +88,8 @@ internal class RevLongArray(private val state: PropagationState, size: Int, init
 
     override fun restore() {
         val i = priorIdx.last()
-        data[i] = priorVal.removeAt(priorVal.size - 1)
+        data[i] = priorVal.last()
+        priorVal.truncateTo(priorVal.size - 1)
         priorIdx.truncateTo(priorIdx.size - 1)
     }
 }
