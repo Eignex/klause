@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
 import com.eignex.klause.factor.bool.internals.pbFalseFormAntecedents
+import com.eignex.klause.factor.bool.internals.pbLitRanges
 import com.eignex.klause.factor.bool.internals.pbSumRange
 import com.eignex.klause.factor.bool.internals.propagatePbBounds
 import com.eignex.klause.model.PbOp
@@ -39,26 +41,20 @@ internal class ReifiedPseudoBooleanPropagator(
             PbOp.GE -> sumHi < bnd
             PbOp.EQ -> sumLo > bnd || sumHi < bnd
         }
-        if (alwaysHolds) {
-            val ant = pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0)
-            return state.pinBool(auxBoolVar, true, ant)
-        }
-        if (neverHolds) {
-            val ant = pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0)
-            return state.pinBool(auxBoolVar, false, ant)
-        }
-
-        val aux = state.boolValues[auxBoolVar] ?: return true
-        val auxAntecedent = Lit.make(auxBoolVar, !aux)
-        return if (aux) {
-            propagatePbBounds(state, weights, literals, op, bnd, extraLit = auxAntecedent)
-        } else {
-            when (op) {
-                PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = auxAntecedent)
-                PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = auxAntecedent)
-                PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = auxAntecedent)
-            }
-        }
+        return state.reifiedAuxTail(
+            auxBoolVar,
+            alwaysHolds,
+            neverHolds,
+            pinAntecedent = { pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0) },
+            propagateTrue = { a -> propagatePbBounds(state, weights, literals, op, bnd, extraLit = a) },
+            propagateFalse = { a ->
+                when (op) {
+                    PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = a)
+                    PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = a)
+                    PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = a)
+                }
+            },
+        )
     }
 
     private fun propagatePbNotEqual(
@@ -68,46 +64,17 @@ internal class ReifiedPseudoBooleanPropagator(
         bound: Long,
         extraLit: Int = 0,
     ): Boolean {
-        val n = literals.size
-        val litLo = LongArray(n)
-        val litHi = LongArray(n)
-        var sumLo = 0L
-        var sumHi = 0L
-        for (i in 0 until n) {
-            val w = weights[i].toLong()
-            val v = Lit.variable(literals[i])
-            val b = state.boolValues[v]
-            val lo: Long
-            val hi: Long
-            when {
-                b == null -> {
-                    lo = minOf(0L, w)
-                    hi = maxOf(0L, w)
-                }
-
-                Lit.evaluate(literals[i], b) -> {
-                    lo = w
-                    hi = w
-                }
-
-                else -> {
-                    lo = 0L
-                    hi = 0L
-                }
-            }
-            litLo[i] = lo
-            litHi[i] = hi
-            sumLo += lo
-            sumHi += hi
-        }
+        val r = pbLitRanges(state, weights, literals)
+        val sumLo = r.sumLo
+        val sumHi = r.sumHi
         if (sumLo == bound && sumHi == bound) return false
-        for (i in 0 until n) {
+        for (i in literals.indices) {
             val w = weights[i].toLong()
             if (w == 0L) continue
             val v = Lit.variable(literals[i])
             if (state.boolValues[v] != null) continue
-            val otherLo = sumLo - litLo[i]
-            val otherHi = sumHi - litHi[i]
+            val otherLo = sumLo - r.litLo[i]
+            val otherHi = sumHi - r.litHi[i]
             val trueOk = !(otherLo + w == bound && otherHi + w == bound)
             val falseOk = !(otherLo == bound && otherHi == bound)
             if (!trueOk && !falseOk) return false

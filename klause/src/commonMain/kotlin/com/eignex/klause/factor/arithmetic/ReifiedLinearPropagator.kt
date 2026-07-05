@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecede
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
+import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -73,74 +74,39 @@ internal class ReifiedLinearPropagator(
         // into the always/never-holds region. LCG-style transitive reasoning — each int
         // bound's recorded `intMinAntecedents` / `intMaxAntecedents` traces back to the
         // bool decisions that established it.
-        if (alwaysHolds) {
-            val ant = state.composeIntVarAtomAntecedents(vars)
-            return state.pinBool(auxBoolVar, true, ant)
-        }
-        if (neverHolds) {
-            val ant = state.composeIntVarAtomAntecedents(vars)
-            return state.pinBool(auxBoolVar, false, ant)
-        }
-        // Bounds alone miss the case where a single-term EQ targets a value that is unreachable
-        // *inside* the bound interval — an interior domain hole, or a bound not divisible by the
-        // coefficient. The equality can then never hold, so pin the aux false now with a
-        // hole-aware antecedent. Without this the aux stays free, search may set it true, and the
-        // resulting empty-domain conflict carries a bounds-only (hole-blind) reason that yields an
-        // unsound learned clause — the latent false-UNSAT of #121.
-        if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
-            return state.pinBool(auxBoolVar, false, collectHoleAndBoundAntecedents(state, vars))
-        }
-
-        val aux = state.boolValues[auxBoolVar] ?: return true
         // Thread the aux's current pinning as an extra antecedent for every implied int
         // tighten — the body-propagation path was selected by this pin, so any subsequent
         // conflict must trace back through it.
-        val auxAntecedent = Lit.make(auxBoolVar, !aux)
-        return if (aux) {
-            propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = auxAntecedent, includeExtraLit = true)
-        } else {
-            when (op) {
-                LinearOp.LE -> propagateLinearBounds(
-                    state,
-                    coeffs,
-                    vars,
-                    LinearOp.GE,
-                    bnd + 1,
-                    extraLit = auxAntecedent,
-                    includeExtraLit = true,
-                )
-
-                LinearOp.GE -> propagateLinearBounds(
-                    state,
-                    coeffs,
-                    vars,
-                    LinearOp.LE,
-                    bnd - 1,
-                    extraLit = auxAntecedent,
-                    includeExtraLit = true,
-                )
-
-                LinearOp.EQ -> propagateLinearBounds(
-                    state,
-                    coeffs,
-                    vars,
-                    LinearOp.NE,
-                    bnd,
-                    extraLit = auxAntecedent,
-                    includeExtraLit = true,
-                )
-
-                LinearOp.NE -> propagateLinearBounds(
-                    state,
-                    coeffs,
-                    vars,
-                    LinearOp.EQ,
-                    bnd,
-                    extraLit = auxAntecedent,
-                    includeExtraLit = true,
-                )
-            }
-        }
+        return state.reifiedAuxTail(
+            auxBoolVar,
+            alwaysHolds,
+            neverHolds,
+            pinAntecedent = { state.composeIntVarAtomAntecedents(vars) },
+            // Bounds alone miss the case where a single-term EQ targets a value that is unreachable
+            // *inside* the bound interval — an interior domain hole, or a bound not divisible by the
+            // coefficient. The equality can then never hold, so pin the aux false now with a
+            // hole-aware antecedent. Without this the aux stays free, search may set it true, and the
+            // resulting empty-domain conflict carries a bounds-only (hole-blind) reason that yields an
+            // unsound learned clause — the latent false-UNSAT of #121.
+            extraFalsePin = {
+                if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
+                    state.pinBool(auxBoolVar, false, collectHoleAndBoundAntecedents(state, vars))
+                } else {
+                    null
+                }
+            },
+            propagateTrue = { a ->
+                propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = a, includeExtraLit = true)
+            },
+            propagateFalse = { a ->
+                when (op) {
+                    LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1, a, true)
+                    LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1, a, true)
+                    LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, a, true)
+                    LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, a, true)
+                }
+            },
+        )
     }
 
     /** For a single-term `c·x = bound`, true when `bound/c` is not an integer in `x`'s current

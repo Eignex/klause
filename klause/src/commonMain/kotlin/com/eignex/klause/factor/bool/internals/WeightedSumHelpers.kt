@@ -296,15 +296,13 @@ internal fun pbFalseFormAntecedents(
     return out
 }
 
-// extraLit threads a reif-var pin into each implied propagation's antecedents (0 = none).
-internal fun propagatePbBounds(
-    state: PropagationState,
-    weights: IntArray,
-    literals: IntArray,
-    op: PbOp,
-    bound: Long,
-    extraLit: Int = 0,
-): Boolean {
+/** Per-literal contribution ranges for a weighted-Boolean sum: [litLo]/[litHi] are each literal's
+ *  `[min, max]` contribution (0 or `w` for a determined literal, `[min(0,w), max(0,w)]` for a free
+ *  one), and [sumLo]/[sumHi] are their totals. The accumulation the `≤/≥/=` and `≠` PB propagators
+ *  share before their op-specific feasibility tests. */
+internal class PbRanges(val litLo: LongArray, val litHi: LongArray, val sumLo: Long, val sumHi: Long)
+
+internal fun pbLitRanges(state: PropagationState, weights: IntArray, literals: IntArray): PbRanges {
     val n = literals.size
     val litLo = LongArray(n)
     val litHi = LongArray(n)
@@ -312,8 +310,7 @@ internal fun propagatePbBounds(
     var sumHi = 0L
     for (i in 0 until n) {
         val w = weights[i].toLong()
-        val v = Lit.variable(literals[i])
-        val b = state.boolValues[v]
+        val b = state.boolValues[Lit.variable(literals[i])]
         val lo: Long
         val hi: Long
         when {
@@ -337,18 +334,33 @@ internal fun propagatePbBounds(
         sumLo += lo
         sumHi += hi
     }
+    return PbRanges(litLo, litHi, sumLo, sumHi)
+}
+
+// extraLit threads a reif-var pin into each implied propagation's antecedents (0 = none).
+internal fun propagatePbBounds(
+    state: PropagationState,
+    weights: IntArray,
+    literals: IntArray,
+    op: PbOp,
+    bound: Long,
+    extraLit: Int = 0,
+): Boolean {
+    val r = pbLitRanges(state, weights, literals)
+    val sumLo = r.sumLo
+    val sumHi = r.sumHi
     when (op) {
         PbOp.LE -> if (sumLo > bound) return false
         PbOp.GE -> if (sumHi < bound) return false
         PbOp.EQ -> if (sumLo > bound || sumHi < bound) return false
     }
-    for (i in 0 until n) {
+    for (i in 0 until literals.size) {
         val w = weights[i].toLong()
         if (w == 0L) continue
         val v = Lit.variable(literals[i])
         if (state.boolValues[v] != null) continue
-        val otherLo = sumLo - litLo[i]
-        val otherHi = sumHi - litHi[i]
+        val otherLo = sumLo - r.litLo[i]
+        val otherHi = sumHi - r.litHi[i]
         val trueOk = pbFeasible(op, otherLo + w, otherHi + w, bound)
         val falseOk = pbFeasible(op, otherLo, otherHi, bound)
         if (!trueOk && !falseOk) return false
