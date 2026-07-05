@@ -9,6 +9,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
 /** Resolve a set expression to a [SetVarLayout]. */
@@ -98,7 +99,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
     }
     val xVar = resolveIntVar(elem)
     val dom = intDomains[xVar]
-    val membershipLits = ArrayList<Int>()
+    val membershipLits = IntArrayList()
     for (v in values) {
         // Skip hole values to avoid dead channels and unnecessary reifications.
         if (v !in dom) continue
@@ -112,7 +113,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
                 bound = v,
             ),
         )
-        membershipLits += Lit.make(chan, true)
+        membershipLits.add(Lit.make(chan, true))
     }
     if (rExpr == null) {
         if (membershipLits.isEmpty()) {
@@ -170,7 +171,7 @@ private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, r
 }
 
 private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layout: SetVarLayout, rExpr: FznExpr?) {
-    val membershipLits = ArrayList<Int>()
+    val membershipLits = IntArrayList()
     for (v in xLo..xHi) {
         val chan = allocBool("__set_in_chan_${layout.name}_$v")
         factors.add(
@@ -205,7 +206,7 @@ private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layo
             factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(chan, true))))
             factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(ind, true))))
             factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(chan, false), Lit.make(ind, false))))
-            membershipLits += Lit.make(aux, true)
+            membershipLits.add(Lit.make(aux, true))
         }
     }
     if (rExpr != null) {
@@ -231,12 +232,12 @@ internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) 
         return
     }
     val r = resolveBoolLit(c.args[2])
-    val auxes = ArrayList<Int>(s.elements.size)
+    val auxes = IntArrayList(s.elements.size)
     for (i in s.elements.indices) {
         val sBit = s.indicatorBoolIds[i]
         val tIdx = t.elements.binarySearchInt(s.elements[i])
         val aux = allocBool("__subset_aux_${s.name}_${t.name}_${s.elements[i]}")
-        auxes += Lit.make(aux, true)
+        auxes.add(Lit.make(aux, true))
         if (tIdx < 0) {
             factors.add(Clause(intArrayOf(Lit.make(aux, false), Lit.make(sBit, false))))
             factors.add(Clause(intArrayOf(Lit.make(aux, true), Lit.make(sBit, true))))

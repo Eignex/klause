@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.IntArrayList
 
 /** Parsed OPB instance and optional objective. */
 data class OpbProblem(
@@ -46,7 +47,7 @@ object Opb {
             if (stmt[0] == "min:") {
                 hasObjective = true
                 val (weights, literals) = parseTerms(stmt.subList(1, stmt.size))
-                for (j in weights.indices) {
+                for (j in 0 until weights.size) {
                     val w = weights[j].toDouble()
                     val lit = literals[j]
                     val v = Lit.variable(lit)
@@ -76,7 +77,7 @@ object Opb {
                 "=" -> PbOp.EQ
                 else -> error("unknown OPB operator '${stmt[opIdx]}'")
             }
-            for (lit in literals) {
+            literals.forEach { lit ->
                 val v = Lit.variable(lit)
                 if (v + 1 > numVars) numVars = v + 1
             }
@@ -107,12 +108,12 @@ object Opb {
     }
 
     /** Parse `coef var` pairs into aligned weights and literals. */
-    private fun parseTerms(tokens: List<String>): Pair<List<Int>, List<Int>> {
+    private fun parseTerms(tokens: List<String>): Pair<IntArrayList, IntArrayList> {
         require(tokens.size % 2 == 0) {
             "OPB term sequence must alternate coefficient/variable, got: ${tokens.joinToString(" ")}"
         }
-        val weights = mutableListOf<Int>()
-        val literals = mutableListOf<Int>()
+        val weights = IntArrayList()
+        val literals = IntArrayList()
         var idx = 0
         while (idx < tokens.size) {
             val coef = tokens[idx].toIntOrNull()

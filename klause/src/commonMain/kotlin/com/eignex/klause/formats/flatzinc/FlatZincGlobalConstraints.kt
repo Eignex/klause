@@ -23,6 +23,7 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
@@ -146,7 +147,7 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
             localIdx[node - 1] = 0 // a node explicitly at terminal level
         }
     }
-    val perLayer = Array(numLayers) { ArrayList<Int>() }
+    val perLayer = Array(numLayers) { IntArrayList() }
     for (e in from.indices) {
         val lyr = level[from[e] - 1] - 1
         if (lyr !in 0 until n) continue
@@ -158,11 +159,11 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
             perLayer[lyr].add(dst)
         }
     }
-    val transitions = ArrayList<Int>()
+    val transitions = IntArrayList()
     val layerStarts = IntArray(numLayers) // = n + 1
     for (lyr in 0 until n) {
         layerStarts[lyr] = transitions.size
-        transitions.addAll(perLayer[lyr])
+        perLayer[lyr].forEach { transitions.add(it) }
     }
     layerStarts[n] = transitions.size
     factors.add(

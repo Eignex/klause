@@ -9,6 +9,8 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.binarySearchInt
 
 /** Compile parsed FlatZinc AST into solver data structures. */
@@ -39,7 +41,7 @@ internal class FlatZincCompiler(
 
     fun compile(): FlatZincProgram {
         for (decl in model.varDecls) processDecl(decl)
-        val impliedFactorIds = ArrayList<Int>()
+        val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false
         for (c in model.constraints) {
             val before = factors.size
@@ -53,7 +55,7 @@ internal class FlatZincCompiler(
         val impliedFactorMask = if (impliedFactorIds.isEmpty()) {
             null
         } else {
-            BooleanArray(factors.size).also { for (i in impliedFactorIds) it[i] = true }
+            BooleanArray(factors.size).also { mask -> impliedFactorIds.forEach { i -> mask[i] = true } }
         }
         // A plain base-baked [Problem]; the SAC / failed-literal probing resolved from the presolve
         // config runs later in the presolve lane via [RootBaker] (the kernel never probes itself).
@@ -170,7 +172,7 @@ internal class FlatZincCompiler(
                     "array `$name`: initializer length ${value.elements.size} ≠ declared ${type.length}"
                 }
                 val sharedUniverse: IntArray? = run {
-                    val acc = HashSet<Int>()
+                    val acc = IntHashSet()
                     for (e in value.elements) {
                         if (e is FznExpr.Ident) {
                             val l = setVarsByName[e.name] ?: continue
@@ -187,9 +189,9 @@ internal class FlatZincCompiler(
                     } else {
                         val elemName = "$name[${i + 1}]"
                         val members = resolveSetLiteral(e)
-                        val universeSet = HashSet<Int>()
-                        for (m in members) universeSet += m
-                        if (sharedUniverse != null) for (u in sharedUniverse) universeSet += u
+                        val universeSet = IntHashSet()
+                        for (m in members) universeSet.add(m)
+                        if (sharedUniverse != null) for (u in sharedUniverse) universeSet.add(u)
                         val universe = if (universeSet.isEmpty()) {
                             intArrayOf(0)
                         } else {

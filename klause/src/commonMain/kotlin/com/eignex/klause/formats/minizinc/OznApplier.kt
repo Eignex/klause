@@ -4,6 +4,7 @@ import com.eignex.klause.formats.flatzinc.FlatZincArray
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SetVarLayout
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.IntArrayList
 
 /** Renders solver samples through a parsed `.ozn` template. */
 class OznApplier(oznSource: String) {
@@ -40,7 +41,7 @@ class OznApplier(oznSource: String) {
     }
 
     private fun setBindingFrom(layout: SetVarLayout, sample: Sample): OznValue.SetV {
-        val present = ArrayList<Int>()
+        val present = IntArrayList()
         for (i in layout.elements.indices) {
             if (sample.bools[layout.indicatorBoolIds[i]]) present.add(layout.elements[i])
         }

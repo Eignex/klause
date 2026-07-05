@@ -1,5 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.util.LongArrayList
+
 /** Recursive-descent parser for FlatZinc 1.6. */
 internal class FlatZincParser(private val tokens: List<FznToken>) {
     private var pos: Int = 0
@@ -124,7 +126,7 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
         }
         if (tok is FznToken.Punct && tok.symbol == "{") {
             advance()
-            val values = ArrayList<Long>()
+            val values = LongArrayList()
             if (peek() !is FznToken.Punct || (peek() as FznToken.Punct).symbol != "}") {
                 values.add(expectIntLit())
                 while (matchPunct(",")) values.add(expectIntLit())
@@ -297,7 +299,7 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
 
     private fun parseIntSetLit(): FznExpr {
         expect("{", "expected `{`")
-        val values = ArrayList<Long>()
+        val values = LongArrayList()
         if (peek() !is FznToken.Punct || (peek() as FznToken.Punct).symbol != "}") {
             values.add(expectIntLit())
             while (matchPunct(",")) values.add(expectIntLit())

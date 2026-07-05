@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.*
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import kotlin.math.*
 
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
@@ -177,7 +178,7 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     val stepA = if (a.buckets > 1) (a.hi - a.lo) / (a.buckets - 1) else 0.0
     val stepB = if (b.buckets > 1) (b.hi - b.lo) / (b.buckets - 1) else 0.0
     val stepC = if (cBk.buckets > 1) (cBk.hi - cBk.lo) / (cBk.buckets - 1) else 0.0
-    val rows = ArrayList<Int>(a.buckets * b.buckets * 3)
+    val rows = IntArrayList(a.buckets * b.buckets * 3)
     val tolerance = 0.5 // round to nearest bucket
     for (ia in 0 until a.buckets) {
         val va = a.lo + ia * stepA
