@@ -128,7 +128,7 @@ internal object SolverInvocation {
                 // klause proves the optimum (#477).
                 add("--output-objective")
             }
-            // No -f for klause: the engine enum encodes free vs fixed (cp/mixed/ls/cp-single = free,
+            // No -f for klause: the engine enum encodes free vs fixed (cp/mixed/ls = free,
             // fixed = annotation). -f is only for references (minizincCommand).
             s.engine?.let {
                 add("-e")

@@ -1,7 +1,6 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.backtrack.selector.Chb
@@ -104,37 +103,16 @@ internal class EngineParams(pairs: List<String>) {
         }
     }
 
-    /** [seed] feeds the LinUCB selector's RNG so an A/B is reproducible under the run's `seed`. */
-    fun varSelector(key: String, seed: Long?): VariableSelector? = map.remove(key)?.let { raw ->
-        when (VarSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${VarSelectorKind.ids()}, got `$raw`")) {
-            VarSelectorKind.VSIDS -> Vsids()
-            VarSelectorKind.CHB -> Chb()
-            VarSelectorKind.LINUCB -> RegressionVariableSelector.linUcb(seed = seed ?: 0L)
-            VarSelectorKind.RANDOM -> RandomVariable
-            VarSelectorKind.INPUT_ORDER -> InputOrder
-            VarSelectorKind.SMALLEST_DOMAIN -> SmallestDomain
-            VarSelectorKind.LARGEST_DOMAIN -> LargestDomain
-            VarSelectorKind.SMALLEST_LOWER_BOUND -> SmallestLowerBound
-            VarSelectorKind.LARGEST_UPPER_BOUND -> LargestUpperBound
-            VarSelectorKind.DOMAIN_MAX_REGRET -> DomainMaxRegret
-        }
+    /** Consume and validate the var-selector [key] into its [VarSelectorKind] (the instance is built
+     *  fresh per worker via [VarSelectorKind.selector]); null when absent. */
+    fun varSelectorKind(key: String): VarSelectorKind? = map.remove(key)?.let { raw ->
+        VarSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${VarSelectorKind.ids()}, got `$raw`")
     }
 
-    fun valSelector(key: String): ValueSelector? = map.remove(key)?.let { raw ->
-        when (ValSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${ValSelectorKind.ids()}, got `$raw`")) {
-            ValSelectorKind.RANDOM -> IndomainRandom
-            ValSelectorKind.MIN -> IndomainMin
-            ValSelectorKind.MAX -> IndomainMax
-            ValSelectorKind.MIDDLE -> IndomainMiddle
-            ValSelectorKind.MEDIAN -> IndomainMedian
-            ValSelectorKind.SPLIT -> IndomainSplit
-            ValSelectorKind.SOLUTION_GUIDED -> SolutionGuided(IndomainMin)
-        }
+    /** Consume and validate the val-selector [key] into its [ValSelectorKind]; null when absent. */
+    fun valSelectorKind(key: String): ValSelectorKind? = map.remove(key)?.let { raw ->
+        ValSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${ValSelectorKind.ids()}, got `$raw`")
     }
-
-    /** Whether any of [keys] is present, without consuming it — a peek used to branch before the
-     *  consuming reads run (e.g. detecting per-solver overrides to resolve a one-arm pool). */
-    fun anyPresent(keys: List<String>): Boolean = keys.any { it in map }
 
     /** Call after an engine consumed its keys: anything left over is a typo or a key for
      *  another engine — reject loudly rather than ignore. */
@@ -150,41 +128,66 @@ internal class EngineParams(pairs: List<String>) {
     }
 }
 
-/** The backtrack override keys consumed by [mergeBacktrackParams], excluding `seed` (owned by the
- *  naked engine / the portfolio scenario) — the presence set that triggers a one-arm override pool. */
+/** The backtrack override keys consumed by [backtrackOverride], excluding `seed` (owned by the naked
+ *  engine / the portfolio scenario) — the set that, when present, edits the `cp` arm pool. */
 internal val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "phase-saving", "target-phasing", "rephase-interval",
     "max-learned", "lbd-glue", "tiered-db", "mid-lbd", "vivification", "vivify-batch",
     "lp-objective-cone", "lp-auto-off-reprobe", "lp-knapsack-lagrangian", "var-selector", "val-selector",
 )
 
-/** Merge the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] onto [base], without touching
- *  `seed` (the caller owns it) or calling [EngineParams.finish] (the caller gates leftovers). Shared by
- *  the naked `fixed` engine and the `cp` portfolio's one-arm override resolution. [allowSelectors] gates
- *  the `var-selector`/`val-selector` keys: they configure a single free backtrack solver, so the
- *  annotation-following `fixed` engine passes `false` (the annotation decides the heuristic). */
-internal fun mergeBacktrackParams(base: BacktrackParams, p: EngineParams, allowSelectors: Boolean): BacktrackParams {
-    var out = base
-    p.long("max-decisions")?.let { out = out.copy(maxDecisions = it) }
-    p.long("luby")?.let { out = out.copy(lubyRestartBase = it) }
-    p.bool("adaptive-restart")?.let { out = out.copy(adaptiveRestart = it) }
-    p.bool("phase-saving")?.let { out = out.copy(phaseSaving = it) }
-    p.bool("target-phasing")?.let { out = out.copy(targetPhasing = it) }
-    p.long("rephase-interval")?.let { out = out.copy(rephaseInterval = it) }
-    p.int("max-learned")?.let { out = out.copy(maxLearnedClauses = it) }
-    p.int("lbd-glue")?.let { out = out.copy(lbdGlueThreshold = it) }
-    p.bool("tiered-db")?.let { out = out.copy(tieredLearnedDb = it) }
-    p.int("mid-lbd")?.let { out = out.copy(midLbdThreshold = it) }
-    p.bool("vivification")?.let { out = out.copy(vivification = it) }
-    p.int("vivify-batch")?.let { out = out.copy(vivifyBatch = it) }
-    p.bool("lp-objective-cone")?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
-    p.bool("lp-auto-off-reprobe")?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
-    p.bool("lp-knapsack-lagrangian")?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
-    if (allowSelectors) {
-        p.varSelector("var-selector", out.randomSeed)?.let { out = out.copy(variableSelector = it) }
-        p.valSelector("val-selector")?.let { out = out.copy(valueSelector = it) }
+/** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
+ *  reusable [BacktrackParams] edit — applied to *each arm* of a pool the way the `ls` axis edits are, so
+ *  `-e cp -p8 --param var-selector=vsids` still runs a full 8-worker portfolio with the override pinned
+ *  across it (the arms keep their own seed/lp/luby diversity). Selectors are rebuilt **per worker** (the
+ *  edit closure constructs a fresh instance from the arm's seed), so parallel arms never share mutable
+ *  heuristic state. `seed` is left to the caller. [allowSelectors] gates the `var-selector`/`val-selector`
+ *  keys: the annotation-following `fixed` engine passes `false` (the annotation decides the heuristic).
+ *  Null when no override key is present. */
+internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
+    val maxDecisions = p.long("max-decisions")
+    val luby = p.long("luby")
+    val adaptiveRestart = p.bool("adaptive-restart")
+    val phaseSaving = p.bool("phase-saving")
+    val targetPhasing = p.bool("target-phasing")
+    val rephaseInterval = p.long("rephase-interval")
+    val maxLearned = p.int("max-learned")
+    val lbdGlue = p.int("lbd-glue")
+    val tieredDb = p.bool("tiered-db")
+    val midLbd = p.int("mid-lbd")
+    val vivification = p.bool("vivification")
+    val vivifyBatch = p.int("vivify-batch")
+    val lpCone = p.bool("lp-objective-cone")
+    val lpAutoOff = p.bool("lp-auto-off-reprobe")
+    val lpKnapsack = p.bool("lp-knapsack-lagrangian")
+    val varKind = if (allowSelectors) p.varSelectorKind("var-selector") else null
+    val valKind = if (allowSelectors) p.valSelectorKind("val-selector") else null
+    val scalars = listOf(
+        maxDecisions, luby, adaptiveRestart, phaseSaving, targetPhasing, rephaseInterval, maxLearned,
+        lbdGlue, tieredDb, midLbd, vivification, vivifyBatch, lpCone, lpAutoOff, lpKnapsack,
+    )
+    if (scalars.all { it == null } && varKind == null && valKind == null) return null
+    return { base ->
+        var out = base
+        maxDecisions?.let { out = out.copy(maxDecisions = it) }
+        luby?.let { out = out.copy(lubyRestartBase = it) }
+        adaptiveRestart?.let { out = out.copy(adaptiveRestart = it) }
+        phaseSaving?.let { out = out.copy(phaseSaving = it) }
+        targetPhasing?.let { out = out.copy(targetPhasing = it) }
+        rephaseInterval?.let { out = out.copy(rephaseInterval = it) }
+        maxLearned?.let { out = out.copy(maxLearnedClauses = it) }
+        lbdGlue?.let { out = out.copy(lbdGlueThreshold = it) }
+        tieredDb?.let { out = out.copy(tieredLearnedDb = it) }
+        midLbd?.let { out = out.copy(midLbdThreshold = it) }
+        vivification?.let { out = out.copy(vivification = it) }
+        vivifyBatch?.let { out = out.copy(vivifyBatch = it) }
+        lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
+        lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
+        lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
+        varKind?.let { out = out.copy(variableSelector = it.selector(out.randomSeed)) }
+        valKind?.let { out = out.copy(valueSelector = it.selector()) }
+        out
     }
-    return out
 }
 
 /** Apply `--param` overrides for the naked `fixed` backtrack solve on top of [base] and reject any
@@ -193,7 +196,7 @@ internal fun mergeBacktrackParams(base: BacktrackParams, p: EngineParams, allowS
 internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
-    out = mergeBacktrackParams(out, p, allowSelectors = false)
+    backtrackOverride(p, allowSelectors = false)?.let { out = it(out) }
     p.finish("cp", "seed, ${BACKTRACK_OVERRIDE_KEYS.dropLast(2).joinToString()}")
     return out
 }
@@ -540,16 +543,18 @@ internal fun buildPortfolioScenario(
  *  - `bt-arm=label,label` pins named [BacktrackCatalog] arms, each validated for [kind] (so a CSP
  *    rejects the COP-only LP/LinUCB arms); an unknown label is a hard usage error.
  *  - the per-solver override keys ([BACKTRACK_OVERRIDE_KEYS] — `var-selector`/`val-selector`/`luby`/…)
- *    resolve a *one-arm* override pool over the conflict-driven base, for single-solver heuristic A/B
- *    (subsuming the former `cp-single` engine).
+ *    *edit the curated pool* ([backtrackOverride]): every arm keeps its own seed/lp/luby diversity with
+ *    the override pinned across it, so `-p8 -e cp --param var-selector=vsids` stays a full 8-worker pool
+ *    (the arms converge to one only if the overrides pin every distinguishing axis). This subsumes the
+ *    former single `cp-single` engine — its one-solver A/B is just this pool at `-p1`.
  *
  * `null` when neither is set — the curated pool is used. A resolved pool is the *set* of arms; the
  * worker *count* still comes from `arms=`/`bt=`/the default and wraps over it, exactly as `lsPool` does.
  */
 internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? {
     val btArm = p.string("bt-arm")
-    val hasOverrides = p.anyPresent(BACKTRACK_OVERRIDE_KEYS)
-    if (btArm != null && hasOverrides) {
+    val edit = backtrackOverride(p, allowSelectors = true)
+    if (btArm != null && edit != null) {
         usageError(
             "cp: bt-arm= pins catalog arms and is mutually exclusive with per-solver overrides " +
                 "(${BACKTRACK_OVERRIDE_KEYS.joinToString()})",
@@ -566,14 +571,16 @@ internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> Backtrack
         }
         return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
     }
-    if (!hasOverrides) return null
-    // A single override arm: bake the overrides once (per-worker seed/sink are copied in the factory,
-    // exactly as BacktrackWorkerConfig.ofParams does for the annotation arm).
-    val template = mergeBacktrackParams(BacktrackPresets.conflictDriven(), p, allowSelectors = true)
-    return listOf({
-        BacktrackRecipe("cp-override") { seed, onEvent -> template.copy(randomSeed = seed, onEvent = onEvent) }
-    })
+    if (edit == null) return null
+    // Edit every curated arm, exactly as resolveLsRecipes edits its pool. The edit rebuilds selectors
+    // per worker (fresh mutable state), so the wrapped factory stays safe across parallel slots.
+    return BacktrackCatalog.factories(kind).map { factory -> { editRecipe(factory(), edit) } }
 }
+
+/** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector
+ *  state stays unshared. Preserves the arm's label for telemetry / the `dry-run-solver` listing. */
+private fun editRecipe(recipe: BacktrackRecipe, edit: (BacktrackParams) -> BacktrackParams): BacktrackRecipe =
+    BacktrackRecipe(recipe.label) { seed, onEvent -> edit(recipe.build(seed, onEvent)) }
 
 /** Auto-tuned default arm-pool size, scaling with the core count (#406): [ARMS_PER_CORE] arms per
  *  core — always *more* arms than cores, so the bandit (single core) / parallel race always has a
@@ -601,6 +608,21 @@ internal enum class VarSelectorKind(val id: String) {
     DOMAIN_MAX_REGRET("domain-max-regret"),
     ;
 
+    /** A **fresh** selector instance (constructed per worker so parallel arms never share mutable
+     *  heuristic state); [seed] feeds the LinUCB RNG so an A/B is reproducible under the run seed. */
+    fun selector(seed: Long?): VariableSelector = when (this) {
+        VSIDS -> Vsids()
+        CHB -> Chb()
+        LINUCB -> RegressionVariableSelector.linUcb(seed = seed ?: 0L)
+        RANDOM -> RandomVariable
+        INPUT_ORDER -> InputOrder
+        SMALLEST_DOMAIN -> SmallestDomain
+        LARGEST_DOMAIN -> LargestDomain
+        SMALLEST_LOWER_BOUND -> SmallestLowerBound
+        LARGEST_UPPER_BOUND -> LargestUpperBound
+        DOMAIN_MAX_REGRET -> DomainMaxRegret
+    }
+
     companion object {
         private val byId = entries.associateBy { it.id }
         fun fromId(token: String): VarSelectorKind? = byId[token.trim().lowercase()]
@@ -620,6 +642,18 @@ internal enum class ValSelectorKind(val id: String) {
     SPLIT("split"),
     SOLUTION_GUIDED("solution-guided"),
     ;
+
+    /** A **fresh** value selector instance (constructed per worker so parallel arms never share
+     *  mutable state, e.g. the random selector's RNG). */
+    fun selector(): ValueSelector = when (this) {
+        RANDOM -> IndomainRandom
+        MIN -> IndomainMin
+        MAX -> IndomainMax
+        MIDDLE -> IndomainMiddle
+        MEDIAN -> IndomainMedian
+        SPLIT -> IndomainSplit
+        SOLUTION_GUIDED -> SolutionGuided(IndomainMin)
+    }
 
     companion object {
         private val byId = entries.associateBy { it.id }

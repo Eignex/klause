@@ -30,7 +30,7 @@ import java.io.File
  * Filters: `suite=a,b` (the token `core` expands to the in-process core) `kind=cop|csp`
  * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
  * `backend=choco|gecode|yuck` (the solver; default klause) `timeout=<ms>`
- * `engine=fixed|cp|mixed|ls|cp-single|ls-single` `processors=N` `fixed=true` (references) `param=key=value`
+ * `engine=fixed|cp|mixed|ls` `processors=N` `fixed=true` (references) `param=key=value`
  * `lp=off|conservative|balanced|aggressive[±id…]` (klause-cli `--lp` LP-relaxation emphasis)
  * `presolve=off|conservative|default|aggressive[,±pass…]` (klause-cli `--presolve` presolve emphasis + deltas)
  * `label=<name>` (tag the run — e.g. a klause version — so re-runs coexist instead of overwriting)
@@ -168,15 +168,13 @@ object BenchCli {
     }
 
     /** Map an `engine=` alias to a klause-cli `-e` value. The cli owns the model (fixed | cp | mixed |
-     *  ls | cp-single); the bench just forwards. */
+     *  ls); the bench just forwards. */
     private fun parseEngine(name: String): String = when (name.lowercase()) {
         "cp", "backtrack", "bt" -> "cp"
         "ls", "localsearch", "local-search" -> "ls"
         "mixed", "portfolio", "pf" -> "mixed"
         "fixed", "fd" -> "fixed"
-        "cp-single", "cpsingle" -> "cp-single"
-        "ls-single", "lssingle" -> "ls-single"
-        else -> error("engine must be fixed|cp|mixed|ls|cp-single|ls-single, got '$name'")
+        else -> error("engine must be fixed|cp|mixed|ls, got '$name'")
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
@@ -271,10 +269,10 @@ object BenchCli {
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
-            |         engine=fixed|cp|mixed|ls|cp-single|ls-single processors=N (klause search for solve)
+            |         engine=fixed|cp|mixed|ls processors=N (klause search for solve)
             |         lp=off|conservative|balanced|aggressive[±id] (klause-cli --lp LP emphasis)
             |         presolve=off|conservative|default|aggressive[,±pass] (klause-cli --presolve)
-            |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; var-/val-selector resolve a cp override arm)
+            |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; var-/val-selector edit the cp pool)
             |         label=<name> (tag the run, e.g. a klause version, so re-runs coexist as distinct dirs)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |
