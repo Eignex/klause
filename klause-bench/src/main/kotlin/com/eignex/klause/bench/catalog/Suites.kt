@@ -512,6 +512,7 @@ internal object ExternalCollections {
             "following its author's passing, so fixes for models that no longer flatten under " +
             "current MiniZinc live in this derived copy",
         fetch = FetchMethod.GitClone(depth = 1),
+        includeDirs = listOf("minizinc/lib"),
     )
     val satlibUf20 = ExternalCollection(
         id = "satlib-uf20-91",
