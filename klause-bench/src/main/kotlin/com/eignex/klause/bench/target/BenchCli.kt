@@ -10,6 +10,7 @@ import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
@@ -95,22 +96,22 @@ object BenchCli {
         )
     }
 
-    /** The fair arm tester: run every candidate arm **in isolation** (one subprocess each, full
-     *  budget, single core — no shared incumbent) over the selection, then score by the MiniZinc-
-     *  Challenge rules and recalibrate a diverse palette (see [ArmCalibration]). Optimize instances
-     *  only (pass `kind=cop`).
+    /** The fair arm tester: score arms into a diverse palette (see [ArmCalibration]) under a `regime=`:
      *
-     *  - `engine=ls` (default): candidates are [LsCatalog] arm labels (or an `arms=a,b` subset), each
-     *    run as `-e ls --param arm=<label>`. LS proves only by reaching the objective bound.
-     *  - `engine=cp`: candidates are [BacktrackCatalog] arm labels (or an `arms=a,b` subset), each run
-     *    as `-e cp --param bt-arm=<label>` (a one-arm backtrack pool).
-     *  - `engine=cp-single`: candidates are the `var-selector` heuristics given in `arms=v1,v2`, each
-     *    run as `-e cp-single --param var-selector=<v>`.
+     *  - `regime=isolated` (default): each candidate arm runs in its own subprocess (full budget,
+     *    single core, no shared incumbent) and scores its own per-problem results — unconfounded
+     *    candidate evaluation. Candidates come from `engine=`:
+     *      - `ls` (default): [LsCatalog] labels, run `-e ls --param arm=<label>`.
+     *      - `cp`: [BacktrackCatalog] labels, run `-e cp --param bt-arm=<label>` (a one-arm pool).
+     *      - `cp-single`: the `var-selector` heuristics in `arms=v1,v2`, run `-e cp-single`.
+     *    `jobs=N` sweeps arms across N threads (default one per core); use `jobs=1` for contention-free
+     *    timing when the `faster` tiebreak matters.
+     *  - `regime=portfolio`: one live `-e mixed -p<p>` run (`p=`, default 8), scoring each problem's
+     *    best-holder from the `%%%klause-arm:` attribution — in-situ pool validation (the old
+     *    `credit.sh`).
      *
-     *  All engines score on the one cross-engine Challenge key (see [ArmCalibration]), so an LS+CP
-     *  mix is comparable. `jobs=N` sweeps arms across N threads (default one per core); use `jobs=1`
-     *  for contention-free timing when the `faster`
-     *  tiebreak matters. */
+     *  Both regimes feed the one cross-engine Challenge key, so an LS+CP mix is comparable. Optimize
+     *  instances only (pass `kind=cop`). */
     private fun calibrate(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
@@ -118,6 +119,18 @@ object BenchCli {
             println("(no problems matched the selection)")
             return
         }
+        val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
+        val entries = BenchLoad.resolveRefs(refs)
+        when (f["regime"]?.lowercase() ?: "isolated") {
+            "isolated" -> calibrateIsolated(f, entries, budget)
+            "portfolio" -> calibratePortfolio(f, entries, budget)
+            else -> error("regime must be isolated | portfolio, got '${f["regime"]}'")
+        }
+    }
+
+    /** The **isolated** regime: run each arm in its own subprocess (full budget, single core, no
+     *  shared incumbent) and score its own per-problem results. Unconfounded candidate evaluation. */
+    private fun calibrateIsolated(f: Map<String, String>, entries: List<ResolvedProblem>, budget: Budget) {
         val engine = f["engine"]?.lowercase() ?: "ls"
         val (paramKey, defaults) = when (engine) {
             "ls" -> "arm" to LsCatalog.labels()
@@ -127,7 +140,6 @@ object BenchCli {
         }
         val arms = f["arms"]?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }
             ?: defaults.ifEmpty { error("engine=$engine needs an arms= list (e.g. arms=vsids,chb,linucb)") }
-        val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         // Arms are independent isolated subprocesses writing distinct output/cache keys, so we sweep
         // them across `jobs` threads (default: one per core, capped at the arm count). Each arm still
         // runs its instances serially at processors=1. `jobs=1` keeps timing clean when the `faster`
@@ -135,9 +147,8 @@ object BenchCli {
         // wall-clock — fine for the quality-dominated win-share ranking.
         val jobs = (f["jobs"]?.toIntOrNull() ?: minOf(arms.size, Runtime.getRuntime().availableProcessors()))
             .coerceAtLeast(1)
-        val entries = BenchLoad.resolveRefs(refs)
         println(
-            "=== calibrate ($engine): ${arms.size} arm(s) × ${refs.size} instance(s), " +
+            "=== calibrate ($engine): ${arms.size} arm(s) × ${entries.size} instance(s), " +
                 "${budget.timeoutMillis}ms each (isolated, jobs=$jobs) ===",
         )
         val pool = Executors.newFixedThreadPool(jobs)
@@ -164,6 +175,45 @@ object BenchCli {
         }
         println()
         println(ArmCalibration.render(ArmCalibration.score(instances)))
+    }
+
+    /** The **portfolio** regime: one live `-e mixed -p<cores>` run (attribution always on under `-s`).
+     *  Each problem's winner is its best-holder — the arm of the final strict improvement — so the
+     *  set-cover palette maximises the pool's virtual-best coverage. In-situ pool validation; this is
+     *  what `credit.sh` did, folded into the harness. `p=` sets the core count (default 8). */
+    private fun calibratePortfolio(f: Map<String, String>, entries: List<ResolvedProblem>, budget: Budget) {
+        val cores = f["p"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
+        println("=== calibrate (portfolio, -p$cores): ${entries.size} instance(s), ${budget.timeoutMillis}ms ===")
+        val dir = SolveMetric.run(
+            entries,
+            budget,
+            SolverInvocation.KLAUSE,
+            KlauseSearch(engine = "mixed", processors = cores),
+        ) ?: return
+        val (arms, won) = portfolioWinners(dir)
+        if (won.isEmpty()) {
+            println(
+                "\n(no optimize instances with attribution — pass kind=cop; -e mixed emits %%%klause-arm: under -s)",
+            )
+            return
+        }
+        println()
+        println(ArmCalibration.render(ArmCalibration.scoreWinnerSets(arms, won)))
+    }
+
+    /** From a portfolio run's per-problem records: every contributing arm label (the ranking pool) and,
+     *  per optimize instance with attribution, the best-holder winner set (the final improvement's arm). */
+    private fun portfolioWinners(dir: File): Pair<List<String>, List<Set<String>>> {
+        val arms = LinkedHashSet<String>()
+        val won = ArrayList<Set<String>>()
+        dir.listFiles { file -> file.extension == "json" }?.sortedBy { it.name }?.forEach { jsonFile ->
+            val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
+            if (rec != null && rec.kind == "optimize" && rec.attribution.isNotEmpty()) {
+                rec.attribution.forEach { arms += it.label }
+                won += setOf(rec.attribution.last().label)
+            }
+        }
+        return arms.toList() to won
     }
 
     /** Read each arm's isolated `solve` output dir back into per-instance [ArmCalibration.Instance]s,
@@ -313,7 +363,7 @@ object BenchCli {
             |
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
-            |  bench calibrate [filters…]            fair-test arms; diverse palette (kind=cop; engine=ls|cp|cp-single, mode=, jobs=)
+            |  bench calibrate [filters…]            palette (kind=cop; regime=isolated|portfolio, engine=ls|cp|cp-single, jobs=, p=)
             |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |

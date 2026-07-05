@@ -87,11 +87,20 @@ internal object ArmCalibration {
         return if (winners.size == inst.runs.size) emptySet() else winners
     }
 
-    /** Score and recalibrate [instances] under the cross-engine Challenge key (see the class KDoc). */
+    /** Score and recalibrate [instances] under the cross-engine Challenge key (see the class KDoc) —
+     *  the **isolated** regime, where each arm's own run yields its per-problem winners. */
     fun score(instances: List<Instance>): Report {
         val arms = instances.flatMap { inst -> inst.runs.map { it.arm } }.distinct()
         val won = instances.map { winnersOf(it) }.filter { it.isNotEmpty() }
+        return scoreWinnerSets(arms, won, instances.size)
+    }
 
+    /** The shared scoring/ranking backend over per-problem winner sets, regime-agnostic: [won] is the
+     *  winner(s) of each discriminating problem (from isolated runs via [winnersOf], or from a live
+     *  portfolio run's best-holder attribution). Emits the win-share tally and the greedy
+     *  marginal-contribution palette. [instances] is the total scored (defaults to the discriminating
+     *  count when the regime has no non-discriminating instances). */
+    fun scoreWinnerSets(arms: List<String>, won: List<Set<String>>, instances: Int = won.size): Report {
         val winShare = HashMap<String, Double>()
         val wins = HashMap<String, Int>()
         for (winners in won) {
@@ -101,10 +110,9 @@ internal object ArmCalibration {
                 wins[arm] = (wins[arm] ?: 0) + 1
             }
         }
-
         val scores = arms.map { ArmScore(it, winShare[it] ?: 0.0, wins[it] ?: 0) }
             .sortedByDescending { it.winShare }
-        return Report(instances.size, won.size, scores, greedyDiverse(arms, won, winShare))
+        return Report(instances, won.size, scores, greedyDiverse(arms, won, winShare))
     }
 
     /** Rank *every* arm by greedy marginal contribution over the per-problem [won] winner sets: each

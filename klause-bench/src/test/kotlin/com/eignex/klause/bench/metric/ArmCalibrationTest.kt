@@ -66,6 +66,15 @@ class ArmCalibrationTest {
     }
 
     @Test
+    fun `scoreWinnerSets ranks a palette from winner sets directly`() {
+        // The portfolio-regime entry point: winner sets (best-holder per problem) fed straight in.
+        val report = ArmCalibration.scoreWinnerSets(arms = listOf("A", "B", "C"), won = listOf(setOf("A"), setOf("B")))
+        assertEquals(2, report.totalWon)
+        assertEquals(setOf("A", "B"), report.diverse.take(2).map { it.arm }.toSet(), "A wins p1, B wins p2")
+        assertEquals(0.0, report.scores.first { it.arm == "C" }.winShare, "a non-winner scores zero")
+    }
+
+    @Test
     fun `the marginal-contribution ranking puts complementary specialists first and the dud last`() {
         val p1 = Instance("p1", maximize = false, runs = listOf(arm("A", 1.0), arm("B", 5.0), arm("C", 9.0)))
         val p2 = Instance("p2", maximize = false, runs = listOf(arm("A", 9.0), arm("B", 1.0), arm("C", 5.0)))
