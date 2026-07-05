@@ -100,15 +100,32 @@ internal object CorpusSelection {
                     .toList()
             }
         }
+
+        /** Flat layout for single-file instances of one [ext] (no data-file pairing): walk
+         *  [subDir] for `*.ext`; family = first path component under [subDir]. Used for the
+         *  SMT-LIB (`.smt2`) and DIMACS (`.cnf`) corpora. */
+        data class Flat(val subDir: String, val ext: String) : Layout {
+            override fun discover(root: File): List<Discovered> {
+                val base = File(root, subDir)
+                if (!base.isDirectory) return emptyList()
+                return base.walkTopDown()
+                    .filter { it.isFile && it.extension == ext }
+                    .sortedBy { it.relativeTo(base).path }
+                    .map { Discovered(it.relativeTo(base).path.removeSuffix(".$ext"), it.relativeTo(root).path) }
+                    .toList()
+            }
+        }
     }
 
-    /** Discover + select instances from a fetched [collection], returning catalog [ProblemRef]s. */
+    /** Discover + select instances from a fetched [collection], returning catalog [ProblemRef]s.
+     *  [format] is the instances' format (defaults to MiniZinc; SMT-LIB/DIMACS corpora set it). */
     fun select(
         collection: ExternalCollection,
         layout: Layout,
         selection: Selection,
         category: Category,
-        /** Resolve an instance's oracle from its resolved `.mzn` [File] (e.g. parse directives). */
+        format: Format = Format.MINIZINC,
+        /** Resolve an instance's oracle from its resolved instance [File] (e.g. parse directives). */
         expected: (File) -> Expected = { Expected.Unknown },
     ): List<ProblemRef> {
         val root = CorpusFetcher.ensure(collection)
@@ -116,7 +133,7 @@ internal object CorpusSelection {
         return chosen.map { d ->
             ProblemRef(
                 name = d.name,
-                format = Format.MINIZINC,
+                format = format,
                 source = ProblemSource.External(collection, d.mznRelPath),
                 category = category,
                 expected = expected(File(root, d.mznRelPath)),

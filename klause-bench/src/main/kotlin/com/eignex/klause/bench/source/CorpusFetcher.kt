@@ -29,11 +29,16 @@ internal object CorpusFetcher {
         error("could not locate workspace root (no klause-mzn-lib parent); set -Dklause.workspace.root")
     }
 
-    /** Where fetched external collections are cached. Anchored at the workspace root so the
-     *  location is stable regardless of the process working directory. */
+    /** Where fetched external collections are cached. Defaults outside the repo tree — under
+     *  `$XDG_CACHE_HOME` (or `~/.cache`) — so multi-GB fetches survive `git clean` / a `build/`
+     *  wipe and are shared across worktrees. Overridable via `-Dklause.bench.corpusCache`. */
     val cacheRoot: File
         get() = System.getProperty("klause.bench.corpusCache")?.let { File(it) }
-            ?: File(workspaceRoot(), "klause-bench/build/corpus-cache")
+            ?: File(xdgCacheHome(), "klause-bench/corpus")
+
+    /** `$XDG_CACHE_HOME` when set, else `~/.cache` (the XDG base-dir default). */
+    private fun xdgCacheHome(): File = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotBlank() }?.let { File(it) }
+        ?: File(System.getProperty("user.home"), ".cache")
 
     /** Resolve [source] to a file, fetching an external collection if needed. */
     fun resolve(source: ProblemSource): File = when (source) {
@@ -69,6 +74,7 @@ internal object CorpusFetcher {
         when (val m = collection.fetch) {
             is FetchMethod.GitClone -> gitClone(collection, m, dir)
             FetchMethod.Tarball -> tarball(collection, dir)
+            FetchMethod.TarballZst -> tarballZst(collection, dir)
             FetchMethod.Zip -> zip(collection, dir)
         }
         return dir
@@ -98,6 +104,14 @@ internal object CorpusFetcher {
         val tar = File(cacheRoot, "${c.id}.tar.gz")
         URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
         run("tar", "xzf", tar.absolutePath, "-C", dir.absolutePath)
+        tar.delete()
+    }
+
+    private fun tarballZst(c: ExternalCollection, dir: File) {
+        dir.mkdirs()
+        val tar = File(cacheRoot, "${c.id}.tar.zst")
+        URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
+        run("tar", "--zstd", "-xf", tar.absolutePath, "-C", dir.absolutePath)
         tar.delete()
     }
 
