@@ -2,6 +2,7 @@ package com.eignex.klause.factor.circuit.internals
 
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.util.IntArrayList
 
 /** Subscribe to all four event types for each distinct variable in [succ]. */
 internal fun buildSuccWatches(succ: IntArray): IntArray {
@@ -15,6 +16,57 @@ internal fun buildSuccWatches(succ: IntArray): IntArray {
         out[w++] = IntEvent.pack(v, IntEvent.FIXED)
     }
     return out
+}
+
+/**
+ * Directed reachability from [root] over the candidate-arc graph of a circuit successor array, the
+ * strong-connectivity DFS both [com.eignex.klause.factor.circuit.CircuitPropagator] and
+ * [com.eignex.klause.factor.circuit.SubcircuitPropagator] run (once forward via each node's live
+ * successor domain, once reverse via the caller-built [rev] adjacency). A *forward* arc `(u, v)` is
+ * followed only when [arcAllowed] holds (circuit: any `v` in range; subcircuit: also `v != u`, since
+ * a self-loop is an opt-out, not a tour edge) — [rev] is expected pre-filtered the same way. A
+ * reached node counts toward the total when [counts] (circuit: every node; subcircuit: only
+ * mandatory nodes). Returns true iff [target] nodes are counted as reached.
+ */
+internal inline fun PropagationState.circuitReachesAll(
+    succ: IntArray,
+    n: Int,
+    root: Int,
+    forward: Boolean,
+    rev: Array<IntArrayList>,
+    target: Int,
+    crossinline arcAllowed: (from: Int, to: Int) -> Boolean,
+    crossinline counts: (node: Int) -> Boolean,
+): Boolean {
+    val seen = BooleanArray(n)
+    val stack = IntArrayList()
+    seen[root] = true
+    var reached = if (counts(root)) 1 else 0
+    stack.add(root)
+    while (!stack.isEmpty()) {
+        val u = stack[stack.size - 1]
+        stack.removeAt(stack.size - 1)
+        if (forward) {
+            intDomains[succ[u]].forEach { v ->
+                if (arcAllowed(u, v) && !seen[v]) {
+                    seen[v] = true
+                    if (counts(v)) reached++
+                    stack.add(v)
+                }
+            }
+        } else {
+            val preds = rev[u]
+            for (idx in 0 until preds.size) {
+                val v = preds[idx]
+                if (!seen[v]) {
+                    seen[v] = true
+                    if (counts(v)) reached++
+                    stack.add(v)
+                }
+            }
+        }
+    }
+    return reached == target
 }
 
 /** Gate used to skip propagation until the first real domain event. */
