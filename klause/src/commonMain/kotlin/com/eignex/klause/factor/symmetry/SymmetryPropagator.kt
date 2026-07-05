@@ -4,6 +4,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.PermutationGroup
 
 /**
@@ -38,7 +39,7 @@ internal class SymmetryPropagator(
     /** The group's support (variables some generator moves), as unified ids in ascending order — the
      *  fixed total order the orbital-fixing rule walks. */
     private val supportOrder: IntArray = run {
-        val moved = HashSet<Int>()
+        val moved = IntHashSet()
         for (p in unified) for (i in p.indices) if (p[i] != i) moved.add(i)
         moved.toIntArray().also { it.sort() }
     }

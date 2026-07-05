@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * CP propagator for [GaussianXor]. Constructed by [GaussianXor.asPropagator] and holds the
@@ -22,30 +23,30 @@ internal class GaussianXorPropagator(private val constraints: List<Xor>, val boo
 
     val intVars: IntArray = EmptyIntArray
 
-    private val colOfVar: HashMap<Int, Int>
+    private val colOfVar: MutableIntIntMap
     private val words: Int
     private val rowMask: Array<LongArray>
     private val rowRhs: IntArray
 
     init {
-        colOfVar = HashMap(boolVars.size * 2)
-        for (i in boolVars.indices) colOfVar[boolVars[i]] = i
+        colOfVar = MutableIntIntMap(boolVars.size * 2)
+        for (i in boolVars.indices) colOfVar.put(boolVars[i], i)
         words = (boolVars.size + 63) ushr 6
 
         rowMask = Array(constraints.size) { LongArray(words) }
         rowRhs = IntArray(constraints.size)
         for (r in constraints.indices) {
             val c = constraints[r]
-            val occ = HashMap<Int, Int>()
+            val occ = MutableIntIntMap()
             var negParity = 0
             for (lit in c.literals) {
                 val v = Lit.variable(lit)
-                occ[v] = (occ[v] ?: 0) + 1
+                occ.addTo(v, 1)
                 if (!Lit.isPositive(lit)) negParity = negParity xor 1
             }
-            for ((v, count) in occ) {
+            occ.forEach { v, count ->
                 if (count and 1 == 1) {
-                    val col = colOfVar.getValue(v)
+                    val col = colOfVar.getOrDefault(v, -1)
                     rowMask[r][col ushr 6] = rowMask[r][col ushr 6] or (1L shl (col and 63))
                 }
             }

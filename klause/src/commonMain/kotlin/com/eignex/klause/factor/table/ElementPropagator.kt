@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableIntIntMap
 
 /** CP propagator for [Element]. Constructed by [Element.asPropagator]. */
 internal class ElementPropagator(
@@ -38,11 +39,20 @@ internal class ElementPropagator(
             return st.propagate(state)
         }
         val cache = (state.refPayload[factorId] as? ElementCache) ?: run {
-            val firstPos = HashMap<Int, Int>(intVars.size)
-            for (k in intVars.indices) firstPos.getOrPut(intVars[k]) { k }
+            val firstPos = MutableIntIntMap(intVars.size)
+            for (k in intVars.indices) {
+                val vid = intVars[k]
+                if (!firstPos.containsKey(vid)) firstPos.put(vid, k)
+            }
+            val keys = IntArrayList(firstPos.size)
+            val values = IntArrayList(firstPos.size)
+            firstPos.forEach { key, pos ->
+                keys.add(key)
+                values.add(pos)
+            }
             val fresh = ElementCache(
                 arrayOfNulls(intVars.size),
-                IntIntMap.build(firstPos.keys.toIntArray(), firstPos.values.toIntArray(), absent = -1),
+                IntIntMap.build(keys.toIntArray(), values.toIntArray(), absent = -1),
             )
             state.refPayload[factorId] = fresh
             fresh

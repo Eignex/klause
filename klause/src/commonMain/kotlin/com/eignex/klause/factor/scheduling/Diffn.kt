@@ -7,7 +7,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * `diffn(xs, ys, widths, heights)` — pairwise non-overlapping 2D rectangles. Each rectangle
@@ -83,10 +85,10 @@ class Diffn(
     // fast path can't apply). IntIntMap keeps the per-move lookup unboxed; -1 doubles as the
     // absent sentinel, which the read site already treats the same as a shared id (`r < 0`).
     private val varToRect: IntIntMap = run {
-        val m = HashMap<Int, Int>(n * 2)
+        val m = MutableIntIntMap(n * 2)
         fun record(v: Int, i: Int) {
-            val prev = m[v]
-            m[v] = if (prev == null || prev == i) i else -1
+            val prev = m.getOrDefault(v, Int.MIN_VALUE)
+            m.put(v, if (prev == Int.MIN_VALUE || prev == i) i else -1)
         }
         for (i in 0 until n) {
             record(xs[i], i)
@@ -94,8 +96,13 @@ class Diffn(
             widthVars?.let { record(it[i], i) }
             heightVars?.let { record(it[i], i) }
         }
-        val keys = m.keys.toIntArray()
-        IntIntMap.build(keys, IntArray(keys.size) { m.getValue(keys[it]) }, absent = -1)
+        val keys = IntArrayList(m.size)
+        val values = IntArrayList(m.size)
+        m.forEach { k, rect ->
+            keys.add(k)
+            values.add(rect)
+        }
+        IntIntMap.build(keys.toIntArray(), values.toIntArray(), absent = -1)
     }
 
     /** Index of the rectangle that owns [varId] (as an x, y, width, or height variable), or `-1`. */
