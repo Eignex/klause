@@ -94,11 +94,18 @@ internal object AffineSingletons {
         // O(factors + Σ rewrites). Every factor below [scanFrom] is a confirmed non-candidate (unchanged
         // since it was last examined), so the selection order — and the eliminations — are unchanged.
         var scanFrom = 0
+        // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
+        // folds is superlinear and can dominate presolve on large models where it barely simplifies;
+        // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be
+        // solved directly (sound). The budget is far above what productive models spend.
+        var fillIn = 0L
         while (!cancellation()) {
             val cand = findAffineCandidate(ws, scanFrom, eliminated, objectiveIntVars, capWide) ?: break
+            fillIn += ws.degreeOf(cand.x).toLong() * cand.termVars.size
             scanFrom = foldOutVariable(problem, ws, cand)
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
+            if (fillIn > AFFINE_FILL_IN_BUDGET) break
         }
         // Residue-class doubletons (#522): a 2-term `a·x + b·y = c` with no unit pivot, where `x` is
         // contained, determines `x = (c − b·y)/a` only for the `y` values keeping it an in-domain
@@ -143,6 +150,13 @@ internal object AffineSingletons {
     // handful of folds a productively-eliminated variable draws so ordinary models are untouched; only a row
     // that is a fold sink — the pathological accumulator — is capped.
     private const val FOLD_ABSORB_CAP = 16
+
+    /** Cumulative substitution-fill-in budget across the whole pass (Σ pivot-degree · substituted-terms).
+     *  [FOLD_ABSORB_CAP] bounds any single row's growth, but a model with *many* moderately-folded rows can
+     *  still spend seconds in aggregate (an SMT-LIB SharedMemory instance runs ~6s under the per-row cap
+     *  alone); this bounds the total work. Once spent, the loop stops and the remaining affine-defined
+     *  variables are solved directly (sound). Set well above what productive models spend. */
+    private const val AFFINE_FILL_IN_BUDGET = 300_000L
 
     /** A residue-class doubleton `a·x + b·y = c` (no unit pivot) at [defIdx]: `x` is contained and
      *  reconstructed as `(constTerm + coeffY·y) / divisor` over the [restrictedY] partner domain. */
