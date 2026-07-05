@@ -71,14 +71,15 @@ Solver-control flags are common to **every** mode:
   backtrack portfolio); with no `-f` and no `-e`, the default engine is `fixed`.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
 - `-p <n>` — MiniZinc-standard parallelism (core count). The portfolio engines (`cp`/`mixed`/`ls`)
-  run sequentially at `n=1` and as an `n`-worker parallel pool at `n>1`; the naked engines
-  (`fixed`/`cp-single`) are single-core. Pool size auto-tunes from `n`, overridable with
+  run sequentially at `n=1` and as an `n`-worker parallel pool at `n>1`; the naked engine
+  (`fixed`) is single-core. Pool size auto-tunes from `n`, overridable with
   `--param arms=N` (or the `ls=N`/`bt=N` split).
 - `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.engine` property):
   - `fixed` *(default)* — single naked backtrack following the model's `int_search` annotation (FD).
   - `cp` — backtrack-only portfolio (free). `mixed` — bt+ls portfolio. `ls` — local-search portfolio.
-  - `cp-single` — single naked free backtrack; the **only** engine that accepts `var-selector`/
-    `val-selector` `--param`s (single-solver heuristic experiments).
+  - `cp` also accepts the per-solver `var-selector`/`val-selector` (and `luby`/`phase-saving`/…)
+    `--param`s, which resolve a one-arm override pool for single-solver heuristic experiments
+    (`cp-single` is a kept alias). `--param bt-arm=label,…` instead pins named catalog arms.
   - `ls-single` — single naked local search; takes the ls strategy `--param`s (`tabu-tenure`,
     `pair-swap-budget`, `lambda`, `noise`, `max-flips`). With `sources=` it instead builds a
     composable recipe over the LS axes — `sources` (e.g. `violated,argmin`), `scoring`

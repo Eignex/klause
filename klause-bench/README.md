@@ -42,7 +42,7 @@ bench list [<suite>]                 list suites, or the problems in one suite
 | `label=<name>` | free-form run tag folded into the `<config>` dir name (e.g. a klause version / fix name), so re-running the same config coexists as a distinct dir instead of overwriting — then `compare.sh` the two. References are version-stable, so this is mainly for klause across updates |
 | `engine=fixed\|cp\|mixed\|ls\|cp-single\|ls-single` `processors=N` | klause's search for a `solve` run (below), forwarded to the cli `-e`/`-p` (the cli owns the engine model). `engine` unset ⇒ no `-e`, so klause follows the cli's own default engine (the bench has no engine default of its own). `fixed=true` is a *separate* reference-only `-f` toggle |
 | `lp=off\|conservative\|balanced\|aggressive[±id…]` | klause only: forwarded as klause-cli `--lp` (the LP-relaxation emphasis / per-technique deltas). Folded into the `<config>` dir name, so `lp=off` vs `lp=aggressive` coexist — run twice and `compare.sh` to A/B the LP cost/benefit |
-| `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` apply only to `engine=cp-single` (a single backtrack solver) — the way to A/B a heuristic: run `solve` twice with different `cp-single` params, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
+| `param=key=value` (repeatable) | klause-cli `--param` engine knobs forwarded verbatim. `var-selector`/`val-selector` resolve a one-arm override pool on `engine=cp` (single-solver heuristic A/B) — run `solve` twice with different selectors, then `compare.sh` the two dirs. Folded into the `<config>` dir name so runs don't clobber |
 | `profile=cpu\|wall\|alloc` `profile-scope=solve\|all` `profile-top=N` | JFR profiling (below) |
 
 ## What `solve` saves
@@ -67,10 +67,10 @@ bench solve suite=mzn-bench per-family=1 max=50 seed=1 backend=yuck    # Yuck ba
 # each writes output/<config>/<problem>.{out,json} — diff two config dirs with output/compare.sh
 
 # search-config A/B: run twice with different --param, then compare the two config dirs.
-# heuristic A/B: var-/val-selector params apply only to engine=cp-single (a single backtrack solver).
-bench solve suite=core kind=cop engine=cp-single param=var-selector=vsids timeout=30000
-bench solve suite=core kind=cop engine=cp-single param=var-selector=chb   timeout=30000
-# output/compare.sh output/klause-cp-single-p1-t30s-var-selector-vsids output/klause-cp-single-p1-t30s-var-selector-chb
+# heuristic A/B: var-/val-selector params resolve a one-arm override pool on engine=cp.
+bench solve suite=core kind=cop engine=cp param=var-selector=vsids timeout=30000
+bench solve suite=core kind=cop engine=cp param=var-selector=chb   timeout=30000
+# output/compare.sh output/klause-cp-p1-t30s-var-selector-vsids output/klause-cp-p1-t30s-var-selector-chb
 
 # tracking klause across updates: rebuild klause, re-run with a version label, then compare to the
 # prior version. References don't change, so only klause is re-run; old labelled dirs stay put.
@@ -87,8 +87,9 @@ which the bench forwards verbatim to `-e`. With `engine` unset the bench passes 
 follows the cli's **own** default engine (the bench has no engine default of its own). **`engine=fixed`**
 (the MiniZinc-Challenge FD behaviour) is a single naked backtrack following the model's `int_search`
 annotation; the portfolio engines **`cp`** (backtrack-only), **`mixed`** (bt+ls), **`ls`** run
-sequentially at `-p1` and as a parallel pool at `-p N`; **`cp-single`** is a single naked free backtrack
-(the only engine that takes `var-selector`/`val-selector` `--param`s). `processors` defaults to 1, so
+sequentially at `-p1` and as a parallel pool at `-p N`. **`cp`** also takes the per-solver
+`var-selector`/`val-selector` `--param`s (a one-arm override pool; `cp-single` is a kept alias).
+`processors` defaults to 1, so
 multi-thread tracks request cores explicitly. The Challenge tracks are just `engine`/`processors` combinations (all compose with
 `kind=cop|csp` and `timeout=`):
 
@@ -124,10 +125,10 @@ bench solve suite=mzn-bench fixed=true backend=choco timeout=300000 # Choco, sam
 
 `profile=cpu|wall|alloc` records the run with Java Flight Recorder, prints a flat top-method table, and leaves `build/bench-prof.jfr` for JMC / `jfr print`. `profile-scope=solve` (default) starts the recording only after the selection is resolved, so parse/compile/fetch are discounted; `profile-scope=all` covers the whole run. Sampling is statistical (1 ms), so pair it with a long-running selection.
 
-`solve` is special: it normally runs solvers as subprocesses (klause-cli / minizinc), which JFR on the bench JVM can't see. So `solve … profile=…` switches to **in-process profiling** — it runs the klause engine itself inside this JVM under the recorder, capturing the real `BacktrackSolver` / `LocalSearchSolver` hot paths. This needs a single-solver engine: `cp`/`cp-single`/`fixed` (→ `BacktrackSolver`) or `ls` (→ `LocalSearchSolver`); the `mixed` portfolio and external references aren't profilable. No JSON/cache is written in this mode — it measures the solver, not the figures.
+`solve` is special: it normally runs solvers as subprocesses (klause-cli / minizinc), which JFR on the bench JVM can't see. So `solve … profile=…` switches to **in-process profiling** — it runs the klause engine itself inside this JVM under the recorder, capturing the real `BacktrackSolver` / `LocalSearchSolver` hot paths. This needs a single-solver engine: `cp`/`fixed` (→ `BacktrackSolver`) or `ls` (→ `LocalSearchSolver`); the `mixed` portfolio and external references aren't profilable. No JSON/cache is written in this mode — it measures the solver, not the figures.
 
 ```
-bench solve suite=mzn-bench name=mario engine=cp-single profile=cpu timeout=30000
+bench solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000
 bench solve suite=mzn-bench name=mario engine=fixed profile=cpu timeout=30000
 bench solve suite=mzn-bench name=mario engine=ls profile=alloc timeout=30000
 ```

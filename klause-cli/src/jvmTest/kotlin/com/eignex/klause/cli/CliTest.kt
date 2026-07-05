@@ -66,7 +66,7 @@ class CliTest {
     }
 
     @Test
-    fun `cp-single accepts every var- and val-selector value the enums expose`() {
+    fun `the cp override pool accepts every var- and val-selector value the enums expose`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
@@ -75,13 +75,13 @@ class CliTest {
         // including the newly added ones (largest-domain, median, split, …).
         for (v in VarSelectorKind.entries) {
             val out = capture {
-                main(arrayOf("-e", "cp-single", "--param", "var-selector=${v.id}", "-t", "5000", fzn.absolutePath))
+                main(arrayOf("-e", "cp", "--param", "var-selector=${v.id}", "-t", "5000", fzn.absolutePath))
             }
             assertTrue("x = " in out, "var-selector=${v.id}:\n$out")
         }
         for (v in ValSelectorKind.entries) {
             val out = capture {
-                main(arrayOf("-e", "cp-single", "--param", "val-selector=${v.id}", "-t", "5000", fzn.absolutePath))
+                main(arrayOf("-e", "cp", "--param", "val-selector=${v.id}", "-t", "5000", fzn.absolutePath))
             }
             assertTrue("x = " in out, "val-selector=${v.id}:\n$out")
         }
@@ -216,8 +216,8 @@ class CliTest {
             deleteOnExit()
         }
         for (engineArgs in listOf(
-            // cp-single is the only engine that takes the per-solver var-/val-selector knobs.
-            arrayOf("-e", "cp-single", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
+            // cp resolves a one-arm override pool from the per-solver var-/val-selector knobs.
+            arrayOf("-e", "cp", "--param", "seed=7", "--param", "val-selector=max", "--param", "luby=50"),
             // ls resolves a four-axis arm pool; a named base takes the strategy knobs (tabu / noise).
             arrayOf("-e", "ls", "--param", "strategy=cbls", "--param", "tabu-tenure=5", "-t", "5000"),
             arrayOf("-e", "ls", "--param", "seed=7", "--param", "lambda=2.0", "-t", "5000"),
@@ -307,7 +307,7 @@ class CliTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        val out = captureErr { main(arrayOf("-e", "cp-single", "--param", "dry-run-solver=on", fzn.absolutePath)) }
+        val out = captureErr { main(arrayOf("-e", "cp", "--param", "dry-run-solver=on", fzn.absolutePath)) }
         assertTrue("solver dry-run:" in out, out)
         assertTrue("backtrack" in out && "var-select:" in out, out)
     }

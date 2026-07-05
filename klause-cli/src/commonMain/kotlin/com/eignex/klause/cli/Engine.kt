@@ -21,8 +21,10 @@ internal enum class Engine(
     /** Single naked backtrack following the model's search annotation (the MiniZinc-Challenge FD track). */
     FIXED("fixed"),
 
-    /** Backtrack-only portfolio (free search). */
-    CP("cp", mix = EngineMix.BACKTRACK, aliases = listOf("backtrack", "bt")),
+    /** Backtrack-only portfolio (free search). Accepts the per-solver `var-selector`/`val-selector`
+     *  (and other backtrack) `--param`s, which resolve a one-arm override pool for single-solver
+     *  heuristic A/B — subsuming the former naked `cp-single` engine (kept as an alias). */
+    CP("cp", mix = EngineMix.BACKTRACK, aliases = listOf("backtrack", "bt", "cp-single", "cpsingle")),
 
     /** Local-search-only portfolio. */
     LS(
@@ -34,9 +36,6 @@ internal enum class Engine(
 
     /** Mixed backtrack + local-search portfolio. */
     MIXED("mixed", mix = EngineMix.MIXED, aliases = listOf("portfolio", "pf")),
-
-    /** Single naked free backtrack — the only engine that takes var-/val-selector `--param`s. */
-    CP_SINGLE("cp-single", aliases = listOf("cpsingle")),
     ;
 
     companion object {
