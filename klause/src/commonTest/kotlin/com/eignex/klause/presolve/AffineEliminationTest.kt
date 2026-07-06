@@ -113,6 +113,23 @@ class AffineEliminationTest {
     }
 
     @Test
+    fun `skips an affine fold whose coefficient would overflow Int`() {
+        // x = 100000*y folded into 100000*x + y <= 500000 needs a coefficient of 10^10, outside the
+        // Int range the Linear coalescer accepts. The pivot is left un-eliminated (sound) rather than
+        // folded with a wrapped/overflowing coefficient.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 300000), IntDomain(0, 2)),
+            factors = listOf(
+                Linear(intArrayOf(1, -100000), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(100000, 1), intArrayOf(0, 1), LinearOp.LE, 500000),
+            ),
+        )
+        checkRoundTrip("int-overflow fold", problem, expectEliminated = false, expectSat = true)
+    }
+
+    @Test
     fun `eliminates with a negative unit coefficient`() {
         // -x + 3y = 2  ⇒  x = 3y - 2.
         val problem = Problem(
