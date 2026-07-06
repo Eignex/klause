@@ -70,10 +70,58 @@ object SmtLibQfLia {
             var lin: LinComb? = null
             var lit: Int? = null
         }
-        private val scopes = ArrayDeque<HashMap<String, Binding>>()
-        private fun lookup(name: String): Binding? {
-            for (i in scopes.indices.reversed()) scopes[i][name]?.let { return it }
-            return null
+
+        // Let scoping as a heap-allocated stack, not recursion. `bindingStacks` maps each name to its
+        // shadow stack (innermost binding on top) for O(1) lookup; `scopeNames` records the names bound
+        // by each active scope so it can be popped. A deeply nested formula unwinds its `let` chain
+        // iteratively into these structures instead of recursing through the call stack.
+        private val bindingStacks = HashMap<String, ArrayDeque<Binding>>()
+        private val scopeNames = ArrayDeque<List<String>>()
+        private fun lookup(name: String): Binding? = bindingStacks[name]?.lastOrNull()
+
+        /** Compile one `let`'s bindings (in parallel — their values don't see each other) and push them
+         *  as a new scope. */
+        private fun pushLetScope(bindingList: SExpr) {
+            require(bindingList is SExpr.SList) { "malformed let bindings" }
+            val bound = bindingList.items.map { pair ->
+                val p = pair as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding")
+                val name = (p.items[0] as SExpr.Atom).text
+                val expr = p.items[1]
+                val b = Binding(isBool = isBoolExpr(expr))
+                if (b.isBool) b.lit = compileBool(expr) else b.lin = linearTerm(expr)
+                name to b
+            }
+            val names = ArrayList<String>(bound.size)
+            for ((name, b) in bound) {
+                bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(b)
+                names.add(name)
+            }
+            scopeNames.addLast(names)
+        }
+
+        private fun popLetScope() {
+            for (name in scopeNames.removeLast()) {
+                val stack = bindingStacks.getValue(name)
+                stack.removeLast()
+                if (stack.isEmpty()) bindingStacks.remove(name)
+            }
+        }
+
+        /** Push scopes for a leading chain of `let`s in [t] iteratively (not recursively), run [body] on
+         *  the innermost non-`let` node, then pop them — keeping let-chain depth off the call stack. */
+        private inline fun <T> unwindingLets(t: SExpr, body: (SExpr) -> T): T {
+            var pushed = 0
+            var node = t
+            try {
+                while (node is SExpr.SList && (node.items.firstOrNull() as? SExpr.Atom)?.text == "let") {
+                    pushLetScope(node.items[1])
+                    pushed++
+                    node = node.items[2]
+                }
+                return body(node)
+            } finally {
+                repeat(pushed) { popLetScope() }
+            }
         }
 
         override fun newBool(): Int = nextBool++
@@ -263,89 +311,87 @@ object SmtLibQfLia {
         private fun containsIte(t: SExpr): Boolean = t is SExpr.SList &&
             ((t.items.firstOrNull() as? SExpr.Atom)?.text == "ite" || t.items.any { containsIte(it) })
 
-        private fun assert(t: SExpr) {
-            if (t is SExpr.SList && t.items.isNotEmpty()) {
-                val h = (t.items[0] as? SExpr.Atom)?.text
-                val args = t.items.drop(1)
+        private fun assert(t: SExpr): Unit = unwindingLets(t) { node ->
+            if (node is SExpr.SList && node.items.isNotEmpty()) {
+                val h = (node.items[0] as? SExpr.Atom)?.text
+                val args = node.items.drop(1)
                 when (h) {
                     "and" -> {
                         args.forEach { assert(it) }
-                        return
+                        return@unwindingLets
                     }
 
                     "<=", "<", ">=", ">" -> {
-                        assertLinear(t)
-                        return
+                        assertLinear(node)
+                        return@unwindingLets
                     }
 
-                    "=" -> if (isArithmeticRelation(t) && args.size == 2) {
-                        assertLinear(t)
-                        return
+                    "=" -> if (isArithmeticRelation(node) && args.size == 2) {
+                        assertLinear(node)
+                        return@unwindingLets
                     }
 
                     "distinct" -> {
                         assertDistinct(args)
-                        return
-                    }
-
-                    "let" -> {
-                        withLet(args[0]) { assert(args[1]) }
-                        return
+                        return@unwindingLets
                     }
                 }
             }
-            forceTrue(compileBool(t))
+            forceTrue(compileBool(node))
         }
 
         private fun forceTrue(lit: Int) {
             factors.add(Clause(intArrayOf(lit)))
         }
 
-        private fun compileBool(t: SExpr): Int = when (t) {
-            is SExpr.Atom -> when (t.text) {
-                "true" -> trueLit()
+        private fun compileBool(t: SExpr): Int = unwindingLets(t) { node ->
+            when (node) {
+                is SExpr.Atom -> when (node.text) {
+                    "true" -> trueLit()
 
-                "false" -> Lit.negate(trueLit())
+                    "false" -> Lit.negate(trueLit())
 
-                else -> lookup(t.text)?.let { boolBinding(t.text, it) }
-                    ?: Lit.make(boolNames[t.text] ?: throw UnsupportedSmtException("unknown bool '${t.text}'"), true)
-            }
+                    else -> lookup(node.text)?.let { boolBinding(node.text, it) }
+                        ?: Lit.make(
+                            boolNames[node.text] ?: throw UnsupportedSmtException("unknown bool '${node.text}'"),
+                            true,
+                        )
+                }
 
-            is SExpr.SList -> {
-                val h = (t.items[0] as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("bad term")
-                val args = t.items.drop(1)
-                when (h) {
-                    "not" -> Lit.negate(compileBool(args[0]))
+                is SExpr.SList -> {
+                    val h = (node.items[0] as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("bad term")
+                    val args = node.items.drop(1)
+                    when (h) {
+                        "not" -> Lit.negate(compileBool(args[0]))
 
-                    "and" -> tseitinAnd(args.map { compileBool(it) })
+                        "and" -> tseitinAnd(args.map { compileBool(it) })
 
-                    "or" -> tseitinOr(args.map { compileBool(it) })
+                        "or" -> tseitinOr(args.map { compileBool(it) })
 
-                    "xor" -> args.map { compileBool(it) }.reduce { a, b -> Lit.negate(tseitinIff(a, b)) }
+                        "xor" -> args.map { compileBool(it) }.reduce { a, b -> Lit.negate(tseitinIff(a, b)) }
 
-                    "=>" -> args.dropLast(1).foldRight(compileBool(args.last())) { a, acc ->
-                        tseitinOr(listOf(Lit.negate(compileBool(a)), acc))
-                    }
-
-                    "<=", "<", ">=", ">" -> reifyRelation(t)
-
-                    "distinct" -> compileDistinct(args)
-
-                    "ite" -> tseitinIte(compileBool(args[0]), compileBool(args[1]), compileBool(args[2]))
-
-                    "=" -> if (isArithmeticRelation(t)) {
-                        if (args.size == 2) {
-                            reifyRelation(t)
-                        } else {
-                            chainEqToFirst(args.map { linearTerm(it) }, ::reifyEq)
+                        "=>" -> args.dropLast(1).foldRight(compileBool(args.last())) { a, acc ->
+                            tseitinOr(listOf(Lit.negate(compileBool(a)), acc))
                         }
-                    } else {
-                        chainEqToFirst(args.map { compileBool(it) }, ::tseitinIff)
+
+                        "<=", "<", ">=", ">" -> reifyRelation(node)
+
+                        "distinct" -> compileDistinct(args)
+
+                        "ite" -> tseitinIte(compileBool(args[0]), compileBool(args[1]), compileBool(args[2]))
+
+                        "=" -> if (isArithmeticRelation(node)) {
+                            if (args.size == 2) {
+                                reifyRelation(node)
+                            } else {
+                                chainEqToFirst(args.map { linearTerm(it) }, ::reifyEq)
+                            }
+                        } else {
+                            chainEqToFirst(args.map { compileBool(it) }, ::tseitinIff)
+                        }
+
+                        else -> throw UnsupportedSmtException("unsupported boolean op '$h'")
                     }
-
-                    "let" -> withLet(args[0]) { compileBool(args[1]) }
-
-                    else -> throw UnsupportedSmtException("unsupported boolean op '$h'")
                 }
             }
         }
@@ -362,25 +408,6 @@ object SmtLibQfLia {
         /** Compile n-ary equality as pairwise equality to the first operand. */
         private fun <T> chainEqToFirst(items: List<T>, relate: (T, T) -> Int): Int =
             tseitinAnd((1 until items.size).map { relate(items[0], items[it]) })
-
-        private inline fun <T> withLet(bindingList: SExpr, body: () -> T): T {
-            val scope = HashMap<String, Binding>()
-            require(bindingList is SExpr.SList) { "malformed let bindings" }
-            for (pair in bindingList.items) {
-                val p = pair as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding")
-                val name = (p.items[0] as SExpr.Atom).text
-                val expr = p.items[1]
-                val b = Binding(isBool = isBoolExpr(expr))
-                if (b.isBool) b.lit = compileBool(expr) else b.lin = linearTerm(expr)
-                scope[name] = b
-            }
-            scopes.addLast(scope)
-            try {
-                return body()
-            } finally {
-                scopes.removeLast()
-            }
-        }
 
         /** Syntactic bool/int classifier for a term. */
         private fun isBoolExpr(t: SExpr): Boolean = when (t) {
@@ -504,64 +531,67 @@ object SmtLibQfLia {
             return Rel(vars, coeffs, linOp, baseBound + delta)
         }
 
-        private fun linearTerm(t: SExpr): LinComb = when (t) {
-            is SExpr.Atom -> {
-                val n = t.text.toIntOrNull()
-                when {
-                    n != null -> LinComb(emptyMap(), n)
+        private fun linearTerm(t: SExpr): LinComb = unwindingLets(t) { node ->
+            when (node) {
+                is SExpr.Atom -> {
+                    val n = node.text.toIntOrNull()
+                    when {
+                        n != null -> LinComb(emptyMap(), n)
 
-                    isRealLiteral(
-                        t.text,
-                    ) -> throw UnsupportedSmtException("real literal '${t.text}' (QF_LIA is integer-only)")
+                        isRealLiteral(
+                            node.text,
+                        ) -> throw UnsupportedSmtException("real literal '${node.text}' (QF_LIA is integer-only)")
 
-                    else -> lookup(t.text)?.let { intBinding(t.text, it) }
-                        ?: LinComb(
-                            mapOf(
-                                (intNames[t.text] ?: throw UnsupportedSmtException("unknown int var '${t.text}'")) to 1,
-                            ),
-                            0,
-                        )
+                        else -> lookup(node.text)?.let { intBinding(node.text, it) }
+                            ?: LinComb(
+                                mapOf(
+                                    (
+                                        intNames[node.text]
+                                            ?: throw UnsupportedSmtException("unknown int var '${node.text}'")
+                                        ) to 1,
+                                ),
+                                0,
+                            )
+                    }
                 }
-            }
 
-            is SExpr.SList -> {
-                val h = (t.items[0] as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("bad int term")
-                val args = t.items.drop(1)
-                when (h) {
-                    "+" -> args.map { linearTerm(it) }.reduce(::add)
+                is SExpr.SList -> {
+                    val h = (node.items[0] as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("bad int term")
+                    val args = node.items.drop(1)
+                    when (h) {
+                        "+" -> args.map { linearTerm(it) }.reduce(::add)
 
-                    "-" -> if (args.size == 1) {
-                        scale(linearTerm(args[0]), -1)
-                    } else {
-                        args.drop(1).fold(linearTerm(args[0])) { acc, e -> add(acc, scale(linearTerm(e), -1)) }
+                        "-" -> if (args.size == 1) {
+                            scale(linearTerm(args[0]), -1)
+                        } else {
+                            args.drop(1).fold(linearTerm(args[0])) { acc, e -> add(acc, scale(linearTerm(e), -1)) }
+                        }
+
+                        "*" -> {
+                            val parts = args.map { linearTerm(it) }
+                            val nonConst = parts.filter { it.coeffs.isNotEmpty() }
+                            if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
+                            val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
+                            if (nonConst.isEmpty()) LinComb(emptyMap(), k) else scale(nonConst[0], k)
+                        }
+
+                        "to_real", "to_int" -> linearTerm(args[0])
+
+                        "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$h'")
+
+                        "ite" -> {
+                            // v = if cond then a else b: a fresh int pinned to each branch by the condition.
+                            val cond = compileBool(args[0])
+                            val a = linearTerm(args[1])
+                            val b = linearTerm(args[2])
+                            val self = LinComb(mapOf(newInt() to 1), 0)
+                            factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
+                            factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
+                            self
+                        }
+
+                        else -> throw UnsupportedSmtException("unsupported int op '$h'")
                     }
-
-                    "*" -> {
-                        val parts = args.map { linearTerm(it) }
-                        val nonConst = parts.filter { it.coeffs.isNotEmpty() }
-                        if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
-                        val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
-                        if (nonConst.isEmpty()) LinComb(emptyMap(), k) else scale(nonConst[0], k)
-                    }
-
-                    "to_real", "to_int" -> linearTerm(args[0])
-
-                    "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$h'")
-
-                    "ite" -> {
-                        // v = if cond then a else b: a fresh int pinned to each branch by the condition.
-                        val cond = compileBool(args[0])
-                        val a = linearTerm(args[1])
-                        val b = linearTerm(args[2])
-                        val self = LinComb(mapOf(newInt() to 1), 0)
-                        factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
-                        factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
-                        self
-                    }
-
-                    "let" -> withLet(args[0]) { linearTerm(args[1]) }
-
-                    else -> throw UnsupportedSmtException("unsupported int op '$h'")
                 }
             }
         }
