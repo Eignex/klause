@@ -22,6 +22,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Variable groups that are pairwise all-different, harvested from the LP-relevant globals so the
@@ -431,11 +432,11 @@ internal class GccSeparator : CutSeparator {
  * literals — and [baseCliques] lists those at-most-one factors' member variables (pairwise adjacent by
  * construction). Global by construction: every edge is implied by a factor of the original problem.
  */
-internal class ConflictGraph(val adjacency: Map<Int, IntHashSet>, val baseCliques: List<IntArray>)
+internal class ConflictGraph(val adjacency: MutableIntObjectMap<IntHashSet>, val baseCliques: List<IntArray>)
 
 /** Builds the [ConflictGraph] the knapsack-lifting and clique separators share. */
 internal fun conflictGraph(problem: Problem): ConflictGraph {
-    val adj = HashMap<Int, IntHashSet>()
+    val adj = MutableIntObjectMap<IntHashSet>()
     fun edge(a: Int, b: Int) {
         if (a == b) return
         adj.getOrPut(a) { IntHashSet() }.add(b)
@@ -586,7 +587,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
      *  set of pairwise mutually-exclusive items. Used as the GUB structure for [gubKnapsackMax]. Using
      *  only a partition's worth of edges (cross-group conflicts are ignored) keeps the lifting max an
      *  over-estimate, so the derived coefficients stay valid. */
-    private fun cliquePartition(k: Int, literals: IntArray, conflict: Map<Int, IntHashSet>): IntArray {
+    private fun cliquePartition(k: Int, literals: IntArray, conflict: MutableIntObjectMap<IntHashSet>): IntArray {
         val vars = IntArray(k) { Lit.variable(literals[it]) }
         fun adjacent(i: Int, j: Int): Boolean = conflict[vars[i]]?.contains(vars[j]) == true
         val group = IntArray(k) { -1 }
@@ -616,10 +617,10 @@ internal class KnapsackCoverSeparator : CutSeparator {
         groupOf: IntArray,
         cap: Int,
     ): Long {
-        val byGroup = HashMap<Int, IntArrayList>()
+        val byGroup = MutableIntObjectMap<IntArrayList>()
         for (t in 0 until lifted.size) byGroup.getOrPut(groupOf[lifted[t]]) { IntArrayList() }.add(t)
         val dp = LongArray(cap + 1)
-        for ((_, idxs) in byGroup) {
+        byGroup.forEach { _, idxs ->
             val next = dp.copyOf() // "take none from this group"
             idxs.forEach { t ->
                 val w = weights[lifted[t]]
@@ -663,7 +664,9 @@ internal class CliqueCutSeparator : CutSeparator {
         if (baseCliques.isEmpty()) return emptyList()
 
         // Variables with a Boolean column, ordered by descending fractional value — the extension order.
-        val ranked = adj.keys
+        val adjKeys = ArrayList<Int>(adj.size)
+        adj.forEach { k, _ -> adjKeys.add(k) }
+        val ranked = adjKeys
             .filter { ctx.relaxation.boolColOf[it] >= 0 }
             .sortedByDescending { ctx.primalOf(ctx.relaxation.boolColOf[it]) }
 

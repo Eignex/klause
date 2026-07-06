@@ -18,6 +18,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Sound LP makespan lower bound for the scheduling globals ([Cumulative] / [Disjunctive]).
@@ -213,7 +214,7 @@ internal class CumulativeRelaxation(
     /** Plans for one scheduling factor: a makespan variable ≥ the end of every task it covers. */
     private fun plansFor(s: Sched, links: MakespanLinks): List<AreaPlan> {
         // makespanVar → covered task local-indices.
-        val cover = HashMap<Int, IntArrayList>()
+        val cover = MutableIntObjectMap<IntArrayList>()
         for (i in s.starts.indices) {
             if (s.dur[i] <= 0 || s.res[i] <= 0) continue
             links.endUpperBoundsOf(s.starts[i], s.dur[i]).forEach { m ->
@@ -222,9 +223,11 @@ internal class CumulativeRelaxation(
         }
         if (cover.isEmpty()) return emptyList()
         // Strongest coverage first; deterministic var-id tie-break. Keep at most MAX_MAKESPAN_VARS.
-        val ranked = cover.entries
-            .filter { it.value.size >= MIN_COVER }
-            .sortedWith(compareByDescending<Map.Entry<Int, IntArrayList>> { it.value.size }.thenBy { it.key })
+        val coverEntries = ArrayList<Pair<Int, IntArrayList>>(cover.size)
+        cover.forEach { m, idxs -> coverEntries.add(m to idxs) }
+        val ranked = coverEntries
+            .filter { it.second.size >= MIN_COVER }
+            .sortedWith(compareByDescending<Pair<Int, IntArrayList>> { it.second.size }.thenBy { it.first })
             .take(MAX_MAKESPAN_VARS)
         return ranked.map { (m, idxs) ->
             val k = idxs.size
@@ -308,10 +311,10 @@ internal class CumulativeRelaxation(
      */
     private inner class MakespanLinks {
         /** `geFrom[v]` = pairs `(w, c)` with a proven `w ≥ v + c`, from two-variable Linear rows. */
-        private val geFrom = HashMap<Int, ArrayList<LongArray>>() // value: [w, c]
+        private val geFrom = MutableIntObjectMap<ArrayList<LongArray>>() // value: [w, c]
 
         /** `maxResultsOf[operand]` = `ArrayMinMax(max)` results, each ≥ that operand. */
-        private val maxResultsOf = HashMap<Int, IntArrayList>()
+        private val maxResultsOf = MutableIntObjectMap<IntArrayList>()
 
         init {
             for (f in problem.factors) {

@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.lp.Relation
+import com.eignex.klause.util.MutableIntLongMap
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -137,11 +138,12 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
         val nb = l2(b)
         if (na == 0.0 || nb == 0.0) return 0.0
         // Map b's columns for an O(|a|) shared-support dot product.
-        val bIndex = HashMap<Int, Long>(b.cols.size * 2)
-        for (k in b.cols.indices) bIndex[b.cols[k]] = b.coeffs[k]
+        val bIndex = MutableIntLongMap(b.cols.size * 2)
+        for (k in b.cols.indices) bIndex.put(b.cols[k], b.coeffs[k])
         var dot = 0.0
         for (k in a.cols.indices) {
-            val bc = bIndex[a.cols[k]] ?: continue
+            if (!bIndex.containsKey(a.cols[k])) continue
+            val bc = bIndex.getOrDefault(a.cols[k], 0L)
             dot += a.coeffs[k].toDouble() * bc.toDouble()
         }
         return abs(dot) / (na * nb)

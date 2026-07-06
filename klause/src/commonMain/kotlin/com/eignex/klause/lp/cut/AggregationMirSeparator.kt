@@ -12,6 +12,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntLongMap
 
 /**
  * Aggregation MIR cuts of the {0,½} Chvátal–Gomory family over the integer [Linear] rows. A single
@@ -38,7 +39,7 @@ internal class AggregationMirSeparator : CutSeparator {
     private class Row(val cols: IntArray, val a: LongArray, val b: Long)
 
     override fun separate(ctx: CutContext): List<Cut> {
-        val loOf = HashMap<Int, Long>()
+        val loOf = MutableIntLongMap()
         val rows = collectRows(ctx, loOf)
         if (rows.isEmpty()) return emptyList()
         val cuts = ArrayList<Cut>()
@@ -58,7 +59,7 @@ internal class AggregationMirSeparator : CutSeparator {
     /** Normalize each [Linear] / [PseudoBoolean] / [Cardinality] factor to `≤`-rows over shifted
      *  nonnegative variables, recording each column's declared lower bound in [loOf]. GE flips sign;
      *  EQ / a cardinality range contributes both directions. */
-    private fun collectRows(ctx: CutContext, loOf: HashMap<Int, Long>): List<Row> {
+    private fun collectRows(ctx: CutContext, loOf: MutableIntLongMap): List<Row> {
         val rows = ArrayList<Row>()
         for (factor in ctx.problem.factors) {
             when (factor) {
@@ -115,7 +116,7 @@ internal class AggregationMirSeparator : CutSeparator {
         weightOf: (Int) -> Long,
         bound: Long,
         flip: Boolean,
-        loOf: HashMap<Int, Long>,
+        loOf: MutableIntLongMap,
         out: MutableList<Row>,
     ) {
         try {
@@ -131,7 +132,7 @@ internal class AggregationMirSeparator : CutSeparator {
                     coef[col] = addExact(coef[col] ?: 0L, -w)
                     b = addExact(b, -w)
                 }
-                loOf[col] = 0L
+                loOf.put(col, 0L)
             }
             if (coef.isEmpty()) return
             val cols = IntArray(coef.size)
@@ -152,7 +153,7 @@ internal class AggregationMirSeparator : CutSeparator {
         ctx: CutContext,
         factor: Linear,
         flip: Boolean,
-        loOf: HashMap<Int, Long>,
+        loOf: MutableIntLongMap,
         out: MutableList<Row>,
     ) {
         val k = factor.vars.size
@@ -167,7 +168,7 @@ internal class AggregationMirSeparator : CutSeparator {
                 cols[idx] = col
                 a[idx] = coeff
                 val lo = ctx.problem.intDomains[factor.vars[idx]].min.toLong()
-                loOf[col] = lo
+                loOf.put(col, lo)
                 b = addExact(b, -mulExact(coeff, lo)) // shift to y_j = x_j − lo_j
             }
             out.add(Row(cols, a, b))
@@ -178,8 +179,8 @@ internal class AggregationMirSeparator : CutSeparator {
 
     /** The {0,½} cut from one or two rows, in original `x` coordinates, or null when it has no integer
      *  term or the LP point does not violate it. */
-    private fun halfCut(ctx: CutContext, loOf: HashMap<Int, Long>, r1: Row, r2: Row?): Cut? = try {
-        val agg = HashMap<Int, Long>()
+    private fun halfCut(ctx: CutContext, loOf: MutableIntLongMap, r1: Row, r2: Row?): Cut? = try {
+        val agg = MutableIntLongMap()
         var bSum = r1.b
         accumulate(agg, r1)
         if (r2 != null) {
@@ -192,13 +193,14 @@ internal class AggregationMirSeparator : CutSeparator {
         val coeffs = LongArrayList()
         var rhsX = rhsY
         var lhs = 0.0
-        for ((col, aSum) in agg) {
+        agg.forEach { col, aSum ->
             val c = aSum.floorDiv(2)
-            if (c == 0L) continue
-            cols.add(col)
-            coeffs.add(c)
-            rhsX = addExact(rhsX, mulExact(c, loOf.getValue(col)))
-            lhs += c.toDouble() * ctx.primalOf(col)
+            if (c != 0L) {
+                cols.add(col)
+                coeffs.add(c)
+                rhsX = addExact(rhsX, mulExact(c, loOf.getOrDefault(col, 0L)))
+                lhs += c.toDouble() * ctx.primalOf(col)
+            }
         }
         if (cols.size == 0) return null
         if (lhs <= rhsX.toDouble() + tol) return null // not violated by the LP point
@@ -207,10 +209,10 @@ internal class AggregationMirSeparator : CutSeparator {
         null
     }
 
-    private fun accumulate(agg: HashMap<Int, Long>, r: Row) {
+    private fun accumulate(agg: MutableIntLongMap, r: Row) {
         for (idx in r.cols.indices) {
             val col = r.cols[idx]
-            agg[col] = addExact(agg[col] ?: 0L, r.a[idx])
+            agg.put(col, addExact(agg.getOrDefault(col, 0L), r.a[idx]))
         }
     }
 

@@ -1,6 +1,7 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntDoubleMap
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.log2
@@ -159,7 +160,7 @@ internal class SparseLu private constructor(
             }
             val u = rows // eliminated in place; u[perm[k]] ends as U's pivot row k (pivot cols ≥ k)
             // L multipliers recorded per elimination step, keyed by the eliminated original row.
-            val lAtStep = Array(m) { HashMap<Int, Double>() }
+            val lAtStep = Array(m) { MutableIntDoubleMap() }
             val perm = IntArray(m) { -1 }
             val colPerm = IntArray(m) { -1 }
             val rowActive = BooleanArray(m) { true }
@@ -216,7 +217,7 @@ internal class SparseLu private constructor(
                     if (!rowActive[i]) continue
                     val aic = u[i][pCol] ?: continue
                     val f = aic / pivot
-                    lAtStep[k][i] = f
+                    lAtStep[k].put(i, f)
                     u[i].remove(pCol)
                     for ((col, value) in u[pRow]) {
                         if (!colActive[col]) continue // skips the pivot column and already-pivoted columns
@@ -231,7 +232,7 @@ internal class SparseLu private constructor(
         @Suppress("LongMethod", "LongParameterList")
         private fun freeze(
             u: Array<HashMap<Int, Double>>,
-            lAtStep: Array<HashMap<Int, Double>>,
+            lAtStep: Array<MutableIntDoubleMap>,
             perm: IntArray,
             colPerm: IntArray,
             m: Int,
@@ -251,12 +252,16 @@ internal class SparseLu private constructor(
                 DoubleArray(uRowIdx[k].size) { t -> row.getValue(colPerm[uRowIdx[k][t]]) }
             }
             // L row k' (pivot space): multipliers from each step j < k' that eliminated row perm[k'].
-            val lRowMap = Array(m) { HashMap<Int, Double>() }
+            val lRowMap = Array(m) { MutableIntDoubleMap() }
             for (j in 0 until m) {
-                for ((origRow, f) in lAtStep[j]) lRowMap[invPerm[origRow]][j] = f
+                lAtStep[j].forEach { origRow, f -> lRowMap[invPerm[origRow]].put(j, f) }
             }
-            val lRowIdx = Array(m) { k -> lRowMap[k].keys.sorted().toIntArray() }
-            val lRowVal = Array(m) { k -> DoubleArray(lRowIdx[k].size) { t -> lRowMap[k].getValue(lRowIdx[k][t]) } }
+            val lRowIdx = Array(m) { k ->
+                val keys = IntArrayList()
+                lRowMap[k].forEach { key, _ -> keys.add(key) }
+                keys.toIntArray().also { it.sort() }
+            }
+            val lRowVal = Array(m) { k -> DoubleArray(lRowIdx[k].size) { t -> lRowMap[k].getOrDefault(lRowIdx[k][t], 0.0) } }
             // Column orientations (pivot space): U strictly-upper by column, L by column.
             val uColB = Array(m) { IntArrayList() }
             val uColBv = Array(m) { ArrayList<Double>() }
