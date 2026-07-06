@@ -121,6 +121,28 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `in set membership intension restricts the variable to the set`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><var id="x"> 0..9 </var></variables>
+            <constraints><intension> in(x,{2,4,6}) </intension><intension> gt(x,3) </intension></constraints></instance>
+            """.trimIndent(),
+        )
+        assertTrue(v[0] in setOf(4, 6), "x must be in {2,4,6} and > 3: x=${v[0]}")
+    }
+
+    @Test
+    fun `sum condition with a set constrains the total to a member`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><var id="a"> 0..3 </var><var id="b"> 0..3 </var></variables>
+            <constraints><sum><list> a b </list><condition> (in,{5,6}) </condition></sum></constraints></instance>
+            """.trimIndent(),
+        )
+        assertTrue(v[0] + v[1] in setOf(5, 6), "a+b must be in {5,6}: ${v[0]}+${v[1]}")
+    }
+
+    @Test
     fun `count maps to Count + condition`() {
         val xml = """
             <instance type="CSP">
