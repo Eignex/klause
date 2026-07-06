@@ -5,20 +5,20 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class BtConfigSpaceTest {
+class BacktrackConfigSpaceTest {
 
     @Test
     fun `sampled points decode to params and gate the lp child knob`() {
         val rng = Random(1)
         val presets = mutableSetOf<String>()
         repeat(1000) {
-            val a = BtConfigSpace.sample(rng)
+            val a = BacktrackConfigSpace.sample(rng)
             presets += a["preset"] as String
             // lp.lbtree is a child of lp.emphasis != off.
             val lpOn = a["lp.emphasis"] != "off"
             assertEquals(lpOn, a.containsKey("lp.lbtree"), "lp.lbtree gated by lp.emphasis: $a")
             // Decodes without throwing; LP config presence matches the emphasis choice.
-            val p = BtConfigSpace.toParams(a)
+            val p = BacktrackConfigSpace.toParams(a)
             assertEquals(!lpOn, p.lpConfig == null, "lpConfig set iff emphasis != off: $a")
         }
         assertEquals(setOf("conflictDriven", "satOptimized", "free"), presets, "all presets reachable")
@@ -37,7 +37,7 @@ class BtConfigSpaceTest {
             "max-learned" to "20000",
             "lp.emphasis" to "off",
         )
-        val p = BtConfigSpace.toParams(a)
+        val p = BacktrackConfigSpace.toParams(a)
         assertEquals(256L, p.lubyRestartBase)
         assertTrue(p.phaseSaving)
         assertTrue(p.tieredLearnedDb)

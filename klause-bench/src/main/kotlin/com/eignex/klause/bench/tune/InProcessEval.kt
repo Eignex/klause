@@ -24,7 +24,7 @@ internal data class EvalResult(val feasible: Boolean, val objective: Double?, va
  */
 internal object InProcessEval {
 
-    /** Evaluate an LS config (decoded [recipe] from [LsConfigSpace]) on [entry] for [budgetMs] at [seed]. */
+    /** Evaluate an LS config (decoded [recipe] from [LocalSearchConfigSpace]) on [entry] for [budgetMs] at [seed]. */
     fun evalLs(entry: ResolvedProblem, recipe: LsRecipe, budgetMs: Long, seed: Long): EvalResult {
         val objective = requireNotNull(entry.objective) { "evalLs needs a COP instance" }
         val solver = LocalSearchSolver(
@@ -45,7 +45,7 @@ internal object InProcessEval {
         return solver.minimize(objective, params).toEval()
     }
 
-    /** Evaluate a backtrack config ([params] from [BtConfigSpace]) on [entry] for [budgetMs] at [seed]. */
+    /** Evaluate a backtrack config ([params] from [BacktrackConfigSpace]) on [entry] for [budgetMs] at [seed]. */
     fun evalBt(entry: ResolvedProblem, params: BacktrackParams, budgetMs: Long, seed: Long): EvalResult {
         val objective = requireNotNull(entry.objective) { "evalBt needs a COP instance" }
         val wired = params.copy(randomSeed = seed, cancellation = deadline(budgetMs))
