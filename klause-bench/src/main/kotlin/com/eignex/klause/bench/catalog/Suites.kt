@@ -86,6 +86,24 @@ internal object Suites {
                     format = Format.DIMACS,
                 )
             },
+            DynamicSuite("xcsp3-cop", "XCSP3 competition COP aggregate 2022-25 (fetched, 1000; cap with max=)") {
+                CorpusSelection.select(
+                    ExternalCollections.xcsp3Cop,
+                    CorpusSelection.Layout.Flat("COP22to25", "xml"),
+                    CorpusSelection.Selection.fromProps(),
+                    Category.OPTIMIZATION,
+                    format = Format.XCSP3,
+                )
+            },
+            DynamicSuite("xcsp3-csp", "XCSP3 competition CSP aggregate 2022-25 (fetched, 800; cap with max=)") {
+                CorpusSelection.select(
+                    ExternalCollections.xcsp3Csp,
+                    CorpusSelection.Layout.Flat("CSP22to25", "xml"),
+                    CorpusSelection.Selection.fromProps(),
+                    Category.CSP,
+                    format = Format.XCSP3,
+                )
+            },
         )
     }
 
@@ -575,12 +593,17 @@ internal object ExternalCollections {
         reason = "$count main-track $track instances (2022–2025 aggregate); fetched rather than vendored",
         fetch = FetchMethod.Zip,
     )
+
+    /** The curated 2022–2025 main-track aggregates: the [xcsp3-cop]/[xcsp3-csp] dynamic suites select
+     *  from these (each ships as `COP22to25/`/`CSP22to25/` dirs of `*.xml.lzma`, decompressed on fetch). */
+    val xcsp3Cop = xcspAggregate("COP", 1000)
+    val xcsp3Csp = xcspAggregate("CSP", 800)
     val xcsp3Competition = listOf(
         xcsp(2017, 102),
         xcsp(2018, 69),
         xcsp(2019, 136),
-        xcspAggregate("COP", 1000),
-        xcspAggregate("CSP", 800),
+        xcsp3Cop,
+        xcsp3Csp,
     )
 
     /** SMT-LIB QF_LIA non-incremental benchmark set: the per-logic `.tar.zst` archive from the
