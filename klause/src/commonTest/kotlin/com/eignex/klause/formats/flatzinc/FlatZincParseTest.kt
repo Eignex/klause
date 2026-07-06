@@ -168,6 +168,20 @@ class FlatZincParseTest {
     }
 
     @Test
+    fun `fzn_all_different_int is recognized`() {
+        // Gecode flattening emits the fzn_-prefixed builtin; it must map to the same AllDifferent.
+        val src = """
+            array [1..3] of var 0..2: xs;
+            constraint fzn_all_different_int(xs);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        assertNotNull(sample)
+        assertEquals(3, setOf(sample.ints[0], sample.ints[1], sample.ints[2]).size)
+    }
+
+    @Test
     fun `circuit emits a hamiltonian cycle`() {
         // MiniZinc-style 1-indexed circuit: each succ holds a value in [1, n].
         val src = """
