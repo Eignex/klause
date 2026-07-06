@@ -692,6 +692,23 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `cumulative with variable heights bounds the overlapping demand`() {
+        // Both tasks run over [0,2); with capacity 3 and h0=2, the variable height h1 must be 1.
+        val v = sat(
+            """
+            <instance type="CSP"><variables>
+              <array id="o" size="[2]"> 0..0 </array><var id="h0"> 1..3 </var><var id="h1"> 1..3 </var>
+            </variables><constraints>
+              <cumulative><origins> o[] </origins><lengths> 2 2 </lengths><heights> h0 h1 </heights>
+                <condition> (le,3) </condition></cumulative>
+              <intension> eq(h0,2) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(1, v[3], "h1 must be 1 (2 + h1 <= 3)")
+    }
+
+    @Test
     fun `regular accepts exactly via the DFA with 0-based symbols shifted`() {
         val xml = """
             <instance type="CSP">
