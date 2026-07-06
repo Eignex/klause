@@ -235,7 +235,8 @@ object BenchCli {
         val r: SolverInvocation.Result
         val maximize: Boolean
         if (xcsp3) {
-            r = cached ?: Xcsp3CpSatReference.run(ref, budget).also { BenchCache.store(key, it) }
+            r = cached ?: Xcsp3CpSatReference.run(ref, budget, settings.processors ?: 1)
+                .also { BenchCache.store(key, it) }
             // Objective sense is unknowable without parsing the model; the container carries it in stats.
             maximize = r.stats["maximize"].toBoolean()
         } else {

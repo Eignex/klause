@@ -39,9 +39,11 @@ internal object Xcsp3CpSatReference {
         p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
 
-    /** Solve [ref]'s XCSP3 `.xml` with cp-sat in the container under [budget]. The objective sense
-     *  (`maximize`), unknowable without parsing the model, is carried in `stats["maximize"]`. */
-    fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
+    /** Solve [ref]'s XCSP3 `.xml` with cp-sat in the container under [budget], pinning cp-sat to
+     *  [workers] search workers (the sweep parallelizes across instances, so 1 keeps a container from
+     *  fanning out to every core). The objective sense (`maximize`), unknowable without parsing the
+     *  model, is carried back in `stats["maximize"]`. */
+    fun run(ref: ProblemRef, budget: Budget, workers: Int): SolverInvocation.Result {
         val xml = CorpusFetcher.resolve(ref.source)
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         val cmd = listOf(
@@ -53,6 +55,7 @@ internal object Xcsp3CpSatReference {
             IMAGE,
             "/in/${xml.name}",
             timeoutSec.toString(),
+            workers.toString(),
         )
         val proc = ProcessBuilder(cmd).redirectErrorStream(false).start()
         val stdout = proc.inputStream.bufferedReader().readText()
