@@ -15,11 +15,12 @@ class LsConfigSpaceTest {
             val a = LsConfigSpace.sample(rng)
             val fam = a["family"] as String
             families += fam
+            fun hasPrefix(prefix: String) = a.keys.any { k -> k.startsWith(prefix) }
             // Conditional params are present only for their family (child-param gating).
-            assertEquals(fam == "cbls", a.keys.any { it.startsWith("cbls.") }, "cbls knobs gated: $a")
-            assertEquals(fam == "probsat", a.keys.any { it.startsWith("probsat.") }, "probsat knobs gated: $a")
-            assertEquals(fam == "walksat", a.keys.any { it.startsWith("walksat.") }, "walksat knobs gated: $a")
-            assertEquals(fam == "sa", a.keys.any { it.startsWith("sa.") }, "sa knobs gated: $a")
+            assertEquals(fam == "cbls", hasPrefix("cbls."), "cbls knobs gated: $a")
+            assertEquals(fam == "probsat", hasPrefix("probsat."), "probsat knobs gated: $a")
+            assertEquals(fam == "walksat", hasPrefix("walksat."), "walksat knobs gated: $a")
+            assertEquals(fam == "sa", hasPrefix("sa."), "sa knobs gated: $a")
             // Every sampled point decodes to a fresh recipe without throwing.
             val recipe = LsConfigSpace.toRecipe(a)
             assertTrue(recipe.label.startsWith("cfg/"), recipe.label)
