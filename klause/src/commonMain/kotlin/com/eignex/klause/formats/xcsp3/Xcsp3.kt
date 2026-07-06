@@ -909,7 +909,8 @@ object Xcsp3 {
             if (e.attr("covered").equals("true", ignoreCase = true)) {
                 throw UnsupportedXcsp3Exception("precedence: covered form")
             }
-            val vars = listVars(e)
+            // The list may be a <list> child or, in the symmetry-breaking shorthand, direct content.
+            val vars = refList(listText(e)).toIntArray()
             if (vars.isEmpty()) return
             val values = parseInts(e.child("values")?.textContent)
                 ?: vars.flatMap { domainValues(it) }.distinct().sorted().toIntArray()
