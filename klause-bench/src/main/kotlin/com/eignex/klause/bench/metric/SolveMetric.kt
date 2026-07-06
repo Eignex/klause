@@ -128,7 +128,7 @@ internal object SolveMetric {
             val optimize = entry.objective != null
             val kind = if (optimize) "optimize" else "satisfy"
             val rec = runCatching {
-                val key = BenchCache.keyFor(entry, tag, budget)
+                val key = BenchCache.keyFor(entry.ref, tag, budget)
                 val r = BenchCache.load(key)
                     ?: SolverInvocation.run(
                         entry,

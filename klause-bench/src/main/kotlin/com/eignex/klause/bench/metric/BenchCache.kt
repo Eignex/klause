@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
-import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -23,11 +23,11 @@ internal object BenchCache {
     private val enabled = System.getProperty("klause.bench.cache")?.toBoolean() ?: true
     private val dir by lazy { File("build/bench-cache").apply { mkdirs() } }
 
-    /** Key for solving [entry] with [solver] (the settings-encoding label) under [budget]. */
-    fun keyFor(entry: ResolvedProblem, solver: String, budget: Budget): String {
+    /** Key for solving [ref] with [solver] (the settings-encoding label) under [budget]. */
+    fun keyFor(ref: ProblemRef, solver: String, budget: Budget): String {
         val md = MessageDigest.getInstance("SHA-256")
-        md.update(CorpusFetcher.resolve(entry.ref.source).readBytes())
-        entry.ref.data?.let { md.update(CorpusFetcher.resolve(it).readBytes()) }
+        md.update(CorpusFetcher.resolve(ref.source).readBytes())
+        ref.data?.let { md.update(CorpusFetcher.resolve(it).readBytes()) }
         md.update("|$solver|t=${budget.timeoutMillis}".toByteArray())
         // klause iterates → invalidate its entries when the cli binary changes; references are external.
         if (solver.startsWith("klause")) {

@@ -2,8 +2,10 @@ package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.metric.ArmCalibration
+import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.ReferenceEntry
 import com.eignex.klause.bench.metric.ReferenceStore
@@ -12,6 +14,7 @@ import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
@@ -19,6 +22,9 @@ import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
 import kotlinx.serialization.decodeFromString
 import java.io.File
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
@@ -47,6 +53,10 @@ import java.io.File
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
 object BenchCli {
+    /** Default reference-sweep concurrency: enough to keep cores busy, low enough that a handful of
+     *  large-instance cp-sat solves can't exhaust memory. Override with `jobs=N`. */
+    private const val DEFAULT_REFERENCE_JOBS = 6
+
     /** CLI entry point dispatching bench subcommands. */
     @JvmStatic
     fun main(args: Array<String>) {
@@ -159,45 +169,115 @@ object BenchCli {
      *  Optimize instances only (pass `kind=cop`); match the cached run's `timeout=` to replay it. */
     private fun reference(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val refs = select(f)
+        val refs = select(f).filter { it.format == Format.MINIZINC }
         if (refs.isEmpty()) {
-            println("(no problems matched the selection)")
+            println("(no MiniZinc problems matched the selection)")
             return
         }
         val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
+        require(SolverInvocation.referenceAvailable(backend)) {
+            "reference solver '$backend' is not registered with minizinc (`minizinc --solvers`)"
+        }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
-        val dir = SolveMetric.run(BenchLoad.resolveRefs(refs), budget, backend, KlauseSearch()) ?: return
-        val harvested = dir.listFiles { file -> file.extension == "json" }?.mapNotNull { jsonFile ->
-            val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
-            // Harvest anything decisive — a COP optimum/bound, a CSP witness (SAT), or a proof
-            // (optimum / UNSAT). Skip pure timeouts (no solution, nothing proved).
-            if (rec != null && (rec.feasible == true || rec.proven)) {
-                // Proof time when proven (the solver's `solveTime`, seconds -> ms), else the budget it
-                // ran out (a timeout stores the full budget, a fast proof stores its real time).
-                val elapsedMs = if (rec.proven) {
-                    rec.stats["solveTime"]?.toDoubleOrNull()?.let { (it * 1000).toLong() } ?: rec.budgetMs
-                } else {
-                    rec.budgetMs
-                }
-                ReferenceEntry(
-                    rec.problem,
-                    rec.maximize,
-                    rec.objective,
-                    rec.feasible,
-                    rec.proven,
-                    elapsedMs,
-                    rec.solver,
-                    rec.budgetMs,
+        // `workers=` pins each cp-sat/choco job to that many search workers (default 1): without it the
+        // reference fans out to every core, so `jobs` concurrent solves would oversubscribe the machine.
+        // Total core pressure is `jobs × workers`; keep it within the box.
+        val workers = (f["workers"] ?: f["processors"])?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val settings = SolverInvocation.Settings(processors = workers, free = f["fixed"]?.toBoolean() != true)
+        val jobs = (f["jobs"]?.toIntOrNull() ?: DEFAULT_REFERENCE_JOBS).coerceIn(1, refs.size)
+        println(
+            "=== reference ($backend, ${budget.timeoutMillis}ms budget, jobs=$jobs × workers=$workers): " +
+                "${refs.size} instance(s) ===",
+        )
+        val pool = Executors.newFixedThreadPool(jobs)
+        val done = AtomicInteger()
+        val harvested = try {
+            refs.map { ref ->
+                pool.submit(
+                    Callable { solveReference(ref, backend, settings, budget, done, refs.size) },
                 )
-            } else {
-                null
             }
-        }.orEmpty()
+                .mapNotNull { it.get() }
+        } finally {
+            pool.shutdown()
+        }
         val (added, tightened, unchanged) = ReferenceStore.mergeAndSave(harvested)
         println(
             "\nreference table: +$added new, $tightened tightened, $unchanged unchanged " +
-                "(${harvested.size} harvested from $backend)",
+                "(${harvested.size} decisive of ${refs.size} from $backend)",
         )
+    }
+
+    /** Solve one instance with the reference [backend] and turn a decisive result (a feasible witness
+     *  or a proof) into a [ReferenceEntry]; a pure timeout yields null. Reuses [BenchCache], so re-runs
+     *  and resumes replay instantly and a killed sweep loses no completed work. */
+    private fun solveReference(
+        ref: ProblemRef,
+        backend: String,
+        settings: SolverInvocation.Settings,
+        budget: Budget,
+        counter: AtomicInteger,
+        total: Int,
+    ): ReferenceEntry? = runCatching {
+        val (optimize, maximize) = solveKind(ref)
+        val key = BenchCache.keyFor(ref, backend, budget)
+        val r = BenchCache.load(key)
+            ?: SolverInvocation.runReference(
+                ref,
+                backend,
+                settings,
+                budget,
+                optimize,
+            ).also { BenchCache.store(key, it) }
+        // Proof time when proven (the solver's `solveTime`, seconds -> ms); for an unproven feasible
+        // witness the time-to-first-feasible (the CSP metric); a pure timeout stores the full budget.
+        val solveMs = r.stats["solveTime"]?.toDoubleOrNull()?.let { (it * 1000).toLong() }
+        val elapsedMs = when {
+            r.proven -> solveMs ?: budget.timeoutMillis
+            r.feasible == true -> r.timeToFirstFeasibleMs ?: solveMs ?: budget.timeoutMillis
+            else -> budget.timeoutMillis
+        }
+        val verdict = when {
+            r.proven && r.feasible == false -> "UNSAT"
+            r.proven -> "opt=${r.objective ?: "sat"}"
+            r.feasible == true -> "best=${r.objective ?: "sat"}"
+            else -> "??"
+        }
+        println("[${counter.incrementAndGet()}/$total] ${ref.name} = $verdict")
+        // Decisive = a witness (SAT) or a proof (optimum / UNSAT); a pure timeout stores nothing.
+        if (r.feasible == true || r.proven) {
+            ReferenceEntry(
+                ref.name,
+                maximize,
+                r.objective,
+                r.feasible,
+                r.proven,
+                elapsedMs,
+                backend,
+                budget.timeoutMillis,
+            )
+        } else {
+            null
+        }
+    }.getOrElse {
+        println("?? ${ref.name} ERROR: ${it.message ?: it::class.simpleName}")
+        null
+    }
+
+    /** Read `(optimize, maximize)` from the model's `solve` item (comments stripped) so the reference
+     *  path needs no klause `Problem`. A `satisfy` model — or one whose solve item is not in the top
+     *  `.mzn` — is treated as a CSP: feasibility only, no `-a` enumeration. */
+    private fun solveKind(ref: ProblemRef): Pair<Boolean, Boolean> {
+        val stripped = CorpusFetcher.resolve(ref.source).readText()
+            .replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ")
+            .replace(Regex("%[^\n]*"), " ")
+        val keyword = Regex("""\bsolve\b[^;]*?\b(satisfy|minimize|maximize)\b""", RegexOption.DOT_MATCHES_ALL)
+            .findAll(stripped).lastOrNull()?.groupValues?.get(1)
+        return when (keyword) {
+            "maximize" -> true to true
+            "minimize" -> true to false
+            else -> false to false
+        }
     }
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
