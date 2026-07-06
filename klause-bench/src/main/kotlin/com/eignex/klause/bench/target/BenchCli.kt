@@ -169,7 +169,9 @@ object BenchCli {
         val dir = SolveMetric.run(BenchLoad.resolveRefs(refs), budget, backend, KlauseSearch()) ?: return
         val harvested = dir.listFiles { file -> file.extension == "json" }?.mapNotNull { jsonFile ->
             val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
-            if (rec != null && rec.kind == "optimize" && rec.objective != null) {
+            // Harvest anything decisive — a COP optimum/bound, a CSP witness (SAT), or a proof
+            // (optimum / UNSAT). Skip pure timeouts (no solution, nothing proved).
+            if (rec != null && (rec.feasible == true || rec.proven)) {
                 // Proof time when proven (the solver's `solveTime`, seconds -> ms), else the budget it
                 // ran out (a timeout stores the full budget, a fast proof stores its real time).
                 val elapsedMs = if (rec.proven) {
@@ -181,6 +183,7 @@ object BenchCli {
                     rec.problem,
                     rec.maximize,
                     rec.objective,
+                    rec.feasible,
                     rec.proven,
                     elapsedMs,
                     rec.solver,
