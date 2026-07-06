@@ -12,7 +12,7 @@ import kotlin.random.Random
  * point (a `Map<name, value>`) into a solver recipe. This is the search space the BO optimizes over,
  * covering the full sub-algorithm knob cross-product without enumerating it.
  */
-sealed interface ConfigParam {
+internal sealed interface ConfigParam {
     val name: String
 
     /** Whether this param is live given the [assignment] drawn for earlier params (family gating). */
@@ -23,7 +23,7 @@ sealed interface ConfigParam {
 }
 
 /** A categorical choice over [values]. */
-class CategoricalParam(
+internal class CategoricalParam(
     override val name: String,
     val values: List<String>,
     private val active: (Map<String, Any>) -> Boolean = { true },
@@ -37,7 +37,7 @@ class CategoricalParam(
 }
 
 /** An integer in `[min, max]` (inclusive). */
-class IntParam(
+internal class IntParam(
     override val name: String,
     val min: Int,
     val max: Int,
@@ -52,7 +52,7 @@ class IntParam(
 }
 
 /** A double in `[min, max)`. */
-class DoubleParam(
+internal class DoubleParam(
     override val name: String,
     val min: Double,
     val max: Double,
@@ -70,7 +70,7 @@ class DoubleParam(
  * A declared search space: an ordered list of [params] (earlier ones gate later conditionals). A
  * decoder in the concrete space (e.g. [LsConfigSpace]) turns a sampled assignment into a solver recipe.
  */
-abstract class ConfigSpace(val params: List<ConfigParam>) {
+internal open class ConfigSpace(val params: List<ConfigParam>) {
     /** A lazy random point: draw each active param in declaration order, so a param's [activeIn] sees
      *  the choices its gate depends on. Inactive params are simply absent from the assignment. */
     fun sample(rng: Random): Map<String, Any> {

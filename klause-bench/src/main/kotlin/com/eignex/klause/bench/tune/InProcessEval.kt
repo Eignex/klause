@@ -13,7 +13,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 /** Outcome of a single-solver evaluation: [feasible] with [objective] (in the minimized orientation),
  *  and whether optimality was [proven]. The gap-to-optimum reward (#22) combines this with the
  *  reference table (#26); the BO (#24) turns the reward into a Vizier measurement. */
-data class EvalResult(val feasible: Boolean, val objective: Double?, val proven: Boolean)
+internal data class EvalResult(val feasible: Boolean, val objective: Double?, val proven: Boolean)
 
 /**
  * In-process single-solver evaluation for the BO config search (#22). Runs one config DIRECTLY on the
