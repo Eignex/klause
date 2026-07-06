@@ -23,15 +23,15 @@ internal enum class Engine(
 
     /** Backtrack-only portfolio (free search). Accepts the per-solver `var-selector`/`val-selector`
      *  (and other backtrack) `--param`s, which resolve a one-arm override pool for single-solver
-     *  heuristic A/B — subsuming the former naked `cp-single` engine. */
-    CP("cp", mix = EngineMix.BACKTRACK, aliases = listOf("backtrack", "bt")),
+     *  heuristic A/B — subsuming the former naked `cp-single` engine. `bt`/`cp` are short aliases. */
+    CP("backtrack", mix = EngineMix.BACKTRACK, aliases = listOf("bt", "cp")),
 
-    /** Local-search-only portfolio. */
+    /** Local-search-only portfolio. `ls` is the short alias. */
     LS(
-        "ls",
+        "localsearch",
         pureLs = true,
         mix = EngineMix.LOCAL_SEARCH,
-        aliases = listOf("localsearch", "local-search"),
+        aliases = listOf("ls", "local-search"),
     ),
 
     /** Mixed backtrack + local-search portfolio. */
@@ -48,7 +48,7 @@ internal enum class Engine(
         /** Parse a user token (canonical id or alias, case-insensitive); `null` if unrecognised. */
         fun fromId(token: String): Engine? = byToken[token.trim().lowercase()]
 
-        /** Canonical ids joined for `--help` / error messages: `fixed | cp | ls | mixed | …`. */
+        /** Canonical ids joined for `--help` / error messages: `fixed | backtrack | localsearch | mixed`. */
         fun ids(): String = entries.joinToString(" | ") { it.id }
     }
 }
