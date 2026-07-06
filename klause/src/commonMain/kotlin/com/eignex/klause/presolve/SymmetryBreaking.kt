@@ -16,6 +16,7 @@ import com.eignex.klause.util.IntDisjointSet
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 internal object SymmetryBreaking {
 
@@ -598,14 +599,16 @@ internal object SymmetryBreaking {
 
         // Cells of the base equitable partition: only same-colour variables can be interchangeable.
         val (intColour, boolColour) = equitablePartition(problem, seedIntBase, seedBoolBase, budget, cancellation)
-        val cells = HashMap<Int, MutableList<Int>>()
+        val cells = MutableIntObjectMap<MutableList<Int>>()
         for (v in 0 until nInt) if (v !in objectiveIntVars) cells.getOrPut(intColour[v]) { ArrayList() }.add(v)
         for (v in 0 until nBool) {
             if (v !in objectiveBoolVars) cells.getOrPut(boolColour[v]) { ArrayList() }.add(nInt + v)
         }
 
         val gens = ArrayList<Pair<IntArray, IntArray>>()
-        for (members in cells.values) {
+        val cellMembers = ArrayList<MutableList<Int>>(cells.size)
+        cells.forEach { _, members -> cellMembers.add(members) }
+        for (members in cellMembers) {
             if (cancellation()) break
             if (members.size < 2 || members.size > MAX_VERIFIED_GROUP) continue
             val sorted = members.sorted()

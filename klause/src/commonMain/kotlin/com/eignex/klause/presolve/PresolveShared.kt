@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
@@ -93,7 +94,7 @@ internal object PresolveShared {
     fun mergeCliques(cliques: List<Set<Int>>): List<Set<Int>> {
         if (cliques.size < 2 || cliques.size > CLIQUE_MERGE_CAP) return cliques
         // Conflict graph: lit -> the lits known pairwise-exclusive with it (co-members of some clique).
-        val adj = HashMap<Int, HashSet<Int>>()
+        val adj = MutableIntObjectMap<HashSet<Int>>()
         for (clique in cliques) {
             for (u in clique) {
                 val nbrs = adj.getOrPut(u) { HashSet() }
