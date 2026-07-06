@@ -225,6 +225,13 @@ internal fun FlatZincCompiler.evalIntVarArray(e: FznExpr): IntArray = when (e) {
             arr.varIds.copyOf()
         }
 
+        // A par int array handed to a var-array position (e.g. `count` over a constant array):
+        // materialize each constant as a fixed singleton var so the global sees uniform var ids.
+        is FlatZincArray.IntParam -> IntArray(arr.values.size) {
+            val v = arr.values[it]
+            allocInt("__const_int_${v}_${intVars.size}", v, v)
+        }
+
         else -> failHere("`${e.name}` is not an int var array")
     }
 
