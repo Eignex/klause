@@ -44,6 +44,9 @@ internal class MutableIntObjectMap<V>(initialCapacity: Int = 8) {
         return null
     }
 
+    /** Value for [key], throwing if absent. The unboxed-key analogue of `Map.getValue`. */
+    fun getValue(key: Int): V = get(key) ?: throw NoSuchElementException("key $key is missing in the map")
+
     fun containsKey(key: Int): Boolean {
         var i = mixIntKey(key) and mask
         while (used[i]) {

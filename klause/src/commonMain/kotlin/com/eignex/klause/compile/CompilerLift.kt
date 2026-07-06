@@ -70,7 +70,7 @@ internal fun Lowering.liftDivMod(num: IntExpr, den: IntExpr, returnRemainder: Bo
     )
     factors += res.factors
     val resultId = if (returnRemainder) res.remainder else res.quotient
-    return IntRef(idToIntName[resultId]!!)
+    return IntRef(idToIntName.getValue(resultId))
 }
 
 internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {

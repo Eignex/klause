@@ -98,7 +98,7 @@ object PermutationGroup {
         frontier.addLast(point)
         while (frontier.isNotEmpty()) {
             val gamma = frontier.removeFirst()
-            val ug = transversal[gamma]!!
+            val ug = transversal.getValue(gamma)
             for (s in gens) {
                 val image = s[gamma]
                 if (!transversal.containsKey(image)) {
@@ -111,10 +111,10 @@ object PermutationGroup {
         val orbit = ArrayList<Int>(transversal.size)
         transversal.forEach { gamma, _ -> orbit.add(gamma) }
         for (gamma in orbit) {
-            val ug = transversal[gamma]!!
+            val ug = transversal.getValue(gamma)
             for (s in gens) {
                 val sug = compose(s, ug)
-                val usg = transversal[s[gamma]]!!
+                val usg = transversal.getValue(s[gamma])
                 result.add(compose(inverse(usg), sug))
             }
         }
