@@ -9,3 +9,7 @@ internal val EmptyIntArray: IntArray = IntArray(0)
  *  wide-only term-contribution snapshot in `propagateLinearBounds`) so the common path binds this
  *  instead of allocating. */
 internal val EmptyLongArray: LongArray = LongArray(0)
+
+/** Shared singleton empty `BooleanArray`, for the empty-occupancy / no-flags slots that would
+ *  otherwise allocate a fresh zero-length array per use. */
+internal val EmptyBooleanArray: BooleanArray = BooleanArray(0)
