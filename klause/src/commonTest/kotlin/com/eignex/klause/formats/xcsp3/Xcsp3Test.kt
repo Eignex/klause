@@ -300,6 +300,34 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `nValues objective minimizes the distinct value count`() {
+        val parsed = Xcsp3.parse(
+            """
+            <instance type="COP"><variables><array id="x" size="[3]"> 1..3 </array></variables>
+            <constraints><sum><list> x[] </list><condition> (ge,5) </condition></sum></constraints>
+            <objectives><minimize type="nValues"><list> x[] </list></minimize></objectives></instance>
+            """.trimIndent(),
+        )
+        val r = BacktrackSolver(parsed.problem).minimize(requireNotNull(parsed.objective), BacktrackParams())
+        assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
+        assertEquals(1.0, r.objective)
+    }
+
+    @Test
+    fun `precedence forces a value to appear only after its predecessor`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><array id="x" size="[3]"> 0..2 </array></variables>
+            <constraints>
+              <precedence><list> x[] </list><values> 0 1 2 </values></precedence>
+              <intension> eq(x[2],2) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(listOf(0, 1, 2), v.take(3))
+    }
+
+    @Test
     fun `noOverlap keeps unit-resource tasks disjoint`() {
         val v = sat(
             """
