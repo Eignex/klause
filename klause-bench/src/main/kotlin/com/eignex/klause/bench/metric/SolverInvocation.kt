@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
@@ -91,13 +92,22 @@ internal object SolverInvocation {
         val cmd = if (solverId == KLAUSE) {
             klauseCommand(entry, settings, budget, optimize)
         } else {
-            minizincCommand(entry, solverId, settings, budget, optimize)
+            minizincCommand(entry.ref, solverId, settings, budget, optimize)
         }
         // Hard wall-clock ceiling: a solve that ignores its `-t` deadline (e.g. an expensive move source
         // that polls cancellation too rarely) must not hang the harness. Generous over the budget so it
         // only ever kills a genuine runaway, never a solve that's merely flushing at the deadline.
         return invoke(cmd, hardTimeoutMs = budget.timeoutMillis * 2 + 20_000)
     }
+
+    /** Run a registered MiniZinc [solverId] reference directly on [ref] — no klause `Problem` is
+     *  built (the reference oracle solves the `.mzn`/`.fzn` itself), so a whole-corpus reference
+     *  sweep stays flat in memory. [optimize] selects intermediate-solution mode (`-a`). */
+    fun runReference(ref: ProblemRef, solverId: String, settings: Settings, budget: Budget, optimize: Boolean): Result =
+        invoke(
+            minizincCommand(ref, solverId, settings, budget, optimize),
+            hardTimeoutMs = budget.timeoutMillis * 2 + 20_000,
+        )
 
     /** The provisioned klause-cli binary (its mtime keys the cache so a klause rebuild invalidates
      *  klause's cached results while references stay frozen). */
@@ -157,18 +167,18 @@ internal object SolverInvocation {
      *  solver's `%%%mzn-stat` block (parity with klause's `-s`); [invoke] already parses those lines
      *  into [Result.stats], so references carry search statistics too. */
     private fun minizincCommand(
-        entry: ResolvedProblem,
+        ref: ProblemRef,
         solverId: String,
         s: Settings,
         budget: Budget,
         optimize: Boolean,
     ): List<String> {
-        require(entry.ref.format == Format.MINIZINC) {
-            "reference '$solverId' only runs MiniZinc instances (got ${entry.ref.format})"
+        require(ref.format == Format.MINIZINC) {
+            "reference '$solverId' only runs MiniZinc instances (got ${ref.format})"
         }
-        val mzn = CorpusFetcher.resolve(entry.ref.source)
-        val dzn = entry.ref.data?.let { CorpusFetcher.resolve(it) }
-        val src = entry.ref.source
+        val mzn = CorpusFetcher.resolve(ref.source)
+        val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
+        val src = ref.source
         val includeDirs = if (src is ProblemSource.External) {
             val root = CorpusFetcher.ensure(src.collection)
             src.collection.includeDirs.map { File(root, it) }.filter { it.isDirectory }
@@ -189,7 +199,11 @@ internal object SolverInvocation {
                 add("--output-objective")
             }
             if (s.free) add("-f")
-            s.processors?.takeIf { it > 1 }?.let {
+            // Pin the reference solver's own worker count when set. Unlike the klause path, emit `-p`
+            // even at 1: cp-sat/choco otherwise fan out to every core, so N instance-level jobs would
+            // each spawn a full worker pool and oversubscribe cores + memory. The reference sweep sets
+            // this to a small per-instance count so `jobs × workers` stays within the machine.
+            s.processors?.let {
                 add("-p")
                 add(it.toString())
             }
