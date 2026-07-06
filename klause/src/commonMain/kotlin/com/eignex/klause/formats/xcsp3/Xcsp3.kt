@@ -657,30 +657,55 @@ object Xcsp3 {
             )
         }
 
-        @Suppress("ThrowsCount") // one guarded throw per unsupported cumulative shape
         private fun cumulative(e: XmlElement) {
             val starts = refList(requireNotNull(e.child("origins")).textContent).toIntArray()
-            val durations = parseInts(e.child("lengths")?.textContent)
-                ?: throw UnsupportedXcsp3Exception("cumulative: only constant <lengths> supported")
-            val resources = parseInts(e.child("heights")?.textContent)
-                ?: throw UnsupportedXcsp3Exception("cumulative: only constant <heights> supported")
+            val (durations, durationVars) = taskDims(requireNotNull(e.child("lengths")).textContent)
+            val (resources, resourceVars) = taskDims(requireNotNull(e.child("heights")).textContent)
+            require(durations.size == starts.size && resources.size == starts.size) {
+                "cumulative: <origins>/<lengths>/<heights> length mismatch"
+            }
             val condEl = e.child("condition")
                 ?: throw UnsupportedXcsp3Exception("cumulative: unsupported form (no single <condition>)")
-            val (op, cap) = condition(condEl.textContent.trim())
+            val (op, cap, capVar) = sumCondition(condEl.textContent.trim())
             if (op != LinearOp.LE) {
-                throw UnsupportedXcsp3Exception(
-                    "cumulative: only (le, capacity) conditions supported",
-                )
+                throw UnsupportedXcsp3Exception("cumulative: only (le, capacity) conditions supported")
             }
-            factors.add(Cumulative(starts = starts, durations = durations, resources = resources, capacity = cap))
-            // <ends> binds each task's end variable to start + (constant) duration.
+            factors.add(
+                Cumulative(
+                    starts = starts,
+                    durations = durations,
+                    resources = resources,
+                    capacity = if (capVar == null) cap else domains[capVar].max,
+                    durationVars = durationVars,
+                    resourceVars = resourceVars,
+                    capacityVar = capVar ?: -1,
+                ),
+            )
+            // <ends> binds each task's end variable to start + duration (constant or variable).
             e.child("ends")?.let { endsEl ->
                 val ends = refList(endsEl.textContent).toIntArray()
                 require(ends.size == starts.size) { "cumulative: <ends>/<origins> length mismatch" }
                 for (i in starts.indices) {
-                    factors.add(Linear(intArrayOf(1, -1), intArrayOf(starts[i], ends[i]), LinearOp.EQ, -durations[i]))
+                    if (durationVars.isEmpty()) {
+                        // start + duration(const) = end  ⟺  start − end = −duration
+                        val vars = intArrayOf(starts[i], ends[i])
+                        factors.add(Linear(intArrayOf(1, -1), vars, LinearOp.EQ, -durations[i]))
+                    } else {
+                        // start + duration(var) − end = 0
+                        val vars = intArrayOf(starts[i], durationVars[i], ends[i])
+                        factors.add(Linear(intArrayOf(1, 1, -1), vars, LinearOp.EQ, 0))
+                    }
                 }
             }
+        }
+
+        /** Resolve a cumulative dimension list (`<lengths>`/`<heights>`) to (constants-or-upper-bounds,
+         *  variable ids). Constant when every entry is an integer; otherwise each entry is a variable and
+         *  the constant array holds its domain upper bound (used by [Cumulative] for horizon sizing). */
+        private fun taskDims(text: String): Pair<IntArray, IntArray> {
+            parseInts(text)?.let { return it to IntArray(0) }
+            val vars = refList(text).toIntArray()
+            return IntArray(vars.size) { domains[vars[it]].max } to vars
         }
 
         private fun circuit(e: XmlElement) {
