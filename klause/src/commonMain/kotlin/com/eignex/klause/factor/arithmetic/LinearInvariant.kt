@@ -13,10 +13,10 @@ import com.eignex.klause.localsearch.MoveSink
 
 /** LS invariant for [Linear]: violation tracking, repair, and structured moves. */
 internal class LinearInvariant(
-    private val coeffs: IntArray,
+    private val coeffs: LongArray,
     private val vars: IntArray,
     private val op: LinearOp,
-    private val bound: Int,
+    private val bound: Long,
 ) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) = initLinearSum(state, factorId, coeffs, vars)
@@ -31,7 +31,7 @@ internal class LinearInvariant(
         val coeff = findCoeff(coeffs, vars, intVar)
         val old = state.assignment.intValue(intVar)
         val sum = state.longPayload[factorId]
-        val newSum = sum + coeff.toLong() * (newValue - old)
+        val newSum = sum + coeff * (newValue - old)
         // The pre-move degree `degree(sum)` is the factor's current violation degree, already
         // maintained in factorDegree — reuse it instead of re-running the residual/compression.
         return linearDegree(newSum, op, bound, state.violationSoftCap) - state.factorDegree[factorId]
@@ -41,7 +41,7 @@ internal class LinearInvariant(
         val coeff = findCoeff(coeffs, vars, intVar)
         val cur = state.assignment.intValue(intVar)
         val oldSum = state.longPayload[factorId]
-        val newSum = oldSum + coeff.toLong() * (cur - oldValue)
+        val newSum = oldSum + coeff * (cur - oldValue)
         state.longPayload[factorId] = newSum
         return linearDegree(newSum, op, bound, state.violationSoftCap) -
             linearDegree(oldSum, op, bound, state.violationSoftCap)
@@ -56,7 +56,7 @@ internal class LinearInvariant(
             for (i in vars.indices) {
                 val v = vars[i]
                 val c = coeffs[i]
-                if (c == 0) continue
+                if (c == 0L) continue
                 val cur = state.assignment.intValue(v)
                 val d = state.problem.intDomains[v]
                 if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
@@ -67,9 +67,9 @@ internal class LinearInvariant(
         for (i in vars.indices) {
             val v = vars[i]
             val c = coeffs[i]
-            if (c == 0) continue
+            if (c == 0L) continue
             val cur = state.assignment.intValue(v)
-            val sumWithout = sum - c.toLong() * cur
+            val sumWithout = sum - c * cur
             val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true) ?: continue
             val clamped = state.problem.intDomains[v].clampLong(target)
             if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
@@ -90,15 +90,15 @@ internal class LinearInvariant(
     ) {
         if (op != LinearOp.EQ || state.violated.contains(factorId)) return
         val coeffV = findCoeff(coeffs, vars, intVar)
-        if (coeffV == 0) return
-        val drift = coeffV.toLong() * (newValue - oldValue)
+        if (coeffV == 0L) return
+        val drift = coeffV * (newValue - oldValue)
         var bestIdx = -1
-        var bestAbs = Int.MAX_VALUE
+        var bestAbs = Long.MAX_VALUE
         for (i in vars.indices) {
             val u = vars[i]
             if (u == intVar || sink.isPinned(u)) continue
             val cu = coeffs[i]
-            if (cu == 0) continue
+            if (cu == 0L) continue
             val absC = if (cu < 0) -cu else cu
             if (absC < bestAbs && drift % cu == 0L) {
                 bestAbs = absC
@@ -149,19 +149,19 @@ internal class LinearInvariant(
         val tryPair = { a: Int, b: Int ->
             val ca = coeffs[a]
             val cb = coeffs[b]
-            if (ca != 0 && cb != 0) {
+            if (ca != 0L && cb != 0L) {
                 val va = state.assignment.intValue(vars[a])
                 val vb = state.assignment.intValue(vars[b])
                 // For each Δ ∈ {-1, +1}, the matching Δb is -ca/cb · Δa; if integer and in
                 // domain on both sides, propose the compound. Covers the common pure-bool
                 // exactly-one decomposition (ca=cb=1, swap 0/1).
                 for (delta in intArrayOf(-1, 1)) {
-                    if (cb == 0) continue
+                    if (cb == 0L) continue
                     val needNumerator = -ca * delta
-                    if (needNumerator % cb != 0) continue
+                    if (needNumerator % cb != 0L) continue
                     val deltaB = needNumerator / cb
                     val newA = va + delta
-                    val newB = vb + deltaB
+                    val newB = vb + deltaB.toInt()
                     if (newA == va && newB == vb) continue
                     val domA = state.problem.intDomains[vars[a]]
                     val domB = state.problem.intDomains[vars[b]]
@@ -205,10 +205,10 @@ internal class LinearInvariant(
         if (slack <= 0L) return
         for (i in vars.indices) {
             val c = coeffs[i]
-            if (c == 0) continue
+            if (c == 0L) continue
             val v = vars[i]
             val cur = state.assignment.intValue(v)
-            val absC = if (c < 0) -c.toLong() else c.toLong()
+            val absC = if (c < 0) -c else c
             val maxStep = slack / absC
             if (maxStep <= 0L) continue
             val dom = state.problem.intDomains[v]

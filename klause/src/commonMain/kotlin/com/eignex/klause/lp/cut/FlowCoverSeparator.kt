@@ -39,7 +39,7 @@ internal class FlowCoverSeparator : CutSeparator {
         val indicator = MutableIntIntMap()
         val vubCap = MutableIntLongMap()
         for (f in problem.factors) {
-            if (f !is Linear || f.op != LinearOp.LE || f.vars.size != 2 || f.bound != 0) continue
+            if (f !is Linear || f.op != LinearOp.LE || f.vars.size != 2 || f.bound != 0L) continue
             val (y, x, u) = matchVub(f) ?: continue
             if (problem.intDomains[x].min != 0 || problem.intDomains[x].max != 1) continue // xⱼ ∈ {0,1}
             val cap = minOf(u, problem.intDomains[y].max.toLong()) // effective flow when xⱼ = 1
@@ -54,7 +54,7 @@ internal class FlowCoverSeparator : CutSeparator {
             val arcs = explicitArcs(f, indicator, vubCap, intColOf)
                 ?: implicitArcs(f, problem, intColOf)
                 ?: continue
-            separateCover(ctx, arcs, f.bound.toLong())?.let { cuts.add(it) }
+            separateCover(ctx, arcs, f.bound)?.let { cuts.add(it) }
         }
         return cuts
     }
@@ -64,8 +64,8 @@ internal class FlowCoverSeparator : CutSeparator {
     private fun matchVub(f: Linear): Triple<Int, Int, Long>? {
         val (c0, c1) = f.coeffs[0] to f.coeffs[1]
         return when {
-            c0 == 1 && c1 < 0 -> Triple(f.vars[0], f.vars[1], -c1.toLong())
-            c1 == 1 && c0 < 0 -> Triple(f.vars[1], f.vars[0], -c0.toLong())
+            c0 == 1L && c1 < 0 -> Triple(f.vars[0], f.vars[1], -c1)
+            c1 == 1L && c0 < 0 -> Triple(f.vars[1], f.vars[0], -c0)
             else -> null
         }
     }
@@ -78,7 +78,7 @@ internal class FlowCoverSeparator : CutSeparator {
         vubCap: MutableIntLongMap,
         intColOf: IntArray,
     ): List<Arc>? {
-        if (f.coeffs.any { it != 1 } || f.vars.any { !indicator.containsKey(it) }) return null
+        if (f.coeffs.any { it != 1L } || f.vars.any { !indicator.containsKey(it) }) return null
         return f.vars.map { y ->
             val x = indicator.getOrDefault(y, -1)
             if (intColOf[y] < 0 || intColOf[x] < 0) return null

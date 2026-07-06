@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -199,11 +200,15 @@ internal object AffineSingletons {
     ): ResidueCandidate? {
         val f = ws.factorAt(di) ?: return null
         if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) return null
+        // This pass folds in Int arithmetic (and guards Int-overflowing folds via foldOverflowsInt); a
+        // wide-coefficient row is left for propagation rather than folded. Sound to skip.
+        if (!fitsInt32(f.coeffs, f.bound)) return null
+        val fBound = f.bound.toInt()
         for (xi in 0..1) {
             val x = f.vars[xi]
             val y = f.vars[1 - xi]
-            val a = f.coeffs[xi]
-            val b = f.coeffs[1 - xi]
+            val a = f.coeffs[xi].toInt()
+            val b = f.coeffs[1 - xi].toInt()
             // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
             // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
             // `y`'s domain is restricted below, so it too must stay clear of the objective — the
@@ -213,12 +218,12 @@ internal object AffineSingletons {
             if (!ws.isContained(di, x)) continue
             val domY = domains[y]
             if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
-            val restricted = restrictPartnerDomain(domY, domains[x], a, b, f.bound) ?: continue
+            val restricted = restrictPartnerDomain(domY, domains[x], a, b, fBound) ?: continue
             return ResidueCandidate(
                 di,
                 x,
                 y,
-                constTerm = f.bound,
+                constTerm = fBound,
                 coeffY = -b,
                 divisor = a,
                 restrictedY = restricted,
@@ -293,9 +298,11 @@ internal object AffineSingletons {
     ): AffineCandidate? {
         val f = ws.factorAt(di) ?: return null
         if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) return null
+        // Int-arithmetic fold; wide-coefficient rows are left for propagation (sound skip).
+        if (!fitsInt32(f.coeffs, f.bound)) return null
         for (xi in f.vars.indices) {
             val x = f.vars[xi]
-            val cx = f.coeffs[xi]
+            val cx = f.coeffs[xi].toInt()
             if (eliminated[x] || x in objectiveIntVars) continue
             // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
             // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
@@ -316,11 +323,11 @@ internal object AffineSingletons {
                 if (j == xi) continue
                 if (eliminated[f.vars[j]]) partnerEliminated = true
                 termVars[w] = f.vars[j]
-                termCoeffs[w] = -f.coeffs[j] / cx
+                termCoeffs[w] = -f.coeffs[j].toInt() / cx
                 w++
             }
             if (partnerEliminated) continue
-            val constTerm = f.bound / cx
+            val constTerm = f.bound.toInt() / cx
             // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
             // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
             // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
@@ -380,9 +387,9 @@ internal object AffineSingletons {
      *  integral. */
     private fun dividesAllPartnersAndBound(f: Linear, xi: Int): Boolean {
         val cx = f.coeffs[xi]
-        if (cx == 0) return false
-        if (f.bound % cx != 0) return false
-        for (j in f.vars.indices) if (j != xi && f.coeffs[j] % cx != 0) return false
+        if (cx == 0L) return false
+        if (f.bound % cx != 0L) return false
+        for (j in f.vars.indices) if (j != xi && f.coeffs[j] % cx != 0L) return false
         return true
     }
 
@@ -714,7 +721,9 @@ internal object AffineSingletons {
         val ix = l.vars.indexOf(c.x)
         val cX = l.coeffs[ix]
         val newVars = IntArray(l.vars.size - 1 + c.termVars.size)
-        val newCoeffs = IntArray(newVars.size)
+        // Long throughout: [l] may itself carry wide coefficients, and the wide [Linear] constructor
+        // re-coalesces without truncation (the fold candidate's own coeffs are Int, but l's need not be).
+        val newCoeffs = LongArray(newVars.size)
         var w = 0
         for (j in l.vars.indices) {
             if (j == ix) continue

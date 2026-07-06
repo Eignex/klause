@@ -146,20 +146,20 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
         if (f !is Linear || f.op == LinearOp.EQ || f.vars.size != 2) continue
         val c0 = f.coeffs[0]
         val c1 = f.coeffs[1]
-        if (!((c0 == 1 && c1 == -1) || (c0 == -1 && c1 == 1))) continue // a unit difference ±(v0 − v1)
+        if (!((c0 == 1L && c1 == -1L) || (c0 == -1L && c1 == 1L))) continue // a unit difference ±(v0 − v1)
         val v0 = f.vars[0]
         val v1 = f.vars[1]
         if (v0 == v1 || !probed.add((minOf(v0, v1).toLong() shl Int.SIZE_BITS) or maxOf(v0, v1).toLong())) continue
         probes++
         val e = LongArray(problem.numIntVars)
-        e[v0] = c0.toLong()
-        e[v1] = c1.toLong()
+        e[v0] = c0
+        e[v1] = c1
         val lo = safeMin(problem, e, token) ?: continue
         val hi = safeMax(problem, e, token) ?: continue
         // The difference is an integer in [lo, hi]; when exactly one integer fits, it is pinned to it.
         val cLo = ceil(lo - EQ_PIN_TOL)
         if (cLo != floor(hi + EQ_PIN_TOL) || !cLo.isFinite()) continue
-        out.add(Linear(intArrayOf(c0, c1), intArrayOf(v0, v1), LinearOp.EQ, cLo.toInt()))
+        out.add(Linear(intArrayOf(c0.toInt(), c1.toInt()), intArrayOf(v0, v1), LinearOp.EQ, cLo.toInt()))
     }
     return out
 }

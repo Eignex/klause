@@ -6,6 +6,7 @@ import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -19,10 +20,10 @@ import com.eignex.klause.util.EmptyIntArray
  * clamped to the variable's domain. Terms pair [coeffs] with [vars]; the sum is compared by [op]
  * against [bound].
  */
-class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bound: Int) : Factor {
+class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bound: Long) : Factor {
 
     val vars: IntArray = terms.vars
-    val coeffs: IntArray = terms.coeffs
+    val coeffs: LongArray = terms.coeffs
 
     init {
         require(coeffs.isNotEmpty()) { "linear sum must have at least one term" }
@@ -35,12 +36,16 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
      * summed) so the local-search payload stays consistent regardless of caller.
      */
     constructor(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
+        this(coalesceLinearTerms(vars, coeffs), op, bound.toLong())
+
+    /** Wide form: coefficients and bound that may exceed 32-bit range (SMT cut lemmas, dense folds). */
+    constructor(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) :
         this(coalesceLinearTerms(vars, coeffs), op, bound)
 
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) {
         enum(op)
-        int(bound)
-        pairsByKey(vars) { coeffs[it].toLong() }
+        long(bound)
+        pairsByKey(vars) { coeffs[it] }
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
@@ -54,7 +59,7 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
         val n = vars.size
         val packed = LongArray(n)
         for (k in 0 until n) {
-            packed[k] = (intMap[vars[k]].toLong() shl Int.SIZE_BITS) or (coeffs[k].toLong() and LOW_WORD)
+            packed[k] = (intMap[vars[k]].toLong() shl Int.SIZE_BITS) or (coeffs[k] and LOW_WORD)
         }
         packed.sort()
         var distinct = 0
@@ -69,7 +74,7 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
         // Payload order: op.ordinal, bound, pair count, then each (image, summed coeff) ascending.
         var h = 1
         h = 31 * h + longHashWord(op.ordinal.toLong())
-        h = 31 * h + longHashWord(bound.toLong())
+        h = 31 * h + longHashWord(bound)
         h = 31 * h + longHashWord(distinct.toLong())
         i = 0
         while (i < n) {
@@ -94,8 +99,8 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
      * other linear is value-meaningful: an ordering (`≤`/`≥`) is not relabeling-invariant, and a
      * nonzero bound or non-opposite coefficients tie the variables to specific magnitudes.
      */
-    private fun isBinaryValueRelation(): Boolean = (op == LinearOp.EQ || op == LinearOp.NE) && bound == 0 &&
-        vars.size == 2 && coeffs[0] != 0 && coeffs[0] == -coeffs[1]
+    private fun isBinaryValueRelation(): Boolean = (op == LinearOp.EQ || op == LinearOp.NE) && bound == 0L &&
+        vars.size == 2 && coeffs[0] != 0L && coeffs[0] == -coeffs[1]
 
     override fun isValueAnonymous(): Boolean = isBinaryValueRelation()
 
@@ -108,11 +113,21 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 
     override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
 
-    override fun asLinearizer(): Linearizer = LinearLinearizer(op, vars, coeffs, bound)
+    // Relaxation/presolve views (LP linearizer, exact linear row) stay 32-bit. A Linear whose
+    // coefficients or bound exceed Int range is simply not surfaced to them — sound, since the
+    // propagator/invariant above still enforce it; the relaxation just omits this row.
+    override fun asLinearizer(): Linearizer =
+        if (fitsInt32(coeffs, bound)) LinearLinearizer(op, vars, IntArray(coeffs.size) { coeffs[it].toInt() }, bound.toInt()) else NoLinearizer
 
-    // A Linear *is* a single exact linear row — its own inequality, no relaxation.
-    override fun linearRows(): List<LinearRow> = listOf(LinearRow(coeffs, vars, op, bound.toLong()))
+    override fun linearRows(): List<LinearRow>? =
+        if (fitsInt32(coeffs, bound)) listOf(LinearRow(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound)) else null
 }
+
+/** True when every coefficient and the bound fit 32-bit range — the precondition for narrowing a wide
+ *  [Linear]/[ReifiedLinear] to an Int-coefficient [LinearRow]/[Linearizer] relaxation view. */
+internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
+    bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
+        coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
 /** Low 32 bits mask for packing/unpacking a `(image, coeff)` pair in [Linear.remapStructuralHash]. */
 private const val LOW_WORD = 0xFFFFFFFFL

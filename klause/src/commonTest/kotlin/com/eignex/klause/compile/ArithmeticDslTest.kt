@@ -30,9 +30,9 @@ class ArithmeticDslTest {
         val compiled = S().compile()
         val linear = compiled.problem.factors.single { it is Linear } as Linear
         assertEquals(LinearOp.LE, linear.op)
-        assertEquals(7, linear.bound)
+        assertEquals(7L, linear.bound)
         assertEquals(2, linear.coeffs.size)
-        assertTrue(linear.coeffs.all { it == 1 })
+        assertTrue(linear.coeffs.all { it == 1L })
     }
 
     @Test
@@ -44,8 +44,8 @@ class ArithmeticDslTest {
         }
         val compiled = S().compile()
         val linear = compiled.problem.factors.single { it is Linear } as Linear
-        assertEquals(setOf(2, 3), linear.coeffs.toSet())
-        assertEquals(10, linear.bound)
+        assertEquals(setOf(2L, 3L), linear.coeffs.toSet())
+        assertEquals(10L, linear.bound)
     }
 
     @Test
@@ -59,8 +59,8 @@ class ArithmeticDslTest {
         val linear = compiled.problem.factors.single { it is Linear } as Linear
 
         assertEquals(LinearOp.GE, linear.op)
-        assertEquals(2, linear.bound)
-        assertEquals(setOf(1, -1), linear.coeffs.toSet())
+        assertEquals(2L, linear.bound)
+        assertEquals(setOf(1L, -1L), linear.coeffs.toSet())
     }
 
     @Test

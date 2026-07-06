@@ -15,10 +15,10 @@ internal class ReifiedLinearPropagator(
     private val auxBoolVar: Int,
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val coeffs: IntArray,
+    private val coeffs: LongArray,
     private val vars: IntArray,
     private val op: LinearOp,
-    private val bound: Int,
+    private val bound: Long,
 ) : Propagator {
 
     /**
@@ -57,7 +57,7 @@ internal class ReifiedLinearPropagator(
         val range = linearSumRange(state, coeffs, vars)
         val sumLo = range[0]
         val sumHi = range[1]
-        val bnd = bound.toLong()
+        val bnd = bound
         val alwaysHolds = when (op) {
             LinearOp.LE -> sumHi <= bnd
             LinearOp.GE -> sumLo >= bnd
@@ -113,8 +113,8 @@ internal class ReifiedLinearPropagator(
      *  domain — i.e. the equality is unsatisfiable even though `bound` lies within `x`'s bounds
      *  (an interior hole) or `bound` is not divisible by `c`. */
     private fun eqTargetUnreachable(state: PropagationState): Boolean {
-        val c = coeffs[0].toLong()
-        val b = bound.toLong()
+        val c = coeffs[0]
+        val b = bound
         if (c == 0L) return b != 0L
         if (b % c != 0L) return true
         val value = b / c

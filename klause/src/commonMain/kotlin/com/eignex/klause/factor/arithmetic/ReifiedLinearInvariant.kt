@@ -16,10 +16,10 @@ import com.eignex.klause.localsearch.MoveSink
 /** LS invariant for [ReifiedLinear]: reified violation tracking and repair. */
 internal class ReifiedLinearInvariant(
     private val auxBoolVar: Int,
-    private val coeffs: IntArray,
+    private val coeffs: LongArray,
     private val vars: IntArray,
     private val op: LinearOp,
-    private val bound: Int,
+    private val bound: Long,
 ) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) = initLinearSum(state, factorId, coeffs, vars)
@@ -49,7 +49,7 @@ internal class ReifiedLinearInvariant(
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.longPayload[factorId]
         val coeff = findCoeff(coeffs, vars, intVar)
-        val newSum = sum + coeff.toLong() * (newValue - state.assignment.intValue(intVar))
+        val newSum = sum + coeff * (newValue - state.assignment.intValue(intVar))
         return reifiedDegreeFor(newSum, aux, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
@@ -65,7 +65,7 @@ internal class ReifiedLinearInvariant(
         val aux = state.assignment.boolValue(auxBoolVar)
         val coeff = findCoeff(coeffs, vars, intVar)
         val oldSum = state.longPayload[factorId]
-        val newSum = oldSum + coeff.toLong() * (state.assignment.intValue(intVar) - oldValue)
+        val newSum = oldSum + coeff * (state.assignment.intValue(intVar) - oldValue)
         state.longPayload[factorId] = newSum
         return reifiedDegreeFor(newSum, aux, state.violationSoftCap) -
             reifiedDegreeFor(oldSum, aux, state.violationSoftCap)
@@ -80,14 +80,14 @@ internal class ReifiedLinearInvariant(
         for (i in vars.indices) {
             val v = vars[i]
             val c = coeffs[i]
-            if (c == 0) continue
+            if (c == 0L) continue
             val cur = state.assignment.intValue(v)
-            val sumWithout = sum - c.toLong() * cur
+            val sumWithout = sum - c * cur
             // Same-aux snap: shift body so the predicate matches the current aux.
             val targetSame = snapLinearTarget(op, bound, c, sumWithout, aux)
             if (targetSame != null) {
                 val clamped = state.problem.intDomains[v].clampLong(targetSame)
-                if (clamped != cur && aux == linearHolds(sumWithout + c.toLong() * clamped, op, bound)) {
+                if (clamped != cur && aux == linearHolds(sumWithout + c * clamped, op, bound)) {
                     sink.addChannelingIntSet(state, v, clamped)
                 }
             }
@@ -96,7 +96,7 @@ internal class ReifiedLinearInvariant(
             val targetOpp = snapLinearTarget(op, bound, c, sumWithout, !aux)
             if (targetOpp != null) {
                 val clamped = state.problem.intDomains[v].clampLong(targetOpp)
-                if (clamped != cur && !aux == linearHolds(sumWithout + c.toLong() * clamped, op, bound)) {
+                if (clamped != cur && !aux == linearHolds(sumWithout + c * clamped, op, bound)) {
                     sink.addCompound(listOf(auxFlipMove, IntSet(v, clamped)))
                 }
             }
@@ -115,7 +115,7 @@ internal class ReifiedLinearInvariant(
     ) {
         if (vars.size != 1 || op != LinearOp.EQ) return
         if (state.assumptions.isFrozenBool(auxBoolVar)) return
-        val shouldHold = coeffs[0].toLong() * newValue == bound.toLong()
+        val shouldHold = coeffs[0] * newValue == bound
         if (state.assignment.boolValue(auxBoolVar) != shouldHold) sink.add(BoolFlip(auxBoolVar))
     }
 
@@ -144,7 +144,7 @@ internal class ReifiedLinearInvariant(
         val newSum = state.longPayload[factorId]
         val coeff = findCoeff(coeffs, vars, intVar)
         val newValue = state.assignment.intValue(intVar)
-        val oldSum = newSum - coeff.toLong() * (newValue - oldValue)
+        val oldSum = newSum - coeff * (newValue - oldValue)
         val oldHolds = linearHolds(oldSum, op, bound)
         val newHolds = linearHolds(newSum, op, bound)
         if (oldHolds == newHolds) return

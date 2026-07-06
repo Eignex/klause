@@ -12,10 +12,10 @@ import com.eignex.klause.propagation.Propagator
 internal class LinearPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val coeffs: IntArray,
+    private val coeffs: LongArray,
     private val vars: IntArray,
     private val op: LinearOp,
-    private val bound: Int,
+    private val bound: Long,
 ) : Propagator {
 
     /**
@@ -33,7 +33,7 @@ internal class LinearPropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
-        propagateLinearBounds(state, coeffs, vars, op, bound.toLong())
+        propagateLinearBounds(state, coeffs, vars, op, bound)
 
     /** Reason set when [propagate] returns false. The conflict comes from exactly one sum
      *  extreme breaching `bound`: `LE` / `EQ`-with-`sumLo>bound` from the lo side (`Σ rLo`),
@@ -48,7 +48,7 @@ internal class LinearPropagator(
         val useLo = when (op) {
             LinearOp.LE -> true
             LinearOp.GE -> false
-            else -> range[0] > bound.toLong() // EQ: lo side (mins too big) vs hi side
+            else -> range[0] > bound // EQ: lo side (mins too big) vs hi side
         }
         return collectLinearDirAntecedents(state, coeffs, vars, excludeIdx = -1, extraLit = 0, useLo = useLo)
     }

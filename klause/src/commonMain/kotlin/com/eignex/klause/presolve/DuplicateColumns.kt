@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -118,9 +119,11 @@ internal object DuplicateColumns {
             val v = factor.vars[i]
             if (keepOf[v] != v) continue // a dropped duplicate: its term is absorbed by the representative's
             keptVars.add(v)
-            keptCoeffs.add(factor.coeffs[i])
+            keptCoeffs.add(factor.coeffs[i].toInt())
         }
-        return Linear(keptCoeffs.toIntArray(), keptVars.toIntArray(), factor.op, factor.bound)
+        // Reached only for a row mentioning a dropped duplicate; such rows are Int-fitting because
+        // eligibleColumns excludes any variable occurring in a wide-coefficient row.
+        return Linear(keptCoeffs.toIntArray(), keptVars.toIntArray(), factor.op, factor.bound.toInt())
     }
 
     /** Per-variable eligibility: every occurrence is a [Linear] factor (a global / reified row reads a
@@ -137,7 +140,9 @@ internal object DuplicateColumns {
             v !in objectiveIntVars && domains[v].isContiguous()
         }
         for (f in factors) {
-            if (f is Linear) continue
+            // A wide-coefficient/bound row can't be safely rewritten with Int columns, and its
+            // coefficients must not be truncated into a column signature; exclude its variables.
+            if (f is Linear && fitsInt32(f.coeffs, f.bound)) continue
             for (v in f.intVars) eligible[v] = false
         }
         return eligible
@@ -152,7 +157,7 @@ internal object DuplicateColumns {
         factors.forEachIndexed { fid, f ->
             if (f !is Linear) return@forEachIndexed
             val coeffByVar = MutableIntIntMap(f.vars.size)
-            for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i])
+            for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i].toInt())
             for (v in f.intVars) {
                 entries[v]?.apply {
                     add(fid.toLong())
