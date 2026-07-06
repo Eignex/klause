@@ -96,7 +96,7 @@ internal class FlowCoverSeparator : CutSeparator {
         }
         return f.vars.indices.map { i ->
             val col = intColOf[f.vars[i]]
-            val w = f.coeffs[i].toLong()
+            val w = f.coeffs[i]
             Arc(flowCol = col, flowCoeff = w, indicatorCol = col, cap = w)
         }
     }

@@ -261,7 +261,7 @@ internal fun propagateLinearBounds(
     }
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
-            val c = coeffs[i].toLong()
+            val c = coeffs[i]
             if (c == 0L) continue
             val v = vars[i]
             val d = state.intDomains[v]

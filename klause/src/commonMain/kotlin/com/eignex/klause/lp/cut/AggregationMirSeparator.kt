@@ -160,11 +160,11 @@ internal class AggregationMirSeparator : CutSeparator {
         val cols = IntArray(k)
         val a = LongArray(k)
         try {
-            var b = if (flip) -factor.bound.toLong() else factor.bound.toLong()
+            var b = if (flip) -factor.bound else factor.bound
             for (idx in 0 until k) {
                 val col = ctx.relaxation.intColOf[factor.vars[idx]]
                 if (col < 0) return // a variable without an LP column ⇒ skip the row
-                val coeff = if (flip) -factor.coeffs[idx].toLong() else factor.coeffs[idx].toLong()
+                val coeff = if (flip) -factor.coeffs[idx] else factor.coeffs[idx]
                 cols[idx] = col
                 a[idx] = coeff
                 val lo = ctx.problem.intDomains[factor.vars[idx]].min.toLong()

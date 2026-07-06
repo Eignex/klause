@@ -77,10 +77,9 @@ class ReifiedLinear private constructor(
 
     // The LP relaxation is best-effort: a reified row whose coefficients/bound exceed 32-bit range is
     // simply not relaxed (the propagator/invariant still enforce it). Sound to skip.
-    override fun asLinearizer(): Linearizer =
-        if (fitsInt32(coeffs, bound)) {
-            ReifiedLinearLinearizer(auxBoolVar, op, bound.toInt(), vars, IntArray(coeffs.size) { coeffs[it].toInt() })
-        } else {
-            NoLinearizer
-        }
+    override fun asLinearizer(): Linearizer = if (fitsInt32(coeffs, bound)) {
+        ReifiedLinearLinearizer(auxBoolVar, op, bound.toInt(), vars, IntArray(coeffs.size) { coeffs[it].toInt() })
+    } else {
+        NoLinearizer
+    }
 }

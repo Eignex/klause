@@ -20,6 +20,18 @@ class LinearSumFactorTest {
     }
 
     @Test
+    fun `coalescing coefficients past Int range keeps the exact Long sum`() {
+        // Two terms on the same variable whose coefficients sum beyond Int.MAX must coalesce to the
+        // exact Long total, not throw — the SMT cut-lemma / dense-affine-fold overflow that used to
+        // crash the compiler at the coalescer's Int-narrowing step.
+        val big = Int.MAX_VALUE.toLong()
+        val linear = Linear(longArrayOf(big, big), intArrayOf(0, 0), LinearOp.LE, 5L)
+        assertTrue(linear.coeffs.contentEquals(longArrayOf(2 * big)))
+        assertTrue(linear.vars.contentEquals(intArrayOf(0)))
+        assertEquals(5L, linear.bound)
+    }
+
+    @Test
     fun `duplicate variable coefficients coalesce and sum correctly in LS`() {
         val linear = Linear(intArrayOf(2, 3, 4), intArrayOf(0, 1, 0), LinearOp.EQ, 9)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)), listOf<Factor>(linear))

@@ -105,7 +105,7 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && idx !in removed }
         val others = Problem(problem.numBoolVars, problem.numIntVars, problem.intDomains.copyOf(), kept)
         val a = LongArray(problem.numIntVars)
-        for (k in f.vars.indices) a[f.vars[k]] += f.coeffs[k].toLong()
+        for (k in f.vars.indices) a[f.vars[k]] += f.coeffs[k]
         val b = f.bound.toDouble()
         // `≤ b` is redundant when the others' max of a·x is already ≤ b; `≥ b` when their min is ≥ b; an
         // `=` only when both hold. Safe bounds (over-/under-estimates) keep it sound — a loose bound just

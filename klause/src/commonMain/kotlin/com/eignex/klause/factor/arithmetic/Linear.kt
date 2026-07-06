@@ -116,11 +116,25 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     // Relaxation/presolve views (LP linearizer, exact linear row) stay 32-bit. A Linear whose
     // coefficients or bound exceed Int range is simply not surfaced to them — sound, since the
     // propagator/invariant above still enforce it; the relaxation just omits this row.
-    override fun asLinearizer(): Linearizer =
-        if (fitsInt32(coeffs, bound)) LinearLinearizer(op, vars, IntArray(coeffs.size) { coeffs[it].toInt() }, bound.toInt()) else NoLinearizer
+    override fun asLinearizer(): Linearizer = if (fitsInt32(
+            coeffs,
+            bound,
+        )
+    ) {
+        LinearLinearizer(op, vars, IntArray(coeffs.size) { coeffs[it].toInt() }, bound.toInt())
+    } else {
+        NoLinearizer
+    }
 
-    override fun linearRows(): List<LinearRow>? =
-        if (fitsInt32(coeffs, bound)) listOf(LinearRow(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound)) else null
+    override fun linearRows(): List<LinearRow>? = if (fitsInt32(
+            coeffs,
+            bound,
+        )
+    ) {
+        listOf(LinearRow(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound))
+    } else {
+        null
+    }
 }
 
 /** True when every coefficient and the bound fit 32-bit range — the precondition for narrowing a wide

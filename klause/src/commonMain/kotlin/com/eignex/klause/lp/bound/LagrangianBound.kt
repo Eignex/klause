@@ -106,8 +106,8 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                 }
                 if (f.vars.any { !inV[it] }) continue // only constraints over the chosen blocks are dualized
                 lv.add(f.vars.copyOf())
-                lc.add(LongArray(f.coeffs.size) { f.coeffs[it].toLong() })
-                lr.add(f.bound.toLong())
+                lc.add(f.coeffs.copyOf())
+                lr.add(f.bound)
                 ls.add(sign)
             }
             linkVars = lv.toTypedArray()
