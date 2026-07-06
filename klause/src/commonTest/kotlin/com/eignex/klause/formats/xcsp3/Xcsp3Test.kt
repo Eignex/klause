@@ -668,6 +668,22 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `lex over a matrix orders both rows and columns`() {
+        val decl = "<instance type=\"CSP\"><variables><array id=\"x\" size=\"[2][2]\"> 0..2 </array></variables>"
+        val lexCons = "<lex><matrix> x[][] </matrix><operator> le </operator></lex>"
+        // lex2: one row-pair chain + one column-pair chain over the 2x2 matrix.
+        val p = Xcsp3.parse("$decl<constraints>$lexCons</constraints></instance>").problem
+        assertEquals(2, p.factors.count { it is LexLess }, "one row-pair and one column-pair")
+        // Row 0 = [1,0] lexicographically exceeds row 1 = [0,0] ⇒ rejected.
+        val bad = "$decl<constraints>$lexCons" +
+            "<instantiation><list> x[][] </list><values> 1 0 0 0 </values></instantiation></constraints></instance>"
+        assertTrue(
+            BacktrackSolver(Xcsp3.parse(bad).problem).solve(BacktrackParams()) is SolveResult.Unsat,
+            "a row-descending matrix must be rejected",
+        )
+    }
+
+    @Test
     fun `lex solve terminates under every search ordering`() {
         val xml = """
             <instance type="CSP">
