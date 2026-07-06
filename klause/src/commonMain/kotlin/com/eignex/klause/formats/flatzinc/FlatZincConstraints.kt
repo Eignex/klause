@@ -128,7 +128,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "table_int", "fzn_table_int", "klause_table_int" -> emitTable(c)
 
-    "regular", "fzn_regular", "klause_regular" -> emitRegular(c)
+    "regular", "fzn_regular", "klause_regular", "gecode_regular" -> emitRegular(c)
 
     "mdd", "fzn_mdd", "klause_mdd" -> emitMdd(c)
 
@@ -176,7 +176,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "among", "fzn_among" -> emitAmong(c)
 
-    "global_cardinality", "fzn_global_cardinality" -> emitGcc(c, GccVariant.STANDARD)
+    "global_cardinality", "fzn_global_cardinality", "gecode_global_cardinality" -> emitGcc(c, GccVariant.STANDARD)
 
     "global_cardinality_closed", "fzn_global_cardinality_closed" -> emitGcc(c, GccVariant.CLOSED)
 

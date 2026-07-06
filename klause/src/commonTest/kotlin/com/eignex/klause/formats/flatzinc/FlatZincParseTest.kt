@@ -168,6 +168,38 @@ class FlatZincParseTest {
     }
 
     @Test
+    fun `gecode_global_cardinality maps to the standard GCC`() {
+        // Gecode flattening emits the gecode_-prefixed builtin (x, cover, counts); it must count like
+        // global_cardinality. Here the count of value 1 among three 0..1 vars is pinned to 2.
+        val src = """
+            array [1..3] of var 0..1: xs;
+            var 2..2: c;
+            constraint gecode_global_cardinality(xs, [1], [c]);
+            solve satisfy;
+        """.trimIndent()
+        val sample = BacktrackSolver(parseFlatZinc(src).problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        assertNotNull(sample)
+        assertEquals(2, (0..2).count { sample.ints[it] == 1 }, "exactly two 1s required")
+    }
+
+    @Test
+    fun `gecode_regular maps to the standard regular`() {
+        // gecode_regular(x, Q, S, d, q0, F): a 2-state DFA over symbols {1,2} accepting sequences that
+        // contain at least one 2 (state 2 is absorbing and accepting). x pinned to all-1 is rejected.
+        val base = """
+            array [1..2] of var 1..2: x;
+            constraint gecode_regular(x, 2, 2, [1, 2, 2, 2], 1, {2});
+        """.trimIndent()
+        // With a 2 available, satisfiable.
+        val open = parseFlatZinc("$base\nsolve satisfy;").problem
+        assertNotNull(BacktrackSolver(open).sample(BacktrackParams(randomSeed = 0L)).assignment)
+        // Forcing all-1 (never reaching the accepting state) is infeasible.
+        val forced = "$base\nconstraint int_eq(x[1], 1);\nconstraint int_eq(x[2], 1);\nsolve satisfy;"
+        val r = BacktrackSolver(parseFlatZinc(forced).problem).solve(BacktrackParams(randomSeed = 0L))
+        assertIs<SolveResult.Unsat>(r)
+    }
+
+    @Test
     fun `circuit emits a hamiltonian cycle`() {
         // MiniZinc-style 1-indexed circuit: each succ holds a value in [1, n].
         val src = """
