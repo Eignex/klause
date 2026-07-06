@@ -5,6 +5,8 @@ import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.metric.ArmCalibration
 import com.eignex.klause.bench.metric.KlauseSearch
+import com.eignex.klause.bench.metric.ReferenceEntry
+import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
@@ -39,6 +41,8 @@ import java.io.File
  * Other commands:
  *  - `calibrate [filters…]` — the fair arm tester: run the pool once as a live portfolio and rank
  *    arms into a diverse palette by per-problem best-holder wins (see [calibrate]).
+ *  - `reference [filters…]` — harvest per-instance reference optima/bounds (default `backend=cp-sat`)
+ *    into the committed table (see [reference]); the gap-to-optimum reward + a soundness oracle.
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
@@ -51,7 +55,8 @@ object BenchCli {
             "solve" -> run(args.drop(1), preview = false)
             "preview" -> run(args.drop(1), preview = true)
             "calibrate" -> calibrate(args.drop(1))
-            else -> error("unknown command '$cmd' (commands: solve, preview, calibrate, list)")
+            "reference" -> reference(args.drop(1))
+            else -> error("unknown command '$cmd' (commands: solve, preview, calibrate, reference, list)")
         }
     }
 
@@ -145,6 +150,36 @@ object BenchCli {
             }
         }
         return arms.toList() to won
+    }
+
+    /** Harvest per-instance reference optima/bounds into the committed table (see [ReferenceStore]) —
+     *  the gap-to-optimum BO reward + a soundness oracle. Runs the reference solver (`backend=`, default
+     *  `cp-sat`) over the selection — cache-replayed if already solved — then merges each optimize
+     *  instance's `{objective, proven}` into `klause-bench/reference/references.json` (virtual-best).
+     *  Optimize instances only (pass `kind=cop`); match the cached run's `timeout=` to replay it. */
+    private fun reference(filterArgs: List<String>) {
+        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val refs = select(f)
+        if (refs.isEmpty()) {
+            println("(no problems matched the selection)")
+            return
+        }
+        val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
+        val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
+        val dir = SolveMetric.run(BenchLoad.resolveRefs(refs), budget, backend, KlauseSearch()) ?: return
+        val harvested = dir.listFiles { file -> file.extension == "json" }?.mapNotNull { jsonFile ->
+            val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
+            if (rec != null && rec.kind == "optimize" && rec.objective != null) {
+                ReferenceEntry(rec.problem, rec.maximize, rec.objective, rec.proven, rec.solver, rec.budgetMs)
+            } else {
+                null
+            }
+        }.orEmpty()
+        val (added, tightened, unchanged) = ReferenceStore.mergeAndSave(harvested)
+        println(
+            "\nreference table: +$added new, $tightened tightened, $unchanged unchanged " +
+                "(${harvested.size} harvested from $backend)",
+        )
     }
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
@@ -264,6 +299,7 @@ object BenchCli {
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
             |  bench calibrate [filters…]            diverse arm palette from a live pool run (kind=cop; engine=mixed|ls|cp, p=)
+            |  bench reference [filters…]            harvest cp-sat optima into the committed reference table (kind=cop)
             |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |

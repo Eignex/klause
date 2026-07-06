@@ -1,0 +1,2490 @@
+[
+    {
+        "problem": "1d_rubiks_cube/1d_rubiks_cube",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "2DBinPacking/class_1/Class1_100_1",
+        "maximize": false,
+        "objective": 29.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "3_jugs/3_jugs",
+        "maximize": false,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "50_puzzle/50_puzzle",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "5x5_puzzle/5x5_puzzle",
+        "maximize": false,
+        "objective": 15.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "M/M12",
+        "maximize": false,
+        "objective": 20.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "OandX/OandX",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "abbott/abbott",
+        "maximize": true,
+        "objective": 52.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "all_paths_graph/all_paths_graph",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "amaze/2012-03-07",
+        "maximize": false,
+        "objective": 315.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "archery_puzzle/archery_puzzle",
+        "maximize": false,
+        "objective": 0.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "arrow/arrow",
+        "maximize": true,
+        "objective": 5.73618492E8,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "assignment/assignment",
+        "maximize": false,
+        "objective": 11.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "bin_packing_me/bin_packing_me",
+        "maximize": false,
+        "objective": 17.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "blending_problem/blending_problem",
+        "maximize": false,
+        "objective": 180.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "bpp/bpp",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "bracket_partitioning/bracket_partitioning",
+        "maximize": true,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "bridge_and_torch_problem/bridge_and_torch_problem",
+        "maximize": false,
+        "objective": 2.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "bridges_to_somewhere/bridges_to_somewhere",
+        "maximize": false,
+        "objective": 58.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "broken_weights/broken_weights",
+        "maximize": false,
+        "objective": 27.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "buckets/buckets",
+        "maximize": false,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "building_a_house/building_a_house",
+        "maximize": false,
+        "objective": 5000.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "bus_scheduling/c1",
+        "maximize": false,
+        "objective": 26.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "calculs_d_enfer/calculs_d_enfer",
+        "maximize": false,
+        "objective": 16.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "candies/candies",
+        "maximize": false,
+        "objective": 2351.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "capital_budget/capital_budget2",
+        "maximize": true,
+        "objective": 42.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "car/car",
+        "maximize": false,
+        "objective": 82.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "car_painting/car_painting",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "car_talk_odometer/car_talk_odometer",
+        "maximize": false,
+        "objective": 11.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cargo/challenge01_0s_1913",
+        "maximize": false,
+        "objective": 0.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "carpet-cutting/mzn_rnd_test.01",
+        "maximize": false,
+        "objective": 621.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "carpool_fairness/carpool_fairness",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "celar/CELAR6-SUB0",
+        "maximize": false,
+        "objective": 159.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "changepoint_detection_int/changepoint_detection_int",
+        "maximize": false,
+        "objective": 106.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "chessset/chessset",
+        "maximize": true,
+        "objective": 1330.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "chinese_remainder_problem/chinese_remainder_problem",
+        "maximize": false,
+        "objective": 1808.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "choose_your_crew/choose_your_crew",
+        "maximize": false,
+        "objective": 268.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "city-position/city-4-04",
+        "maximize": false,
+        "objective": 31.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "clique/clique",
+        "maximize": true,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "coins/coins",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "coins_grid/coins_grid",
+        "maximize": false,
+        "objective": 13668.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "coins_problem/coins_problem",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "color_simple/color_simple",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "coloring_ip/coloring_ip",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "combinatorial_auction/combinatorial_auction",
+        "maximize": true,
+        "objective": 11.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "community-detection/Sampson.s10.k3",
+        "maximize": true,
+        "objective": 10.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "company_competition/company_competition",
+        "maximize": false,
+        "objective": 14.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "conference/conference",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "config/config",
+        "maximize": false,
+        "objective": 550.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "constraint/constraint",
+        "maximize": false,
+        "objective": 346.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "contractor_costs/contractor_costs",
+        "maximize": false,
+        "objective": 8400.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cookie_bake_off/cookie_bake_off",
+        "maximize": false,
+        "objective": 168.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cookie_monster_problem/cookie_monster_problem",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "crew/crew",
+        "maximize": false,
+        "objective": 19.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "crew_overlapping_flights/crew_overlapping_flights",
+        "maximize": false,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "critical_path/critical_path1",
+        "maximize": false,
+        "objective": 38.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "crosswords/grid-05.01_dict-35",
+        "maximize": true,
+        "objective": 39.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "crowd/crowd",
+        "maximize": false,
+        "objective": 51.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cube_sum/cube_sum",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cumulative_test/cumulative_test",
+        "maximize": false,
+        "objective": 11.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cutstock/small_test0",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cutting_stock_winston/cutting_stock_winston",
+        "maximize": false,
+        "objective": 19.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cvrp/A-n37-k5.vrp",
+        "maximize": false,
+        "objective": 812.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "cyclic-rcpsp/easy_1",
+        "maximize": false,
+        "objective": 2057.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "defending_castle/defending_castle",
+        "maximize": true,
+        "objective": 10.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "depot-placement/a280_4",
+        "maximize": false,
+        "objective": 103.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "diameterc-mst/c_v15_a105_d4",
+        "maximize": false,
+        "objective": 346.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "diet/diet1",
+        "maximize": false,
+        "objective": 90.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "distance_between/distance_between",
+        "maximize": true,
+        "objective": 2.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "dqueens/dqueens",
+        "maximize": false,
+        "objective": 57.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "dudeney_bishop_placement/dudeney_bishop_placement1",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "egg_basket/egg_basket",
+        "maximize": false,
+        "objective": 301.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "einav_puzzle/einav_puzzle",
+        "maximize": false,
+        "objective": 812.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "elitserien/handball11",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "equal_sized_groups/equal_sized_groups",
+        "maximize": false,
+        "objective": 26.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "evilshop/js-brs2-5",
+        "maximize": false,
+        "objective": 77406.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "evision/evision",
+        "maximize": false,
+        "objective": 10.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "examination_scheduling/examination_scheduling",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "eyedrop_optimize/eyedrop_optimize",
+        "maximize": true,
+        "objective": 36.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "facility_location_problem/facility_location_problem",
+        "maximize": false,
+        "objective": 4570.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "fair_split_into_3_groups/fair_split_into_3_groups",
+        "maximize": false,
+        "objective": 166834.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "fair_xmas_duty/fair_xmas_duty_2014",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "fancy/fancy",
+        "maximize": false,
+        "objective": 10.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "fast-food/ff1",
+        "maximize": false,
+        "objective": 3050.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "filters/ar_1_1",
+        "maximize": false,
+        "objective": 34.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "five/five",
+        "maximize": false,
+        "objective": 15.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "five_elements/five_elements",
+        "maximize": false,
+        "objective": 11.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "fixed_charge/fixed_charge",
+        "maximize": true,
+        "objective": 75.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "flexible-jobshop/easy01",
+        "maximize": false,
+        "objective": 253.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "football/football",
+        "maximize": true,
+        "objective": 30000.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "four_same_friends/four_same_friends",
+        "maximize": false,
+        "objective": 2.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "freepizza/pizza27",
+        "maximize": false,
+        "objective": 726897.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "freight_transfer/freight_transfer",
+        "maximize": false,
+        "objective": 530.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "furniture/furniture",
+        "maximize": false,
+        "objective": 9600.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "furniture_moving/furniture_moving",
+        "maximize": false,
+        "objective": 60.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "gap/gap",
+        "maximize": false,
+        "objective": 261.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "gardner_sum_square/gardner_sum_square",
+        "maximize": false,
+        "objective": 34.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "gbac/UD2-gbac",
+        "maximize": false,
+        "objective": 157.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "generalized_knapsack_problem/generalized_knapsack_problem",
+        "maximize": true,
+        "objective": 160.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "geost_test/geost_test",
+        "maximize": false,
+        "objective": 9.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "gfd-schedule/n10f2d10m10k3",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "ghoulomb/3-10-16",
+        "maximize": false,
+        "objective": 55.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "giapetto/giapetto",
+        "maximize": true,
+        "objective": 180.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "golf_puzzle/golf_puzzle",
+        "maximize": false,
+        "objective": 26.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "golomb/03",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "good_burger_puzzlor/good_burger_puzzlor",
+        "maximize": true,
+        "objective": 280.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "graph_partition/graph_partition",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "greatest_combination/greatest_combination",
+        "maximize": true,
+        "objective": 33.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "grid-colouring/10_10",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "groupsplitter/u12g1pref0",
+        "maximize": true,
+        "objective": 207.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "gunport_problem/gunport_problem1",
+        "maximize": false,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "hitchcock_transporation_problem/hitchcock_transporation_problem",
+        "maximize": false,
+        "objective": 2651.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "hitting_set/hitting_set",
+        "maximize": false,
+        "objective": 9.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "hrc/exp1-0-10",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "ice_cream/ice_cream",
+        "maximize": false,
+        "objective": 53180.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "integer_programming/integer_programming1",
+        "maximize": true,
+        "objective": 170.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "inter_distance/inter_distance",
+        "maximize": true,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "investment_problem_mip/investment_problem_mip",
+        "maximize": true,
+        "objective": 223.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "is/1YHXeG1xYs",
+        "maximize": false,
+        "objective": 67200.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "java-auto-gen",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "java-routing",
+        "maximize": false,
+        "objective": 67.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "jive_turkeys/jive_turkeys",
+        "maximize": false,
+        "objective": 511.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "jobshop/jobshop_abz5",
+        "maximize": false,
+        "objective": 1234.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "jobshop2/abz6",
+        "maximize": false,
+        "objective": 943.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "joshua/joshua",
+        "maximize": false,
+        "objective": 92.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "jp-encoding/data100",
+        "maximize": false,
+        "objective": 5338.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "jssp/jssp",
+        "maximize": false,
+        "objective": 55.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "kidney_exchange/kidney_exchange",
+        "maximize": true,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "kidney_exchange_model/kidney_exchange_model",
+        "maximize": true,
+        "objective": 0.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "knapsack/knapsack1",
+        "maximize": true,
+        "objective": 39.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "knapsack_investments/knapsack_investments",
+        "maximize": true,
+        "objective": 2370.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "knapsack_rosetta_code/knapsack_rosetta_code_01",
+        "maximize": true,
+        "objective": 1030.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "knapsack_rosetta_code_bounded/knapsack_rosetta_code_bounded",
+        "maximize": true,
+        "objective": 1010.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "knapsack_rosetta_code_unbounded_int/knapsack_rosetta_code_unbounded_int",
+        "maximize": true,
+        "objective": 54500.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "kqueens/kqueens",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "kraftwerk_ticket_problem/kraftwerk_ticket_problem",
+        "maximize": true,
+        "objective": 122.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "lager/lager",
+        "maximize": false,
+        "objective": 938.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "largescheduling/instance-0100-1",
+        "maximize": false,
+        "objective": 229219.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "league/model10-3-4",
+        "maximize": false,
+        "objective": 39992.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "least_diff/least_diff",
+        "maximize": false,
+        "objective": 247.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "lectures/lectures",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "lichtenstein_coloring/lichtenstein_coloring",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "lights/lights",
+        "maximize": false,
+        "objective": 12.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "lights_out/lights_out",
+        "maximize": false,
+        "objective": 27.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "lights_out_all/lights_out_all",
+        "maximize": false,
+        "objective": 34.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "linear-to-program/l2p1",
+        "maximize": false,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "liner-sf-repositioning",
+        "maximize": false,
+        "objective": 91140.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "logical_design/logical_design",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "lost_at_sea/lost_at_sea",
+        "maximize": true,
+        "objective": 32.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "ma-path-finding/ins_g16_p10_a10",
+        "maximize": false,
+        "objective": 112.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "magic_square_primes/magic_square_primes",
+        "maximize": false,
+        "objective": 253.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "magic_square_water_retention/magic_square_water_retention",
+        "maximize": true,
+        "objective": 59.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "make_a_good_burger/make_a_good_burger",
+        "maximize": true,
+        "objective": 280.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mango_puzzle/mango_puzzle",
+        "maximize": false,
+        "objective": 79.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "map_coloring_with_costs/map_coloring_with_costs",
+        "maximize": false,
+        "objective": 3100.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mapping/full2x2",
+        "maximize": false,
+        "objective": 793.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mario/mario_easy_2",
+        "maximize": true,
+        "objective": 628.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "max_activity/max_activity",
+        "maximize": true,
+        "objective": 18.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "max_cut/max_cut",
+        "maximize": true,
+        "objective": 20.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "max_flow_taha/max_flow_taha",
+        "maximize": true,
+        "objective": 60.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "max_flow_winston/max_flow_winston1",
+        "maximize": true,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "maxflow/maxflow",
+        "maximize": true,
+        "objective": 29.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "maximal_independent_sets/maximal_independent_sets",
+        "maximize": true,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "maximal_nonsegment_sum_regular/maximal_nonsegment_sum_regular",
+        "maximize": true,
+        "objective": 708.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "maximum-dag/15_05",
+        "maximize": true,
+        "objective": 46.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "maximum_density_still_life/maximum_density_still_life",
+        "maximize": true,
+        "objective": 28.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "maximum_subarray/maximum_subarray",
+        "maximize": true,
+        "objective": 15.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mceverywhere/mceverywhere",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mfasp/mfasp",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mfvsp/mfvsp",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "minimal_subset_of_columns/minimal_subset_of_columns",
+        "maximize": false,
+        "objective": 2.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "minimum_weight_alldifferent/minimum_weight_alldifferent",
+        "maximize": false,
+        "objective": 17.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "minsum/minsum",
+        "maximize": false,
+        "objective": -532.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "misp/misp",
+        "maximize": true,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "movement_puzzle/movement_puzzle",
+        "maximize": false,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "movie_scheduling/movie_scheduling",
+        "maximize": true,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "movie_stars/movie_stars",
+        "maximize": false,
+        "objective": 9.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "moving_coins/moving_coins",
+        "maximize": true,
+        "objective": 19.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mqueens/n11",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mrcpsp/mm_c15/c15_10_1",
+        "maximize": false,
+        "objective": 21.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mspsp/easy_01",
+        "maximize": false,
+        "objective": 26.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "mvcp/mvcp",
+        "maximize": false,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "n_puzzle/n_puzzle",
+        "maximize": false,
+        "objective": 16.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "newspaper/newspaper",
+        "maximize": false,
+        "objective": 180.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "nfc/12_2_10",
+        "maximize": false,
+        "objective": 848.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "nim/nim",
+        "maximize": false,
+        "objective": 1.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "non_dominating_queens/non_dominating_queens",
+        "maximize": false,
+        "objective": 22.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "nonlin/nonlin2",
+        "maximize": true,
+        "objective": 625.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "nontransitive_dice/nontransitive_dice",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "number_of_days/number_of_days",
+        "maximize": false,
+        "objective": 8300.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "on-call-rostering/10s-150d",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "onroad/onroad",
+        "maximize": false,
+        "objective": 10.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "opd/flener_et_al_10_350_100",
+        "maximize": false,
+        "objective": 28.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "open_stacks/Miller19",
+        "maximize": false,
+        "objective": 13.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "openshop/gp10-4",
+        "maximize": false,
+        "objective": 1077.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "opt-cryptanalysis/r11",
+        "maximize": false,
+        "objective": 46.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "optimal_picking_elements_from_each_list/optimal_picking_elements_from_each_list",
+        "maximize": false,
+        "objective": 16.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "or_matching/or_matching",
+        "maximize": true,
+        "objective": 519.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "or_seating/or_seating",
+        "maximize": true,
+        "objective": 996.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "p1f/10",
+        "maximize": false,
+        "objective": 300.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "p_median/p_median",
+        "maximize": false,
+        "objective": 670.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "parity-learning/44_22_5.1",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "patient_no/patient_no_21",
+        "maximize": false,
+        "objective": 0.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "pattern-set-mining/anneal-k1",
+        "maximize": true,
+        "objective": 494.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "peacableArmyOfQueens/peacableArmyOfQueens",
+        "maximize": true,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "peaceableArmyOfQueens/peaceableArmyOfQueens",
+        "maximize": true,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "persistent_numbers/persistent_numbers",
+        "maximize": false,
+        "objective": 679.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "pert/pert",
+        "maximize": false,
+        "objective": 22.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "photo/photo1",
+        "maximize": true,
+        "objective": 10.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "photo_hkj/photo_hkj",
+        "maximize": true,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "picking_teams/picking_teams",
+        "maximize": false,
+        "objective": 1.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "planet_colonization_puzzlor/planet_colonization_puzzlor",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "popsicle_stand/popsicle_stand",
+        "maximize": false,
+        "objective": 8200.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "post_office_problem/post_office_problem",
+        "maximize": false,
+        "objective": 23.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "prize-collecting/15-3-5-0",
+        "maximize": true,
+        "objective": 20.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "product_configuration/product_configuration",
+        "maximize": false,
+        "objective": 690.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "project-planning",
+        "maximize": false,
+        "objective": 17.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "proteindesign12/1HZ5.12p.19aa.usingEref_self",
+        "maximize": false,
+        "objective": 3384.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "public_school_problem/public_school_problem",
+        "maximize": false,
+        "objective": 26.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "queens_diversity/queens_diversity",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "queens_ip/queens_ip",
+        "maximize": true,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "radiation/01",
+        "maximize": false,
+        "objective": 370.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "raven_puzzle/raven_puzzle",
+        "maximize": true,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rcpsp-max/psp_c_314",
+        "maximize": false,
+        "objective": 324.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rcpsp-wet/j30_1_3-wet",
+        "maximize": false,
+        "objective": 93.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rcpsp/00",
+        "maximize": false,
+        "objective": 53.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rectangle_from_line_segments/rectangle_from_line_segments",
+        "maximize": true,
+        "objective": 48.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rehearsal/rehearsal",
+        "maximize": false,
+        "objective": 0.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rel2onto/3_2",
+        "maximize": false,
+        "objective": 56907.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "relief_mission/relief_mission",
+        "maximize": false,
+        "objective": 178.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "remainder_puzzle/remainder_puzzle",
+        "maximize": false,
+        "objective": 58.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "restaurant_scheduling/restaurant_scheduling",
+        "maximize": false,
+        "objective": 6000.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "road-cons/road_11",
+        "maximize": false,
+        "objective": 5020.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "roster/chicroster_dataset_1",
+        "maximize": false,
+        "objective": 0.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rotation/rotation",
+        "maximize": false,
+        "objective": 10.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "routing-flexible",
+        "maximize": false,
+        "objective": 115729.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "rubiks_cube/rubiks_cube",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "sangraal/sangraal",
+        "maximize": true,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "sangraal_cp/sangraal_cp",
+        "maximize": true,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "sat/sat",
+        "maximize": false,
+        "objective": 1.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "scene_allocation/scene_allocation",
+        "maximize": false,
+        "objective": 334144.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "schedule/schedule1",
+        "maximize": false,
+        "objective": 23.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "scheduling_bratko/scheduling_bratko",
+        "maximize": false,
+        "objective": 9.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "scheduling_chip/scheduling_chip",
+        "maximize": false,
+        "objective": 23.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "scheduling_speakers_optimize/scheduling_speakers_optimize",
+        "maximize": false,
+        "objective": 5.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "scheduling_with_assignments/scheduling_with_assignments",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "scheduling_with_multiple_workers/scheduling_with_multiple_workers",
+        "maximize": false,
+        "objective": 12.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "scp/scp41",
+        "maximize": false,
+        "objective": 429.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "send_most_money/send_most_money",
+        "maximize": true,
+        "objective": 10876.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "sequence_puzzle/sequence_puzzle",
+        "maximize": false,
+        "objective": 4113.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "set_covering/set_covering",
+        "maximize": false,
+        "objective": 2.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "set_covering_deployment/set_covering_deployment",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "set_covering_opl/set_covering_opl",
+        "maximize": false,
+        "objective": 14.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "set_covering_skiena/set_covering_skiena",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "ship-schedule/3Ships",
+        "maximize": true,
+        "objective": 265650.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "shopping_basket/shopping_basket",
+        "maximize": false,
+        "objective": 125.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "shortest_path/00",
+        "maximize": false,
+        "objective": 88.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "shortest_path_graph/shortest_path_graph",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "ski_assignment_problem/ski_assignment_problem",
+        "maximize": false,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "smallest_winning_electoral/smallest_winning_electoral",
+        "maximize": false,
+        "objective": 1625012.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "smelt/smelt_11",
+        "maximize": false,
+        "objective": 377.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "smuggler_knapsack/smuggler_knapsack",
+        "maximize": true,
+        "objective": 32.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "sonet_problem/sonet_problem",
+        "maximize": false,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "spot5/1401",
+        "maximize": false,
+        "objective": 459106.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "spp/spp",
+        "maximize": false,
+        "objective": 20.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "squeens/squeens",
+        "maximize": true,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "stamp_licking/stamp_licking",
+        "maximize": true,
+        "objective": 50.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "steelmillslab/bench_111orders",
+        "maximize": false,
+        "objective": 0.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "still-life-wastage/09",
+        "maximize": true,
+        "objective": 43.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "still_life/2x3",
+        "maximize": true,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "still_life2/still_life_5",
+        "maximize": true,
+        "objective": 16.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "stochastic-fjsp",
+        "maximize": false,
+        "objective": 108.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "stochastic-vrp",
+        "maximize": false,
+        "objective": 160.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "strata/strata",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "stuckey_assignment/stuckey_assignment",
+        "maximize": true,
+        "objective": 21.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "subsequence_sum/subsequence_sum",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "sugiyama/g3_7_7_7",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "superpermutations/superpermutations",
+        "maximize": false,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "survivor/survivor",
+        "maximize": true,
+        "objective": 75.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "table-layout/en-1000-1274-line521",
+        "maximize": false,
+        "objective": 5377.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "talent/talent",
+        "maximize": false,
+        "objective": 17.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "talent_scheduling/easy/concert",
+        "maximize": false,
+        "objective": 102.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tc-graph-color/k10_31",
+        "maximize": false,
+        "objective": 427.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tdtsp/inst_10_24_10",
+        "maximize": false,
+        "objective": 9341.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tea_mixing/tea_mixing",
+        "maximize": false,
+        "objective": 570.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "template_design/catfood_2",
+        "maximize": false,
+        "objective": 418.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "temporal_reasoning/temporal_reasoning",
+        "maximize": false,
+        "objective": 7.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tennis_tournament/tennis_tournament",
+        "maximize": false,
+        "objective": 18.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "thirteen_link_chain_puzzle/thirteen_link_chain_puzzle",
+        "maximize": false,
+        "objective": 4.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "touching_numbers/touching_numbers",
+        "maximize": true,
+        "objective": 320.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tpp/tpp_3_3_20_1",
+        "maximize": false,
+        "objective": 126.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "train/instance.1",
+        "maximize": false,
+        "objective": 6630.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "transportation/transportation",
+        "maximize": false,
+        "objective": 6600.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "transshipment/transshipment",
+        "maximize": false,
+        "objective": 6370.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "traveling-tppv/circ14anonbal",
+        "maximize": false,
+        "objective": 434.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "triangular/n10",
+        "maximize": true,
+        "objective": 20.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "trucking/01",
+        "maximize": false,
+        "objective": 220.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "trucking_hl/trucking_hl_1",
+        "maximize": false,
+        "objective": 220.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tsp/tsp",
+        "maximize": false,
+        "objective": 6859.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tsp_circuit/tsp_circuit",
+        "maximize": false,
+        "objective": 6859.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "tsptw/tsptw",
+        "maximize": false,
+        "objective": 387.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "twelve_statements/twelve_statements",
+        "maximize": true,
+        "objective": 6.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "unique_set_puzzle/unique_set_puzzle",
+        "maximize": false,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "urban_planning/urban_planning",
+        "maximize": true,
+        "objective": 14.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "vrp/A-n32-k5.vrp",
+        "maximize": false,
+        "objective": 796.0,
+        "proven": false,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "war_or_peace/war_or_peace",
+        "maximize": false,
+        "objective": 12.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "water_buckets/water_buckets1",
+        "maximize": false,
+        "objective": 8.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "wedding_optimal_chart/wedding_optimal_chart",
+        "maximize": true,
+        "objective": 271.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "xkcd_among_diff/xkcd_among_diff_0",
+        "maximize": true,
+        "objective": 3.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "zephyrus/12__6__6__3",
+        "maximize": false,
+        "objective": 780.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    },
+    {
+        "problem": "zoo_buses_and_kids/zoo_buses_and_kids",
+        "maximize": false,
+        "objective": 3800.0,
+        "proven": true,
+        "solver": "cp-sat",
+        "budgetMs": 300000
+    }
+]
