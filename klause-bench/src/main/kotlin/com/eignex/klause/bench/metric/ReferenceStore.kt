@@ -16,7 +16,13 @@ import java.io.File
 internal data class ReferenceEntry(
     val problem: String,
     val maximize: Boolean,
+    /** COP: the best/optimal objective (null if only known infeasible). CSP: null (feasibility is in
+     *  [feasible]). */
     val objective: Double?,
+    /** Satisfiability status: `true` = feasible/SAT (a witness), `false` = proven infeasible/UNSAT,
+     *  `null` = undecided in budget. For a COP with an [objective] this is `true`. */
+    val feasible: Boolean?,
+    /** COP: the [objective] is the proven optimum. CSP: the UNSAT was proven. */
     val proven: Boolean,
     /** How long the reference took: the solver's proof time when [proven], else the full [budgetMs]
      *  it exhausted (a timeout). So a fast proof stores its real time and a timeout stores the budget. */
