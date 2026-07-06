@@ -132,6 +132,7 @@ object Xcsp3 {
                 "noOverlap" -> noOverlap(e)
                 "binPacking" -> binPacking(e)
                 "nValues" -> nValues(e)
+                "precedence" -> precedence(e)
                 "knapsack" -> knapsack(e)
                 "slide" -> slide(e)
                 "group" -> group(e)
@@ -757,13 +758,18 @@ object Xcsp3 {
 
         /** `nValues`: the number of distinct values taken across the list meets the condition. */
         private fun nValues(e: XmlElement) {
-            val vars = listVars(e)
+            val cnt = distinctCountVar(listVars(e))
+            postCondition(intArrayOf(1), intArrayOf(cnt), requireNotNull(e.child("condition")).textContent.trim())
+        }
+
+        /** A fresh int var equal to the count of distinct values taken across [vars], decomposed as
+         *  `Σ used[v]` where `used[v] = 1` iff some variable equals `v`. */
+        private fun distinctCountVar(vars: IntArray): Int {
             val loV = vars.minOf { domains[it].min }
             val hiV = vars.maxOf { domains[it].max }
             if ((hiV - loV + 1).toLong() * vars.size > negTableCap) {
                 throw UnsupportedXcsp3Exception("nValues: value range too large to decompose")
             }
-            // used[v] = 1 iff some variable equals v; the distinct count is their sum.
             val used = ArrayList<Int>()
             for (v in loV..hiV) {
                 val eqLits = vars.map { reifyLinear(intArrayOf(1), intArrayOf(it), LinearOp.EQ, v) }
@@ -772,7 +778,39 @@ object Xcsp3 {
             val cnt = newAuxVar(0, used.size)
             val coeffs = IntArray(used.size + 1) { if (it < used.size) 1 else -1 }
             factors.add(Linear(coeffs, (used + cnt).toIntArray(), LinearOp.EQ, 0))
-            postCondition(intArrayOf(1), intArrayOf(cnt), requireNotNull(e.child("condition")).textContent.trim())
+            return cnt
+        }
+
+        /** Value precedence: for each consecutive pair `(s, t)` in `<values>`, value `s` must first
+         *  occur before `t` — `t` at position `j` requires some `s` at an earlier position, and `t`
+         *  cannot occupy position 0. With no `<values>`, the chain runs over the sorted union of the
+         *  variables' domain values. */
+        private fun precedence(e: XmlElement) {
+            if (e.attr("covered").equals("true", ignoreCase = true)) {
+                throw UnsupportedXcsp3Exception("precedence: covered form")
+            }
+            val vars = listVars(e)
+            if (vars.isEmpty()) return
+            val values = parseInts(e.child("values")?.textContent)
+                ?: vars.flatMap { domainValues(it) }.distinct().sorted().toIntArray()
+            if (values.size < 2) return
+            if (values.size.toLong() * vars.size * vars.size > negTableCap) {
+                throw UnsupportedXcsp3Exception("precedence: too large to decompose")
+            }
+            val eqLits = HashMap<Long, Int>()
+            fun eqLit(j: Int, v: Int) = eqLits.getOrPut(j.toLong() shl 32 or (v.toLong() and 0xffffffffL)) {
+                reifyLinear(intArrayOf(1), intArrayOf(vars[j]), LinearOp.EQ, v)
+            }
+            for (i in 0 until values.size - 1) {
+                val s = values[i]
+                val t = values[i + 1]
+                factors.add(Clause(intArrayOf(Lit.negate(eqLit(0, t))))) // t may not occupy position 0
+                for (j in 1 until vars.size) {
+                    // x[j] = t ⇒ some earlier variable equals s
+                    val clause = IntArray(j + 1) { if (it == 0) Lit.negate(eqLit(j, t)) else eqLit(it - 1, s) }
+                    factors.add(Clause(clause))
+                }
+            }
         }
 
         /** 1-D no-overlap (disjunctive): tasks with constant durations share a unit resource, so at
@@ -815,13 +853,20 @@ object Xcsp3 {
                 "maximum", "minimum" -> {
                     val m = newAuxVar(domainMin(termVars), domainMin(termVars) + domainSpan(termVars) - 1)
                     factors.add(ArrayMinMax(result = m, xs = termVars, max = type == "maximum"))
-                    val arr = LongArray(domains.size)
-                    arr[m] = if (maximize) -1L else 1L
-                    objective = LinearObjective(intCoefficients = arr)
+                    objective = singleVarObjective(m, maximize)
                 }
+
+                "nValues" -> objective = singleVarObjective(distinctCountVar(termVars), maximize)
 
                 else -> throw UnsupportedXcsp3Exception("objective type '$type'")
             }
+        }
+
+        /** An objective that minimizes (or, when [maximize], maximizes) a single variable. */
+        private fun singleVarObjective(v: Int, maximize: Boolean): LinearObjective {
+            val arr = LongArray(domains.size)
+            arr[v] = if (maximize) -1L else 1L
+            return LinearObjective(intCoefficients = arr)
         }
 
         private data class Lin(val coeffs: Map<Int, Int>, val constant: Int)
