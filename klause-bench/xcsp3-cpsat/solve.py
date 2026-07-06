@@ -12,12 +12,14 @@ import json
 import sys
 
 
-def solve(path, time_limit):
+def solve(path, time_limit, workers):
     from cpmpy.tools.xcsp3 import read_xcsp3
     model = read_xcsp3(path)
     obj = getattr(model, "objective_", None)
     maximize = None if obj is None else not bool(getattr(model, "objective_is_min", True))
-    model.solve(solver="ortools", time_limit=time_limit)
+    # Pin cp-sat's own workers: the bench parallelizes across instances, so each container stays
+    # single-worker and N concurrent solves can't fan out to every core (memory/CPU blow-up).
+    model.solve(solver="ortools", time_limit=time_limit, num_workers=workers)
     status = model.status()
     exitstatus = str(status.exitstatus).rsplit(".", 1)[-1]
     # objective_value() errors on a CSP (no objective) or when there is no incumbent yet.
@@ -38,11 +40,12 @@ def solve(path, time_limit):
 def main():
     path = sys.argv[1]
     time_limit = float(sys.argv[2]) if len(sys.argv) > 2 else 10.0
+    workers = int(sys.argv[3]) if len(sys.argv) > 3 else 1
     # Keep the real stdout for the JSON verdict only; CPMpy/parser chatter goes to stderr.
     out = sys.stdout
     sys.stdout = sys.stderr
     try:
-        result = solve(path, time_limit)
+        result = solve(path, time_limit, workers)
     except Exception as e:  # noqa: BLE001 — a parse/solve failure is a per-instance verdict, not a crash
         result = {"exit": "ERROR", "error": f"{type(e).__name__}: {e}"}
     print(json.dumps(result), file=out)
