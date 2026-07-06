@@ -137,6 +137,25 @@ class SmtLibQfLiaTest {
     }
 
     @Test
+    fun `integer ite selects the branch chosen by its condition`() {
+        // c forced true ⇒ x = 7; a second solve with c false ⇒ x = 3.
+        val whenTrue = solve(
+            """
+            (declare-const x Int) (declare-const c Bool)
+            (assert c) (assert (= x (ite c 7 3))) (check-sat)
+            """.trimIndent(),
+        )
+        assertEquals(7, whenTrue[0])
+        val whenFalse = solve(
+            """
+            (declare-const x Int) (declare-const c Bool)
+            (assert (not c)) (assert (= x (ite c 7 3))) (check-sat)
+            """.trimIndent(),
+        )
+        assertEquals(3, whenFalse[0])
+    }
+
+    @Test
     fun `strict bounds errors on an unbounded variable`() {
         val ex = assertFailsWith<UnsupportedSmtException> {
             SmtLibQfLia.parse("(declare-const x Int) (declare-const y Int) (assert (<= x 4))", strictBounds = true)

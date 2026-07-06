@@ -9,6 +9,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.channelBoolTo01
+import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
@@ -249,13 +250,18 @@ object SmtLibQfLia {
             when (h) {
                 "and" -> t.items.drop(1).forEach { collectConjunctiveRelations(it, out) }
 
-                "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t)) {
+                "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t) && !containsIte(t)) {
                     try {
                         out.add(relationToLinear(t))
                     } catch (_: UnsupportedSmtException) { }
                 }
             }
         }
+
+        /** Whether [t] contains an `(ite …)` subterm — lowering it has side effects (fresh vars and
+         *  clauses), so the read-only bound-inference pass must not descend into it. */
+        private fun containsIte(t: SExpr): Boolean = t is SExpr.SList &&
+            ((t.items.firstOrNull() as? SExpr.Atom)?.text == "ite" || t.items.any { containsIte(it) })
 
         private fun assert(t: SExpr) {
             if (t is SExpr.SList && t.items.isNotEmpty()) {
@@ -268,12 +274,12 @@ object SmtLibQfLia {
                     }
 
                     "<=", "<", ">=", ">" -> {
-                        factors.add(hardLinear(t))
+                        assertLinear(t)
                         return
                     }
 
                     "=" -> if (isArithmeticRelation(t) && args.size == 2) {
-                        factors.add(hardLinear(t))
+                        assertLinear(t)
                         return
                     }
 
@@ -466,9 +472,15 @@ object SmtLibQfLia {
             }
         }
 
-        private fun hardLinear(t: SExpr.SList): Linear {
+        /** Assert a linear relation; when all terms cancel to a constant it is trivially true (post
+         *  nothing) or false (post the false literal ⇒ unsat) rather than an empty [Linear]. */
+        private fun assertLinear(t: SExpr.SList) {
             val rel = relationToLinear(t)
-            return Linear(rel.coeffs, rel.vars, rel.op, rel.bound)
+            if (rel.vars.isEmpty()) {
+                if (!constRelationHolds(rel.op, rel.bound)) forceTrue(Lit.negate(trueLit()))
+                return
+            }
+            factors.add(Linear(rel.coeffs, rel.vars, rel.op, rel.bound))
         }
 
         private fun reifyRelation(t: SExpr.SList): Int {
@@ -542,6 +554,17 @@ object SmtLibQfLia {
                     "to_real", "to_int" -> linearTerm(args[0])
 
                     "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$h'")
+
+                    "ite" -> {
+                        // v = if cond then a else b: a fresh int pinned to each branch by the condition.
+                        val cond = compileBool(args[0])
+                        val a = linearTerm(args[1])
+                        val b = linearTerm(args[2])
+                        val self = LinComb(mapOf(newInt() to 1), 0)
+                        factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
+                        factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
+                        self
+                    }
 
                     "let" -> withLet(args[0]) { linearTerm(args[1]) }
 
