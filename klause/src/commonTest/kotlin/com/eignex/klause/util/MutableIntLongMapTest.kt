@@ -56,8 +56,11 @@ class MutableIntLongMapTest {
         for (k in 0 until 50) m.put(k, k.toLong())
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
         for (k in 0 until 50) {
-            if (k % 3 == 0) assertFalse(m.containsKey(k), "removed key $k")
-            else assertEquals(k.toLong(), m.getOrDefault(k, -1L), "survivor key $k")
+            if (k % 3 == 0) {
+                assertFalse(m.containsKey(k), "removed key $k")
+            } else {
+                assertEquals(k.toLong(), m.getOrDefault(k, -1L), "survivor key $k")
+            }
         }
         assertFalse(m.remove(0))
     }
