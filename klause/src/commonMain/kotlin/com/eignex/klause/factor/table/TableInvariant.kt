@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 /** LS invariant for [Table]. Constructed by [Table.asInvariant]. */
 internal class TableInvariant(
@@ -15,7 +16,7 @@ internal class TableInvariant(
     private val arity: Int,
     private val numTuples: Int,
     private val singleColumnByVar: IntIntMap,
-    private val multiColumnsByVar: Map<Int, IntArray>,
+    private val multiColumnsByVar: MutableIntObjectMap<IntArray>,
 ) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
@@ -154,7 +155,7 @@ internal fun tableRescanForChange(
     arity: Int,
     numTuples: Int,
     singleColumnByVar: IntIntMap,
-    multiColumnsByVar: Map<Int, IntArray>,
+    multiColumnsByVar: MutableIntObjectMap<IntArray>,
     intVar: Int,
     oldV: Int,
     newV: Int,
@@ -170,7 +171,7 @@ internal fun tableRescanForChange(
             if (d < minD) minD = d
         }
     } else {
-        val cols = multiColumnsByVar.getValue(intVar)
+        val cols = multiColumnsByVar[intVar]!!
         for (row in 0 until numTuples) {
             val base = row * arity
             var d = s.dist[row]
@@ -220,18 +221,18 @@ internal fun tableBuildTupleMove(
 }
 
 /** Build the var→column lookup structures. */
-internal fun tableColumnMaps(xs: IntArray, arity: Int): Pair<IntIntMap, Map<Int, IntArray>> {
-    val occ = HashMap<Int, IntArrayList>()
+internal fun tableColumnMaps(xs: IntArray, arity: Int): Pair<IntIntMap, MutableIntObjectMap<IntArray>> {
+    val occ = MutableIntObjectMap<IntArrayList>()
     for (c in 0 until arity) occ.getOrPut(xs[c]) { IntArrayList() }.add(c)
     val singleKeys = IntArrayList()
     val singleVals = IntArrayList()
-    val multi = HashMap<Int, IntArray>()
-    for ((v, cols) in occ) {
+    val multi = MutableIntObjectMap<IntArray>()
+    occ.forEach { v, cols ->
         if (cols.size == 1) {
             singleKeys.add(v)
             singleVals.add(cols[0])
         } else {
-            multi[v] = cols.toIntArray()
+            multi.put(v, cols.toIntArray())
         }
     }
     return Pair(

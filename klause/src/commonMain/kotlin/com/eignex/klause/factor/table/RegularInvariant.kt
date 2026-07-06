@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 
 /** LS invariant for [Regular]. Constructed by [Regular.asInvariant]. */
 internal class RegularInvariant(
@@ -20,10 +21,12 @@ internal class RegularInvariant(
 
     /** Positions in [seq] each variable occupies — usually one, so a single-symbol move recombines a
      *  single DP column. A variable repeated across positions falls back to a full recompute. */
-    private val positionsByVar: Map<Int, IntArray> = run {
-        val tmp = HashMap<Int, MutableList<Int>>()
+    private val positionsByVar: MutableIntObjectMap<IntArray> = run {
+        val tmp = MutableIntObjectMap<MutableList<Int>>()
         for (i in seq.indices) tmp.getOrPut(seq[i]) { mutableListOf() }.add(i)
-        tmp.mapValues { it.value.toIntArray() }
+        val out = MutableIntObjectMap<IntArray>()
+        tmp.forEach { v, cols -> out.put(v, cols.toIntArray()) }
+        out
     }
 
     override fun initialize(state: LocalSearchState, factorId: Int) {

@@ -9,6 +9,7 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.argsortBy
 
 /**
@@ -143,7 +144,8 @@ class Table private constructor(
     val singleColumnByVar: IntIntMap
 
     /** Var id → all tuple columns it occupies, for vars that appear more than once in [xs]. */
-    val multiColumnsByVar: Map<Int, IntArray>
+    @Suppress("EXPOSED_PROPERTY_TYPE")
+    val multiColumnsByVar: MutableIntObjectMap<IntArray>
 
     init {
         val (single, multi) = tableColumnMaps(xs, arity)
