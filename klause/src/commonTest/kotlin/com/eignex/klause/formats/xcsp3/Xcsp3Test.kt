@@ -249,6 +249,35 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `binPacking with loads equates each bin's total to its load variable`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables>
+              <array id="x" size="[3]"> 0..1 </array><array id="y" size="[2]"> 0..20 </array>
+            </variables><constraints>
+              <binPacking><list> x[] </list><sizes> 4 4 4 </sizes><loads> y[] </loads></binPacking>
+              <intension> eq(x[0],0) </intension><intension> eq(x[1],0) </intension><intension> eq(x[2],1) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(8, v[3]) // y[0] = total size in bin 0
+        assertEquals(4, v[4]) // y[1] = total size in bin 1
+    }
+
+    @Test
+    fun `binPacking with per-bin limits caps each bin separately`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><array id="x" size="[3]"> 0..1 </array></variables>
+            <constraints><binPacking><list> x[] </list><sizes> 4 4 4 </sizes><limits> 8 4 </limits></binPacking></constraints></instance>
+            """.trimIndent(),
+        )
+        val load = IntArray(2)
+        for (i in 0..2) load[v[i]] += 4
+        assertTrue(load[0] <= 8 && load[1] <= 4, "bins over limit: ${load.toList()}")
+    }
+
+    @Test
     fun `nValues counts distinct values`() {
         val v = sat(
             """
