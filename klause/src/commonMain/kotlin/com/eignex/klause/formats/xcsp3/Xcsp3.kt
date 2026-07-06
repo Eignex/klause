@@ -481,8 +481,17 @@ object Xcsp3 {
                 e.child("index")?.textContent
                     ?: throw UnsupportedXcsp3Exception("element: missing <index>"),
             )
+            // The selected element arr[idx] is constrained either directly to a <value> (the eq form)
+            // or by a <condition> `(op, operand)` on a fresh var bound to it.
+            val condEl = e.child("condition")
+            if (condEl != null) {
+                val selected = newAuxVar(domainMin(arr), domainMin(arr) + domainSpan(arr) - 1)
+                factors.add(Element(idx = idx, result = selected, arr = arr, arrIsVars = true, indexOffset = offset))
+                postCondition(intArrayOf(1), intArrayOf(selected), condEl.textContent.trim())
+                return
+            }
             val value = e.child("value")?.textContent?.trim()
-                ?: throw UnsupportedXcsp3Exception("element: missing <value>")
+                ?: throw UnsupportedXcsp3Exception("element: missing <value> or <condition>")
             factors.add(
                 Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = true, indexOffset = offset),
             )
