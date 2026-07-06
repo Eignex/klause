@@ -58,8 +58,11 @@ class MutableIntDoubleMapTest {
         for (k in 0 until 50) m.put(k, k.toDouble())
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
         for (k in 0 until 50) {
-            if (k % 3 == 0) assertFalse(m.containsKey(k), "removed key $k")
-            else assertEquals(k.toDouble(), m.getOrDefault(k, -1.0), "survivor key $k")
+            if (k % 3 == 0) {
+                assertFalse(m.containsKey(k), "removed key $k")
+            } else {
+                assertEquals(k.toDouble(), m.getOrDefault(k, -1.0), "survivor key $k")
+            }
         }
         assertFalse(m.remove(0))
     }

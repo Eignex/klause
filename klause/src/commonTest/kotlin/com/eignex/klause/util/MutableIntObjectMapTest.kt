@@ -67,8 +67,11 @@ class MutableIntObjectMapTest {
         for (k in 0 until 50) m.put(k, k * k)
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
         for (k in 0 until 50) {
-            if (k % 3 == 0) assertNull(m[k], "removed key $k")
-            else assertEquals(k * k, m[k], "survivor key $k")
+            if (k % 3 == 0) {
+                assertNull(m[k], "removed key $k")
+            } else {
+                assertEquals(k * k, m[k], "survivor key $k")
+            }
         }
         assertFalse(m.remove(0))
     }

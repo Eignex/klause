@@ -261,7 +261,9 @@ internal class SparseLu private constructor(
                 lRowMap[k].forEach { key, _ -> keys.add(key) }
                 keys.toIntArray().also { it.sort() }
             }
-            val lRowVal = Array(m) { k -> DoubleArray(lRowIdx[k].size) { t -> lRowMap[k].getOrDefault(lRowIdx[k][t], 0.0) } }
+            val lRowVal = Array(m) { k ->
+                DoubleArray(lRowIdx[k].size) { t -> lRowMap[k].getOrDefault(lRowIdx[k][t], 0.0) }
+            }
             // Column orientations (pivot space): U strictly-upper by column, L by column.
             val uColB = Array(m) { IntArrayList() }
             val uColBv = Array(m) { ArrayList<Double>() }
