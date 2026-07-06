@@ -333,6 +333,9 @@ internal object AffineSingletons {
             if (!isAlias) {
                 if (ws.anyOtherLinearAtAbsorbCap(di, x)) continue
                 if (capWide && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
+                // Leave x un-eliminated if folding it would push a coefficient past the Int range the
+                // Linear coalescer rejects — sound (x stays, solved directly) and avoids a hard crash.
+                if (ws.foldOverflowsInt(di, x, termVars, termCoeffs, constTerm)) continue
             }
             // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
             // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
@@ -401,6 +404,11 @@ internal object AffineSingletons {
          *  [FOLD_ABSORB_CAP] folds — a fold on [x] would rewrite that row once more. Always `false` before any
          *  fold (the pristine seed), so it only ever defers a pivot targeting an established fold sink. */
         fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean
+
+        /** Whether folding the pivot `x = constTerm + Σ termCoeffs·termVars` into any Linear row that
+         *  mentions [x] (other than [defIdx]) would overflow the `Int` coefficient range. When it would,
+         *  the candidate is skipped and `x` is left un-eliminated (sound) rather than crashing the fold. */
+        fun foldOverflowsInt(defIdx: Int, x: Int, termVars: IntArray, termCoeffs: IntArray, constTerm: Int): Boolean
     }
 
     /**
@@ -429,6 +437,30 @@ internal object AffineSingletons {
                 if (id != defIdx && factors[id] !is Linear) return false
             }
             return true
+        }
+
+        override fun foldOverflowsInt(
+            defIdx: Int,
+            x: Int,
+            termVars: IntArray,
+            termCoeffs: IntArray,
+            constTerm: Int,
+        ): Boolean {
+            for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+                val id = occ.flat[k]
+                val f = factors[id]
+                if (id != defIdx && f is Linear && foldRowOverflowsInt(
+                        f,
+                        x,
+                        termVars,
+                        termCoeffs,
+                        constTerm,
+                    )
+                ) {
+                    return true
+                }
+            }
+            return false
         }
 
         override fun otherOccurrencesAffineSubstitutable(
@@ -537,6 +569,31 @@ internal object AffineSingletons {
                 if (id != defIdx && slots[id] !is Linear) return false
             }
             return true
+        }
+
+        override fun foldOverflowsInt(
+            defIdx: Int,
+            x: Int,
+            termVars: IntArray,
+            termCoeffs: IntArray,
+            constTerm: Int,
+        ): Boolean {
+            val occ = intOcc[x]
+            for (k in 0 until occ.size) {
+                val id = occ[k]
+                val f = slots[id]
+                if (id != defIdx && f is Linear && foldRowOverflowsInt(
+                        f,
+                        x,
+                        termVars,
+                        termCoeffs,
+                        constTerm,
+                    )
+                ) {
+                    return true
+                }
+            }
+            return false
         }
 
         /** Whether every factor other than [defIdx] that mentions [x] can take the substitution
@@ -713,4 +770,24 @@ internal class AffineElimination(private val subs: List<AffineSub>) {
         }
         return Sample(sample.bools, ints)
     }
+}
+
+private fun Long.overflowsInt(): Boolean = this < Int.MIN_VALUE || this > Int.MAX_VALUE
+
+/** Whether folding `x = constTerm + Σ termCoeffs·termVars` into the Linear row [f] would produce a
+ *  coefficient or bound outside the `Int` range that [Linear]'s coalescing rejects. Computed in `Long`
+ *  so the check itself never overflows. A `true` result lets the caller leave `x` un-eliminated (sound)
+ *  rather than crash on an over-wide fold (e.g. DeBruijn-sequence instances). */
+private fun foldRowOverflowsInt(f: Linear, x: Int, termVars: IntArray, termCoeffs: IntArray, constTerm: Int): Boolean {
+    val xi = f.vars.indexOf(x)
+    if (xi < 0) return false
+    val cX = f.coeffs[xi].toLong()
+    if ((f.bound.toLong() - cX * constTerm).overflowsInt()) return true
+    for (k in termVars.indices) {
+        val prod = cX * termCoeffs[k]
+        if (prod.overflowsInt()) return true
+        val yi = f.vars.indexOf(termVars[k])
+        if (yi >= 0 && (f.coeffs[yi].toLong() + prod).overflowsInt()) return true
+    }
+    return false
 }
