@@ -456,20 +456,13 @@ object SmtLibQfLia {
         /** Build linear coefficients for `a - b op 0`. */
         private fun diff(a: LinComb, b: LinComb): Triple<IntArray, IntArray, Int> = linCombDiff(a, b)
 
+        // `=` is an arithmetic (integer) equality iff its operands are integer-sorted — i.e. not
+        // boolean. Deciding by the first operand's sort (via the scope- and ite-aware [isBoolExpr])
+        // is more robust than head-op matching, which misjudged an int-sorted `ite`/`let`/nested `=`
+        // operand as boolean and then compiled an int subterm as Bool.
         private fun isArithmeticRelation(t: SExpr.SList): Boolean {
             val arg = t.items.getOrNull(1) ?: return false
-            return when (arg) {
-                is SExpr.Atom -> arg.text.toIntOrNull() != null || intNames.containsKey(arg.text) ||
-                    (lookup(arg.text)?.isBool == false)
-
-                is SExpr.SList -> (arg.items.firstOrNull() as? SExpr.Atom)?.text in setOf(
-                    "+",
-                    "-",
-                    "*",
-                    "to_real",
-                    "to_int",
-                )
-            }
+            return !isBoolExpr(arg)
         }
 
         /** Assert a linear relation; when all terms cancel to a constant it is trivially true (post

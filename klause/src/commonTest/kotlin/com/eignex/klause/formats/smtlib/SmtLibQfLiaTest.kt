@@ -19,6 +19,20 @@ class SmtLibQfLiaTest {
     }
 
     @Test
+    fun `integer equality over an ite operand is an arithmetic relation`() {
+        // `(= (ite p x (+ x 1)) 5)`: the first operand is an int-sorted ite. The dispatch must treat
+        // this as arithmetic equality (not boolean iff), else it compiles the int subterm as Bool.
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int) (declare-const p Bool)
+            (assert (= (ite p x (+ x 1)) 5))
+            (assert p)
+            (check-sat)
+        """.trimIndent()
+        assertEquals(5, solve(text)[0], "p true ⇒ ite = x = 5")
+    }
+
+    @Test
     fun `parses conjunctive and disjunctive QF_LIA and solves SAT`() {
         val text = """
             (set-logic QF_LIA)
