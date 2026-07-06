@@ -113,6 +113,23 @@ class AffineEliminationTest {
     }
 
     @Test
+    fun `affine pass is skipped above the factor cap`() {
+        // The same eliminable x = 2y + 1, but with the factor cap below the factor count: the pass is
+        // skipped (sound — x stays, solved directly). At the default cap it eliminates as usual.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
+            ),
+        )
+        assertTrue(AffineSingletons.eliminateAffineSingletons(problem, maxFactors = 1).isEmpty, "capped: skip")
+        assertTrue(!AffineSingletons.eliminateAffineSingletons(problem).isEmpty, "uncapped: eliminate")
+    }
+
+    @Test
     fun `skips an affine fold whose coefficient would overflow Int`() {
         // x = 100000*y folded into 100000*x + y <= 500000 needs a coefficient of 10^10, outside the
         // Int range the Linear coalescer accepts. The pivot is left un-eliminated (sound) rather than

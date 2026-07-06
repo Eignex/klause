@@ -47,8 +47,16 @@ internal object AffineSingletons {
         sharedIntOcc: SharedIntOccurrence? = null,
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
+        maxFactors: Int = AFFINE_MAX_FACTORS,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
+        // On instances with millions of factors the pass scans the whole set for candidates and can run
+        // for several seconds while barely simplifying (e.g. Coprime/ItemsetMining: ~10M factors, net
+        // factor change in the tens). Skipping it there keeps presolve bounded; it is sound (the
+        // affine-defined variables simply stay and are solved directly) and, per a solve A/B over the
+        // hakank suite, disabling affine did not change whether any instance solved. The threshold sits
+        // far above what any non-giant model reaches, so ordinary instances are unaffected (byte-identical).
+        if (problem.factors.size > maxFactors) return PassDelta()
         val eliminated = BooleanArray(problem.numIntVars)
         val subs = ArrayList<AffineSub>()
         // Before any fold the working set is byte-for-byte the pristine input, so the first candidate scan
@@ -157,6 +165,12 @@ internal object AffineSingletons {
      *  alone); this bounds the total work. Once spent, the loop stops and the remaining affine-defined
      *  variables are solved directly (sound). Set well above what productive models spend. */
     private const val AFFINE_FILL_IN_BUDGET = 300_000L
+
+    /** Skip the whole affine pass on instances with more than this many factors: the O(factors) candidate
+     *  scan dominates presolve on multi-million-factor giants (where it also barely simplifies), and the
+     *  pass is optional (skipping is sound). Far above any non-giant model, so ordinary instances run it
+     *  unchanged. */
+    private const val AFFINE_MAX_FACTORS = 1_000_000
 
     /** A residue-class doubleton `a·x + b·y = c` (no unit pivot) at [defIdx]: `x` is contained and
      *  reconstructed as `(constTerm + coeffY·y) / divisor` over the [restrictedY] partner domain. */
