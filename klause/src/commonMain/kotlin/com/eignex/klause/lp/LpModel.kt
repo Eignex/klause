@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntLongMap
 
 /** Constraint relation for a row added to the builder, before normalization to `<=` form. */
 internal enum class Relation { LE, GE, EQ }
@@ -302,15 +303,18 @@ internal class LpBuilder {
         val colValBuckets = Array(n) { LongArrayList() }
         for ((i, row) in rows.withIndex()) {
             val flip = row.rel == Relation.GE
-            val summed = HashMap<Int, Long>(row.cols.size)
+            val summed = MutableIntLongMap(row.cols.size)
             for (k in row.cols.indices) {
                 val j = row.cols[k]
                 val coeff = if (flip) -row.vals[k] else row.vals[k]
-                summed[j] = addExact(summed.getOrElse(j) { 0L }, coeff)
+                summed.put(j, addExact(summed.getOrDefault(j, 0L), coeff))
             }
             // Ascending column order keeps the CSC deterministic; i ascends ⇒ rows ascend within a column.
-            for (j in summed.keys.sorted()) {
-                val v = summed.getValue(j)
+            val summedCols = IntArrayList()
+            summed.forEach { j, _ -> summedCols.add(j) }
+            val sortedCols = summedCols.toIntArray().also { it.sort() }
+            for (j in sortedCols) {
+                val v = summed.getOrDefault(j, 0L)
                 if (v != 0L) {
                     colRowBuckets[j].add(i)
                     colValBuckets[j].add(v)

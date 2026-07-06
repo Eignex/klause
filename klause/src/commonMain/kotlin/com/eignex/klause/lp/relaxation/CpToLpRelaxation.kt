@@ -39,6 +39,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntLongMap
 
 /**
  * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
@@ -692,7 +693,7 @@ internal class CpToLpRelaxation(
                     if (rltColumns >= MAX_RLT_COLUMNS) break
                     val xi = f.vars[iIdx]
                     val xiCol = intColumn(xi)
-                    val rltRow = HashMap<Int, Long>() // coalesces the wᵢᵢ = xᵢ term with the −b·xᵢ term
+                    val rltRow = MutableIntLongMap() // coalesces the wᵢᵢ = xᵢ term with the −b·xᵢ term
                     for (kIdx in f.vars.indices) {
                         val xk = f.vars[kIdx]
                         val a = f.coeffs[kIdx].toLong()
@@ -707,11 +708,13 @@ internal class CpToLpRelaxation(
                             builder.addRow(intArrayOf(w, xkCol, xiCol), longArrayOf(1L, -1L, -1L), Relation.GE, -1L)
                             w
                         }
-                        rltRow[wCol] = (rltRow[wCol] ?: 0L) + a
+                        rltRow.addTo(wCol, a)
                     }
-                    rltRow[xiCol] = (rltRow[xiCol] ?: 0L) - b // Σ aₖwₖᵢ ≤ b·xᵢ
-                    val cols = rltRow.keys.toIntArray()
-                    builder.addRow(cols, LongArray(cols.size) { rltRow.getValue(cols[it]) }, Relation.LE, 0L)
+                    rltRow.addTo(xiCol, -b) // Σ aₖwₖᵢ ≤ b·xᵢ
+                    val colsList = IntArrayList()
+                    rltRow.forEach { k, _ -> colsList.add(k) }
+                    val cols = colsList.toIntArray()
+                    builder.addRow(cols, LongArray(cols.size) { rltRow.getOrDefault(cols[it], 0L) }, Relation.LE, 0L)
                 }
             }
         }

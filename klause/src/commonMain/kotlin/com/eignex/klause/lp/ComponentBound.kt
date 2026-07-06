@@ -3,6 +3,7 @@ package com.eignex.klause.lp
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Per-connected-component LP lower bound (the per-component decomposition).
@@ -69,13 +70,13 @@ internal fun componentLowerBoundCeil(model: LpModel, cancellation: Cancellation 
 
     // Group constrained columns by component root (ascending column order within each group), and
     // certify each block's exact objective `Nᵦ / 2^kᵦ`.
-    val groups = HashMap<Int, IntArrayList>()
+    val groups = MutableIntObjectMap<IntArrayList>()
     for (j in 0 until n) {
         if (!inRow[j]) continue
         groups.getOrPut(find(j)) { IntArrayList() }.add(j)
     }
     val blocks = ArrayList<IntegerCertificate>(groups.size)
-    for (cols in groups.values) blocks.add(componentObjective(model, cols, cancellation) ?: return null)
+    groups.forEach { _, cols -> blocks.add(componentObjective(model, cols, cancellation) ?: return null) }
 
     // Sum at the common (max) power-of-two denominator `2ᵏ`, then ceil once. ⌈Σ⌉ ≠ Σ⌈·⌉.
     var k = 0
