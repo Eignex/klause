@@ -224,12 +224,27 @@ object Xcsp3 {
         }
 
         /** Constrain the linear expression `Σ coeffs·vars` by a `<condition>`: a simple `(op, k|var)`
-         *  relation or an `(in, lo..hi)` interval (two bounds). */
+         *  relation, an `(in, lo..hi)` interval (two bounds), or an `(in, {set})` membership. */
         private fun postCondition(coeffs: IntArray, vars: IntArray, condText: String) {
             val interval = Regex("""\(\s*in\s*,\s*(-?\d+)\.\.(-?\d+)\s*\)""").find(condText)
             if (interval != null) {
                 factors.add(Linear(coeffs, vars, LinearOp.GE, interval.groupValues[1].toInt()))
                 factors.add(Linear(coeffs, vars, LinearOp.LE, interval.groupValues[2].toInt()))
+                return
+            }
+            val set = Regex("""\(\s*in\s*,\s*\{([^}]*)}\s*\)""").find(condText)
+            if (set != null) {
+                val m = if (coeffs.size == 1 && coeffs[0] == 1) {
+                    vars[0]
+                } else {
+                    materializeVar(
+                        Lin(linMap(coeffs, vars), 0),
+                    )
+                }
+                val members = parseSetMembers(set.groupValues[1])
+                factors.add(
+                    Clause(members.map { reifyLinear(intArrayOf(1), intArrayOf(m), LinearOp.EQ, it) }.toIntArray()),
+                )
                 return
             }
             val (op, k, rhsVar) = sumCondition(condText)
@@ -238,6 +253,21 @@ object Xcsp3 {
             } else {
                 factors.add(Linear(coeffs + -1, vars + rhsVar, op, k))
             }
+        }
+
+        /** Parse a `{...}` set body into its members, expanding `lo..hi` ranges. */
+        private fun parseSetMembers(body: String): List<Int> =
+            body.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { tok ->
+                tok.split(
+                    "..",
+                ).let { if (it.size == 2) (it[0].toInt()..it[1].toInt()).toList() else listOf(tok.toInt()) }
+            }
+
+        /** Coalesce parallel `coeffs`/`vars` arrays into a single variable-keyed linear map. */
+        private fun linMap(coeffs: IntArray, vars: IntArray): Map<Int, Int> {
+            val m = HashMap<Int, Int>()
+            for (i in vars.indices) m[vars[i]] = (m[vars[i]] ?: 0) + coeffs[i]
+            return m
         }
 
         private fun extension(e: XmlElement) {
@@ -345,6 +375,8 @@ object Xcsp3 {
 
             is FExpr.Ref -> reifyRel(FExpr.Call("ge", listOf(e, FExpr.Num(1))))
 
+            is FExpr.SetLit -> throw UnsupportedXcsp3Exception("set literal outside 'in'")
+
             is FExpr.Call -> when (e.fn) {
                 "not" -> Lit.negate(compileBool(e.args[0]))
                 "and" -> tseitinAnd(e.args.map { compileBool(it) })
@@ -352,9 +384,17 @@ object Xcsp3 {
                 "imp" -> tseitinOr(listOf(Lit.negate(compileBool(e.args[0])), compileBool(e.args[1])))
                 "iff" -> e.args.map { compileBool(it) }.reduce { a, b -> tseitinIff(a, b) }
                 "xor" -> e.args.map { compileBool(it) }.reduce { a, b -> Lit.negate(tseitinIff(a, b)) }
+                "in" -> memberLit(e)
                 in REL -> reifyRel(e)
                 else -> throw UnsupportedXcsp3Exception("non-boolean intension op '${e.fn}'")
             }
+        }
+
+        /** `in(expr, {set})`: a literal true iff the expression takes one of the set's values. */
+        private fun memberLit(e: FExpr.Call): Int {
+            val set = e.args[1] as? FExpr.SetLit ?: throw UnsupportedXcsp3Exception("in: right side is not a set")
+            val m = materializeVar(linear(e.args[0]))
+            return tseitinOr(set.values.map { reifyLinear(intArrayOf(1), intArrayOf(m), LinearOp.EQ, it) })
         }
 
         override var trueLitCache = -1
@@ -831,6 +871,8 @@ object Xcsp3 {
 
             is FExpr.Ref -> Lin(mapOf(ref(e.name) to 1), 0)
 
+            is FExpr.SetLit -> throw UnsupportedXcsp3Exception("set literal used arithmetically")
+
             is FExpr.Call -> when (e.fn) {
                 "add" -> e.args.map { linear(it) }.reduce(::addLin)
 
@@ -879,7 +921,7 @@ object Xcsp3 {
                 }
 
                 // A boolean-valued subexpression used arithmetically is its 0/1 truth value.
-                in REL, in BOOL_FNS -> Lin(mapOf(litTo01(compileBool(e)) to 1), 0)
+                "in", in REL, in BOOL_FNS -> Lin(mapOf(litTo01(compileBool(e)) to 1), 0)
 
                 else -> throw UnsupportedXcsp3Exception("arithmetic fn '${e.fn}'")
             }

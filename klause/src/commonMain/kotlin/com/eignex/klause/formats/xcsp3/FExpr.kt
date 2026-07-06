@@ -22,6 +22,12 @@ sealed interface FExpr {
         val args: List<FExpr>,
     ) : FExpr
 
+    /** Integer set literal `{v1, v2, lo..hi, …}`, used as the right side of `in`. */
+    data class SetLit(
+        /** Enumerated set members (ranges already expanded). */
+        val values: List<Int>,
+    ) : FExpr
+
     /** Parser entry points. */
     companion object {
         /** Parse text into an [FExpr] tree. */
@@ -40,6 +46,7 @@ sealed interface FExpr {
 
         fun parseExpr(): FExpr {
             skipWs()
+            if (pos < s.length && s[pos] == '{') return parseSet()
             val tok = readToken()
             skipWs()
             return if (pos < s.length && s[pos] == '(') {
@@ -64,6 +71,35 @@ sealed interface FExpr {
             } else {
                 tok.toIntOrNull()?.let { Num(it) } ?: Ref(tok)
             }
+        }
+
+        private fun parseSet(): FExpr {
+            pos++ // consume '{'
+            val values = ArrayList<Int>()
+            val elem = StringBuilder()
+            fun flush() {
+                val tok = elem.toString().trim()
+                elem.clear()
+                if (tok.isEmpty()) return
+                val range = tok.split("..")
+                if (range.size == 2) {
+                    for (v in range[0].toInt()..range[1].toInt()) {
+                        values.add(
+                            v,
+                        )
+                    }
+                } else {
+                    values.add(tok.toInt())
+                }
+            }
+            while (pos < s.length && s[pos] != '}') {
+                if (s[pos] == ',') flush() else elem.append(s[pos])
+                pos++
+            }
+            flush()
+            require(pos < s.length && s[pos] == '}') { "expected '}' in '$s'" }
+            pos++
+            return SetLit(values)
         }
 
         private fun readToken(): String {
