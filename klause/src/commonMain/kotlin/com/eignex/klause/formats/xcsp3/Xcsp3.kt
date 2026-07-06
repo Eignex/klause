@@ -251,10 +251,10 @@ object Xcsp3 {
                 // No forbidden tuple ⇒ trivially satisfied; post nothing.
                 conflicts != null && conflicts.isEmpty() -> Unit
 
-                supports != null -> factors.add(Table(xs = vars, tuples = parseTuples(supports, vars.size)))
+                supports != null -> factors.add(Table(xs = vars, tuples = parseTuples(supports, vars)))
 
                 conflicts != null -> {
-                    val allowed = negativeTable(vars, parseTuples(conflicts, vars.size))
+                    val allowed = negativeTable(vars, parseTuples(conflicts, vars))
                     // Every tuple forbidden ⇒ unsatisfiable; otherwise the allowed-tuple table.
                     if (allowed.isEmpty()) {
                         factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
@@ -267,28 +267,49 @@ object Xcsp3 {
             }
         }
 
-        @Suppress("ThrowsCount") // distinct guards for wildcard tuples and arity, in both list forms
-        private fun parseTuples(text: String, arity: Int): IntArray {
+        @Suppress("ThrowsCount") // arity and expansion-cap guards
+        private fun parseTuples(text: String, vars: IntArray): IntArray {
+            val arity = vars.size
             val t = text.trim()
-            // A unary table is written as bare values `0 1 2` (or ranges `0..2`), no parentheses.
+            val out = ArrayList<Int>()
+            // A unary table is written as bare values `0 1 2` (or ranges `0..2`, or `*`), no parentheses.
             if (arity == 1 && '(' !in t) {
-                val out = ArrayList<Int>()
-                for (tok in t.split(Regex("\\s+")).filter { it.isNotBlank() }) {
-                    if (tok == "*") throw UnsupportedXcsp3Exception("wildcard (*) tuples not supported")
-                    val r = tok.split("..")
-                    if (r.size == 2) for (v in r[0].toInt()..r[1].toInt()) out.add(v) else out.add(tok.toInt())
-                }
+                for (tok in t.split(Regex("\\s+")).filter { it.isNotBlank() }) out.addAll(columnValues(tok, vars[0]))
                 return out.toIntArray()
             }
-            val tuples = ArrayList<Int>()
             for (m in Regex("""\(([^)]*)\)""").findAll(t)) {
                 val row = m.groupValues[1].split(",").map { it.trim() }
-                if (row.any { it == "*" }) throw UnsupportedXcsp3Exception("wildcard (*) tuples not supported")
-                val ints = row.map { it.toInt() }
-                if (ints.size != arity) throw UnsupportedXcsp3Exception("tuple arity ${ints.size} != $arity")
-                tuples.addAll(ints)
+                if (row.size != arity) throw UnsupportedXcsp3Exception("tuple arity ${row.size} != $arity")
+                appendTupleExpansion(row, vars, out)
+                if (out.size / arity > negTableCap) throw UnsupportedXcsp3Exception("table exceeds cap ($negTableCap)")
             }
-            return tuples.toIntArray()
+            return out.toIntArray()
+        }
+
+        /** The concrete values a table-column entry denotes: `*` = the variable's whole domain,
+         *  `lo..hi` = the inclusive range, otherwise the single literal value. */
+        private fun columnValues(tok: String, v: Int): List<Int> = when {
+            tok == "*" -> domainValues(v)
+            ".." in tok -> tok.split("..").let { (it[0].toInt()..it[1].toInt()).toList() }
+            else -> listOf(tok.toInt())
+        }
+
+        /** Append every concrete tuple denoted by [row] to [out], expanding `*`/range columns as a
+         *  Cartesian product over the involved variables' domains. */
+        private fun appendTupleExpansion(row: List<String>, vars: IntArray, out: MutableList<Int>) {
+            val cols = row.mapIndexed { i, tok -> columnValues(tok, vars[i]) }
+            val cur = IntArray(cols.size)
+            fun rec(p: Int) {
+                if (p == cols.size) {
+                    for (x in cur) out.add(x)
+                    return
+                }
+                for (value in cols[p]) {
+                    cur[p] = value
+                    rec(p + 1)
+                }
+            }
+            rec(0)
         }
 
         /** Complement a negative (conflicts) table to the flat allowed-tuple list; empty when every
