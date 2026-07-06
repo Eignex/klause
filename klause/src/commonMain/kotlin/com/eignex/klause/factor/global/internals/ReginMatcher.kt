@@ -9,6 +9,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Shared Régin domain-consistency filtering for the alldifferent family — `AllDifferent`
@@ -187,7 +188,7 @@ internal fun reginFilter(
     // from a free value) cannot extend to a feasible matching. Except values are never pruned
     // (their copies always leave slack). Antecedents cite the sharp Hall set forward-reachable
     // from the value-node (memoised per value-SCC), hole-aware. ----
-    val sccHallVars = HashMap<Int, IntArray>()
+    val sccHallVars = MutableIntObjectMap<IntArray>()
     fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
         val vis = BooleanArray(total)
         val bfs = IntArray(total)

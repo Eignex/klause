@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecede
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 
 /*
  * Reversible, delta-driven Régin GAC for plain alldifferent (no excepted values) — the incremental
@@ -206,7 +207,7 @@ private fun reginSccReachPrune(
     // dirtyLabels non-null and empty → no intra-component deletion → every SCC label still valid.
 
     // Prune unsupported unmatched edges: different SCC and not reachable from a free value.
-    val sccHallVars = HashMap<Int, IntArray>()
+    val sccHallVars = MutableIntObjectMap<IntArray>()
     for (i in 0 until n) {
         for (vid in valuesPerVar[i]) {
             if (inc.matchVar[i] == vid) continue

@@ -7,6 +7,7 @@ import com.eignex.klause.lp.LinearizerEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * One-hot selector model for one count-variable [GlobalCardinality] `counts(k) = #{i : xs(i) =
@@ -30,8 +31,8 @@ internal class GccCountLinearizer(
         for (x in xs) cells += builder.declaredDomain(x).size.toLong()
         if (cells == 0L || cells > MAX_GCC_CELLS) return
         // Selector columns contributing to each cover value's count, accumulated across all xs.
-        val selByCover = HashMap<Int, IntArrayList>()
-        for (v in cover) selByCover[v] = IntArrayList()
+        val selByCover = MutableIntObjectMap<IntArrayList>()
+        for (v in cover) selByCover.put(v, IntArrayList())
         for (x in xs) {
             val declared = builder.declaredDomain(x)
             val live = builder.liveDomain(x)

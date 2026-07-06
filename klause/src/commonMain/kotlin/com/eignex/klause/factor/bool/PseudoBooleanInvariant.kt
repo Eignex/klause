@@ -13,6 +13,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 /** LS invariant for [PseudoBoolean]: violation scoring and break/make maintenance. */
 internal class PseudoBooleanInvariant(
@@ -84,8 +85,8 @@ internal class PseudoBooleanInvariant(
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (literals.size < 2) return
         val sum = state.longPayload[factorId]
-        val trueByWeight = HashMap<Int, IntArrayList>()
-        val falseByWeight = HashMap<Int, IntArrayList>()
+        val trueByWeight = MutableIntObjectMap<IntArrayList>()
+        val falseByWeight = MutableIntObjectMap<IntArrayList>()
         for (i in literals.indices) {
             val lit = literals[i]
             val v = Lit.variable(lit)
@@ -95,19 +96,23 @@ internal class PseudoBooleanInvariant(
             bucket.getOrPut(effW) { IntArrayList() }.add(v)
         }
         var proposed = 0
-        outer@ for ((w, trueVars) in trueByWeight) {
-            val falseVars = falseByWeight[w] ?: continue
-            for (i in 0 until trueVars.size) {
-                for (j in 0 until falseVars.size) {
-                    if (trueVars[i] == falseVars[j]) continue
-                    sink.addCompound(
-                        listOf(
-                            BoolFlip(trueVars[i]),
-                            BoolFlip(falseVars[j]),
-                        ),
-                    )
-                    proposed++
-                    if (proposed >= PAIR_PROPOSAL_CAP) break@outer
+        trueByWeight.forEach { w, trueVars ->
+            if (proposed < PAIR_PROPOSAL_CAP) {
+                val falseVars = falseByWeight[w]
+                if (falseVars != null) {
+                    for (i in 0 until trueVars.size) {
+                        for (j in 0 until falseVars.size) {
+                            if (trueVars[i] == falseVars[j]) continue
+                            sink.addCompound(
+                                listOf(
+                                    BoolFlip(trueVars[i]),
+                                    BoolFlip(falseVars[j]),
+                                ),
+                            )
+                            proposed++
+                            if (proposed >= PAIR_PROPOSAL_CAP) return@forEach
+                        }
+                    }
                 }
             }
         }

@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Typed int-event wakeup machinery for [PropagationState]: the per-`(intVar, kind)` advisor index,
@@ -38,7 +39,7 @@ internal class IntEventMachinery(problem: Problem, incremental: Boolean) {
      *  adds no int-event-watching factor mid-run (presolve appends Linear rows, which watch nothing), so
      *  this stays `null` and the read pays only a null check past the CSR. */
     @Suppress("DoubleMutabilityForCollection") // null until the first mid-life subscription; assigned once, lazily
-    internal var overflow: HashMap<Int, IntArrayList>? = null
+    internal var overflow: MutableIntObjectMap<IntArrayList>? = null
 
     init {
         if (on) {
@@ -64,7 +65,7 @@ internal class IntEventMachinery(problem: Problem, incremental: Boolean) {
     /** Subscribe a mid-life factor [fid] to the event [packed] ([IntEvent.pack]); the base CSR is frozen,
      *  so post-construction subscriptions go to the sparse [overflow]. */
     fun subscribeMidlife(packed: Int, fid: Int) {
-        val o = overflow ?: HashMap<Int, IntArrayList>().also { overflow = it }
+        val o = overflow ?: MutableIntObjectMap<IntArrayList>().also { overflow = it }
         o.getOrPut(packed) { IntArrayList(initialCapacity = 1) }.add(fid)
     }
 
