@@ -20,7 +20,7 @@ import com.eignex.klause.backtrack.selector.Vsids
  * by [toParams] over a preset base. The BO searches this directly; each evaluated point builds one
  * params object on demand (the backtrack analogue of [LsConfigSpace]).
  */
-object BtConfigSpace : ConfigSpace(PARAMS) {
+internal object BtConfigSpace : ConfigSpace(PARAMS) {
 
     /** Decode a sampled assignment into [BacktrackParams] on top of the chosen preset base. */
     fun toParams(a: Map<String, Any>): BacktrackParams {

@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.tune
 
+import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.AdaptivePerturbationRestart
 import com.eignex.klause.localsearch.AspirationCriterion
 import com.eignex.klause.localsearch.FixedCadenceRestart
@@ -8,7 +9,6 @@ import com.eignex.klause.localsearch.LubyRestart
 import com.eignex.klause.localsearch.PerturbationKind
 import com.eignex.klause.localsearch.RestartPolicy
 import com.eignex.klause.localsearch.TabuFilter
-import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.localsearch.schedule.LoopSchedule
 import com.eignex.klause.localsearch.schedule.Reheating
@@ -30,7 +30,7 @@ import com.eignex.klause.localsearch.strategy.WalkSat
  * cap is inactive for a ProbSat point. This replaces the fixed 4-axis RecipeSpace + strategy=sweep
  * MAB: the BO searches this space directly and each evaluated point builds one recipe on demand.
  */
-object LsConfigSpace : ConfigSpace(PARAMS) {
+internal object LsConfigSpace : ConfigSpace(PARAMS) {
 
     /** Decode a sampled assignment into a fresh [LsRecipe]. Family-routed to the public strategy
      *  factories; CBLS/SA use the unified minimize path (a second fresh strategy for the optimize
@@ -46,14 +46,19 @@ object LsConfigSpace : ConfigSpace(PARAMS) {
                 perMoveInvariants = a.str("cbls.augment") != "chain",
                 seedImplicitOnRestart = a.str("cbls.augment") in setOf("implicit", "extended"),
             )
+
             "probsat" -> LsRecipe(label, probsat(a).withRestart(restart))
+
             "walksat" -> LsRecipe(label, walksat(a).withRestart(restart))
+
             "sa" -> LsRecipe(
                 label,
                 SimulatedAnnealing.optimizer(schedule(a.str("sa.schedule"))).withRestart(restart),
                 optimizeStrategy = SimulatedAnnealing.optimizer(schedule(a.str("sa.schedule"))).withRestart(restart),
             )
+
             "fjump" -> LsRecipe(label, FeasibilityJump().withRestart(restart))
+
             else -> error("unknown family '${a.str("family")}'")
         }
     }
@@ -65,15 +70,23 @@ object LsConfigSpace : ConfigSpace(PARAMS) {
         val noise = a.dbl("cbls.noise")
         return when (a.str("cbls.augment")) {
             "plateau" -> Cbls(stallSwapCap = 16, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "plateau64" -> Cbls(stallSwapCap = 64, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "chain" ->
                 Cbls(stallChainCap = 8, stallChainDepth = 16, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "smooth" ->
                 Cbls(smoothProb = 0.4, smoothFactor = 0.8, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "clique" -> Cbls(stallCliqueSwapCap = 8, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "flipprop" -> Cbls(flipPropagateCap = 8, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "hotpair" -> Cbls(pairSwapHotSpotCap = 8, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "implicit" -> Cbls(implicitStructuredCap = 8, noiseProbability = noise, tabu = tabu, scoring = scoring)
+
             "extended" -> Cbls(
                 implicitStructuredCap = 8,
                 extendedStructuredCap = 8,
@@ -81,6 +94,7 @@ object LsConfigSpace : ConfigSpace(PARAMS) {
                 tabu = tabu,
                 scoring = scoring,
             )
+
             else -> Cbls(noiseProbability = noise, tabu = tabu, scoring = scoring)
         }
     }
@@ -107,12 +121,14 @@ object LsConfigSpace : ConfigSpace(PARAMS) {
 
     private fun schedule(kind: String): Schedule = when (kind) {
         "reheat" -> Reheating(Geometric(), period = 20_000)
+
         "phased" -> LoopSchedule(
             listOf(
                 Segment(Geometric(initialTemperature = 2.0, coolingRate = 0.99), steps = 10_000),
                 Segment(Geometric(initialTemperature = 0.3, coolingRate = 0.9995), steps = 40_000),
             ),
         )
+
         else -> Geometric()
     }
 
@@ -121,13 +137,16 @@ object LsConfigSpace : ConfigSpace(PARAMS) {
 
     private fun restart(name: String): RestartPolicy = when (name) {
         "luby" -> LubyRestart(unit = 200)
+
         "perturb" -> AdaptivePerturbationRestart()
+
         "ils-basin" -> IteratedLocalSearchRestart(
             populationSize = 3,
             crossoverRate = 0.25,
             perturbationKind = PerturbationKind.BasinHopping,
             acceptance = AcceptanceCriterion.Improving,
         )
+
         else -> FixedCadenceRestart()
     }
 
