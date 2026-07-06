@@ -376,6 +376,22 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `precedence accepts the list as direct content without a list wrapper`() {
+        // Symmetry-breaking shorthand `<precedence> x[] </precedence>`: no <list>, no <values>
+        // (values default to the sorted domain union).
+        val v = sat(
+            """
+            <instance type="CSP"><variables><array id="x" size="[3]"> 0..2 </array></variables>
+            <constraints>
+              <precedence class="symmetry-breaking"> x[] </precedence>
+              <intension> eq(x[2],2) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(listOf(0, 1, 2), v.take(3))
+    }
+
+    @Test
     fun `noOverlap keeps unit-resource tasks disjoint`() {
         val v = sat(
             """
