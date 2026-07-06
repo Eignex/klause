@@ -2,6 +2,7 @@ package com.eignex.klause.count
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntObjectMap
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.ln
@@ -74,7 +75,7 @@ internal object ApproxMC {
     private fun core(ctx: CellContext, thresh: Int, seed: Long, startM: Int): CoreResult? {
         val n = ctx.hashDomain.size
         val allHashes = XorHashFamily(ctx.hashDomain, seed).draw(n)
-        val cache = HashMap<Int, CellResult>()
+        val cache = MutableIntObjectMap<CellResult>()
         fun cellAt(m: Int): CellResult = cache.getOrPut(m) { cellCount(ctx, allHashes.subList(0, m), cap = thresh) }
 
         // fits(m): the m-hash cell holds ≤ thresh projections; fits(0) is false (caller checked base).

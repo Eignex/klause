@@ -92,27 +92,29 @@ object PermutationGroup {
      *  transversal `u` of the orbit of [point], `u(s·γ)⁻¹ ∘ s ∘ u(γ)` over every generator `s` and
      *  orbit point `γ`. Each fixes [point] and lies in `<gens>`. */
     private fun schreierGenerators(gens: List<IntArray>, point: Int, n: Int): List<IntArray> {
-        val transversal = HashMap<Int, IntArray>()
-        transversal[point] = IntArray(n) { it }
+        val transversal = MutableIntObjectMap<IntArray>()
+        transversal.put(point, IntArray(n) { it })
         val frontier = ArrayDeque<Int>()
         frontier.addLast(point)
         while (frontier.isNotEmpty()) {
             val gamma = frontier.removeFirst()
-            val ug = transversal.getValue(gamma)
+            val ug = transversal[gamma]!!
             for (s in gens) {
                 val image = s[gamma]
-                if (image !in transversal) {
-                    transversal[image] = compose(s, ug)
+                if (!transversal.containsKey(image)) {
+                    transversal.put(image, compose(s, ug))
                     frontier.addLast(image)
                 }
             }
         }
         val result = ArrayList<IntArray>()
-        for (gamma in transversal.keys) {
-            val ug = transversal.getValue(gamma)
+        val orbit = ArrayList<Int>(transversal.size)
+        transversal.forEach { gamma, _ -> orbit.add(gamma) }
+        for (gamma in orbit) {
+            val ug = transversal[gamma]!!
             for (s in gens) {
                 val sug = compose(s, ug)
-                val usg = transversal.getValue(s[gamma])
+                val usg = transversal[s[gamma]]!!
                 result.add(compose(inverse(usg), sug))
             }
         }

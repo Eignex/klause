@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntDoubleMap
 
 /** Parsed OPB instance and optional objective. */
 data class OpbProblem(
@@ -30,7 +31,7 @@ object Opb {
         }
 
         val factors = mutableListOf<Factor>()
-        val objWeights = mutableMapOf<Int, Double>()
+        val objWeights = MutableIntDoubleMap()
         var objConstant = 0.0
         var hasObjective = false
         var numVars = 0
@@ -52,10 +53,10 @@ object Opb {
                     val lit = literals[j]
                     val v = Lit.variable(lit)
                     if (Lit.isPositive(lit)) {
-                        objWeights[v] = (objWeights[v] ?: 0.0) + w
+                        objWeights.addTo(v, w)
                     } else {
                         // c*(~x) in OPB objective is c*(1-x).
-                        objWeights[v] = (objWeights[v] ?: 0.0) - w
+                        objWeights.addTo(v, -w)
                         objConstant += w
                     }
                     if (v + 1 > numVars) numVars = v + 1
@@ -95,7 +96,7 @@ object Opb {
             null
         } else {
             val weights = LongArray(numVars)
-            for ((v, w) in objWeights) weights[v] = w.toLong()
+            objWeights.forEach { v, w -> weights[v] = w.toLong() }
             LinearObjective(boolWeights = weights, intCoefficients = EmptyLongArray, constant = objConstant.toLong())
         }
         val problem = Problem(

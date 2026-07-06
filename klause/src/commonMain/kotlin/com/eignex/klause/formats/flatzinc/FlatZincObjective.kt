@@ -8,17 +8,18 @@ import com.eignex.klause.solver.objective.FunctionalObjective.Operand
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntObjectMap
 
 /** Build an exact [FunctionalObjective] from `defines_var` annotations when possible. */
 internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? {
     val objId = intVars[objName] ?: return null
-    val byDef = HashMap<Int, FznConstraint>()
+    val byDef = MutableIntObjectMap<FznConstraint>()
     for (c in model.constraints) {
         val ann = c.annotations.firstOrNull { it.name == "defines_var" } ?: continue
         val defId = varIdOrNull(ann.args.firstOrNull() ?: continue) ?: continue
-        if (defId !in byDef) byDef[defId] = c
+        if (!byDef.containsKey(defId)) byDef.put(defId, c)
     }
-    if (objId !in byDef) return null
+    if (!byDef.containsKey(objId)) return null
 
     val nodes = ArrayList<FunctionalObjective.Node>()
     val visited = IntHashSet()
@@ -50,18 +51,18 @@ internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize
 /** Build a [DefinitionalSweep] from evaluable `defines_var` constraints. */
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
-    val byIntDef = HashMap<Int, FznConstraint>()
-    val byBoolDef = HashMap<Int, FznConstraint>()
+    val byIntDef = MutableIntObjectMap<FznConstraint>()
+    val byBoolDef = MutableIntObjectMap<FznConstraint>()
     for (c in model.constraints) {
         val ann = c.annotations.firstOrNull { it.name == "defines_var" } ?: continue
         val arg = ann.args.firstOrNull() ?: continue
         val intId = varIdOrNull(arg)
         if (intId != null) {
-            if (intId !in byIntDef) byIntDef[intId] = c
+            if (!byIntDef.containsKey(intId)) byIntDef.put(intId, c)
             continue
         }
         val boolId = boolIdOrNull(arg) ?: continue
-        if (boolId !in byBoolDef) byBoolDef[boolId] = c
+        if (!byBoolDef.containsKey(boolId)) byBoolDef.put(boolId, c)
     }
     if (byIntDef.isEmpty() && byBoolDef.isEmpty()) return null
 
@@ -115,8 +116,14 @@ internal fun FlatZincCompiler.buildDefinitionalSweep(): DefinitionalSweep? {
         finishVisit(id, built, cyclicBool, grayBool, doneBool, ::visitInt)
     }
     visitBoolRef = ::visitBool
-    for (id in byIntDef.keys.sorted()) visitInt(id)
-    for (id in byBoolDef.keys.sorted()) visitBool(id)
+    val intDefIds = ArrayList<Int>(byIntDef.size)
+    byIntDef.forEach { id, _ -> intDefIds.add(id) }
+    intDefIds.sort()
+    for (id in intDefIds) visitInt(id)
+    val boolDefIds = ArrayList<Int>(byBoolDef.size)
+    byBoolDef.forEach { id, _ -> boolDefIds.add(id) }
+    boolDefIds.sort()
+    for (id in boolDefIds) visitBool(id)
     if (nodes.isEmpty()) return null
     return DefinitionalSweep(nodes)
 }

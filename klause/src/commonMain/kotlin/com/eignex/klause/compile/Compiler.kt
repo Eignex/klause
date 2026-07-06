@@ -67,6 +67,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.FloatInterval
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.skema.SchemaDef
 import kotlin.math.roundToInt
 
@@ -83,8 +84,8 @@ internal class Lowering(val config: KlauseConfig) {
     // [bindIntName] / [bindBoolName]. They turn the per-node/per-edge reverse lookups in the
     // global/set lowering from O(n) entry scans into O(1), so that lowering is no longer
     // O(n²) in model size (#97).
-    val idToIntName = mutableMapOf<Int, String>()
-    val idToBoolName = mutableMapOf<Int, String>()
+    val idToIntName = MutableIntObjectMap<String>()
+    val idToBoolName = MutableIntObjectMap<String>()
     val intDomains = mutableListOf<IntDomain>()
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
@@ -125,7 +126,7 @@ internal class Lowering(val config: KlauseConfig) {
      *  [intVarIdByName] must go through here so [idToIntName] stays consistent (#97). */
     fun bindIntName(name: String, id: Int): Int {
         intVarIdByName[name] = id
-        idToIntName[id] = name
+        idToIntName.put(id, name)
         return id
     }
 
@@ -133,7 +134,7 @@ internal class Lowering(val config: KlauseConfig) {
      *  [boolVarIdByName] must go through here so [idToBoolName] stays consistent (#97). */
     fun bindBoolName(name: String, id: Int): Int {
         boolVarIdByName[name] = id
-        idToBoolName[id] = name
+        idToBoolName.put(id, name)
         return id
     }
 
