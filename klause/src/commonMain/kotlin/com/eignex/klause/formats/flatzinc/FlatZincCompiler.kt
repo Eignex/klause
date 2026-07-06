@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.toSortedIntArray
 
 /** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(
@@ -179,7 +180,7 @@ internal class FlatZincCompiler(
                             for (u in l.elements) acc.add(u)
                         }
                     }
-                    if (acc.isEmpty()) null else acc.toIntArray().also { it.sort() }
+                    if (acc.isEmpty()) null else acc.toSortedIntArray()
                 }
                 for ((i, e) in value.elements.withIndex()) {
                     if (e is FznExpr.Ident) {
@@ -195,7 +196,7 @@ internal class FlatZincCompiler(
                         val universe = if (universeSet.isEmpty()) {
                             intArrayOf(0)
                         } else {
-                            universeSet.toIntArray().also { it.sort() }
+                            universeSet.toSortedIntArray()
                         }
                         val indicatorIds = IntArray(universe.size) { k ->
                             allocBool("__set_${elemName}_${universe[k]}")

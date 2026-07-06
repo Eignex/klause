@@ -7,6 +7,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.sortedKeys
 
 /**
  * Result of [com.eignex.klause.solver.Problem.propagate]. Either a (possibly empty) set of
@@ -326,14 +327,6 @@ sealed interface PropagationResult {
             private fun packHole(id: Int, value: Int): Long =
                 (id.toLong() shl HOLE_ID_SHIFT) or (value.toLong() and HOLE_VALUE_MASK)
 
-            private fun sortedKeys(m: MutableIntIntMap): IntArray {
-                val ks = IntArray(m.size)
-                var i = 0
-                m.forEach { k, _ -> ks[i++] = k }
-                ks.sort()
-                return ks
-            }
-
             /** Materialise an [Implied] from the accumulation maps used by [merge] / [withMin] / [withMax] /
              *  [withHole], emitting the key-sorted parallel arrays the constructor expects. [sets] maps a
              *  variable to its ascending survivor values; they are emitted as the CSR
@@ -346,13 +339,10 @@ sealed interface PropagationResult {
                 holes: Set<Long>,
                 sets: Map<Int, IntArray> = emptyMap(),
             ): Implied {
-                val bKeys = IntArray(bools.size)
-                var bi = 0
-                bools.forEach { k, _ -> bKeys[bi++] = k }
-                bKeys.sort()
-                val iKeys = sortedKeys(ints)
-                val minK = sortedKeys(mins)
-                val maxK = sortedKeys(maxes)
+                val bKeys = bools.sortedKeys()
+                val iKeys = ints.sortedKeys()
+                val minK = mins.sortedKeys()
+                val maxK = maxes.sortedKeys()
                 val holesSorted = holes.toLongArray().also { it.sort() }
                 val setK = sets.keys.toIntArray().also { it.sort() }
                 if (bKeys.isEmpty() && iKeys.isEmpty() && minK.isEmpty() &&

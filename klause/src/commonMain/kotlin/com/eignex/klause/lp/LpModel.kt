@@ -3,6 +3,7 @@ package com.eignex.klause.lp
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.toSortedIntArray
 
 /** Constraint relation for a row added to the builder, before normalization to `<=` form. */
 internal enum class Relation { LE, GE, EQ }
@@ -312,7 +313,7 @@ internal class LpBuilder {
             // Ascending column order keeps the CSC deterministic; i ascends ⇒ rows ascend within a column.
             val summedCols = IntArrayList()
             summed.forEach { j, _ -> summedCols.add(j) }
-            val sortedCols = summedCols.toIntArray().also { it.sort() }
+            val sortedCols = summedCols.toSortedIntArray()
             for (j in sortedCols) {
                 val v = summed.getOrDefault(j, 0L)
                 if (v != 0L) {

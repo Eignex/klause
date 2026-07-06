@@ -12,6 +12,7 @@ import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.toSortedIntArray
 
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
@@ -226,7 +227,7 @@ class Problem(
         val holesByVar = MutableIntObjectMap<IntArrayList>()
         result.forEachIntHole { v, value -> holesByVar.getOrPut(v) { IntArrayList() }.add(value) }
         holesByVar.forEach { v, holes ->
-            val sorted = holes.toIntArray().also { it.sort() }
+            val sorted = holes.toSortedIntArray()
             intDomains[v] = requireNotNull(intDomains[v].excludeValues(sorted)) {
                 "baked holes emptied domain $v despite an Implied bake"
             }
