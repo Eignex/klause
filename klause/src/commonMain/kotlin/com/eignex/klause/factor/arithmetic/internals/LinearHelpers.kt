@@ -8,9 +8,9 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
-internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: IntArray, vars: IntArray) {
+internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongArray, vars: IntArray) {
     var sum = 0L
-    for (i in vars.indices) sum += coeffs[i].toLong() * state.assignment.intValue(vars[i])
+    for (i in vars.indices) sum += coeffs[i] * state.assignment.intValue(vars[i])
     state.longPayload[factorId] = sum
 }
 
@@ -19,9 +19,9 @@ internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: IntAr
  * O(n) scan used by interface default methods — the hot path in the concrete classes uses
  * [com.eignex.klause.factor.CoeffLookup] for O(1) access.
  */
-internal fun findCoeff(coeffs: IntArray, vars: IntArray, intVar: Int): Int {
+internal fun findCoeff(coeffs: LongArray, vars: IntArray, intVar: Int): Long {
     for (i in vars.indices) if (vars[i] == intVar) return coeffs[i]
-    return 0
+    return 0L
 }
 
 /**
@@ -96,7 +96,7 @@ internal fun collectHoleAndBoundAntecedents(
  */
 internal fun collectLinearDirAntecedents(
     state: PropagationState,
-    coeffs: IntArray,
+    coeffs: LongArray,
     vars: IntArray,
     excludeIdx: Int,
     extraLit: Int,
@@ -120,7 +120,7 @@ internal fun collectLinearDirAntecedents(
     for (j in vars.indices) {
         if (j == excludeIdx) continue
         val c = coeffs[j]
-        if (c == 0) continue
+        if (c == 0L) continue
         val v = vars[j]
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val citeMin = if (useLo) c > 0 else c < 0
@@ -190,7 +190,7 @@ private const val LINEAR_SHARED_REASON_ARITY = 32
  */
 internal fun collectLinearStartBoundAntecedents(
     state: PropagationState,
-    coeffs: IntArray,
+    coeffs: LongArray,
     vars: IntArray,
     rLo: LongArray,
     rHi: LongArray,
@@ -202,7 +202,7 @@ internal fun collectLinearStartBoundAntecedents(
     if (includeExtraLit) out.add(extraLit)
     for (j in vars.indices) {
         val c = coeffs[j]
-        if (c == 0) continue
+        if (c == 0L) continue
         val v = vars[j]
         val startMin = if (c > 0) rLo[j] / c else rHi[j] / c
         val startMax = if (c > 0) rHi[j] / c else rLo[j] / c
@@ -226,7 +226,7 @@ internal fun collectLinearStartBoundAntecedents(
  */
 internal fun propagateLinearBounds(
     state: PropagationState,
-    coeffs: IntArray,
+    coeffs: LongArray,
     vars: IntArray,
     op: LinearOp,
     bound: Long,
@@ -241,7 +241,7 @@ internal fun propagateLinearBounds(
     var sumHi = 0L
     for (i in 0 until n) {
         val d = state.intDomains[vars[i]]
-        val c = coeffs[i].toLong()
+        val c = coeffs[i]
         val a = c * d.min
         val b = c * d.max
         val lo = if (a <= b) a else b
@@ -338,7 +338,7 @@ internal fun propagateLinearBounds(
         return hiBase
     }
     for (i in 0 until n) {
-        val c = coeffs[i].toLong()
+        val c = coeffs[i]
         if (c == 0L) continue
         val v = vars[i]
         val d = state.intDomains[v]
@@ -371,12 +371,12 @@ internal fun propagateLinearBounds(
 /**
  * Range `[sumLo, sumHi]` reachable by `Σ coeffs[i] * vars[i]` given current domains.
  */
-internal fun linearSumRange(state: PropagationState, coeffs: IntArray, vars: IntArray): LongArray {
+internal fun linearSumRange(state: PropagationState, coeffs: LongArray, vars: IntArray): LongArray {
     var lo = 0L
     var hi = 0L
     for (i in vars.indices) {
         val d = state.intDomains[vars[i]]
-        val c = coeffs[i].toLong()
+        val c = coeffs[i]
         val a = c * d.min
         val b = c * d.max
         if (a <= b) {

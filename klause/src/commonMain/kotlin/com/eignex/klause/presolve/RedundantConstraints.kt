@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -584,16 +585,24 @@ internal object RedundantConstraints {
     }
 
     private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {
-        is Linear -> when (f.op) {
-            LinearOp.LE -> reducedIneq(f.vars, f.coeffs, f.bound.toLong(), ::leKey, fromEq = false)
+        is Linear -> if (!fitsInt32(f.coeffs, f.bound)) {
+            // Redundancy detection compares Int-coefficient normal forms; a wide-coefficient row is
+            // simply not indexed (never claimed redundant). Sound.
+            null
+        } else {
+            val c = IntArray(f.coeffs.size) { f.coeffs[it].toInt() }
+            val b = f.bound
+            when (f.op) {
+                LinearOp.LE -> reducedIneq(f.vars, c, b, ::leKey, fromEq = false)
 
-            LinearOp.GE -> reducedIneq(f.vars, negated(f.coeffs), -f.bound.toLong(), ::leKey, fromEq = false)
+                LinearOp.GE -> reducedIneq(f.vars, negated(c), -b, ::leKey, fromEq = false)
 
-            LinearOp.EQ -> reducedIneq(f.vars, f.coeffs, f.bound.toLong(), ::leKey, fromEq = true).copyWithOpposite(
-                reducedIneq(f.vars, negated(f.coeffs), -f.bound.toLong(), ::leKey, fromEq = true),
-            )
+                LinearOp.EQ -> reducedIneq(f.vars, c, b, ::leKey, fromEq = true).copyWithOpposite(
+                    reducedIneq(f.vars, negated(c), -b, ::leKey, fromEq = true),
+                )
 
-            LinearOp.NE -> null
+                LinearOp.NE -> null
+            }
         }
 
         is PseudoBoolean -> when (f.op) {

@@ -9,6 +9,7 @@ import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -25,11 +26,11 @@ class ReifiedLinear private constructor(
     override val auxBoolVar: Int,
     terms: CoalescedTerms,
     val op: LinearOp,
-    val bound: Int,
+    val bound: Long,
 ) : ReifiedFactor {
 
     val vars: IntArray = terms.vars
-    val coeffs: IntArray = terms.coeffs
+    val coeffs: LongArray = terms.coeffs
 
     init {
         require(coeffs.isNotEmpty()) { "linear sum must have at least one term" }
@@ -43,6 +44,10 @@ class ReifiedLinear private constructor(
      * caller (issue #84).
      */
     constructor(auxBoolVar: Int, coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
+        this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound.toLong())
+
+    /** Wide form: coefficients and bound that may exceed 32-bit range. */
+    constructor(auxBoolVar: Int, coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound)
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
@@ -53,8 +58,8 @@ class ReifiedLinear private constructor(
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_LINEAR) {
         int(auxBoolVar)
         enum(op)
-        int(bound)
-        pairsByKey(vars) { coeffs[it].toLong() }
+        long(bound)
+        pairsByKey(vars) { coeffs[it] }
     }
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)
@@ -70,5 +75,12 @@ class ReifiedLinear private constructor(
 
     override fun asInvariant(): Invariant = ReifiedLinearInvariant(auxBoolVar, coeffs, vars, op, bound)
 
-    override fun asLinearizer(): Linearizer = ReifiedLinearLinearizer(auxBoolVar, op, bound, vars, coeffs)
+    // The LP relaxation is best-effort: a reified row whose coefficients/bound exceed 32-bit range is
+    // simply not relaxed (the propagator/invariant still enforce it). Sound to skip.
+    override fun asLinearizer(): Linearizer =
+        if (fitsInt32(coeffs, bound)) {
+            ReifiedLinearLinearizer(auxBoolVar, op, bound.toInt(), vars, IntArray(coeffs.size) { coeffs[it].toInt() })
+        } else {
+            NoLinearizer
+        }
 }

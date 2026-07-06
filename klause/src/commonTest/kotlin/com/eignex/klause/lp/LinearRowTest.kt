@@ -13,7 +13,7 @@ class LinearRowTest {
 
     @Test
     fun `Linear exposes its own row exactly`() {
-        val rows = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 5).linearRows()
+        val rows = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 5).linearRows()!!
         assertEquals(1, rows.size)
         val r = rows[0]
         assertEquals(LinearOp.LE, r.op)

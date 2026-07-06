@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
@@ -63,7 +64,9 @@ internal object CoefficientStrengthening {
      *  regardless of which constraint witnesses the conflict. */
     private fun equalityContradiction(factor: Factor, domains: Array<IntDomain>): List<Factor>? = when (factor) {
         is Linear ->
-            if (factor.op == LinearOp.EQ && indivisible(factor.coeffs, factor.bound)) {
+            if (factor.op == LinearOp.EQ && fitsInt32(factor.coeffs, factor.bound) &&
+                indivisible(IntArray(factor.coeffs.size) { factor.coeffs[it].toInt() }, factor.bound.toInt())
+            ) {
                 intContradiction(factor.vars[0], domains)
             } else {
                 null
@@ -124,13 +127,17 @@ internal object CoefficientStrengthening {
     }
 
     private fun strengthenLinear(factor: Linear, domains: Array<IntDomain>): Factor? {
-        val g = PresolveShared.gcdOf(factor.coeffs)
+        // Coefficient strengthening is Int-arithmetic (gcd, knapsack lifting); a wide-coefficient row
+        // is left unchanged (same reference ⇒ no delta). Sound — strengthening is optional.
+        if (!fitsInt32(factor.coeffs, factor.bound)) return factor
+        val intCoeffs = IntArray(factor.coeffs.size) { factor.coeffs[it].toInt() }
+        val g = PresolveShared.gcdOf(intCoeffs)
         val gcdReduced: Linear = if (g <= 1) {
             factor
         } else {
-            when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
+            when (val reduced = reduceBound(toRel(factor.op), factor.bound.toInt(), g)) {
                 is Reduced.Bound -> Linear(
-                    PresolveShared.divAll(factor.coeffs, g),
+                    PresolveShared.divAll(intCoeffs, g),
                     factor.vars.copyOf(),
                     factor.op,
                     reduced.bound,
@@ -170,13 +177,13 @@ internal object CoefficientStrengthening {
         val bound: Long
         when (l.op) {
             LinearOp.LE -> {
-                coeffs = l.coeffs
-                bound = l.bound.toLong()
+                coeffs = IntArray(l.coeffs.size) { l.coeffs[it].toInt() }
+                bound = l.bound
             }
 
             LinearOp.GE -> {
-                coeffs = IntArray(l.coeffs.size) { -l.coeffs[it] }
-                bound = -l.bound.toLong()
+                coeffs = IntArray(l.coeffs.size) { -l.coeffs[it].toInt() }
+                bound = -l.bound
             }
 
             else -> return l

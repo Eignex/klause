@@ -16,7 +16,7 @@ class LinearSumFactorTest {
     fun `vars and coeffs are set from constructor`() {
         val linear = Linear(intArrayOf(3, -2, 5), intArrayOf(0, 1, 2), LinearOp.LE, 10)
         assertTrue(linear.vars.contentEquals(intArrayOf(0, 1, 2)))
-        assertTrue(linear.coeffs.contentEquals(intArrayOf(3, -2, 5)))
+        assertTrue(linear.coeffs.contentEquals(longArrayOf(3, -2, 5)))
     }
 
     @Test

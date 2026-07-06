@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.lp.Basis
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.bound.CumulativeFlowBound
@@ -190,16 +191,19 @@ internal class LpEngine(
         var best: Triple<Int, Int, Int>? = null
         for (f in problem.factors) {
             if (f !is Linear || f.op != LinearOp.EQ) continue
+            // Modular reasoning is Int-arithmetic (gcd); a wide-coefficient row is skipped rather than
+            // truncated (which would deduce a wrong congruence). Sound — the row just yields no modulus.
+            if (!fitsInt32(f.coeffs, f.bound)) continue
             val vi = f.vars.indexOf(v)
             if (vi < 0) continue
-            val a = f.coeffs[vi]
+            val a = f.coeffs[vi].toInt()
             if (a != 1 && a != -1) continue
             var g = 0
-            for (j in f.vars.indices) if (j != vi) g = gcdOfInt(g, f.coeffs[j])
+            for (j in f.vars.indices) if (j != vi) g = gcdOfInt(g, f.coeffs[j].toInt())
             if (g <= 1) continue
             // a·v ≡ b (mod g); a = ±1 ⇒ v ≡ a·b (mod g). Keep the largest modulus (tightest rounding).
             if (best != null && g <= best.second) continue
-            val residue = (a.toLong() * f.bound.toLong()).mod(g.toLong()).toInt()
+            val residue = (a.toLong() * f.bound).mod(g.toLong()).toInt()
             best = Triple(v, g, residue)
         }
         return best

@@ -14,14 +14,14 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.MutableIntIntMap
 
-internal fun linearHolds(sum: Long, op: LinearOp, bound: Int): Boolean = when (op) {
+internal fun linearHolds(sum: Long, op: LinearOp, bound: Long): Boolean = when (op) {
     LinearOp.LE -> sum <= bound
-    LinearOp.EQ -> sum == bound.toLong()
+    LinearOp.EQ -> sum == bound
     LinearOp.GE -> sum >= bound
-    LinearOp.NE -> sum != bound.toLong()
+    LinearOp.NE -> sum != bound
 }
 
-internal fun linearDegree(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int {
+internal fun linearDegree(sum: Long, op: LinearOp, bound: Long, softCap: Int): Int {
     val d = sum - bound
     return when (op) {
         LinearOp.LE -> if (d <= 0L) 0 else compressViolation(d, softCap)
@@ -49,10 +49,16 @@ internal inline fun reifiedDegree(aux: Boolean, holds: Boolean, violatedDegree: 
     else -> 1
 }
 
-internal class CoalescedTerms(val vars: IntArray, val coeffs: IntArray)
+internal class CoalescedTerms(val vars: IntArray, val coeffs: LongArray)
+
+// Int-coefficient convenience: widen and delegate. Most callers build small Int coefficients; the
+// frontends that can produce coefficients beyond Int range (SMT cut lemmas, dense affine folds) build
+// a `LongArray` and call the wide form directly.
+internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTerms =
+    coalesceLinearTerms(vars, LongArray(coeffs.size) { coeffs[it].toLong() })
 
 // XCSP3 and direct-API callers can pass the same var twice; without coalescing the LS payload desyncs.
-internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTerms {
+internal fun coalesceLinearTerms(vars: IntArray, coeffs: LongArray): CoalescedTerms {
     require(vars.size == coeffs.size) { "coeffs/vars length mismatch" }
     val seen = IntHashSet(vars.size)
     var hasDuplicate = false
@@ -79,23 +85,17 @@ internal fun coalesceLinearTerms(vars: IntArray, coeffs: IntArray): CoalescedTer
             slotOf.put(v, slot)
             order.add(v)
         }
-        sums[slot] += coeffs[i].toLong()
+        sums[slot] += coeffs[i]
     }
     val outVars = order.toIntArray()
-    val outCoeffs = IntArray(outVars.size) { idx ->
-        val s = sums[idx]
-        require(s in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
-            "coalesced coefficient overflow for var ${outVars[idx]}: $s"
-        }
-        s.toInt()
-    }
+    val outCoeffs = LongArray(outVars.size) { sums[it] }
     return CoalescedTerms(outVars, outCoeffs)
 }
 
-internal fun linearResidual(sum: Long, op: LinearOp, bound: Int, softCap: Int): Int = when (op) {
+internal fun linearResidual(sum: Long, op: LinearOp, bound: Long, softCap: Int): Int = when (op) {
     LinearOp.LE -> compressViolation(sum - bound, softCap)
 
-    LinearOp.GE -> compressViolation(bound.toLong() - sum, softCap)
+    LinearOp.GE -> compressViolation(bound - sum, softCap)
 
     LinearOp.EQ -> {
         val d = sum - bound
@@ -105,9 +105,9 @@ internal fun linearResidual(sum: Long, op: LinearOp, bound: Int, softCap: Int): 
     LinearOp.NE -> 1
 }
 
-internal fun snapLinearTarget(op: LinearOp, bound: Int, coeff: Int, sumWithout: Long, wantHolds: Boolean): Long? {
-    if (coeff == 0) return null
-    val c = coeff.toLong()
+internal fun snapLinearTarget(op: LinearOp, bound: Long, coeff: Long, sumWithout: Long, wantHolds: Boolean): Long? {
+    if (coeff == 0L) return null
+    val c = coeff
     val numerator = bound - sumWithout
     val targetEq = numerator / c
     return when (op) {

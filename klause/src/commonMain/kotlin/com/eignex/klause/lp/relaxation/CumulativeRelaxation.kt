@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -332,11 +333,14 @@ internal class CumulativeRelaxation(
 
         /** Record every `w ≥ v + c` implied by a two-variable [Linear] `coeffA·a + coeffB·b op bound`. */
         private fun addLinearLinks(f: Linear) {
+            // Only ±1-coefficient rows produce a link; a wide coefficient can't be one, and narrowing it
+            // to Int could spuriously look like ±1. Skip wide rows — sound (the link is just not added).
+            if (!fitsInt32(f.coeffs, f.bound)) return
             val a = f.vars[0]
             val b = f.vars[1]
-            val ca = f.coeffs[0]
-            val cb = f.coeffs[1]
-            val bound = f.bound.toLong()
+            val ca = f.coeffs[0].toInt()
+            val cb = f.coeffs[1].toInt()
+            val bound = f.bound
             // "≥ bound" holds for GE/EQ; "≤ bound" (⇔ "≥ −bound" after negating) holds for LE/EQ.
             if (f.op == LinearOp.GE || f.op == LinearOp.EQ) addGeForm(a, ca, b, cb, bound)
             if (f.op == LinearOp.LE || f.op == LinearOp.EQ) addGeForm(a, -ca, b, -cb, -bound)

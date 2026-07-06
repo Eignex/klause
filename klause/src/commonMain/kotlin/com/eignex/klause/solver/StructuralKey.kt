@@ -115,6 +115,8 @@ internal class StructuralKeyBuilder {
 
     fun int(value: Int) = append(value.toLong())
 
+    fun long(value: Long) = append(value)
+
     fun bool(value: Boolean) = append(if (value) 1L else 0L)
 
     fun enum(value: Enum<*>) = append(value.ordinal.toLong())
