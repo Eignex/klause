@@ -144,6 +144,22 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `sum with variable coefficients forms products`() {
+        // c0*x0 + c1*x1 = 10 with c0=3, x0=x1=2 forces c1 = 2.
+        val v = sat(
+            """
+            <instance type="CSP"><variables>
+              <var id="c0"> 0..3 </var><var id="c1"> 0..3 </var><var id="x0"> 0..3 </var><var id="x1"> 0..3 </var>
+            </variables><constraints>
+              <sum><list> x0 x1 </list><coeffs> c0 c1 </coeffs><condition> (eq,10) </condition></sum>
+              <intension> eq(x0,2) </intension><intension> eq(x1,2) </intension><intension> eq(c0,3) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(2, v[1], "c1 must be 2")
+    }
+
+    @Test
     fun `count maps to Count + condition`() {
         val xml = """
             <instance type="CSP">

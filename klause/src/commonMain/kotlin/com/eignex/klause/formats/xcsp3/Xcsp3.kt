@@ -156,9 +156,26 @@ object Xcsp3 {
                 .split(Regex("\\s+")).filter { it.isNotBlank() }
             val termVars = tokens.flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
             if (termVars.isEmpty()) throw UnsupportedXcsp3Exception("sum: empty <list>")
-            val coeffs = coeffsOrUnit(e.child("coeffs")?.textContent, termVars.size)
-            require(coeffs.size == termVars.size) { "sum: <coeffs> length != term count" }
-            postCondition(coeffs, termVars, requireNotNull(e.child("condition")).textContent.trim())
+            val condText = requireNotNull(e.child("condition")).textContent.trim()
+            val coeffsText = e.child("coeffs")?.textContent
+            val constCoeffs = if (coeffsText == null) IntArray(termVars.size) { 1 } else parseInts(coeffsText)
+            if (constCoeffs != null) {
+                require(constCoeffs.size == termVars.size) { "sum: <coeffs> length != term count" }
+                postCondition(constCoeffs, termVars, condText)
+                return
+            }
+            // Variable coefficients (constCoeffs is null only when <coeffs> is present but not constant):
+            // Σ coeff_i·term_i where each product is materialized via [Product].
+            val coeffVars = requireNotNull(coeffsText).trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
+            require(coeffVars.size == termVars.size) { "sum: <coeffs> length != term count" }
+            val products = IntArray(termVars.size) { i ->
+                val (lo, hi) = productBounds(coeffVars[i], termVars[i])
+                val p = newAuxVar(lo, hi)
+                factors.add(Product(coeffVars[i], termVars[i], p))
+                p
+            }
+            postCondition(IntArray(products.size) { 1 }, products, condText)
         }
 
         /** Resolve a `<sum>` term to an int var: a declared variable, a constant, a reified
