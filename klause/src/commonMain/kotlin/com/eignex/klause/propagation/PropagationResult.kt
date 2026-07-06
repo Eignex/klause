@@ -5,6 +5,7 @@ import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -204,10 +205,12 @@ sealed interface PropagationResult {
          *  Bound tightenings take the tighter value; holes union; a variable pinned in the union is
          *  dropped from the bound and hole sets. Used by root-bake probing to accumulate deductions. */
         fun merge(other: Implied): Implied {
-            val bools = HashMap(bools)
-            other.forEachBool { k, v -> bools[k] = v }
-            val ints = HashMap(ints)
-            other.forEachInt { k, v -> ints[k] = v }
+            val bools = MutableIntObjectMap<Boolean>()
+            forEachBool { k, v -> bools.put(k, v) }
+            other.forEachBool { k, v -> bools.put(k, v) }
+            val ints = MutableIntIntMap()
+            forEachInt { k, v -> ints.put(k, v) }
+            other.forEachInt { k, v -> ints.put(k, v) }
             val mins = MutableIntIntMap()
             forEachIntMin { k, v -> mins.put(k, v) }
             other.forEachIntMin { k, v -> mins.put(k, maxOf(mins.getOrDefault(k, Int.MIN_VALUE), v)) }
@@ -228,7 +231,7 @@ sealed interface PropagationResult {
                 val existing = sets[id]
                 sets[id] = if (existing == null) t else intersectSorted(existing, t)
             }
-            for (k in ints.keys) {
+            ints.forEach { k, _ ->
                 mins.remove(k)
                 maxes.remove(k)
                 holes.removeAll { (it ushr HOLE_ID_SHIFT).toInt() == k }
@@ -244,7 +247,7 @@ sealed interface PropagationResult {
             mins.put(v, maxOf(mins.getOrDefault(v, Int.MIN_VALUE), newMin))
             val maxes = MutableIntIntMap()
             forEachIntMax { k, vv -> maxes.put(k, vv) }
-            return build(bools, ints, mins, maxes, holeSet(), setMap())
+            return build(boolMap(), intMap(), mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with int [v]'s upper bound lowered to at most [newMax]. */
@@ -254,7 +257,7 @@ sealed interface PropagationResult {
             val maxes = MutableIntIntMap()
             forEachIntMax { k, vv -> maxes.put(k, vv) }
             maxes.put(v, minOf(maxes.getOrDefault(v, Int.MAX_VALUE), newMax))
-            return build(bools, ints, mins, maxes, holeSet(), setMap())
+            return build(boolMap(), intMap(), mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with interior [value] excluded from int [v]'s domain (`v ≠ value`). */
@@ -265,7 +268,19 @@ sealed interface PropagationResult {
             forEachIntMax { k, vv -> maxes.put(k, vv) }
             val holes = holeSet()
             holes.add(packHole(v, value))
-            return build(bools, ints, mins, maxes, holes, setMap())
+            return build(boolMap(), intMap(), mins, maxes, holes, setMap())
+        }
+
+        private fun boolMap(): MutableIntObjectMap<Boolean> {
+            val m = MutableIntObjectMap<Boolean>()
+            forEachBool { k, v -> m.put(k, v) }
+            return m
+        }
+
+        private fun intMap(): MutableIntIntMap {
+            val m = MutableIntIntMap()
+            forEachInt { k, v -> m.put(k, v) }
+            return m
         }
 
         private fun holeSet(): HashSet<Long> {
@@ -324,25 +339,37 @@ sealed interface PropagationResult {
              *  variable to its ascending survivor values; they are emitted as the CSR
              *  [intSetKeys]/[intSetOffsets]/[intSetValues] (empty when there are none). */
             private fun build(
-                bools: Map<Int, Boolean>,
-                ints: Map<Int, Int>,
+                bools: MutableIntObjectMap<Boolean>,
+                ints: MutableIntIntMap,
                 mins: MutableIntIntMap,
                 maxes: MutableIntIntMap,
                 holes: Set<Long>,
                 sets: Map<Int, IntArray> = emptyMap(),
             ): Implied {
+                val bKeys = IntArray(bools.size)
+                var bi = 0
+                bools.forEach { k, _ -> bKeys[bi++] = k }
+                bKeys.sort()
+                val iKeys = sortedKeys(ints)
                 val minK = sortedKeys(mins)
                 val maxK = sortedKeys(maxes)
                 val holesSorted = holes.toLongArray().also { it.sort() }
                 val setK = sets.keys.toIntArray().also { it.sort() }
+                if (bKeys.isEmpty() && iKeys.isEmpty() && minK.isEmpty() &&
+                    maxK.isEmpty() && holesSorted.isEmpty() && setK.isEmpty()
+                ) {
+                    return EMPTY
+                }
                 val setOffsets = IntArray(setK.size + 1)
                 for (i in setK.indices) setOffsets[i + 1] = setOffsets[i] + sets.getValue(setK[i]).size
                 val setVals = IntArray(setOffsets[setK.size])
                 var w = 0
                 for (k in setK) for (sv in sets.getValue(k)) setVals[w++] = sv
                 return Implied(
-                    bools = bools,
-                    ints = ints,
+                    boolKeys = bKeys,
+                    boolValues = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) },
+                    intKeys = iKeys,
+                    intValues = IntArray(iKeys.size) { ints.getOrDefault(iKeys[it], 0) },
                     intMinKeys = minK,
                     intMinValues = IntArray(minK.size) { mins.getOrDefault(minK[it], 0) },
                     intMaxKeys = maxK,
