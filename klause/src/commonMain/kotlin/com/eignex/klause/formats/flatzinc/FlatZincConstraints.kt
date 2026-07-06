@@ -46,6 +46,12 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "int_lin_le_reif", "int_lin_eq_reif", "int_lin_ne_reif" -> emitIntLinear(c, reified = true)
 
+    "int_eq_imp", "int_ne_imp", "int_le_imp", "int_lt_imp",
+    "int_ge_imp", "int_gt_imp",
+    -> emitIntCmpImp(c)
+
+    "int_lin_le_imp", "int_lin_eq_imp", "int_lin_ne_imp" -> emitIntLinearImp(c)
+
     "bool_lin_le", "bool_lin_eq" -> emitBoolLinear(c)
 
     "float_lin_le", "float_lin_eq", "float_lin_ne" -> emitFloatLinear(c, reified = false)

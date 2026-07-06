@@ -341,4 +341,61 @@ class FlatZincParseTest {
         assertNotNull(sample)
         assertEquals(3, sample.ints[0])
     }
+
+    @Test
+    fun `int_le_imp enforces the relation when the guard holds`() {
+        val src = """
+            var 0..10: x;
+            var 0..10: y;
+            var bool: r;
+            constraint bool_clause([r], []);
+            constraint int_le_imp(x, y, r);
+            constraint int_eq(x, 6);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        assertNotNull(sample)
+        val x = sample.ints[program.intVarsByName.getValue("x")]
+        val y = sample.ints[program.intVarsByName.getValue("y")]
+        assertTrue(x <= y, "r true must force x<=y, got x=$x y=$y")
+    }
+
+    @Test
+    fun `int_le_imp leaves the relation free when the guard is false`() {
+        // r false must not enforce x<=y, so x=10>y=0 stays satisfiable.
+        val src = """
+            var 0..10: x;
+            var 0..10: y;
+            var bool: r;
+            constraint bool_clause([], [r]);
+            constraint int_le_imp(x, y, r);
+            constraint int_eq(x, 10);
+            constraint int_eq(y, 0);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        assertNotNull(sample)
+        assertEquals(10, sample.ints[program.intVarsByName.getValue("x")])
+        assertEquals(0, sample.ints[program.intVarsByName.getValue("y")])
+    }
+
+    @Test
+    fun `int_lin_le_imp enforces the linear bound when the guard holds`() {
+        val src = """
+            var 0..10: a;
+            var 0..10: b;
+            var bool: r;
+            constraint bool_clause([r], []);
+            constraint int_lin_le_imp([1, 1], [a, b], 3, r);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        assertNotNull(sample)
+        val a = sample.ints[program.intVarsByName.getValue("a")]
+        val b = sample.ints[program.intVarsByName.getValue("b")]
+        assertTrue(a + b <= 3, "r true must force a+b<=3, got a=$a b=$b")
+    }
 }
