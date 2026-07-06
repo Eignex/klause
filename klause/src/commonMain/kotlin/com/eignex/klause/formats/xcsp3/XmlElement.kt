@@ -24,19 +24,42 @@ class XmlElement(
     /** First direct child with [tag], or null. */
     fun child(tag: String): XmlElement? = children.firstOrNull { it.tag == tag }
 
-    /** Substitute `%i` and `%...` placeholders for group-template instantiation. */
-    fun substituteParams(tokens: List<String>): XmlElement = XmlElement(
+    /** Substitute `%i`, `%i..%j` (parameter range) and `%...` placeholders for group-template
+     *  instantiation. Per the XCSP3 convention, `%...` denotes the parameters **not** explicitly
+     *  referenced elsewhere in the template ([usedIndices]); with none referenced it is all of them. */
+    fun substituteParams(tokens: List<String>, usedIndices: Set<Int> = emptySet()): XmlElement = XmlElement(
         tag,
         attributes,
-        children.map { it.substituteParams(tokens) },
+        children.map { it.substituteParams(tokens, usedIndices) },
         PARAM.replace(directText) { m ->
-            val g = m.groupValues[1]
-            if (g == "...") tokens.joinToString(" ") else tokens.getOrNull(g.toInt()) ?: m.value
+            when {
+                m.groupValues[1].isNotEmpty() -> { // %i..%j
+                    val lo = m.groupValues[1].toInt()
+                    val hi = m.groupValues[2].toInt()
+                    (lo..hi).mapNotNull { tokens.getOrNull(it) }.joinToString(" ")
+                }
+
+                m.groupValues[3] == "..." ->
+                    tokens.filterIndexed { i, _ -> i !in usedIndices }.joinToString(" ")
+
+                else -> tokens.getOrNull(m.groupValues[3].toInt()) ?: m.value
+            }
         },
     )
 
+    /** Parameter indices explicitly referenced (`%i` / `%i..%j`) in this element's full text —
+     *  the complement of what `%...` expands to. */
+    fun explicitParamIndices(): Set<Int> = buildSet {
+        for (m in EXPLICIT_PARAM.findAll(textContent)) {
+            val lo = m.groupValues[1].toInt()
+            val hi = m.groupValues[2].toIntOrNull() ?: lo
+            for (i in lo..hi) add(i)
+        }
+    }
+
     private companion object {
-        val PARAM = Regex("""%(\.\.\.|\d+)""")
+        val PARAM = Regex("""%(\d+)\.\.%(\d+)|%(\.\.\.|\d+)""")
+        val EXPLICIT_PARAM = Regex("""%(\d+)(?:\.\.%(\d+))?""")
     }
 }
 

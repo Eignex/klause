@@ -53,8 +53,10 @@ internal fun CnfLowering.tseitinIff(x: Int, y: Int): Int {
     return a
 }
 
-/** Reify one linear relation onto a fresh positive literal. */
+/** Reify one linear relation onto a fresh positive literal. A relation whose terms all cancel to
+ *  a constant (`0 ⟨op⟩ bound`) reifies to the true/false literal without a [ReifiedLinear] factor. */
 internal fun CnfLowering.reifyLinear(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int): Int {
+    if (vars.isEmpty()) return if (constRelationHolds(op, bound)) trueLit() else Lit.negate(trueLit())
     val aux = newBool()
     factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = coeffs, vars = vars, op = op, bound = bound))
     return Lit.make(aux, true)
@@ -78,4 +80,12 @@ internal fun channelBoolTo01(factors: MutableList<Factor>, auxBoolVar: Int, intV
             bound = if (whenTrue) 1 else 0,
         ),
     )
+}
+
+/** Whether the constant relation `0 ⟨op⟩ bound` holds — the value of a linear whose terms cancel. */
+internal fun constRelationHolds(op: LinearOp, bound: Int): Boolean = when (op) {
+    LinearOp.LE -> 0 <= bound
+    LinearOp.GE -> 0 >= bound
+    LinearOp.EQ -> 0 == bound
+    LinearOp.NE -> 0 != bound
 }

@@ -33,33 +33,59 @@ class SExprReader(private val src: String) {
     private fun readExpr(): SExpr {
         skipWs()
         require(pos < src.length) { "unexpected end of input" }
-        return if (src[pos] == '(') readList() else SExpr.Atom(readToken())
-    }
-
-    private fun readList(): SExpr.SList {
-        expect('(')
-        val items = ArrayList<SExpr>()
+        if (src[pos] != '(') return SExpr.Atom(readToken())
+        // Iterative nesting via an explicit stack: SMT-LIB formulas nest thousands of lists deep,
+        // which overflows a recursive-descent reader.
+        val stack = ArrayDeque<ArrayList<SExpr>>()
         while (true) {
             skipWs()
             require(pos < src.length) { "unterminated list" }
-            if (src[pos] == ')') {
-                pos++
-                break
+            when (src[pos]) {
+                '(' -> {
+                    pos++
+                    stack.addLast(ArrayList())
+                }
+
+                ')' -> {
+                    pos++
+                    val list = SExpr.SList(stack.removeLast())
+                    if (stack.isEmpty()) return list
+                    stack.last().add(list)
+                }
+
+                else -> stack.last().add(SExpr.Atom(readToken()))
             }
-            items.add(readExpr())
         }
-        return SExpr.SList(items)
     }
 
     private fun readToken(): String {
         val start = pos
-        while (pos < src.length && !src[pos].isWhitespace() && src[pos] != '(' && src[pos] != ')') pos++
-        return src.substring(start, pos)
-    }
+        when (src[pos]) {
+            // Quoted symbol |...| — may contain whitespace and parentheses; runs to the next '|'.
+            '|' -> {
+                pos++
+                while (pos < src.length && src[pos] != '|') pos++
+                require(pos < src.length) { "unterminated |quoted symbol|" }
+                pos++
+            }
 
-    private fun expect(c: Char) {
-        require(pos < src.length && src[pos] == c) { "expected '$c' at $pos" }
-        pos++
+            // String literal "..." with "" as an embedded-quote escape.
+            '"' -> {
+                pos++
+                while (pos < src.length) {
+                    if (src[pos] == '"') {
+                        if (pos + 1 < src.length && src[pos + 1] == '"') pos += 2 else break
+                    } else {
+                        pos++
+                    }
+                }
+                require(pos < src.length) { "unterminated string literal" }
+                pos++
+            }
+
+            else -> while (pos < src.length && !src[pos].isWhitespace() && src[pos] != '(' && src[pos] != ')') pos++
+        }
+        return src.substring(start, pos)
     }
 
     private fun skipWs() {
