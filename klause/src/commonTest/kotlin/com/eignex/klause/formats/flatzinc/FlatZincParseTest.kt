@@ -154,6 +154,22 @@ class FlatZincParseTest {
     }
 
     @Test
+    fun `count_eq over a par int array counts the constant matches`() {
+        // MiniZinc emits `count` over a fixed array as a var-array builtin whose array is a par
+        // constant array; each constant must be coerced to a fixed var. Here [1,2,2,3] has two 2s.
+        val src = """
+            array [1..4] of int: xs = [1, 2, 2, 3];
+            var 0..4: n;
+            constraint count_eq(xs, 2, n);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        assertNotNull(sample)
+        assertEquals(2, sample.ints[program.intVarsByName.getValue("n")])
+    }
+
+    @Test
     fun `all_different_int`() {
         val src = """
             array [1..3] of var 0..2: xs;
