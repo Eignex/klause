@@ -133,6 +133,17 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `in accepts a set-call operand`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><var id="x"> 0..9 </var></variables>
+            <constraints><intension> in(x,set(2,4,6)) </intension><intension> gt(x,3) </intension></constraints></instance>
+            """.trimIndent(),
+        )
+        assertTrue(v[0] in setOf(4, 6), "x must be in set(2,4,6) and > 3: x=${v[0]}")
+    }
+
+    @Test
     fun `sum condition with a set constrains the total to a member`() {
         val v = sat(
             """

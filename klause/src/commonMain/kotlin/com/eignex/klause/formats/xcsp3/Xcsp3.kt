@@ -414,9 +414,17 @@ object Xcsp3 {
 
         /** `in(expr, {set})`: a literal true iff the expression takes one of the set's values. */
         private fun memberLit(e: FExpr.Call): Int {
-            val set = e.args[1] as? FExpr.SetLit ?: throw UnsupportedXcsp3Exception("in: right side is not a set")
+            val values = setValues(e.args[1]) ?: throw UnsupportedXcsp3Exception("in: right side is not a set")
             val m = materializeVar(linear(e.args[0]))
-            return tseitinOr(set.values.map { reifyLinear(intArrayOf(1), intArrayOf(m), LinearOp.EQ, it) })
+            return tseitinOr(values.map { reifyLinear(intArrayOf(1), intArrayOf(m), LinearOp.EQ, it) })
+        }
+
+        /** The integer members of a set operand: a `{v, …}` literal or a `set(v, …)` call. Null when
+         *  the operand is not a constant set (e.g. a set variable), which the caller rejects. */
+        private fun setValues(node: FExpr): List<Int>? = when {
+            node is FExpr.SetLit -> node.values
+            node is FExpr.Call && node.fn == "set" -> node.args.map { (it as? FExpr.Num)?.value ?: return null }
+            else -> null
         }
 
         override var trueLitCache = -1
