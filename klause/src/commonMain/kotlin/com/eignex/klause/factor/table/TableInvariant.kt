@@ -171,7 +171,7 @@ internal fun tableRescanForChange(
             if (d < minD) minD = d
         }
     } else {
-        val cols = multiColumnsByVar[intVar]!!
+        val cols = multiColumnsByVar.getValue(intVar)
         for (row in 0 until numTuples) {
             val base = row * arity
             var d = s.dist[row]
