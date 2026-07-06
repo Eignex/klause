@@ -480,6 +480,21 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `element with a condition constrains the selected value`() {
+        // t = [1,3,1]; only index 1 selects a value > 2, so the condition forces i = 1.
+        val v = sat(
+            """
+            <instance type="CSP"><variables><array id="t" size="[3]"> 1..3 </array><var id="i"> 0..2 </var></variables>
+            <constraints>
+              <instantiation><list> t[] </list><values> 1 3 1 </values></instantiation>
+              <element><list> t[] </list><index> i </index><condition> (gt,2) </condition></element>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(1, v[3], "only index 1 selects a value > 2")
+    }
+
+    @Test
     fun `channel maps to Inverse and the permutation is consistent`() {
         val xml = """
             <instance type="CSP">
