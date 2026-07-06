@@ -88,7 +88,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
         ),
     )
 
-    "all_different_int", "klause_all_different_int" -> emitAllDifferent(c)
+    "all_different_int", "fzn_all_different_int", "klause_all_different_int" -> emitAllDifferent(c)
 
     "alldifferent_except_0", "fzn_alldifferent_except_0", "klause_alldifferent_except_0" ->
         emitAllDifferentExceptZero(c)
