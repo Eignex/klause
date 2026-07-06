@@ -68,7 +68,7 @@ internal class DoubleParam(
 
 /**
  * A declared search space: an ordered list of [params] (earlier ones gate later conditionals). A
- * decoder in the concrete space (e.g. [LsConfigSpace]) turns a sampled assignment into a solver recipe.
+ * decoder in the concrete space (e.g. [LocalSearchConfigSpace]) turns a sampled assignment into a solver recipe.
  */
 internal open class ConfigSpace(val params: List<ConfigParam>) {
     /** A lazy random point: draw each active param in declaration order, so a param's [activeIn] sees

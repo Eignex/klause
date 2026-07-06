@@ -5,14 +5,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class LsConfigSpaceTest {
+class LocalSearchConfigSpaceTest {
 
     @Test
     fun `sampled points gate family knobs and every family decodes to a recipe`() {
         val rng = Random(1)
         val families = mutableSetOf<String>()
         repeat(1000) {
-            val a = LsConfigSpace.sample(rng)
+            val a = LocalSearchConfigSpace.sample(rng)
             val fam = a["family"] as String
             families += fam
             fun hasPrefix(prefix: String) = a.keys.any { k -> k.startsWith(prefix) }
@@ -22,7 +22,7 @@ class LsConfigSpaceTest {
             assertEquals(fam == "walksat", hasPrefix("walksat."), "walksat knobs gated: $a")
             assertEquals(fam == "sa", hasPrefix("sa."), "sa knobs gated: $a")
             // Every sampled point decodes to a fresh recipe without throwing.
-            val recipe = LsConfigSpace.toRecipe(a)
+            val recipe = LocalSearchConfigSpace.toRecipe(a)
             assertTrue(recipe.label.startsWith("cfg/"), recipe.label)
         }
         assertEquals(
@@ -42,8 +42,8 @@ class LsConfigSpaceTest {
             "cbls.tabu" to 10,
             "cbls.scoring" to "weighted",
         )
-        val r1 = LsConfigSpace.toRecipe(a)
-        val r2 = LsConfigSpace.toRecipe(a)
+        val r1 = LocalSearchConfigSpace.toRecipe(a)
+        val r2 = LocalSearchConfigSpace.toRecipe(a)
         assertEquals(r1.label, r2.label, "same assignment -> same label")
         assertTrue(r1.strategy !== r2.strategy, "fresh strategy instances (no shared mutable state)")
         assertTrue(r1.optimizeStrategy != null, "cbls uses the unified minimize path")

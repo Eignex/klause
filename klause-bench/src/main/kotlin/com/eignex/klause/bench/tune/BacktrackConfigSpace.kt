@@ -18,9 +18,9 @@ import com.eignex.klause.backtrack.selector.Vsids
  * The backtrack config search space (task #21) — variable/value selectors × restart cadence × phase
  * saving × LP emphasis/plan × learned-DB knobs as a lazy [ConfigSpace], decoded into [BacktrackParams]
  * by [toParams] over a preset base. The BO searches this directly; each evaluated point builds one
- * params object on demand (the backtrack analogue of [LsConfigSpace]).
+ * params object on demand (the backtrack analogue of [LocalSearchConfigSpace]).
  */
-internal object BtConfigSpace : ConfigSpace(PARAMS) {
+internal object BacktrackConfigSpace : ConfigSpace(PARAMS) {
 
     /** Decode a sampled assignment into [BacktrackParams] on top of the chosen preset base. */
     fun toParams(a: Map<String, Any>): BacktrackParams {
@@ -72,7 +72,7 @@ private fun lpOn(): (Map<String, Any>) -> Boolean = { it["lp.emphasis"] != "off"
 private val PARAMS: List<ConfigParam> = listOf(
     CategoricalParam("preset", listOf("conflictDriven", "satOptimized", "free")),
     // NOTE: domwdeg/activity var-selectors and the impact val-selector are `internal` in klause
-    // (not exposable across modules) — add them once they're public or BtConfigSpace moves into klause.
+    // (not exposable across modules) — add them once they're public or BacktrackConfigSpace moves into klause.
     CategoricalParam("var-selector", listOf("vsids", "last-conflict-vsids", "chb", "smallest-domain")),
     CategoricalParam("val-selector", listOf("min", "max", "solution-guided")),
     CategoricalParam("luby", listOf("off", "128", "256", "512")),

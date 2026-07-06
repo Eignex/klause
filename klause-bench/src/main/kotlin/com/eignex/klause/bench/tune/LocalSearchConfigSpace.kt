@@ -30,7 +30,7 @@ import com.eignex.klause.localsearch.strategy.WalkSat
  * cap is inactive for a ProbSat point. This replaces the fixed 4-axis RecipeSpace + strategy=sweep
  * MAB: the BO searches this space directly and each evaluated point builds one recipe on demand.
  */
-internal object LsConfigSpace : ConfigSpace(PARAMS) {
+internal object LocalSearchConfigSpace : ConfigSpace(PARAMS) {
 
     /** Decode a sampled assignment into a fresh [LsRecipe]. Family-routed to the public strategy
      *  factories; CBLS/SA use the unified minimize path (a second fresh strategy for the optimize
