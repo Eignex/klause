@@ -170,7 +170,22 @@ object BenchCli {
         val harvested = dir.listFiles { file -> file.extension == "json" }?.mapNotNull { jsonFile ->
             val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
             if (rec != null && rec.kind == "optimize" && rec.objective != null) {
-                ReferenceEntry(rec.problem, rec.maximize, rec.objective, rec.proven, rec.solver, rec.budgetMs)
+                // Proof time when proven (the solver's `solveTime`, seconds -> ms), else the budget it
+                // ran out (a timeout stores the full budget, a fast proof stores its real time).
+                val elapsedMs = if (rec.proven) {
+                    rec.stats["solveTime"]?.toDoubleOrNull()?.let { (it * 1000).toLong() } ?: rec.budgetMs
+                } else {
+                    rec.budgetMs
+                }
+                ReferenceEntry(
+                    rec.problem,
+                    rec.maximize,
+                    rec.objective,
+                    rec.proven,
+                    elapsedMs,
+                    rec.solver,
+                    rec.budgetMs,
+                )
             } else {
                 null
             }
