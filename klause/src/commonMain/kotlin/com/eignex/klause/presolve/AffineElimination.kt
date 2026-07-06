@@ -804,13 +804,13 @@ private fun Long.overflowsInt(): Boolean = this < Int.MIN_VALUE || this > Int.MA
 private fun foldRowOverflowsInt(f: Linear, x: Int, termVars: IntArray, termCoeffs: IntArray, constTerm: Int): Boolean {
     val xi = f.vars.indexOf(x)
     if (xi < 0) return false
-    val cX = f.coeffs[xi].toLong()
-    if ((f.bound.toLong() - cX * constTerm).overflowsInt()) return true
+    val cX = f.coeffs[xi]
+    if ((f.bound - cX * constTerm).overflowsInt()) return true
     for (k in termVars.indices) {
         val prod = cX * termCoeffs[k]
         if (prod.overflowsInt()) return true
         val yi = f.vars.indexOf(termVars[k])
-        if (yi >= 0 && (f.coeffs[yi].toLong() + prod).overflowsInt()) return true
+        if (yi >= 0 && (f.coeffs[yi] + prod).overflowsInt()) return true
     }
     return false
 }

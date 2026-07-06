@@ -688,7 +688,7 @@ internal class CpToLpRelaxation(
                 if (f.vars.size < 2 || f.vars.size > MAX_RLT_ROW) continue
                 if (f.bound < 0 || f.coeffs.any { it <= 0 }) continue
                 if (f.vars.any { problem.intDomains[it].min != 0 || problem.intDomains[it].max != 1 }) continue
-                val b = f.bound.toLong()
+                val b = f.bound
                 for (iIdx in f.vars.indices) {
                     if (rltColumns >= MAX_RLT_COLUMNS) break
                     val xi = f.vars[iIdx]
@@ -696,7 +696,7 @@ internal class CpToLpRelaxation(
                     val rltRow = MutableIntLongMap() // coalesces the wᵢᵢ = xᵢ term with the −b·xᵢ term
                     for (kIdx in f.vars.indices) {
                         val xk = f.vars[kIdx]
-                        val a = f.coeffs[kIdx].toLong()
+                        val a = f.coeffs[kIdx]
                         val wCol = if (kIdx == iIdx) {
                             xiCol // wᵢᵢ = xᵢ²= xᵢ
                         } else {
