@@ -2,9 +2,9 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.Serializable
 import java.io.File
 
 /**
@@ -18,6 +18,9 @@ internal data class ReferenceEntry(
     val maximize: Boolean,
     val objective: Double?,
     val proven: Boolean,
+    /** How long the reference took: the solver's proof time when [proven], else the full [budgetMs]
+     *  it exhausted (a timeout). So a fast proof stores its real time and a timeout stores the budget. */
+    val elapsedMs: Long,
     val solver: String,
     val budgetMs: Long,
 )
@@ -47,8 +50,16 @@ internal object ReferenceStore {
         for (e in incoming) {
             val old = table[e.problem]
             when {
-                old == null -> { table[e.problem] = e; added++ }
-                isBetter(e, old) -> { table[e.problem] = e; tightened++ }
+                old == null -> {
+                    table[e.problem] = e
+                    added++
+                }
+
+                isBetter(e, old) -> {
+                    table[e.problem] = e
+                    tightened++
+                }
+
                 else -> unchanged++
             }
         }
