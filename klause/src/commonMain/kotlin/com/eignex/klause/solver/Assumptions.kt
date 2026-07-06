@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -505,7 +506,7 @@ class Assumptions internal constructor(
     companion object {
         /** The empty assumption set (nothing pinned). */
         val None: Assumptions =
-            Assumptions(EmptyIntArray, BooleanArray(0), EmptyIntArray, EmptyIntArray)
+            Assumptions(EmptyIntArray, EmptyBooleanArray, EmptyIntArray, EmptyIntArray)
 
         /** Map-based factory. Call sites use `Assumptions(bools = mapOf(0 to true))`;
          *  internally normalises to the primitive sorted-array form. */

@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -39,7 +40,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     // var space (bool vars + atoms) for the current analysis; all loops bound by it, since
     // a buffer may be larger than the current universe after a deeper earlier conflict.
     private var universe = 0
-    private var seen = BooleanArray(0)
+    private var seen = EmptyBooleanArray
 
     // Per-analysis memo of atomLevelForConflict (#561). Within one analysis the search path is
     // frozen — domains are never mutated, only the implication graph is walked — so an atom's
@@ -59,7 +60,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     // mentions B and vice-versa). Once a var has been resolved we must never re-ingest it, or the
     // 1UIP loop ping-pongs forever (and grows [bumpIntVars] until OOM). In the acyclic bool case
     // this never triggers.
-    private var resolved = BooleanArray(0)
+    private var resolved = EmptyBooleanArray
 
     // Variables encountered (resolved through or kept) during the most recent analysis —
     // the canonical CDCL VSIDS bump set (MiniSAT/Glucose bump every var seen while walking
