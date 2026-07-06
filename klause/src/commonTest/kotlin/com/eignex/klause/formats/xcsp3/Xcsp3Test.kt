@@ -81,6 +81,31 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `star in a support tuple allows any value in that column`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><var id="a"> 0..1 </var><var id="b"> 0..1 </var></variables>
+            <constraints>
+              <extension><list> a b </list><supports> (0,*)(1,1) </supports></extension>
+              <intension> eq(a,1) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(1, v[1]) // a=1 leaves only the (1,1) tuple
+    }
+
+    @Test
+    fun `star in a conflict tuple forbids the whole column`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><var id="a"> 0..1 </var><var id="b"> 0..1 </var></variables>
+            <constraints><extension><list> a b </list><conflicts> (1,*) </conflicts></extension></constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(0, v[0]) // every (1,*) tuple is forbidden
+    }
+
+    @Test
     fun `boolean intension or of relations is reified and solved`() {
         val xml = """
             <instance type="CSP">
