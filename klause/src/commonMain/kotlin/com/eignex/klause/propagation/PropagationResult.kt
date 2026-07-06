@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.binarySearchInt
 
 /**
@@ -207,12 +208,12 @@ sealed interface PropagationResult {
             other.forEachBool { k, v -> bools[k] = v }
             val ints = HashMap(ints)
             other.forEachInt { k, v -> ints[k] = v }
-            val mins = HashMap<Int, Int>()
-            forEachIntMin { k, v -> mins[k] = v }
-            other.forEachIntMin { k, v -> mins[k] = maxOf(mins[k] ?: Int.MIN_VALUE, v) }
-            val maxes = HashMap<Int, Int>()
-            forEachIntMax { k, v -> maxes[k] = v }
-            other.forEachIntMax { k, v -> maxes[k] = minOf(maxes[k] ?: Int.MAX_VALUE, v) }
+            val mins = MutableIntIntMap()
+            forEachIntMin { k, v -> mins.put(k, v) }
+            other.forEachIntMin { k, v -> mins.put(k, maxOf(mins.getOrDefault(k, Int.MIN_VALUE), v)) }
+            val maxes = MutableIntIntMap()
+            forEachIntMax { k, v -> maxes.put(k, v) }
+            other.forEachIntMax { k, v -> maxes.put(k, minOf(maxes.getOrDefault(k, Int.MAX_VALUE), v)) }
             val holes = HashSet<Long>()
             forEachIntHole { id, v -> holes.add(packHole(id, v)) }
             other.forEachIntHole { id, v -> holes.add(packHole(id, v)) }
@@ -238,30 +239,30 @@ sealed interface PropagationResult {
 
         /** This implied set with int [v]'s lower bound raised to at least [newMin]. */
         fun withMin(v: Int, newMin: Int): Implied {
-            val mins = HashMap<Int, Int>()
-            forEachIntMin { k, vv -> mins[k] = vv }
-            mins[v] = maxOf(mins[v] ?: Int.MIN_VALUE, newMin)
-            val maxes = HashMap<Int, Int>()
-            forEachIntMax { k, vv -> maxes[k] = vv }
+            val mins = MutableIntIntMap()
+            forEachIntMin { k, vv -> mins.put(k, vv) }
+            mins.put(v, maxOf(mins.getOrDefault(v, Int.MIN_VALUE), newMin))
+            val maxes = MutableIntIntMap()
+            forEachIntMax { k, vv -> maxes.put(k, vv) }
             return build(bools, ints, mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with int [v]'s upper bound lowered to at most [newMax]. */
         fun withMax(v: Int, newMax: Int): Implied {
-            val mins = HashMap<Int, Int>()
-            forEachIntMin { k, vv -> mins[k] = vv }
-            val maxes = HashMap<Int, Int>()
-            forEachIntMax { k, vv -> maxes[k] = vv }
-            maxes[v] = minOf(maxes[v] ?: Int.MAX_VALUE, newMax)
+            val mins = MutableIntIntMap()
+            forEachIntMin { k, vv -> mins.put(k, vv) }
+            val maxes = MutableIntIntMap()
+            forEachIntMax { k, vv -> maxes.put(k, vv) }
+            maxes.put(v, minOf(maxes.getOrDefault(v, Int.MAX_VALUE), newMax))
             return build(bools, ints, mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with interior [value] excluded from int [v]'s domain (`v ≠ value`). */
         fun withHole(v: Int, value: Int): Implied {
-            val mins = HashMap<Int, Int>()
-            forEachIntMin { k, vv -> mins[k] = vv }
-            val maxes = HashMap<Int, Int>()
-            forEachIntMax { k, vv -> maxes[k] = vv }
+            val mins = MutableIntIntMap()
+            forEachIntMin { k, vv -> mins.put(k, vv) }
+            val maxes = MutableIntIntMap()
+            forEachIntMax { k, vv -> maxes.put(k, vv) }
             val holes = holeSet()
             holes.add(packHole(v, value))
             return build(bools, ints, mins, maxes, holes, setMap())
@@ -310,6 +311,14 @@ sealed interface PropagationResult {
             private fun packHole(id: Int, value: Int): Long =
                 (id.toLong() shl HOLE_ID_SHIFT) or (value.toLong() and HOLE_VALUE_MASK)
 
+            private fun sortedKeys(m: MutableIntIntMap): IntArray {
+                val ks = IntArray(m.size)
+                var i = 0
+                m.forEach { k, _ -> ks[i++] = k }
+                ks.sort()
+                return ks
+            }
+
             /** Materialise an [Implied] from the accumulation maps used by [merge] / [withMin] / [withMax] /
              *  [withHole], emitting the key-sorted parallel arrays the constructor expects. [sets] maps a
              *  variable to its ascending survivor values; they are emitted as the CSR
@@ -317,13 +326,13 @@ sealed interface PropagationResult {
             private fun build(
                 bools: Map<Int, Boolean>,
                 ints: Map<Int, Int>,
-                mins: Map<Int, Int>,
-                maxes: Map<Int, Int>,
+                mins: MutableIntIntMap,
+                maxes: MutableIntIntMap,
                 holes: Set<Long>,
                 sets: Map<Int, IntArray> = emptyMap(),
             ): Implied {
-                val minK = mins.keys.toIntArray().also { it.sort() }
-                val maxK = maxes.keys.toIntArray().also { it.sort() }
+                val minK = sortedKeys(mins)
+                val maxK = sortedKeys(maxes)
                 val holesSorted = holes.toLongArray().also { it.sort() }
                 val setK = sets.keys.toIntArray().also { it.sort() }
                 val setOffsets = IntArray(setK.size + 1)
@@ -335,9 +344,9 @@ sealed interface PropagationResult {
                     bools = bools,
                     ints = ints,
                     intMinKeys = minK,
-                    intMinValues = IntArray(minK.size) { mins.getValue(minK[it]) },
+                    intMinValues = IntArray(minK.size) { mins.getOrDefault(minK[it], 0) },
                     intMaxKeys = maxK,
-                    intMaxValues = IntArray(maxK.size) { maxes.getValue(maxK[it]) },
+                    intMaxValues = IntArray(maxK.size) { maxes.getOrDefault(maxK[it], 0) },
                     intHoleVarIds = IntArray(holesSorted.size) { (holesSorted[it] ushr HOLE_ID_SHIFT).toInt() },
                     intHoleValues = IntArray(holesSorted.size) { holesSorted[it].toInt() },
                     intSetKeys = if (setK.isEmpty()) EmptyIntArray else setK,

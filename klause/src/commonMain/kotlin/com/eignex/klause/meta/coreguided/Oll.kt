@@ -13,6 +13,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Shared OLL (relax-by-selector) scaffolding for the core-guided MaxSAT drivers
@@ -56,10 +57,11 @@ internal object Oll {
     /** Project an assumption-[core] back to soft indices: the softs whose selector the core
      *  pins to `false` (matching the "soft satisfied ⇒ selector assumed false" shape).
      *  [selectorToSoft] maps each selector var id to its soft index. */
-    fun projectCoreToSofts(core: Assumptions, selectorToSoft: Map<Int, Int>): IntArray {
+    fun projectCoreToSofts(core: Assumptions, selectorToSoft: MutableIntIntMap): IntArray {
         val out = IntArrayList()
         for (i in core.boolKeys.indices) {
-            val softIdx = selectorToSoft[core.boolKeys[i]] ?: continue
+            val softIdx = selectorToSoft.getOrDefault(core.boolKeys[i], -1)
+            if (softIdx < 0) continue
             // Only selectors the core pins to `false` correspond to a satisfied-soft
             // assumption the core refuted.
             if (!core.boolValues[i]) out.add(softIdx)
