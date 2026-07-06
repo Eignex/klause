@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.ArmCalibration
 import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.KlauseSearch
@@ -12,6 +13,7 @@ import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
+import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -169,14 +171,20 @@ object BenchCli {
      *  Optimize instances only (pass `kind=cop`); match the cached run's `timeout=` to replay it. */
     private fun reference(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
-        val refs = select(f).filter { it.format == Format.MINIZINC }
+        // cp-sat solves MiniZinc via `minizinc --solver` and XCSP3 via the CPMpy container (OR-Tools has
+        // no XCSP3 frontend); both are cp-sat. Other formats have no reference path.
+        val refs = select(f).filter { it.format == Format.MINIZINC || it.format == Format.XCSP3 }
         if (refs.isEmpty()) {
-            println("(no MiniZinc problems matched the selection)")
+            println("(no MiniZinc/XCSP3 problems matched the selection)")
             return
         }
         val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
-        require(SolverInvocation.referenceAvailable(backend)) {
+        require(refs.none { it.format == Format.MINIZINC } || SolverInvocation.referenceAvailable(backend)) {
             "reference solver '$backend' is not registered with minizinc (`minizinc --solvers`)"
+        }
+        require(refs.none { it.format == Format.XCSP3 } || Xcsp3CpSatReference.imageAvailable()) {
+            "XCSP3 reference needs the ${Xcsp3CpSatReference.IMAGE} image " +
+                "(build it: docker build -t ${Xcsp3CpSatReference.IMAGE} klause-bench/xcsp3-cpsat)"
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         // `workers=` pins each cp-sat/choco job to that many search workers (default 1): without it the
@@ -219,16 +227,24 @@ object BenchCli {
         counter: AtomicInteger,
         total: Int,
     ): ReferenceEntry? = runCatching {
-        val (optimize, maximize) = solveKind(ref)
-        val key = BenchCache.keyFor(ref, backend, budget)
-        val r = BenchCache.load(key)
-            ?: SolverInvocation.runReference(
-                ref,
-                backend,
-                settings,
-                budget,
-                optimize,
-            ).also { BenchCache.store(key, it) }
+        // XCSP3 is solved by the CPMpy cp-sat container (OR-Tools reads no XCSP3); MiniZinc by
+        // `minizinc --solver`. Both cache under [BenchCache] and flow through the same scoring below.
+        val xcsp3 = ref.format == Format.XCSP3
+        val key = BenchCache.keyFor(ref, if (xcsp3) "$backend-xcsp3" else backend, budget)
+        val cached = BenchCache.load(key)
+        val r: SolverInvocation.Result
+        val maximize: Boolean
+        if (xcsp3) {
+            r = cached ?: Xcsp3CpSatReference.run(ref, budget).also { BenchCache.store(key, it) }
+            // Objective sense is unknowable without parsing the model; the container carries it in stats.
+            maximize = r.stats["maximize"].toBoolean()
+        } else {
+            // MiniZinc: read (optimize, maximize) from the model's solve item.
+            val (optimize, max) = solveKind(ref)
+            r = cached ?: SolverInvocation.runReference(ref, backend, settings, budget, optimize)
+                .also { BenchCache.store(key, it) }
+            maximize = max
+        }
         // Proof time when proven (the solver's `solveTime`, seconds -> ms); for an unproven feasible
         // witness the time-to-first-feasible (the CSP metric); a pure timeout stores the full budget.
         val solveMs = r.stats["solveTime"]?.toDoubleOrNull()?.let { (it * 1000).toLong() }
@@ -247,6 +263,7 @@ object BenchCli {
         // Decisive = a witness (SAT) or a proof (optimum / UNSAT); a pure timeout stores nothing.
         if (r.feasible == true || r.proven) {
             ReferenceEntry(
+                suiteOf(ref),
                 ref.name,
                 maximize,
                 r.objective,
@@ -262,6 +279,16 @@ object BenchCli {
     }.getOrElse {
         println("?? ${ref.name} ERROR: ${it.message ?: it::class.simpleName}")
         null
+    }
+
+    /** The instance's corpus id, for the reference table key (see [ReferenceEntry.suite]) — the source
+     *  collection for a fetched corpus, else a path-derived label. Distinguishes same-named instances
+     *  across corpora (e.g. a `queens` in hakank vs the XCSP3 archive). */
+    private fun suiteOf(ref: ProblemRef): String = when (val s = ref.source) {
+        is ProblemSource.External -> s.collection.id
+        is ProblemSource.ExternalIndexed -> s.collection.id
+        is ProblemSource.Vendored -> s.workspaceRelPath.substringBeforeLast('/', "vendored")
+        is ProblemSource.InCode -> "in-code"
     }
 
     /** Read `(optimize, maximize)` from the model's `solve` item (comments stripped) so the reference

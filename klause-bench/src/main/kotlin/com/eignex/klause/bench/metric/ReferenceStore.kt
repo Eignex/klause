@@ -14,6 +14,10 @@ import java.io.File
  */
 @Serializable
 internal data class ReferenceEntry(
+    /** The instance's corpus (its source collection id, e.g. `hakank` / `minizinc-benchmarks` /
+     *  `xcsp3-cop-22to25`). Part of the table key: the same [problem] name can occur in different
+     *  corpora, so entries are keyed by (suite, problem), not name alone. */
+    val suite: String,
     val problem: String,
     val maximize: Boolean,
     /** COP: the best/optimal objective (null if only known infeasible). CSP: null (feasibility is in
@@ -41,13 +45,16 @@ internal data class ReferenceEntry(
 internal object ReferenceStore {
     private fun file() = File(CorpusFetcher.workspaceRoot(), "klause-bench/reference/references.json")
 
-    fun load(): Map<String, ReferenceEntry> {
+    /** Table key: (suite, problem) — a bare name is not unique across corpora. */
+    private fun key(e: ReferenceEntry) = e.suite to e.problem
+
+    fun load(): Map<Pair<String, String>, ReferenceEntry> {
         val f = file()
         if (!f.isFile) return emptyMap()
-        return Reports.json.decodeFromString<List<ReferenceEntry>>(f.readText()).associateBy { it.problem }
+        return Reports.json.decodeFromString<List<ReferenceEntry>>(f.readText()).associateBy { key(it) }
     }
 
-    /** Merge [incoming] into the table (virtual-best) and write it back sorted by problem.
+    /** Merge [incoming] into the table (virtual-best) and write it back sorted by (suite, problem).
      *  Returns (added, tightened, unchanged). */
     fun mergeAndSave(incoming: List<ReferenceEntry>): Triple<Int, Int, Int> {
         val table = load().toMutableMap()
@@ -55,15 +62,15 @@ internal object ReferenceStore {
         var tightened = 0
         var unchanged = 0
         for (e in incoming) {
-            val old = table[e.problem]
+            val old = table[key(e)]
             when {
                 old == null -> {
-                    table[e.problem] = e
+                    table[key(e)] = e
                     added++
                 }
 
                 isBetter(e, old) -> {
-                    table[e.problem] = e
+                    table[key(e)] = e
                     tightened++
                 }
 
@@ -72,7 +79,7 @@ internal object ReferenceStore {
         }
         val f = file()
         f.parentFile?.mkdirs()
-        f.writeText(Reports.json.encodeToString(table.values.sortedBy { it.problem }))
+        f.writeText(Reports.json.encodeToString(table.values.sortedWith(compareBy({ it.suite }, { it.problem }))))
         return Triple(added, tightened, unchanged)
     }
 
