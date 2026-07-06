@@ -81,6 +81,23 @@ class SmtLibQfLiaTest {
     }
 
     @Test
+    fun `a deeply nested let chain compiles without overflowing the stack`() {
+        // Generated SMT (e.g. Dartagnan) nests thousands of lets in tail position. Compilation must
+        // unwind the chain iteratively (heap-allocated scope stack), not recurse per let.
+        val depth = 20_000
+        val body = StringBuilder("(declare-const x Int)\n(assert ")
+        val close = StringBuilder()
+        for (i in 0 until depth) {
+            val v = if (i == 0) "(>= x 0)" else "b${i - 1}"
+            body.append("(let ((b$i $v)) ")
+            close.append(')')
+        }
+        body.append("b${depth - 1}").append(close).append(")\n(check-sat)")
+        // Parses and compiles (no StackOverflowError); x >= 0 is asserted through the chain.
+        assertTrue(solve(body.toString())[0] >= 0)
+    }
+
+    @Test
     fun `n-ary distinct over ints maps to AllDifferent and is a permutation`() {
         val text = """
             (declare-const a Int) (declare-const b Int) (declare-const c Int)
