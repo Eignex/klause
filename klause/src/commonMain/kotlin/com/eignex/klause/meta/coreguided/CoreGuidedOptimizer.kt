@@ -15,6 +15,7 @@ import com.eignex.klause.solver.result.SatisfyResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.satisfyUnderAssumptions
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Core-guided MaxSAT optimiser — Fu-Malik MSU3 (unweighted) extended to RC2 (weighted +
@@ -273,8 +274,8 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
     private fun projectCoreToSofts(workings: List<Working>, activeIdx: IntArray, core: Assumptions): IntArray {
         // Map each active soft's initial selector back to its working index, then defer to
         // the shared core projection so both drivers agree on what a core "covers".
-        val selectorToSoft = HashMap<Int, Int>(activeIdx.size)
-        for (i in activeIdx) selectorToSoft[workings[i].initialSelector] = i
+        val selectorToSoft = MutableIntIntMap(activeIdx.size)
+        for (i in activeIdx) selectorToSoft.put(workings[i].initialSelector, i)
         return Oll.projectCoreToSofts(core, selectorToSoft)
     }
 

@@ -183,7 +183,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
 
         val selectorLits = IntArray(n) { Lit.make(selectors[it], positive = true) }
         val weightsInt = IntArray(n) { softs[it].weight.toInt() }
-        val selectorToSoft = HashMap<Int, Int>(n).apply {
+        val selectorToSoft = MutableIntIntMap(n).apply {
             for (i in 0 until n) put(selectors[i], i)
         }
         val costSofts = softs.map { Oll.Soft(it.lit, it.weight) }
