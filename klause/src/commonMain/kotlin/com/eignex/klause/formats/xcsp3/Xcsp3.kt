@@ -6,7 +6,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -451,7 +451,9 @@ object Xcsp3 {
         /** `element` over a constant matrix `M`: `M[i][j] = v` with `<index> i j </index>`, encoded
          *  as a 3-column [Table] over `(i, j, v)` — one tuple per cell. */
         private fun elementMatrix(e: XmlElement, matrix: XmlElement) {
-            val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
+            // Matrix element uses per-axis start indices (defaulting to 0), not a single startIndex.
+            val rowOffset = e.attr("startRowIndex").ifBlank { "0" }.toInt()
+            val colOffset = e.attr("startColIndex").ifBlank { "0" }.toInt()
             val rows = Regex("""\(([^)]*)\)""").findAll(matrix.textContent)
                 .map { m -> m.groupValues[1].split(",").map { it.trim().toInt() } }.toList()
             if (rows.isEmpty()) throw UnsupportedXcsp3Exception("element: empty <matrix>")
@@ -464,8 +466,8 @@ object Xcsp3 {
             val tuples = ArrayList<Int>(rows.sumOf { it.size } * 3)
             for (r in rows.indices) {
                 for (c in rows[r].indices) {
-                    tuples.add(r + offset)
-                    tuples.add(c + offset)
+                    tuples.add(r + rowOffset)
+                    tuples.add(c + colOffset)
                     tuples.add(rows[r][c])
                 }
             }
@@ -483,28 +485,31 @@ object Xcsp3 {
                 2 -> {
                     val f = refList(lists[0].textContent).toIntArray()
                     val g = refList(lists[1].textContent).toIntArray()
-                    // Equal lengths are a bijection (Inverse); unequal lengths are a partial channel
-                    // decomposed to its defining biconditional `∀i,j: f[i]=j ⟺ g[j]=i`.
-                    if (f.size == g.size) factors.add(Inverse(f = f, g = g)) else channelBiconditional(f, g)
+                    // Equal lengths are a bijection (Inverse, Semantics 31: f[i]=j ⟺ g[j]=i). With
+                    // |X| < |Y| the spec (Semantics 32) is a one-way implication only.
+                    when {
+                        f.size == g.size -> factors.add(Inverse(f = f, g = g))
+                        f.size < g.size -> channelPartial(f, g)
+                        else -> throw UnsupportedXcsp3Exception("channel: first list longer violates |X|<|Y|")
+                    }
                 }
 
                 else -> throw UnsupportedXcsp3Exception("channel: only 1- or 2-list forms supported")
             }
         }
 
-        /** Decompose a two-list `channel` into `∀i,j: f[i]=j ⟺ g[j]=i` via reified equalities —
-         *  the definitional (sound, complete) form, used when the lists differ in length so [Inverse]
-         *  (a bijection) does not apply. */
-        private fun channelBiconditional(f: IntArray, g: IntArray) {
-            if (f.size.toLong() * g.size > negTableCap) {
-                throw UnsupportedXcsp3Exception("channel: ${f.size}x${g.size} decomposition exceeds cap")
+        /** A two-list `channel` with `|X| < |Y|` (XCSP3 Semantics 32): the one-way implication
+         *  `∀i,j: x[i]=j ⟹ y[j]=i`. The reverse does NOT hold — entries `y[j]` for `j` never taken
+         *  by any `x[i]` are unconstrained — so unlike the equal-length case this is not a bijection. */
+        private fun channelPartial(x: IntArray, y: IntArray) {
+            if (x.size.toLong() * y.size > negTableCap) {
+                throw UnsupportedXcsp3Exception("channel: ${x.size}x${y.size} decomposition exceeds cap")
             }
-            for (i in f.indices) {
-                for (j in g.indices) {
-                    val fij = reifyLinear(intArrayOf(1), intArrayOf(f[i]), LinearOp.EQ, j) // f[i] = j
-                    val gji = reifyLinear(intArrayOf(1), intArrayOf(g[j]), LinearOp.EQ, i) // g[j] = i
-                    factors.add(Clause(intArrayOf(Lit.negate(fij), gji)))
-                    factors.add(Clause(intArrayOf(fij, Lit.negate(gji))))
+            for (i in x.indices) {
+                for (j in y.indices) {
+                    val xij = reifyLinear(intArrayOf(1), intArrayOf(x[i]), LinearOp.EQ, j) // x[i] = j
+                    val yji = reifyLinear(intArrayOf(1), intArrayOf(y[j]), LinearOp.EQ, i) // y[j] = i
+                    factors.add(Clause(intArrayOf(Lit.negate(xij), yji))) // x[i]=j ⟹ y[j]=i
                 }
             }
         }
@@ -593,19 +598,46 @@ object Xcsp3 {
                 ?: throw UnsupportedXcsp3Exception("cumulative: only constant <lengths> supported")
             val resources = parseInts(e.child("heights")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("cumulative: only constant <heights> supported")
-            val (op, cap) = condition(requireNotNull(e.child("condition")).textContent.trim())
+            val condEl = e.child("condition")
+                ?: throw UnsupportedXcsp3Exception("cumulative: unsupported form (no single <condition>)")
+            val (op, cap) = condition(condEl.textContent.trim())
             if (op != LinearOp.LE) {
                 throw UnsupportedXcsp3Exception(
                     "cumulative: only (le, capacity) conditions supported",
                 )
             }
             factors.add(Cumulative(starts = starts, durations = durations, resources = resources, capacity = cap))
+            // <ends> binds each task's end variable to start + (constant) duration.
+            e.child("ends")?.let { endsEl ->
+                val ends = refList(endsEl.textContent).toIntArray()
+                require(ends.size == starts.size) { "cumulative: <ends>/<origins> length mismatch" }
+                for (i in starts.indices) {
+                    factors.add(Linear(intArrayOf(1, -1), intArrayOf(starts[i], ends[i]), LinearOp.EQ, -durations[i]))
+                }
+            }
         }
 
         private fun circuit(e: XmlElement) {
             val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
             if (offset != 0) throw UnsupportedXcsp3Exception("circuit: only startIndex=0 supported")
-            factors.add(Circuit(succ = refList(listText(e)).toIntArray()))
+            val succ = refList(listText(e)).toIntArray()
+            // XCSP3 `circuit` (Semantics 46) is subcircuit semantics: nodes with succ(i) = i are
+            // excluded (self-looping); the rest form a single cycle. It additionally requires a
+            // circuit of size > 1. [Subcircuit] captures the cycle-over-included-nodes part but also
+            // admits the empty (all-excluded) assignment, so pin the number of participating nodes
+            // (those with succ(i) ≠ i): to <size> when given, else to "at least one" — which, with
+            // Subcircuit's rejection of a lone included node, yields size ≥ 2.
+            factors.add(Subcircuit(succ = succ))
+            val included = IntArray(succ.size) { reifyLinear(intArrayOf(1), intArrayOf(succ[it]), LinearOp.NE, it) }
+            val sizeEl = e.child("size")
+            if (sizeEl != null) {
+                val sizeVar = singleTermVar(sizeEl.textContent.trim())
+                val chans = IntArray(included.size) { litTo01(included[it]) }
+                val coeffs = IntArray(chans.size + 1) { if (it < chans.size) 1 else -1 }
+                factors.add(Linear(coeffs, chans + sizeVar, LinearOp.EQ, 0))
+            } else {
+                factors.add(Clause(included))
+            }
         }
 
         private fun lex(e: XmlElement) {
@@ -648,6 +680,8 @@ object Xcsp3 {
 
         /** All listed variables take the same value. */
         private fun allEqual(e: XmlElement) {
+            // <except> weakens the constraint (listed values are exempt); dropping it would be unsound.
+            if (e.child("except") != null) throw UnsupportedXcsp3Exception("allEqual with <except>")
             val vars = refList(listText(e)).toIntArray()
             for (i in 0 until vars.size - 1) {
                 factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[i + 1]), LinearOp.EQ, 0))
@@ -669,8 +703,11 @@ object Xcsp3 {
          *  variable count (`<occurs>`) among the listed variables. */
         private fun cardinality(e: XmlElement) {
             val vars = listVars(e)
-            val values = parseInts(e.child("values")?.textContent)
+            val valuesEl = requireNotNull(e.child("values"))
+            val values = parseInts(valuesEl.textContent)
                 ?: throw UnsupportedXcsp3Exception("cardinality: non-constant <values>")
+            // closed="true" additionally forbids any variable taking a value outside <values>.
+            val closed = valuesEl.attr("closed").equals("true", ignoreCase = true)
             val occursText = requireNotNull(e.child("occurs")).textContent.trim()
             val occTokens = occursText.split(Regex("\\s+")).filter { it.isNotBlank() }
             val exact = parseInts(occursText)
@@ -680,20 +717,30 @@ object Xcsp3 {
                     require(occTokens.size == values.size) { "cardinality: <values>/<occurs> length mismatch" }
                     val lo = IntArray(occTokens.size) { occTokens[it].substringBefore("..").toInt() }
                     val hi = IntArray(occTokens.size) { occTokens[it].substringAfter("..").toInt() }
-                    factors.add(GlobalCardinality(xs = vars, cover = values, countLow = lo, countHigh = hi))
+                    factors.add(
+                        GlobalCardinality(xs = vars, cover = values, countLow = lo, countHigh = hi, closed = closed),
+                    )
                 }
 
                 // Exact constant occurrences.
                 exact != null -> {
                     require(exact.size == values.size) { "cardinality: <values>/<occurs> length mismatch" }
-                    factors.add(GlobalCardinality(xs = vars, cover = values, countLow = exact, countHigh = exact))
+                    factors.add(
+                        GlobalCardinality(
+                            xs = vars,
+                            cover = values,
+                            countLow = exact,
+                            countHigh = exact,
+                            closed = closed,
+                        ),
+                    )
                 }
 
                 // Variable occurrences (a `<list>`/array reference, possibly a wildcard like `g[]`).
                 else -> {
                     val occVars = refList(occursText).toIntArray()
                     require(occVars.size == values.size) { "cardinality: <values>/<occurs> length mismatch" }
-                    factors.add(GlobalCardinality(xs = vars, cover = values, countVars = occVars))
+                    factors.add(GlobalCardinality(xs = vars, cover = values, countVars = occVars, closed = closed))
                 }
             }
         }
@@ -745,14 +792,22 @@ object Xcsp3 {
                     }
                 }
 
-                // `<condition>`: each bin's total size meets a shared capacity condition.
+                // `<condition>`: each bin's total size meets a shared capacity condition. The spec
+                // quantifies only over used bins; applying the condition to every bin value in range
+                // is a strengthening that is sound only for `le`/`lt` (an empty bin's total 0 always
+                // satisfies `≤ k` for a non-negative capacity). Other operators would force empty bins
+                // to meet a lower bound, so they are rejected rather than mis-encoded.
                 condEl != null -> {
+                    val condText = condEl.textContent.trim()
+                    val (op, _) = condition(condText)
+                    if (op != LinearOp.LE) {
+                        throw UnsupportedXcsp3Exception("binPacking: only a (le/lt, k) <condition> is supported")
+                    }
                     val loBin = items.minOf { domains[it].min }
                     val hiBin = items.maxOf { domains[it].max }
                     if ((hiBin - loBin + 1).toLong() * items.size > negTableCap) {
                         throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
                     }
-                    val condText = condEl.textContent.trim()
                     for (b in loBin..hiBin) {
                         val ind = IntArray(items.size) { i -> eqValue01(items[i], b) }
                         postCondition(sizes.copyOf(), ind, condText)
@@ -777,15 +832,18 @@ object Xcsp3 {
             postCondition(profits, items, conditions[1].textContent.trim())
         }
 
-        /** `nValues`: the number of distinct values taken across the list meets the condition. */
+        /** `nValues`: the number of distinct values taken across the list — excluding any `<except>`
+         *  values — meets the condition. */
         private fun nValues(e: XmlElement) {
-            val cnt = distinctCountVar(listVars(e))
+            val except = (parseInts(e.child("except")?.textContent)?.toSet()).orEmpty()
+            val cnt = distinctCountVar(listVars(e), except)
             postCondition(intArrayOf(1), intArrayOf(cnt), requireNotNull(e.child("condition")).textContent.trim())
         }
 
         /** A fresh int var equal to the count of distinct values taken across [vars], decomposed as
-         *  `Σ used[v]` where `used[v] = 1` iff some variable equals `v`. */
-        private fun distinctCountVar(vars: IntArray): Int {
+         *  `Σ used[v]` where `used[v] = 1` iff some variable equals `v`. Values in [except] are not
+         *  counted (XCSP3 `nValues` with `<except>`). */
+        private fun distinctCountVar(vars: IntArray, except: Set<Int> = emptySet()): Int {
             val loV = vars.minOf { domains[it].min }
             val hiV = vars.maxOf { domains[it].max }
             if ((hiV - loV + 1).toLong() * vars.size > negTableCap) {
@@ -793,6 +851,7 @@ object Xcsp3 {
             }
             val used = ArrayList<Int>()
             for (v in loV..hiV) {
+                if (v in except) continue
                 val eqLits = vars.map { reifyLinear(intArrayOf(1), intArrayOf(it), LinearOp.EQ, v) }
                 used.add(litTo01(tseitinOr(eqLits)))
             }
@@ -836,6 +895,7 @@ object Xcsp3 {
 
         /** 1-D no-overlap (disjunctive): tasks with constant durations share a unit resource, so at
          *  most one runs at a time — a [Cumulative] with unit heights and capacity 1. */
+        @Suppress("ThrowsCount") // one guard per unsupported noOverlap shape
         private fun noOverlap(e: XmlElement) {
             val originsText = requireNotNull(e.child("origins")).textContent
             if ('(' in originsText) throw UnsupportedXcsp3Exception("noOverlap: multi-dimensional form")
@@ -843,6 +903,12 @@ object Xcsp3 {
             val durations = parseInts(e.child("lengths")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("noOverlap: non-constant <lengths>")
             require(durations.size == starts.size) { "noOverlap: <origins>/<lengths> length mismatch" }
+            // The Cumulative encoding lets a zero-length task sit anywhere (it consumes no resource),
+            // which is exactly zeroIgnored="true" (the default). zeroIgnored="false" forbids placing a
+            // zero-length task overlapping others, which this encoding cannot express — reject it.
+            if (e.attr("zeroIgnored").equals("false", ignoreCase = true) && durations.any { it == 0 }) {
+                throw UnsupportedXcsp3Exception("noOverlap: zeroIgnored=false with a zero-length task")
+            }
             factors.add(
                 Cumulative(
                     starts = starts,

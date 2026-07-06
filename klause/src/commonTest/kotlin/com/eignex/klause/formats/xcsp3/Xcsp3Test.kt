@@ -3,7 +3,7 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.circuit.Circuit
+import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.LexLess
@@ -16,6 +16,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class Xcsp3Test {
@@ -397,25 +398,6 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `unequal-length channel enforces the defining biconditional`() {
-        val xml = """
-            <instance format="XCSP3" type="CSP">
-              <variables><array id="x" size="[2]"> 0..2 </array><array id="y" size="[3]"> 0..2 </array></variables>
-              <constraints>
-                <channel><list> x[] </list><list> y[] </list></channel>
-                <intension> eq(x[0],1) </intension>
-                <intension> eq(x[1],2) </intension>
-              </constraints>
-            </instance>
-        """.trimIndent()
-        val v = sat(xml)
-        val x = intArrayOf(v[0], v[1])
-        val y = intArrayOf(v[2], v[3], v[4])
-        // x[i]=j  ⟺  y[j]=i, for all i in 0..1, j in 0..2.
-        for (i in 0..1) for (j in 0..2) assertEquals(x[i] == j, y[j] == i, "biconditional i=$i j=$j")
-    }
-
-    @Test
     fun `intension with a variable product posts a Product and solves`() {
         val xml = """
             <instance format="XCSP3" type="CSP">
@@ -497,23 +479,136 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `circuit forms a single Hamiltonian cycle`() {
+    fun `circuit forms a subcircuit over the participating nodes`() {
         val xml = """
             <instance type="CSP">
               <variables><array id="s" size="[3]"> 0..2 </array></variables>
               <constraints><circuit><list> s[] </list></circuit></constraints>
             </instance>
         """.trimIndent()
-        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Circuit })
+        // XCSP3 circuit is subcircuit semantics: self-loops (s[i]=i) are excluded nodes.
+        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Subcircuit })
         val v = sat(xml)
+        val included = (0..2).filter { v[it] != it }
+        assertTrue(included.isNotEmpty(), "circuit must have size > 1: $v")
         val seen = HashSet<Int>()
-        var cur = 0
-        repeat(3) {
+        var cur = included.first()
+        while (cur !in seen) {
             seen.add(cur)
             cur = v[cur]
         }
-        assertEquals(setOf(0, 1, 2), seen)
-        assertEquals(0, cur)
+        assertEquals(included.toSet(), seen, "participating nodes form exactly one cycle: $v")
+    }
+
+    @Test
+    fun `circuit admits a proper subcircuit with self-loops`() {
+        // 0 and 1 form a 2-cycle; node 2 self-loops (excluded). A Hamiltonian encoding would
+        // wrongly reject this — XCSP3 circuit (Semantics 46) accepts it.
+        val v = sat(
+            """
+            <instance type="CSP">
+              <variables><var id="a"> 1..1 </var><var id="b"> 0..0 </var><var id="c"> 2..2 </var></variables>
+              <constraints><circuit><list> a b c </list></circuit></constraints>
+            </instance>
+            """.trimIndent(),
+        )
+        assertEquals(listOf(1, 0, 2), v.take(3))
+    }
+
+    @Test
+    fun `channel with unequal lengths is a one-way implication`() {
+        // |X| < |Y| (Semantics 32): x_i=j ⇒ y_j=i, but y entries beyond X's range stay free.
+        // Pinning y[2]=0 is satisfiable; the previous biconditional wrongly forced x[0]=2 → UNSAT.
+        val v = sat(
+            """
+            <instance type="CSP">
+              <variables><array id="x" size="[2]"> 0..2 </array><array id="y" size="[3]"> 0..2 </array></variables>
+              <constraints>
+                <channel><list> x[] </list><list> y[] </list></channel>
+                <intension> eq(x[0],0) </intension><intension> eq(x[1],1) </intension>
+                <intension> eq(y[2],0) </intension>
+              </constraints>
+            </instance>
+            """.trimIndent(),
+        )
+        assertEquals(0, v[2], "x[0]=0 ⇒ y[0]=0")
+        assertEquals(1, v[3], "x[1]=1 ⇒ y[1]=1")
+        assertEquals(0, v[4], "y[2] is unconstrained and may be 0")
+    }
+
+    @Test
+    fun `cardinality closed forbids values outside the cover`() {
+        // closed=true forces x ∈ {0,1}; x fixed to 2 ⇒ UNSAT. The open (buggy) form accepted it.
+        val r = BacktrackSolver(
+            Xcsp3.parse(
+                """
+                <instance type="CSP"><variables><var id="x"> 2..2 </var></variables>
+                <constraints><cardinality><list> x </list>
+                  <values closed="true"> 0 1 </values><occurs> 0..1 0..1 </occurs></cardinality></constraints></instance>
+                """.trimIndent(),
+            ).problem,
+        ).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "closed cover forbids x=2: $r")
+    }
+
+    @Test
+    fun `nValues excludes the except values from the count`() {
+        // z=[0,0,3,5]; distinct excluding {0} = {3,5} = 2. Counting 0 (the bug) gives 3 ≠ 2 → UNSAT.
+        val v = sat(
+            """
+            <instance type="CSP"><variables><array id="z" size="[4]"> 0..5 </array></variables>
+            <constraints>
+              <instantiation><list> z[] </list><values> 0 0 3 5 </values></instantiation>
+              <nValues><list> z[] </list><except> 0 </except><condition> (eq,2) </condition></nValues>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(listOf(0, 0, 3, 5), v.take(4))
+    }
+
+    @Test
+    fun `cumulative ends binds each task end to start plus duration`() {
+        val v = sat(
+            """
+            <instance type="CSP">
+              <variables><array id="o" size="[2]"> 0..5 </array><array id="e" size="[2]"> 0..10 </array></variables>
+              <constraints>
+                <cumulative><origins> o[] </origins><lengths> 2 3 </lengths><heights> 1 1 </heights>
+                  <ends> e[] </ends><condition> (le,1) </condition></cumulative>
+                <intension> eq(o[0],0) </intension>
+              </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(2, v[2], "e[0] = o[0] + 2")
+        assertEquals(v[1] + 3, v[3], "e[1] = o[1] + 3")
+    }
+
+    @Test
+    fun `element matrix honors separate row and column start indices`() {
+        // startRowIndex/startColIndex = 1: index (2,2) selects matrix cell [1][1] = 21.
+        val v = sat(
+            """
+            <instance type="CSP"><variables><var id="i"> 1..2 </var><var id="j"> 1..2 </var><var id="v"> 0..99 </var></variables>
+            <constraints>
+              <element startRowIndex="1" startColIndex="1">
+                <matrix> (10,11)(20,21) </matrix><index> i j </index><value> v </value></element>
+              <intension> eq(i,2) </intension><intension> eq(j,2) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(21, v[2])
+    }
+
+    @Test
+    fun `allEqual with except is rejected`() {
+        assertFailsWith<UnsupportedXcsp3Exception> {
+            Xcsp3.parse(
+                """
+                <instance type="CSP"><variables><array id="x" size="[2]"> 0..2 </array></variables>
+                <constraints><allEqual><list> x[] </list><except> 0 </except></allEqual></constraints></instance>
+                """.trimIndent(),
+            )
+        }
     }
 
     @Test
