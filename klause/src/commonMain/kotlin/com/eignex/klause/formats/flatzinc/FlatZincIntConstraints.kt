@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.model.PbOp
@@ -182,6 +183,52 @@ internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
         else -> failHere("unhandled reified int cmp `${c.name}`")
     }
     factors.add(ReifiedLinear(r, coeffs, vars, op, bound))
+}
+
+/** Post a half-reified relation `guard -> C`. [ReifiedLinear] is biconditional-only, so a fresh
+ *  bool `cond` mirrors `C` (`cond <-> C`) and a clause `(!guard | cond)` forces `guard -> cond -> C`.
+ *  When `guard` is false, `cond` floats freely and leaves `C` unconstrained. */
+private fun FlatZincCompiler.postHalfReified(
+    coeffs: IntArray,
+    vars: IntArray,
+    op: LinearOp,
+    bound: Int,
+    guardLit: Int,
+) {
+    val cond = allocBool("__imp_$numBoolVars")
+    factors.add(ReifiedLinear(cond, coeffs, vars, op, bound))
+    factors.add(Clause(intArrayOf(Lit.negate(guardLit), Lit.make(cond, true))))
+}
+
+internal fun FlatZincCompiler.emitIntCmpImp(c: FznConstraint) {
+    require(c.args.size == 3)
+    val a = resolveIntVar(c.args[0])
+    val b = resolveIntVar(c.args[1])
+    val guard = resolveBoolLit(c.args[2])
+    val (op, bound) = when (c.name) {
+        "int_eq_imp" -> LinearOp.EQ to 0
+        "int_ne_imp" -> LinearOp.NE to 0
+        "int_le_imp" -> LinearOp.LE to 0
+        "int_lt_imp" -> LinearOp.LE to -1
+        "int_ge_imp" -> LinearOp.GE to 0
+        "int_gt_imp" -> LinearOp.GE to 1
+        else -> failHere("unhandled half-reified int cmp `${c.name}`")
+    }
+    postHalfReified(intArrayOf(1, -1), intArrayOf(a, b), op, bound, guard)
+}
+
+internal fun FlatZincCompiler.emitIntLinearImp(c: FznConstraint) {
+    require(c.args.size == 4)
+    val coeffs = evalIntConstArray(c.args[0])
+    val vars = evalIntVarArray(c.args[1])
+    val bound = evalIntConst(c.args[2]).toInt()
+    val op = when (c.name) {
+        "int_lin_le_imp" -> LinearOp.LE
+        "int_lin_eq_imp" -> LinearOp.EQ
+        "int_lin_ne_imp" -> LinearOp.NE
+        else -> failHere("unhandled half-reified int linear `${c.name}`")
+    }
+    postHalfReified(coeffs, vars, op, bound, resolveBoolLit(c.args[3]))
 }
 
 internal fun FlatZincCompiler.emitArrayMinMax(c: FznConstraint, max: Boolean) {
