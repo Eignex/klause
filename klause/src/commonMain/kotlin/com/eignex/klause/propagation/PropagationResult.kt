@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
@@ -346,7 +347,7 @@ sealed interface PropagationResult {
             }
 
             /** The empty implied set (nothing forced). */
-            val EMPTY: Implied = Implied(EmptyIntArray, BooleanArray(0), EmptyIntArray, EmptyIntArray)
+            val EMPTY: Implied = Implied(EmptyIntArray, EmptyBooleanArray, EmptyIntArray, EmptyIntArray)
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
              *  normalises to the primitive sorted-array form. Optional bound-tightening

@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 
@@ -30,8 +31,8 @@ internal interface ReasonGraph {
  * per analyzer) instead of reallocating per analysis.
  */
 internal class ClauseMinimizer(private val state: PropagationState, private val graph: ReasonGraph) {
-    private var inClause = BooleanArray(0)
-    private var toDrop = BooleanArray(0)
+    private var inClause = EmptyBooleanArray
+    private var toDrop = EmptyBooleanArray
 
     // Reusable explicit-stack buffers for the iterative [isRedundant] DFS (cleared per call),
     // so deep implication graphs can't overflow the call stack. Three parallel stacks: the
@@ -42,7 +43,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
 
     // Marks variables currently on the [isRedundant] DFS path, so a back-edge (atom antecedent
     // graphs can be cyclic) is detected as a cycle rather than re-pushed forever.
-    private var onPath = BooleanArray(0)
+    private var onPath = EmptyBooleanArray
 
     /** Run both minimization passes on [learned] and return the (possibly shorter) clause. */
     fun reduce(learned: IntArrayList, currentLevel: Int): IntArrayList =
