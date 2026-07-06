@@ -168,6 +168,21 @@ class FlatZincParseTest {
     }
 
     @Test
+    fun `gecode_int_element applies its index offset`() {
+        // gecode_int_element(idx, offset, x, c): c = x[idx - offset] over 0-based x.
+        // idx=2, offset=1, x=[10,20,30] ⇒ x[1] = 20.
+        val src = """
+            var 0..30: c;
+            constraint gecode_int_element(2, 1, [10, 20, 30], c);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        assertNotNull(sample)
+        assertEquals(20, sample.ints[program.intVarsByName.getValue("c")])
+    }
+
+    @Test
     fun `circuit emits a hamiltonian cycle`() {
         // MiniZinc-style 1-indexed circuit: each succ holds a value in [1, n].
         val src = """

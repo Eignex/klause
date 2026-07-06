@@ -164,6 +164,8 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "array_var_int_element" -> emitArrayIntElement(c, varArray = true)
 
+    "gecode_int_element" -> emitGecodeIntElement(c)
+
     "array_bool_element" -> emitArrayBoolElement(c, varArray = false)
 
     "array_var_bool_element" -> emitArrayBoolElement(c, varArray = true)

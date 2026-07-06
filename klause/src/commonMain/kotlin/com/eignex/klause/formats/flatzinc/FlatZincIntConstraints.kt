@@ -165,6 +165,19 @@ internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Bo
     factors.add(Element(idx = idx, result = result, arr = arr, arrIsVars = varArray, indexOffset = 1))
 }
 
+/** Gecode's element with an explicit index offset: `gecode_int_element(idx, idxoffset, x, c)` means
+ *  `c = x[idx − idxoffset]` over the 0-based array `x` (verified against a gecode flatten of `a[i]`:
+ *  `a[2]` with `a=[10,20,30]` emits `gecode_int_element(2, 1, [10,20,30], c)` ⇒ c = x[1] = 20). Maps
+ *  to [Element] with that offset. `x` may hold variables or constant literals. */
+internal fun FlatZincCompiler.emitGecodeIntElement(c: FznConstraint) {
+    require(c.args.size == 4)
+    val idx = resolveIntVar(c.args[0])
+    val idxOffset = evalIntConst(c.args[1]).toInt()
+    val arr = evalIntVarArray(c.args[2])
+    val result = resolveIntVar(c.args[3])
+    factors.add(Element(idx = idx, result = result, arr = arr, arrIsVars = true, indexOffset = idxOffset))
+}
+
 internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
     require(c.args.size == 3)
     val a = resolveIntVar(c.args[0])
