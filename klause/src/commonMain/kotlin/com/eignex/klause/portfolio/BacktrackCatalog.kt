@@ -15,6 +15,7 @@ import com.eignex.klause.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.util.ArmCatalog
 
 /**
  * The public catalog of backtrack (complete-search) arm recipes — the backtrack counterpart of
@@ -182,24 +183,25 @@ object BacktrackCatalog {
         Kind.CSP -> cspOrder
     }
 
-    private fun fromLabel(label: String): BacktrackArm = BacktrackArm.entries.firstOrNull { it.label == label }
-        ?: error("unknown backtrack arm '$label' (have ${labels().joinToString()})")
+    /** The shared string-boundary / order-driven accessors (see [ArmCatalog]); this catalog supplies
+     *  the per-[Kind] order ([rankedArms]) to the pool builders. */
+    private val catalog = ArmCatalog(BacktrackArm.entries, BacktrackArm::label, ::make)
 
     /** Every arm label across both kinds (COP is the superset), for validation and error messages. */
-    fun labels(): List<String> = copOrder.map { it.label }
+    fun labels(): List<String> = catalog.labels(copOrder)
 
     /** Every arm label for [kind], in credit order — for enumerating the pool by name. */
-    fun labels(kind: Kind): List<String> = rankedArms(kind).map { it.label }
+    fun labels(kind: Kind): List<String> = catalog.labels(rankedArms(kind))
 
     /** A fresh recipe for the arm named [label] (the single string boundary — CLI `bt-arm=`, campaigns). */
-    fun byLabel(label: String): BacktrackRecipe = make(fromLabel(label))
+    fun byLabel(label: String): BacktrackRecipe = catalog.byLabel(label)
 
     /** One fresh recipe for every arm of [kind], in credit order. */
-    fun ranked(kind: Kind): List<BacktrackRecipe> = rankedArms(kind).map { make(it) }
+    fun ranked(kind: Kind): List<BacktrackRecipe> = catalog.ranked(rankedArms(kind))
 
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
      *  shape a campaign or the CLI feeds to `PortfolioScenario.btPool`). */
-    fun factories(kind: Kind): List<() -> BacktrackRecipe> = rankedArms(kind).map { arm -> { make(arm) } }
+    fun factories(kind: Kind): List<() -> BacktrackRecipe> = catalog.factories(rankedArms(kind))
 }
 
 /**

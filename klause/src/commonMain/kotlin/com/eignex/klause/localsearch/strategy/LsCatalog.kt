@@ -17,6 +17,7 @@ import com.eignex.klause.localsearch.schedule.Reheating
 import com.eignex.klause.localsearch.schedule.Schedule
 import com.eignex.klause.localsearch.schedule.Segment
 import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.util.ArmCatalog
 
 /**
  * A named local-search recipe: a four-axis [SourceDrivenStrategy] (its restart cadence carried in the
@@ -318,23 +319,24 @@ object LsCatalog {
         LsArm.SaReheatFixed, LsArm.SaPhasedFixed,
     )
 
-    private fun fromLabel(label: String): LsArm = LsArm.entries.firstOrNull { it.label == label }
-        ?: error("unknown LS arm '$label' (have ${LsArm.entries.joinToString { it.label }})")
+    /** The shared string-boundary / order-driven accessors (see [ArmCatalog]); this catalog supplies
+     *  the [ranked] order to the pool builders and keeps its own [diverse]. */
+    private val catalog = ArmCatalog(LsArm.entries, LsArm::label, ::make)
 
     /** A fresh recipe for the arm named [label] (the single string boundary). */
-    fun byLabel(label: String): LsRecipe = make(fromLabel(label))
+    fun byLabel(label: String): LsRecipe = catalog.byLabel(label)
 
     /** Every catalog arm label, in credit order — for enumerating the pool by name (the fair-tester
      *  sweep, the CLI `arm=` selector). */
-    fun labels(): List<String> = ranked.map { it.label }
+    fun labels(): List<String> = catalog.labels(ranked)
 
     /** One fresh recipe for every arm, in credit order. */
-    fun auto(): List<LsRecipe> = ranked.map { make(it) }
+    fun auto(): List<LsRecipe> = catalog.ranked(ranked)
 
     /** Per-arm factories in credit order — each builds a *fresh* recipe. Lets a caller layer axis
      *  edits over the curated pool while still handing every portfolio slot its own instance (the
      *  strategies carry mutable per-search state, so slots must not share one). */
-    fun factories(): List<() -> LsRecipe> = ranked.map { arm -> { make(arm) } }
+    fun factories(): List<() -> LsRecipe> = catalog.factories(ranked)
 
     /** The top-[count] prefix of the credit-ordered pool (wrapping past the pool size). Every slot is
      *  a fresh instance even when arms repeat. */
