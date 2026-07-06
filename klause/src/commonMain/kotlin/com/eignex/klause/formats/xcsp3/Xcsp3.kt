@@ -995,7 +995,10 @@ object Xcsp3 {
         private fun refList(text: String): List<Int> =
             text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }.flatMap { expandRef(it) }
 
-        private fun expandRef(tok: String): List<Int> = expandNames(tok).map { ref(it) }
+        // A `<list>` entry may be a declared variable (possibly a wildcard/range over cells), a
+        // constant, a reified relation, or an arithmetic expression; [termVar] resolves each to an
+        // int var (fast-pathing declared variables) so lists of expressions/constants are supported.
+        private fun expandRef(tok: String): List<Int> = expandNames(tok).map { termVar(it) }
 
         /** Expand an array reference token into the declared cell names it denotes. Each `[...]`
          *  group is a fixed index `[i]`, a range `[lo..hi]`, or a wildcard `[]` (any index), in

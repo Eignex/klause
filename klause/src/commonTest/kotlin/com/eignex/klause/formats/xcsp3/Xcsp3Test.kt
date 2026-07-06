@@ -188,6 +188,17 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `allDifferent over constants and expressions forbids collisions`() {
+        val v = sat(
+            """
+            <instance type="CSP"><variables><var id="x"> 4..6 </var></variables>
+            <constraints><allDifferent> x add(x,1) 5 </allDifferent></constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(6, v[0])
+    }
+
+    @Test
     fun `cardinality enforces the required value occurrences`() {
         val v = sat(
             """
