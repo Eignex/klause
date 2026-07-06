@@ -681,20 +681,65 @@ object Xcsp3 {
         }
 
         private fun lex(e: XmlElement) {
+            val (strict, swap) = lexOp(e)
+            val matrixEl = e.children.firstOrNull { it.tag == "matrix" }
+            if (matrixEl != null) {
+                // lex-matrix / lex2 (Semantics 99): both rows and columns are lexicographically ordered.
+                val rows = matrixRows(matrixEl.textContent)
+                if (rows.size < 2) throw UnsupportedXcsp3Exception("lex: matrix needs at least two rows")
+                val width = rows[0].size
+                require(rows.all { it.size == width }) { "lex: ragged <matrix>" }
+                postLexChain(rows, strict, swap)
+                val cols = List(width) { j -> IntArray(rows.size) { i -> rows[i][j] } }
+                postLexChain(cols, strict, swap)
+                return
+            }
             val lists = e.children.filter { it.tag == "list" }.map { refList(it.textContent).toIntArray() }
             if (lists.size < 2) throw UnsupportedXcsp3Exception("lex: needs at least two lists")
+            postLexChain(lists, strict, swap)
+        }
+
+        /** Parse a lex `<operator>` into (strict, swap): `gt`/`ge` swap the pair so `a ⊙ b` becomes the
+         *  equivalent `b </≤ a`. */
+        private fun lexOp(e: XmlElement): Pair<Boolean, Boolean> {
             val opText = (e.child("operator")?.textContent?.trim() ?: e.attr("operator")).ifBlank { "lt" }
-            val (strict, swap) = when (opText) {
+            return when (opText) {
                 "lt" -> true to false
                 "le" -> false to false
                 "gt" -> true to true
                 "ge" -> false to true
                 else -> throw UnsupportedXcsp3Exception("lex operator '$opText'")
             }
-            for (i in 0 until lists.size - 1) {
-                val a = lists[i]
-                val b = lists[i + 1]
+        }
+
+        /** Post `vectors[i] ⊙ vectors[i+1]` for consecutive vectors as [LexLess] factors. */
+        private fun postLexChain(vectors: List<IntArray>, strict: Boolean, swap: Boolean) {
+            for (i in 0 until vectors.size - 1) {
+                val a = vectors[i]
+                val b = vectors[i + 1]
                 if (swap) factors.add(LexLess(b, a, strict)) else factors.add(LexLess(a, b, strict))
+            }
+        }
+
+        /** Rows of a `<matrix>`: explicit `(a,b)(c,d)` tuples, or a compact 2-D array reference such
+         *  as `x[][]` reshaped from the cells' trailing `[row][col]` indices. */
+        private fun matrixRows(text: String): List<IntArray> {
+            val t = text.trim()
+            if ('(' in t) {
+                return Regex("""\(([^)]*)\)""").findAll(t)
+                    .map { m -> m.groupValues[1].split(",").map { singleTermVar(it.trim()) }.toIntArray() }
+                    .toList()
+            }
+            val idxRe = Regex("""\[(\d+)]""")
+            val cells = t.split(Regex("\\s+")).filter { it.isNotBlank() }.flatMap { expandNames(it) }
+            val byRow = HashMap<Int, MutableList<Pair<Int, Int>>>()
+            for (name in cells) {
+                val idx = idxRe.findAll(name).map { it.groupValues[1].toInt() }.toList()
+                require(idx.size >= 2) { "lex: <matrix> cell '$name' is not 2-D" }
+                byRow.getOrPut(idx[idx.size - 2]) { ArrayList() }.add(idx[idx.size - 1] to ref(name))
+            }
+            return byRow.keys.sorted().map { r ->
+                byRow.getValue(r).sortedBy { it.first }.map { it.second }.toIntArray()
             }
         }
 
