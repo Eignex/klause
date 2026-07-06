@@ -404,6 +404,39 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `noOverlap in two dimensions separates boxes`() {
+        // box0 at (0,0) with a 2x2 footprint; box1 must clear it in x or y.
+        val v = sat(
+            """
+            <instance type="CSP"><variables>
+              <var id="x0"> 0..3 </var><var id="y0"> 0..3 </var><var id="x1"> 0..3 </var><var id="y1"> 0..3 </var>
+            </variables><constraints>
+              <noOverlap><origins> (x0,y0)(x1,y1) </origins><lengths> (2,2)(2,2) </lengths></noOverlap>
+              <intension> eq(x0,0) </intension><intension> eq(y0,0) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertTrue(v[2] >= 2 || v[3] >= 2, "box1 must clear box0's 2x2 footprint: (${v[2]},${v[3]})")
+    }
+
+    @Test
+    fun `noOverlap in two dimensions rejects overlapping boxes`() {
+        // Two 2x2 boxes pinned to (0,0) and (1,1) share cell (1,1) — infeasible.
+        val r = BacktrackSolver(
+            Xcsp3.parse(
+                """
+                <instance type="CSP"><variables>
+                  <var id="x0"> 0..0 </var><var id="y0"> 0..0 </var><var id="x1"> 1..1 </var><var id="y1"> 1..1 </var>
+                </variables><constraints>
+                  <noOverlap><origins> (x0,y0)(x1,y1) </origins><lengths> (2,2)(2,2) </lengths></noOverlap>
+                </constraints></instance>
+                """.trimIndent(),
+            ).problem,
+        ).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "overlapping boxes must be rejected: $r")
+    }
+
+    @Test
     fun `an interval sum condition bounds the total between two values`() {
         val v = sat(
             """

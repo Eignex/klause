@@ -984,7 +984,7 @@ object Xcsp3 {
         @Suppress("ThrowsCount") // one guard per unsupported noOverlap shape
         private fun noOverlap(e: XmlElement) {
             val originsText = requireNotNull(e.child("origins")).textContent
-            if ('(' in originsText) throw UnsupportedXcsp3Exception("noOverlap: multi-dimensional form")
+            if ('(' in originsText) return noOverlapMulti(e, originsText)
             val starts = refList(originsText).toIntArray()
             val durations = parseInts(e.child("lengths")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("noOverlap: non-constant <lengths>")
@@ -1004,6 +1004,48 @@ object Xcsp3 {
                 ),
             )
         }
+
+        /** k-dimensional no-overlap (diffn, Semantics 37): for each pair of boxes there is at least one
+         *  dimension in which one box lies entirely before the other. Origins are variables, lengths
+         *  may be constants or variables. `zeroIgnored="false"` (zero-width boxes may not be placed) is
+         *  not expressible here and is rejected. */
+        private fun noOverlapMulti(e: XmlElement, originsText: String) {
+            if (e.attr("zeroIgnored").equals("false", ignoreCase = true)) {
+                throw UnsupportedXcsp3Exception("noOverlap: zeroIgnored=false not supported for boxes")
+            }
+            val origins = tupleRows(originsText) { ref(it) }
+            val lengths = tupleRows(requireNotNull(e.child("lengths")).textContent) { singleTermVar(it) }
+            require(origins.size == lengths.size) { "noOverlap: <origins>/<lengths> box count mismatch" }
+            if (origins.isEmpty()) return
+            val nDim = origins[0].size
+            require(origins.all { it.size == nDim } && lengths.all { it.size == nDim }) {
+                "noOverlap: inconsistent box dimensionality"
+            }
+            if (origins.size.toLong() * origins.size * nDim > negTableCap) {
+                throw UnsupportedXcsp3Exception("noOverlap: decomposition exceeds cap")
+            }
+            for (i in origins.indices) {
+                for (j in i + 1 until origins.size) {
+                    val seps = ArrayList<Int>(2 * nDim)
+                    for (k in 0 until nDim) {
+                        // box i entirely before box j in dim k: x[i,k] + len[i,k] ≤ x[j,k]
+                        seps.add(reifyLe3(origins[i][k], lengths[i][k], origins[j][k]))
+                        seps.add(reifyLe3(origins[j][k], lengths[j][k], origins[i][k]))
+                    }
+                    factors.add(Clause(seps.toIntArray()))
+                }
+            }
+        }
+
+        /** Reify `a + b ≤ c` (a,b,c variable ids) onto a literal. */
+        private fun reifyLe3(a: Int, b: Int, c: Int): Int =
+            reifyLinear(intArrayOf(1, 1, -1), intArrayOf(a, b, c), LinearOp.LE, 0)
+
+        /** Parse `(t,t,…)(t,t,…)…` tuple rows, resolving each entry with [resolve]. */
+        private fun tupleRows(text: String, resolve: (String) -> Int): List<IntArray> =
+            Regex("""\(([^)]*)\)""").findAll(text.trim())
+                .map { m -> m.groupValues[1].split(",").map { resolve(it.trim()) }.toIntArray() }
+                .toList()
 
         fun objective(e: XmlElement) {
             val maximize = e.tag == "maximize"
