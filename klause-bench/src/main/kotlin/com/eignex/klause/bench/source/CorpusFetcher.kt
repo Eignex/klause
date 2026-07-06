@@ -121,12 +121,27 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
         run("unzip", "-q", "-o", zip.absolutePath, "-d", dir.absolutePath)
         zip.delete()
+        // XCSP3 competition archives ship each instance individually `*.xml.lzma`-compressed; unzip
+        // leaves them packed, so decompress in place to the plain file the front-end reads. A no-op
+        // for archives with no `.lzma` members.
+        decompressLzma(dir)
     }
 
-    private fun run(vararg cmd: String) = run(null, *cmd)
+    /** Decompress every `*.lzma` under [dir] in place (`unlzma` strips the `.lzma` suffix, so
+     *  `foo.xml.lzma` becomes `foo.xml`). Chunked to stay under the argument-length limit. */
+    private fun decompressLzma(dir: File) {
+        val packed = dir.walkTopDown().filter { it.isFile && it.extension == "lzma" }.map { it.absolutePath }.toList()
+        if (packed.isEmpty()) return
+        log("decompressing ${packed.size} .lzma instance(s) in '${dir.name}'")
+        for (chunk in packed.chunked(500)) runCmd(null, listOf("unlzma", "-q", "-f") + chunk)
+    }
 
-    private fun run(workdir: File?, vararg cmd: String) {
-        val pb = ProcessBuilder(*cmd).inheritIO()
+    private fun run(vararg cmd: String) = runCmd(null, cmd.asList())
+
+    private fun run(workdir: File?, vararg cmd: String) = runCmd(workdir, cmd.asList())
+
+    private fun runCmd(workdir: File?, cmd: List<String>) {
+        val pb = ProcessBuilder(cmd).inheritIO()
         if (workdir != null) pb.directory(workdir)
         val rc = pb.start().waitFor()
         require(rc == 0) { "command failed (exit $rc): ${cmd.joinToString(" ")}" }
