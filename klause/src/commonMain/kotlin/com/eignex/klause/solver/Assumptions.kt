@@ -7,6 +7,8 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.toSortedIntArray
+import com.eignex.klause.util.toSortedLongArray
 
 /**
  * Per-call constraint on the solver: pin specific variables to specific values for the
@@ -200,10 +202,10 @@ class Assumptions internal constructor(
         }
         val minKList = IntArrayList(minMap.size)
         minMap.forEach { k, _ -> minKList.add(k) }
-        val minK = minKList.toIntArray().also { it.sort() }
+        val minK = minKList.toSortedIntArray()
         val maxKList = IntArrayList(maxMap.size)
         maxMap.forEach { k, _ -> maxKList.add(k) }
-        val maxK = maxKList.toIntArray().also { it.sort() }
+        val maxK = maxKList.toSortedIntArray()
         // Holes: union of (varId, value) pairs, dropping pinned vars.
         val holeSet = LongHashSet()
         forEachIntHole { id, v -> if (id !in pinned) holeSet.add((id.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)) }
@@ -214,7 +216,7 @@ class Assumptions internal constructor(
                 )
             }
         }
-        val holes = holeSet.toLongArray().also { it.sort() }
+        val holes = holeSet.toSortedLongArray()
         val holeIds = IntArray(holes.size) { (holes[it] ushr 32).toInt() }
         val holeVals = IntArray(holes.size) { holes[it].toInt() }
         // Set-restrictions: per-var survivor sets, [other] winning on overlap (last-write, as with

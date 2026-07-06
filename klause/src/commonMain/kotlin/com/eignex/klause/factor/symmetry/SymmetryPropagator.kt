@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.PermutationGroup
+import com.eignex.klause.util.toSortedIntArray
 
 /**
  * Dynamic symmetry handling: one global propagator for the whole automorphism group, replacing the
@@ -41,7 +42,7 @@ internal class SymmetryPropagator(
     private val supportOrder: IntArray = run {
         val moved = IntHashSet()
         for (p in unified) for (i in p.indices) if (p[i] != i) moved.add(i)
-        moved.toIntArray().also { it.sort() }
+        moved.toSortedIntArray()
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {

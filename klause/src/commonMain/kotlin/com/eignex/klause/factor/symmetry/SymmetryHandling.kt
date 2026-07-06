@@ -9,6 +9,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.PermutationGroup
+import com.eignex.klause.util.toSortedIntArray
 
 /**
  * Whole-group symmetry handling as a single propagator-only factor (#896): it carries the verified
@@ -47,7 +48,7 @@ class SymmetryHandling(
             val map = image(g)
             for (v in map.indices) if (map[v] != v) moved.add(v)
         }
-        return if (moved.isEmpty()) EmptyIntArray else moved.toIntArray().also { it.sort() }
+        return if (moved.isEmpty()) EmptyIntArray else moved.toSortedIntArray()
     }
 
     private val nInt: Int = generators.first().first.size

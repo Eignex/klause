@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.toSortedIntArray
 
 /*
  * Reversible, delta-driven GAC for the constant-array element constraint `result = arr(idx)` — the
@@ -216,7 +217,7 @@ internal class ElementConstState(
         return true
     }
 
-    private fun sortedDistinct(list: IntArrayList): IntArray = list.toIntArray().also { it.sort() }
+    private fun sortedDistinct(list: IntArrayList): IntArray = list.toSortedIntArray()
 
     private companion object {
         val EMPTY = IntArrayList()

@@ -11,6 +11,7 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.toSortedIntArray
 
 /**
  * A local-search acceleration structure (consumed by [LocalSearchSolver]): the topologically-
@@ -311,6 +312,6 @@ class InvariantNetwork internal constructor(
             val n = nodeArr[i]
             if (n.outIsBool) seedBool(n.out) else seedInt(n.out)
         }
-        return marked.toIntArray().also { it.sort() }
+        return marked.toSortedIntArray()
     }
 }

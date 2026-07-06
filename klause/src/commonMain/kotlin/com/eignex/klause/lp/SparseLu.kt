@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntDoubleMap
+import com.eignex.klause.util.toSortedIntArray
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.log2
@@ -259,7 +260,7 @@ internal class SparseLu private constructor(
             val lRowIdx = Array(m) { k ->
                 val keys = IntArrayList()
                 lRowMap[k].forEach { key, _ -> keys.add(key) }
-                keys.toIntArray().also { it.sort() }
+                keys.toSortedIntArray()
             }
             val lRowVal = Array(m) { k ->
                 DoubleArray(lRowIdx[k].size) { t -> lRowMap[k].getOrDefault(lRowIdx[k][t], 0.0) }
