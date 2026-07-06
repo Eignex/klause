@@ -634,7 +634,10 @@ object Xcsp3 {
 
         /** `minimum`/`maximum` of a list constrained by a condition, via [ArrayMinMax] + the condition. */
         private fun minMax(e: XmlElement, max: Boolean) {
-            val vars = listVars(e)
+            // Entries may be plain variables or expressions (e.g. `sub(y,37)`), each resolved to an int var.
+            val vars = requireNotNull(e.child("list")).textContent.trim()
+                .split(Regex("\\s+")).filter { it.isNotBlank() }
+                .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
             val m = newAuxVar(domainMin(vars), domainMin(vars) + domainSpan(vars) - 1)
             factors.add(ArrayMinMax(result = m, xs = vars, max = max))
             postCondition(intArrayOf(1), intArrayOf(m), requireNotNull(e.child("condition")).textContent.trim())
@@ -683,20 +686,58 @@ object Xcsp3 {
         }
 
         /** `binPacking`: item `i` goes to bin `list[i]`; each bin's total item size meets the condition. */
+        @Suppress("ThrowsCount") // one guard per unsupported shape across the loads/limits/condition forms
         private fun binPacking(e: XmlElement) {
             val items = listVars(e)
             val sizes = parseInts(e.child("sizes")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("binPacking: non-constant <sizes>")
             require(sizes.size == items.size) { "binPacking: <list>/<sizes> length mismatch" }
-            val loBin = items.minOf { domains[it].min }
-            val hiBin = items.maxOf { domains[it].max }
-            if ((hiBin - loBin + 1).toLong() * items.size > negTableCap) {
-                throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
-            }
-            val condText = requireNotNull(e.child("condition")).textContent.trim()
-            for (b in loBin..hiBin) {
-                val loads = IntArray(items.size) { i -> eqValue01(items[i], b) }
-                postCondition(sizes.copyOf(), loads, condText) // Σ size[i]·[list[i]=b] ⟨cond⟩
+            val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
+            val loadsEl = e.child("loads")
+            val condEl = e.child("condition")
+            when {
+                // `<loads>`: each bin's total size equals its load variable — `Σ size[i]·[list[i]=b] = loads[b]`.
+                loadsEl != null -> {
+                    // Load entries may be plain variables or expressions (e.g. `sub(y,37)`).
+                    val loadVars = loadsEl.textContent.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                        .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
+                    if (loadVars.size.toLong() * items.size > negTableCap) {
+                        throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
+                    }
+                    for (b in loadVars.indices) {
+                        val ind = IntArray(items.size) { i -> eqValue01(items[i], b + offset) }
+                        factors.add(Linear(sizes + -1, ind + loadVars[b], LinearOp.EQ, 0))
+                    }
+                }
+
+                // `<limits>`: each bin `b` has its own constant capacity — `Σ size[i]·[list[i]=b] ≤ limits[b]`.
+                e.child("limits") != null -> {
+                    val limits = parseInts(e.child("limits")?.textContent)
+                        ?: throw UnsupportedXcsp3Exception("binPacking: non-constant <limits>")
+                    if (limits.size.toLong() * items.size > negTableCap) {
+                        throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
+                    }
+                    for (b in limits.indices) {
+                        val ind = IntArray(items.size) { i -> eqValue01(items[i], b + offset) }
+                        factors.add(Linear(sizes.copyOf(), ind, LinearOp.LE, limits[b]))
+                    }
+                }
+
+                // `<condition>`: each bin's total size meets a shared capacity condition.
+                condEl != null -> {
+                    val loBin = items.minOf { domains[it].min }
+                    val hiBin = items.maxOf { domains[it].max }
+                    if ((hiBin - loBin + 1).toLong() * items.size > negTableCap) {
+                        throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
+                    }
+                    val condText = condEl.textContent.trim()
+                    for (b in loBin..hiBin) {
+                        val ind = IntArray(items.size) { i -> eqValue01(items[i], b) }
+                        postCondition(sizes.copyOf(), ind, condText)
+                    }
+                }
+
+                else -> throw UnsupportedXcsp3Exception("binPacking: neither <condition> nor <loads>")
             }
         }
 
