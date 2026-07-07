@@ -30,21 +30,85 @@ class BoTuningTest {
         )
     }
 
-    private val instances = listOf(
-        cop("opb-a", "min: 1 x1 +2 x2 +3 x3 ;\n+1 x1 +1 x2 >= 1 ;\n+1 x2 +1 x3 >= 1 ;\n"),
-        cop("opb-b", "min: 3 x1 +1 x2 +1 x3 ;\n+1 x1 +1 x3 >= 1 ;\n+1 x2 +1 x3 >= 2 ;\n"),
-    )
+    /** A deterministic [Tuner] that cycles through a fixed list of config points — so the residual-round
+     *  mechanics can be asserted exactly (no RNG), and, as a third [Tuner] impl, it re-proves the seam. */
+    private class CyclingTuner(private val points: List<Map<String, Any>>) : Tuner {
+        private var next = 0
+        override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String) = object : TuningStudy {
+            override fun suggest(count: Int): List<Suggestion> =
+                List(count) { Suggestion("t$next", points[next++ % points.size]) }
+            override fun complete(suggestion: Suggestion, objective: Double) = Unit
+            override fun observe(values: Map<String, Any>, objective: Double) = Unit
+            override fun close() = Unit
+        }
+        override fun close() = Unit
+    }
 
     @Test
-    fun `the random-tuner BO loop yields a set-cover palette of evaluated configs`() {
-        val result = BoTuning.tuneBt(instances, RandomTuner(seed = 1), trials = 4, batch = 2, budgetMs = 20, seed = 7)
+    fun `residual rounds pick a complement, raise coverage, and see diminishing gains`() {
+        // Three arms over four instances: A and B are opposite specialists, C is the all-rounder.
+        val rewards = mapOf(
+            "A" to doubleArrayOf(1.0, 1.0, 0.0, 0.0),
+            "B" to doubleArrayOf(0.0, 0.0, 1.0, 1.0),
+            "C" to doubleArrayOf(0.6, 0.6, 0.6, 0.6),
+        )
+        val instances = List(4) { cop("i$it", "min: 1 x1 ;\n+1 x1 >= 0 ;\n") }
+        val space = ConfigSpace(listOf(CategoricalParam("arm", listOf("A", "B", "C"))))
+        val tuner = CyclingTuner(listOf(mapOf("arm" to "A"), mapOf("arm" to "B"), mapOf("arm" to "C")))
 
-        val evaluated = result.configs.keys
-        assertTrue(evaluated.isNotEmpty(), "the loop evaluated at least one config")
-        val palette = result.report.diverse.map { it.arm }
-        assertTrue(palette.isNotEmpty(), "the greedy set-cover palette is non-empty")
-        assertTrue(palette.all { it in evaluated }, "every palette arm is one of the evaluated configs")
-        assertTrue(result.report.diverse.first().newlyCovered > 0, "the top palette slot wins at least one instance")
+        val result = BoTuning.tune(
+            space = space,
+            decode = { it.getValue("arm") as String },
+            reward = { instance, arm -> rewards.getValue(arm)[instances.indexOf(instance)] },
+            instances = instances,
+            tuner = tuner,
+            rounds = 4,
+            trials = 3,
+            batch = 3,
+            warmStart = true,
+            studyId = "test",
+        )
+        val palette = result.palette
+
+        assertTrue(palette.size >= 2, "greedy rounds keep more than one arm")
+        // Round 1 (frontier 0) maximizes mean reward → the all-rounder C (0.6 > A,B's 0.5).
+        assertEquals("arm=C", palette[0].label, "round 1 anchors the best-on-average arm")
+        // Round 2 rewards only what C misses → a specialist, not C again.
+        assertTrue(palette[1].label != palette[0].label, "round 2 picks a complement, not the anchor")
+        // Coverage (mean frontier) only rises; marginal gains never grow (submodular diminishing returns).
+        assertTrue(
+            palette.zipWithNext().all { (a, b) -> b.cumulativeCoverage >= a.cumulativeCoverage },
+            "the frontier / cumulative coverage is monotone non-decreasing",
+        )
+        assertTrue(
+            palette.zipWithNext().all { (a, b) -> b.gain <= a.gain + 1e-9 },
+            "each round's marginal gain is non-increasing",
+        )
+    }
+
+    @Test
+    fun `the random-tuner BO loop over real COP instances yields a non-empty palette`() {
+        val instances = listOf(
+            cop("opb-a", "min: 1 x1 +2 x2 +3 x3 ;\n+1 x1 +1 x2 >= 1 ;\n+1 x2 +1 x3 >= 1 ;\n"),
+            cop("opb-b", "min: 3 x1 +1 x2 +1 x3 ;\n+1 x1 +1 x3 >= 1 ;\n+1 x2 +1 x3 >= 2 ;\n"),
+        )
+        val result =
+            BoTuning.tuneBt(
+                instances,
+                RandomTuner(seed = 1),
+                rounds = 3,
+                trials = 4,
+                batch = 2,
+                budgetMs = 20,
+                seed = 7,
+            )
+
+        assertTrue(result.configs.isNotEmpty(), "the loop evaluated at least one config")
+        assertTrue(result.palette.isNotEmpty(), "the residual-round palette is non-empty")
+        assertTrue(
+            result.palette.all { it.label in result.configs.keys },
+            "every palette entry is one of the evaluated configs",
+        )
     }
 
     @Test

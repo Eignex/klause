@@ -31,6 +31,13 @@ internal interface TuningStudy : AutoCloseable {
     /** Report [suggestion]'s measured [objective] (in the study's orientation). */
     fun complete(suggestion: Suggestion, objective: Double)
 
+    /** Warm-start: inject a config already evaluated *outside* this study (its [values] and measured
+     *  [objective]) as a known completed trial, so the optimizer starts already informed. The residual
+     *  rounds ([BoTuning]) use this to seed each round's fresh study with every config the earlier
+     *  rounds solved — re-scored against the new frontier — for free (no re-evaluation). A learning-free
+     *  backend may ignore it. */
+    fun observe(values: Map<String, Any>, objective: Double)
+
     /** Finish with this study (the backend may release its server-side state). */
     override fun close()
 }
