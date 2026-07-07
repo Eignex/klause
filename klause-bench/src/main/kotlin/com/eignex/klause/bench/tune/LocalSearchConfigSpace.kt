@@ -17,7 +17,7 @@ import com.eignex.klause.localsearch.schedule.Segment
 import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibilityJump
-import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
@@ -25,21 +25,21 @@ import com.eignex.klause.localsearch.strategy.WalkSat
 
 /**
  * The local-search config search space (task #21) — the full sub-algorithm knob cross-product as a
- * lazy [ConfigSpace], decoded into an [LsRecipe] by [toRecipe]. A `family` categorical
+ * lazy [ConfigSpace], decoded into an [LocalSearchRecipe] by [toRecipe]. A `family` categorical
  * (cbls/probsat/walksat/sa/fjump) gates the per-family knobs (conditional params), so a CBLS-only
  * cap is inactive for a ProbSat point. This replaces the fixed 4-axis RecipeSpace + strategy=sweep
  * MAB: the BO searches this space directly and each evaluated point builds one recipe on demand.
  */
 internal object LocalSearchConfigSpace : ConfigSpace(PARAMS) {
 
-    /** Decode a sampled assignment into a fresh [LsRecipe]. Family-routed to the public strategy
+    /** Decode a sampled assignment into a fresh [LocalSearchRecipe]. Family-routed to the public strategy
      *  factories; CBLS/SA use the unified minimize path (a second fresh strategy for the optimize
      *  phase, since strategies carry per-search state). */
-    fun toRecipe(a: Map<String, Any>): LsRecipe {
+    fun toRecipe(a: Map<String, Any>): LocalSearchRecipe {
         val restart = a.str("restart")
         val label = "cfg/" + a.entries.joinToString(",") { "${it.key}=${it.value}" }
         return when (a.str("family")) {
-            "cbls" -> LsRecipe(
+            "cbls" -> LocalSearchRecipe(
                 label,
                 cbls(a).withRestart(restart),
                 optimizeStrategy = cbls(a).withRestart(restart),
@@ -47,17 +47,17 @@ internal object LocalSearchConfigSpace : ConfigSpace(PARAMS) {
                 seedImplicitOnRestart = a.str("cbls.augment") in setOf("implicit", "extended"),
             )
 
-            "probsat" -> LsRecipe(label, probsat(a).withRestart(restart))
+            "probsat" -> LocalSearchRecipe(label, probsat(a).withRestart(restart))
 
-            "walksat" -> LsRecipe(label, walksat(a).withRestart(restart))
+            "walksat" -> LocalSearchRecipe(label, walksat(a).withRestart(restart))
 
-            "sa" -> LsRecipe(
+            "sa" -> LocalSearchRecipe(
                 label,
                 SimulatedAnnealing.optimizer(schedule(a.str("sa.schedule"))).withRestart(restart),
                 optimizeStrategy = SimulatedAnnealing.optimizer(schedule(a.str("sa.schedule"))).withRestart(restart),
             )
 
-            "fjump" -> LsRecipe(label, FeasibilityJump().withRestart(restart))
+            "fjump" -> LocalSearchRecipe(label, FeasibilityJump().withRestart(restart))
 
             else -> error("unknown family '${a.str("family")}'")
         }

@@ -7,19 +7,18 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
-import com.eignex.klause.localsearch.strategy.LsCatalog
-import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
 
 /**
- * A portfolio arm wrapping a curated [LsRecipe] for execution: it materialises the recipe into a
+ * A portfolio arm wrapping a curated [LocalSearchRecipe] for execution: it materialises the recipe into a
  * runnable [LocalSearchSession] worker. The recipe owns the four axes (restart included, in its
  * schedule); this adapter owns only the run-time wiring (λ-shaping, warm-start, event sink).
  */
-internal class LocalSearchWorkerConfig(val recipe: LsRecipe) : WorkerConfig {
+internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerConfig {
 
     override val label: String get() = recipe.label
 
@@ -79,14 +78,15 @@ internal class LocalSearchWorkerConfig(val recipe: LsRecipe) : WorkerConfig {
 
     companion object {
         /** A fresh instance of the pool config named [label] (the string boundary). */
-        fun byLabel(label: String): LocalSearchWorkerConfig = LocalSearchWorkerConfig(LsCatalog.byLabel(label))
+        fun byLabel(label: String): LocalSearchWorkerConfig = LocalSearchWorkerConfig(LocalSearchCatalog.byLabel(label))
 
-        /** One fresh instance of every pool config, in credit order. */
-        fun pool(): List<LocalSearchWorkerConfig> = LsCatalog.auto().map { LocalSearchWorkerConfig(it) }
+        /** The credit-ordered LS pool for [kind] — [LocalSearchCatalog.ranked] wrapped as arms. */
+        fun ranked(kind: Kind): List<LocalSearchWorkerConfig> =
+            LocalSearchCatalog.ranked(kind).map { LocalSearchWorkerConfig(it) }
 
-        /** The top-[count] prefix of the credit-ordered pool (wrapping past the pool size) — `-p <n>`
-         *  maps straight onto this. Every slot is a fresh instance even when arms repeat. */
-        fun diverse(count: Int): List<LocalSearchWorkerConfig> =
-            LsCatalog.diverse(count).map { LocalSearchWorkerConfig(it) }
+        /** The top-[count] prefix of [kind]'s credit-ordered pool (wrapping past the pool size) —
+         *  `-p <n>` maps straight onto this. Every slot is a fresh instance even when arms repeat. */
+        fun diverse(kind: Kind, count: Int): List<LocalSearchWorkerConfig> =
+            LocalSearchCatalog.diverse(kind, count).map { LocalSearchWorkerConfig(it) }
     }
 }

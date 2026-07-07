@@ -6,7 +6,7 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.result.MinimizeResult
 
@@ -25,7 +25,7 @@ internal data class EvalResult(val feasible: Boolean, val objective: Double?, va
 internal object InProcessEval {
 
     /** Evaluate an LS config (decoded [recipe] from [LocalSearchConfigSpace]) on [entry] for [budgetMs] at [seed]. */
-    fun evalLs(entry: ResolvedProblem, recipe: LsRecipe, budgetMs: Long, seed: Long): EvalResult {
+    fun evalLs(entry: ResolvedProblem, recipe: LocalSearchRecipe, budgetMs: Long, seed: Long): EvalResult {
         val objective = requireNotNull(entry.objective) { "evalLs needs a COP instance" }
         val solver = LocalSearchSolver(
             entry.problem,

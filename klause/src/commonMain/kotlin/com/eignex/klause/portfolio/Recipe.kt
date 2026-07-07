@@ -13,7 +13,7 @@ import com.eignex.klause.localsearch.schedule.Schedule
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
-import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import kotlin.random.Random
 
@@ -40,7 +40,7 @@ internal class Recipe(
      *  built-in objective descent owns the optimize phase (the recipe drives the feasibility fight),
      *  matching how the SAT-family / fjump arms are registered. */
     fun toWorkerConfig(tabu: TabuFilter = TabuFilter.Disabled): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        LsRecipe(
+        LocalSearchRecipe(
             "recipe/$label",
             SourceDrivenStrategy(
                 MoveSourceCatalog.parse(sources.spec),

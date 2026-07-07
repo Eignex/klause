@@ -1,7 +1,7 @@
 package com.eignex.klause.util
 
 /**
- * The shared arm-catalog ritual behind the two portfolio arm catalogs (`LsCatalog` / `BacktrackCatalog`).
+ * The shared arm-catalog ritual behind the two portfolio arm catalogs (`LocalSearchCatalog` / `BacktrackCatalog`).
  * Given the full set of [all] arms, a [label] accessor, and a [make] factory, it owns the string-boundary
  * accessors (`byLabel` / `fromLabel`) and the order-driven pool builders (`labels` / `ranked` / `factories`
  * over a *supplied* ordered arm list). The concrete catalog keeps its own ordering source — a single
