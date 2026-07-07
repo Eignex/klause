@@ -146,6 +146,16 @@ object Xcsp3 {
             if (e.child("except") != null) throw UnsupportedXcsp3Exception("allDifferent with <except>")
             val vars = refList(listText(e)).toIntArray()
             if (vars.isEmpty()) throw UnsupportedXcsp3Exception("allDifferent: empty list")
+            // A value span beyond Int range would truncate AllDifferent's Int-sized value-indexed
+            // scratch; decompose to pairwise != (sound at any magnitude — <except> was rejected above).
+            if (domainSpan(vars) > Int.MAX_VALUE.toLong()) {
+                for (a in vars.indices) {
+                    for (b in a + 1 until vars.size) {
+                        factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[a], vars[b]), LinearOp.NE, 0))
+                    }
+                }
+                return
+            }
             factors.add(
                 AllDifferent(
                     vars = vars,

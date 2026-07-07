@@ -52,6 +52,20 @@ private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: Long
 private fun FlatZincCompiler.emitAllDifferentCore(vars: IntArray, exceptSet: LongArray, boundsConsistent: Boolean) {
     if (vars.size < 2) return
     val (lo, hi) = checkNotNull(intVarUnionBounds(vars))
+    // AllDifferent's value-indexed matching/occurrence scratch is sized by the Int-typed value span, so
+    // a span beyond Int range (reachable for unbounded int vars) would truncate. With no excepted values
+    // the constraint decomposes to pairwise != — sound at any magnitude; an except-set has no pairwise
+    // form, so reject rather than mis-encode.
+    val wide = lo < Int.MIN_VALUE.toLong() || hi > Int.MAX_VALUE.toLong() || hi - lo + 1 > Int.MAX_VALUE.toLong()
+    if (wide) {
+        require(exceptSet.isEmpty()) { "alldifferent_except over a value span exceeding 2^31 is unsupported" }
+        for (a in vars.indices) {
+            for (b in a + 1 until vars.size) {
+                factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[a], vars[b]), LinearOp.NE, 0))
+            }
+        }
+        return
+    }
     factors.add(
         AllDifferent(
             vars = vars,
