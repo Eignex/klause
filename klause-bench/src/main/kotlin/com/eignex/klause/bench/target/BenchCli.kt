@@ -63,6 +63,9 @@ object BenchCli {
      *  large-instance cp-sat solves can't exhaust memory. Override with `jobs=N`. */
     private const val DEFAULT_REFERENCE_JOBS = 6
 
+    /** Truncate coverage values to three decimals for the `tune` palette console output. */
+    private const val COVERAGE_DECIMALS = 1000.0
+
     /** CLI entry point dispatching bench subcommands. */
     @JvmStatic
     fun main(args: Array<String>) {
@@ -154,10 +157,11 @@ object BenchCli {
         println(ArmCalibration.render(ArmCalibration.scoreWinnerSets(arms, won)))
     }
 
-    /** BO config search (task #24): ask a [Tuner] for config points over an engine's `ConfigSpace`,
-     *  evaluate each in-process on the COP selection (reference-normalised gap-to-optimum reward), and
-     *  print the greedy set-cover palette — the configs that together win the most instances. Filters:
-     *  `engine=ls|bt` `trials=N` `batch=M` `timeout=<ms>` `tuner=random|vizier` `seed=N` (+ the usual
+    /** BO config search (task #24): greedy residual rounds ([BoTuning]) that ask a [Tuner] for config
+     *  points over an engine's `ConfigSpace`, evaluate each in-process on the COP selection
+     *  (reference-normalised gap-to-optimum reward), and build a diverse palette one complement per
+     *  round. Filters: `engine=ls|bt` `rounds=N` (palette size) `trials=M` (per-round asks) `batch=B`
+     *  `timeout=<ms>` `tuner=random|vizier` `warm-start=true|false` `seed=N` (+ the usual
      *  `suite=`/`kind=`/… selection). COP-only: the in-process eval needs an objective, so pass
      *  `kind=cop`. Depends only on the [Tuner] seam, so the optimizer backend is swappable. */
     private fun tune(filterArgs: List<String>) {
@@ -172,28 +176,37 @@ object BenchCli {
             println("(no COP instances matched — the BO eval needs an objective; pass kind=cop)")
             return
         }
+        val rounds = f["rounds"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
         val trials = f["trials"]?.toIntOrNull()?.coerceAtLeast(1) ?: 32
         val batch = f["batch"]?.toIntOrNull()?.coerceAtLeast(1) ?: 4
         val budgetMs = f["timeout"]?.toLongOrNull() ?: 2000L
         val seed = f["seed"]?.toLongOrNull() ?: 0L
+        val warmStart = f["warm-start"]?.toBoolean() ?: true
         val tunerId = f["tuner"]?.lowercase() ?: "random"
         val tuner: Tuner = when (tunerId) {
             "vizier" -> VizierTuner()
             "random" -> RandomTuner(seed)
             else -> error("tune tuner must be random | vizier, got '${f["tuner"]}'")
         }
-        println("=== tune ($engine, $tunerId): ${instances.size} COP instance(s), $trials trials × ${budgetMs}ms ===")
+        println(
+            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${instances.size} COP instance(s), " +
+                "$rounds rounds × $trials trials × ${budgetMs}ms ===",
+        )
         val result = tuner.use {
             when (engine) {
-                TuneEngine.LS -> BoTuning.tuneLs(instances, tuner, trials, batch, budgetMs, seed)
-                TuneEngine.BT -> BoTuning.tuneBt(instances, tuner, trials, batch, budgetMs, seed)
+                TuneEngine.LS -> BoTuning.tuneLs(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart)
+                TuneEngine.BT -> BoTuning.tuneBt(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart)
             }
         }
-        println(ArmCalibration.render(result.report))
-        println("\npalette configs (each slot's marginal instances):")
-        result.report.diverse.takeWhile { it.newlyCovered > 0 }.forEach { slot ->
-            println("  ${slot.rank}. +${slot.newlyCovered}: ${result.configs[slot.arm] ?: slot.arm}")
+        // The residual-round palette is the primary output: each round's marginal coverage gain, then
+        // the cumulative coverage after it — the concave curve flattens where added arms stop paying off.
+        println("residual-round palette (round: +marginal coverage → cumulative):")
+        result.palette.forEach { slot ->
+            val gain = (slot.gain * COVERAGE_DECIMALS).toLong() / COVERAGE_DECIMALS
+            val cover = (slot.cumulativeCoverage * COVERAGE_DECIMALS).toLong() / COVERAGE_DECIMALS
+            println("  r${slot.round}. +$gain → $cover   ${slot.assignment}")
         }
+        if (result.palette.isEmpty()) println("  (no config improved coverage — check the reward / instances)")
     }
 
     /** From a portfolio run's per-problem records: every contributing arm label (the ranking pool) and,

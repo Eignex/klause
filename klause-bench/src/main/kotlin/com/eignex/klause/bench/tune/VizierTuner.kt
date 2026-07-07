@@ -90,6 +90,15 @@ internal class VizierTuner(
             )
         }
 
+        /** Warm-start is not wired for Vizier (yet). The OSS server's `CreateTrial` yields a REQUESTED
+         *  trial, and `AddTrialMeasurement` / `CompleteTrial` reject any state but ACTIVE/STOPPING — so a
+         *  pre-evaluated config can't be injected as a completed trial without the server's (undocumented)
+         *  trial-activation flow. The residual rounds don't rely on it: the per-config reward cache still
+         *  avoids re-solving and cached configs stay round candidates, and the warm-start is ablatable
+         *  (`BoTuning.tune(warmStart=…)`) — so it drops out cleanly. A later change can activate the
+         *  created trial before measuring it. */
+        override fun observe(values: Map<String, Any>, objective: Double) = Unit
+
         override fun close() {
             stub.deleteStudy(DeleteStudyRequest.newBuilder().setName(studyName).build())
         }
