@@ -48,9 +48,10 @@ interface RelaxationBuilder {
      * product column). [presence], when given, is a flat list of `(intVar, value)` pairs that must all
      * hold for the column to be present; it lets the persistent relaxation re-bind the column across
      * nodes (its upper bound drops to 0 when any required value leaves the live domain). `null` keeps
-     * the column off the persistent path.
+     * the column off the persistent path. Values are `Long` so a column keyed on a domain value beyond
+     * Int range (a float-scaled bucket) re-binds against the true value rather than a truncated one.
      */
-    fun auxColumn(lo: Long, hi: Long, presence: IntArray? = null): Int
+    fun auxColumn(lo: Long, hi: Long, presence: LongArray? = null): Int
 
     /**
      * Whether this factor's HULL contribution is enabled this build — its convex-hull family flag is

@@ -41,7 +41,7 @@ internal class GccCountLinearizer(
             val selVal = LongArrayList()
             declared.forEach { v ->
                 // The selector z_xv is present while value v stays in x's live domain.
-                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v.toInt()))
+                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
                 sel.add(z)
                 selVal.add(v)
                 selByCover[v.toInt()]?.add(z) // only cover values carry a count row

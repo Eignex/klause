@@ -42,10 +42,10 @@ internal class TableLinearizer(
             if (!declaredFeasible) continue
             // The selector is present while every entry stays in its column's live domain — the
             // membership conjunction that lets the persistent relaxation re-bind this column.
-            val presence = IntArray(arity * 2)
+            val presence = LongArray(arity * 2)
             for (col in 0 until arity) {
-                presence[col * 2] = xs[col]
-                presence[col * 2 + 1] = tuples[t * arity + col].toInt()
+                presence[col * 2] = xs[col].toLong()
+                presence[col * 2 + 1] = tuples[t * arity + col]
             }
             selCols.add(builder.auxColumn(0L, if (liveFeasible) 1L else 0L, presence = presence))
             rows.add(t)

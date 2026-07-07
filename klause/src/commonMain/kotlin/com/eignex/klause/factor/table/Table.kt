@@ -4,7 +4,6 @@ import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
-import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -161,8 +160,5 @@ class Table private constructor(
     override fun asInvariant(): Invariant =
         TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar)
 
-    // The LP relaxation's presence column is Int-typed; skip it for tuple values beyond Int range (the
-    // propagator/invariant still enforce the table). Sound — a best-effort relaxation may omit a factor.
-    override fun asLinearizer(): Linearizer =
-        if (fitsInt32(tuples)) TableLinearizer(xs, tuples, arity, numTuples) else NoLinearizer
+    override fun asLinearizer(): Linearizer = TableLinearizer(xs, tuples, arity, numTuples)
 }

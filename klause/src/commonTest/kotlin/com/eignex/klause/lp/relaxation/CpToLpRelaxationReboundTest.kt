@@ -158,6 +158,27 @@ class CpToLpRelaxationReboundTest {
     }
 
     @Test
+    fun `rebound reproduces a table hull over values beyond Int range`() {
+        // Tuple values past 2^31 (a float-scaled table): the selector's presence rule stores the true
+        // Long value, so pruning a wide value must pin the tuple's column exactly as a rebuild does. A
+        // truncated presence value would test membership of the wrong value and diverge from the rebuild.
+        val b = 4_000_000_000L
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(b, b + 4), IntDomain(0, 5)),
+            arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(b, 5, b + 2, 2, b + 4, 0))),
+        )
+        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0)), tableHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.persistentEligible, "a table hull relaxation must be persistent-eligible")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, b + 3) // value b+4 leaves x0 — tuple (b+4, 0) infeasible
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
     fun `rebound reproduces an nvalue hull when a value is pruned`() {
         // var n = |distinct(x0,x1,x2)| over [0,3]; pruning value 3 from x0 drops its z selector.
         val problem = Problem(

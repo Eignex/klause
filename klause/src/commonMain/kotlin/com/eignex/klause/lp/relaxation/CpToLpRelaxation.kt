@@ -79,7 +79,7 @@ internal class LpRelaxation(
      * stays in its variable's live domain. Null for CP-var-backed columns and for auxiliary columns
      * with no rule (which make the relaxation persistent-ineligible). Empty by default.
      */
-    val colReq: Array<IntArray?> = arrayOfNulls(model.n),
+    val colReq: Array<LongArray?> = arrayOfNulls(model.n),
     /** Per structural column, the upper bound an auxiliary column takes when present (see [colReq]);
      *  unused for CP-var columns. */
     val colPresentUpper: LongArray = LongArray(model.n),
@@ -106,7 +106,7 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
                 var present = true
                 var k = 0
                 while (k < req.size) {
-                    if (!session.intDomain(req[k]).contains(req[k + 1].toLong())) {
+                    if (!session.intDomain(req[k].toInt()).contains(req[k + 1])) {
                         present = false
                         break
                     }
@@ -387,7 +387,7 @@ internal class CpToLpRelaxation(
         // when any required value left the live domain, else the present-upper) instead of rebuilding.
         // null/0 for CP-var columns (re-bound from the variable's own domain) and for un-ruled aux
         // columns (which keep the relaxation off the persistent path).
-        private val colReq = ArrayList<IntArray?>()
+        private val colReq = ArrayList<LongArray?>()
         private val colPresentUpper = LongArrayList()
 
         /** Arc-indicator models recorded by `buildCircuitArcs` for the subtour-elimination separator. */
@@ -422,7 +422,7 @@ internal class CpToLpRelaxation(
         /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc.
          *  [presence] names the `(intVar, value)` memberships that must all hold for the column to be
          *  present (upper [hi]); when given, the column can be re-bound on the persistent path. */
-        override fun auxColumn(lo: Long, hi: Long, presence: IntArray?): Int {
+        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int {
             val c = builder.addVar(lo, hi, cost = 0L, tag = -1)
             colVarId.add(-1)
             colIsBool.add(0)
@@ -490,7 +490,11 @@ internal class CpToLpRelaxation(
                     val present = live.contains(j)
                     // The arc is present exactly while head j stays in succ[i]'s live domain — the single
                     // membership that lets the persistent relaxation re-bind this column (#43).
-                    val col = auxColumn(0L, if (present) 1L else 0L, presence = intArrayOf(succ[i], jn))
+                    val col = auxColumn(
+                        0L,
+                        if (present) 1L else 0L,
+                        presence = longArrayOf(succ[i].toLong(), jn.toLong()),
+                    )
                     outCols.add(col)
                     chanCols.add(col)
                     chanCoef.add(jn)
@@ -708,7 +712,7 @@ internal class CpToLpRelaxation(
                             xiCol // wᵢᵢ = xᵢ²= xᵢ
                         } else {
                             val xkCol = intColumn(xk)
-                            val w = auxColumn(0L, 1L, presence = intArrayOf(xk, xi))
+                            val w = auxColumn(0L, 1L, presence = longArrayOf(xk.toLong(), xi.toLong()))
                             rltColumns++
                             builder.addRow(intArrayOf(w, xkCol), longArrayOf(1L, -1L), Relation.LE, 0L) // w ≤ xₖ
                             builder.addRow(intArrayOf(w, xiCol), longArrayOf(1L, -1L), Relation.LE, 0L) // w ≤ xᵢ

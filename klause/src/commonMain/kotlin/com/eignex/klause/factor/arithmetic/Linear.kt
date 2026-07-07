@@ -143,10 +143,12 @@ internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
     bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
         coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
-/** True when every value in [values] fits 32-bit range — the precondition for a value-carrying global
- *  (GCC cover, Table tuples, Element const array, Mdd symbols) to expose an Int-based LP relaxation or a
- *  value-symmetry relabeling; a wide value must skip those (return `NoLinearizer` / `null`) to stay sound,
- *  since the LP presence column and the `remapValues` relabel are `(Int)`-typed and would truncate. */
+/** True when every value in [values] fits 32-bit range. The value-symmetry relabel (`remapValues`) is
+ *  `(Int)`-typed, so a value-carrying global (GCC cover, Table tuples, Mdd symbols, AllDifferent
+ *  except-set) declines value symmetry (`null`) when wide, to avoid truncating two values into one.
+ *  The GCC/Mdd LP relaxations also use it: GCC's cover-index map and Mdd's cost weights are still Int,
+ *  so those skip the relaxation when wide — Table/Element carry their LP presence and coefficients as
+ *  [Long] and need no such guard. */
 internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
 /** Low 32 bits mask for packing/unpacking a `(image, coeff)` pair in [Linear.remapStructuralHash]. */
