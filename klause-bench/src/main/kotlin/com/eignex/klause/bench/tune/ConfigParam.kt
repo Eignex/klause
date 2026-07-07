@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.tune
 
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
@@ -78,4 +79,28 @@ internal open class ConfigSpace(val params: List<ConfigParam>) {
         for (p in params) if (p.activeIn(assignment)) assignment[p.name] = p.sample(rng)
         return assignment
     }
+}
+
+/**
+ * Coerce a tuner's suggested [values] to each param's declared type — a [Tuner] may hand an integer
+ * param back as a `Double` (Vizier does; [RandomTuner] already types them), so [IntParam]s are rounded
+ * and every numeric is clamped to its declared domain and categoricals normalised to `String`. Makes
+ * any backend's raw suggestion safe for the concrete space's `as Int` / `as Double` decoder.
+ */
+internal fun ConfigSpace.coerce(values: Map<String, Any>): Map<String, Any> {
+    val byName = params.associateBy { it.name }
+    return values.mapValues { (name, v) ->
+        when (val p = byName[name]) {
+            is IntParam -> asDouble(v).roundToInt().coerceIn(p.min, p.max)
+            is DoubleParam -> asDouble(v).coerceIn(p.min, p.max)
+            is CategoricalParam -> v.toString()
+            null -> v
+        }
+    }
+}
+
+private fun asDouble(v: Any): Double = when (v) {
+    is Number -> v.toDouble()
+    is String -> v.toDouble()
+    else -> error("cannot coerce '$v' (${v::class.simpleName}) to a number")
 }

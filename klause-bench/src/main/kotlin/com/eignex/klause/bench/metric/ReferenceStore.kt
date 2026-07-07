@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import java.io.File
 
@@ -47,6 +49,16 @@ internal object ReferenceStore {
 
     /** Table key: (suite, problem) — a bare name is not unique across corpora. */
     private fun key(e: ReferenceEntry) = e.suite to e.problem
+
+    /** The [ref]'s corpus id — the [ReferenceEntry.suite] half of the table key: the source collection
+     *  for a fetched corpus, else a path-derived label. Lets any caller look an instance up in the
+     *  table by (suite, name) (the harvest keys entries this way, the BO reward reads them back). */
+    fun suiteOf(ref: ProblemRef): String = when (val s = ref.source) {
+        is ProblemSource.External -> s.collection.id
+        is ProblemSource.ExternalIndexed -> s.collection.id
+        is ProblemSource.Vendored -> s.workspaceRelPath.substringBeforeLast('/', "vendored")
+        is ProblemSource.InCode -> "in-code"
+    }
 
     fun load(): Map<Pair<String, String>, ReferenceEntry> {
         val f = file()
