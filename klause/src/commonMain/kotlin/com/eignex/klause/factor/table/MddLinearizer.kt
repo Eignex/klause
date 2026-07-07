@@ -63,7 +63,7 @@ internal class MddLinearizer(
                     val col = builder.auxColumn(
                         0L,
                         if (live.contains(value)) 1L else 0L,
-                        presence = intArrayOf(seq[layer], value.toInt()),
+                        presence = longArrayOf(seq[layer].toLong(), value),
                     )
                     (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
                     (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)

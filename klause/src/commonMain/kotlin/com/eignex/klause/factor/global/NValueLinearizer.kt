@@ -6,7 +6,7 @@ import com.eignex.klause.lp.Linearizer
 import com.eignex.klause.lp.LinearizerEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
@@ -37,7 +37,7 @@ internal class NValueLinearizer(
             if (existing >= 0) return existing
             // The "used" indicator is free in [0,1] regardless of the live domains — an empty
             // requirement keeps it present so the relaxation stays persistent (#43).
-            val col = builder.auxColumn(0L, 1L, presence = EmptyIntArray)
+            val col = builder.auxColumn(0L, 1L, presence = EmptyLongArray)
             yCols.add(col)
             yByValue.put(v, col)
             return col
@@ -49,7 +49,7 @@ internal class NValueLinearizer(
             val selVal = LongArrayList()
             declared.forEach { v ->
                 // The selector z_xv is present while value v stays in x's live domain.
-                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v.toInt()))
+                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
                 sel.add(z)
                 selVal.add(v)
                 builder.row(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL) // y_v ≥ z

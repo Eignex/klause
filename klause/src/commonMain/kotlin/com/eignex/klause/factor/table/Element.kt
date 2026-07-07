@@ -2,10 +2,8 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
-import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -172,8 +170,5 @@ class Element private constructor(
         indexOffset,
     )
 
-    // The LP relaxation's presence/const columns are Int-typed; skip it when a constant array value
-    // exceeds Int range (var-id arrays always fit). Sound — the propagator/invariant still enforce it.
-    override fun asLinearizer(): Linearizer =
-        if (fitsInt32(arr)) ElementLinearizer(idx, result, arr, arrIsVars, indexOffset) else NoLinearizer
+    override fun asLinearizer(): Linearizer = ElementLinearizer(idx, result, arr, arrIsVars, indexOffset)
 }

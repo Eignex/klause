@@ -55,7 +55,11 @@ internal class ElementLinearizer(
             val idxVal = p + off
             if (idxVal.toLong() !in declared) continue
             selCols.add(
-                builder.auxColumn(0L, if (idxVal.toLong() in live) 1L else 0L, presence = intArrayOf(idx, idxVal)),
+                builder.auxColumn(
+                    0L,
+                    if (idxVal.toLong() in live) 1L else 0L,
+                    presence = longArrayOf(idx.toLong(), idxVal.toLong()),
+                ),
             )
             positions.add(p)
         }

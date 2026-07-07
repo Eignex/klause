@@ -54,7 +54,7 @@ internal class RegularLinearizer(
                     val col = builder.auxColumn(
                         0L,
                         if (live.contains(sym)) 1L else 0L,
-                        presence = intArrayOf(seq[t], sym.toInt()),
+                        presence = longArrayOf(seq[t].toLong(), sym),
                     )
                     (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
                     (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)
