@@ -63,10 +63,10 @@ class Circuit(
      * Returns 0 iff the assignment (with optional override `succ[replaceAt] = replaceWith`)
      * is a single Hamiltonian cycle of length `n`. O(n).
      */
-    override fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int {
+    override fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int {
         if (n == 1) {
             val v = if (replaceAt == 0) replaceWith else state.assignment.intValue(succ[0])
-            return if (v == 0) 0 else 1
+            return if (v == 0L) 0 else 1
         }
         val next = IntArray(n)
         var numSelfLoops = 0
@@ -76,11 +76,11 @@ class Circuit(
             if (s < 0 || s >= n) {
                 next[i] = -1
                 numOob++
-            } else if (s == i) {
+            } else if (s == i.toLong()) {
                 next[i] = -1
                 numSelfLoops++
             } else {
-                next[i] = s
+                next[i] = s.toInt()
             }
         }
         val scan = cycleScan(next, n)

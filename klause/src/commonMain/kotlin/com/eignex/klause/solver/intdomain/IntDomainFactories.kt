@@ -3,7 +3,7 @@ package com.eignex.klause.solver.intdomain
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.Bits
-import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * Build a domain from a non-empty sorted-distinct survivor array. Picks the most compact rep:
@@ -12,21 +12,22 @@ import com.eignex.klause.util.IntArrayList
  * O(1) `contains` beats the survivor list's binary search; else the survivor list. The array is adopted
  * by-reference for the survivor rep, so callers must not mutate it after.
  */
-internal fun intDomainFromSurvivors(sv: IntArray): IntDomain {
+internal fun intDomainFromSurvivors(sv: LongArray): IntDomain {
     val s = sv.size
     val newMin = sv[0]
     val newMax = sv[s - 1]
     val span = newMax - newMin + 1
-    if (s == span) return ContiguousDomain(newMin, newMax)
+    if (s.toLong() == span) return ContiguousDomain(newMin, newMax)
     if (span <= KlauseConfig.current.bitsetThreshold) {
-        val bits = LongArray((span + 63) ushr 6)
-        for (i in 0 until s) Bits.set(bits, sv[i] - newMin)
+        val spanI = span.toInt()
+        val bits = LongArray((spanI + 63) ushr 6)
+        for (i in 0 until s) Bits.set(bits, (sv[i] - newMin).toInt())
         return BitsetDomain(newMin, newMax, bits, newMin)
     }
     var r = 1
     for (i in 1 until s) if (sv[i] != sv[i - 1] + 1) r++
     if (2 * r <= s) {
-        val runs = IntArray(2 * r)
+        val runs = LongArray(2 * r)
         var ri = 0
         var runLo = sv[0]
         for (i in 1 until s) {
@@ -41,11 +42,12 @@ internal fun intDomainFromSurvivors(sv: IntArray): IntDomain {
         return RunsDomain(newMin, newMax, runs)
     }
     // A scattered domain the run list can't compact still prefers a bitset when it is no larger than the
-    // survivor array: O(1) `contains` in place of a binary search, at memory parity.
+    // survivor array: O(1) `contains` in place of a binary search, at memory parity. A wide span makes
+    // `words` huge, so `2·words <= s` is false and we fall through to the survivor list (span-independent).
     val words = (span + 63) ushr 6
     if (2 * words <= s) {
-        val bits = LongArray(words)
-        for (i in 0 until s) Bits.set(bits, sv[i] - newMin)
+        val bits = LongArray(words.toInt())
+        for (i in 0 until s) Bits.set(bits, (sv[i] - newMin).toInt())
         return BitsetDomain(newMin, newMax, bits, newMin)
     }
     return SurvivorsDomain(newMin, newMax, sv)
@@ -56,40 +58,43 @@ internal fun intDomainFromSurvivors(sv: IntArray): IntDomain {
  * with strict gaps). Same selection rule as [intDomainFromSurvivors], expanding to a survivor list
  * only in the scattered (comb) case.
  */
-internal fun intDomainFromRuns(runs: IntArrayList): IntDomain {
+internal fun intDomainFromRuns(runs: LongArrayList): IntDomain {
     val newMin = runs[0]
     val newMax = runs[runs.size - 1]
     if (runs.size == 2) return ContiguousDomain(newMin, newMax) // single run
     val span = newMax - newMin + 1
     val r = runs.size shr 1
-    var s = 0
+    var s = 0L
     var k = 0
     while (k < runs.size) {
         s += runs[k + 1] - runs[k] + 1
         k += 2
     }
     if (span <= KlauseConfig.current.bitsetThreshold) {
-        val bits = LongArray((span + 63) ushr 6)
+        val spanI = span.toInt()
+        val bits = LongArray((spanI + 63) ushr 6)
         k = 0
         while (k < runs.size) {
-            Bits.fillRange(bits, runs[k] - newMin, runs[k + 1] - newMin + 1)
+            Bits.fillRange(bits, (runs[k] - newMin).toInt(), (runs[k + 1] - newMin + 1).toInt())
             k += 2
         }
         return BitsetDomain(newMin, newMax, bits, newMin)
     }
-    if (2 * r <= s) return RunsDomain(newMin, newMax, runs.toIntArray())
+    if (2 * r <= s) return RunsDomain(newMin, newMax, runs.toLongArray())
     // Same memory-parity bitset preference as [intDomainFromSurvivors], filled straight from the runs.
+    // A wide span makes `words` huge so this is skipped, and a huge run makes `2·r <= s` true above, so
+    // the O(s) survivor materialisation below is only reached for a genuinely small scattered set.
     val words = (span + 63) ushr 6
     if (2 * words <= s) {
-        val bits = LongArray(words)
+        val bits = LongArray(words.toInt())
         k = 0
         while (k < runs.size) {
-            Bits.fillRange(bits, runs[k] - newMin, runs[k + 1] - newMin + 1)
+            Bits.fillRange(bits, (runs[k] - newMin).toInt(), (runs[k + 1] - newMin + 1).toInt())
             k += 2
         }
         return BitsetDomain(newMin, newMax, bits, newMin)
     }
-    val sv = IntArray(s)
+    val sv = LongArray(s.toInt())
     var idx = 0
     k = 0
     while (k < runs.size) {

@@ -9,8 +9,8 @@ internal fun tightenSuccToRange(state: PropagationState, succ: IntArray, n: Int)
     for (i in succ.indices) {
         val v = succ[i]
         val d = state.intDomains[v]
-        val newLo = maxOf(d.min, 0)
-        val newHi = minOf(d.max, n - 1)
+        val newLo = maxOf(d.min, 0L)
+        val newHi = minOf(d.max, (n - 1).toLong())
         if (newLo > newHi) return false
         if (newLo != d.min && !state.tightenIntMin(v, newLo)) return false
         if (newHi != d.max && !state.tightenIntMax(v, newHi)) return false
@@ -31,9 +31,9 @@ internal fun shaveClaimedFromEndpoints(
         val d = state.intDomains[v]
         if (d.min == d.max) continue
         var newMin = d.min
-        while (newMin < d.max && claimed[newMin] != -1 && claimed[newMin] != i) newMin++
+        while (newMin < d.max && claimed[newMin.toInt()] != -1 && claimed[newMin.toInt()] != i) newMin++
         var newMax = d.max
-        while (newMax > newMin && claimed[newMax] != -1 && claimed[newMax] != i) newMax--
+        while (newMax > newMin && claimed[newMax.toInt()] != -1 && claimed[newMax.toInt()] != i) newMax--
         if (newMin > newMax) return false
         if (newMin != d.min && !state.tightenIntMin(v, newMin, ant)) return false
         if (newMax != d.max && !state.tightenIntMax(v, newMax, ant)) return false

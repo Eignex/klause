@@ -6,8 +6,9 @@ import com.eignex.klause.factor.global.internals.reginTarjanScc
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableLongIntMap
 
 /** CP propagation logic for `nvalue`. */
 internal class NValuePropagator(
@@ -45,8 +46,8 @@ internal class NValuePropagator(
         // pinned to that maximum, a maximum matching is mandatory, so Régin value-pruning applies.
         if (mode != NValue.Mode.AtMost) {
             val matching = buildMatching(state)
-            if (!state.tightenIntMax(n, matching.size, ant)) return false
-            if (state.intDomains[n].min == matching.size) {
+            if (!state.tightenIntMax(n, matching.size.toLong(), ant)) return false
+            if (state.intDomains[n].min == matching.size.toLong()) {
                 if (!atLeastGacPrune(state, matching, ant)) return false
             }
         }
@@ -61,7 +62,7 @@ internal class NValuePropagator(
 
     /** The original order-insensitive greedy bounds, retained for the optional-presence variant. */
     private fun propagateGreedy(state: PropagationState): Boolean {
-        val unionValues = IntHashSet()
+        val unionValues = LongHashSet()
         for (i in xs.indices) {
             if (definitelyAbsentNvFn(i, state)) continue
             state.intDomains[xs[i]].forEach { unionValues.add(it) }
@@ -70,7 +71,7 @@ internal class NValuePropagator(
         val present = IntArrayList(xs.size)
         for (i in xs.indices) if (definitelyPresentNvFn(i, state)) present.add(xs[i])
         present.sortByIntKey { state.intDomains[it].size }
-        val covered = IntHashSet()
+        val covered = LongHashSet()
         var minDistinct = 0
         for (idx in 0 until present.size) {
             val d = state.intDomains[present[idx]]
@@ -84,16 +85,16 @@ internal class NValuePropagator(
         val ant = collectHoleAndBoundAntecedents(state, xs)
         when (mode) {
             NValue.Mode.Eq -> {
-                if (!state.tightenIntMin(n, minDistinct, ant)) return false
-                if (!state.tightenIntMax(n, maxDistinct, ant)) return false
+                if (!state.tightenIntMin(n, minDistinct.toLong(), ant)) return false
+                if (!state.tightenIntMax(n, maxDistinct.toLong(), ant)) return false
             }
 
             NValue.Mode.AtLeast -> {
-                if (!state.tightenIntMax(n, maxDistinct, ant)) return false
+                if (!state.tightenIntMax(n, maxDistinct.toLong(), ant)) return false
             }
 
             NValue.Mode.AtMost -> {
-                if (!state.tightenIntMin(n, minDistinct, ant)) return false
+                if (!state.tightenIntMin(n, minDistinct.toLong(), ant)) return false
             }
         }
         return true
@@ -103,14 +104,14 @@ internal class NValuePropagator(
     private class Matching(
         val varToVal: IntArray,
         val valToVar: IntArray,
-        val values: IntArray,
+        val values: LongArray,
         val adj: Array<IntArrayList>,
         val size: Int,
     )
 
     private fun buildMatching(state: PropagationState): Matching {
-        val valueId = MutableIntIntMap()
-        val values = IntArrayList()
+        val valueId = MutableLongIntMap()
+        val values = LongArrayList()
         val adj = Array(xs.size) { i ->
             val ids = IntArrayList()
             state.intDomains[xs[i]].forEach { v ->
@@ -134,7 +135,7 @@ internal class NValuePropagator(
         }
         val varToVal = IntArray(xs.size) { -1 }
         for (v in 0 until nVals) if (valToVar[v] >= 0) varToVal[valToVar[v]] = v
-        return Matching(varToVal, valToVar, values.toIntArray(), adj, matched)
+        return Matching(varToVal, valToVar, values.toLongArray(), adj, matched)
     }
 
     /**
@@ -206,8 +207,8 @@ internal class NValuePropagator(
      */
     private fun kernelBoundConsistency(state: PropagationState, ant: IntArray?): Boolean {
         val nv = xs.size
-        val minVal = IntArray(nv)
-        val maxVal = IntArray(nv)
+        val minVal = LongArray(nv)
+        val maxVal = LongArray(nv)
         val order = IntArray(nv)
         var loop = true
         while (loop) {
@@ -232,8 +233,8 @@ internal class NValuePropagator(
         state: PropagationState,
         ant: IntArray?,
         nv: Int,
-        minVal: IntArray,
-        maxVal: IntArray,
+        minVal: LongArray,
+        maxVal: LongArray,
         order: IntArray,
         lowerPass: Boolean,
     ): Int {
@@ -245,18 +246,18 @@ internal class NValuePropagator(
         // primaries break by index descending.
         val packed = LongArray(nv)
         for (i in 0 until nv) {
-            val primary = (if (lowerPass) minVal[i] else -maxVal[i]).toLong()
+            val primary = if (lowerPass) minVal[i] else -maxVal[i]
             packed[i] = (primary shl 32) or ((nv - 1 - i).toLong() and 0xFFFFFFFFL)
         }
         packed.sort()
         for (idx in 0 until nv) order[idx] = nv - 1 - (packed[idx] and 0xFFFFFFFFL).toInt()
         val kerRep = BooleanArray(nv)
-        var min = Int.MIN_VALUE
-        var max = Int.MIN_VALUE
+        var min = Long.MIN_VALUE
+        var max = Long.MIN_VALUE
         var nbKer = 0
         for (idx in 0 until nv) {
             val node = order[idx]
-            if (min == Int.MIN_VALUE) {
+            if (min == Long.MIN_VALUE) {
                 min = minVal[node]
                 max = maxVal[node]
                 nbKer++
@@ -272,12 +273,12 @@ internal class NValuePropagator(
         }
         var status = 0
         if (state.intDomains[n].min < nbKer) {
-            if (!state.tightenIntMin(n, nbKer, ant)) return -1
+            if (!state.tightenIntMin(n, nbKer.toLong(), ant)) return -1
             status = 1
         }
         // When the kernel count is forced to equal n's max, no variable may stray outside its
         // window's value range, so squeeze each group.
-        if (nbKer == state.intDomains[n].max) {
+        if (state.intDomains[n].max == nbKer.toLong()) {
             val stamp = IntArrayList()
             for (idx in 0 until nv) {
                 val node = order[idx]
@@ -289,14 +290,14 @@ internal class NValuePropagator(
                 }
                 stamp.add(node)
             }
-            val s = squeeze(state, ant, stamp, if (lowerPass) Int.MAX_VALUE else Int.MIN_VALUE, lowerPass)
+            val s = squeeze(state, ant, stamp, if (lowerPass) Long.MAX_VALUE else Long.MIN_VALUE, lowerPass)
             if (s < 0) return -1
             if (s > 0) status = 1
         }
         return status
     }
 
-    private fun overlaps(lowerPass: Boolean, nodeMin: Int, nodeMax: Int, min: Int, max: Int): Boolean =
+    private fun overlaps(lowerPass: Boolean, nodeMin: Long, nodeMax: Long, min: Long, max: Long): Boolean =
         if (lowerPass) nodeMin <= max else nodeMax >= min
 
     /**
@@ -308,17 +309,17 @@ internal class NValuePropagator(
         state: PropagationState,
         ant: IntArray?,
         stamp: IntArrayList,
-        frontier: Int,
+        frontier: Long,
         lowerPass: Boolean,
     ): Int {
         var status = 0
         if (lowerPass) {
-            var newMin = Int.MIN_VALUE
+            var newMin = Long.MIN_VALUE
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
                 if (state.intDomains[vid].max < frontier) newMin = maxOf(newMin, state.intDomains[vid].min)
             }
-            if (newMin == Int.MIN_VALUE) return 0
+            if (newMin == Long.MIN_VALUE) return 0
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
                 if (state.intDomains[vid].max < frontier && state.intDomains[vid].min < newMin) {
@@ -327,12 +328,12 @@ internal class NValuePropagator(
                 }
             }
         } else {
-            var newMax = Int.MAX_VALUE
+            var newMax = Long.MAX_VALUE
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
                 if (state.intDomains[vid].min > frontier) newMax = minOf(newMax, state.intDomains[vid].max)
             }
-            if (newMax == Int.MAX_VALUE) return 0
+            if (newMax == Long.MAX_VALUE) return 0
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
                 if (state.intDomains[vid].min > frontier && state.intDomains[vid].max > newMax) {

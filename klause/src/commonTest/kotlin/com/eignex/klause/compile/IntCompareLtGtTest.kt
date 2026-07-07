@@ -27,7 +27,7 @@ class IntCompareLtGtTest {
             val xv = compiled.decode(schema.x, s)
             assertTrue(xv < 5, "x=$xv violates lt 5")
         }
-        val anyAtFour = samples.any { compiled.decode(schema.x, it) == 4 }
+        val anyAtFour = samples.any { compiled.decode(schema.x, it) == 4L }
         assertTrue(anyAtFour, "no sample reached x=4 — compiler is over-tightening lt")
     }
 
@@ -47,7 +47,7 @@ class IntCompareLtGtTest {
             val xv = compiled.decode(schema.x, s)
             assertTrue(xv > 5, "x=$xv violates gt 5")
         }
-        val anyAtSix = samples.any { compiled.decode(schema.x, it) == 6 }
+        val anyAtSix = samples.any { compiled.decode(schema.x, it) == 6L }
         assertTrue(anyAtSix, "no sample reached x=6 — compiler is over-tightening gt")
     }
 }

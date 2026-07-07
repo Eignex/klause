@@ -209,10 +209,10 @@ internal fun collectLinearStartBoundAntecedents(
         val citeMin = if (useLo) c > 0 else c < 0
         if (citeMin) {
             if (startMin <= state.problem.intDomains[v].min) continue
-            out.add(Lit.make(state.atomVarGe(v, startMin.toInt()), false))
+            out.add(Lit.make(state.atomVarGe(v, startMin), false))
         } else {
             if (startMax >= state.problem.intDomains[v].max) continue
-            out.add(Lit.make(state.atomVarLe(v, startMax.toInt()), false))
+            out.add(Lit.make(state.atomVarLe(v, startMax), false))
         }
     }
     if (out.size == 0) return null
@@ -275,7 +275,7 @@ internal fun propagateLinearBounds(
             val forbidden = rhs / c
             if (forbidden < Int.MIN_VALUE || forbidden > Int.MAX_VALUE) continue
             val ant = collectLinearTightenAntecedents(state, vars, i, extraLit, includeExtraLit = includeExtraLit)
-            if (!state.excludeIntValue(v, forbidden.toInt(), ant)) return false
+            if (!state.excludeIntValue(v, forbidden, ant)) return false
         }
         return true
     }
@@ -390,17 +390,13 @@ internal fun linearSumRange(state: PropagationState, coeffs: LongArray, vars: In
     return longArrayOf(lo, hi)
 }
 
-private fun tightenMinClamped(state: PropagationState, v: Int, newMin: Long, ant: IntArray? = null): Boolean = when {
-    newMin > Int.MAX_VALUE -> false
-    newMin < Int.MIN_VALUE -> true
-    else -> state.tightenIntMin(v, newMin.toInt(), ant)
-}
+// Domains are 64-bit, so a bound beyond the 32-bit range is a valid tightening, not an infeasibility;
+// the mutator itself is a no-op when the bound doesn't constrain the current domain.
+private fun tightenMinClamped(state: PropagationState, v: Int, newMin: Long, ant: IntArray? = null): Boolean =
+    state.tightenIntMin(v, newMin, ant)
 
-private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long, ant: IntArray? = null): Boolean = when {
-    newMax < Int.MIN_VALUE -> false
-    newMax > Int.MAX_VALUE -> true
-    else -> state.tightenIntMax(v, newMax.toInt(), ant)
-}
+private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long, ant: IntArray? = null): Boolean =
+    state.tightenIntMax(v, newMax, ant)
 
 /** floor(a / b) with correct handling of negative operands. */
 internal fun floorDivLong(a: Long, b: Long): Long {

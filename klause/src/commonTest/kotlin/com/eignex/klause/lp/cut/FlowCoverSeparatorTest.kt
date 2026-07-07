@@ -24,7 +24,7 @@ class FlowCoverSeparatorTest {
     /** `n` flow vars `y₀..` (ints 0..n−1, domain `[0,u]`) + indicators `x₀..` (ints n..2n−1, `{0,1}`),
      *  with VUBs `yⱼ ≤ u·xⱼ` and the capacity row `Σ yⱼ ≤ b`. */
     private fun flowProblem(n: Int, u: Int, b: Int): Problem {
-        val domains = Array(2 * n) { if (it < n) IntDomain(0, u) else IntDomain(0, 1) }
+        val domains = Array(2 * n) { if (it < n) IntDomain(0, u.toLong()) else IntDomain(0, 1) }
         val factors = ArrayList<Factor>()
         for (j in 0 until n) factors.add(Linear(intArrayOf(1, -u), intArrayOf(j, n + j), LinearOp.LE, 0))
         factors.add(Linear(IntArray(n) { 1 }, IntArray(n) { it }, LinearOp.LE, b))

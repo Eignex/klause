@@ -77,9 +77,9 @@ internal fun LpEngine.pinToward(
 /** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
  *  of the LP value on a conflict. False only when both candidates wipe out — a conflicting pin reverts
  *  the session to its pre-pin state, so the fallback resumes cleanly. */
-private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo: Int, hi: Int): Boolean {
+private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo: Long, hi: Long): Boolean {
     if (lp == null) return session.pinInt(v, lo) !is PropagationResult.Unsat
-    val first = round(lp).toInt().coerceIn(lo, hi)
+    val first = round(lp).toLong().coerceIn(lo, hi)
     if (session.pinInt(v, first) !is PropagationResult.Unsat) return true
     val second = (if (lp >= first) first + 1 else first - 1).coerceIn(lo, hi)
     if (second == first) return false
@@ -108,10 +108,10 @@ internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation
     repeat(PUMP_ROUNDS) {
         if (cancellation()) return null
         val (relaxation, primal) = solved
-        val intTarget = IntArray(problem.numIntVars) { v ->
+        val intTarget = LongArray(problem.numIntVars) { v ->
             val col = relaxation.intColOf[v]
             val d = problem.intDomains[v]
-            if (col in 0 until primal.size) round(primal[col]).toInt().coerceIn(d.min, d.max) else d.min
+            if (col in 0 until primal.size) round(primal[col]).toLong().coerceIn(d.min, d.max) else d.min
         }
         val boolTarget = BooleanArray(problem.numBoolVars) { b ->
             val col = relaxation.boolColOf[b]
@@ -137,7 +137,7 @@ internal fun LpEngine.lpFeasibilityPump(objective: LinearObjective, cancellation
 }
 
 /** The dedup key of a feasibility-pump rounding (its full integer + Boolean target tuple). */
-private fun pumpKey(intTarget: IntArray, boolTarget: BooleanArray): String =
+private fun pumpKey(intTarget: LongArray, boolTarget: BooleanArray): String =
     intTarget.joinToString(",") + "|" + boolTarget.joinToString(",")
 
 /**
@@ -150,7 +150,7 @@ private fun pumpKey(intTarget: IntArray, boolTarget: BooleanArray): String =
 private fun LpEngine.perturbRounding(
     relaxation: LpRelaxation,
     primal: DoubleArray,
-    intTarget: IntArray,
+    intTarget: LongArray,
     boolTarget: BooleanArray,
     count: Int,
 ) {
@@ -202,7 +202,7 @@ private fun LpEngine.solveRelaxation(
 /** The rounded target of structural column [col] as a double, or null when it backs no live variable. */
 private fun LpEngine.targetOfCol(
     relaxation: LpRelaxation,
-    intTarget: IntArray,
+    intTarget: LongArray,
     boolTarget: BooleanArray,
     col: Int,
 ): Double? {
@@ -220,7 +220,7 @@ private fun LpEngine.targetOfCol(
  *  (whose `|x − t|` is not linear). Null when no coordinate contributes — nothing left to pump. */
 private fun LpEngine.distanceObjective(
     relaxation: LpRelaxation,
-    intTarget: IntArray,
+    intTarget: LongArray,
     boolTarget: BooleanArray,
 ): LinearObjective? {
     var any = false

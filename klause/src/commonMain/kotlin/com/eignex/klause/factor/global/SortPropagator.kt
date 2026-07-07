@@ -60,10 +60,10 @@ internal class SortPropagator(
     private val recup2 = IntArray(3)
     private var currentScc = 0
 
-    private fun xlb(i: Int) = state.intDomains[xs[i]].min
-    private fun xub(i: Int) = state.intDomains[xs[i]].max
-    private fun ylb(i: Int) = state.intDomains[ys[i]].min
-    private fun yub(i: Int) = state.intDomains[ys[i]].max
+    private fun xlb(i: Int) = state.intDomains[xs[i]].min.toInt()
+    private fun xub(i: Int) = state.intDomains[xs[i]].max.toInt()
+    private fun ylb(i: Int) = state.intDomains[ys[i]].min.toInt()
+    private fun yub(i: Int) = state.intDomains[ys[i]].max.toInt()
 
     // The active state, set per propagate() so the bound accessors above stay terse.
     private lateinit var state: PropagationState
@@ -82,10 +82,10 @@ internal class SortPropagator(
 
         // (a) Normalize ys into a non-decreasing bound chain.
         for (i in 1 until n) {
-            if (!state.tightenIntMin(ys[i], ylb(i - 1), ant)) return false
+            if (!state.tightenIntMin(ys[i], ylb(i - 1).toLong(), ant)) return false
         }
         for (i in n - 2 downTo 0) {
-            if (!state.tightenIntMax(ys[i], yub(i + 1), ant)) return false
+            if (!state.tightenIntMax(ys[i], yub(i + 1).toLong(), ant)) return false
         }
 
         // (b1) Greedy matching f: assign each ys[j] (ascending) the available xs of smallest UB.
@@ -101,7 +101,7 @@ internal class SortPropagator(
             f[j] = popF(j) ?: return false
         }
         for (i in 0 until n) {
-            if (!state.tightenIntMax(ys[i], xub(f[i]), ant)) return false
+            if (!state.tightenIntMax(ys[i], xub(f[i]).toLong(), ant)) return false
         }
 
         // (b2) Greedy matching f': assign each ys[j] (descending) the available xs of largest LB.
@@ -117,7 +117,7 @@ internal class SortPropagator(
             fPrime[j] = popFPrime(j) ?: return false
         }
         for (i in 0 until n) {
-            if (!state.tightenIntMin(ys[i], xlb(fPrime[i]), ant)) return false
+            if (!state.tightenIntMin(ys[i], xlb(fPrime[i]).toLong(), ant)) return false
         }
 
         // (c) Condense the xy-intersection graph into SCCs, then tighten each xs to the range its
@@ -147,7 +147,7 @@ internal class SortPropagator(
                 var k = 0
                 while (k < n && sccSequences[c][k] != -1 && xlb(jprime) > yub(sccSequences[c][k])) k++
                 if (k >= n || sccSequences[c][k] == -1) return false
-                if (!state.tightenIntMin(xs[jprime], ylb(sccSequences[c][k]), ant)) return false
+                if (!state.tightenIntMin(xs[jprime], ylb(sccSequences[c][k]).toLong(), ant)) return false
                 j++
             }
             c++
@@ -166,7 +166,7 @@ internal class SortPropagator(
                 var k = 0
                 while (k < n && sccSequences[c][k] != -1 && xub(jprime) < ylb(sccSequences[c][k])) k++
                 if (k >= n || sccSequences[c][k] == -1) return false
-                if (!state.tightenIntMax(xs[jprime], yub(sccSequences[c][k]), ant)) return false
+                if (!state.tightenIntMax(xs[jprime], yub(sccSequences[c][k]).toLong(), ant)) return false
                 j++
             }
             c++

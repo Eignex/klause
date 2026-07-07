@@ -9,6 +9,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.LongArrayList
 
 /** CP propagation logic for `global_cardinality`. */
 internal class GlobalCardinalityPropagator(
@@ -31,7 +32,7 @@ internal class GlobalCardinalityPropagator(
         collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? GccPropCache)?.conflictVars ?: intVars),
     )
 
-    private fun pinnedTo(state: PropagationState, scope: IntArray, value: Int): IntArrayList {
+    private fun pinnedTo(state: PropagationState, scope: IntArray, value: Long): IntArrayList {
         val out = IntArrayList()
         for (x in scope) {
             val d = state.intDomains[x]
@@ -111,8 +112,8 @@ internal class GlobalCardinalityPropagator(
         if (closed) {
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
-                val toRemove = IntArrayList()
-                d.forEach { if (!coverIndexByValue.contains(it)) toRemove.add(it) }
+                val toRemove = LongArrayList()
+                d.forEach { if (!coverIndexByValue.contains(it.toInt())) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(x, toRemove[k], gccAntecedents)) return false
                 }
@@ -122,7 +123,7 @@ internal class GlobalCardinalityPropagator(
         val definite = IntArray(m)
         val possible = IntArray(m)
         for (k in cover.indices) {
-            val target = cover[k]
+            val target = cover[k].toLong()
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
                 if (d.min == d.max && d.min == target) definite[k]++
@@ -132,12 +133,12 @@ internal class GlobalCardinalityPropagator(
                 if (target in state.intDomains[x]) possible[k]++
             }
             if (cvArr != null) {
-                if (!state.tightenIntMin(cvArr[k], definite[k], gccAntecedents)) {
+                if (!state.tightenIntMin(cvArr[k], definite[k].toLong(), gccAntecedents)) {
                     cache.conflictVars = pinnedTo(state, effectiveXs, target)
                         .also { it.add(cvArr[k]) }.toIntArray()
                     return false
                 }
-                if (!state.tightenIntMax(cvArr[k], possible[k], gccAntecedents)) return false
+                if (!state.tightenIntMax(cvArr[k], possible[k].toLong(), gccAntecedents)) return false
             } else {
                 if (requireNotNull(countLow)[k] > possible[k]) return false
                 if (requireNotNull(countHigh)[k] < definite[k]) {
@@ -151,8 +152,8 @@ internal class GlobalCardinalityPropagator(
         for (k in 0 until m) {
             if (cvArr != null) {
                 val cd = state.intDomains[cvArr[k]]
-                lo[k] = cd.min
-                hi[k] = cd.max
+                lo[k] = cd.min.toInt()
+                hi[k] = cd.max.toInt()
             } else {
                 lo[k] = requireNotNull(countLow)[k]
                 hi[k] = requireNotNull(countHigh)[k]
@@ -165,7 +166,7 @@ internal class GlobalCardinalityPropagator(
             for (i in 0 until n) {
                 val d = state.intDomains[effectiveXs[i]]
                 var found = false
-                d.forEach { if (!found && !coverIndexByValue.contains(it)) found = true }
+                d.forEach { if (!found && !coverIndexByValue.contains(it.toInt())) found = true }
                 hasOtherVar[i] = found
                 if (found) any = true
             }
@@ -192,7 +193,7 @@ internal class GlobalCardinalityPropagator(
         for (i in 0 until n) {
             val d = state.intDomains[effectiveXs[i]]
             for (k in 0 until m) {
-                if (cover[k] in d) {
+                if (cover[k].toLong() in d) {
                     val eIdx = flow.addEdge(varNode[i], covNode[k], 1)
                     xToCovEdgeIdx[i][k] = eIdx
                 }
@@ -263,13 +264,13 @@ internal class GlobalCardinalityPropagator(
                 if (eIdx < 0) continue
                 if (flow.flowOf(eIdx) > 0) continue
                 if (sccId[varNode[i]] == sccId[covNode[k]]) continue
-                if (!state.excludeIntValue(effectiveXs[i], cover[k], gccAntecedents)) return false
+                if (!state.excludeIntValue(effectiveXs[i], cover[k].toLong(), gccAntecedents)) return false
             }
             val oIdx = xToOtherEdgeIdx[i]
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[varNode[i]] != sccId[otherNode]) {
                 val d = state.intDomains[effectiveXs[i]]
-                val toRemove = IntArrayList()
-                d.forEach { if (!coverIndexByValue.contains(it)) toRemove.add(it) }
+                val toRemove = LongArrayList()
+                d.forEach { if (!coverIndexByValue.contains(it.toInt())) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(effectiveXs[i], toRemove[k], gccAntecedents)) return false
                 }

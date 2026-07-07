@@ -4,7 +4,7 @@ import com.eignex.klause.factor.scheduling.internals.firstInDomainAtLeast
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.argsortByIntKey
+import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 
 /**
@@ -31,10 +31,10 @@ internal class DisjunctiveInvariant(
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         cumulativeBacking.violationDegree(state, factorId)
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int =
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int =
         cumulativeBacking.deltaIfIntSet(state, factorId, intVar, newValue)
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int =
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int =
         cumulativeBacking.applyIntSet(state, factorId, intVar, oldValue)
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
@@ -59,8 +59,10 @@ internal class DisjunctiveInvariant(
      *  (domain exhausted, or a frozen start overlaps the packing). */
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (presents.isNotEmpty() || starts.isEmpty()) return false
-        val order = argsortByIntKey(starts.size) { state.problem.intDomains[starts[it]].min }
-        var prevEnd = Int.MIN_VALUE
+        val order = argsortBy(starts.size) { a, b ->
+            state.problem.intDomains[starts[a]].min.compareTo(state.problem.intDomains[starts[b]].min)
+        }
+        var prevEnd = Long.MIN_VALUE
         for (oi in order.indices) {
             val i = order[oi]
             val v = starts[i]
@@ -80,6 +82,6 @@ internal class DisjunctiveInvariant(
     }
 
     /** Current duration of task [i]: the constant, or the duration variable's value. */
-    private fun durationOf(state: LocalSearchState, i: Int): Int =
-        if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
+    private fun durationOf(state: LocalSearchState, i: Int): Long =
+        if (durationVars.isEmpty()) durations[i].toLong() else state.assignment.intValue(durationVars[i])
 }

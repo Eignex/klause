@@ -25,15 +25,15 @@ class MoveSinkTest {
         val sink = MoveSink()
         sink.addIntSet(0, 0)
         sink.addIntSet(1, -5)
-        sink.addIntSet(2, Int.MAX_VALUE)
-        sink.addIntSet(3, Int.MIN_VALUE)
+        sink.addIntSet(2, Int.MAX_VALUE.toLong())
+        sink.addIntSet(3, Int.MIN_VALUE.toLong())
         sink.addIntSet(4, -1)
         assertEquals(
             listOf(
                 Move.IntSet(0, 0),
                 Move.IntSet(1, -5),
-                Move.IntSet(2, Int.MAX_VALUE),
-                Move.IntSet(3, Int.MIN_VALUE),
+                Move.IntSet(2, Int.MAX_VALUE.toLong()),
+                Move.IntSet(3, Int.MIN_VALUE.toLong()),
                 Move.IntSet(4, -1),
             ),
             sink.list,
@@ -155,9 +155,9 @@ class MoveSinkTest {
     @Test
     fun `growth past initial capacity preserves entries`() {
         val sink = MoveSink()
-        for (v in 0 until 100) sink.addIntSet(v, v * 7)
+        for (v in 0 until 100) sink.addIntSet(v, (v * 7).toLong())
         val out = sink.list
         assertEquals(100, out.size)
-        for (v in 0 until 100) assertEquals(Move.IntSet(v, v * 7), out[v])
+        for (v in 0 until 100) assertEquals(Move.IntSet(v, (v * 7).toLong()), out[v])
     }
 }

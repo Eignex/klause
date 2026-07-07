@@ -26,10 +26,10 @@ class OznApplier(oznSource: String) {
         // Float-backed int vars are rendered under their float names.
         for ((name, id) in program.intVarsByName) {
             if (program.floatVarsByName.containsKey(name)) continue
-            out[name] = OznValue.IntV(sample.ints[id].toLong())
+            out[name] = OznValue.IntV(sample.ints[id])
         }
         for ((name, b) in program.floatVarsByName) {
-            out[name] = OznValue.FloatV(b.valueOf(sample.ints[b.varId]))
+            out[name] = OznValue.FloatV(b.valueOf(sample.ints[b.varId].toInt()))
         }
         for ((name, layout) in program.setVarsByName) {
             out[name] = setBindingFrom(layout, sample)
@@ -64,11 +64,11 @@ class OznApplier(oznSource: String) {
                 when (arr.elementKind) {
                     FlatZincArray.Vars.ElementKind.Bool -> OznValue.BoolV(sample.bools[v])
 
-                    FlatZincArray.Vars.ElementKind.Int -> OznValue.IntV(sample.ints[v].toLong())
+                    FlatZincArray.Vars.ElementKind.Int -> OznValue.IntV(sample.ints[v])
 
                     FlatZincArray.Vars.ElementKind.Float -> {
                         val b = requireNotNull(arr.floatBucketings)[idx]
-                        OznValue.FloatV(b.valueOf(sample.ints[v]))
+                        OznValue.FloatV(b.valueOf(sample.ints[v].toInt()))
                     }
                 }
             },

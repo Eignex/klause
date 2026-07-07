@@ -109,7 +109,7 @@ class CircuitCutTest {
         val p = Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, n - 1) },
+            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(Circuit(IntArray(n) { it })),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(5L, 4L, 6L, 2L, 1L, 3L))
@@ -136,7 +136,7 @@ class CircuitCutTest {
             val p = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(0, n - 1) },
+                intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
                 factors = arrayOf<Factor>(Circuit(IntArray(n) { it })),
             )
             return CpToLpRelaxation(p, null, circuitArcs = true).build(PropagationSession(p))

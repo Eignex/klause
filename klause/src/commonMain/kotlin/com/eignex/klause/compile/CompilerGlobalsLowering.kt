@@ -87,7 +87,7 @@ internal fun Lowering.assertMddDecomposed(expr: MddExpr) {
     val stateRefs = Array(n + 1) { i ->
         val ns = expr.numStatesPerLayer[i]
         require(ns >= 1) { "mdd: numStatesPerLayer[$i] must be ≥ 1" }
-        IntRef(newAuxIntVar(IntDomain(0, ns - 1)))
+        IntRef(newAuxIntVar(IntDomain(0L, (ns - 1).toLong())))
     }
 
     // state[0] = initial.
@@ -145,7 +145,7 @@ internal fun Lowering.assertCostMddDecomposed(expr: CostMddExpr) {
     val n = expr.seq.size
     val stateRefs = Array(n + 1) { i ->
         val ns = expr.numStatesPerLayer[i]
-        IntRef(newAuxIntVar(IntDomain(0, ns - 1)))
+        IntRef(newAuxIntVar(IntDomain(0L, (ns - 1).toLong())))
     }
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
     if (expr.accepting.isEmpty()) {
@@ -163,7 +163,7 @@ internal fun Lowering.assertCostMddDecomposed(expr: CostMddExpr) {
     }
     val wLo = (allWeights.toIntArray().minOrNull() ?: 0)
     val wHi = (allWeights.toIntArray().maxOrNull() ?: 0)
-    val weightRefs = Array(n) { IntRef(newAuxIntVar(IntDomain(wLo, wHi))) }
+    val weightRefs = Array(n) { IntRef(newAuxIntVar(IntDomain(wLo.toLong(), wHi.toLong()))) }
 
     for (i in 0 until n) {
         val wRef = weightRefs[i]
@@ -243,7 +243,7 @@ internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
 
     // Decomposition path: always emitted so the bit-blast pipeline (which skips the
     // propagation-only Mdd factor) still sees the constraint as primitive Table + Linear.
-    val stateRefs = Array(n + 1) { IntRef(newAuxIntVar(IntDomain(0, numStates - 1))) }
+    val stateRefs = Array(n + 1) { IntRef(newAuxIntVar(IntDomain(0L, (numStates - 1).toLong()))) }
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
     if (expr.accepting.isEmpty()) {
         assertExpr(IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(1)))
@@ -262,7 +262,7 @@ internal fun Lowering.assertCostRegular(expr: CostRegularExpr) {
     }
     val wLo = tuples.minOfOrNull { it[3] } ?: 0
     val wHi = tuples.maxOfOrNull { it[3] } ?: 0
-    val weightRefs = Array(n) { IntRef(newAuxIntVar(IntDomain(wLo, wHi))) }
+    val weightRefs = Array(n) { IntRef(newAuxIntVar(IntDomain(wLo.toLong(), wHi.toLong()))) }
     for (i in 0 until n) {
         val wRef = weightRefs[i]
         if (tuples.isEmpty()) {

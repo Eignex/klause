@@ -19,6 +19,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 /**
@@ -87,12 +88,12 @@ internal class CumulativeRelaxation(
     internal class AreaPlan(
         val makespanVar: Int,
         /** Declared capacity upper bound (`> 0`); the energy ceiling per unit time. */
-        val capacity: Int,
+        val capacity: Long,
         val startVars: IntArray,
         /** Per-task constant duration (`> 0`). */
         val durations: IntArray,
         /** Per-task minimum resource demand (`> 0`). */
-        val resources: IntArray,
+        val resources: LongArray,
     )
 
     /** The validated, live right-hand side of one [AreaPlan]'s row at a node. */
@@ -109,12 +110,11 @@ internal class CumulativeRelaxation(
      * still its declared one; otherwise the tightened starts it used are recorded as premises.
      */
     fun rowSpec(plan: AreaPlan, session: PropagationSession): RowSpec {
-        val cap = plan.capacity.toLong()
+        val cap = plan.capacity
         val n = plan.startVars.size
-        val estLive = IntArray(n) { session.intDomain(plan.startVars[it]).min }
-        val estDecl = IntArray(n) { problem.intDomains[plan.startVars[it]].min }
-        // Both Int → the product fits in a Long without overflow; the declared bound is always valid.
-        val floor = cap * problem.intDomains[plan.makespanVar].min.toLong()
+        val estLive = LongArray(n) { session.intDomain(plan.startVars[it]).min }
+        val estDecl = LongArray(n) { problem.intDomains[plan.startVars[it]].min }
+        val floor = cap * problem.intDomains[plan.makespanVar].min
 
         val energetic = try {
             energeticRhs(cap, estLive, plan.durations, plan.resources)
@@ -137,14 +137,14 @@ internal class CumulativeRelaxation(
      * visits the earliest-starts in ascending order, maintaining the full-energy / partial-energy
      * partition incrementally in `O(n log n)`. Throws [LpOverflowException] on any product overflow.
      */
-    private fun energeticRhs(cap: Long, est: IntArray, dur: IntArray, res: IntArray): Long {
+    private fun energeticRhs(cap: Long, est: LongArray, dur: IntArray, res: LongArray): Long {
         val n = est.size
-        val ect = LongArray(n) { addExact(est[it].toLong(), dur[it].toLong()) }
+        val ect = LongArray(n) { addExact(est[it], dur[it].toLong()) }
         // A = {est ≥ t1}: full energy rᵢ·durᵢ. B = {est < t1 < ect}: rᵢ·(ectᵢ − t1). C = {ect ≤ t1}: 0.
         var fullEnergy = 0L // Σ_A rᵢ·durᵢ
         var bSumREct = 0L // Σ_B rᵢ·ectᵢ
         var bSumR = 0L // Σ_B rᵢ
-        for (k in 0 until n) fullEnergy = addExact(fullEnergy, mulExact(res[k].toLong(), dur[k].toLong()))
+        for (k in 0 until n) fullEnergy = addExact(fullEnergy, mulExact(res[k], dur[k].toLong()))
 
         val estOrder = (0 until n).sortedBy { est[it] }
         val ectOrder = (0 until n).sortedBy { ect[it] }
@@ -157,24 +157,24 @@ internal class CumulativeRelaxation(
         var best = Long.MIN_VALUE
         var idx = 0
         while (idx <= n) {
-            val t1 = if (idx < n) est[estOrder[idx]].toLong() else maxEct
+            val t1 = if (idx < n) est[estOrder[idx]] else maxEct
             if (idx < n && idx > 0 && est[estOrder[idx]] == est[estOrder[idx - 1]]) {
                 idx++
                 continue // dedupe equal earliest-starts
             }
             // Advance events strictly below / at t1: est_k < t1 enters B; ect_k ≤ t1 leaves to C.
-            while (ei < n && est[estOrder[ei]].toLong() < t1) {
+            while (ei < n && est[estOrder[ei]] < t1) {
                 val k = estOrder[ei]
-                fullEnergy = subExact(fullEnergy, mulExact(res[k].toLong(), dur[k].toLong()))
-                bSumREct = addExact(bSumREct, mulExact(res[k].toLong(), ect[k]))
-                bSumR = addExact(bSumR, res[k].toLong())
+                fullEnergy = subExact(fullEnergy, mulExact(res[k], dur[k].toLong()))
+                bSumREct = addExact(bSumREct, mulExact(res[k], ect[k]))
+                bSumR = addExact(bSumR, res[k])
                 ei++
             }
             while (ci < n && ect[ectOrder[ci]] <= t1) {
                 val k = ectOrder[ci]
-                if (est[k].toLong() < t1) { // only tasks that had entered B leave to C
-                    bSumREct = subExact(bSumREct, mulExact(res[k].toLong(), ect[k]))
-                    bSumR = subExact(bSumR, res[k].toLong())
+                if (est[k] < t1) { // only tasks that had entered B leave to C
+                    bSumREct = subExact(bSumREct, mulExact(res[k], ect[k]))
+                    bSumR = subExact(bSumR, res[k])
                 }
                 ci++
             }
@@ -188,9 +188,9 @@ internal class CumulativeRelaxation(
     }
 
     /** Records the tightened (live) earliest-starts the row leaned on as `startᵢ ≥ estLiveᵢ` atoms. */
-    private fun livePremises(startVars: IntArray, estLive: IntArray, estDecl: IntArray): LpRowPremises {
+    private fun livePremises(startVars: IntArray, estLive: LongArray, estDecl: LongArray): LpRowPremises {
         val pv = IntArrayList()
-        val pt = IntArrayList()
+        val pt = LongArrayList()
         var count = 0
         for (k in startVars.indices) {
             if (estLive[k] == estDecl[k]) continue
@@ -198,7 +198,7 @@ internal class CumulativeRelaxation(
             pt.add(estLive[k])
             count++
         }
-        return LpRowPremises(pv.toIntArray(), BooleanArray(count) { false }, pt.toIntArray())
+        return LpRowPremises(pv.toIntArray(), BooleanArray(count) { false }, pt.toLongArray())
     }
 
     // ----- structural plan construction (once, at problem load) -----
@@ -237,13 +237,13 @@ internal class CumulativeRelaxation(
                 capacity = s.cap,
                 startVars = IntArray(k) { s.starts[idxs[it]] },
                 durations = IntArray(k) { s.dur[idxs[it]] },
-                resources = IntArray(k) { s.res[idxs[it]] },
+                resources = LongArray(k) { s.res[idxs[it]] },
             )
         }
     }
 
     /** A scheduling factor normalized to constant per-task duration / minimum demand / max capacity. */
-    private class Sched(val starts: IntArray, val dur: IntArray, val res: IntArray, val cap: Int)
+    private class Sched(val starts: IntArray, val dur: IntArray, val res: LongArray, val cap: Long)
 
     private fun schedulingFactors(): List<Sched> {
         val out = ArrayList<Sched>()
@@ -255,10 +255,14 @@ internal class CumulativeRelaxation(
                     // the link is conditional on presence. Both are skipped (drops energy, sound).
                     if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
                     if (f.starts.size > MAX_TASKS) continue
-                    val cap = if (f.capacityVar >= 0) problem.intDomains[f.capacityVar].max else f.capacity
-                    if (cap <= 0) continue
-                    val res = IntArray(f.starts.size) { i ->
-                        if (f.resourceVars.isNotEmpty()) problem.intDomains[f.resourceVars[i]].min else f.resources[i]
+                    val cap = if (f.capacityVar >= 0) problem.intDomains[f.capacityVar].max else f.capacity.toLong()
+                    if (cap <= 0L) continue
+                    val res = LongArray(f.starts.size) { i ->
+                        if (f.resourceVars.isNotEmpty()) {
+                            problem.intDomains[f.resourceVars[i]].min
+                        } else {
+                            f.resources[i].toLong()
+                        }
                     }
                     out.add(Sched(f.starts, f.durations, res, cap))
                 }
@@ -267,7 +271,7 @@ internal class CumulativeRelaxation(
                     if (!includeCumulative) continue
                     if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
                     if (f.starts.size > MAX_TASKS) continue
-                    out.add(Sched(f.starts, f.durations, IntArray(f.starts.size) { 1 }, cap = 1))
+                    out.add(Sched(f.starts, f.durations, LongArray(f.starts.size) { 1L }, cap = 1L))
                 }
 
                 is Diffn -> if (includeDiffn) addDiffnScheds(f, out)
@@ -285,17 +289,17 @@ internal class CumulativeRelaxation(
         if (f.widthVars != null || f.heightVars != null) return
         if (f.xs.size > MAX_TASKS) return
         val yExtent = perpendicularExtent(f.ys, f.heights)
-        if (yExtent > 0) out.add(Sched(f.xs, f.widths, f.heights, yExtent))
+        if (yExtent > 0L) out.add(Sched(f.xs, f.widths, LongArray(f.heights.size) { f.heights[it].toLong() }, yExtent))
         val xExtent = perpendicularExtent(f.xs, f.widths)
-        if (xExtent > 0) out.add(Sched(f.ys, f.heights, f.widths, xExtent))
+        if (xExtent > 0L) out.add(Sched(f.ys, f.heights, LongArray(f.widths.size) { f.widths[it].toLong() }, xExtent))
     }
 
     /** Maximum extent of the bounding box along an axis: `max(coordᵢ.max + sizeᵢ) − min(coordᵢ.min)`.
      *  An upper bound on the perpendicular resource room, so using it as the cumulative capacity only
      *  loosens the energetic bound (sound). */
-    private fun perpendicularExtent(coords: IntArray, sizes: IntArray): Int {
-        var hi = Int.MIN_VALUE
-        var lo = Int.MAX_VALUE
+    private fun perpendicularExtent(coords: IntArray, sizes: IntArray): Long {
+        var hi = Long.MIN_VALUE
+        var lo = Long.MAX_VALUE
         for (i in coords.indices) {
             val d = problem.intDomains[coords[i]]
             if (d.max + sizes[i] > hi) hi = d.max + sizes[i]

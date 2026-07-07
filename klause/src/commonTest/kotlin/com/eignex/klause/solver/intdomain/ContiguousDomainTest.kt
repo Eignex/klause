@@ -62,9 +62,9 @@ class ContiguousDomainTest {
         assertTrue(2 in e)
         assertFalse(3 in e)
         assertTrue(4 in e)
-        val seen = mutableListOf<Int>()
+        val seen = mutableListOf<Long>()
         e.forEach { seen.add(it) }
-        assertEquals(listOf(1, 2, 4, 5), seen)
+        assertEquals(listOf(1L, 2L, 4L, 5L), seen)
     }
 
     @Test
@@ -77,9 +77,9 @@ class ContiguousDomainTest {
         assertFalse(5 in d)
         assertFalse(7 in d)
         assertTrue(6 in d)
-        val seen = mutableListOf<Int>()
+        val seen = mutableListOf<Long>()
         d.forEach { seen.add(it) }
-        assertEquals(listOf(1, 2, 3, 6, 8, 9, 10), seen)
+        assertEquals(listOf(1L, 2L, 3L, 6L, 8L, 9L, 10L), seen)
     }
 
     @Test
@@ -89,9 +89,9 @@ class ContiguousDomainTest {
         assertEquals(4, e.min)
         assertEquals(10, e.max)
         assertEquals(7, e.size)
-        val seen = mutableListOf<Int>()
+        val seen = mutableListOf<Long>()
         e.forEach { seen.add(it) }
-        assertEquals(listOf(4, 5, 6, 7, 8, 9, 10), seen)
+        assertEquals(listOf(4L, 5L, 6L, 7L, 8L, 9L, 10L), seen)
     }
 
     @Test
@@ -130,9 +130,9 @@ class ContiguousDomainTest {
     @Test
     fun `forEach skips holes and preserves order`() {
         val d = ContiguousDomain(1, 7).excludeValue(3).excludeValue(5)
-        val seen = mutableListOf<Int>()
+        val seen = mutableListOf<Long>()
         d.forEach { seen.add(it) }
-        assertEquals(listOf(1, 2, 4, 6, 7), seen)
+        assertEquals(listOf(1L, 2L, 4L, 6L, 7L), seen)
     }
 
     @Test
@@ -143,10 +143,10 @@ class ContiguousDomainTest {
 
     @Test
     fun `excludeValue should use runs domain for wide interior carve`() {
-        val d = ContiguousDomain(0, DEFAULT_BITSET_THRESHOLD + 10).excludeValue(100)
+        val d = ContiguousDomain(0, (DEFAULT_BITSET_THRESHOLD + 10).toLong()).excludeValue(100)
         assertTrue(d is RunsDomain)
         assertEquals(0, d.min)
-        assertEquals(DEFAULT_BITSET_THRESHOLD + 10, d.max)
+        assertEquals((DEFAULT_BITSET_THRESHOLD + 10).toLong(), d.max)
         assertFalse(100 in d)
         assertTrue(99 in d)
         assertTrue(101 in d)

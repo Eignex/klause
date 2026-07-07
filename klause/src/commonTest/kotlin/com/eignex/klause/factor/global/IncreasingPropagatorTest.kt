@@ -19,7 +19,7 @@ class IncreasingPropagatorTest {
     private fun chain(strict: Boolean, n: Int = 3, lo: Int = 0, hi: Int = 3) = Problem(
         numBoolVars = 0,
         numIntVars = n,
-        intDomains = Array(n) { IntDomain(lo, hi) },
+        intDomains = Array(n) { IntDomain(lo.toLong(), hi.toLong()) },
         factors = arrayOf<Factor>(Increasing(IntArray(n) { it }, strict = strict)),
     )
 

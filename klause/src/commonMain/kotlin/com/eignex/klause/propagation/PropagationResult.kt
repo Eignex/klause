@@ -3,8 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.sortedKeys
@@ -33,22 +34,22 @@ sealed interface PropagationResult {
         /** Int var ids forced to a singleton value, ascending. */
         val intKeys: IntArray,
         /** Forced values aligned with [intKeys]. */
-        val intValues: IntArray,
+        val intValues: LongArray,
         /** Int var ids whose lower bound was tightened (but not yet singleton). Disjoint
          *  from [intKeys]; ascending. Populated by bound-SAC and any future propagation
          *  that wants to expose non-singleton deductions. */
         val intMinKeys: IntArray = EmptyIntArray,
         /** Lower-bound values aligned with [intMinKeys]. */
-        val intMinValues: IntArray = EmptyIntArray,
+        val intMinValues: LongArray = EmptyLongArray,
         /** Int var ids whose upper bound was tightened, ascending. */
         val intMaxKeys: IntArray = EmptyIntArray,
         /** Upper-bound values aligned with [intMaxKeys]. */
-        val intMaxValues: IntArray = EmptyIntArray,
+        val intMaxValues: LongArray = EmptyLongArray,
         /** Interior holes: parallel `(varId, value)` rows in lex order. Each row
          *  encodes `v ≠ value`, with `value` strictly between v's current min and max. */
         val intHoleVarIds: IntArray = EmptyIntArray,
         /** Forbidden values aligned with [intHoleVarIds]. */
-        val intHoleValues: IntArray = EmptyIntArray,
+        val intHoleValues: LongArray = EmptyLongArray,
         /** Set-restrictions `v ∈ {survivors}` for variables reduced to a sparse survivor set — recorded
          *  instead of one interior hole per excluded value, which is O(span) for a wide-but-sparse domain.
          *  CSR: var `intSetKeys[i]`'s survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i+1]]`
@@ -57,7 +58,7 @@ sealed interface PropagationResult {
         /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
         val intSetOffsets: IntArray = EmptyIntArray,
         /** Concatenated ascending survivor values, sliced per variable by [intSetOffsets]. */
-        val intSetValues: IntArray = EmptyIntArray,
+        val intSetValues: LongArray = EmptyLongArray,
     ) : PropagationResult {
 
         /** True iff nothing was forced. */
@@ -76,35 +77,35 @@ sealed interface PropagationResult {
         }
 
         /** Forced value for int [id], or null if not implied. */
-        fun intValueOrNull(id: Int): Int? {
+        fun intValueOrNull(id: Int): Long? {
             val idx = intKeys.binarySearchInt(id)
             return if (idx >= 0) intValues[idx] else null
         }
 
         /** Tightened lower bound for int [id], or null if none. */
-        fun intMinOrNullCompat(id: Int): Int? {
+        fun intMinOrNullCompat(id: Int): Long? {
             val idx = intMinKeys.binarySearchInt(id)
             return if (idx >= 0) intMinValues[idx] else null
         }
 
         /** Tightened upper bound for int [id], or null if none. */
-        fun intMaxOrNullCompat(id: Int): Int? {
+        fun intMaxOrNullCompat(id: Int): Long? {
             val idx = intMaxKeys.binarySearchInt(id)
             return if (idx >= 0) intMaxValues[idx] else null
         }
 
         /** Invoke [action] for each lower-bound tightening `(id, value)`. */
-        inline fun forEachIntMin(action: (id: Int, value: Int) -> Unit) {
+        inline fun forEachIntMin(action: (id: Int, value: Long) -> Unit) {
             for (i in intMinKeys.indices) action(intMinKeys[i], intMinValues[i])
         }
 
         /** Invoke [action] for each upper-bound tightening `(id, value)`. */
-        inline fun forEachIntMax(action: (id: Int, value: Int) -> Unit) {
+        inline fun forEachIntMax(action: (id: Int, value: Long) -> Unit) {
             for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
         }
 
         /** Invoke [action] for each interior hole `(id, forbiddenValue)`. */
-        inline fun forEachIntHole(action: (id: Int, value: Int) -> Unit) {
+        inline fun forEachIntHole(action: (id: Int, value: Long) -> Unit) {
             for (i in intHoleVarIds.indices) action(intHoleVarIds[i], intHoleValues[i])
         }
 
@@ -114,14 +115,14 @@ sealed interface PropagationResult {
         }
 
         /** Invoke [action] for each forced integer `(id, value)`. */
-        inline fun forEachInt(action: (id: Int, value: Int) -> Unit) {
+        inline fun forEachInt(action: (id: Int, value: Long) -> Unit) {
             for (i in intKeys.indices) action(intKeys[i], intValues[i])
         }
 
         /** Invoke [action] for each survivor-set restriction `(id, sortedSurvivors)` — the compact
          *  form of a wide-but-sparse reduction. The survivors are the exact surviving values in
          *  ascending order; callers restrict the variable's domain to them. */
-        inline fun forEachIntSet(action: (id: Int, survivors: IntArray) -> Unit) {
+        inline fun forEachIntSet(action: (id: Int, survivors: LongArray) -> Unit) {
             for (i in intSetKeys.indices) {
                 action(intSetKeys[i], intSetValues.copyOfRange(intSetOffsets[i], intSetOffsets[i + 1]))
             }
@@ -159,11 +160,11 @@ sealed interface PropagationResult {
             }
 
         /** Map view. See [bools]. */
-        val ints: Map<Int, Int>
+        val ints: Map<Int, Long>
             get() = if (intKeys.isEmpty()) {
                 emptyMap()
             } else {
-                LinkedHashMap<Int, Int>(intKeys.size).also { m ->
+                LinkedHashMap<Int, Long>(intKeys.size).also { m ->
                     for (i in intKeys.indices) m[intKeys[i]] = intValues[i]
                 }
             }
@@ -209,24 +210,24 @@ sealed interface PropagationResult {
             val bools = MutableIntObjectMap<Boolean>()
             forEachBool { k, v -> bools.put(k, v) }
             other.forEachBool { k, v -> bools.put(k, v) }
-            val ints = MutableIntIntMap()
+            val ints = MutableIntLongMap()
             forEachInt { k, v -> ints.put(k, v) }
             other.forEachInt { k, v -> ints.put(k, v) }
-            val mins = MutableIntIntMap()
+            val mins = MutableIntLongMap()
             forEachIntMin { k, v -> mins.put(k, v) }
-            other.forEachIntMin { k, v -> mins.put(k, maxOf(mins.getOrDefault(k, Int.MIN_VALUE), v)) }
-            val maxes = MutableIntIntMap()
+            other.forEachIntMin { k, v -> mins.put(k, maxOf(mins.getOrDefault(k, Long.MIN_VALUE), v)) }
+            val maxes = MutableIntLongMap()
             forEachIntMax { k, v -> maxes.put(k, v) }
-            other.forEachIntMax { k, v -> maxes.put(k, minOf(maxes.getOrDefault(k, Int.MAX_VALUE), v)) }
-            val holes = HashSet<Long>()
-            forEachIntHole { id, v -> holes.add(packHole(id, v)) }
-            other.forEachIntHole { id, v -> holes.add(packHole(id, v)) }
+            other.forEachIntMax { k, v -> maxes.put(k, minOf(maxes.getOrDefault(k, Long.MAX_VALUE), v)) }
+            val holes = HashMap<Int, HashSet<Long>>()
+            forEachIntHole { id, v -> holes.getOrPut(id) { HashSet() }.add(v) }
+            other.forEachIntHole { id, v -> holes.getOrPut(id) { HashSet() }.add(v) }
             // Set-restrictions accumulate by INTERSECTION: v ∈ S and v ∈ T both hold, so v ∈ S ∩ T.
             // A var restricted on only one side keeps that side's survivors; an empty intersection is
             // left as-is (an empty survivor set signals infeasibility on apply, exactly as a crossed
             // min/max bound already does). Preserving these is why the PR #958 wide-sparse fold isn't
             // silently discarded when root-probing seeds a merge.
-            val sets = HashMap<Int, IntArray>()
+            val sets = HashMap<Int, LongArray>()
             forEachIntSet { id, s -> sets[id] = s }
             other.forEachIntSet { id, t ->
                 val existing = sets[id]
@@ -235,40 +236,40 @@ sealed interface PropagationResult {
             ints.forEach { k, _ ->
                 mins.remove(k)
                 maxes.remove(k)
-                holes.removeAll { (it ushr HOLE_ID_SHIFT).toInt() == k }
+                holes.remove(k)
                 sets.remove(k)
             }
             return build(bools, ints, mins, maxes, holes, sets)
         }
 
         /** This implied set with int [v]'s lower bound raised to at least [newMin]. */
-        fun withMin(v: Int, newMin: Int): Implied {
-            val mins = MutableIntIntMap()
+        fun withMin(v: Int, newMin: Long): Implied {
+            val mins = MutableIntLongMap()
             forEachIntMin { k, vv -> mins.put(k, vv) }
-            mins.put(v, maxOf(mins.getOrDefault(v, Int.MIN_VALUE), newMin))
-            val maxes = MutableIntIntMap()
+            mins.put(v, maxOf(mins.getOrDefault(v, Long.MIN_VALUE), newMin))
+            val maxes = MutableIntLongMap()
             forEachIntMax { k, vv -> maxes.put(k, vv) }
             return build(boolMap(), intMap(), mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with int [v]'s upper bound lowered to at most [newMax]. */
-        fun withMax(v: Int, newMax: Int): Implied {
-            val mins = MutableIntIntMap()
+        fun withMax(v: Int, newMax: Long): Implied {
+            val mins = MutableIntLongMap()
             forEachIntMin { k, vv -> mins.put(k, vv) }
-            val maxes = MutableIntIntMap()
+            val maxes = MutableIntLongMap()
             forEachIntMax { k, vv -> maxes.put(k, vv) }
-            maxes.put(v, minOf(maxes.getOrDefault(v, Int.MAX_VALUE), newMax))
+            maxes.put(v, minOf(maxes.getOrDefault(v, Long.MAX_VALUE), newMax))
             return build(boolMap(), intMap(), mins, maxes, holeSet(), setMap())
         }
 
         /** This implied set with interior [value] excluded from int [v]'s domain (`v ≠ value`). */
-        fun withHole(v: Int, value: Int): Implied {
-            val mins = MutableIntIntMap()
+        fun withHole(v: Int, value: Long): Implied {
+            val mins = MutableIntLongMap()
             forEachIntMin { k, vv -> mins.put(k, vv) }
-            val maxes = MutableIntIntMap()
+            val maxes = MutableIntLongMap()
             forEachIntMax { k, vv -> maxes.put(k, vv) }
             val holes = holeSet()
-            holes.add(packHole(v, value))
+            holes.getOrPut(v) { HashSet() }.add(value)
             return build(boolMap(), intMap(), mins, maxes, holes, setMap())
         }
 
@@ -278,29 +279,29 @@ sealed interface PropagationResult {
             return m
         }
 
-        private fun intMap(): MutableIntIntMap {
-            val m = MutableIntIntMap()
+        private fun intMap(): MutableIntLongMap {
+            val m = MutableIntLongMap()
             forEachInt { k, v -> m.put(k, v) }
             return m
         }
 
-        private fun holeSet(): HashSet<Long> {
-            val holes = HashSet<Long>()
-            forEachIntHole { id, v -> holes.add(packHole(id, v)) }
+        private fun holeSet(): HashMap<Int, HashSet<Long>> {
+            val holes = HashMap<Int, HashSet<Long>>()
+            forEachIntHole { id, v -> holes.getOrPut(id) { HashSet() }.add(v) }
             return holes
         }
 
         /** This set's per-variable survivor sets (var → ascending survivors), for threading through
          *  [build] unchanged in the single-set [withMin] / [withMax] / [withHole] paths. */
-        private fun setMap(): HashMap<Int, IntArray> {
-            val m = HashMap<Int, IntArray>()
+        private fun setMap(): HashMap<Int, LongArray> {
+            val m = HashMap<Int, LongArray>()
             forEachIntSet { id, survivors -> m[id] = survivors }
             return m
         }
 
         /** Intersection of two ascending survivor arrays (two-pointer); result stays ascending. */
-        private fun intersectSorted(a: IntArray, b: IntArray): IntArray {
-            val out = IntArrayList(minOf(a.size, b.size))
+        private fun intersectSorted(a: LongArray, b: LongArray): LongArray {
+            val out = LongArrayList(minOf(a.size, b.size))
             var i = 0
             var j = 0
             while (i < a.size && j < b.size) {
@@ -316,80 +317,86 @@ sealed interface PropagationResult {
                     }
                 }
             }
-            return out.toIntArray()
+            return out.toLongArray()
         }
 
         /** Shared [PropagationResult] instances. */
         companion object {
-            private const val HOLE_ID_SHIFT = 32
-            private const val HOLE_VALUE_MASK = 0xFFFFFFFFL
-
-            private fun packHole(id: Int, value: Int): Long =
-                (id.toLong() shl HOLE_ID_SHIFT) or (value.toLong() and HOLE_VALUE_MASK)
-
             /** Materialise an [Implied] from the accumulation maps used by [merge] / [withMin] / [withMax] /
-             *  [withHole], emitting the key-sorted parallel arrays the constructor expects. [sets] maps a
-             *  variable to its ascending survivor values; they are emitted as the CSR
+             *  [withHole], emitting the key-sorted parallel arrays the constructor expects. [holes] maps a
+             *  variable to its set of forbidden values (emitted as `(id, value)` rows sorted by
+             *  `(id, value)`); [sets] maps a variable to its ascending survivor values, emitted as the CSR
              *  [intSetKeys]/[intSetOffsets]/[intSetValues] (empty when there are none). */
             private fun build(
                 bools: MutableIntObjectMap<Boolean>,
-                ints: MutableIntIntMap,
-                mins: MutableIntIntMap,
-                maxes: MutableIntIntMap,
-                holes: Set<Long>,
-                sets: Map<Int, IntArray> = emptyMap(),
+                ints: MutableIntLongMap,
+                mins: MutableIntLongMap,
+                maxes: MutableIntLongMap,
+                holes: Map<Int, HashSet<Long>>,
+                sets: Map<Int, LongArray> = emptyMap(),
             ): Implied {
                 val bKeys = bools.sortedKeys()
                 val iKeys = ints.sortedKeys()
                 val minK = mins.sortedKeys()
                 val maxK = maxes.sortedKeys()
-                val holesSorted = holes.toLongArray().also { it.sort() }
+                val holeK = holes.keys.filter { holes.getValue(it).isNotEmpty() }.toIntArray().also { it.sort() }
                 val setK = sets.keys.toIntArray().also { it.sort() }
                 if (bKeys.isEmpty() && iKeys.isEmpty() && minK.isEmpty() &&
-                    maxK.isEmpty() && holesSorted.isEmpty() && setK.isEmpty()
+                    maxK.isEmpty() && holeK.isEmpty() && setK.isEmpty()
                 ) {
                     return EMPTY
                 }
+                val holeCount = holeK.sumOf { holes.getValue(it).size }
+                val holeIds = IntArray(holeCount)
+                val holeVals = LongArray(holeCount)
+                var hw = 0
+                for (id in holeK) {
+                    for (v in holes.getValue(id).toLongArray().also { it.sort() }) {
+                        holeIds[hw] = id
+                        holeVals[hw] = v
+                        hw++
+                    }
+                }
                 val setOffsets = IntArray(setK.size + 1)
                 for (i in setK.indices) setOffsets[i + 1] = setOffsets[i] + sets.getValue(setK[i]).size
-                val setVals = IntArray(setOffsets[setK.size])
+                val setVals = LongArray(setOffsets[setK.size])
                 var w = 0
                 for (k in setK) for (sv in sets.getValue(k)) setVals[w++] = sv
                 return Implied(
                     boolKeys = bKeys,
                     boolValues = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) },
                     intKeys = iKeys,
-                    intValues = IntArray(iKeys.size) { ints.getOrDefault(iKeys[it], 0) },
+                    intValues = LongArray(iKeys.size) { ints.getOrDefault(iKeys[it], 0L) },
                     intMinKeys = minK,
-                    intMinValues = IntArray(minK.size) { mins.getOrDefault(minK[it], 0) },
+                    intMinValues = LongArray(minK.size) { mins.getOrDefault(minK[it], 0L) },
                     intMaxKeys = maxK,
-                    intMaxValues = IntArray(maxK.size) { maxes.getOrDefault(maxK[it], 0) },
-                    intHoleVarIds = IntArray(holesSorted.size) { (holesSorted[it] ushr HOLE_ID_SHIFT).toInt() },
-                    intHoleValues = IntArray(holesSorted.size) { holesSorted[it].toInt() },
+                    intMaxValues = LongArray(maxK.size) { maxes.getOrDefault(maxK[it], 0L) },
+                    intHoleVarIds = if (holeCount == 0) EmptyIntArray else holeIds,
+                    intHoleValues = if (holeCount == 0) EmptyLongArray else holeVals,
                     intSetKeys = if (setK.isEmpty()) EmptyIntArray else setK,
                     intSetOffsets = if (setK.isEmpty()) EmptyIntArray else setOffsets,
-                    intSetValues = if (setK.isEmpty()) EmptyIntArray else setVals,
+                    intSetValues = if (setK.isEmpty()) EmptyLongArray else setVals,
                 )
             }
 
             /** The empty implied set (nothing forced). */
-            val EMPTY: Implied = Implied(EmptyIntArray, EmptyBooleanArray, EmptyIntArray, EmptyIntArray)
+            val EMPTY: Implied = Implied(EmptyIntArray, EmptyBooleanArray, EmptyIntArray, EmptyLongArray)
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
              *  normalises to the primitive sorted-array form. Optional bound-tightening
              *  args support SAC-at-root and any future producer of non-singleton deductions. */
             operator fun invoke(
                 bools: Map<Int, Boolean> = emptyMap(),
-                ints: Map<Int, Int> = emptyMap(),
+                ints: Map<Int, Long> = emptyMap(),
                 intMinKeys: IntArray = EmptyIntArray,
-                intMinValues: IntArray = EmptyIntArray,
+                intMinValues: LongArray = EmptyLongArray,
                 intMaxKeys: IntArray = EmptyIntArray,
-                intMaxValues: IntArray = EmptyIntArray,
+                intMaxValues: LongArray = EmptyLongArray,
                 intHoleVarIds: IntArray = EmptyIntArray,
-                intHoleValues: IntArray = EmptyIntArray,
+                intHoleValues: LongArray = EmptyLongArray,
                 intSetKeys: IntArray = EmptyIntArray,
                 intSetOffsets: IntArray = EmptyIntArray,
-                intSetValues: IntArray = EmptyIntArray,
+                intSetValues: LongArray = EmptyLongArray,
             ): Implied {
                 if (bools.isEmpty() && ints.isEmpty() &&
                     intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty() && intSetKeys.isEmpty()
@@ -399,7 +406,7 @@ sealed interface PropagationResult {
                 val bKeys = bools.keys.toIntArray().also { it.sort() }
                 val bVals = BooleanArray(bKeys.size) { bools.getValue(bKeys[it]) }
                 val iKeys = ints.keys.toIntArray().also { it.sort() }
-                val iVals = IntArray(iKeys.size) { ints.getValue(iKeys[it]) }
+                val iVals = LongArray(iKeys.size) { ints.getValue(iKeys[it]) }
                 return Implied(
                     bKeys, bVals, iKeys, iVals,
                     intMinKeys, intMinValues, intMaxKeys, intMaxValues,

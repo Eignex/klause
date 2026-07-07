@@ -19,7 +19,7 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         softCap = state.violationSoftCap,
     )
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val cap = state.violationSoftCap
         val before = lexDegree(
             getX = { state.assignment.intValue(xs[it]) },
@@ -40,7 +40,7 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         return after - before
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int = 0
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
@@ -111,7 +111,7 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
             if (prefix.contains(vId)) continue
             val cur = state.assignment.intValue(vId)
             val d = state.problem.intDomains[vId]
-            var pick = -1
+            var pick = -1L
             var seen = 0
             d.forEach { w ->
                 if (w != cur) {
@@ -162,7 +162,7 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         getY = { state.assignment.intValue(ys[it]) },
     )
 
-    private inline fun compare(getX: (Int) -> Int, getY: (Int) -> Int): Boolean {
+    private inline fun compare(getX: (Int) -> Long, getY: (Int) -> Long): Boolean {
         val len = minOf(xs.size, ys.size)
         for (i in 0 until len) {
             val a = getX(i)
@@ -177,13 +177,13 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         }
     }
 
-    private inline fun lexDegree(getX: (Int) -> Int, getY: (Int) -> Int, softCap: Int): Int {
+    private inline fun lexDegree(getX: (Int) -> Long, getY: (Int) -> Long, softCap: Int): Int {
         val len = minOf(xs.size, ys.size)
         for (i in 0 until len) {
             val a = getX(i)
             val b = getY(i)
             if (a < b) return 0
-            if (a > b) return compressViolation(a.toLong() - b, softCap)
+            if (a > b) return compressViolation(a - b, softCap)
         }
         return when {
             xs.size == ys.size -> if (strict) 1 else 0

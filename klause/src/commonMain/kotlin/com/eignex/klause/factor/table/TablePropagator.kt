@@ -42,15 +42,15 @@ internal class TablePropagator(
         }
         val dirty = state.drainIntEventDirtyVars(factorId)
         if (s.started && dirty.isEmpty()) return true
-        val lo = IntArray(arity)
-        val hi = IntArray(arity)
+        val lo = LongArray(arity)
+        val hi = LongArray(arity)
         val supportBits = arrayOfNulls<LongArray>(arity)
         for (col in 0 until arity) {
             val d = state.intDomains[xs[col]]
             lo[col] = d.min
             hi[col] = d.max
             val span = hi[col] - lo[col] + 1
-            supportBits[col] = LongArray((span + 63) ushr 6)
+            supportBits[col] = LongArray(((span + 63) ushr 6).toInt())
         }
         var i = 0
         while (i < s.numValid) {
@@ -58,7 +58,7 @@ internal class TablePropagator(
             var feasible = true
             for (col in 0 until arity) {
                 val v = tuples[row * arity + col]
-                if (v !in state.intDomains[xs[col]]) {
+                if (v.toLong() !in state.intDomains[xs[col]]) {
                     feasible = false
                     break
                 }
@@ -73,7 +73,7 @@ internal class TablePropagator(
             } else {
                 for (col in 0 until arity) {
                     val v = tuples[row * arity + col]
-                    val off = v - lo[col]
+                    val off = (v.toLong() - lo[col]).toInt()
                     val bits = requireNotNull(supportBits[col])
                     bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
                 }
@@ -107,10 +107,10 @@ internal class TablePropagator(
             val colLo = lo[col]
             val colHi = hi[col]
             var toRemoveCount = 0
-            val toRemove = IntArray(d.size)
+            val toRemove = LongArray(d.size)
             d.forEach { value ->
                 if (value in colLo..colHi) {
-                    val off = value - colLo
+                    val off = (value - colLo).toInt()
                     if (((bits[off ushr 6] ushr (off and 63)) and 1L) == 0L) toRemove[toRemoveCount++] = value
                 } else {
                     toRemove[toRemoveCount++] = value

@@ -23,7 +23,7 @@ class AssignmentObjectiveCutTest {
         val p = Problem(
             0,
             n,
-            Array(n) { IntDomain(0, hi) },
+            Array(n) { IntDomain(0, hi.toLong()) },
             arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = hi + 1)),
         )
         val session = PropagationSession(p)

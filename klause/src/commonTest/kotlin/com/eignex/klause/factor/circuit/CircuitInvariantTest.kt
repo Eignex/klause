@@ -86,7 +86,7 @@ class CircuitInvariantTest {
             for (step in 0 until 3) {
                 assertFalse(visited[node], "revisit at step $step")
                 visited[node] = true
-                node = sample.ints[node]
+                node = sample.ints[node].toInt()
             }
             assertEquals(0, node, "must return to start")
         }
@@ -142,7 +142,7 @@ class CircuitInvariantTest {
         for (step in 0 until 4) {
             assertFalse(visited[node], "revisit at step $step in ${sample.ints.toList()}")
             visited[node] = true
-            node = sample.ints[node]
+            node = sample.ints[node].toInt()
         }
         assertEquals(0, node, "must return to start in ${sample.ints.toList()}")
     }
@@ -150,12 +150,12 @@ class CircuitInvariantTest {
     private fun nNodeCircuit(n: Int): Problem = Problem(
         numBoolVars = 0,
         numIntVars = n,
-        intDomains = Array(n) { IntDomain(0, n - 1) },
+        intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
         factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it })),
     )
 
     private fun seedTour(state: LocalSearchState, n: Int) {
-        for (i in 0 until n) state.assignment.setInt(i, (i + 1) % n)
+        for (i in 0 until n) state.assignment.setInt(i, ((i + 1) % n).toLong())
         state.recompute()
     }
 
@@ -281,7 +281,7 @@ class CircuitInvariantTest {
 
     private fun seededSubcircuit(seed: Long): LocalSearchState {
         val state = LocalSearchState(subcircuitWithExcluded(), Random(seed))
-        for (i in 0 until 5) state.assignment.setInt(i, (i + 1) % 5)
+        for (i in 0 until 5) state.assignment.setInt(i, ((i + 1) % 5).toLong())
         state.assignment.setInt(5, 5)
         state.recompute()
         return state

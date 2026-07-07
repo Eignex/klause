@@ -7,8 +7,8 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableLongIntMap
 
 /** LS invariant logic for `nvalue`. */
 internal class NValueInvariant(
@@ -20,7 +20,7 @@ internal class NValueInvariant(
 ) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        val counts = MutableIntIntMap()
+        val counts = MutableLongIntMap()
         var distinct = 0
         for (i in xs.indices) {
             if (!presentNvInvFn(state, i)) continue
@@ -34,25 +34,25 @@ internal class NValueInvariant(
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val s = state.refPayload[factorId] as NValueState
-        return nvDegree(s.distinctCount, state.assignment.intValue(n)) > 0
+        return nvDegree(s.distinctCount, state.assignment.intValue(n)) > 0L
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
         val s = state.refPayload[factorId] as NValueState
-        val raw = nvDegree(s.distinctCount, state.assignment.intValue(n)).toLong()
+        val raw = nvDegree(s.distinctCount, state.assignment.intValue(n))
         return compressViolation(raw, state.violationSoftCap)
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val s = state.refPayload[factorId] as NValueState
         val before = nvDegree(s.distinctCount, state.assignment.intValue(n))
         val newDistinct = simulateDistinct(state, s, intVar, newValue)
         val newN = if (intVar == n) newValue else state.assignment.intValue(n)
-        return compressViolation(nvDegree(newDistinct, newN).toLong(), state.violationSoftCap) -
-            compressViolation(before.toLong(), state.violationSoftCap)
+        return compressViolation(nvDegree(newDistinct, newN), state.violationSoftCap) -
+            compressViolation(before, state.violationSoftCap)
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val s = state.refPayload[factorId] as NValueState
         val cur = state.assignment.intValue(intVar)
         if (cur == oldValue) return 0
@@ -73,8 +73,8 @@ internal class NValueInvariant(
             s.counts.put(cur, newCount + occurrences)
         }
         val afterDeg = nvDegree(s.distinctCount, state.assignment.intValue(n))
-        return compressViolation(afterDeg.toLong(), state.violationSoftCap) -
-            compressViolation(beforeDeg.toLong(), state.violationSoftCap)
+        return compressViolation(afterDeg, state.violationSoftCap) -
+            compressViolation(beforeDeg, state.violationSoftCap)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -83,7 +83,7 @@ internal class NValueInvariant(
         val nVal = state.assignment.intValue(n)
         val before = nvDegree(s.distinctCount, nVal)
         var distinct = s.distinctCount
-        val touched = MutableIntIntMap()
+        val touched = MutableLongIntMap()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasP = presentNvInvFn(state, i)
@@ -96,8 +96,8 @@ internal class NValueInvariant(
             if (cntBefore == 0 && cntAfter > 0) distinct++
             if (cntBefore > 0 && cntAfter == 0) distinct--
         }
-        return compressViolation(nvDegree(distinct, nVal).toLong(), state.violationSoftCap) -
-            compressViolation(before.toLong(), state.violationSoftCap)
+        return compressViolation(nvDegree(distinct, nVal), state.violationSoftCap) -
+            compressViolation(before, state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -125,8 +125,8 @@ internal class NValueInvariant(
             }
         }
         val afterDeg = nvDegree(s.distinctCount, state.assignment.intValue(n))
-        return compressViolation(afterDeg.toLong(), state.violationSoftCap) -
-            compressViolation(beforeDeg.toLong(), state.violationSoftCap)
+        return compressViolation(afterDeg, state.violationSoftCap) -
+            compressViolation(beforeDeg, state.violationSoftCap)
     }
 
     override val providesImplicitNeighbourhood: Boolean get() = true
@@ -136,7 +136,7 @@ internal class NValueInvariant(
         val s = state.refPayload[factorId] as NValueState
         val nv = state.assignment.intValue(n)
         val nDom = state.problem.intDomains[n]
-        if (s.distinctCount in nDom) sink.addChannelingIntSet(state, n, s.distinctCount)
+        if (s.distinctCount.toLong() in nDom) sink.addChannelingIntSet(state, n, s.distinctCount.toLong())
         val needIncrease = when (mode) {
             NValue.Mode.Eq -> nv > s.distinctCount
             NValue.Mode.AtLeast -> true
@@ -154,9 +154,10 @@ internal class NValueInvariant(
                 val cur = state.assignment.intValue(xs[i])
                 if (s.counts.getOrDefault(cur, 0) <= 1) continue
                 val d = state.problem.intDomains[xs[i]]
-                var pick: Int? = null
+                var pick: Long? = null
                 d.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it }
-                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick)
+                val p = pick
+                if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
         }
         if (needDecrease) {
@@ -165,9 +166,10 @@ internal class NValueInvariant(
                 val cur = state.assignment.intValue(xs[i])
                 if (s.counts.getOrDefault(cur, 0) > 1) continue
                 val d = state.problem.intDomains[xs[i]]
-                var pick: Int? = null
+                var pick: Long? = null
                 d.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it }
-                if (pick != null) sink.addChannelingIntSet(state, xs[i], pick)
+                val p = pick
+                if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
         }
     }
@@ -186,7 +188,7 @@ internal class NValueInvariant(
             val cv = s.counts.getOrDefault(v, 0)
             val vDies = cv - occ == 0
             val d = state.problem.intDomains[xs[i]]
-            var pick = -1
+            var pick = -1L
             var seen = 0
             d.forEach { w ->
                 if (w != v) {
@@ -209,28 +211,28 @@ internal class NValueInvariant(
             if (state.assumptions.isFrozenInt(xs[i])) continue
             state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
         }
-        val seen = IntHashSet()
+        val seen = LongHashSet()
         for (i in xs.indices) if (presentNvInvFn(state, i)) seen.add(state.assignment.intValue(xs[i]))
         val distinct = seen.size
         val nDom = state.problem.intDomains[n]
         val target = when (mode) {
-            NValue.Mode.Eq -> distinct
+            NValue.Mode.Eq -> distinct.toLong()
             NValue.Mode.AtLeast -> largestInDomainAtMost(nDom, distinct) ?: return false
             NValue.Mode.AtMost -> smallestInDomainAtLeast(nDom, distinct) ?: return false
         }
-        if (state.assumptions.isFrozenInt(n)) return nvDegree(distinct, state.assignment.intValue(n)) == 0
+        if (state.assumptions.isFrozenInt(n)) return nvDegree(distinct, state.assignment.intValue(n)) == 0L
         if (target !in nDom) return false
         state.assignment.setInt(n, target)
         return true
     }
 
-    fun nvDegree(distinct: Int, nVal: Int): Int = when (mode) {
+    fun nvDegree(distinct: Int, nVal: Long): Long = when (mode) {
         NValue.Mode.Eq -> if (nVal >= distinct) nVal - distinct else distinct - nVal
         NValue.Mode.AtLeast -> if (nVal > distinct) nVal - distinct else 0
         NValue.Mode.AtMost -> if (distinct > nVal) distinct - nVal else 0
     }
 
-    private fun simulateDistinct(state: LocalSearchState, s: NValueState, intVar: Int, newValue: Int): Int {
+    private fun simulateDistinct(state: LocalSearchState, s: NValueState, intVar: Int, newValue: Long): Int {
         val occurrences = countPresentOccurrences(xs, intVar, state) { st, i -> presentNvInvFn(st, i) }
         if (occurrences == 0) return s.distinctCount
         val old = state.assignment.intValue(intVar)
@@ -243,16 +245,16 @@ internal class NValueInvariant(
         return distinct
     }
 
-    private fun largestInDomainAtMost(d: IntDomain, bound: Int): Int? {
+    private fun largestInDomainAtMost(d: IntDomain, bound: Int): Long? {
         if (d.min > bound) return null
-        var pick = -1
+        var pick = -1L
         d.forEach { if (it <= bound) pick = it }
         return if (pick < 0) null else pick
     }
 
-    private fun smallestInDomainAtLeast(d: IntDomain, bound: Int): Int? {
+    private fun smallestInDomainAtLeast(d: IntDomain, bound: Int): Long? {
         if (d.max < bound) return null
-        var pick = -1
+        var pick = -1L
         d.forEach { if (pick < 0 && it >= bound) pick = it }
         return if (pick < 0) null else pick
     }
@@ -263,4 +265,4 @@ internal class NValueInvariant(
     }
 }
 
-internal class NValueState(val counts: MutableIntIntMap, var distinctCount: Int)
+internal class NValueState(val counts: MutableLongIntMap, var distinctCount: Int)

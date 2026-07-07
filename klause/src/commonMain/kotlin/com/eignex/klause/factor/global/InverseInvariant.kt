@@ -22,8 +22,8 @@ internal class InverseInvariant(
      *  would write the shared variables twice. */
     private val selfInverse: Boolean = fOffset == gOffset && f.contentEquals(g)
 
-    private fun fValueToGIndex(j: Int): Int = j - gOffset
-    private fun gValueToFIndex(i: Int): Int = i - fOffset
+    private fun fValueToGIndex(j: Long): Long = j - gOffset
+    private fun gValueToFIndex(i: Long): Long = i - fOffset
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         state.refPayload[factorId] = InverseState(countBrokenPairs(state))
@@ -37,7 +37,7 @@ internal class InverseInvariant(
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         compressViolation((state.refPayload[factorId] as InverseState).violated.toLong(), state.violationSoftCap)
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val s = state.refPayload[factorId] as InverseState
         val current = state.assignment.intValue(intVar)
         if (current == newValue) return 0
@@ -46,7 +46,7 @@ internal class InverseInvariant(
             compressViolation(s.violated.toLong(), state.violationSoftCap)
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val s = state.refPayload[factorId] as InverseState
         val before = s.violated
         s.violated = countBrokenPairs(state)
@@ -66,11 +66,11 @@ internal class InverseInvariant(
                 if (mid in d && mid != j) sink.addChannelingIntSet(state, f[i], mid)
                 return
             }
-            val gVal = state.assignment.intValue(g[gIdx])
-            if (gVal != i + fOffset) {
-                val gd = state.problem.intDomains[g[gIdx]]
-                val target = i + fOffset
-                if (target in gd && target != gVal) sink.addChannelingIntSet(state, g[gIdx], target)
+            val gVal = state.assignment.intValue(g[gIdx.toInt()])
+            val fBack = (i + fOffset).toLong()
+            if (gVal != fBack) {
+                val gd = state.problem.intDomains[g[gIdx.toInt()]]
+                if (fBack in gd && fBack != gVal) sink.addChannelingIntSet(state, g[gIdx.toInt()], fBack)
                 val gFwd = gVal - fOffset
                 if (gFwd in 0 until g.size) {
                     val targetFwd = gFwd + gOffset
@@ -79,8 +79,8 @@ internal class InverseInvariant(
                 }
                 val fd = state.problem.intDomains[f[i]]
                 for (jPrime in g.indices) {
-                    if (state.assignment.intValue(g[jPrime]) == i + fOffset) {
-                        val tgt = jPrime + gOffset
+                    if (state.assignment.intValue(g[jPrime]) == fBack) {
+                        val tgt = (jPrime + gOffset).toLong()
                         if (tgt in fd && tgt != j) {
                             sink.addChannelingIntSet(state, f[i], tgt)
                             break
@@ -112,18 +112,20 @@ internal class InverseInvariant(
             val gIdxA = fValueToGIndex(a)
             val gIdxB = fValueToGIndex(b)
             if (gIdxA !in g.indices || gIdxB !in g.indices) continue
-            val newGA = i2 + fOffset
-            val newGB = i1 + fOffset
+            val gA = g[gIdxA.toInt()]
+            val gB = g[gIdxB.toInt()]
+            val newGA = (i2 + fOffset).toLong()
+            val newGB = (i1 + fOffset).toLong()
             if (b !in state.problem.intDomains[f[i1]]) continue
             if (a !in state.problem.intDomains[f[i2]]) continue
-            if (newGA !in state.problem.intDomains[g[gIdxA]]) continue
-            if (newGB !in state.problem.intDomains[g[gIdxB]]) continue
+            if (newGA !in state.problem.intDomains[gA]) continue
+            if (newGB !in state.problem.intDomains[gB]) continue
             sink.addCompound(
                 listOf(
                     Move.IntSet(f[i1], b),
                     Move.IntSet(f[i2], a),
-                    Move.IntSet(g[gIdxA], newGA),
-                    Move.IntSet(g[gIdxB], newGB),
+                    Move.IntSet(gA, newGA),
+                    Move.IntSet(gB, newGB),
                 ),
             )
             emitted++
@@ -145,10 +147,12 @@ internal class InverseInvariant(
         while (emitted < STRUCTURED_SWAP_CAP && attempts < STRUCTURED_SWAP_CAP * SWAP_ATTEMPT_STRIDE) {
             attempts++
             val a = state.rng.nextInt(n)
-            val pa = state.assignment.intValue(f[a]) - gOffset
+            val paLong = state.assignment.intValue(f[a]) - gOffset
             val b = state.rng.nextInt(n)
-            val pb = state.assignment.intValue(f[b]) - gOffset
-            if (pa !in 0 until n || pb !in 0 until n) continue
+            val pbLong = state.assignment.intValue(f[b]) - gOffset
+            if (paLong !in 0 until n || pbLong !in 0 until n) continue
+            val pa = paLong.toInt()
+            val pb = pbLong.toInt()
             val ok = when {
                 pa == a && pb == b && a != b -> emitInvolution(state, sink, intArrayOf(a, b), intArrayOf(b, a))
 
@@ -169,7 +173,7 @@ internal class InverseInvariant(
         val parts = ArrayList<Move>(indices.size)
         for (k in indices.indices) {
             val v = f[indices[k]]
-            val value = targets[k] + gOffset
+            val value = (targets[k] + gOffset).toLong()
             if (value !in state.problem.intDomains[v]) return false
             parts.add(Move.IntSet(v, value))
         }
@@ -185,15 +189,15 @@ internal class InverseInvariant(
     private fun seedIdentity(state: LocalSearchState): Boolean {
         val n = f.size
         for (i in 0 until n) {
-            val fv = i + gOffset
-            val gv = i + fOffset
+            val fv = (i + gOffset).toLong()
+            val gv = (i + fOffset).toLong()
             if (fv !in state.problem.intDomains[f[i]] || gv !in state.problem.intDomains[g[i]]) return false
             if (state.assumptions.isFrozenInt(f[i]) && state.assignment.intValue(f[i]) != fv) return false
             if (state.assumptions.isFrozenInt(g[i]) && state.assignment.intValue(g[i]) != gv) return false
         }
         for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(f[i])) state.assignment.setInt(f[i], i + gOffset)
-            if (!state.assumptions.isFrozenInt(g[i])) state.assignment.setInt(g[i], i + fOffset)
+            if (!state.assumptions.isFrozenInt(f[i])) state.assignment.setInt(f[i], (i + gOffset).toLong())
+            if (!state.assumptions.isFrozenInt(g[i])) state.assignment.setInt(g[i], (i + fOffset).toLong())
         }
         return true
     }
@@ -223,8 +227,8 @@ internal class InverseInvariant(
             val allowed = IntArrayList()
             val fd = state.problem.intDomains[f[i]]
             for (vid in 0 until n) {
-                if (vid + gOffset !in fd) continue
-                if (i + fOffset !in state.problem.intDomains[g[vid]]) continue
+                if ((vid + gOffset).toLong() !in fd) continue
+                if ((i + fOffset).toLong() !in state.problem.intDomains[g[vid]]) continue
                 allowed.add(vid)
             }
             IntArray(allowed.size) { allowed[it] }
@@ -238,8 +242,8 @@ internal class InverseInvariant(
         }
         for (i in 0 until n) {
             val vid = matchVar[i]
-            state.assignment.setInt(f[i], vid + gOffset)
-            state.assignment.setInt(g[vid], i + fOffset)
+            state.assignment.setInt(f[i], (vid + gOffset).toLong())
+            state.assignment.setInt(g[vid], (i + fOffset).toLong())
         }
         return true
     }
@@ -253,8 +257,8 @@ internal class InverseInvariant(
                 bad++
                 continue
             }
-            val gVal = state.assignment.intValue(g[gIdx])
-            if (gVal != i + fOffset) bad++
+            val gVal = state.assignment.intValue(g[gIdx.toInt()])
+            if (gVal != (i + fOffset).toLong()) bad++
         }
         for (i in g.indices) {
             val j = state.assignment.intValue(g[i])
@@ -263,13 +267,13 @@ internal class InverseInvariant(
                 bad++
                 continue
             }
-            val fVal = state.assignment.intValue(f[fIdx])
-            if (fVal != i + gOffset) bad++
+            val fVal = state.assignment.intValue(f[fIdx.toInt()])
+            if (fVal != (i + gOffset).toLong()) bad++
         }
         return bad
     }
 
-    private fun simulateViolations(state: LocalSearchState, intVar: Int, newValue: Int): Int {
+    private fun simulateViolations(state: LocalSearchState, intVar: Int, newValue: Long): Int {
         var bad = 0
         for (i in f.indices) {
             val j = if (f[i] == intVar) newValue else state.assignment.intValue(f[i])
@@ -278,8 +282,9 @@ internal class InverseInvariant(
                 bad++
                 continue
             }
-            val gVal = if (g[gIdx] == intVar) newValue else state.assignment.intValue(g[gIdx])
-            if (gVal != i + fOffset) bad++
+            val gv = g[gIdx.toInt()]
+            val gVal = if (gv == intVar) newValue else state.assignment.intValue(gv)
+            if (gVal != (i + fOffset).toLong()) bad++
         }
         for (i in g.indices) {
             val j = if (g[i] == intVar) newValue else state.assignment.intValue(g[i])
@@ -288,8 +293,9 @@ internal class InverseInvariant(
                 bad++
                 continue
             }
-            val fVal = if (f[fIdx] == intVar) newValue else state.assignment.intValue(f[fIdx])
-            if (fVal != i + gOffset) bad++
+            val fv = f[fIdx.toInt()]
+            val fVal = if (fv == intVar) newValue else state.assignment.intValue(fv)
+            if (fVal != (i + gOffset).toLong()) bad++
         }
         return bad
     }

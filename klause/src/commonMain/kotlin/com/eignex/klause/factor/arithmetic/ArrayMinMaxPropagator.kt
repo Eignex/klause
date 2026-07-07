@@ -29,8 +29,8 @@ internal class ArrayMinMaxPropagator(
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val antResult = state.composeIntVarAtomAntecedents(intArrayOf(result))
         if (max) {
-            var hiBound = Int.MIN_VALUE
-            var loBound = Int.MIN_VALUE
+            var hiBound = Long.MIN_VALUE
+            var loBound = Long.MIN_VALUE
             var loVar = xs[0]
             for (i in xs) {
                 val d = state.intDomains[i]
@@ -52,8 +52,8 @@ internal class ArrayMinMaxPropagator(
             val rMax = state.intDomains[result].max
             for (i in xs) if (!state.tightenIntMax(i, rMax, antResult)) return false
         } else {
-            var loBound = Int.MAX_VALUE
-            var hiBound = Int.MAX_VALUE
+            var loBound = Long.MAX_VALUE
+            var hiBound = Long.MAX_VALUE
             var hiVar = xs[0]
             for (i in xs) {
                 val d = state.intDomains[i]

@@ -11,8 +11,9 @@ import com.eignex.klause.propagation.extractConflictInts
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.toSortedIntArray
+import com.eignex.klause.util.toSortedLongArray
 
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
@@ -224,10 +225,10 @@ class Problem(
         // wide hole set one value at a time rebuilds the hole array per value (O(holes^2)) — the
         // construction-time wedge on Element-heavy instances (#599). Holes are interior to the
         // bounds folded above, so excluding them never empties a domain of an Implied bake.
-        val holesByVar = MutableIntObjectMap<IntArrayList>()
-        result.forEachIntHole { v, value -> holesByVar.getOrPut(v) { IntArrayList() }.add(value) }
+        val holesByVar = MutableIntObjectMap<LongArrayList>()
+        result.forEachIntHole { v, value -> holesByVar.getOrPut(v) { LongArrayList() }.add(value) }
         holesByVar.forEach { v, holes ->
-            val sorted = holes.toSortedIntArray()
+            val sorted = holes.toSortedLongArray()
             intDomains[v] = requireNotNull(intDomains[v].excludeValues(sorted)) {
                 "baked holes emptied domain $v despite an Implied bake"
             }
@@ -299,16 +300,16 @@ class Problem(
             bVals.add(b)
         }
         val iKeys = IntArrayList(initialCapacity = 8)
-        val iVals = IntArrayList(initialCapacity = 8)
+        val iVals = LongArrayList(initialCapacity = 8)
         val iMinKeys = IntArrayList(initialCapacity = 8)
-        val iMinVals = IntArrayList(initialCapacity = 8)
+        val iMinVals = LongArrayList(initialCapacity = 8)
         val iMaxKeys = IntArrayList(initialCapacity = 8)
-        val iMaxVals = IntArrayList(initialCapacity = 8)
+        val iMaxVals = LongArrayList(initialCapacity = 8)
         val iHoleIds = IntArrayList(initialCapacity = 8)
-        val iHoleVals = IntArrayList(initialCapacity = 8)
+        val iHoleVals = LongArrayList(initialCapacity = 8)
         val iSetKeys = IntArrayList(initialCapacity = 4)
         val iSetOffsets = IntArrayList(initialCapacity = 4).also { it.add(0) }
-        val iSetVals = IntArrayList(initialCapacity = 8)
+        val iSetVals = LongArrayList(initialCapacity = 8)
         for (v in 0 until numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
@@ -325,9 +326,13 @@ class Problem(
             // treats as too wide for a bitset — so narrow reductions keep the plain hole path (their holes
             // are few and cheap, and the hole path carries the pre-existing-seed dedup the survivor path
             // omits). A full contiguous domain has `size == span`, so `size <= holes` excludes it anyway.
-            val span = d.max.toLong() - d.min + 1
+            val span = d.max - d.min + 1
             val holeCount = span - d.size
-            if (span > KlauseConfig.current.bitsetThreshold && d.size <= holeCount) {
+            // The survivor path enumerates every present value, so it is only valid when [size] is a
+            // genuine small count. A wide contiguous (or huge-run) domain saturates [size] at Int.MAX —
+            // its `holeCount` then looks positive though it is hole-free/few-holed; those fall through to
+            // the bound + forEachHole path below (span-independent), never enumerating billions of values.
+            if (span > KlauseConfig.current.bitsetThreshold && d.size < Int.MAX_VALUE && d.size <= holeCount) {
                 iSetKeys.add(v)
                 d.forEach { iSetVals.add(it) }
                 iSetOffsets.add(iSetVals.size)
@@ -335,8 +340,8 @@ class Problem(
             }
             // Non-singleton: emit bound tightenings relative to the effective seed bounds.
             val orig = intDomains[v]
-            val seedMin = maxOf(orig.min, assumptions.intMinOrNull(v) ?: Int.MIN_VALUE)
-            val seedMax = minOf(orig.max, assumptions.intMaxOrNull(v) ?: Int.MAX_VALUE)
+            val seedMin = maxOf(orig.min, assumptions.intMinOrNull(v) ?: Long.MIN_VALUE)
+            val seedMax = minOf(orig.max, assumptions.intMaxOrNull(v) ?: Long.MAX_VALUE)
             if (d.min > seedMin) {
                 iMinKeys.add(v)
                 iMinVals.add(d.min)
@@ -372,16 +377,16 @@ class Problem(
             boolKeys = bKeys.toIntArray(),
             boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
-            intValues = iVals.toIntArray(),
+            intValues = iVals.toLongArray(),
             intMinKeys = iMinKeys.toIntArray(),
-            intMinValues = iMinVals.toIntArray(),
+            intMinValues = iMinVals.toLongArray(),
             intMaxKeys = iMaxKeys.toIntArray(),
-            intMaxValues = iMaxVals.toIntArray(),
+            intMaxValues = iMaxVals.toLongArray(),
             intHoleVarIds = iHoleIds.toIntArray(),
-            intHoleValues = iHoleVals.toIntArray(),
+            intHoleValues = iHoleVals.toLongArray(),
             intSetKeys = iSetKeys.toIntArray(),
             intSetOffsets = if (iSetKeys.isEmpty()) EmptyIntArray else iSetOffsets.toIntArray(),
-            intSetValues = iSetVals.toIntArray(),
+            intSetValues = iSetVals.toLongArray(),
         )
     }
 }

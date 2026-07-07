@@ -27,14 +27,14 @@ import kotlin.random.Random
 class SolutionGuided(private val base: ValueSelector) : ValueSelector {
 
     private var bools: BooleanArray? = null
-    private var ints: IntArray? = null
+    private var ints: LongArray? = null
 
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> {
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> {
         val savedBools = bools
         val savedInts = ints
         if (savedBools == null || savedInts == null) return base.values(session, varRef, rng)
-        val saved: Int = when (varRef) {
-            is VarRef.Bool -> if (varRef.varId < savedBools.size && savedBools[varRef.varId]) 1 else 0
+        val saved: Long = when (varRef) {
+            is VarRef.Bool -> if (varRef.varId < savedBools.size && savedBools[varRef.varId]) 1L else 0L
 
             is VarRef.IntVar -> {
                 if (varRef.varId >= savedInts.size) return base.values(session, varRef, rng)
@@ -54,8 +54,8 @@ class SolutionGuided(private val base: ValueSelector) : ValueSelector {
         }
     }
 
-    override fun onConflict(varRef: VarRef, value: Int) = base.onConflict(varRef, value)
-    override fun onCommit(varRef: VarRef, value: Int) = base.onCommit(varRef, value)
+    override fun onConflict(varRef: VarRef, value: Long) = base.onConflict(varRef, value)
+    override fun onCommit(varRef: VarRef, value: Long) = base.onCommit(varRef, value)
     override fun onRestart() = base.onRestart()
 
     override fun onSolution(snapshot: Sample) {

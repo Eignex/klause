@@ -31,10 +31,10 @@ internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     emitAllDifferentExcept(vars, intArrayOf(0))
 }
 
-private fun FlatZincCompiler.intVarUnionBounds(vars: IntArray): Pair<Int, Int>? {
+private fun FlatZincCompiler.intVarUnionBounds(vars: IntArray): Pair<Long, Long>? {
     if (vars.isEmpty()) return null
-    var lo = Int.MAX_VALUE
-    var hi = Int.MIN_VALUE
+    var lo = Long.MAX_VALUE
+    var hi = Long.MIN_VALUE
     for (v in vars) {
         val d = intDomains[v]
         if (d.min < lo) lo = d.min
@@ -54,8 +54,8 @@ private fun FlatZincCompiler.emitAllDifferentCore(vars: IntArray, exceptSet: Int
     factors.add(
         AllDifferent(
             vars = vars,
-            domainMin = lo,
-            domainSize = hi - lo + 1,
+            domainMin = lo.toInt(),
+            domainSize = (hi - lo + 1).toInt(),
             exceptSet = exceptSet,
             boundsConsistent = boundsConsistent,
         ),
@@ -265,21 +265,21 @@ internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
     require(c.args.size == 1)
     val srcIds = evalIntVarArray(c.args[0])
     val n = srcIds.size
-    var offset = Int.MAX_VALUE
+    var offset = Long.MAX_VALUE
     for (v in srcIds) offset = minOf(offset, intDomains[v].min)
-    if (offset == Int.MAX_VALUE) offset = 0
-    val ids = if (offset == 0) {
+    if (offset == Long.MAX_VALUE) offset = 0L
+    val ids = if (offset == 0L) {
         srcIds
     } else {
         IntArray(n) { i ->
             val auxName = "__circuit_aux_${i}_${factors.size}"
-            val auxId = allocInt(auxName, 0, n - 1)
+            val auxId = allocInt(auxName, 0L, (n - 1).toLong())
             factors.add(
                 Linear(
                     coeffs = intArrayOf(1, -1),
                     vars = intArrayOf(srcIds[i], auxId),
                     op = LinearOp.EQ,
-                    bound = offset,
+                    bound = offset.toInt(),
                 ),
             )
             auxId
@@ -332,7 +332,7 @@ private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<IntArr
     val asConst = tryEvalIntConstArray(e)
     if (asConst != null) return asConst to EmptyIntArray
     val vars = evalIntVarArray(e)
-    val ubs = IntArray(vars.size) { intDomains[vars[it]].max }
+    val ubs = IntArray(vars.size) { intDomains[vars[it]].max.toInt() }
     return ubs to vars
 }
 
@@ -341,7 +341,7 @@ private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
     val asConst = evalIntConstOrNull(e)
     if (asConst != null) return asConst.toInt() to -1
     val varId = resolveIntVar(e)
-    return intDomains[varId].max to varId
+    return intDomains[varId].max.toInt() to varId
 }
 
 /** Shared body for `{exactly,at_least,at_most}_int`. */
@@ -460,7 +460,7 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
         factors.add(Linear(intArrayOf(1), intArrayOf(n), LinearOp.EQ, 0))
         return
     }
-    val counts = IntArray(cover.size) { allocInt("__among_cnt_${cover[it]}_${factors.size}", 0, xs.size) }
+    val counts = IntArray(cover.size) { allocInt("__among_cnt_${cover[it]}_${factors.size}", 0L, xs.size.toLong()) }
     factors.add(GlobalCardinality(xs = xs, cover = cover, countVars = counts))
     val coeffs = IntArray(cover.size + 1) { if (it < cover.size) 1 else -1 }
     factors.add(Linear(coeffs = coeffs, vars = counts + n, op = LinearOp.EQ, bound = 0))

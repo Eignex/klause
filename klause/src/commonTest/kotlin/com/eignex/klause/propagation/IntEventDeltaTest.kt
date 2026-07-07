@@ -96,14 +96,19 @@ class IntEventDeltaTest {
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-            .take(100_000).map { it.ints.toList() }.toHashSet()
+            .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     @Test
     fun `delta-driven alldifferent enumerates exactly the brute-force distinct set`() {
         // n vars over 0..n-1: the delta-driven consumer must reject every non-distinct assignment, so
         // the enumerated set is exactly the permutations. A dropped delivery would admit a clash.
         for (n in 3..5) {
-            val problem = Problem(0, n, Array(n) { IntDomain(0, n - 1) }, listOf(DeltaAllDifferent(IntArray(n) { it })))
+            val problem = Problem(
+                0,
+                n,
+                Array(n) { IntDomain(0, (n - 1).toLong()) },
+                listOf(DeltaAllDifferent(IntArray(n) { it })),
+            )
             val brute = HashSet<List<Int>>()
             fun rec(i: Int, acc: IntArray, used: BooleanArray) {
                 if (i == n) {

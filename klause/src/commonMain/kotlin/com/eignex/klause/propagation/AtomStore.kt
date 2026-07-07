@@ -2,7 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.klause.util.LongArrayList
 
 /**
  * Bound-atom registry for [PropagationState] (LCG with virtual int-bound literals).
@@ -20,15 +20,15 @@ import com.eignex.klause.util.MutableLongIntMap
  * them. The channeling and wake logic lives in `Atoms.kt`.
  */
 internal class AtomStore(numIntVars: Int) {
-    /** Atom id → int variable. Packed into a single long for the reverse lookup ([byKey]);
-     *  stored separately here for fast iteration. */
+    /** Atom id → int variable. Stored here for fast iteration; the reverse (var, kind, threshold) →
+     *  atom lookup is an exact per-variable search over the sorted threshold index. */
     val intVar: IntArrayList = IntArrayList()
 
     /** The relational form of each atom, parallel to [intVar] / [threshold]. */
     val kind: ArrayList<AtomKind> = ArrayList()
 
     /** Threshold value `k` for the atom. */
-    val threshold: IntArrayList = IntArrayList()
+    val threshold: LongArrayList = LongArrayList()
 
     /** Stored truth of this order literal — the canonical, BCP-cheap replacement for deriving it
      *  from the int domains on every clause touch (the #588 profile's dominant cost). 0 =
@@ -49,10 +49,6 @@ internal class AtomStore(numIntVars: Int) {
      *  literals whose conjunction forced it. `wakeAtom` stores it on each crossed atom's [ant]
      *  slot (the trail-resident reason, recorded at the atom's establishment level). */
     var pendingMoveAnt: IntArray? = null
-
-    /** Reverse lookup: packed key `(intVar << 33) | (kind << 32) | (threshold + INT_MAX)`
-     *  → atomId. Allows O(1) re-allocation checks. */
-    val byKey: MutableLongIntMap = MutableLongIntMap()
 
     /** Per-atom-lit watcher list — factor ids that fire when this atom-lit transitions to false.
      *  Mirrors [BoolWatcherIndex.byLit] for atoms. Array-indexed by atom-lit (two slots per atom:

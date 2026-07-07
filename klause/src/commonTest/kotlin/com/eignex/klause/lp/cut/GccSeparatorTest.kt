@@ -23,7 +23,7 @@ class GccSeparatorTest {
      */
     private fun cuts(factor: GlobalCardinality, hi: Int, coef: Long): List<Cut> {
         val n = factor.xs.size
-        val p = Problem(0, n, Array(n) { IntDomain(0, hi) }, arrayOf<Factor>(factor))
+        val p = Problem(0, n, Array(n) { IntDomain(0, hi.toLong()) }, arrayOf<Factor>(factor))
         val session = PropagationSession(p)
         val r = CpToLpRelaxation(p, LinearObjective(intCoefficients = LongArray(n) { coef }))
             .build(session)

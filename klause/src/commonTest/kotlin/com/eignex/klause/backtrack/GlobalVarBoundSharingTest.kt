@@ -43,7 +43,7 @@ class GlobalVarBoundSharingTest {
 
     @Test
     fun `a beyond-bake shaving tightening reaches the sink`() {
-        val published = HashMap<Int, Pair<Int, Int>>()
+        val published = HashMap<Int, Pair<Long, Long>>()
         val res = BacktrackSolver(triangleCover()).minimize(
             LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), // minimize cost (var 3)
             BacktrackParams(
@@ -62,8 +62,8 @@ class GlobalVarBoundSharingTest {
             LinearObjective(intCoefficients = longArrayOf(1)),
             BacktrackParams(
                 randomSeed = 1L,
-                globalVarLowerSupplier = { v -> if (v == 0) 3 else Int.MIN_VALUE },
-                globalVarUpperSupplier = { Int.MAX_VALUE },
+                globalVarLowerSupplier = { v -> if (v == 0) 3L else Int.MIN_VALUE.toLong() },
+                globalVarUpperSupplier = { Int.MAX_VALUE.toLong() },
             ),
         )
         assertTrue(

@@ -193,7 +193,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         var c = liveFactorCount.toLong()
         for (v in 0 until base.numIntVars) {
             val d = state.intDomains[v]
-            c += d.max.toLong() - d.min.toLong()
+            c += d.max - d.min
         }
         return c
     }

@@ -82,7 +82,7 @@ class RegularInvariantTest {
         val rng = Random(99)
         repeat(500) { step ->
             val v = rng.nextInt(n)
-            val nv = 1 + rng.nextInt(2)
+            val nv = 1L + rng.nextInt(2)
             val before = state.factors[0].violationDegree(state, 0)
             val predicted = state.factors[0].deltaIfIntSet(state, 0, v, nv)
             state.apply(Move.IntSet(v, nv))

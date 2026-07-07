@@ -154,7 +154,7 @@ internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: B
 
 /** Channel bool literals to 0/1 int vars. */
 internal fun FlatZincCompiler.channelBoolsToInts(lits: IntArray, tag: String): IntArray = IntArray(lits.size) { i ->
-    val ch = allocInt("__chan_${tag}_$i", 0, 1)
+    val ch = allocInt("__chan_${tag}_$i", 0L, 1L)
     channelBoolTo01(factors, Lit.variable(lits[i]), ch, whenTrue = Lit.isPositive(lits[i]))
     ch
 }

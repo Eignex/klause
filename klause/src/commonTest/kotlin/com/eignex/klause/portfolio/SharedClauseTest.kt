@@ -83,10 +83,10 @@ class SharedClauseTest {
     @Test
     fun `pool de-dups by key and advances the cursor`() {
         val pool = SharedClausePool()
-        val a = SharedClause(intArrayOf(2, 5), IntArray(0), lbd = 2)
-        val b = SharedClause(intArrayOf(4), IntArray(0), lbd = 1)
-        val aDup = SharedClause(intArrayOf(2, 5), IntArray(0), lbd = 2) // same content as a → same key
-        val c = SharedClause(IntArray(0), intArrayOf(0, 0, 3, 0), lbd = 1)
+        val a = SharedClause(intArrayOf(2, 5), LongArray(0), lbd = 2)
+        val b = SharedClause(intArrayOf(4), LongArray(0), lbd = 1)
+        val aDup = SharedClause(intArrayOf(2, 5), LongArray(0), lbd = 2) // same content as a → same key
+        val c = SharedClause(IntArray(0), longArrayOf(0, 0, 3, 0), lbd = 1)
 
         pool.publish(listOf(a, b))
         val first = pool.drainSince(0)

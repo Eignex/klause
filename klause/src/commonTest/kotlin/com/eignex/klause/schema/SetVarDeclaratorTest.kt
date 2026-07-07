@@ -59,7 +59,7 @@ class SetMembershipTest {
         for (sample in samples) {
             val xv = compiled.decode(schema.x, sample)
             val sv = compiled.decode(schema.s, sample)
-            assertTrue(xv in sv, "x=$xv not in s=$sv")
+            assertTrue(xv.toInt() in sv, "x=$xv not in s=$sv")
         }
     }
 }
@@ -200,7 +200,7 @@ class SetReifiedTest {
             val xv = compiled.decode(schema.x, sample)
             val sv = compiled.decode(schema.s, sample)
             val flag = compiled.decode(schema.flag, sample)
-            val expected = xv in sv
+            val expected = xv.toInt() in sv
             assertEquals(
                 expected,
                 flag,

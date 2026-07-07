@@ -105,8 +105,8 @@ internal class FlatZincCompiler(
         }
         when (val t = d.type) {
             FznType.Bool -> allocBool(d.name)
-            FznType.IntAny -> allocInt(d.name, unboundedIntLo, unboundedIntHi)
-            is FznType.IntRange -> allocInt(d.name, t.lo.toInt(), t.hi.toInt())
+            FznType.IntAny -> allocInt(d.name, unboundedIntLo.toLong(), unboundedIntHi.toLong())
+            is FznType.IntRange -> allocInt(d.name, t.lo, t.hi)
             is FznType.IntSet -> allocIntSet(d.name, t)
             FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
@@ -125,7 +125,7 @@ internal class FlatZincCompiler(
 
             is FznType.IntRange -> {
                 val id = resolveIntVar(rhs)
-                intDomains[id] = intDomains[id].withMinAtLeast(type.lo.toInt()).withMaxAtMost(type.hi.toInt())
+                intDomains[id] = intDomains[id].withMinAtLeast(type.lo).withMaxAtMost(type.hi)
                 intVars[name] = id
             }
 
@@ -253,7 +253,7 @@ internal class FlatZincCompiler(
             when (val t = type.element) {
                 FznType.Bool -> varIds[i] = allocBool(elemName)
 
-                is FznType.IntRange -> varIds[i] = allocInt(elemName, t.lo.toInt(), t.hi.toInt())
+                is FznType.IntRange -> varIds[i] = allocInt(elemName, t.lo, t.hi)
 
                 is FznType.IntSet -> varIds[i] = allocIntSet(elemName, t)
 
@@ -287,7 +287,7 @@ internal class FlatZincCompiler(
         boolVars[name] = id
         return id
     }
-    internal fun allocInt(name: String, lo: Int, hi: Int): Int {
+    internal fun allocInt(name: String, lo: Long, hi: Long): Int {
         val id = intDomains.size
         intDomains.add(IntDomain(lo, hi))
         intVars[name] = id
@@ -296,7 +296,7 @@ internal class FlatZincCompiler(
 
     /** Allocate int var with an explicit sparse domain. */
     internal fun allocIntSet(name: String, t: FznType.IntSet): Int {
-        val sorted = t.values.distinct().sorted().map { it.toInt() }
+        val sorted = t.values.distinct().sorted()
         require(sorted.isNotEmpty()) { "IntSet domain for `$name` is empty" }
         val id = allocInt(name, sorted.first(), sorted.last())
         var dom = intDomains[id]
@@ -343,7 +343,7 @@ internal class FlatZincCompiler(
 
     internal fun allocFloat(name: String, lo: Double, hi: Double): Int {
         val id = intDomains.size
-        intDomains.add(IntDomain(0, floatBuckets - 1))
+        intDomains.add(IntDomain(0L, (floatBuckets - 1).toLong()))
         intVars[name] = id
         floatVars[name] = FloatBucketing(id, lo, hi, floatBuckets)
         return id
@@ -375,7 +375,7 @@ internal class FlatZincCompiler(
         when (e) {
             is FznExpr.IntLit -> {
                 val name = "__obj_const_${e.value}"
-                val v = e.value.toInt()
+                val v = e.value
                 if (name !in intVars) {
                     allocInt(name, v, v)
                 }
@@ -401,7 +401,7 @@ internal class FlatZincCompiler(
             ?: failHere("solve objective must be a variable name")
         (params[name] as? ParamValue.Int)?.let { p ->
             val pinName = "__obj_const_$name"
-            val v = p.value.toInt()
+            val v = p.value
             if (pinName !in intVars) {
                 allocInt(pinName, v, v)
             }

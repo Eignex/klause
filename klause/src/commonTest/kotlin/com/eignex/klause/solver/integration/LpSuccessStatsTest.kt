@@ -20,7 +20,7 @@ class LpSuccessStatsTest {
 
     /** `min M  s.t.  M ≥ startᵢ + durᵢ,  cumulative(...)`; ints 0..n-1 starts, n is the makespan. */
     private fun makespanProblem(n: Int, durations: IntArray, resources: IntArray, capacity: Int, hi: Int): Problem {
-        val domains = Array(n + 1) { if (it < n) IntDomain(0, hi) else IntDomain(0, hi + 6) }
+        val domains = Array(n + 1) { if (it < n) IntDomain(0, hi.toLong()) else IntDomain(0, (hi + 6).toLong()) }
         val factors = ArrayList<Factor>()
         for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, durations[i]))
         factors.add(Cumulative(IntArray(n) { it }, durations, resources, capacity))

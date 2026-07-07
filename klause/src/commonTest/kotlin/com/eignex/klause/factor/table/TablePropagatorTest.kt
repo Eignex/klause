@@ -30,7 +30,7 @@ class TablePropagatorTest {
             ),
         )
         val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
-            .map { it.ints.toList() }
+            .map { it.ints.map { v -> v.toInt() } }
             .toList()
             .toSet()
         assertEquals(setOf(listOf(0, 1), listOf(2, 3)), results)
@@ -70,7 +70,7 @@ class TablePropagatorTest {
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        val ints = sat.assignment.ints.toList()
+        val ints = sat.assignment.ints.map { it.toInt() }
         assertTrue(
             ints in setOf(listOf(1, 2, 3), listOf(1, 4, 5), listOf(7, 8, 9)),
             "got $ints — not a known tuple",
@@ -99,11 +99,11 @@ class TablePropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = inst.arity,
-                intDomains = Array(inst.arity) { IntDomain(inst.lo, inst.hi) },
+                intDomains = Array(inst.arity) { IntDomain(inst.lo.toLong(), inst.hi.toLong()) },
                 factors = arrayOf<Factor>(Table(xs = varsOf, tuples = flat)),
             )
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "table instance #$idx: enumerated solutions must equal in-domain tuples")
         }
     }
@@ -135,11 +135,11 @@ class TablePropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = arity,
-                intDomains = Array(arity) { IntDomain(cdom[it].first, cdom[it].second) },
+                intDomains = Array(arity) { IntDomain(cdom[it].first.toLong(), cdom[it].second.toLong()) },
                 factors = arrayOf<Factor>(Table(xs = IntArray(arity) { it }, tuples = flat)),
             )
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = (trial + 1).toLong()))
-                .take(100_000).map { it.ints.toList() }.toHashSet()
+                .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "trial #$trial (arity=$arity hi=$hi rows=$numRows): must equal in-domain tuples")
         }
     }

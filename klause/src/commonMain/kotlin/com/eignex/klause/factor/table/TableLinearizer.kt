@@ -33,11 +33,11 @@ internal class TableLinearizer(
             var liveFeasible = true
             for (col in 0 until arity) {
                 val v = tuples[t * arity + col]
-                if (v !in declared[col]) {
+                if (v.toLong() !in declared[col]) {
                     declaredFeasible = false
                     break
                 }
-                if (v !in live[col]) liveFeasible = false
+                if (v.toLong() !in live[col]) liveFeasible = false
             }
             if (!declaredFeasible) continue
             // The selector is present while every entry stays in its column's live domain — the

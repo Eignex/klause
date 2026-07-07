@@ -10,40 +10,40 @@ import kotlin.test.assertEquals
  */
 class ImpliedMergeIntSetTest {
 
-    private fun setOf(v: Int, survivors: IntArray): PropagationResult.Implied = PropagationResult.Implied(
+    private fun setOf(v: Int, survivors: LongArray): PropagationResult.Implied = PropagationResult.Implied(
         intSetKeys = intArrayOf(v),
         intSetOffsets = intArrayOf(0, survivors.size),
         intSetValues = survivors,
     )
 
-    private fun sets(i: PropagationResult.Implied): Map<Int, List<Int>> {
-        val m = HashMap<Int, List<Int>>()
+    private fun sets(i: PropagationResult.Implied): Map<Int, List<Long>> {
+        val m = HashMap<Int, List<Long>>()
         i.forEachIntSet { id, survivors -> m[id] = survivors.toList() }
         return m
     }
 
     @Test
     fun `merge preserves a one-sided set-restriction`() {
-        val merged = setOf(2, intArrayOf(1, 3, 5)).merge(PropagationResult.Implied.EMPTY)
-        assertEquals(mapOf(2 to listOf(1, 3, 5)), sets(merged))
+        val merged = setOf(2, longArrayOf(1, 3, 5)).merge(PropagationResult.Implied.EMPTY)
+        assertEquals(mapOf(2 to listOf(1L, 3L, 5L)), sets(merged))
     }
 
     @Test
     fun `merge intersects set-restrictions on the same variable`() {
-        val merged = setOf(2, intArrayOf(1, 3, 5)).merge(setOf(2, intArrayOf(3, 5, 7)))
-        assertEquals(mapOf(2 to listOf(3, 5)), sets(merged))
+        val merged = setOf(2, longArrayOf(1, 3, 5)).merge(setOf(2, longArrayOf(3, 5, 7)))
+        assertEquals(mapOf(2 to listOf(3L, 5L)), sets(merged))
     }
 
     @Test
     fun `merge drops the set-restriction of a variable pinned in the union`() {
         val pinTwo = PropagationResult.Implied(ints = mapOf(2 to 3))
-        val merged = setOf(2, intArrayOf(1, 3, 5)).merge(pinTwo)
+        val merged = setOf(2, longArrayOf(1, 3, 5)).merge(pinTwo)
         assertEquals(emptyMap(), sets(merged))
     }
 
     @Test
     fun `withMin preserves the set-restriction`() {
-        val restricted = setOf(2, intArrayOf(1, 3, 5)).withMin(4, 0)
-        assertEquals(mapOf(2 to listOf(1, 3, 5)), sets(restricted))
+        val restricted = setOf(2, longArrayOf(1, 3, 5)).withMin(4, 0)
+        assertEquals(mapOf(2 to listOf(1L, 3L, 5L)), sets(restricted))
     }
 }

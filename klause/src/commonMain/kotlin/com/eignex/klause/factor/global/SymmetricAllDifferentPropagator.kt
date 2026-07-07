@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAnteced
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
 
 /** CP propagation logic for `symmetric_all_different`. */
 internal class SymmetricAllDifferentPropagator(
@@ -39,10 +39,10 @@ internal class SymmetricAllDifferentPropagator(
         val lo = indexOffset
         val hi = indexOffset + xs.size - 1
         for (v in xs) {
-            if (!state.tightenIntMin(v, lo)) return false
-            if (!state.tightenIntMax(v, hi)) return false
+            if (!state.tightenIntMin(v, lo.toLong())) return false
+            if (!state.tightenIntMax(v, hi.toLong())) return false
         }
-        val taken = IntHashSet()
+        val taken = LongHashSet()
         for (v in xs) {
             val d = state.intDomains[v]
             if (d.min != d.max) continue
@@ -52,11 +52,11 @@ internal class SymmetricAllDifferentPropagator(
             val d = state.intDomains[xs[i]]
             if (d.min != d.max) continue
             val target = d.min - indexOffset
-            if (target !in xs.indices) return false
+            if (target < 0 || target >= xs.size) return false
             val mirror = i + indexOffset
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))
-            if (!state.tightenIntMin(xs[target], mirror, ant)) return false
-            if (!state.tightenIntMax(xs[target], mirror, ant)) return false
+            if (!state.tightenIntMin(xs[target.toInt()], mirror.toLong(), ant)) return false
+            if (!state.tightenIntMax(xs[target.toInt()], mirror.toLong(), ant)) return false
         }
         return true
     }

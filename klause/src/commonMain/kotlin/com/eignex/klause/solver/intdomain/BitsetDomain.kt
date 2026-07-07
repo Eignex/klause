@@ -8,10 +8,10 @@ import com.eignex.klause.util.Bits
  *  array keeps its construction-time length; a later bound move clears bits but never reallocates,
  *  so the surplus high words are always zero. */
 internal class BitsetDomain(
-    override val min: Int,
-    override val max: Int,
+    override val min: Long,
+    override val max: Long,
     private val bitset: LongArray,
-    private val bitsetLo: Int,
+    private val bitsetLo: Long,
 ) : AbstractIntDomain() {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
@@ -23,9 +23,9 @@ internal class BitsetDomain(
         s
     }
 
-    override fun contains(value: Int): Boolean = value in min..max && Bits.has(bitset, value - bitsetLo)
+    override fun contains(value: Long): Boolean = value in min..max && Bits.has(bitset, (value - bitsetLo).toInt())
 
-    override fun valueAt(i: Int): Int {
+    override fun valueAt(i: Int): Long {
         var remaining = i
         for (w in bitset.indices) {
             val word = bitset[w]
@@ -44,10 +44,10 @@ internal class BitsetDomain(
         error("valueAt($i) out of range; size=$size")
     }
 
-    override fun excludeValue(value: Int): IntDomain {
+    override fun excludeValue(value: Long): IntDomain {
         if (!contains(value)) return this
         val newBits = bitset.copyOf()
-        Bits.clear(newBits, value - bitsetLo)
+        Bits.clear(newBits, (value - bitsetLo).toInt())
         var newMin = min
         var newMax = max
         if (value == min) {
@@ -63,11 +63,11 @@ internal class BitsetDomain(
         return BitsetDomain(newMin, newMax, newBits, bitsetLo)
     }
 
-    override fun withMinAtLeast(newMin: Int): IntDomain {
+    override fun withMinAtLeast(newMin: Long): IntDomain {
         if (newMin <= min) return this
         check(newMin <= max) { "withMinAtLeast($newMin) empties domain [$min..$max]" }
         val newBits = bitset.copyOf()
-        Bits.clearBelow(newBits, newMin - bitsetLo)
+        Bits.clearBelow(newBits, (newMin - bitsetLo).toInt())
         val firstSet = Bits.firstSet(newBits)
         check(firstSet >= 0) { "withMinAtLeast($newMin) emptied bitset domain" }
         val m = bitsetLo + firstSet
@@ -75,11 +75,11 @@ internal class BitsetDomain(
         return BitsetDomain(m, max, newBits, bitsetLo)
     }
 
-    override fun withMaxAtMost(newMax: Int): IntDomain {
+    override fun withMaxAtMost(newMax: Long): IntDomain {
         if (newMax >= max) return this
         check(newMax >= min) { "withMaxAtMost($newMax) empties domain [$min..$max]" }
         val newBits = bitset.copyOf()
-        Bits.clearAbove(newBits, newMax - bitsetLo)
+        Bits.clearAbove(newBits, (newMax - bitsetLo).toInt())
         val lastSet = Bits.lastSet(newBits)
         check(lastSet >= 0) { "withMaxAtMost($newMax) emptied bitset domain" }
         val m = bitsetLo + lastSet
@@ -87,10 +87,10 @@ internal class BitsetDomain(
         return BitsetDomain(min, m, newBits, bitsetLo)
     }
 
-    override fun includeInteriorValue(value: Int): IntDomain {
+    override fun includeInteriorValue(value: Long): IntDomain {
         require(value > min && value < max) { "includeInteriorValue($value) outside ($min, $max)" }
         val newBits = bitset.copyOf()
-        Bits.set(newBits, value - bitsetLo)
+        Bits.set(newBits, (value - bitsetLo).toInt())
         return BitsetDomain(min, max, newBits, bitsetLo)
     }
 
@@ -106,17 +106,19 @@ internal class BitsetDomain(
     }
 
     override fun forEachHole(action: IntConsumer) {
-        for (v in (min + 1) until max) {
-            if (!Bits.has(bitset, v - bitsetLo)) action.accept(v)
+        var v = min + 1
+        while (v < max) {
+            if (!Bits.has(bitset, (v - bitsetLo).toInt())) action.accept(v)
+            v++
         }
     }
 
-    override fun forEachHoleInRange(lo: Int, hi: Int, action: IntConsumer) {
+    override fun forEachHoleInRange(lo: Long, hi: Long, action: IntConsumer) {
         val from = if (lo > min) lo else min
         val to = if (hi < max) hi else max
         var v = from
         while (v <= to) {
-            if (!Bits.has(bitset, v - bitsetLo)) action.accept(v)
+            if (!Bits.has(bitset, (v - bitsetLo).toInt())) action.accept(v)
             v++
         }
     }

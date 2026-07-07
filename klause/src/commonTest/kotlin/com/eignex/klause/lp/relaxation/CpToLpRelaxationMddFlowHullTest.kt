@@ -89,7 +89,7 @@ class CpToLpRelaxationMddFlowHullTest {
             val p = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(1, alphabet) },
+                intDomains = Array(n) { IntDomain(1, alphabet.toLong()) },
                 factors = arrayOf<Factor>(
                     Mdd(IntArray(n) { it }, spl, starts, trans.toIntArray(), 0, acc.toIntArray(), 3, -1),
                 ),

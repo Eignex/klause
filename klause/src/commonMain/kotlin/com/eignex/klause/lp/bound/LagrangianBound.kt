@@ -15,7 +15,7 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableLongIntMap
 import kotlin.math.ceil
 
 /**
@@ -150,7 +150,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
 
     /** A subproblem evaluation at fixed multipliers: combined assignment cost and the value each
      *  block variable took (indexed over [vars]); [feasible] is false when any block has no assignment. */
-    private class Eval(val feasible: Boolean, val cost: Long, val values: IntArray)
+    private class Eval(val feasible: Boolean, val cost: Long, val values: LongArray)
 
     /**
      * Compute the Lagrangian bound at the current node. [incumbent] is the best objective to beat
@@ -168,8 +168,8 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
 
         // Per-block value set = union of the live domains of the block's variables; bail if any block
         // is too large to assign over, prune if any has fewer distinct values than variables.
-        val blockValueIndex = Array(numBlocks) { MutableIntIntMap() }
-        val blockValueList = Array(numBlocks) { IntArrayList() }
+        val blockValueIndex = Array(numBlocks) { MutableLongIntMap() }
+        val blockValueList = Array(numBlocks) { LongArrayList() }
         for (j in 0 until numBlocks) {
             val index = blockValueIndex[j]
             val list = blockValueList[j]
@@ -229,11 +229,11 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
      */
     private fun evaluate(
         session: PropagationSession,
-        blockValueIndex: Array<MutableIntIntMap>,
-        blockValueList: Array<IntArrayList>,
+        blockValueIndex: Array<MutableLongIntMap>,
+        blockValueList: Array<LongArrayList>,
         p: LongArray,
     ): Eval {
-        val values = IntArray(vars.size)
+        val values = LongArray(vars.size)
         var totalCost = 0L
         for (j in 0 until numBlocks) {
             val lo = blockStart[j]
@@ -247,7 +247,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                     if (a != 0L) w = addExact(w, mulExact(p[r], a))
                 }
                 session.intDomain(varId).forEach { value ->
-                    assign.addOption(idx, blockValueIndex[j].getOrDefault(value, -1), mulExact(w, value.toLong()))
+                    assign.addOption(idx, blockValueIndex[j].getOrDefault(value, -1), mulExact(w, value))
                 }
             }
             val res = assign.solve()
@@ -267,7 +267,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
      * solver klause does not have, and the bound is exact for any λ regardless of how λ is chosen.
      */
     private fun subgradientStep(
-        values: IntArray,
+        values: LongArray,
         p: LongArray,
         num: Long,
         incumbent: Double,
@@ -350,7 +350,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             val c = intCoef[i]
             if (c == 0L) continue
             val dom = session.intDomain(i)
-            total = addExact(total, mulExact(c, if (c >= 0L) dom.min.toLong() else dom.max.toLong()))
+            total = addExact(total, mulExact(c, if (c >= 0L) dom.min else dom.max))
         }
         return total
     }

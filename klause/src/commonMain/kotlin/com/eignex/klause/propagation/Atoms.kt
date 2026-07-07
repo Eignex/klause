@@ -2,7 +2,8 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.binarySearchLong
 
 /** Register [atomId] in the watched index (idempotent per threshold/kind). */
 internal fun PropagationState.markAtomWatched(atomId: Int) {
@@ -14,13 +15,6 @@ internal fun PropagationState.markAtomWatched(atomId: Int) {
     val at = keys.lowerBound(k)
     if (at < keys.size && keys[at] == k) return // already tracked
     idx.insert(kind, k, atomId)
-}
-
-internal fun PropagationState.atomKey(intVar: Int, kind: AtomKind, threshold: Int): Long {
-    // Threshold can be negative; bias by Int.MIN_VALUE to keep it non-negative within
-    // the lower 32 bits. Kind (0..2) takes bits 32..33; intVar takes bits 34..63.
-    val biased = threshold.toLong() - Int.MIN_VALUE.toLong()
-    return (intVar.toLong() shl 34) or (kind.ordinal.toLong() shl 32) or biased
 }
 
 /** Translate a virtual atom-var id back to its 0-based atom index. */
@@ -95,7 +89,7 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
  *  reconstructed") for undetermined atoms, looser-than-current bounds, and interior-hole eq atoms —
  *  those keep -1 and the level read falls back to the hole-carve record. A -1 per-side slot means
  *  the bound is still at its root, i.e. level 0. [st]: 0 = undetermined, 1 = true, 2 = false. */
-internal fun PropagationState.reconstructCurrentBoundLevel(v: Int, kind: AtomKind, k: Int, st: Int): Int {
+internal fun PropagationState.reconstructCurrentBoundLevel(v: Int, kind: AtomKind, k: Long, st: Int): Int {
     if (st == 0) return -1
     val d = intDomains[v]
     fun lvlOrRoot(lvl: Int): Int = if (lvl >= 0) lvl else 0
@@ -140,7 +134,7 @@ internal fun PropagationState.reconstructCurrentBoundLevel(v: Int, kind: AtomKin
  *  [reconstructCurrentBoundLevel]. Returns `null` for the looser / interior-hole / undetermined
  *  cases — those keep `null` and (paired with a -1 reconstructed level) fall back to the history
  *  derivation in [atomAntecedentsDerived]. A `null` per-side slot is itself a valid root/leaf reason. */
-internal fun PropagationState.reconstructCurrentBoundReason(v: Int, kind: AtomKind, k: Int, st: Int): IntArray? {
+internal fun PropagationState.reconstructCurrentBoundReason(v: Int, kind: AtomKind, k: Long, st: Int): IntArray? {
     if (st == 0) return null
     val d = intDomains[v]
     return when (kind) {
@@ -165,10 +159,12 @@ internal fun PropagationState.reconstructCurrentBoundReason(v: Int, kind: AtomKi
     }
 }
 
-internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: Int): Int {
-    val key = atomKey(intVar, kind, threshold)
-    val existing = atoms.byKey.getOrDefault(key, -1)
-    if (existing >= 0) return problem.numBoolVars + existing
+internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: Long): Int {
+    val byVar = atoms.byIntVar[intVar]
+    if (byVar != null) {
+        val existing = byVar.find(kind, threshold)
+        if (existing >= 0) return problem.numBoolVars + existing
+    }
     val id = atoms.intVar.size
     atoms.intVar.add(intVar)
     atoms.kind.add(kind)
@@ -184,8 +180,7 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
     atoms.ant.add(reconstructCurrentBoundReason(intVar, kind, threshold, st))
     atoms.watchersByLit.add(null) // positive-literal watcher slot for this atom
     atoms.watchersByLit.add(null) // negative-literal watcher slot
-    atoms.byKey.put(key, id)
-    (atoms.byIntVar[intVar] ?: VarAtomIndex().also { atoms.byIntVar[intVar] = it }).insert(kind, threshold, id)
+    (byVar ?: VarAtomIndex().also { atoms.byIntVar[intVar] = it }).insert(kind, threshold, id)
     return problem.numBoolVars + id
 }
 
@@ -273,7 +268,7 @@ internal fun PropagationState.endpointLevel(v: Int, viaMax: Boolean): Int {
     return if (lvl >= 0) lvl else 0
 }
 
-internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Int): Boolean? {
+internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Long): Boolean? {
     val d = intDomains[v]
     return when (kind) {
         AtomKind.GE -> when {
@@ -311,8 +306,8 @@ internal fun PropagationState.atomTruthOf(v: Int, kind: AtomKind, k: Int): Boole
  */
 private inline fun PropagationState.wakeMinCrossing(
     idx: VarAtomIndex,
-    oldMin: Int,
-    newMin: Int,
+    oldMin: Long,
+    newMin: Long,
     ant: IntArray?,
     eqAction: (atomId: Int) -> Unit,
 ) {
@@ -327,8 +322,8 @@ private inline fun PropagationState.wakeMinCrossing(
  *  `[v = t]` in `(newMax, oldMax]`. */
 private inline fun PropagationState.wakeMaxCrossing(
     idx: VarAtomIndex,
-    newMax: Int,
-    oldMax: Int,
+    newMax: Long,
+    oldMax: Long,
     ant: IntArray?,
     eqAction: (atomId: Int) -> Unit,
 ) {
@@ -355,11 +350,11 @@ internal fun PropagationState.propagateAtomsForVar(
     v: Int,
     antNear: IntArray?,
     antFar: IntArray? = antNear,
-    reqMin: Int = intDomains[v].min,
-    reqMax: Int = intDomains[v].max,
-    oldMin: Int,
-    oldMax: Int,
-    carved: Int = NO_CARVE,
+    reqMin: Long = intDomains[v].min,
+    reqMax: Long = intDomains[v].max,
+    oldMin: Long,
+    oldMax: Long,
+    carved: Long = NO_CARVE,
 ) {
     // Iterate all materialized atoms so every crossed order literal becomes a chronological
     // trail fact (see [wakeAtom]), with the move's reason recorded on its slot. A move carries
@@ -407,11 +402,11 @@ internal fun PropagationState.propagateAtomsForVar(
  */
 internal fun PropagationState.propagateAtomsForExclusionBatch(
     v: Int,
-    oldMin: Int,
-    oldMax: Int,
+    oldMin: Long,
+    oldMax: Long,
     antMin: IntArray?,
     antMax: IntArray?,
-    interiorVals: IntArrayList?,
+    interiorVals: LongArrayList?,
     interiorAnt: IntArray?,
 ) {
     val idx = atoms.byIntVar[v] ?: return
@@ -445,9 +440,9 @@ internal fun PropagationState.propagateAtomsForExclusionBatch(
  */
 internal fun PropagationState.propagateAtomsForSetRestriction(
     v: Int,
-    oldMin: Int,
-    oldMax: Int,
-    survivors: IntArray,
+    oldMin: Long,
+    oldMax: Long,
+    survivors: LongArray,
     ant: IntArray?,
 ) {
     val idx = atoms.byIntVar[v] ?: return
@@ -462,7 +457,7 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
     }
     atoms.pendingMoveAnt = ant
     visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMax) { id ->
-        if (survivors.binarySearchInt(atoms.threshold[id]) < 0) wakeAtom(id, false)
+        if (survivors.binarySearchLong(atoms.threshold[id]) < 0) wakeAtom(id, false)
     }
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
         visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
@@ -470,10 +465,10 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
 }
 
 internal inline fun PropagationState.visitAtomRange(
-    keys: IntArrayList,
+    keys: LongArrayList,
     ids: IntArrayList,
-    from: Int,
-    to: Int,
+    from: Long,
+    to: Long,
     action: (atomId: Int) -> Unit,
 ) {
     if (to < from || keys.size == 0) return
@@ -493,7 +488,7 @@ internal inline fun PropagationState.visitAtomRange(
  *  whose reason lists this very eq-atom, the same-var cycle 1UIP cannot collapse. A FAR-region
  *  crossing reuses the record from the value's first (near) death. [AtomStore.pendingMoveAnt] is the fallback
  *  reason [wakeAtom] uses when no record is on file. */
-private fun PropagationState.recordEqDeath(v: Int, k: Int, near: Boolean, antNear: IntArray?, antFar: IntArray?) {
+private fun PropagationState.recordEqDeath(v: Int, k: Long, near: Boolean, antNear: IntArray?, antFar: IntArray?) {
     if (near && !holeHistHas(v, k)) pushHoleHist(v, k, currentLevel, antNear)
     atoms.pendingMoveAnt = if (near) antNear else antFar
 }
@@ -589,7 +584,7 @@ private fun PropagationState.clearEqIfFreed(atomId: Int) {
  * exactly (off-by-one parity matters: [atomCurrentTruth] has no derive fallback, so a missed
  * flip would leave a stale truth bit).
  */
-internal fun PropagationState.resetAtomTrailFor(v: Int, oldMin: Int, oldMax: Int) {
+internal fun PropagationState.resetAtomTrailFor(v: Int, oldMin: Long, oldMax: Long) {
     val idx = atoms.byIntVar[v] ?: return
     val d = intDomains[v]
     val newMin = d.min
@@ -613,7 +608,7 @@ internal fun PropagationState.resetAtomTrailFor(v: Int, oldMin: Int, oldMax: Int
 
 /** Backtrack of an interior carve: re-inserting [value] flips `[v = value]` from false to
  *  undetermined (the bounds are unchanged), so clear that eq atom's slot. */
-internal fun PropagationState.resetAtomTrailForCarve(v: Int, value: Int) {
+internal fun PropagationState.resetAtomTrailForCarve(v: Int, value: Long) {
     val idx = atoms.byIntVar[v] ?: return
     visitAtomRange(idx.eqKeys, idx.eqIds, value, value) { id -> clearAtomSlot(id) }
 }

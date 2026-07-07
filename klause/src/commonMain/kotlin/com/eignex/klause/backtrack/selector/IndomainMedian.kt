@@ -10,8 +10,8 @@ import kotlin.random.Random
  * present value; differs from [IndomainMiddle] (mean of bounds) when the domain is skewed or holey.
  */
 object IndomainMedian : ValueSelector {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
-        is VarRef.Bool -> sequenceOf(0, 1)
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(0L, 1L)
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)

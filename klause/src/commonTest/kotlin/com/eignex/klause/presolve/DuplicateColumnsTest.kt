@@ -77,9 +77,9 @@ class DuplicateColumnsTest {
         return any
     }
 
-    private fun enumerate(domains: Array<IntDomain>, body: (IntArray) -> Unit) {
+    private fun enumerate(domains: Array<IntDomain>, body: (LongArray) -> Unit) {
         val n = domains.size
-        val assign = IntArray(n) { domains[it].min }
+        val assign = LongArray(n) { domains[it].min }
         while (true) {
             body(assign)
             var i = 0

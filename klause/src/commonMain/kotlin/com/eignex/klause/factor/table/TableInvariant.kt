@@ -32,7 +32,7 @@ internal class TableInvariant(
             val base = row * arity
             var d = 0
             for (col in 0 until arity) {
-                if (state.assignment.intValue(xs[col]) != tuples[base + col]) d++
+                if (state.assignment.intValue(xs[col]) != tuples[base + col].toLong()) d++
             }
             dist[row] = d
             if (d < minD) minD = d
@@ -53,11 +53,11 @@ internal class TableInvariant(
             for (col in 0 until arity) {
                 val target = tuples[row * arity + col]
                 val cur = state.assignment.intValue(xs[col])
-                if (target != cur && target in state.problem.intDomains[xs[col]]) {
+                if (target.toLong() != cur && target.toLong() in state.problem.intDomains[xs[col]]) {
                     sink.addChannelingIntSet(
                         state,
                         xs[col],
-                        target,
+                        target.toLong(),
                     )
                 }
             }
@@ -89,13 +89,13 @@ internal class TableInvariant(
             for (col in 0 until arity) {
                 val v = xs[col]
                 val target = tuples[base + col]
-                if (target !in state.problem.intDomains[v]) {
+                if (target.toLong() !in state.problem.intDomains[v]) {
                     usable = false
                     break
                 }
                 if (state.assumptions.isFrozenInt(
                         v,
-                    ) && state.assignment.intValue(v) != target
+                    ) && state.assignment.intValue(v) != target.toLong()
                 ) {
                     usable = false
                     break
@@ -115,29 +115,31 @@ internal class TableInvariant(
             if (!usable) continue
             for (col in 0 until arity) {
                 val v = xs[col]
-                if (!state.assumptions.isFrozenInt(v)) state.assignment.setInt(v, tuples[base + col])
+                if (!state.assumptions.isFrozenInt(v)) state.assignment.setInt(v, tuples[base + col].toLong())
             }
             return true
         }
         return false
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val s = state.refPayload[factorId] as TableLsState
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return 0
         return tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, old, newValue, commit = false,
+            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, old, newValue,
+            commit = false,
         ) - s.minDist
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val s = state.refPayload[factorId] as TableLsState
         val newVal = state.assignment.intValue(intVar)
         if (newVal == oldValue) return 0
         val before = s.minDist
         val minD = tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, oldValue, newVal, commit = true,
+            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, oldValue, newVal,
+            commit = true,
         )
         s.minDist = minD
         return minD - before
@@ -157,15 +159,15 @@ internal fun tableRescanForChange(
     singleColumnByVar: IntIntMap,
     multiColumnsByVar: MutableIntObjectMap<IntArray>,
     intVar: Int,
-    oldV: Int,
-    newV: Int,
+    oldV: Long,
+    newV: Long,
     commit: Boolean,
 ): Int {
     var minD = arity
     val col = singleColumnByVar[intVar]
     if (col >= 0) {
         for (row in 0 until numTuples) {
-            val t = tuples[row * arity + col]
+            val t = tuples[row * arity + col].toLong()
             val d = s.dist[row] + (if (newV != t) 1 else 0) - (if (oldV != t) 1 else 0)
             if (commit) s.dist[row] = d
             if (d < minD) minD = d
@@ -176,7 +178,7 @@ internal fun tableRescanForChange(
             val base = row * arity
             var d = s.dist[row]
             for (c in cols) {
-                val t = tuples[base + c]
+                val t = tuples[base + c].toLong()
                 d += (if (newV != t) 1 else 0) - (if (oldV != t) 1 else 0)
             }
             if (commit) s.dist[row] = d
@@ -198,7 +200,7 @@ internal fun tableBuildTupleMove(
     for (col in 0 until arity) {
         val v = xs[col]
         val target = tuples[base + col]
-        if (target !in state.problem.intDomains[v]) return null
+        if (target.toLong() !in state.problem.intDomains[v]) return null
         for (prev in 0 until col) {
             if (xs[prev] == v && tuples[base + prev] != target) return null
         }
@@ -215,7 +217,7 @@ internal fun tableBuildTupleMove(
         }
         if (dup) continue
         val target = tuples[base + col]
-        if (state.assignment.intValue(v) != target) parts.add(Move.IntSet(v, target))
+        if (state.assignment.intValue(v) != target.toLong()) parts.add(Move.IntSet(v, target.toLong()))
     }
     return parts
 }

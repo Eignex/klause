@@ -189,16 +189,16 @@ data class BacktrackParams(
      * unconditional tightenings are published here; incumbent-relative reduced-cost fixings are not (they
      * stay arm-local against the shared cutoff). `null` (default) disables it.
      */
-    val globalVarBoundSink: ((varId: Int, lo: Int, hi: Int) -> Unit)? = null,
+    val globalVarBoundSink: ((varId: Int, lo: Long, hi: Long) -> Unit)? = null,
     /**
      * Suppliers of the portfolio's shared globally-valid level-0 variable bounds — the tightest lower /
      * upper bound any arm has proven for an integer variable. The engine imports them at its own level 0
      * (`Int.MIN_VALUE` / `Int.MAX_VALUE` meaning "nothing shared"). Sound: every shared bound holds at
      * every solution, so importing one only tightens a domain. `null` (default) disables import.
      */
-    val globalVarLowerSupplier: ((varId: Int) -> Int)? = null,
+    val globalVarLowerSupplier: ((varId: Int) -> Long)? = null,
     /** Companion of [globalVarLowerSupplier] for the shared upper bounds. */
-    val globalVarUpperSupplier: ((varId: Int) -> Int)? = null,
+    val globalVarUpperSupplier: ((varId: Int) -> Long)? = null,
     /**
      * The emphasis-driven LP-relaxation selector (#429): an [LpEmphasis] cost ceiling + per-technique
      * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]

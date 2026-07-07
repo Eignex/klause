@@ -11,8 +11,8 @@ import kotlin.random.Random
  * on wide domains where value enumeration is linear.
  */
 object IndomainSplit : ValueSelector {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
-        is VarRef.Bool -> sequenceOf(0, 1)
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(0L, 1L)
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)

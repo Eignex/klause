@@ -15,7 +15,7 @@ class Assignment(
     val numIntVars: Int,
 ) {
     private val bits: Bits = Bits(numBoolVars)
-    private val ints: IntArray = IntArray(numIntVars)
+    private val ints: LongArray = LongArray(numIntVars)
 
     /** Current value of Boolean variable [varId]. */
     fun boolValue(varId: Int): Boolean = bits.get(varId)
@@ -30,11 +30,11 @@ class Assignment(
         if (bits.get(varId)) bits.clear(varId) else bits.set(varId)
     }
 
-    /** Current value of integer variable [varId]. */
-    fun intValue(varId: Int): Int = ints[varId]
+    /** Current value of integer variable [varId]. May exceed 32-bit range. */
+    fun intValue(varId: Int): Long = ints[varId]
 
     /** Set integer variable [varId] to [value]. */
-    fun setInt(varId: Int, value: Int) {
+    fun setInt(varId: Int, value: Long) {
         ints[varId] = value
     }
 
@@ -62,8 +62,8 @@ class Assignment(
 data class Sample(
     /** Boolean values indexed by bool var id. */
     val bools: BooleanArray,
-    /** Integer values indexed by int var id. */
-    val ints: IntArray,
+    /** Integer values indexed by int var id. May exceed 32-bit range. */
+    val ints: LongArray,
 ) {
 
     /** Hamming distance to [other]: number of variable slots that differ. Caller must

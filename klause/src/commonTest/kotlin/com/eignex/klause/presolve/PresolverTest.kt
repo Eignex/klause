@@ -256,7 +256,7 @@ class PresolverTest {
         )
         val pre = Presolver.run(problem, PresolveConfig.NONE)
         assertSame(problem, pre.problem)
-        val s = Sample(BooleanArray(0), intArrayOf(2))
+        val s = Sample(BooleanArray(0), longArrayOf(2))
         assertSame(s, pre.reconstruct(s))
     }
 
@@ -334,7 +334,7 @@ class PresolverTest {
         )
         val pre = Presolver.run(problem, PresolveConfig.DEFAULT, cancellation = { true })
         assertSame(problem, pre.problem, "a fired cancellation must skip every pass and return the input")
-        val s = Sample(BooleanArray(0), intArrayOf(3, 1, 0))
+        val s = Sample(BooleanArray(0), longArrayOf(3, 1, 0))
         assertSame(s, pre.reconstruct(s), "no pass ran, so reconstruct is the identity")
     }
 
@@ -355,7 +355,7 @@ class PresolverTest {
         val result = BacktrackSolver(pre.problem).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
         val full = pre.reconstruct(result.assignment)
-        assertEquals(listOf(0, 1, 2), full.ints.toList(), "the single canonical permutation")
+        assertEquals(listOf(0L, 1L, 2L), full.ints.toList(), "the single canonical permutation")
         assertTrue(isFeasible(problem, full), "reconstructed sample infeasible in the original problem")
     }
 
@@ -419,7 +419,7 @@ class PresolverTest {
         // affine pass eliminates the aux vars by folding the channel away; if it runs under `-a` the
         // freed aux vars get enumerated independently, inflating circuit(4)'s 6 solutions (#507).
         val n = 4
-        val domains = Array(2 * n) { v -> if (v < n) IntDomain(1, n) else IntDomain(0, n - 1) }
+        val domains = Array(2 * n) { v -> if (v < n) IntDomain(1, n.toLong()) else IntDomain(0, (n - 1).toLong()) }
         val factors = ArrayList<Factor>()
         for (i in 0 until n) {
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(i, n + i), LinearOp.EQ, 1))

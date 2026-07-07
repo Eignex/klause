@@ -20,7 +20,7 @@ class IntVarLiftTest {
     private fun intVars(count: Int, lo: Int, hi: Int) = Problem(
         numBoolVars = 0,
         numIntVars = count,
-        intDomains = Array(count) { IntDomain(lo, hi) },
+        intDomains = Array(count) { IntDomain(lo.toLong(), hi.toLong()) },
         factors = arrayOf<Factor>(),
     )
 
@@ -72,7 +72,7 @@ class IntVarLiftTest {
             .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 5L), BacktrackParams())
             .take(draws).toList()
         assertEquals(draws, samples.size)
-        val counts = HashMap<List<Int>, Int>()
+        val counts = HashMap<List<Long>, Int>()
         for (s in samples) {
             assertTrue(s.ints.all { it in 0..3 }, "sampled value out of domain: ${s.ints.toList()}")
             val key = s.ints.toList()
@@ -97,7 +97,7 @@ class IntVarLiftTest {
         assertEquals(exact, r.estimate)
     }
 
-    private fun intKey(s: Sample): List<Int> = s.ints.toList()
+    private fun intKey(s: Sample): List<Long> = s.ints.toList()
 
     @Test
     fun `exact count over a constrained integer problem matches brute force`() {
@@ -113,7 +113,9 @@ class IntVarLiftTest {
         var bruteForce = 0
         for (a in 0..4) {
             for (b in 0..4) {
-                val r = solver.solve(BacktrackParams(assumptions = Assumptions(ints = mapOf(0 to a, 1 to b))))
+                val r = solver.solve(
+                    BacktrackParams(assumptions = Assumptions(ints = mapOf(0 to a.toLong(), 1 to b.toLong()))),
+                )
                 if (r is SolveResult.Sat) bruteForce++
             }
         }

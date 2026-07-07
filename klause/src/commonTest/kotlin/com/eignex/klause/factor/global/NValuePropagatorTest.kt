@@ -41,11 +41,11 @@ class NValuePropagatorTest {
                 val xsDomains = Array(k) {
                     val a = rng.nextInt(maxVal + 1)
                     val b = rng.nextInt(maxVal + 1)
-                    IntDomain(minOf(a, b), maxOf(a, b))
+                    IntDomain(minOf(a, b).toLong(), maxOf(a, b).toLong())
                 }
                 val a = rng.nextInt(k + 1)
                 val b = rng.nextInt(k + 1)
-                val nDomain = IntDomain(minOf(a, b), maxOf(a, b))
+                val nDomain = IntDomain(minOf(a, b).toLong(), maxOf(a, b).toLong())
                 FactorPropagationOracle.assertSound(nvalueProblem(xsDomains, nDomain, mode), "nvalue-$mode#$iter")
             }
         }
@@ -79,12 +79,12 @@ class NValuePropagatorTest {
             val xsDomains = Array(k) {
                 val a = rng.nextInt(maxVal + 1)
                 val b = rng.nextInt(maxVal + 1)
-                IntDomain(minOf(a, b), maxOf(a, b))
+                IntDomain(minOf(a, b).toLong(), maxOf(a, b).toLong())
             }
             // Pin the count high to provoke the matching-saturated pruning regime.
             val target = 1 + rng.nextInt(k)
             FactorPropagationOracle.assertGac(
-                nvalueProblem(xsDomains, IntDomain(target, target), NValue.Mode.AtLeast),
+                nvalueProblem(xsDomains, IntDomain(target.toLong(), target.toLong()), NValue.Mode.AtLeast),
                 "atleast-gac#$iter",
             )
         }
@@ -234,7 +234,9 @@ class NValuePropagatorTest {
             }
             rec(0)
             // var ids: xs = 0..xsCount-1, n = xsCount.
-            val doms = Array(xsCount + 1) { if (it < xsCount) IntDomain(1, xsHi) else IntDomain(1, nHi) }
+            val doms = Array(
+                xsCount + 1,
+            ) { if (it < xsCount) IntDomain(1, xsHi.toLong()) else IntDomain(1, nHi.toLong()) }
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = xsCount + 1,
@@ -242,7 +244,7 @@ class NValuePropagatorTest {
                 factors = arrayOf<Factor>(NValue(n = xsCount, xs = IntArray(xsCount) { it }, mode = mode)),
             )
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "mode=$mode: enumerated (xs, n) set must equal brute force")
         }
     }

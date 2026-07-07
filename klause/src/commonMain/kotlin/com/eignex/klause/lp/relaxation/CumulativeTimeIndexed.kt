@@ -32,23 +32,23 @@ import com.eignex.klause.util.LongArrayList
  */
 internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) {
     val n = view.starts.size
-    val est = IntArray(n) { declaredDomain(view.starts[it]).min }
-    val lst = IntArray(n) { declaredDomain(view.starts[it]).max }
-    var t0 = Int.MAX_VALUE
-    var t1 = Int.MIN_VALUE
+    val est = LongArray(n) { declaredDomain(view.starts[it]).min }
+    val lst = LongArray(n) { declaredDomain(view.starts[it]).max }
+    var t0 = Long.MAX_VALUE
+    var t1 = Long.MIN_VALUE
     var cols = 0L
     for (i in 0 until n) {
         if (lst[i] < est[i]) return // empty declared start domain — leave to propagation
         if (est[i] < t0) t0 = est[i]
         val end = lst[i] + view.durations[i]
         if (end > t1) t1 = end
-        cols += (lst[i] - est[i] + 1).toLong()
+        cols += lst[i] - est[i] + 1
     }
     val horizon = t1 - t0
     if (horizon <= 0 || horizon > CpToLpRelaxation.MAX_TI_HORIZON || cols > CpToLpRelaxation.MAX_TI_COLS) return
 
     // Per-task start-time columns, indexed by (t - est_i); assignment + start channel rows.
-    val taskCols = Array(n) { IntArray(lst[it] - est[it] + 1) }
+    val taskCols = Array(n) { IntArray((lst[it] - est[it] + 1).toInt()) }
     for (i in 0 until n) {
         val live = liveDomain(view.starts[i])
         val assignCols = IntArray(taskCols[i].size)
@@ -60,7 +60,7 @@ internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) 
             taskCols[i][k] = col
             assignCols[k] = col
             chanCols[k] = col
-            chanVals[k] = t.toLong()
+            chanVals[k] = t
         }
         row(assignCols, LongArray(assignCols.size) { 1L }, LinearOp.EQ, 1L)
         chanCols[taskCols[i].size] = intColumn(view.starts[i])
@@ -77,16 +77,16 @@ internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) 
         for (i in 0 until n) {
             val d = view.durations[i]
             val r = view.resources[i]
-            if (d <= 0 || r <= 0) continue
+            if (d <= 0 || r <= 0L) continue
             val lo = maxOf(est[i], tt - d + 1)
             val hi = minOf(lst[i], tt)
             for (t in lo..hi) {
-                rowCols.add(taskCols[i][t - est[i]])
-                rowVals.add(r.toLong())
+                rowCols.add(taskCols[i][(t - est[i]).toInt()])
+                rowVals.add(r)
             }
         }
         if (!rowCols.isEmpty()) {
-            row(rowCols.toIntArray(), rowVals.toLongArray(), LinearOp.LE, view.capacity.toLong())
+            row(rowCols.toIntArray(), rowVals.toLongArray(), LinearOp.LE, view.capacity)
         }
     }
 }

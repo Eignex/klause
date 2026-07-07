@@ -46,6 +46,26 @@ internal fun IntArray.binarySearchInt(element: Int, fromIndex: Int = 0, toIndex:
     return if (lo < toIndex && this[lo] == element) lo else -(lo + 1)
 }
 
+/** [binarySearchInt] for a sorted [LongArray] — same return contract. Used by the wide-value
+ *  [com.eignex.klause.solver.intdomain.SurvivorsDomain] whose present values may exceed 32-bit range. */
+internal fun LongArray.binarySearchLong(element: Long, fromIndex: Int = 0, toIndex: Int = size): Int {
+    var lo = fromIndex
+    var len = toIndex - fromIndex
+    while (len > LINEAR_SCAN_THRESHOLD) {
+        val half = len shr 1
+        val mid = lo + half
+        if (this[mid] < element) {
+            lo = mid + 1
+            len -= half + 1
+        } else {
+            len = half
+        }
+    }
+    val end = lo + len
+    while (lo < end && this[lo] < element) lo++
+    return if (lo < toIndex && this[lo] == element) lo else -(lo + 1)
+}
+
 /** Window width at or below which the linear scan takes over from the binary narrowing. A sweep
  *  over array sizes 16..16384 (the hole-array range) put the optimum at 8-24: thresholds >=64
  *  regress badly (the linear tail dominates), small arrays favour ~8, and the large arrays that

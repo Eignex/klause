@@ -26,7 +26,7 @@ class GlobalCardinalityInvariantTest {
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, domainHi) },
+            intDomains = Array(n) { IntDomain(0, domainHi.toLong()) },
             factors = arrayOf<Factor>(GlobalCardinality(xs, cover, countLow = countLow, countHigh = countHigh)),
         )
     }
@@ -42,7 +42,7 @@ class GlobalCardinalityInvariantTest {
         )
         fun seeded(seed: Long): LocalSearchState {
             val state = LocalSearchState(p, Random(seed))
-            for (i in 0 until 4) state.assignment.setInt(i, i)
+            for (i in 0 until 4) state.assignment.setInt(i, i.toLong())
             state.recompute()
             return state
         }

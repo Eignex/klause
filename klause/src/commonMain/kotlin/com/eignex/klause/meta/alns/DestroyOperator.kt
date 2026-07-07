@@ -180,8 +180,8 @@ internal fun interface DestroyOperator {
             val n = problem.numIntVars
             if (n == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             // Pick the window start uniformly across the smallest..largest int var domain.
-            var globalLo = Int.MAX_VALUE
-            var globalHi = Int.MIN_VALUE
+            var globalLo = Long.MAX_VALUE
+            var globalHi = Long.MIN_VALUE
             for (i in 0 until n) {
                 val d = problem.intDomains[i]
                 if (d.min < globalLo) globalLo = d.min
@@ -192,7 +192,7 @@ internal fun interface DestroyOperator {
             val start = if (span <= windowSize) {
                 globalLo
             } else {
-                globalLo + rng.nextInt(span - windowSize + 1)
+                globalLo + rng.nextLong(span - windowSize + 1)
             }
             val end = start + windowSize // exclusive
             val inWindow = IntArrayList()

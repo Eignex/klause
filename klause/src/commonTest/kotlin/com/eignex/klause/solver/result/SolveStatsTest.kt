@@ -88,7 +88,7 @@ class SolveStatsTest {
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, n - 2) },
+            intDomains = Array(n) { IntDomain(0, (n - 2).toLong()) },
             factors = factors.toTypedArray(),
         )
     }

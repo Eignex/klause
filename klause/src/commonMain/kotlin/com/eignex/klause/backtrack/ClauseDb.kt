@@ -422,7 +422,7 @@ internal fun BacktrackSolver.backjumpAndLearn(
 internal fun snapshotAssignment(session: PropagationSession): Sample {
     val sp = session.problem
     val bools = BooleanArray(sp.numBoolVars) { v -> session.boolValue(v) ?: false }
-    val ints = IntArray(sp.numIntVars) { v -> session.intDomain(v).min }
+    val ints = LongArray(sp.numIntVars) { v -> session.intDomain(v).min }
     return Sample(bools, ints)
 }
 

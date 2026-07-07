@@ -39,7 +39,7 @@ class SortPropagatorTest {
             val domains = Array(2 * n) {
                 val a = rng.nextInt(maxVal + 1)
                 val b = rng.nextInt(maxVal + 1)
-                IntDomain(minOf(a, b), maxOf(a, b))
+                IntDomain(minOf(a, b).toLong(), maxOf(a, b).toLong())
             }
             FactorPropagationOracle.assertSound(sortProblem(domains), "sort#$iter")
         }
@@ -52,7 +52,7 @@ class SortPropagatorTest {
             val domains = Array(8) {
                 val a = rng.nextInt(4)
                 val b = rng.nextInt(4)
-                IntDomain(minOf(a, b), maxOf(a, b))
+                IntDomain(minOf(a, b).toLong(), maxOf(a, b).toLong())
             }
             FactorPropagationOracle.assertSound(sortProblem(domains), "sort4#$iter")
         }
@@ -99,6 +99,6 @@ class SortPropagatorTest {
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals(listOf(1, 1, 2), listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]))
+        assertEquals(listOf(1L, 1L, 2L), listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]))
     }
 }

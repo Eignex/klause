@@ -81,7 +81,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) {
      * distance), preserving the heuristic's order among ties. Returns [values] unchanged when there is
      * no LP value for [varRef].
      */
-    fun order(varRef: VarRef, values: Sequence<Int>): Sequence<Int> {
+    fun order(varRef: VarRef, values: Sequence<Long>): Sequence<Long> {
         val hint = when (varRef) {
             is VarRef.IntVar -> intVal.getOrElse(varRef.varId) { Double.NaN }
             is VarRef.Bool -> boolVal.getOrElse(varRef.varId) { Double.NaN }
@@ -89,7 +89,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) {
         if (hint.isNaN()) return values
         val target = hint.roundToLong()
         // Stable sort by |value − round(LP)|: round-toward-LP diving, ties keep heuristic order.
-        return values.sortedBy { abs(it.toLong() - target) }.asSequence()
+        return values.sortedBy { abs(it - target) }.asSequence()
     }
 
     private companion object {

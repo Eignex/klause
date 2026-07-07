@@ -264,7 +264,7 @@ internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
             val (dMin, span) = domainMinAndSpan(ids)
-            factors += AllDifferentFactor(ids, dMin, span)
+            factors += AllDifferentFactor(ids, dMin.toInt(), span.toInt())
             return
         }
     }
@@ -299,7 +299,7 @@ private fun Lowering.liftToIntRefIds(exprs: List<IntExpr>, context: String, term
 
 /** Smallest domain min and total value span (`max − min + 1`) across [ids]' current domains —
  *  the value-occurrence range an [AllDifferentFactor] indexes over. */
-private fun Lowering.domainMinAndSpan(ids: IntArray): Pair<Int, Int> {
+private fun Lowering.domainMinAndSpan(ids: IntArray): Pair<Long, Long> {
     var dMin = intDomains[ids[0]].min
     var dMax = intDomains[ids[0]].max
     for (id in ids) {
@@ -340,7 +340,7 @@ internal fun Lowering.assertCircuit(succ: List<IntExpr>, valueOffset: Int, sub: 
     } else {
         IntArray(n) { i ->
             // Channel: aux = src - valueOffset, with aux ∈ [0, n − 1].
-            val auxId = newIntVar(IntDomain(0, n - 1))
+            val auxId = newIntVar(IntDomain(0L, (n - 1).toLong()))
             factors += Linear(
                 coeffs = intArrayOf(1, -1),
                 vars = intArrayOf(srcIds[i], auxId),
@@ -382,7 +382,7 @@ internal fun Lowering.assertAllDifferentOpt(expr: AllDifferentOpt) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
             val (dMin, span) = domainMinAndSpan(ids)
-            factors += AllDifferentFactor(ids, dMin, span, presents = presentLits)
+            factors += AllDifferentFactor(ids, dMin.toInt(), span.toInt(), presents = presentLits)
             return
         }
     }

@@ -65,7 +65,7 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
         val c = obj.intCoefficients[i]
         if (c == 0L) continue
         val d = session.intDomain(i)
-        total = addExact(total, mulExact(c, if (c >= 0L) d.min.toLong() else d.max.toLong()))
+        total = addExact(total, mulExact(c, if (c >= 0L) d.min else d.max))
     }
     total
 } catch (_: LpOverflowException) {
@@ -85,7 +85,7 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): R
     RevisedSimplex(model, cancellation)
 
 /** One branch decision on the path from the root in [lbTreeSearch]: pin/bound [varId]. */
-private class LbDecision(val isBool: Boolean, val varId: Int, val lower: Boolean, val bound: Int)
+private class LbDecision(val isBool: Boolean, val varId: Int, val lower: Boolean, val bound: Long)
 
 /** An open node in [lbTreeSearch]: its decisions from the root and the LP bound used to order it. */
 private class LbNode(val decisions: List<LbDecision>, val bound: Double)
@@ -141,11 +141,11 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
         }
         val (v, isBool, f) = frac
         if (isBool) {
-            frontier.add(LbNode(node.decisions + LbDecision(true, v, false, 0), result.objective))
-            frontier.add(LbNode(node.decisions + LbDecision(true, v, false, 1), result.objective))
+            frontier.add(LbNode(node.decisions + LbDecision(true, v, false, 0L), result.objective))
+            frontier.add(LbNode(node.decisions + LbDecision(true, v, false, 1L), result.objective))
         } else {
-            frontier.add(LbNode(node.decisions + LbDecision(false, v, false, floor(f).toInt()), result.objective))
-            frontier.add(LbNode(node.decisions + LbDecision(false, v, true, ceil(f).toInt()), result.objective))
+            frontier.add(LbNode(node.decisions + LbDecision(false, v, false, floor(f).toLong()), result.objective))
+            frontier.add(LbNode(node.decisions + LbDecision(false, v, true, ceil(f).toLong()), result.objective))
         }
         while (frontier.size > LB_TREE_FRONTIER_CAP) { // bound memory: drop the worst (highest-bound) node
             var wi = 0
@@ -158,7 +158,7 @@ internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Can
 
 /** Apply an [LbDecision] to [session], returning the propagation result (Unsat ⇒ the node is dead). */
 private fun applyLbDecision(session: PropagationSession, d: LbDecision): PropagationResult = when {
-    d.isBool -> session.implyBool(d.varId, d.bound == 1)
+    d.isBool -> session.implyBool(d.varId, d.bound == 1L)
     d.lower -> session.implyIntAtLeast(d.varId, d.bound)
     else -> session.implyIntAtMost(d.varId, d.bound)
 }
@@ -427,7 +427,7 @@ internal fun LpEngine.sparseSafePrune(
         } else {
             null
         }
-        val lpFloor = exactFloor ?: ceil(full).takeIf { it in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble() }
+        val lpFloor = exactFloor ?: ceil(full).takeIf { it in Long.MIN_VALUE.toDouble()..Long.MAX_VALUE.toDouble() }
             ?.toLong()
         // Round the bound up to the objective variable's achievable residue (`v ≡ r mod g` from its
         // defining equality): a tighter, still-sound cutoff. A strict lift cannot be witnessed by the
@@ -436,20 +436,19 @@ internal fun LpEngine.sparseSafePrune(
         val mod = objectiveModulus?.takeIf { it.first == objectiveVar }
         val rounded = if (lpFloor != null && mod != null) {
             roundUpToResidue(lpFloor, mod.second.toLong(), mod.third.toLong())
-                .takeIf { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() } ?: lpFloor
         } else {
             lpFloor
         }
-        if (rounded != null && rounded in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+        if (rounded != null) {
             val reason = if (learn && cert != null && rounded == lpFloor) {
                 LpExplanation.objectiveBoundReason(boundRel, cert, session)
             } else {
                 null
             }
             val res = if (reason != null) {
-                session.implyIntAtLeastWithReason(objectiveVar, rounded.toInt(), reason)
+                session.implyIntAtLeastWithReason(objectiveVar, rounded, reason)
             } else {
-                session.implyIntAtLeast(objectiveVar, rounded.toInt())
+                session.implyIntAtLeast(objectiveVar, rounded)
             }
             if (res is PropagationResult.Unsat) {
                 sink.lp.observePrune()
@@ -500,8 +499,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     // Expressible only with a single-var ascending objective whose live upper bound already meets the
     // incumbent atom, all dual-weighted non-global rows premise-backed, and no support on an aux column.
     var canLearn = learn && objectiveVar >= 0 && objectiveAscending &&
-        improvingMax in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
-        session.intDomain(objectiveVar).max.toLong() <= improvingMax
+        session.intDomain(objectiveVar).max <= improvingMax
     val supportCols = IntArrayList()
     val supportLits = IntArrayList()
     if (canLearn) {
@@ -529,7 +527,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
             canLearn = false
         }
     }
-    val incumbentLit = if (canLearn) session.boundLeLit(objectiveVar, improvingMax.toInt(), positive = false) else 0
+    val incumbentLit = if (canLearn) session.boundLeLit(objectiveVar, improvingMax, positive = false) else 0
 
     // Reason for fixing `col`: every support column's seated-bound negation except col's own, plus the
     // incumbent objective bound. (col's own bound is the variable moving, not a premise.)
@@ -553,8 +551,8 @@ internal fun LpEngine.applySparseReducedCostFixing(
             liveMax = 1L
         } else {
             val d = session.intDomain(varId)
-            liveMin = d.min.toLong()
-            liveMax = d.max.toLong()
+            liveMin = d.min
+            liveMax = d.max
         }
         if (liveMin == liveMax) continue
         val span = liveMax - liveMin
@@ -564,7 +562,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
                 if (cert.reducedCostSign(col) <= 0) continue
                 val dMax = cert.fixSteps(col, improvingMax) ?: continue // overflow ⇒ skip (sound)
                 if (dMax >= span) continue
-                val hi = (liveMin + dMax).toInt()
+                val hi = liveMin + dMax
                 when {
                     isBool -> session.implyBool(varId, false)
                     canLearn -> session.implyIntAtMostWithReason(varId, hi, reasonFor(col))
@@ -577,7 +575,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
                 if (cert.reducedCostSign(col) >= 0) continue
                 val dMax = cert.fixSteps(col, improvingMax) ?: continue
                 if (dMax >= span) continue
-                val lo = (liveMax - dMax).toInt()
+                val lo = liveMax - dMax
                 when {
                     isBool -> session.implyBool(varId, true)
                     canLearn -> session.implyIntAtLeastWithReason(varId, lo, reasonFor(col))

@@ -21,8 +21,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * Variable groups that are pairwise all-different, harvested from the LP-relevant globals so the
@@ -174,7 +174,7 @@ internal class AllDifferentSeparator : CutSeparator {
         // Merge domain intervals into disjoint ascending ranges.
         val ranges = vars.map {
             val d = session.intDomain(it)
-            d.min.toLong() to d.max.toLong()
+            d.min to d.max
         }
             .sortedBy { it.first }
         val merged = ArrayList<LongArray>() // [lo, hi]
@@ -264,8 +264,8 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
      * arithmetic overflows (then no cut is produced — sound, just no strengthening).
      */
     private fun assignmentMin(vars: IntArray, session: PropagationSession): Long? {
-        val valueIndex = MutableIntIntMap()
-        val values = IntArrayList()
+        val valueIndex = MutableLongIntMap()
+        val values = LongArrayList()
         for (v in vars) {
             session.intDomain(v).forEach { value ->
                 if (!valueIndex.containsKey(value)) {
@@ -280,7 +280,7 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
             for (i in vars.indices) {
                 val c = intCoef.getOrElse(vars[i]) { 0L }
                 session.intDomain(vars[i]).forEach { value ->
-                    assign.addOption(i, valueIndex.getOrDefault(value, -1), mulExact(c, value.toLong()))
+                    assign.addOption(i, valueIndex.getOrDefault(value, -1), mulExact(c, value))
                 }
             }
             val r = assign.solve()
@@ -379,8 +379,8 @@ internal class GccSeparator : CutSeparator {
                 hi = countHigh[k].toLong()
             } else if (countVars != null) {
                 val d = session.intDomain(countVars[k])
-                lo = d.min.toLong()
-                hi = d.max.toLong()
+                lo = d.min
+                hi = d.max
             } else {
                 return null
             }

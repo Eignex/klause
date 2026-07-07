@@ -45,7 +45,7 @@ internal class ReifiedLinearInvariant(
         return reifiedDegreeFor(sum, !aux, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.longPayload[factorId]
         val coeff = findCoeff(coeffs, vars, intVar)
@@ -61,7 +61,7 @@ internal class ReifiedLinearInvariant(
             reifiedDegreeFor(sum, !aux, state.violationSoftCap)
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val coeff = findCoeff(coeffs, vars, intVar)
         val oldSum = state.longPayload[factorId]
@@ -86,7 +86,7 @@ internal class ReifiedLinearInvariant(
             // Same-aux snap: shift body so the predicate matches the current aux.
             val targetSame = snapLinearTarget(op, bound, c, sumWithout, aux)
             if (targetSame != null) {
-                val clamped = state.problem.intDomains[v].clampLong(targetSame)
+                val clamped = state.problem.intDomains[v].clamp(targetSame)
                 if (clamped != cur && aux == linearHolds(sumWithout + c * clamped, op, bound)) {
                     sink.addChannelingIntSet(state, v, clamped)
                 }
@@ -95,7 +95,7 @@ internal class ReifiedLinearInvariant(
             // predicate matches the flipped aux.
             val targetOpp = snapLinearTarget(op, bound, c, sumWithout, !aux)
             if (targetOpp != null) {
-                val clamped = state.problem.intDomains[v].clampLong(targetOpp)
+                val clamped = state.problem.intDomains[v].clamp(targetOpp)
                 if (clamped != cur && !aux == linearHolds(sumWithout + c * clamped, op, bound)) {
                     sink.addCompound(listOf(auxFlipMove, IntSet(v, clamped)))
                 }
@@ -109,8 +109,8 @@ internal class ReifiedLinearInvariant(
         state: LocalSearchState,
         factorId: Int,
         intVar: Int,
-        oldValue: Int,
-        newValue: Int,
+        oldValue: Long,
+        newValue: Long,
         sink: ChannelingSink,
     ) {
         if (vars.size != 1 || op != LinearOp.EQ) return
@@ -140,7 +140,7 @@ internal class ReifiedLinearInvariant(
 
     /** Aux's break/make contribution depends only on `holds(sum)` and `aux`. An int set
      *  may flip `holds`, in which case the aux's contribution swaps; otherwise no change. */
-    override fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {
+    override fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long) {
         val newSum = state.longPayload[factorId]
         val coeff = findCoeff(coeffs, vars, intVar)
         val newValue = state.assignment.intValue(intVar)

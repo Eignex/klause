@@ -356,7 +356,7 @@ class CardinalityInvariantTest {
         val intDomains = Array(3) { IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
         val state = LocalSearchState(problem, Random(0))
-        for (i in 0 until 3) state.assignment.setInt(i, i + 1)
+        for (i in 0 until 3) state.assignment.setInt(i, (i + 1).toLong())
         state.recompute()
         for (round in 0 until 10) {
             val v = round % 3
@@ -393,7 +393,7 @@ class CardinalityInvariantTest {
         val intDomains = Array(3) { IntDomain(0, 5) }
         val problem = Problem(1, 3, intDomains, listOf(factor))
         val state = LocalSearchState(problem, Random(0))
-        for (i in 0 until 3) state.assignment.setInt(i, i + 1)
+        for (i in 0 until 3) state.assignment.setInt(i, (i + 1).toLong())
         state.recompute()
         repeat(4) {
             state.apply(BoolFlip(0))

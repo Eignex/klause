@@ -39,8 +39,8 @@ internal fun FlatZincCompiler.compileParamArray(name: String, elem: FznType, lit
         is FznType.IntRange, is FznType.IntSet, FznType.IntAny -> {
             FlatZincArray.IntParam(
                 name,
-                IntArray(lit.elements.size) {
-                    evalIntConst(lit.elements[it]).toInt()
+                LongArray(lit.elements.size) {
+                    evalIntConst(lit.elements[it])
                 },
             )
         }
@@ -142,7 +142,20 @@ internal fun FlatZincCompiler.evalIntConstArray(e: FznExpr): IntArray = when (e)
     is FznExpr.ArrayLit -> IntArray(e.elements.size) { evalIntConst(e.elements[it]).toInt() }
 
     is FznExpr.Ident -> when (val arr = arrays[e.name]) {
-        is FlatZincArray.IntParam -> arr.values
+        is FlatZincArray.IntParam -> IntArray(arr.values.size) { arr.values[it].toInt() }
+        else -> failHere("`${e.name}` is not an int parameter array")
+    }
+
+    else -> failHere("expected int array, got ${e::class.simpleName}")
+}
+
+/** [evalIntConstArray] without narrowing to `Int` — the linear-constraint coefficient path, where a
+ *  coefficient may legitimately exceed 32-bit range (mirrors [evalIntConst] returning `Long`). */
+internal fun FlatZincCompiler.evalIntConstArrayLong(e: FznExpr): LongArray = when (e) {
+    is FznExpr.ArrayLit -> LongArray(e.elements.size) { evalIntConst(e.elements[it]) }
+
+    is FznExpr.Ident -> when (val arr = arrays[e.name]) {
+        is FlatZincArray.IntParam -> arr.values.copyOf()
         else -> failHere("`${e.name}` is not an int parameter array")
     }
 
@@ -166,6 +179,7 @@ internal fun FlatZincCompiler.tryEvalIntConstArray(e: FznExpr): IntArray? = when
     }
 
     is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.IntParam)?.values
+        ?.let { v -> IntArray(v.size) { v[it].toInt() } }
 
     else -> null
 }
@@ -270,7 +284,7 @@ internal fun FlatZincCompiler.resolveIntVar(e: FznExpr): Int = when (e) {
 
     is FznExpr.IntLit -> {
         val name = "__const_int_${e.value}_${intVars.size}"
-        allocInt(name, e.value.toInt(), e.value.toInt())
+        allocInt(name, e.value, e.value)
     }
 
     is FznExpr.ArrayAccess -> {

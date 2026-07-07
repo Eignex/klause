@@ -16,10 +16,10 @@ internal class ProductLinearizer(private val a: Int, private val b: Int, private
         if (!builder.hullEnabled()) return
         val aDom = builder.declaredDomain(a)
         val bDom = builder.declaredDomain(b)
-        val aL = aDom.min.toLong()
-        val aH = aDom.max.toLong()
-        val bL = bDom.min.toLong()
-        val bH = bDom.max.toLong()
+        val aL = aDom.min
+        val aH = aDom.max
+        val bL = bDom.min
+        val bH = bDom.max
         val resCol = builder.intColumn(result)
         val aCol = builder.intColumn(a)
         val bCol = builder.intColumn(b)

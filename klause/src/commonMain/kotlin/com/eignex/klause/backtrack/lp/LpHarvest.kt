@@ -154,9 +154,9 @@ private fun provenInfeasible(problem: Problem, bakeConfig: BakeConfig): Problem 
     when {
         problem.numIntVars > 0 -> {
             val min = problem.intDomains[0].min
-            val c = if (min < Int.MAX_VALUE) min else min - 1
-            factors.add(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, c))
-            factors.add(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, c + 1))
+            val c = if (min < Long.MAX_VALUE) min else min - 1
+            factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c))
+            factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c + 1))
         }
 
         problem.numBoolVars > 0 -> {

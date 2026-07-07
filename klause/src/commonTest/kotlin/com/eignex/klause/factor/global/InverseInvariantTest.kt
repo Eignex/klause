@@ -40,7 +40,7 @@ class InverseInvariantTest {
         val starts = listOf(intArrayOf(0, 1, 2, 3), intArrayOf(1, 0, 3, 2))
         fun seeded(start: IntArray, seed: Long): LocalSearchState {
             val state = LocalSearchState(problem, Random(seed))
-            for (i in 0 until 4) state.assignment.setInt(i, start[i])
+            for (i in 0 until 4) state.assignment.setInt(i, start[i].toLong())
             state.recompute()
             return state
         }
@@ -121,8 +121,8 @@ class InverseInvariantTest {
         val p = problem()
         val state = LocalSearchState(p, Random(0))
         // f = [0,1,2], g = [0,1,2]: identity is its own inverse
-        for (i in 0..2) state.assignment.setInt(i, i)
-        for (i in 0..2) state.assignment.setInt(3 + i, i)
+        for (i in 0..2) state.assignment.setInt(i, i.toLong())
+        for (i in 0..2) state.assignment.setInt(3 + i, i.toLong())
         state.recompute()
         assertFalse(state.factors[0].isViolated(state, 0))
     }
@@ -132,7 +132,7 @@ class InverseInvariantTest {
         val p = problem()
         val state = LocalSearchState(p, Random(0))
         // Start with identity, break g[0] to 2 (was 0)
-        for (i in 0..2) state.assignment.setInt(i, i)
+        for (i in 0..2) state.assignment.setInt(i, i.toLong())
         state.assignment.setInt(3, 2)
         state.assignment.setInt(4, 1)
         state.assignment.setInt(5, 2)

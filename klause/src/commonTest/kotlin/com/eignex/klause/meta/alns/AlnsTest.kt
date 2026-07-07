@@ -23,7 +23,7 @@ class AlnsTest {
     @Test
     fun `random destroy returns expected fraction`() {
         val problem = Problem(numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val incumbent = Sample(BooleanArray(10) { false }, IntArray(0))
+        val incumbent = Sample(BooleanArray(10) { false }, LongArray(0))
         val obj = LinearObjective(boolWeights = LongArray(10) { 1L })
         val freed = DestroyOperator.Random.destroy(Random(0), problem, incumbent, obj, fraction = 0.3)
         assertEquals(3, freed.bools.size, "expected 3 freed bools (fraction 0.3 of 10)")
@@ -46,7 +46,7 @@ class AlnsTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(fA, fB),
         )
-        val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
+        val incumbent = Sample(BooleanArray(8) { false }, LongArray(0))
         val obj = LinearObjective(boolWeights = LongArray(8) { 1L })
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
         assertEquals(2, freed.bools.size)
@@ -67,7 +67,7 @@ class AlnsTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(fA, fB),
         )
-        val incumbent = Sample(BooleanArray(8) { false }, IntArray(0))
+        val incumbent = Sample(BooleanArray(8) { false }, LongArray(0))
         val obj = LinearObjective(boolWeights = LongArray(8) { 1L })
         val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem, incumbent, obj, fraction = 0.75)
         assertEquals(6, freed.bools.size)
@@ -79,7 +79,7 @@ class AlnsTest {
     @Test
     fun `worst objective destroy picks high contribution vars`() {
         val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val incumbent = Sample(booleanArrayOf(false, false, false, true), IntArray(0))
+        val incumbent = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
         val obj = LinearObjective(boolWeights = longArrayOf(1L, 2L, 3L, 100L))
         val freed = DestroyOperator.WorstObjective.destroy(Random(0), problem, incumbent, obj, fraction = 0.25)
         assertEquals(1, freed.bools.size)
@@ -156,7 +156,7 @@ class AlnsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val inner = LocalSearchSolver(problem)
-        val incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0))
+        val incumbent = Sample(booleanArrayOf(false, false, false, false), LongArray(0))
         val context = RepairContext(
             inner = inner,
             params = LocalSearchParams(randomSeed = 0L),
@@ -193,7 +193,7 @@ class AlnsTest {
             params = LocalSearchParams(randomSeed = 0L),
             objective = objective,
             pinAssumptions = pinAssumptions,
-            incumbent = Sample(booleanArrayOf(false, false, false, false), IntArray(0)),
+            incumbent = Sample(booleanArrayOf(false, false, false, false), LongArray(0)),
             freed = FreedVars(intArrayOf(3), IntArray(0)),
             rng = Random(0),
         )
@@ -217,7 +217,7 @@ class AlnsTest {
             params = LocalSearchParams(maxFlips = 999_999L, randomSeed = 0L),
             objective = objective,
             pinAssumptions = Assumptions.None,
-            incumbent = Sample(booleanArrayOf(false, true), IntArray(0)),
+            incumbent = Sample(booleanArrayOf(false, true), LongArray(0)),
             freed = FreedVars(intArrayOf(0, 1), IntArray(0)),
         )
         val s = repair.repair(context)

@@ -122,7 +122,7 @@ object FactorPropagationOracle {
         }
     }
 
-    private fun isAllowed(r: PropagationResult.Implied, problem: Problem, v: Int, value: Int, pinned: Int?): Boolean {
+    private fun isAllowed(r: PropagationResult.Implied, problem: Problem, v: Int, value: Long, pinned: Long?): Boolean {
         if (pinned != null) return pinned == value
         val lo = r.intMinOrNullCompat(v) ?: problem.intDomains[v].min
         val hi = r.intMaxOrNullCompat(v) ?: problem.intDomains[v].max

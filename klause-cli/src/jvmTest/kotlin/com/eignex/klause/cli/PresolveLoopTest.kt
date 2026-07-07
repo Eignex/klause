@@ -51,7 +51,7 @@ class PresolveLoopTest {
         assertTrue(presolved !== solvable, "affine elimination should have transformed the problem")
         assertTrue(presolved.problem.factors.isEmpty(), "the lone defining equality should be eliminated")
         // y = 2 in the presolved problem (x left free) must reconstruct to x = 5.
-        assertEquals(5L, presolved.objectiveValue!!(Sample(BooleanArray(0), intArrayOf(2, 0))))
+        assertEquals(5L, presolved.objectiveValue!!(Sample(BooleanArray(0), longArrayOf(2, 0))))
     }
 
     @Test

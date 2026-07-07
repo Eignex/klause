@@ -16,7 +16,7 @@ class CumulativeFlowBoundTest {
         Problem(
             0,
             n,
-            Array(n) { IntDomain(0, spanHi) },
+            Array(n) { IntDomain(0, spanHi.toLong()) },
             arrayOf<Factor>(Cumulative(IntArray(n) { it }, durations, resources, capacity)),
         )
 
@@ -74,8 +74,8 @@ class CumulativeFlowBoundTest {
             val session = PropagationSession(p)
             if (!CumulativeFlowBound(p).isInfeasible(session)) return@repeat
             flagged++
-            val mins = IntArray(n) { session.intDomain(it).min }
-            val maxs = IntArray(n) { session.intDomain(it).max }
+            val mins = IntArray(n) { session.intDomain(it).min.toInt() }
+            val maxs = IntArray(n) { session.intDomain(it).max.toInt() }
             assertTrue(!feasible(n, mins, maxs, durations, resources, capacity), "false infeasible")
         }
         assertTrue(flagged > 20, "only $flagged instances were flagged infeasible")

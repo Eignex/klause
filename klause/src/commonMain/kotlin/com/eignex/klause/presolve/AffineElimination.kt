@@ -10,6 +10,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
 
 internal object AffineSingletons {
 
@@ -249,17 +251,17 @@ internal object AffineSingletons {
     /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
      *  inside [domX], or `null` if no such `y` exists (leave the constraint for propagation to fail). */
     private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Int, b: Int, c: Int): IntDomain? {
-        val valid = IntArrayList()
+        val valid = LongArrayList()
         for (y in domY.min..domY.max) {
             if (y !in domY) continue
             val num = c - b * y
-            if (num % a != 0) continue
+            if (num % a != 0L) continue
             val x = num / a
             if (x in domX) valid.add(y)
         }
         if (valid.isEmpty()) return null
         var d = domY.withMinAtLeast(valid[0]).withMaxAtMost(valid.last())
-        val keep = IntHashSet()
+        val keep = LongHashSet()
         valid.forEach { keep.add(it) }
         for (y in valid[0]..valid.last()) if (y !in keep && y in d) d = d.excludeValue(y)
         return d
@@ -755,10 +757,13 @@ internal object AffineSingletons {
 
     /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within
      *  `x`'s domain [domX]. */
-    private fun domainBoundsOnTerms(domX: IntDomain, c: AffineCandidate): List<Factor> = listOf(
-        Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.LE, domX.max - c.constTerm),
-        Linear(c.termCoeffs.copyOf(), c.termVars.copyOf(), LinearOp.GE, domX.min - c.constTerm),
-    )
+    private fun domainBoundsOnTerms(domX: IntDomain, c: AffineCandidate): List<Factor> {
+        val coeffs = LongArray(c.termCoeffs.size) { c.termCoeffs[it].toLong() }
+        return listOf(
+            Linear(coeffs, c.termVars.copyOf(), LinearOp.LE, domX.max - c.constTerm),
+            Linear(coeffs, c.termVars.copyOf(), LinearOp.GE, domX.min - c.constTerm),
+        )
+    }
 }
 
 /** A single affine elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded by
@@ -787,7 +792,7 @@ internal class AffineElimination(private val subs: List<AffineSub>) {
         if (subs.isEmpty()) return sample
         val ints = sample.ints.copyOf()
         for (s in subs.asReversed()) {
-            var v = s.constTerm
+            var v = s.constTerm.toLong()
             for (k in s.termVars.indices) v += s.termCoeffs[k] * ints[s.termVars[k]]
             ints[s.x] = if (s.divisor == 1) v else v / s.divisor
         }

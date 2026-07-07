@@ -65,7 +65,7 @@ class DefinitionalSweep internal constructor(
         fun apply(assignment: Assignment, domains: Array<IntDomain>) {
             val v = eval(assignment, domains)
             if (v == NO_WRITE) return
-            if (outIsBool) assignment.setBool(out, v != 0L) else assignment.setInt(out, v.toInt())
+            if (outIsBool) assignment.setBool(out, v != 0L) else assignment.setInt(out, v)
         }
 
         /** Shared [SweepNode] constants. */
@@ -84,7 +84,7 @@ class DefinitionalSweep internal constructor(
             override val outIsBool: Boolean get() = false
             override val boolInputs: IntArray get() = EmptyIntArray
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long =
-                domains[node.out].clampLong(node.compute { id -> assignment.intValue(id).toLong() }).toLong()
+                domains[node.out].clamp(node.compute { id -> assignment.intValue(id) })
         }
 
         /** `out ↔ (Σ coeffs·vars ⟨op⟩ rhs)` — every `int_*_reif` / `int_lin_*_reif` shape as a
@@ -118,7 +118,7 @@ class DefinitionalSweep internal constructor(
             /** The defined output var id. */
             override val out: Int,
             private val x: Int,
-            private val values: IntArray,
+            private val values: LongArray,
         ) : SweepNode {
             override val outIsBool: Boolean get() = true
             override val intInputs: IntArray = intArrayOf(x)
@@ -150,7 +150,7 @@ class DefinitionalSweep internal constructor(
             override val intInputs: IntArray get() = EmptyIntArray
             override val boolInputs: IntArray = intArrayOf(b)
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long =
-                domains[out].clampLong(if (assignment.boolValue(b)) 1L else 0L).toLong()
+                domains[out].clamp(if (assignment.boolValue(b)) 1L else 0L)
         }
 
         /** `out ↔ ⋀ ins` / `out ↔ ⋁ ins` over bool *literals* (polarity-encoded via [Lit], the
@@ -183,7 +183,7 @@ class DefinitionalSweep internal constructor(
             override val out: Int,
             private val idx: Int,
             private val arrVars: IntArray?,
-            private val arrConsts: IntArray?,
+            private val arrConsts: LongArray?,
             private val offset: Int,
         ) : SweepNode {
             override val outIsBool: Boolean get() = false
@@ -191,15 +191,17 @@ class DefinitionalSweep internal constructor(
                 if (arrVars != null) intArrayOf(idx) + arrVars else intArrayOf(idx)
             override val boolInputs: IntArray get() = EmptyIntArray
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
+                // The array position is a domain value; only an in-range one indexes the array, so
+                // narrow to Int after the range guard (an out-of-Int-range value is out of range).
                 val pos = assignment.intValue(idx) - offset
                 val vars = arrVars
                 val consts = arrConsts
                 val v = when {
-                    vars != null && pos in vars.indices -> assignment.intValue(vars[pos]).toLong()
-                    consts != null && pos >= 0 && pos < consts.size -> consts[pos].toLong()
+                    vars != null && pos >= 0 && pos < vars.size -> assignment.intValue(vars[pos.toInt()])
+                    consts != null && pos >= 0 && pos < consts.size -> consts[pos.toInt()]
                     else -> return NO_WRITE
                 }
-                return domains[out].clampLong(v).toLong()
+                return domains[out].clamp(v)
             }
         }
     }

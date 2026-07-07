@@ -29,7 +29,7 @@ class SignedMulDslTest {
         for (s in samples) {
             val xv = compiled.decode(schema.x, s)
             val yv = compiled.decode(schema.y, s)
-            assertTrue(xv * yv == -6, "x=$xv y=$yv x*y=${xv * yv}")
+            assertTrue(xv * yv == -6L, "x=$xv y=$yv x*y=${xv * yv}")
         }
     }
 }

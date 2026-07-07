@@ -61,7 +61,7 @@ class AllDifferentInvariantTest {
         )
         fun seeded(seed: Long): LocalSearchState {
             val state = LocalSearchState(problem, Random(seed))
-            for (i in 0 until 5) state.assignment.setInt(i, i)
+            for (i in 0 until 5) state.assignment.setInt(i, i.toLong())
             state.recompute()
             return state
         }
@@ -125,7 +125,7 @@ class AllDifferentInvariantTest {
         val targetSet = intSets.map { it.newValue }.toSet()
         assertTrue(targetSet.size == intSets.size, "duplicate targets: $intSets")
         for (t in targetSet) {
-            assertTrue(t != 5 && t != 0, "target $t collides with existing assignment")
+            assertTrue(t != 5L && t != 0L, "target $t collides with existing assignment")
         }
     }
 

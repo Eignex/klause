@@ -34,7 +34,10 @@ class IntDomainMicrobench {
             next = s + 1
         }
         for (v in next until span) toExclude.add(v)
-        return IntDomain(0, span - 1).excludeValues(toExclude.toIntArray())!!
+        return IntDomain(
+            0,
+            (span - 1).toLong(),
+        ).excludeValues(toExclude.toIntArray().map { it.toLong() }.toLongArray())!!
     }
 
     @Test
@@ -48,7 +51,7 @@ class IntDomainMicrobench {
             val d = carveDownTo(span, survivors)
             val probes = IntArray(1_000_000) { rng.nextInt(span) }
             var hits = 0
-            val t = measureTime { for (p in probes) if (p in d) hits++ }
+            val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
             println(
                 "span=2^$spanShift ($span) rep=${d::class.simpleName} size=${d.size} " +
                     "1M contains=$t hits=$hits",
@@ -76,7 +79,7 @@ class IntDomainMicrobench {
             val d = carveDownTo(span, survivors.toIntArray())
             val probes = IntArray(1_000_000) { rng.nextInt(span) }
             var hits = 0
-            val t = measureTime { for (p in probes) if (p in d) hits++ }
+            val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
             println("avgRun~$avgRun rep=${d::class.simpleName} size=${d.size} 1M contains=$t")
         }
     }
@@ -91,18 +94,18 @@ class IntDomainMicrobench {
         run {
             val sv = IntArray(5_000) { rng.nextInt(span) }.distinct().sorted().toIntArray()
             val d = carveDownTo(span, sv)
-            val excl = IntArray(1000) { rng.nextInt(span) }.also { it.sort() }
+            val excl = LongArray(1000) { rng.nextInt(span).toLong() }.also { it.sort() }
             val tExcl = measureTime { repeat(1000) { d.excludeValues(excl) } }
             println("wide-sparse rep=${d::class.simpleName} size=${d.size} 1000xexcludeValues=$tExcl")
         }
 
         // Few-holes-wide: nearly full domain with a few holes (interval rep, few runs).
         run {
-            val holes = IntArray(50) { rng.nextInt(span) }.also { it.sort() }
-            val d = IntDomain(0, span - 1).excludeValues(holes)!!
+            val holes = LongArray(50) { rng.nextInt(span).toLong() }.also { it.sort() }
+            val d = IntDomain(0, (span - 1).toLong()).excludeValues(holes)!!
             val probes = IntArray(1_000_000) { rng.nextInt(span) }
             var hits = 0
-            val t = measureTime { for (p in probes) if (p in d) hits++ }
+            val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
             println("few-holes-wide rep=${d::class.simpleName} size=${d.size} 1M contains=$t hits=$hits")
         }
 
@@ -110,10 +113,13 @@ class IntDomainMicrobench {
         run {
             val combSpan = 2_000_000
             val sv = IntArray(combSpan / 2) { it * 2 }
-            val d = IntDomain(0, combSpan - 1).excludeValues(IntArray(combSpan / 2) { it * 2 + 1 })!!
+            val d = IntDomain(
+                0,
+                (combSpan - 1).toLong(),
+            ).excludeValues(LongArray(combSpan / 2) { (it * 2 + 1).toLong() })!!
             val probes = IntArray(1_000_000) { rng.nextInt(combSpan) }
             var hits = 0
-            val t = measureTime { for (p in probes) if (p in d) hits++ }
+            val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
             println(
                 "comb rep=${d::class.simpleName} size=${d.size} (survivors=${sv.size}) " +
                     "1M contains=$t hits=$hits",

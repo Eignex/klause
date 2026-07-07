@@ -19,7 +19,7 @@ class SubcircuitInvariantTest {
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, n - 1) },
+            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(factor),
         )
     }
@@ -44,7 +44,7 @@ class SubcircuitInvariantTest {
         val n = 4
         val problem = problem(n)
         val state = LocalSearchState(problem, Random(0))
-        for (i in 0 until n) state.assignment.setInt(i, (i + 1) % n)
+        for (i in 0 until n) state.assignment.setInt(i, ((i + 1) % n).toLong())
         state.recompute()
         assertEquals(0, state.intPayload[0], "a full N-cycle should satisfy Subcircuit with zero cost")
         assertFalse(state.factors[0].isViolated(state, 0))
@@ -80,13 +80,13 @@ class SubcircuitInvariantTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, n - 1) },
+            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(factor),
         )
         val state = LocalSearchState(problem, Random(0))
 
         // One valid 6-cycle.
-        for (i in 0 until n) state.assignment.setInt(i, (i + 1) % n)
+        for (i in 0 until n) state.assignment.setInt(i, ((i + 1) % n).toLong())
         state.recompute()
         val oneCycleCost = state.intPayload[0]
         assertEquals(0, oneCycleCost, "one 6-cycle should have zero cost")

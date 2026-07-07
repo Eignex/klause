@@ -19,7 +19,7 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.argsortByIntKey
+import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 import kotlin.math.min
 
@@ -42,14 +42,14 @@ internal class CumulativeInvariant(
     private val resPosOf: (Int) -> Int,
 ) : Invariant {
 
-    private fun curDur(state: LocalSearchState, i: Int): Int =
-        if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
+    private fun curDur(state: LocalSearchState, i: Int): Long =
+        if (durationVars.isEmpty()) durations[i].toLong() else state.assignment.intValue(durationVars[i])
 
-    private fun curRes(state: LocalSearchState, i: Int): Int =
-        if (resourceVars.isEmpty()) resources[i] else state.assignment.intValue(resourceVars[i])
+    private fun curRes(state: LocalSearchState, i: Int): Long =
+        if (resourceVars.isEmpty()) resources[i].toLong() else state.assignment.intValue(resourceVars[i])
 
-    private fun curCap(state: LocalSearchState): Int = if (capacityVar < 0) {
-        capacity
+    private fun curCap(state: LocalSearchState): Long = if (capacityVar < 0) {
+        capacity.toLong()
     } else {
         state.assignment.intValue(
             capacityVar,
@@ -59,51 +59,56 @@ internal class CumulativeInvariant(
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val tLow = computeTLow(state)
         val tHigh = computeTHigh(state)
-        val size = max(0, tHigh - tLow)
-        val usage = IntArray(size)
+        val size = max(0L, tHigh - tLow).toInt()
+        val usage = LongArray(size)
         for (i in 0 until n) {
             if (!OptPresence.isPresentInAssignment(presents, i, state)) continue
             val s = state.assignment.intValue(starts[i])
             val d = curDur(state, i)
             val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
-            val from = max(0, s - tLow)
-            val to = min(size, s + d - tLow)
+            val from = max(0L, s - tLow).toInt()
+            val to = min(size.toLong(), s + d - tLow).toInt()
             for (t in from until to) usage[t] += r
         }
         val cap = curCap(state)
-        var ov = 0
+        var ov = 0L
         for (t in usage.indices) {
             val u = usage[t]
             if (u > cap) ov += u - cap
         }
         val ls = CumulativeLsState(tLow, usage, ov, cap)
         state.refPayload[factorId] = ls
-        state.intPayload[factorId] = ov
+        state.intPayload[factorId] = clampOverage(ov)
     }
+
+    // The int payload mirrors the raw overage for the `isViolated` / repair-guard checks (and ALNS
+    // reads it directly); saturate at Int range since a wide profile can exceed 32 bits — overage is
+    // non-negative, so `> 0` / `== 0` are preserved exactly.
+    private fun clampOverage(ov: Long): Int = ov.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         compressViolation(state.intPayload[factorId].toLong(), state.violationSoftCap)
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val ls = state.refPayload[factorId] as CumulativeLsState
         val oldVal = state.assignment.intValue(intVar)
         if (oldVal == newValue) return 0
-        val delta = when {
+        val delta: Long = when {
             intVar == capacityVar -> cumulativeCapacityDelta(ls, newValue)
 
             else -> {
                 val sp = startPosOf(intVar)
                 if (sp >= 0) {
                     if (!OptPresence.isPresentInAssignment(presents, sp, state)) {
-                        0
+                        0L
                     } else {
                         val d = curDur(state, sp)
                         val r = curRes(state, sp)
                         if (d <= 0 || r <= 0) {
-                            0
+                            0L
                         } else {
                             simulateCumulativeStartDelta(ls, oldVal, newValue, d, r)
                         }
@@ -112,11 +117,11 @@ internal class CumulativeInvariant(
                     val dp = durPosOf(intVar)
                     if (dp >= 0) {
                         if (!OptPresence.isPresentInAssignment(presents, dp, state)) {
-                            0
+                            0L
                         } else {
                             val r = curRes(state, dp)
                             if (r <= 0) {
-                                0
+                                0L
                             } else {
                                 val s = state.assignment.intValue(starts[dp])
                                 simulateCumulativeDurDelta(ls, s, oldVal, newValue, r)
@@ -126,28 +131,28 @@ internal class CumulativeInvariant(
                         val rp = resPosOf(intVar)
                         if (rp >= 0) {
                             if (!OptPresence.isPresentInAssignment(presents, rp, state)) {
-                                0
+                                0L
                             } else {
                                 val d = curDur(state, rp)
                                 if (d <= 0) {
-                                    0
+                                    0L
                                 } else {
                                     val s = state.assignment.intValue(starts[rp])
                                     simulateCumulativeResDelta(ls, s, d, oldVal, newValue)
                                 }
                             }
                         } else {
-                            0
+                            0L
                         }
                     }
                 }
             }
         }
-        return compressViolation((ls.overage + delta).toLong(), state.violationSoftCap) -
-            compressViolation(ls.overage.toLong(), state.violationSoftCap)
+        return compressViolation(ls.overage + delta, state.violationSoftCap) -
+            compressViolation(ls.overage, state.violationSoftCap)
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val ls = state.refPayload[factorId] as CumulativeLsState
         val newValue = state.assignment.intValue(intVar)
         val before = ls.overage
@@ -183,16 +188,16 @@ internal class CumulativeInvariant(
                 }
             }
         }
-        state.intPayload[factorId] = ls.overage
-        return compressViolation(ls.overage.toLong(), state.violationSoftCap) -
-            compressViolation(before.toLong(), state.violationSoftCap)
+        state.intPayload[factorId] = clampOverage(ls.overage)
+        return compressViolation(ls.overage, state.violationSoftCap) -
+            compressViolation(before, state.violationSoftCap)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val ls = state.refPayload[factorId] as CumulativeLsState
         val cap = ls.cap
-        var deltaOv = 0
+        var deltaOv = 0L
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val d = curDur(state, i)
@@ -201,16 +206,16 @@ internal class CumulativeInvariant(
             val wasP = OptPresence.isPresentInAssignment(presents, i, state)
             val sign = if (wasP) -1 else +1
             val s = state.assignment.intValue(starts[i])
-            val from = max(0, s - ls.tLow)
-            val to = min(ls.usage.size, s + d - ls.tLow)
+            val from = max(0L, s - ls.tLow).toInt()
+            val to = min(ls.usage.size.toLong(), s + d - ls.tLow).toInt()
             for (t in from until to) {
                 val u = ls.usage[t]
                 val nu = u + sign * r
-                deltaOv += max(0, nu - cap) - max(0, u - cap)
+                deltaOv += max(0L, nu - cap) - max(0L, u - cap)
             }
         }
-        return compressViolation((ls.overage + deltaOv).toLong(), state.violationSoftCap) -
-            compressViolation(ls.overage.toLong(), state.violationSoftCap)
+        return compressViolation(ls.overage + deltaOv, state.violationSoftCap) -
+            compressViolation(ls.overage, state.violationSoftCap)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -218,7 +223,7 @@ internal class CumulativeInvariant(
         val ls = state.refPayload[factorId] as CumulativeLsState
         val cap = ls.cap
         val before = ls.overage
-        var deltaOv = 0
+        var deltaOv = 0L
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val d = curDur(state, i)
@@ -227,19 +232,19 @@ internal class CumulativeInvariant(
             val nowP = OptPresence.isPresentInAssignment(presents, i, state)
             val sign = if (nowP) +1 else -1
             val s = state.assignment.intValue(starts[i])
-            val from = max(0, s - ls.tLow)
-            val to = min(ls.usage.size, s + d - ls.tLow)
+            val from = max(0L, s - ls.tLow).toInt()
+            val to = min(ls.usage.size.toLong(), s + d - ls.tLow).toInt()
             for (t in from until to) {
                 val u = ls.usage[t]
                 val nu = u + sign * r
                 ls.usage[t] = nu
-                deltaOv += max(0, nu - cap) - max(0, u - cap)
+                deltaOv += max(0L, nu - cap) - max(0L, u - cap)
             }
         }
         ls.overage += deltaOv
-        state.intPayload[factorId] = ls.overage
-        return compressViolation(ls.overage.toLong(), state.violationSoftCap) -
-            compressViolation(before.toLong(), state.violationSoftCap)
+        state.intPayload[factorId] = clampOverage(ls.overage)
+        return compressViolation(ls.overage, state.violationSoftCap) -
+            compressViolation(before, state.violationSoftCap)
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -255,7 +260,7 @@ internal class CumulativeInvariant(
             }
         }
         val tLow = ls.tLow
-        val absT = if (peakT >= 0) peakT + tLow else 0
+        val absT = if (peakT >= 0) peakT + tLow else 0L
         val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else EmptyIntArray
         val maxTargets = 4
         for (i in 0 until n) {
@@ -285,7 +290,7 @@ internal class CumulativeInvariant(
         if (peakTasks.isNotEmpty()) emitFeasibleSwaps(state, ls, peakTasks, sink)
     }
 
-    private fun collectPeakTasks(state: LocalSearchState, absT: Int): IntArray {
+    private fun collectPeakTasks(state: LocalSearchState, absT: Long): IntArray {
         val out = IntArrayList()
         for (i in 0 until n) {
             val r = curRes(state, i)
@@ -364,8 +369,10 @@ internal class CumulativeInvariant(
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (starts.isEmpty()) return false
         val cap = curCap(state)
-        val order = argsortByIntKey(starts.size) { state.problem.intDomains[starts[it]].min }
-        var prevEnd = Int.MIN_VALUE
+        val order = argsortBy(starts.size) { a, b ->
+            state.problem.intDomains[starts[a]].min.compareTo(state.problem.intDomains[starts[b]].min)
+        }
+        var prevEnd = Long.MIN_VALUE
         for (oi in order.indices) {
             val i = order[oi]
             if (!OptPresence.isPresentInAssignment(presents, i, state)) continue
@@ -387,26 +394,26 @@ internal class CumulativeInvariant(
         return true
     }
 
-    private fun computeTLow(state: LocalSearchState): Int {
-        var lo = Int.MAX_VALUE
+    private fun computeTLow(state: LocalSearchState): Long {
+        var lo = Long.MAX_VALUE
         for (i in 0 until n) {
             lo = min(lo, min(state.problem.intDomains[starts[i]].min, state.assignment.intValue(starts[i])))
         }
-        return if (lo == Int.MAX_VALUE) 0 else lo
+        return if (lo == Long.MAX_VALUE) 0L else lo
     }
 
-    private fun computeTHigh(state: LocalSearchState): Int {
-        var hi = Int.MIN_VALUE
+    private fun computeTHigh(state: LocalSearchState): Long {
+        var hi = Long.MIN_VALUE
         for (i in 0 until n) {
             val dUb = if (durationVars.isEmpty()) {
-                durations[i]
+                durations[i].toLong()
             } else {
-                max(durations[i], state.problem.intDomains[durationVars[i]].max)
+                max(durations[i].toLong(), state.problem.intDomains[durationVars[i]].max)
             }
             val cand = max(state.problem.intDomains[starts[i]].max, state.assignment.intValue(starts[i])) + dUb
             hi = max(hi, cand)
         }
-        return if (hi == Int.MIN_VALUE) 0 else hi
+        return if (hi == Long.MIN_VALUE) 0L else hi
     }
 }
 

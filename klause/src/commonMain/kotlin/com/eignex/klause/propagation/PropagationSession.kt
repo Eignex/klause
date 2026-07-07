@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
 enum class VarKind {
@@ -73,7 +74,7 @@ class PropagationSession(
     // `numBoolVars + v` (int), matching PropagationState's level encoding.
     private val boolPinned: IntArray = IntArray(problem.numBoolVars) { -1 }
     private val intPinnedSet: BooleanArray = BooleanArray(problem.numIntVars)
-    private val intPinnedVal: IntArray = IntArray(problem.numIntVars)
+    private val intPinnedVal: LongArray = LongArray(problem.numIntVars)
     private val trail: IntArrayList = IntArrayList()
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
@@ -83,7 +84,7 @@ class PropagationSession(
      *  variable demanding it differ. Blocking a found solution's full assignment (rather than
      *  the decisions that led to it) is order-independent — the same assignment reached later
      *  through a different decision sequence is still excluded. */
-    fun assignmentNogood(bools: BooleanArray, ints: IntArray): IntArray {
+    fun assignmentNogood(bools: BooleanArray, ints: LongArray): IntArray {
         val out = IntArray(bools.size + ints.size)
         var j = 0
         for (v in bools.indices) out[j++] = Lit.make(v, !bools[v])
@@ -93,10 +94,10 @@ class PropagationSession(
 
     /** Literal `x_v ≥ threshold` ([positive]) or its negation — for LP/energetic explanation
      *  clauses (#247), whose reason atoms are absolute variable bounds. */
-    fun boundGeLit(v: Int, threshold: Int, positive: Boolean): Int = Lit.make(state.atomVarGe(v, threshold), positive)
+    fun boundGeLit(v: Int, threshold: Long, positive: Boolean): Int = Lit.make(state.atomVarGe(v, threshold), positive)
 
     /** Literal `x_v ≤ threshold` ([positive]) or its negation. See [boundGeLit]. */
-    fun boundLeLit(v: Int, threshold: Int, positive: Boolean): Int = Lit.make(state.atomVarLe(v, threshold), positive)
+    fun boundLeLit(v: Int, threshold: Long, positive: Boolean): Int = Lit.make(state.atomVarLe(v, threshold), positive)
 
     /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
      *  All session operations short-circuit to this result. */
@@ -186,7 +187,7 @@ class PropagationSession(
     }
 
     /** Push one int pin at a fresh decision level. */
-    fun pinInt(v: Int, value: Int): PropagationResult {
+    fun pinInt(v: Int, value: Long): PropagationResult {
         bakedUnsat?.let { return it }
         return pushInt(v, value)
     }
@@ -197,7 +198,7 @@ class PropagationSession(
      * to any conflict it seeds — letting CDCL learn an asserting clause where an equality
      * pin (two same-level bound atoms) could not. The complementary branch is [pinIntAtLeast].
      */
-    fun pinIntAtMost(v: Int, hi: Int): PropagationResult {
+    fun pinIntAtMost(v: Int, hi: Long): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
         if (!state.setIntMaxAsDecision(v, hi)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
@@ -209,7 +210,7 @@ class PropagationSession(
     }
 
     /** Decide `v ≥ lo` at a fresh decision level. See [pinIntAtMost]. */
-    fun pinIntAtLeast(v: Int, lo: Int): PropagationResult {
+    fun pinIntAtLeast(v: Int, lo: Long): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
         if (!state.setIntMinAsDecision(v, lo)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
@@ -260,7 +261,7 @@ class PropagationSession(
      * Returns the propagation result, [PropagationResult.Unsat] if the bound is already
      * infeasible at the root (the remaining objective space is empty).
      */
-    fun assertObjectiveBound(v: Int, bound: Int, atMost: Boolean): PropagationResult {
+    fun assertObjectiveBound(v: Int, bound: Long, atMost: Boolean): PropagationResult {
         val atom = if (atMost) state.atomVarLe(v, bound) else state.atomVarGe(v, bound)
         return addLearnedClause(Clause(intArrayOf(Lit.make(atom, true))), lbd = 1, permanent = true)
     }
@@ -277,10 +278,10 @@ class PropagationSession(
      * the problem under the path bounds plus this tightening, so any learned nogood is globally
      * valid; the reduction itself never escapes its level.
      */
-    fun implyIntAtMost(v: Int, hi: Int): PropagationResult = implyAtCurrentLevel { state.tightenIntMax(v, hi) }
+    fun implyIntAtMost(v: Int, hi: Long): PropagationResult = implyAtCurrentLevel { state.tightenIntMax(v, hi) }
 
     /** Lower-bound reduced-cost reduction at the current level. See [implyIntAtMost]. */
-    fun implyIntAtLeast(v: Int, lo: Int): PropagationResult = implyAtCurrentLevel { state.tightenIntMin(v, lo) }
+    fun implyIntAtLeast(v: Int, lo: Long): PropagationResult = implyAtCurrentLevel { state.tightenIntMin(v, lo) }
 
     /** Boolean reduced-cost fixing at the current level. See [implyIntAtMost]. */
     fun implyBool(v: Int, value: Boolean): PropagationResult = implyAtCurrentLevel { state.pinBool(v, value) }
@@ -293,11 +294,11 @@ class PropagationSession(
      * `(new bound atom) ∨ reason` is globally valid. The antecedent is journaled and undone on
      * backtrack like any other; the tightening itself still folds into the current level.
      */
-    fun implyIntAtLeastWithReason(v: Int, lo: Int, reason: IntArray): PropagationResult =
+    fun implyIntAtLeastWithReason(v: Int, lo: Long, reason: IntArray): PropagationResult =
         implyAtCurrentLevel { state.tightenIntMin(v, lo, reason) }
 
     /** Upper-bound counterpart of [implyIntAtLeastWithReason]. */
-    fun implyIntAtMostWithReason(v: Int, hi: Int, reason: IntArray): PropagationResult =
+    fun implyIntAtMostWithReason(v: Int, hi: Long, reason: IntArray): PropagationResult =
         implyAtCurrentLevel { state.tightenIntMax(v, hi, reason) }
 
     private fun implyAtCurrentLevel(apply: () -> Boolean): PropagationResult {
@@ -383,7 +384,7 @@ class PropagationSession(
         var boolCount = 0
         for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
         val bools = IntArray(boolCount)
-        val quads = IntArray((lits.size - boolCount) * SharedClause.QUAD)
+        val quads = LongArray((lits.size - boolCount) * SharedClause.QUAD)
         var bi = 0
         var qi = 0
         for (lit in lits) {
@@ -392,10 +393,10 @@ class PropagationSession(
                 bools[bi++] = lit
             } else {
                 val atomId = v - numBool
-                quads[qi++] = state.atoms.intVar[atomId]
-                quads[qi++] = state.atoms.kind[atomId].ordinal
+                quads[qi++] = state.atoms.intVar[atomId].toLong()
+                quads[qi++] = state.atoms.kind[atomId].ordinal.toLong()
                 quads[qi++] = state.atoms.threshold[atomId]
-                quads[qi++] = if (Lit.isPositive(lit)) 0 else 1
+                quads[qi++] = if (Lit.isPositive(lit)) 0L else 1L
             }
         }
         return SharedClause(bools, quads, lbd)
@@ -413,10 +414,10 @@ class PropagationSession(
         for (l in shared.boolLits) lits[j++] = l
         var i = 0
         while (i < shared.atomQuads.size) {
-            val intVar = shared.atomQuads[i]
-            val kind = shared.atomQuads[i + 1]
+            val intVar = shared.atomQuads[i].toInt()
+            val kind = shared.atomQuads[i + 1].toInt()
             val threshold = shared.atomQuads[i + 2]
-            val positive = shared.atomQuads[i + 3] == 0
+            val positive = shared.atomQuads[i + 3] == 0L
             val virtualVar = when (kind) {
                 0 -> state.atomVarGe(intVar, threshold)
                 1 -> state.atomVarLe(intVar, threshold)
@@ -441,7 +442,7 @@ class PropagationSession(
         return impliedSince(base)
     }
 
-    private fun pushInt(v: Int, value: Int): PropagationResult {
+    private fun pushInt(v: Int, value: Long): PropagationResult {
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
@@ -537,7 +538,7 @@ class PropagationSession(
      *  (decision) order. */
     fun currentAssumptions(): Assumptions {
         val bools = LinkedHashMap<Int, Boolean>()
-        val ints = LinkedHashMap<Int, Int>()
+        val ints = LinkedHashMap<Int, Long>()
         for (i in 0 until trail.size) {
             val e = trail[i]
             if (trailIsBool(e)) {
@@ -573,7 +574,7 @@ class PropagationSession(
             bVals.add(b)
         }
         val iKeys = IntArrayList(initialCapacity = 8)
-        val iVals = IntArrayList(initialCapacity = 8)
+        val iVals = LongArrayList(initialCapacity = 8)
         for (v in 0 until problem.numIntVars) {
             val d = state.intDomains[v]
             if (d.min == d.max) {
@@ -586,7 +587,7 @@ class PropagationSession(
             boolKeys = bKeys.toIntArray(),
             boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
-            intValues = iVals.toIntArray(),
+            intValues = iVals.toLongArray(),
         )
     }
 
@@ -623,7 +624,7 @@ class PropagationSession(
             }
         }
         val iKeys = IntArrayList()
-        val iVals = IntArrayList()
+        val iVals = LongArrayList()
         if (iRaw.size > 0) {
             val sorted = iRaw.toIntArray()
             sorted.sort()
@@ -642,7 +643,7 @@ class PropagationSession(
             boolKeys = bKeys.toIntArray(),
             boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
-            intValues = iVals.toIntArray(),
+            intValues = iVals.toLongArray(),
         )
     }
 }

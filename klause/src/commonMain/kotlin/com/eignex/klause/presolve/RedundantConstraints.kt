@@ -394,7 +394,7 @@ internal object RedundantConstraints {
      *  (a sound sufficient condition; hole-induced disjointness is conservatively not claimed). */
     private fun isVacuousGlobal(factor: Factor, domains: Array<IntDomain>): Boolean {
         if (factor !is AllDifferent || factor.vars.size < 2) return false
-        var prevMax = Int.MIN_VALUE
+        var prevMax = Long.MIN_VALUE
         for (d in factor.vars.map { domains[it] }.sortedBy { it.min }) {
             if (d.min <= prevMax) return false // intervals overlap → a collision is possible
             if (d.max > prevMax) prevMax = d.max

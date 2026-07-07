@@ -71,8 +71,9 @@ internal object IntBitChannel {
                 continue
             }
 
-            // Linear: 1·x + Σ (-2^i)·c(i) == min  ⇔  x = min + Σ 2^i·c(i).
-            val coeffs = IntArray(width + 1)
+            // Linear: 1·x + Σ (-2^i)·c(i) == min  ⇔  x = min + Σ 2^i·c(i). Long bit weights: `1 shl i`
+            // overflows Int past bit 30, and a wide domain needs a ~50-bit channel.
+            val coeffs = LongArray(width + 1)
             val vars = IntArray(width + 1)
             coeffs[0] = 1
             vars[0] = x
@@ -92,7 +93,7 @@ internal object IntBitChannel {
                     ),
                 )
                 bits[i] = bit
-                coeffs[i + 1] = -(1 shl i)
+                coeffs[i + 1] = -(1L shl i)
                 vars[i + 1] = channelInt
             }
             extraFactors.add(Linear(coeffs, vars, LinearOp.EQ, min))

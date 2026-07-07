@@ -29,7 +29,7 @@ class MaxSdSelectorTest {
         val session = PropagationSession(problem)
         val values = MaxSd().values(session, VarRef.IntVar(0), Random(0L)).toList()
         assertTrue(2 !in values, "MaxSd must drop infeasible value 2; got $values")
-        assertEquals(setOf(0, 1, 3), values.toSet())
+        assertEquals(setOf(0L, 1L, 3L), values.toSet())
     }
 
     @Test
@@ -66,11 +66,11 @@ class MaxSdSelectorTest {
             "both heuristics should yield the same set; got $impactOrder vs $maxSdOrder",
         )
         assertTrue(
-            maxSdOrder.first() in setOf(0, 1, 2),
+            maxSdOrder.first() in setOf(0L, 1L, 2L),
             "MaxSd should prefer a v0 ∈ {0,1,2} (largest residual); got ${maxSdOrder.first()}",
         )
         assertEquals(
-            4,
+            4L,
             impactOrder.first(),
             "Impact should prefer v0 = 4 (smallest residual); got ${impactOrder.first()}",
         )
@@ -92,7 +92,7 @@ class MaxSdSelectorTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
+        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
     }
 
     @Test

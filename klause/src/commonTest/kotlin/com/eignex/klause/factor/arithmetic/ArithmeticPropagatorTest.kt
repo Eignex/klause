@@ -146,7 +146,7 @@ class ArithmeticPropagatorTest {
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-            .take(100_000).map { it.ints.toList() }.toHashSet()
+            .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     @Test
     fun `linear with interior holes punched mid-search enumerates exactly brute force`() {
@@ -167,7 +167,7 @@ class ArithmeticPropagatorTest {
                     ExcludeOnFix(src = 3, dst = 0),
                     ExcludeOnFix(src = 3, dst = 1),
                 )
-                val problem = Problem(0, 4, Array(4) { IntDomain(0, hi) }, factors)
+                val problem = Problem(0, 4, Array(4) { IntDomain(0, hi.toLong()) }, factors)
                 val brute = HashSet<List<Int>>()
                 val base = hi + 1
                 for (m in 0 until base * base * base * base) {
@@ -263,12 +263,12 @@ class ArithmeticPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(inst.lo, inst.hi) },
+                intDomains = Array(n) { IntDomain(inst.lo.toLong(), inst.hi.toLong()) },
                 factors = factors,
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(200_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
     }
@@ -310,12 +310,12 @@ class ArithmeticPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = arity,
-                intDomains = Array(arity) { IntDomain(lo[it], hi[it]) },
+                intDomains = Array(arity) { IntDomain(lo[it].toLong(), hi[it].toLong()) },
                 factors = arrayOf<Factor>(Linear(coeffs = con.coeffs, vars = varsOf, op = con.op, bound = con.bound)),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(200_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "wide instance #$idx (op=${con.op}): solution set must equal brute force")
         }
     }
@@ -352,7 +352,7 @@ class ArithmeticPropagatorTest {
 
     private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-            .take(100_000).map { it.ints.toList() }.toHashSet()
+            .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     private fun assertBoundOnly(watches: IntArray?, vars: IntArray) {
         val pairs = watches!!.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()
@@ -638,7 +638,9 @@ class ArithmeticPropagatorTest {
         }
 
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-        val found = BacktrackSolver(p).enumerate(params).take(100_000).map { it.ints.toList() }.toHashSet()
+        val found = BacktrackSolver(
+            p,
+        ).enumerate(params).take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
         assertEquals(brute, found, "backtrack enumeration must equal the brute-force feasible set")
     }
 
@@ -923,7 +925,7 @@ class ArithmeticPropagatorTest {
             val p = Problem(
                 numBoolVars = numBool,
                 numIntVars = 2,
-                intDomains = arrayOf(IntDomain(lo, hi), IntDomain(lo, hi)),
+                intDomains = arrayOf(IntDomain(lo.toLong(), hi.toLong()), IntDomain(lo.toLong(), hi.toLong())),
                 factors = factors.toTypedArray(),
             )
 
@@ -1023,7 +1025,7 @@ class ArithmeticPropagatorTest {
     private fun enumerateBoolInt(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
-        .map { it.bools.map { b -> if (b) 1 else 0 } + it.ints.toList() }
+        .map { it.bools.map { b -> if (b) 1 else 0 } + it.ints.map { v -> v.toInt() } }
         .toHashSet()
 
     @Test
@@ -1145,7 +1147,7 @@ class ArithmeticPropagatorTest {
                     randomSeed = seed,
                     variableSelector = Vsids(),
                 ),
-            ).map { sample -> (0 until nv).map { sample.ints[it] } }.toHashSet()
+            ).map { sample -> (0 until nv).map { sample.ints[it].toInt() } }.toHashSet()
             val expected = HashSet<List<Int>>()
             for (x0 in 0..3) for (x1 in 0..3) for (x2 in 0..3) expected.add(listOf(x0, x1, x2))
             assertEquals(expected, projected, "seed=$seed: enumerate must cover all 64 projected models")
@@ -1184,7 +1186,7 @@ class ArithmeticPropagatorTest {
         }
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
         val found = BacktrackSolver(p).enumerate(params).take(100_000)
-            .map { it.bools.toList() to it.ints[0] }.toHashSet()
+            .map { it.bools.toList() to it.ints[0].toInt() }.toHashSet()
         assertEquals(brute, found, "reified eq over a hole domain must match brute enumeration")
     }
 
@@ -1194,7 +1196,7 @@ class ArithmeticPropagatorTest {
         val perVar = 31 // values 1..31; 1..30 are holes, 31 is live
         val doms = Array(nVars) {
             var d = IntDomain(0, 34)
-            for (v in 1..30) d = d.excludeValue(v)
+            for (v in 1..30) d = d.excludeValue(v.toLong())
             d
         }
         val factors = ArrayList<Factor>()
@@ -1252,7 +1254,7 @@ class ArithmeticPropagatorTest {
                 when (state.atoms.kind[a]) {
                     AtomKind.GE -> 2 >= state.atoms.threshold[a]
                     AtomKind.LE -> 2 <= state.atoms.threshold[a]
-                    AtomKind.EQ -> 2 == state.atoms.threshold[a]
+                    AtomKind.EQ -> 2L == state.atoms.threshold[a]
                 }
             }
             return holds == Lit.isPositive(lit)
@@ -1266,7 +1268,7 @@ class ArithmeticPropagatorTest {
     @Test
     fun `all-hole reifications are correctly unsat`() {
         var dom = IntDomain(0, 10)
-        for (v in 3..7) dom = dom.excludeValue(v)
+        for (v in 3..7) dom = dom.excludeValue(v.toLong())
         val values = intArrayOf(3, 4, 5, 6, 7) // every candidate is a hole
         val factors = ArrayList<Factor>()
         for (k in values.indices) {

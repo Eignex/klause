@@ -61,7 +61,7 @@ class RegretSelectorTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(-1L)) // maximise → try high first
         val session = PropagationSession(problem)
         val values = IndomainBest(obj).values(session, VarRef.IntVar(0), Random(0L)).toList()
-        assertEquals(listOf(4, 3, 2, 1, 0), values)
+        assertEquals(listOf(4L, 3L, 2L, 1L, 0L), values)
     }
 
     @Test
@@ -75,7 +75,7 @@ class RegretSelectorTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(2L))
         val session = PropagationSession(problem)
         val values = IndomainBest(obj).values(session, VarRef.IntVar(0), Random(0L)).toList()
-        assertEquals(listOf(0, 1, 2, 3, 4), values)
+        assertEquals(listOf(0L, 1L, 2L, 3L, 4L), values)
     }
 
     @Test
@@ -106,7 +106,7 @@ class RegretSelectorTest {
         )
         val opt = assertIs<MinimizeResult.Optimal>(r)
         assertEquals(3.0, opt.objectiveValue)
-        assertEquals(3, opt.sample.ints[0])
-        assertEquals(0, opt.sample.ints[1])
+        assertEquals(3L, opt.sample.ints[0])
+        assertEquals(0L, opt.sample.ints[1])
     }
 }

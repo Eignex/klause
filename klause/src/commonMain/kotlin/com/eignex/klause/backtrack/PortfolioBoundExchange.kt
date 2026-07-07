@@ -31,8 +31,8 @@ internal class PortfolioBoundExchange(
         val bound = supplier()
         if (!bound.isFinite()) return
         val floor = ceil(bound)
-        if (floor in Int.MIN_VALUE.toDouble()..Int.MAX_VALUE.toDouble()) {
-            session.implyIntAtLeast(obj.varId, floor.toInt())
+        if (floor in Long.MIN_VALUE.toDouble()..Long.MAX_VALUE.toDouble()) {
+            session.implyIntAtLeast(obj.varId, floor.toLong())
         }
     }
 
@@ -57,9 +57,9 @@ internal class PortfolioBoundExchange(
         if (session.decisionLevel != 0) return
         for (v in 0 until problem.numIntVars) {
             val lo = lower(v)
-            if (lo != Int.MIN_VALUE) session.implyIntAtLeast(v, lo)
+            if (lo != Long.MIN_VALUE) session.implyIntAtLeast(v, lo)
             val hi = upper(v)
-            if (hi != Int.MAX_VALUE) session.implyIntAtMost(v, hi)
+            if (hi != Long.MAX_VALUE) session.implyIntAtMost(v, hi)
         }
     }
 

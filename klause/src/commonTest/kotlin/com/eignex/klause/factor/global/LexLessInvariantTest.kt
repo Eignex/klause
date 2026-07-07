@@ -39,11 +39,11 @@ class LexLessInvariantTest {
         // Expect a move lowering xs[0] to ≤ 1 (strict ≤ b-1 = 1) and/or raising ys[0] to ≥ 4.
         val intSets = sink.list.filterIsInstance<IntSet>()
         assertTrue(
-            intSets.any { it.varId == 0 && it.newValue == 1 },
+            intSets.any { it.varId == 0 && it.newValue == 1L },
             "expected IntSet(xs[0]=1) in $intSets",
         )
         assertTrue(
-            intSets.any { it.varId == 2 && it.newValue == 4 },
+            intSets.any { it.varId == 2 && it.newValue == 4L },
             "expected IntSet(ys[0]=4) in $intSets",
         )
     }
@@ -104,8 +104,8 @@ class LexLessInvariantTest {
         val intSets = sink.list.filterIsInstance<IntSet>()
         // Must propose lowering xs[0] or raising ys[0] (the earliest position with room).
         assertTrue(
-            intSets.any { it.varId == 0 && it.newValue == 1 } ||
-                intSets.any { it.varId == 2 && it.newValue == 4 },
+            intSets.any { it.varId == 0 && it.newValue == 1L } ||
+                intSets.any { it.varId == 2 && it.newValue == 4L },
             "expected prefix-break move at index 0 in $intSets",
         )
     }

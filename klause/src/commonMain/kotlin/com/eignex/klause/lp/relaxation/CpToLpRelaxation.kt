@@ -106,7 +106,7 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
                 var present = true
                 var k = 0
                 while (k < req.size) {
-                    if (!session.intDomain(req[k]).contains(req[k + 1])) {
+                    if (!session.intDomain(req[k]).contains(req[k + 1].toLong())) {
                         present = false
                         break
                     }
@@ -124,8 +124,8 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
 
             else -> {
                 val d = session.intDomain(colVarId[j])
-                lo[j] = d.min.toLong()
-                hi[j] = d.max.toLong()
+                lo[j] = d.min
+                hi[j] = d.max
             }
         }
     }
@@ -465,7 +465,13 @@ internal class CpToLpRelaxation(
             // graphs (small per-node successor domains) are not skipped by a blunt node cap.
             var arcCount = 0
             for (i in 0 until n) {
-                problem.intDomains[succ[i]].forEach { j -> if ((selfLoops || j != i) && j in 0 until n) arcCount++ }
+                problem.intDomains[succ[i]].forEach { j ->
+                    if ((selfLoops || j != i.toLong()) && j >= 0 &&
+                        j < n
+                    ) {
+                        arcCount++
+                    }
+                }
             }
             if (arcCount == 0 || arcCount > MAX_CIRCUIT_ARCS) return
             val tails = IntArrayList()
@@ -479,18 +485,19 @@ internal class CpToLpRelaxation(
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
                 problem.intDomains[succ[i]].forEach { j ->
-                    if ((!selfLoops && j == i) || j < 0 || j >= n) return@forEach
+                    if ((!selfLoops && j == i.toLong()) || j < 0 || j >= n) return@forEach
+                    val jn = j.toInt() // validated node index in [0, n)
                     val present = live.contains(j)
                     // The arc is present exactly while head j stays in succ[i]'s live domain — the single
                     // membership that lets the persistent relaxation re-bind this column (#43).
-                    val col = auxColumn(0L, if (present) 1L else 0L, presence = intArrayOf(succ[i], j))
+                    val col = auxColumn(0L, if (present) 1L else 0L, presence = intArrayOf(succ[i], jn))
                     outCols.add(col)
                     chanCols.add(col)
-                    chanCoef.add(j)
+                    chanCoef.add(jn)
                     tails.add(i)
-                    heads.add(j)
+                    heads.add(jn)
                     cols.add(col)
-                    inColsByHead[j].add(col)
+                    inColsByHead[jn].add(col)
                 }
                 if (outCols.isEmpty()) return // degenerate: no candidate successor — leave to propagation
                 builder.addRow(outCols.toIntArray(), LongArray(outCols.size) { 1L }, Relation.EQ, 1L)
@@ -520,7 +527,7 @@ internal class CpToLpRelaxation(
             var c = intCol[i]
             if (c == -1) {
                 val dom = session.intDomain(i)
-                c = builder.addVar(dom.min.toLong(), dom.max.toLong(), intCost(i), tag = i)
+                c = builder.addVar(dom.min, dom.max, intCost(i), tag = i)
                 intCol[i] = c
                 colVarId.add(i)
                 colIsBool.add(0)
@@ -687,7 +694,7 @@ internal class CpToLpRelaxation(
                 if (f !is Linear || f.op != LinearOp.LE) continue
                 if (f.vars.size < 2 || f.vars.size > MAX_RLT_ROW) continue
                 if (f.bound < 0 || f.coeffs.any { it <= 0 }) continue
-                if (f.vars.any { problem.intDomains[it].min != 0 || problem.intDomains[it].max != 1 }) continue
+                if (f.vars.any { problem.intDomains[it].min != 0L || problem.intDomains[it].max != 1L }) continue
                 val b = f.bound
                 for (iIdx in f.vars.indices) {
                     if (rltColumns >= MAX_RLT_COLUMNS) break
@@ -729,15 +736,14 @@ internal class CpToLpRelaxation(
         private fun cumulativeRows(rel: CumulativeRelaxation) {
             for (plan in rel.plans) {
                 val spec = rel.rowSpec(plan, session)
-                addIntRow(
-                    intArrayOf(plan.makespanVar),
-                    intArrayOf(plan.capacity),
-                    auxCol = -1,
-                    auxCoeff = 0L,
-                    rel = Relation.GE,
-                    rhs = spec.rhs,
-                    global = spec.global,
-                    premises = spec.premises,
+                // Single-term row capacity·M ≥ rhs; the capacity coefficient is a (possibly wide) Long.
+                builder.addRow(
+                    intArrayOf(intColumn(plan.makespanVar)),
+                    longArrayOf(plan.capacity),
+                    Relation.GE,
+                    spec.rhs,
+                    spec.global,
+                    spec.premises,
                 )
             }
         }
@@ -814,7 +820,7 @@ internal class CpToLpRelaxation(
         private fun derivePremises(columns: IntArray, coeffs: LongArray, maxSide: Boolean): LpRowPremises {
             val pv = IntArrayList()
             val pu = ArrayList<Boolean>()
-            val pt = IntArrayList()
+            val pt = LongArrayList()
             for (j in columns.indices) {
                 val col = columns[j]
                 if (colIsBool[col] == 1 || colVarId[col] < 0) continue
@@ -835,7 +841,7 @@ internal class CpToLpRelaxation(
                     pt.add(dom.min)
                 }
             }
-            return LpRowPremises(pv.toIntArray(), BooleanArray(pu.size) { pu[it] }, pt.toIntArray())
+            return LpRowPremises(pv.toIntArray(), BooleanArray(pu.size) { pu[it] }, pt.toLongArray())
         }
     }
 }

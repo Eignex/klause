@@ -168,7 +168,7 @@ private class ObjectiveBoundInvariant(
         return degree(state, newSum) - state.factorDegree[factorId]
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val c = intCoeffOf(intVar)
         val old = state.assignment.intValue(intVar)
         val newSum = state.longPayload[factorId] + c * (newValue - old)
@@ -185,7 +185,7 @@ private class ObjectiveBoundInvariant(
         return degree(state, newSum) - degree(state, oldSum)
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val c = intCoeffOf(intVar)
         val cur = state.assignment.intValue(intVar)
         val oldSum = state.longPayload[factorId]

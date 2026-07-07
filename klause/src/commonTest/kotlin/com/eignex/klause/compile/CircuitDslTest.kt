@@ -36,7 +36,7 @@ class CircuitDslTest {
         for (step in 0 until 4) {
             assertTrue(!visited[node], "revisit at step $step")
             visited[node] = true
-            node = sample.ints[node]
+            node = sample.ints[node].toInt()
         }
         assertEquals(0, node, "must close the cycle")
     }
@@ -63,7 +63,7 @@ class CircuitDslTest {
             assertTrue(!visited[node], "revisit at step $step in ${sample.ints.toList()}")
             visited[node] = true
             // Successor value (1-indexed) → 0-indexed node.
-            node = sample.ints[node] - 1
+            node = sample.ints[node].toInt() - 1
         }
         assertEquals(0, node, "must close the cycle (1-indexed inputs decoded)")
     }
@@ -91,7 +91,7 @@ class CircuitDslTest {
         // Verify non-overlapping schedule under capacity 1.
         val occ = IntArray(8)
         for (i in 0 until 3) {
-            val s = sample.ints[i]
+            val s = sample.ints[i].toInt()
             for (t in s until s + 2) if (t in occ.indices) occ[t]++
         }
         for (t in occ.indices) assertTrue(occ[t] <= 1, "capacity broken at t=$t: ${sample.ints.toList()}")

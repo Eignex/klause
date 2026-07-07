@@ -115,8 +115,8 @@ internal class SelectorPortfolio(
     val valueSelector: ValueSelector = object : ValueSelector {
         override fun values(session: PropagationSession, varRef: VarRef, rng: Random) =
             current.valueSelector.values(session, varRef, rng)
-        override fun onConflict(varRef: VarRef, value: Int) = current.valueSelector.onConflict(varRef, value)
-        override fun onCommit(varRef: VarRef, value: Int) = current.valueSelector.onCommit(varRef, value)
+        override fun onConflict(varRef: VarRef, value: Long) = current.valueSelector.onConflict(varRef, value)
+        override fun onCommit(varRef: VarRef, value: Long) = current.valueSelector.onCommit(varRef, value)
         override fun onSolution(snapshot: Sample) = current.valueSelector.onSolution(snapshot)
         override fun onRestart() {
             // Bandit update is owned by the variable-heuristic delegate (fired first by the

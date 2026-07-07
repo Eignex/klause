@@ -81,9 +81,9 @@ class RootBakerTest {
         val baked = assertIs<PropagationResult.Implied>(
             bake(p, BakeConfig(probeIntBounds = true, probeIntHoles = true)),
         )
-        val xHoles = mutableSetOf<Int>()
+        val xHoles = mutableSetOf<Long>()
         baked.forEachIntHole { id, v -> if (id == 0) xHoles.add(v) }
-        assertEquals(setOf(1, 2), xHoles, "interior-hole SAC should mark x ≠ 1 and x ≠ 2")
+        assertEquals(setOf(1L, 2L), xHoles, "interior-hole SAC should mark x ≠ 1 and x ≠ 2")
     }
 
     @Test

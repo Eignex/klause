@@ -53,7 +53,7 @@ class LpLearnTest {
         // the negated live lower-bound premise of x — the load-bearing support for objective >= 5.
         val lo = relaxation.model.loShift[0]
         assertTrue(
-            session.boundGeLit(0, lo.toInt(), positive = false) in reason.toList(),
+            session.boundGeLit(0, lo, positive = false) in reason.toList(),
             "reason ${reason.toList()} must cite the negated lower-bound premise of x (lo=$lo)",
         )
     }

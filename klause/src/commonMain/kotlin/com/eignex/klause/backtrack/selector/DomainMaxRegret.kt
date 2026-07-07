@@ -15,12 +15,12 @@ import kotlin.random.Random
 object DomainMaxRegret : VariableSelector {
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         var best: VarRef? = null
-        var bestRegret = Int.MIN_VALUE
+        var bestRegret = Long.MIN_VALUE
         val problem = session.problem
         for (v in 0 until problem.numBoolVars) {
-            if (session.boolValue(v) == null && 1 > bestRegret) {
+            if (session.boolValue(v) == null && 1L > bestRegret) {
                 best = VarRef.Bool(v)
-                bestRegret = 1
+                bestRegret = 1L
             }
         }
         for (v in 0 until problem.numIntVars) {

@@ -23,11 +23,11 @@ import com.eignex.kumulant.stream.lock
  * a platform mutex under the parallel one.
  */
 internal class SharedVarBounds(numIntVars: Int, private val lock: Mutex = Concurrency.None.lock()) {
-    private val lo = IntArray(numIntVars) { Int.MIN_VALUE }
-    private val hi = IntArray(numIntVars) { Int.MAX_VALUE }
+    private val lo = LongArray(numIntVars) { Long.MIN_VALUE }
+    private val hi = LongArray(numIntVars) { Long.MAX_VALUE }
 
     /** Tighten the shared bounds of [varId] toward `[lower, upper]` (keeps the tightest seen each side). */
-    fun publish(varId: Int, lower: Int, upper: Int) {
+    fun publish(varId: Int, lower: Long, upper: Long) {
         if (varId !in lo.indices) return
         lock.withLock {
             if (lower > lo[varId]) lo[varId] = lower
@@ -35,9 +35,9 @@ internal class SharedVarBounds(numIntVars: Int, private val lock: Mutex = Concur
         }
     }
 
-    /** The tightest shared lower bound for [varId] (`Int.MIN_VALUE` if none). */
-    fun lowerOf(varId: Int): Int = lock.withLock { if (varId in lo.indices) lo[varId] else Int.MIN_VALUE }
+    /** The tightest shared lower bound for [varId] (`Long.MIN_VALUE` if none). */
+    fun lowerOf(varId: Int): Long = lock.withLock { if (varId in lo.indices) lo[varId] else Long.MIN_VALUE }
 
-    /** The tightest shared upper bound for [varId] (`Int.MAX_VALUE` if none). */
-    fun upperOf(varId: Int): Int = lock.withLock { if (varId in hi.indices) hi[varId] else Int.MAX_VALUE }
+    /** The tightest shared upper bound for [varId] (`Long.MAX_VALUE` if none). */
+    fun upperOf(varId: Int): Long = lock.withLock { if (varId in hi.indices) hi[varId] else Long.MAX_VALUE }
 }

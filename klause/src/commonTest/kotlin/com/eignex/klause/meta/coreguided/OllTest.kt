@@ -22,9 +22,9 @@ class OllTest {
 
     @Test
     fun `softCost counts the weight of every unsatisfied soft`() {
-        val both = Sample(bools = booleanArrayOf(false, false), ints = intArrayOf())
-        val one = Sample(bools = booleanArrayOf(true, false), ints = intArrayOf())
-        val none = Sample(bools = booleanArrayOf(true, true), ints = intArrayOf())
+        val both = Sample(bools = booleanArrayOf(false, false), ints = longArrayOf())
+        val one = Sample(bools = booleanArrayOf(true, false), ints = longArrayOf())
+        val none = Sample(bools = booleanArrayOf(true, true), ints = longArrayOf())
         assertEquals(2L, Oll.softCost(both, softs))
         assertEquals(1L, Oll.softCost(one, softs))
         assertEquals(0L, Oll.softCost(none, softs))
@@ -35,7 +35,7 @@ class OllTest {
         // #80: the witness violates both softs (cost 2) but the proven optimum is lb = 1.
         // recoverOptimalSample must re-solve under the true-cost cap and return a model
         // whose cost is exactly lb — here, exactly one of b0/b1 true.
-        val overRelaxed = Sample(bools = booleanArrayOf(false, false), ints = intArrayOf())
+        val overRelaxed = Sample(bools = booleanArrayOf(false, false), ints = longArrayOf())
         val recovered = Oll.recoverOptimalSample(mutex01, softs, overRelaxed, lb = 1L, BacktrackParams())
         assertEquals(1L, Oll.softCost(recovered, softs))
         assertTrue(recovered.bools[0] != recovered.bools[1])
@@ -43,7 +43,7 @@ class OllTest {
 
     @Test
     fun `recoverOptimalSample is a no-op when the witness already costs lb`() {
-        val good = Sample(bools = booleanArrayOf(true, false), ints = intArrayOf())
+        val good = Sample(bools = booleanArrayOf(true, false), ints = longArrayOf())
         val recovered = Oll.recoverOptimalSample(mutex01, softs, good, lb = 1L, BacktrackParams())
         assertSame(good, recovered)
     }

@@ -32,7 +32,7 @@ class ActivityBasedSearchTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
+        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
     }
 
     @Test
@@ -112,7 +112,7 @@ class ActivityBasedSearchTest {
             boolKeys,
             BooleanArray(boolKeys.size),
             intKeys,
-            IntArray(intKeys.size),
+            LongArray(intKeys.size),
         )
     }
 }

@@ -49,7 +49,7 @@ class LpHarvestTest {
         repeat(300) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
-            val domains = Array(n) { IntDomain(0, hi) }
+            val domains = Array(n) { IntDomain(0, hi.toLong()) }
             val factors = ArrayList<Factor>()
             repeat(rng.nextInt(1, 4)) { _ ->
                 val coeffs = IntArray(n) { rng.nextInt(-2, 3) }
@@ -79,7 +79,7 @@ class LpHarvestTest {
                     if (feasible()) {
                         for (v in 0 until n) {
                             assertTrue(
-                                point[v] in harvested.intDomains[v],
+                                point[v].toLong() in harvested.intDomains[v],
                                 "harvest excluded feasible x$v=${point[v]} from ${harvested.intDomains[v].min}..${
                                     harvested.intDomains[v].max
                                 }",
@@ -303,7 +303,7 @@ class LpHarvestTest {
         repeat(300) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
-            val domains = Array(n) { IntDomain(0, hi) }
+            val domains = Array(n) { IntDomain(0, hi.toLong()) }
             val factors = ArrayList<Factor>()
             repeat(rng.nextInt(2, 5)) { _ ->
                 val coeffs = IntArray(n) { rng.nextInt(0, 3) }
@@ -325,7 +325,7 @@ class LpHarvestTest {
         val n = original.numIntVars
         val point = IntArray(n)
         fun feasible(p: Problem): Boolean {
-            for (v in 0 until n) if (point[v] !in p.intDomains[v]) return false
+            for (v in 0 until n) if (point[v].toLong() !in p.intDomains[v]) return false
             return p.factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
                 for (i in f.vars.indices) s += f.coeffs[i].toLong() * point[f.vars[i]]

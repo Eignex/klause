@@ -30,7 +30,7 @@ class DiffnInvariantTest {
         val rng = Random(seed * 31L + 1)
         repeat(600) { step ->
             val v = probeVars[rng.nextInt(probeVars.size)]
-            val nv = rng.nextInt(valueRange.first, valueRange.last + 1)
+            val nv = rng.nextInt(valueRange.first, valueRange.last + 1).toLong()
             val before = state.factors[0].violationDegree(state, 0)
             val predicted = state.factors[0].deltaIfIntSet(state, 0, v, nv)
             state.apply(Move.IntSet(v, nv))
@@ -52,7 +52,7 @@ class DiffnInvariantTest {
         state.recompute()
         val rng = Random(99)
         repeat(600) { step ->
-            state.apply(Move.IntSet(rng.nextInt(8), rng.nextInt(0, 5)))
+            state.apply(Move.IntSet(rng.nextInt(8), rng.nextInt(0, 5).toLong()))
             val fresh = LocalSearchState(problem, Random(0))
             for (k in 0 until 8) fresh.assignment.setInt(k, state.assignment.intValue(k))
             fresh.recompute()

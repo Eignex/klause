@@ -115,10 +115,10 @@ internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : Repa
             val baseline = currentScore()
             var bestVal = cur
             var bestScore = baseline
-            val candidates: IntArray = if (d.size <= intDomainSampleCap) {
-                IntArray(d.size) { d.valueAt(it) }
+            val candidates: LongArray = if (d.size <= intDomainSampleCap) {
+                LongArray(d.size) { d.valueAt(it) }
             } else {
-                IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                LongArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
             }
             for (v in candidates) {
                 if (v == cur) continue
@@ -168,15 +168,15 @@ internal class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
             if (currentScore() >= baseline) state.apply(Move.BoolFlip(b))
         }
         // Integers: compute regret per var, sort desc, assign best value in that order.
-        data class Slot(val v: Int, val best: Int, val bestScore: Double, val regret: Double)
+        data class Slot(val v: Int, val best: Long, val bestScore: Double, val regret: Double)
         val slots = ArrayList<Slot>(context.freed.ints.size)
         for (i in context.freed.ints) {
             val d = problem.intDomains[i]
             val cur = state.assignment.intValue(i)
-            val cand: IntArray = if (d.size <= intDomainSampleCap) {
-                IntArray(d.size) { d.valueAt(it) }
+            val cand: LongArray = if (d.size <= intDomainSampleCap) {
+                LongArray(d.size) { d.valueAt(it) }
             } else {
-                IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                LongArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
             }
             var best = cur
             var bestScore = currentScore()
@@ -245,10 +245,10 @@ internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIter
             for (i in context.freed.ints) {
                 val d = problem.intDomains[i]
                 val cur = state.assignment.intValue(i)
-                val cand: IntArray = if (d.size <= intDomainSampleCap) {
-                    IntArray(d.size) { d.valueAt(it) }
+                val cand: LongArray = if (d.size <= intDomainSampleCap) {
+                    LongArray(d.size) { d.valueAt(it) }
                 } else {
-                    IntArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                    LongArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
                 }
                 for (v in cand) {
                     if (v == cur) continue

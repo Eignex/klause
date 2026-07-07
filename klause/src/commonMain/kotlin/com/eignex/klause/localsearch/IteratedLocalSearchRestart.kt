@@ -198,7 +198,7 @@ class IteratedLocalSearchRestart(
     private fun biasedCrossover(state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: Random): Sample {
         if (linkageAware) return linkageAwareCrossover(state, a, b, probA, rng)
         val bools = BooleanArray(a.bools.size) { if (rng.nextDouble() < probA) a.bools[it] else b.bools[it] }
-        val ints = IntArray(a.ints.size) { if (rng.nextDouble() < probA) a.ints[it] else b.ints[it] }
+        val ints = LongArray(a.ints.size) { if (rng.nextDouble() < probA) a.ints[it] else b.ints[it] }
         return Sample(bools, ints)
     }
 
@@ -216,7 +216,7 @@ class IteratedLocalSearchRestart(
         rng: Random,
     ): Sample {
         val bools = BooleanArray(a.bools.size)
-        val ints = IntArray(a.ints.size)
+        val ints = LongArray(a.ints.size)
         val boolSet = BooleanArray(a.bools.size)
         val intSet = BooleanArray(a.ints.size)
         for ((fid, _) in state.factors.withIndex()) {

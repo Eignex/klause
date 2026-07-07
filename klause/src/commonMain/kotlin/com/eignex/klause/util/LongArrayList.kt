@@ -100,6 +100,16 @@ internal class LongArrayList(initialCapacity: Int = 8) {
         }
     }
 
+    /**
+     * Index of the first element `>= element` in `[0, size)`, assuming the list is sorted
+     * **strictly ascending** (no duplicates) — the lower-bound / insertion point. Returns
+     * [size] when every element is strictly below [element]. O(log size) via [binarySearchLong].
+     */
+    fun lowerBound(element: Long): Int {
+        val idx = data.binarySearchLong(element, 0, size)
+        return if (idx >= 0) idx else -(idx + 1)
+    }
+
     inline fun forEach(action: (Long) -> Unit) {
         for (i in 0 until size) action(this[i])
     }

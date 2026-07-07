@@ -58,11 +58,11 @@ internal class MddLinearizer(
                 val src = trans[p]
                 val value = trans[p + 1]
                 val dst = trans[p + 2]
-                if (src in reach[layer] && value in declared) {
+                if (src in reach[layer] && value.toLong() in declared) {
                     // The arc is present while its value stays in seq[layer]'s live domain.
                     val col = builder.auxColumn(
                         0L,
-                        if (live.contains(value)) 1L else 0L,
+                        if (live.contains(value.toLong())) 1L else 0L,
                         presence = intArrayOf(seq[layer], value),
                     )
                     (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
@@ -156,7 +156,7 @@ internal class MddLinearizer(
             var p = starts[layer]
             val end = starts[layer + 1]
             while (p < end) {
-                if (trans[p] in reach[layer] && trans[p + 1] in dom) {
+                if (trans[p] in reach[layer] && trans[p + 1].toLong() in dom) {
                     reach[layer + 1].add(trans[p + 2])
                     arcCount++
                 }

@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.excludeIntValues
-import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /*
  * Reversible, delta-driven GAC for [Regular] — the incremental counterpart to the full
@@ -41,10 +41,10 @@ internal class RegularIncrementalState(
     var conflictPrefix: IntArray? = null
         private set
 
-    private fun delta(stateQ: Int, symbol: Int): Int {
+    private fun delta(stateQ: Int, symbol: Long): Int {
         if (stateQ < 1 || stateQ > numStates) return 0
         if (symbol < 1 || symbol > alphabetSize) return 0
-        return transitions[(stateQ - 1) * alphabetSize + (symbol - 1)]
+        return transitions[(stateQ - 1) * alphabetSize + (symbol - 1).toInt()]
     }
 
     private fun testBit(rev: RevLongArray, layer: Int, bit: Int): Boolean =
@@ -126,7 +126,7 @@ internal class RegularIncrementalState(
         val ant = state.composeIntVarAtomAntecedents(seq)
         for (i in lo..hi) {
             val d = state.intDomains[seq[i]]
-            var toRemove: IntArrayList? = null
+            var toRemove: LongArrayList? = null
             d.forEach { s ->
                 var live = false
                 forEachState(fwd, i) { q ->
@@ -135,9 +135,9 @@ internal class RegularIncrementalState(
                         if (nx != 0 && testBit(bwd, i + 1, nx - 1)) live = true
                     }
                 }
-                if (!live) (toRemove ?: IntArrayList().also { toRemove = it }).add(s)
+                if (!live) (toRemove ?: LongArrayList().also { toRemove = it }).add(s)
             }
-            toRemove?.let { if (!state.excludeIntValues(seq[i], it.toIntArray(), ant)) return false }
+            toRemove?.let { if (!state.excludeIntValues(seq[i], it.toLongArray(), ant)) return false }
         }
         return true
     }

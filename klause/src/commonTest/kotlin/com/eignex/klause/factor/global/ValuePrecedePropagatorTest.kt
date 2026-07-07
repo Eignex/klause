@@ -48,10 +48,11 @@ class ValuePrecedePropagatorTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = domains.size,
-            intDomains = Array(domains.size) { IntDomain(domains[it].first, domains[it].last) },
+            intDomains = Array(domains.size) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
             factors = listOf(ValuePrecede(s, t, IntArray(domains.size) { it })),
         )
-        return BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).map { it.ints.toList() }.toSet()
+        return BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+            .map { sample -> sample.ints.map { it.toInt() } }.toSet()
     }
 
     private fun assertExact(s: Int, t: Int, domains: Array<IntRange>) {
@@ -83,7 +84,7 @@ class ValuePrecedePropagatorTest {
         )
         assertEquals(
             setOf(listOf(0, 1)),
-            BacktrackSolver(problem).enumerate(BacktrackParams()).map { it.ints.toList() }.toSet(),
+            BacktrackSolver(problem).enumerate(BacktrackParams()).map { s -> s.ints.map { it.toInt() } }.toSet(),
         )
     }
 

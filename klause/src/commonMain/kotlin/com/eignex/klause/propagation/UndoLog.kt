@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * Column-wise undo journal for [PropagationState] (replaces per-level full-array snapshots).
@@ -29,6 +30,7 @@ internal class UndoLog {
     val maxLvl = IntArrayList() // int: prior intMaxLevel
     val minReason = IntArrayList() // int: prior intMinReason
     val maxReason = IntArrayList() // int: prior intMaxReason
+    val carved = LongArrayList() // long: carved value (tags 2/3); padding otherwise
     val domain = ArrayList<IntDomain?>() // int: prior intDomains[v]
     val minAnt = ArrayList<IntArray?>() // int: prior intMinAntecedents
     val maxAnt = ArrayList<IntArray?>() // int: prior intMaxAntecedents
@@ -52,6 +54,7 @@ internal class UndoLog {
         maxLvl.truncateTo(n)
         minReason.truncateTo(n)
         maxReason.truncateTo(n)
+        carved.truncateTo(n)
         while (domain.size > n) domain.removeAt(domain.size - 1)
         while (minAnt.size > n) minAnt.removeAt(minAnt.size - 1)
         while (maxAnt.size > n) maxAnt.removeAt(maxAnt.size - 1)

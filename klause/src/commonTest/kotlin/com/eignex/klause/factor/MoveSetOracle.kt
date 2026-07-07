@@ -209,6 +209,6 @@ object MoveSetOracle {
     private fun snapshotBools(s: LocalSearchState, p: Problem): List<Boolean> =
         (0 until p.numBoolVars).map { s.assignment.boolValue(it) }
 
-    private fun snapshotInts(s: LocalSearchState, p: Problem): List<Int> =
+    private fun snapshotInts(s: LocalSearchState, p: Problem): List<Long> =
         (0 until p.numIntVars).map { s.assignment.intValue(it) }
 }

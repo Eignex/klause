@@ -10,7 +10,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.argsortByIntKey
+import com.eignex.klause.util.argsortBy
 
 /**
  * CP propagator for [Cumulative]. Constructed by [Cumulative.asPropagator] and holds the
@@ -42,7 +42,7 @@ internal class CumulativePropagator(
         for (i in 0 until n) {
             val d = eff.dur[i]
             val r = eff.res[i]
-            if (d == 0 || r == 0) continue
+            if (d == 0L || r == 0L) continue
             val dom = state.intDomains[starts[i]]
             profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
         }
@@ -51,18 +51,18 @@ internal class CumulativePropagator(
     }
 
     private fun effectiveSnapshot(state: PropagationState): CumulativeEff? {
-        val dur = IntArray(n)
-        val res = IntArray(n)
+        val dur = LongArray(n)
+        val res = LongArray(n)
         for (i in 0 until n) {
             if (durationVars.isEmpty()) {
-                dur[i] = durations[i]
+                dur[i] = durations[i].toLong()
             } else {
                 val d = state.intDomains[durationVars[i]]
                 if (d.min != d.max) return null
                 dur[i] = d.min
             }
             if (resourceVars.isEmpty()) {
-                res[i] = resources[i]
+                res[i] = resources[i].toLong()
             } else {
                 val d = state.intDomains[resourceVars[i]]
                 if (d.min != d.max) return null
@@ -70,7 +70,7 @@ internal class CumulativePropagator(
             }
         }
         val cap = if (capacityVar < 0) {
-            capacity
+            capacity.toLong()
         } else {
             val d = state.intDomains[capacityVar]
             if (d.min != d.max) return null
@@ -81,7 +81,7 @@ internal class CumulativePropagator(
 
     private fun pointwiseOverloadReason(
         state: PropagationState,
-        t: Int,
+        t: Long,
         eff: CumulativeEff,
         blamed: Int,
         blamedStart: Int,
@@ -118,20 +118,24 @@ internal class CumulativePropagator(
     private fun citeEnergyBounds(out: IntArrayList, state: PropagationState, k: Int, eff: CumulativeEff) {
         if (durationVars.isNotEmpty()) {
             val dv = durationVars[k]
-            if (eff.dur[k] > state.problem.intDomains[dv].min) out.add(Lit.make(state.atomVarGe(dv, eff.dur[k]), false))
+            if (eff.dur[k] > state.problem.intDomains[dv].min) {
+                out.add(Lit.make(state.atomVarGe(dv, eff.dur[k]), false))
+            }
         }
         if (resourceVars.isNotEmpty()) {
             val rv = resourceVars[k]
-            if (eff.res[k] > state.problem.intDomains[rv].min) out.add(Lit.make(state.atomVarGe(rv, eff.res[k]), false))
+            if (eff.res[k] > state.problem.intDomains[rv].min) {
+                out.add(Lit.make(state.atomVarGe(rv, eff.res[k]), false))
+            }
         }
     }
 
     private fun minTightenReason(
         state: PropagationState,
         i: Int,
-        d: Int,
-        oldMin: Int,
-        newMin: Int,
+        d: Long,
+        oldMin: Long,
+        newMin: Long,
         eff: CumulativeEff,
     ): IntArray? {
         val orig = state.problem.intDomains[starts[i]]
@@ -145,9 +149,9 @@ internal class CumulativePropagator(
     private fun maxTightenReason(
         state: PropagationState,
         i: Int,
-        d: Int,
-        oldMax: Int,
-        newMax: Int,
+        d: Long,
+        oldMax: Long,
+        newMax: Long,
         eff: CumulativeEff,
     ): IntArray? {
         val orig = state.problem.intDomains[starts[i]]
@@ -161,8 +165,8 @@ internal class CumulativePropagator(
     private fun windowOverloadReason(
         state: PropagationState,
         i: Int,
-        winLo: Int,
-        winHi: Int,
+        winLo: Long,
+        winHi: Long,
         eff: CumulativeEff,
         extra: Int,
     ): IntArray? {
@@ -214,7 +218,7 @@ internal class CumulativePropagator(
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
-            if (d == 0 || r == 0) continue
+            if (d == 0L || r == 0L) continue
             val dom = state.intDomains[starts[i]]
             profile.addTask(lst = dom.max, ect = dom.min + d, resource = r)
         }
@@ -224,7 +228,7 @@ internal class CumulativePropagator(
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
-            if (d == 0 || r == 0) continue
+            if (d == 0L || r == 0L) continue
             val v = starts[i]
             val dom = state.intDomains[v]
             if (dom.min == dom.max) continue
@@ -265,23 +269,17 @@ internal class CumulativePropagator(
         return true
     }
 
-    private fun minDur(state: PropagationState, i: Int): Int =
-        if (durationVars.isEmpty()) durations[i] else state.intDomains[durationVars[i]].min
+    private fun minDur(state: PropagationState, i: Int): Long =
+        if (durationVars.isEmpty()) durations[i].toLong() else state.intDomains[durationVars[i]].min
 
-    private fun maxDur(state: PropagationState, i: Int): Int =
-        if (durationVars.isEmpty()) durations[i] else state.intDomains[durationVars[i]].max
+    private fun maxDur(state: PropagationState, i: Int): Long =
+        if (durationVars.isEmpty()) durations[i].toLong() else state.intDomains[durationVars[i]].max
 
-    private fun minHeight(state: PropagationState, i: Int): Int =
-        if (resourceVars.isEmpty()) resources[i] else state.intDomains[resourceVars[i]].min
+    private fun minHeight(state: PropagationState, i: Int): Long =
+        if (resourceVars.isEmpty()) resources[i].toLong() else state.intDomains[resourceVars[i]].min
 
-    private fun capMax(state: PropagationState): Int =
-        if (capacityVar < 0) capacity else state.intDomains[capacityVar].max
-
-    private fun clampToInt(v: Long): Int = when {
-        v > Int.MAX_VALUE.toLong() -> Int.MAX_VALUE
-        v < Int.MIN_VALUE.toLong() -> Int.MIN_VALUE
-        else -> v.toInt()
-    }
+    private fun capMax(state: PropagationState): Long =
+        if (capacityVar < 0) capacity.toLong() else state.intDomains[capacityVar].max
 
     /**
      * Naive energetic reasoning (after Baptiste–Le Pape–Nuijten, as in choco's `energyNaive`). For
@@ -301,38 +299,38 @@ internal class CumulativePropagator(
         val m = act.size
         if (m == 0) return true
         val ids = IntArray(m) { act[it] }
-        val est = IntArray(m) { state.intDomains[starts[ids[it]]].min }
-        val lct = IntArray(m) { state.intDomains[starts[ids[it]]].max + maxDur(state, ids[it]) }
-        val order = argsortByIntKey(m) { lct[it] }
+        val est = LongArray(m) { state.intDomains[starts[ids[it]]].min }
+        val lct = LongArray(m) { state.intDomains[starts[ids[it]]].max + maxDur(state, ids[it]) }
+        val order = argsortBy(m) { a, b -> lct[a].compareTo(lct[b]) }
         val camax = capMax(state)
         val ant = state.composeIntVarAtomAntecedents(intVars)
-        var xMin = Int.MAX_VALUE
-        var xMax = Int.MIN_VALUE
+        var xMin = Long.MAX_VALUE
+        var xMax = Long.MIN_VALUE
         var surface = 0L
         for (p in 0 until m) {
             val k = order[p]
             val i = ids[k]
             if (est[k] < xMin) xMin = est[k]
             if (lct[k] > xMax) xMax = lct[k]
-            val len = (xMax - xMin).toLong()
+            val len = xMax - xMin
             if (len > 0L) {
-                val availSurf = len * camax.toLong() - surface
+                val availSurf = len * camax - surface
                 if (availSurf < 0L) return false
                 val md = minDur(state, i)
                 if (resourceVars.isNotEmpty() && md > 0) {
-                    if (!state.tightenIntMax(resourceVars[i], clampToInt(availSurf / md), ant)) return false
+                    if (!state.tightenIntMax(resourceVars[i], availSurf / md, ant)) return false
                 }
                 val mh = minHeight(state, i)
                 if (durationVars.isNotEmpty() && mh > 0) {
-                    if (!state.tightenIntMax(durationVars[i], clampToInt(availSurf / mh), ant)) return false
+                    if (!state.tightenIntMax(durationVars[i], availSurf / mh, ant)) return false
                 }
                 if (capacityVar >= 0) {
                     val capLb = (surface + len - 1L) / len
-                    if (!state.tightenIntMin(capacityVar, clampToInt(capLb), ant)) return false
+                    if (!state.tightenIntMin(capacityVar, capLb, ant)) return false
                 }
             }
-            surface += minDur(state, i).toLong() * minHeight(state, i).toLong()
-            if (surface > (xMax - xMin).toLong() * camax.toLong()) return false
+            surface += minDur(state, i) * minHeight(state, i)
+            if (surface > (xMax - xMin) * camax) return false
         }
         return true
     }
@@ -364,15 +362,17 @@ internal class CumulativePropagator(
             val ect = state.intDomains[starts[i]].min + minDur(state, i)
             if (lst >= ect) continue
             val newUb = cap - (profile.maxLevelOver(lst, ect) - minHeight(state, i))
-            if (newUb < state.intDomains[resourceVars[i]].max && !state.tightenIntMax(resourceVars[i], newUb, ant)) {
+            if (newUb < state.intDomains[resourceVars[i]].max &&
+                !state.tightenIntMax(resourceVars[i], newUb, ant)
+            ) {
                 return false
             }
         }
         return true
     }
 
-    private fun edgeFindingPass(state: PropagationState, effDur: IntArray, effRes: IntArray, effCap: Int): Boolean {
-        if (n < 2 || effCap == 0) return true
+    private fun edgeFindingPass(state: PropagationState, effDur: LongArray, effRes: LongArray, effCap: Long): Boolean {
+        if (n < 2 || effCap == 0L) return true
         val active = IntArrayList()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
@@ -382,19 +382,19 @@ internal class CumulativePropagator(
         if (m < 2) return true
 
         val taskIds = IntArray(m) { active[it] }
-        val ests = IntArray(m) { state.intDomains[starts[taskIds[it]]].min }
-        val lcts = IntArray(m) { state.intDomains[starts[taskIds[it]]].max + effDur[taskIds[it]] }
-        val energies = LongArray(m) { effDur[taskIds[it]].toLong() * effRes[taskIds[it]].toLong() }
-        val cs = IntArray(m) { effRes[taskIds[it]] }
+        val ests = LongArray(m) { state.intDomains[starts[taskIds[it]]].min }
+        val lcts = LongArray(m) { state.intDomains[starts[taskIds[it]]].max + effDur[taskIds[it]] }
+        val energies = LongArray(m) { effDur[taskIds[it]] * effRes[taskIds[it]] }
+        val cs = LongArray(m) { effRes[taskIds[it]] }
 
-        val estOrder = argsortByIntKey(m) { ests[it] }
+        val estOrder = argsortBy(m) { a, b -> ests[a].compareTo(ests[b]) }
         val leafPos = IntArray(m)
         for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
-        val lctOrder = argsortByIntKey(m) { lcts[it] }
+        val lctOrder = argsortBy(m) { a, b -> lcts[a].compareTo(lcts[b]) }
 
         val tree = CumulativeThetaTree(n = m, capacity = effCap)
         tree.setLeafOrder(leafPos)
-        val capL = effCap.toLong()
+        val capL = effCap
         val activeStarts = if (constantEnergyAndCap) IntArrayList() else null
         var scopedAnt: IntArray? = null
         var scopedAntBuilt = false
@@ -412,7 +412,7 @@ internal class CumulativePropagator(
             }
             scopedAntBuilt = false
             val envTheta = tree.envOfTheta()
-            val capTau = capL * tau.toLong()
+            val capTau = capL * tau
             if (envTheta > capTau) return false
             for (ki in k until m) {
                 val i = lctOrder[ki]
@@ -420,11 +420,9 @@ internal class CumulativePropagator(
                 val cI = cs[i]
                 val envWith = tree.envIfActivated(i, ests[i], eI)
                 if (envWith <= capTau) continue
-                val numerator = envTheta - (effCap - cI).toLong() * tau.toLong()
+                val numerator = envTheta - (effCap - cI) * tau
                 if (numerator <= 0L) continue
-                val newEstL = (numerator + cI - 1L) / cI.toLong()
-                if (newEstL > Int.MAX_VALUE.toLong()) continue
-                val newEst = newEstL.toInt()
+                val newEst = (numerator + cI - 1L) / cI
                 val v = starts[taskIds[i]]
                 if (newEst > state.intDomains[v].min) {
                     val reason: IntArray?

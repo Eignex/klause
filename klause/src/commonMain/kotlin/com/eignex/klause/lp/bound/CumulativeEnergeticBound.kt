@@ -68,7 +68,7 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
     private fun overSubscribedChecked(c: Cumulative, session: PropagationSession): Boolean {
         val n = c.starts.size
         if (n == 0 || n > MAX_TASKS) return false
-        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max.toLong() else c.capacity.toLong()
+        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max else c.capacity.toLong()
 
         // Per definitely-present task: earliest start, latest start, min duration, min demand.
         val est = LongArray(n)
@@ -81,8 +81,8 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
         for (i in 0 until n) {
             if (c.presents.isNotEmpty() && session.litTruth(c.presents[i]) != true) continue // maybe absent
             val sd = session.intDomain(c.starts[i])
-            est[i] = sd.min.toLong()
-            lst[i] = sd.max.toLong()
+            est[i] = sd.min
+            lst[i] = sd.max
             dur[i] = minOrConst(session, c.durationVars, i, c.durations[i])
             dem[i] = minOrConst(session, c.resourceVars, i, c.resources[i])
             if (dur[i] <= 0L || dem[i] <= 0L) continue
@@ -120,7 +120,7 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
     private fun explainChecked(c: Cumulative, session: PropagationSession): IntArray? {
         val n = c.starts.size
         if (n == 0 || n > MAX_TASKS) return null
-        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max.toLong() else c.capacity.toLong()
+        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max else c.capacity.toLong()
         val est = LongArray(n)
         val lst = LongArray(n)
         val dur = LongArray(n)
@@ -131,8 +131,8 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
         for (i in 0 until n) {
             if (c.presents.isNotEmpty() && session.litTruth(c.presents[i]) != true) continue
             val sd = session.intDomain(c.starts[i])
-            est[i] = sd.min.toLong()
-            lst[i] = sd.max.toLong()
+            est[i] = sd.min
+            lst[i] = sd.max
             dur[i] = minOrConst(session, c.durationVars, i, c.durations[i])
             dem[i] = minOrConst(session, c.resourceVars, i, c.resources[i])
             if (dur[i] <= 0L || dem[i] <= 0L) continue
@@ -180,22 +180,22 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
         capacity: Long,
     ): IntArray {
         val lits = IntArrayList()
-        fun geNot(v: Int, k: Long) = lits.add(session.boundGeLit(v, k.toInt(), positive = false))
+        fun geNot(v: Int, k: Long) = lits.add(session.boundGeLit(v, k, positive = false))
         for (i in c.starts.indices) {
             if (!present[i] || mandatoryOverlap(est[i], lst[i], dur[i], t1, t2) <= 0L) continue
             if (c.presents.isNotEmpty()) lits.add(Lit.negate(c.presents[i]))
             geNot(c.starts[i], est[i])
-            lits.add(session.boundLeLit(c.starts[i], lst[i].toInt(), positive = false))
+            lits.add(session.boundLeLit(c.starts[i], lst[i], positive = false))
             if (c.durationVars.isNotEmpty()) geNot(c.durationVars[i], dur[i])
             if (c.resourceVars.isNotEmpty()) geNot(c.resourceVars[i], dem[i])
         }
-        if (c.capacityVar >= 0) lits.add(session.boundLeLit(c.capacityVar, capacity.toInt(), positive = false))
+        if (c.capacityVar >= 0) lits.add(session.boundLeLit(c.capacityVar, capacity, positive = false))
         return lits.toIntArray()
     }
 
     /** Live minimum of the per-task variable (when [vars] is set) else the [const] fallback. */
     private fun minOrConst(session: PropagationSession, vars: IntArray, i: Int, const: Int): Long =
-        if (vars.isNotEmpty()) session.intDomain(vars[i]).min.toLong() else const.toLong()
+        if (vars.isNotEmpty()) session.intDomain(vars[i]).min else const.toLong()
 
     /** Minimum time task `[est, lst]+dur` must spend inside `[t1, t2)` over all its placements. */
     private fun mandatoryOverlap(est: Long, lst: Long, dur: Long, t1: Long, t2: Long): Long {

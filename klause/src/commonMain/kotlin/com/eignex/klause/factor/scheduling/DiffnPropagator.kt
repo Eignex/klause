@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAnteced
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * CP propagator for [Diffn]. Constructed by [Diffn.asPropagator] and holds pairwise
@@ -100,7 +100,7 @@ internal class DiffnPropagator(
                 continue
             }
             // Segment starts: pMin plus every compulsory-part entry/exit breakpoint inside (pMin, pMax].
-            val starts = IntArrayList()
+            val starts = LongArrayList()
             starts.add(pMin)
             for (j in 0 until n) {
                 if (j == i || size[j] <= 0 || osize[j] <= 0) continue
@@ -112,9 +112,9 @@ internal class DiffnPropagator(
                 if (enter in (pMin + 1)..pMax) starts.add(enter)
                 if (exit in (pMin + 1)..pMax) starts.add(exit)
             }
-            starts.sortByIntKey { it }
+            starts.sort()
             // First feasible segment start → new lower bound.
-            var newMin = Int.MIN_VALUE
+            var newMin = Long.MIN_VALUE
             for (k in 0 until starts.size) {
                 val s = starts[k]
                 if (s > newMin && feasibleColumn(state, i, s, pos, size, opos, osize)) {
@@ -122,10 +122,10 @@ internal class DiffnPropagator(
                     break
                 }
             }
-            if (newMin == Int.MIN_VALUE) return false
+            if (newMin == Long.MIN_VALUE) return false
             if (!state.tightenIntMin(pos[i], newMin, ant)) return false
             // Last feasible segment → new upper bound (segment end clamped to pMax).
-            var newMax = Int.MAX_VALUE
+            var newMax = Long.MAX_VALUE
             for (k in starts.size - 1 downTo 0) {
                 val s = starts[k]
                 if (s < newMin) break
@@ -137,7 +137,7 @@ internal class DiffnPropagator(
                     break
                 }
             }
-            if (newMax == Int.MAX_VALUE) return false
+            if (newMax == Long.MAX_VALUE) return false
             if (!state.tightenIntMax(pos[i], newMax, ant)) return false
         }
         return true
@@ -149,7 +149,7 @@ internal class DiffnPropagator(
     private fun feasibleColumn(
         state: PropagationState,
         i: Int,
-        x: Int,
+        x: Long,
         pos: IntArray,
         size: IntArray,
         opos: IntArray,
@@ -157,8 +157,8 @@ internal class DiffnPropagator(
     ): Boolean {
         // Forbidden orthogonal-origin intervals contributed by rectangles whose compulsory primary
         // part overlaps [x, x+size[i]).
-        val lows = IntArrayList()
-        val highs = IntArrayList()
+        val lows = LongArrayList()
+        val highs = LongArrayList()
         for (j in 0 until n) {
             if (j == i || size[j] <= 0 || osize[j] <= 0) continue
             val pcLo = state.intDomains[pos[j]].max
@@ -192,15 +192,15 @@ internal class DiffnPropagator(
     private fun propagateVarSizeSoundOnly(state: PropagationState): Boolean {
         val wvars = widthVars
         val hvars = heightVars
-        fun wMin(i: Int) = if (wvars == null) widths[i] else state.intDomains[wvars[i]].min
-        fun hMin(i: Int) = if (hvars == null) heights[i] else state.intDomains[hvars[i]].min
+        fun wMin(i: Int): Long = if (wvars == null) widths[i].toLong() else state.intDomains[wvars[i]].min
+        fun hMin(i: Int): Long = if (hvars == null) heights[i].toLong() else state.intDomains[hvars[i]].min
         for (i in 0 until n) {
             for (j in i + 1 until n) {
                 val wI = wMin(i)
                 val hI = hMin(i)
                 val wJ = wMin(j)
                 val hJ = hMin(j)
-                if (nonStrict && (wI == 0 || hI == 0 || wJ == 0 || hJ == 0)) continue
+                if (nonStrict && (wI == 0L || hI == 0L || wJ == 0L || hJ == 0L)) continue
                 val xMust = state.intDomains[xs[i]].max < state.intDomains[xs[j]].min + wJ &&
                     state.intDomains[xs[j]].max < state.intDomains[xs[i]].min + wI
                 val yMust = state.intDomains[ys[i]].max < state.intDomains[ys[j]].min + hJ &&

@@ -24,7 +24,7 @@ class LpWarmStartTest {
                 rows.add(Linear(intArrayOf(1, 1), intArrayOf(i, j), LinearOp.GE, hi))
             }
         }
-        return Problem(0, n, Array(n) { IntDomain(0, hi) }, rows.toTypedArray())
+        return Problem(0, n, Array(n) { IntDomain(0, hi.toLong()) }, rows.toTypedArray())
     }
 
     @Test

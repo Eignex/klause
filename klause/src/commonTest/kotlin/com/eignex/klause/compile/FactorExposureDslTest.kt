@@ -32,7 +32,7 @@ class FactorExposureDslTest {
         // Every solution is a self-inverse permutation of {0,1,2}.
         for (p in sols) {
             assertEquals(p.toSet().size, p.size, "not a permutation: $p")
-            for (i in p.indices) assertEquals(i, p[p[i]], "not an involution at $i: $p")
+            for (i in p.indices) assertEquals(i.toLong(), p[p[i].toInt()], "not an involution at $i: $p")
         }
         // S3 has 4 involutions: identity plus the three transpositions.
         assertEquals(4, sols.toSet().size, "expected 4 involutions, got ${sols.toSet()}")
@@ -57,7 +57,7 @@ class FactorExposureDslTest {
             .map { s -> fh.map { compiled.decode(it, s) } to gh.map { compiled.decode(it, s) } }.toList()
         for ((f, g) in sols) {
             assertTrue(f.toSet().size == f.size, "f not a permutation: $f")
-            for (i in f.indices) assertEquals(i, g[f[i]], "g is not the inverse of f at $i: f=$f g=$g")
+            for (i in f.indices) assertEquals(i.toLong(), g[f[i].toInt()], "g is not the inverse of f at $i: f=$f g=$g")
         }
         // Each of the 6 permutations of {0,1,2} pairs with a unique inverse.
         assertEquals(6, sols.size, "expected 6 permutation/inverse pairs, got ${sols.size}")

@@ -71,9 +71,9 @@ internal object LpExplanation {
             }
         }
         return if (lowerSide) {
-            session.boundGeLit(varId, lo.toInt(), positive = false)
+            session.boundGeLit(varId, lo, positive = false)
         } else {
-            session.boundLeLit(varId, hi.toInt(), positive = false)
+            session.boundLeLit(varId, hi, positive = false)
         }
     }
 

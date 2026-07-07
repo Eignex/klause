@@ -34,7 +34,7 @@ class SelectorCallbackTest {
 
         override fun pick(session: PropagationSession, rng: Random): VarRef? = InputOrder.pick(session, rng)
 
-        override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
+        override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =
             IndomainMin.values(session, varRef, rng)
 
         override fun onCommit(varRef: VarRef) {
@@ -48,8 +48,8 @@ class SelectorCallbackTest {
         override fun onRestart() {
             restartCount++
         }
-        override fun onCommit(varRef: VarRef, value: Int) { /* not exercised by this test */ }
-        override fun onConflict(varRef: VarRef, value: Int) { /* not exercised by this test */ }
+        override fun onCommit(varRef: VarRef, value: Long) { /* not exercised by this test */ }
+        override fun onConflict(varRef: VarRef, value: Long) { /* not exercised by this test */ }
         override fun onSolution(snapshot: Sample) { /* not exercised by this test */ }
     }
 

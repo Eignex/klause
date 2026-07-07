@@ -57,7 +57,7 @@ class LagrangianBoundTest {
         repeat(400) { _ ->
             val n = 3
             val hi = rng.nextInt(2, 6)
-            val doms = Array(n) { IntDomain(0, hi) }
+            val doms = Array(n) { IntDomain(0, hi.toLong()) }
             val factors = ArrayList<Factor>()
             factors.add(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = hi + 1))
             // 0–2 linear linking constraints over the all-different variables.
@@ -163,7 +163,7 @@ class LagrangianBoundTest {
         var feasibleChecked = 0
         repeat(300) { _ ->
             val hi = rng.nextInt(2, 5)
-            val doms = Array(6) { IntDomain(0, hi) }
+            val doms = Array(6) { IntDomain(0, hi.toLong()) }
             val factors = ArrayList<Factor>()
             factors.add(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = hi + 1))
             factors.add(AllDifferent(intArrayOf(3, 4, 5), domainMin = 0, domainSize = hi + 1))

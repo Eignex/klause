@@ -170,7 +170,7 @@ class CumulativePropagatorTest {
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
-        .map { it.ints.toList() }
+        .map { it.ints.map { v -> v.toInt() } }
         .toHashSet()
 
     @Test
@@ -184,7 +184,11 @@ class CumulativePropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 3,
-                intDomains = arrayOf(IntDomain(0, span), IntDomain(0, span), IntDomain(0, span)),
+                intDomains = arrayOf(
+                    IntDomain(0, span.toLong()),
+                    IntDomain(0, span.toLong()),
+                    IntDomain(0, span.toLong()),
+                ),
                 factors = arrayOf<Factor>(
                     Cumulative(
                         starts = intArrayOf(0, 1, 2),
@@ -225,7 +229,12 @@ class CumulativePropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 4,
-                intDomains = arrayOf(IntDomain(0, span), IntDomain(0, span), IntDomain(0, 1), IntDomain(0, 1)),
+                intDomains = arrayOf(
+                    IntDomain(0, span.toLong()),
+                    IntDomain(0, span.toLong()),
+                    IntDomain(0, 1),
+                    IntDomain(0, 1),
+                ),
                 factors = arrayOf<Factor>(
                     Cumulative(
                         starts = intArrayOf(0, 1),
@@ -350,7 +359,7 @@ class CumulativePropagatorTest {
         val occ = IntArray(8)
         for (i in 0 until 3) {
             for (t in starts[i] until starts[i] + 2) {
-                if (t in occ.indices) occ[t]++
+                if (t in occ.indices) occ[t.toInt()]++
             }
         }
         for (t in occ.indices) assertTrue(occ[t] <= 1, "unary capacity broken at t=$t in $starts")
@@ -481,7 +490,7 @@ class CumulativePropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = k,
-                intDomains = Array(k) { IntDomain(inst.lo, inst.hi) },
+                intDomains = Array(k) { IntDomain(inst.lo.toLong(), inst.hi.toLong()) },
                 factors = arrayOf<Factor>(
                     Cumulative(
                         starts = IntArray(k) { it },
@@ -495,7 +504,7 @@ class CumulativePropagatorTest {
             // no restarts so enumeration completeness is simple to reason about.
             val params = BacktrackParams(randomSeed = 1, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: cumulative backtrack solution set must equal brute force")
         }
     }
@@ -629,11 +638,11 @@ class CumulativePropagatorTest {
         // Same task set, different leaf orderings: the recurrence anchors at the
         // leftmost EST in the subtree, so EST-ascending leaf order is the one that
         // gives the correct envelope.
-        val aEst = 0
+        val aEst = 0L
         val aE = 10L
-        val bEst = 5
+        val bEst = 5L
         val bE = 4L
-        val capacity = 1
+        val capacity = 1L
 
         val ordered = CumulativeThetaTree(n = 2, capacity = capacity)
         ordered.setLeafOrder(intArrayOf(0, 1))
@@ -738,9 +747,9 @@ class CumulativePropagatorTest {
             val leafPos = IntArray(n)
             for ((leafIdx, id) in order.withIndex()) leafPos[id] = leafIdx
 
-            val tree = CumulativeThetaTree(n = n, capacity = capacity)
+            val tree = CumulativeThetaTree(n = n, capacity = capacity.toLong())
             tree.setLeafOrder(leafPos)
-            for (id in 0 until n) if (active[id]) tree.activate(id, ests[id], energies[id])
+            for (id in 0 until n) if (active[id]) tree.activate(id, ests[id].toLong(), energies[id])
 
             val expected = bruteEnv(capacity, ests, energies, active)
             val got = tree.envOfTheta()
@@ -856,7 +865,7 @@ class CumulativePropagatorTest {
             }
             val found = BacktrackSolver(problem)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-                .take(100_000).map { it.ints.toList() }.toHashSet()
+                .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: disjunctive + interior holes must match brute force")
         }
     }

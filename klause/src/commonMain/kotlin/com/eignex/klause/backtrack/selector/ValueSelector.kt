@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
 import kotlin.math.ln
 import kotlin.random.Random
 
@@ -22,13 +22,13 @@ import kotlin.random.Random
  */
 interface ValueSelector {
     /** Candidate values for `varRef`, yielded in trial order. */
-    fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int>
+    fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long>
 
     /** Hook: a conflict involved `varRef` taking [value]. */
-    fun onConflict(varRef: VarRef, value: Int) {}
+    fun onConflict(varRef: VarRef, value: Long) {}
 
     /** Hook: `varRef` was committed to [value]. */
-    fun onCommit(varRef: VarRef, value: Int) {}
+    fun onCommit(varRef: VarRef, value: Long) {}
 
     /** Hook: the search restarted. */
     fun onRestart() {}
@@ -41,9 +41,9 @@ interface ValueSelector {
 /** Present domain values ordered by distance from [center] (ties prefer the upper value), skipping
  *  holes via the `in d` membership check. The first value drives [IndomainMiddle]/[IndomainMedian]'s
  *  int bound split; the tail keeps the sequence complete for any consumer that enumerates past it. */
-internal fun centeredDomainValues(d: IntDomain, center: Int): Sequence<Int> = sequence {
+internal fun centeredDomainValues(d: IntDomain, center: Long): Sequence<Long> = sequence {
     if (center in d) yield(center)
-    var off = 1
+    var off = 1L
     while (center - off >= d.min || center + off <= d.max) {
         if (center + off <= d.max && (center + off) in d) yield(center + off)
         if (center - off >= d.min && (center - off) in d) yield(center - off)
@@ -67,17 +67,17 @@ internal fun probeAndOrder(
     rng: Random,
     maxProbes: Int,
     ascending: Boolean,
-): Sequence<Int> {
-    val candidates: IntArray = when (varRef) {
-        is VarRef.Bool -> intArrayOf(0, 1)
+): Sequence<Long> {
+    val candidates: LongArray = when (varRef) {
+        is VarRef.Bool -> longArrayOf(0L, 1L)
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
             if (d.size <= maxProbes) {
-                IntArray(d.size) { d.valueAt(it) }
+                LongArray(d.size) { d.valueAt(it) }
             } else {
-                val seen = IntHashSet(maxProbes * 2)
-                val sample = IntArray(maxProbes)
+                val seen = LongHashSet(maxProbes * 2)
+                val sample = LongArray(maxProbes)
                 var i = 0
                 var guard = 0
                 while (i < maxProbes && guard < maxProbes * 8) {
@@ -92,10 +92,10 @@ internal fun probeAndOrder(
             }
         }
     }
-    val scored = ArrayList<Pair<Int, Double>>(candidates.size)
+    val scored = ArrayList<Pair<Long, Double>>(candidates.size)
     for (v in candidates) {
         val r = when (varRef) {
-            is VarRef.Bool -> session.pinBool(varRef.varId, v != 0)
+            is VarRef.Bool -> session.pinBool(varRef.varId, v != 0L)
             is VarRef.IntVar -> session.pinInt(varRef.varId, v)
         }
         if (r is Unsat) continue
@@ -107,7 +107,7 @@ internal fun probeAndOrder(
     if (varRef is VarRef.IntVar) {
         val d = session.intDomain(varRef.varId)
         if (candidates.size < d.size) {
-            val probed = IntHashSet(candidates.size * 2).apply {
+            val probed = LongHashSet(candidates.size * 2).apply {
                 for ((p, _) in scored) add(p)
                 for (c in candidates) add(c)
             }
@@ -139,11 +139,11 @@ internal fun logRemainingDomainProduct(session: PropagationSession): Double {
 
 /** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
  *  the engine can early-exit before enumerating the full domain on a backtrack. */
-internal fun domainValuesAscending(d: IntDomain): Sequence<Int> =
+internal fun domainValuesAscending(d: IntDomain): Sequence<Long> =
     sequence { for (i in 0 until d.size) yield(d.valueAt(i)) }
 
 /** Descending sequence; same skip-holes semantics. */
-internal fun domainValuesDescending(d: IntDomain): Sequence<Int> = sequence {
+internal fun domainValuesDescending(d: IntDomain): Sequence<Long> = sequence {
     // Backwards walk: iterate from max down to min, skip holes via membership check.
     // For sparse domains this is O((max - min) + holes); for contiguous it's O(span).
     for (v in d.max downTo d.min) if (v in d) yield(v)

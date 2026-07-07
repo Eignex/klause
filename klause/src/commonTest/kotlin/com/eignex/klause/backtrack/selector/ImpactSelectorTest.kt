@@ -36,7 +36,7 @@ class ImpactSelectorTest {
             .toList()
         assertTrue(2 !in values, "Impact should drop infeasible value 2; got $values")
         assertEquals(
-            setOf(0, 1, 3),
+            setOf(0L, 1L, 3L),
             values.toSet(),
             "Impact should yield exactly the feasible values; got $values",
         )
@@ -64,7 +64,7 @@ class ImpactSelectorTest {
             .values(session, VarRef.IntVar(0), Random(7L))
             .toList()
         assertEquals(
-            setOf(1, 2, 3),
+            setOf(1L, 2L, 3L),
             values.toSet(),
             "0 must be dropped (v3 = 0); the remaining 3 values must all appear; got $values",
         )
@@ -92,7 +92,7 @@ class ImpactSelectorTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
+        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
     }
 
     @Test
@@ -138,7 +138,7 @@ class ImpactSelectorTest {
             .values(session, VarRef.IntVar(0), Random(13L))
             .toList()
         assertEquals(100, values.size, "expected full coverage; got ${values.size}")
-        assertEquals((0..99).toSet(), values.toSet(), "must cover the entire domain")
+        assertEquals((0L..99L).toSet(), values.toSet(), "must cover the entire domain")
     }
 
     @Test
@@ -153,7 +153,7 @@ class ImpactSelectorTest {
         )
         val session = PropagationSession(problem)
         val values = Impact().values(session, VarRef.Bool(0), Random(0L)).toList()
-        assertEquals(setOf(0, 1), values.toSet())
+        assertEquals(setOf(0L, 1L), values.toSet())
     }
 
     @Test

@@ -44,7 +44,7 @@ internal fun FlatZincCompiler.resolveIntVarOrConst(e: FznExpr): IntVarRef = when
 /** Post a linear relation as a hard [Linear], or a [ReifiedLinear] onto [reifyLit] when non-null
  *  ([reifyLit] is a bool literal; its variable channels the relation's truth). The single lowering
  *  point every `*_lin_*` / linear-compare emitter funnels through, hard or `_reif`. */
-internal fun FlatZincCompiler.postLinear(coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int, reifyLit: Int?) {
+internal fun FlatZincCompiler.postLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long, reifyLit: Int?) {
     factors.add(
         if (reifyLit != null) {
             ReifiedLinear(Lit.variable(reifyLit), coeffs, vars, op, bound)
@@ -56,9 +56,9 @@ internal fun FlatZincCompiler.postLinear(coeffs: IntArray, vars: IntArray, op: L
 
 internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) {
     require(c.args.size == if (reified) 4 else 3)
-    val coeffs = evalIntConstArray(c.args[0])
+    val coeffs = evalIntConstArrayLong(c.args[0])
     val vars = evalIntVarArray(c.args[1])
-    val bound = evalIntConst(c.args[2]).toInt()
+    val bound = evalIntConst(c.args[2])
     val op = when (c.name.removeSuffix("_reif")) {
         "int_lin_le" -> LinearOp.LE
         "int_lin_eq" -> LinearOp.EQ

@@ -12,14 +12,16 @@ import com.eignex.klause.util.LongArrayList
  *  - [boolLits] — literals over real boolean variables (id `< numBoolVars`), [com.eignex.klause.solver.Lit]-encoded.
  *    Boolean var ids are stable across sessions of the same problem, so these travel as-is.
  *  - [atomQuads] — int-bound atom literals, flattened as `[intVar, kind, threshold, sign]` per atom
- *    (`kind` 0 = `≥`, 1 = `≤`, 2 = `=`; `sign` 0 = positive). The importing session re-allocates each
- *    atom in its own space ([PropagationSession.importClause]).
+ *    (`kind` 0 = `≥`, 1 = `≤`, 2 = `=`; `sign` 0 = positive). Stored as `Long` because the atom
+ *    threshold is a domain value that may exceed 32-bit range; `intVar` / `kind` / `sign` are small
+ *    non-negative fields that fit `Long` losslessly. The importing session re-allocates each atom in
+ *    its own space ([PropagationSession.importClause]).
  *
  * Built by [PropagationSession.exportGlueClauses] and consumed by [PropagationSession.importClause].
  */
 class SharedClause internal constructor(
     internal val boolLits: IntArray,
-    internal val atomQuads: IntArray,
+    internal val atomQuads: LongArray,
     internal val lbd: Int,
 ) {
     /** Order-independent content key for pool de-duplication. A hash collision only drops a *share*
@@ -30,8 +32,8 @@ class SharedClause internal constructor(
         var i = 0
         while (i < atomQuads.size) {
             // Pack a quad into one token; bit layout is arbitrary, only equality/order matters.
-            val t = (atomQuads[i].toLong() shl 40) xor (atomQuads[i + 1].toLong() shl 36) xor
-                (atomQuads[i + 2].toLong() shl 4) xor atomQuads[i + 3].toLong()
+            val t = (atomQuads[i] shl 40) xor (atomQuads[i + 1] shl 36) xor
+                (atomQuads[i + 2] shl 4) xor atomQuads[i + 3]
             tokens.add(t)
             i += QUAD
         }

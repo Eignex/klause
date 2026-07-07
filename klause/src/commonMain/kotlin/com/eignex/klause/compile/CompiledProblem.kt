@@ -75,14 +75,14 @@ class CompiledProblem internal constructor(
     }
 
     /** Decode [handle]'s integer value from [sample]. */
-    fun decode(handle: IntHandle, sample: Sample): Int {
+    fun decode(handle: IntHandle, sample: Sample): Long {
         val id = intVarIdByName[handle.name]
             ?: error("No integer variable named '${handle.name}'")
         return sample.ints[id]
     }
 
     /** Decodes an optional integer: `null` when the presence bit is false, the value otherwise. */
-    fun decode(handle: OptIntHandle, sample: Sample): Int? {
+    fun decode(handle: OptIntHandle, sample: Sample): Long? {
         if (!decode(handle.present, sample)) return null
         return decode(handle.value, sample)
     }
@@ -139,7 +139,7 @@ class CompiledProblem internal constructor(
             ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        return spec.realValue(sample.ints[id])
+        return spec.realValue(sample.ints[id].toInt())
     }
 
     /**

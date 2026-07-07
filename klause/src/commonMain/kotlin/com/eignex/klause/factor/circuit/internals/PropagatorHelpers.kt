@@ -47,7 +47,8 @@ internal inline fun PropagationState.circuitReachesAll(
         val u = stack[stack.size - 1]
         stack.removeAt(stack.size - 1)
         if (forward) {
-            intDomains[succ[u]].forEach { v ->
+            intDomains[succ[u]].forEach { vLong ->
+                val v = vLong.toInt()
                 if (arcAllowed(u, v) && !seen[v]) {
                     seen[v] = true
                     if (counts(v)) reached++

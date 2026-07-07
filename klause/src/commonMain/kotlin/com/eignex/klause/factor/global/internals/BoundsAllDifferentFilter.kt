@@ -16,8 +16,8 @@ internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): 
     val n = vars.size
     if (n < 2) return null
 
-    val lo = IntArray(n) { state.intDomains[vars[it]].min }
-    val hi = IntArray(n) { state.intDomains[vars[it]].max }
+    val lo = IntArray(n) { state.intDomains[vars[it]].min.toInt() }
+    val hi = IntArray(n) { state.intDomains[vars[it]].max.toInt() }
     val newLo = lo.copyOf()
     val newHi = hi.copyOf()
 
@@ -28,8 +28,8 @@ internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): 
     if (!changed) return null
     val ant = collectHoleAndBoundAntecedents(state, vars)
     for (i in 0 until n) {
-        if (newLo[i] > lo[i] && !state.tightenIntMin(vars[i], newLo[i], ant)) return vars
-        if (newHi[i] < hi[i] && !state.tightenIntMax(vars[i], newHi[i], ant)) return vars
+        if (newLo[i] > lo[i] && !state.tightenIntMin(vars[i], newLo[i].toLong(), ant)) return vars
+        if (newHi[i] < hi[i] && !state.tightenIntMax(vars[i], newHi[i].toLong(), ant)) return vars
     }
     return null
 }

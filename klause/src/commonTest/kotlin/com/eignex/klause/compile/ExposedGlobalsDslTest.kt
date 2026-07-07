@@ -92,6 +92,6 @@ class ExposedGlobalsDslTest {
             .enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "regular: solver found no sample")
         fun v(n: String) = sample.ints[compiled.intVarIdByName.getValue(n)]
-        assertTrue(v("s1") == 1, "regular: final symbol not accepting (s1=${v("s1")})")
+        assertTrue(v("s1") == 1L, "regular: final symbol not accepting (s1=${v("s1")})")
     }
 }

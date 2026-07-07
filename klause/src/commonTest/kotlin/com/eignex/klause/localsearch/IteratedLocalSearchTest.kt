@@ -96,8 +96,8 @@ class IteratedLocalSearchTest {
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart(initialPerturbationStrength = 3)
-        val s1 = Sample(booleanArrayOf(true, false), intArrayOf())
-        val s2 = Sample(booleanArrayOf(false, true), intArrayOf())
+        val s1 = Sample(booleanArrayOf(true, false), longArrayOf())
+        val s2 = Sample(booleanArrayOf(false, true), longArrayOf())
         policy.onLocalOptimum(state, s1, objective = 10.0)
         policy.onLocalOptimum(state, s2, objective = 5.0)
         policy.onLocalOptimum(state, s1, objective = 10.0)
@@ -120,7 +120,7 @@ class IteratedLocalSearchTest {
             populationSize = 3,
             acceptance = com.eignex.klause.localsearch.AcceptanceCriterion.BetterOrEqual,
         )
-        val s = { obj: Double -> Sample(booleanArrayOf(true, false), intArrayOf()) to obj }
+        val s = { obj: Double -> Sample(booleanArrayOf(true, false), longArrayOf()) to obj }
         policy.onLocalOptimum(state, s(10.0).first, 10.0)
         policy.onLocalOptimum(state, s(8.0).first, 8.0)
         policy.onLocalOptimum(state, s(12.0).first, 12.0)
@@ -146,8 +146,8 @@ class IteratedLocalSearchTest {
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart()
-        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), intArrayOf()), 10.0)
-        policy.onLocalOptimum(state, Sample(booleanArrayOf(false, true), intArrayOf()), 5.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), longArrayOf()), 10.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(false, true), longArrayOf()), 5.0)
         assertEquals(1, policy.incumbents.size, "single-incumbent mode")
         assertEquals(5.0, policy.incumbents[0].objective)
     }
@@ -164,8 +164,8 @@ class IteratedLocalSearchTest {
             crossoverRate = 1.0,
             acceptance = com.eignex.klause.localsearch.AcceptanceCriterion.BetterOrEqual,
         )
-        policy.onLocalOptimum(state, Sample(BooleanArray(8) { true }, IntArray(0)), 10.0)
-        policy.onLocalOptimum(state, Sample(BooleanArray(8) { false }, IntArray(0)), 12.0)
+        policy.onLocalOptimum(state, Sample(BooleanArray(8) { true }, LongArray(0)), 10.0)
+        policy.onLocalOptimum(state, Sample(BooleanArray(8) { false }, LongArray(0)), 12.0)
 
         policy.restart(state, bestSoFar = null)
         val trues = (0 until 8).count { state.assignment.boolValue(it) }
@@ -210,7 +210,7 @@ class IteratedLocalSearchTest {
         for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
 
         val policy = IteratedLocalSearchRestart(populationSize = 3, crossoverRate = 1.0)
-        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, true, true, true), IntArray(0)), 4.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, true, true, true), LongArray(0)), 4.0)
         policy.restart(state, bestSoFar = null)
         assertTrue(state.step == 0L, "restart should reset step")
     }

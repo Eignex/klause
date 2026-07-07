@@ -75,7 +75,7 @@ class FznFunctionalObjectiveTest {
 
     private fun snapshot(state: LocalSearchState, program: FlatZincProgram): Sample {
         val bools = BooleanArray(program.problem.numBoolVars) { state.assignment.boolValue(it) }
-        val ints = IntArray(program.problem.numIntVars) { state.assignment.intValue(it) }
+        val ints = LongArray(program.problem.numIntVars) { state.assignment.intValue(it) }
         return Sample(bools, ints)
     }
 }

@@ -26,12 +26,12 @@ import kotlin.math.floor
  * tightens the search's objective lower bound to the returned value. Bounded by [SHAVE_MAX_ITERS] and
  * [token].
  */
-internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, token: Cancellation): Int? {
+internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, token: Cancellation): Long? {
     if (!ascending || objectiveVar < 0 || lpRelaxer == null) return null
     val root = PropagationSession(problem)
     if (root.isUnsatAtRoot) return null
     var candidate = root.intDomain(objectiveVar).min
-    var improved: Int? = null
+    var improved: Long? = null
     var iters = 0
     while (iters++ < SHAVE_MAX_ITERS && !token()) {
         val s = PropagationSession(problem)
@@ -48,7 +48,7 @@ internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, to
 }
 
 /** A proven-tighter domain for an integer variable from variable shaving: `varId ∈ [lo, hi]`. */
-internal class ShavedBound(val varId: Int, val lo: Int, val hi: Int)
+internal class ShavedBound(val varId: Int, val lo: Long, val hi: Long)
 
 /**
  * Variable shaving: tighten integer variables' domain bounds
@@ -159,7 +159,7 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
         // The difference is an integer in [lo, hi]; when exactly one integer fits, it is pinned to it.
         val cLo = ceil(lo - EQ_PIN_TOL)
         if (cLo != floor(hi + EQ_PIN_TOL) || !cLo.isFinite()) continue
-        out.add(Linear(intArrayOf(c0.toInt(), c1.toInt()), intArrayOf(v0, v1), LinearOp.EQ, cLo.toInt()))
+        out.add(Linear(longArrayOf(c0, c1), intArrayOf(v0, v1), LinearOp.EQ, cLo.toLong()))
     }
     return out
 }
@@ -222,7 +222,7 @@ internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
 /** Whether a fresh root with `v ≤ bound` (or `v ≥ bound` when not [atMost]) is provably infeasible —
  *  propagation Unsat, or an LP infeasibility at an infinite incumbent (so `pruneNode` fires only on a
  *  genuine infeasibility). Sound: a true result proves every solution lies strictly past [bound]. */
-private fun LpEngine.infeasibleUnder(v: Int, bound: Int, atMost: Boolean): Boolean {
+private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean): Boolean {
     val s = PropagationSession(problem)
     if (s.isUnsatAtRoot) return false
     val assumed = if (atMost) s.implyIntAtMost(v, bound) else s.implyIntAtLeast(v, bound)

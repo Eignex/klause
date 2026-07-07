@@ -34,7 +34,7 @@ internal class RegularLinearizer(
         val len = seq.size
         val s = alphabetSize
         val trans = transitions
-        fun delta(state: Int, sym: Int): Int = trans[(state - 1) * s + (sym - 1)] // 1-based; 0 = dead
+        fun delta(state: Int, sym: Long): Int = trans[(state - 1) * s + (sym - 1).toInt()] // 1-based; 0 = dead
         val ns = numStates
 
         val outCols = Array(len) { arrayOfNulls<IntArrayList>(ns + 1) }
@@ -54,12 +54,12 @@ internal class RegularLinearizer(
                     val col = builder.auxColumn(
                         0L,
                         if (live.contains(sym)) 1L else 0L,
-                        presence = intArrayOf(seq[t], sym),
+                        presence = intArrayOf(seq[t], sym.toInt()),
                     )
                     (outCols[t][state] ?: IntArrayList().also { outCols[t][state] = it }).add(col)
                     (inCols[t + 1][nxt] ?: IntArrayList().also { inCols[t + 1][nxt] = it }).add(col)
                     chanCols[t].add(col)
-                    chanSym[t].add(sym)
+                    chanSym[t].add(sym.toInt())
                     if (t == len - 1 && nxt in accepting) acceptCols.add(col)
                 }
             }
@@ -132,7 +132,7 @@ internal class RegularLinearizer(
             reach[t].forEach { state ->
                 dom.forEach { sym ->
                     if (sym in 1..s) {
-                        val nxt = trans[(state - 1) * s + (sym - 1)]
+                        val nxt = trans[(state - 1) * s + (sym - 1).toInt()]
                         if (nxt != 0) {
                             reach[t + 1].add(nxt)
                             arcCount++

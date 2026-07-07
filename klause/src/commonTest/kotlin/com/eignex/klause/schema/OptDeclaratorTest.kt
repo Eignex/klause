@@ -52,7 +52,7 @@ class OptDeclaratorTest {
         // Construct a sample by hand: presence false, value irrelevant.
         val sample = Sample(
             bools = booleanArrayOf(false),
-            ints = intArrayOf(3),
+            ints = longArrayOf(3),
         )
         assertNull(compiled.decode(s.x, sample))
     }
@@ -63,7 +63,7 @@ class OptDeclaratorTest {
         val compiled = s.compile()
         val sample = Sample(
             bools = booleanArrayOf(true),
-            ints = intArrayOf(3),
+            ints = longArrayOf(3),
         )
         assertEquals(3, compiled.decode(s.x, sample))
     }
@@ -187,7 +187,7 @@ class OptNValueTest {
                 if (pb) add(vb)
                 if (pc) add(vc)
             }.size
-            assertEquals(expected, compiled.decode(s.nDistinct, sample))
+            assertEquals(expected.toLong(), compiled.decode(s.nDistinct, sample))
         }
     }
 }
@@ -225,7 +225,7 @@ class OptGccTest {
             val va = sample.ints[compiled.intVarIdByName.getValue("a")]
             val vb = sample.ints[compiled.intVarIdByName.getValue("b")]
             val vc = sample.ints[compiled.intVarIdByName.getValue("c")]
-            val zeros = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 0 }
+            val zeros = listOf(pa to va, pb to vb, pc to vc).count { it.first && it.second == 0L }
             assertTrue(
                 zeros in 1..2,
                 "gcc opt out of range: zeros=$zeros (presents=$pa,$pb,$pc values=$va,$vb,$vc)",
@@ -309,7 +309,17 @@ class OptCumulativeTest {
             val vs = listOf(s.s0, s.s1, s.s2).map { sample.ints[compiled.intVarIdByName.getValue(it.name)] }
             // Reconstruct the usage profile from present tasks; max must be ≤ capacity.
             val usage = IntArray(6)
-            for (i in 0..2) if (ps[i]) for (t in vs[i] until vs[i] + 2) if (t in usage.indices) usage[t]++
+            for (i in 0..2) {
+                if (ps[i]) {
+                    for (t in vs[i].toInt() until vs[i].toInt() + 2) {
+                        if (t in
+                            usage.indices
+                        ) {
+                            usage[t]++
+                        }
+                    }
+                }
+            }
             val peak = usage.max()
             assertTrue(
                 peak <= 2,

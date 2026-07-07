@@ -106,7 +106,9 @@ class GlobalCardinalityPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(inst.xsRanges[it].first, inst.xsRanges[it].second) },
+                intDomains = Array(
+                    n,
+                ) { IntDomain(inst.xsRanges[it].first.toLong(), inst.xsRanges[it].second.toLong()) },
                 factors = arrayOf<Factor>(
                     GlobalCardinality(
                         xs = IntArray(n) { it },
@@ -119,7 +121,7 @@ class GlobalCardinalityPropagatorTest {
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
     }
@@ -156,7 +158,11 @@ class GlobalCardinalityPropagatorTest {
         rec(0)
 
         val doms = Array(k) {
-            if (it < n) IntDomain(xsRange.first, xsRange.second) else IntDomain(cvRange.first, cvRange.second)
+            if (it < n) {
+                IntDomain(xsRange.first.toLong(), xsRange.second.toLong())
+            } else {
+                IntDomain(cvRange.first.toLong(), cvRange.second.toLong())
+            }
         }
         val problem = Problem(
             numBoolVars = 0,
@@ -168,7 +174,7 @@ class GlobalCardinalityPropagatorTest {
         )
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
         val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-            .map { it.ints.toList() }.toHashSet()
+            .map { s -> s.ints.map { it.toInt() } }.toHashSet()
         assertEquals(brute, found, "count-vars backtrack solution set must equal brute force")
     }
 
@@ -192,8 +198,8 @@ class GlobalCardinalityPropagatorTest {
         val sat = assertIs<SolveResult.Sat>(r)
         val xs = (0..4).map { sat.assignment.ints[it] }
         for (k in 0..2) {
-            val expected = xs.count { it == k }
-            assertEquals(expected, sat.assignment.ints[5 + k], "count[$k] mismatch")
+            val expected = xs.count { it == k.toLong() }
+            assertEquals(expected, sat.assignment.ints[5 + k].toInt(), "count[$k] mismatch")
         }
     }
 
@@ -218,7 +224,7 @@ class GlobalCardinalityPropagatorTest {
         val sat = assertIs<SolveResult.Sat>(r)
         val xs = (0..5).map { sat.assignment.ints[it] }
         for (k in 0..2) {
-            val c = xs.count { it == k }
+            val c = xs.count { it == k.toLong() }
             assertTrue(c in 1..3, "count[$k]=$c out of [1, 3]; xs=$xs")
         }
     }
@@ -244,7 +250,7 @@ class GlobalCardinalityPropagatorTest {
         val sat = assertIs<SolveResult.Sat>(r)
         for (i in 0..2) {
             assertTrue(
-                sat.assignment.ints[i] in setOf(1, 2, 3),
+                sat.assignment.ints[i] in setOf(1L, 2L, 3L),
                 "closed gcc: xs[$i] = ${sat.assignment.ints[i]} not in cover",
             )
         }
@@ -334,7 +340,7 @@ class GlobalCardinalityPropagatorTest {
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "GCC+Linear (bound=$bound): solution set must equal brute force")
         }
     }

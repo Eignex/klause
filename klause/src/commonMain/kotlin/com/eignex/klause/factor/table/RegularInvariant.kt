@@ -43,13 +43,13 @@ internal class RegularInvariant(
         return compressViolation(st.distance.toLong(), state.violationSoftCap)
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val st = state.refPayload[factorId] as RegularLsState
         val newDist = distanceWith(state, st, intVar, newValue)
         return compressViolation(newDist.toLong(), state.violationSoftCap) - state.factorDegree[factorId]
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         if (state.assignment.intValue(intVar) == oldValue) return 0
         // Apply is once per accepted move; rebuild both layers (O(n·Q·Σ), the order the old full
         // recompute already cost) so the per-candidate delta stays O(Q·Σ).
@@ -75,7 +75,7 @@ internal class RegularInvariant(
 
     /** Accept distance with [intVar] set to [newValue]. A single-position variable recombines its DP
      *  column in O(Q·Σ); a repeated variable falls back to a full recompute. */
-    private fun distanceWith(state: LocalSearchState, st: RegularLsState, intVar: Int, newValue: Int): Int {
+    private fun distanceWith(state: LocalSearchState, st: RegularLsState, intVar: Int, newValue: Long): Int {
         val positions = positionsByVar[intVar]
         if (positions == null || positions.size != 1) {
             return regularAcceptDistance(seq, numStates, alphabetSize, transitions, q0, acceptingSet) {
@@ -89,11 +89,11 @@ internal class RegularInvariant(
             val fq = st.forward[p][q]
             if (fq >= inf) continue
             for (s in 1..alphabetSize) {
-                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s.toLong())
                 if (nq == 0) continue
                 val bq = st.backward[p + 1][nq]
                 if (bq >= inf) continue
-                val cand = fq + (if (s == newValue) 0 else 1) + bq
+                val cand = fq + (if (s.toLong() == newValue) 0 else 1) + bq
                 if (cand < best) best = cand
             }
         }
@@ -143,7 +143,9 @@ internal class RegularInvariant(
         // can walk straight to feasibility instead of chasing one dead-state fix at a time.
         val target = regularRepairPath(state, seq, numStates, alphabetSize, transitions, q0, acceptingSet) ?: return
         for (i in seq.indices) {
-            if (target[i] != state.assignment.intValue(seq[i])) sink.addChannelingIntSet(state, seq[i], target[i])
+            if (target[i].toLong() != state.assignment.intValue(seq[i])) {
+                sink.addChannelingIntSet(state, seq[i], target[i].toLong())
+            }
         }
     }
 
@@ -171,12 +173,16 @@ internal class RegularInvariant(
             var pick = -1
             var seen = 0
             for (s in 1..alphabetSize) {
-                if (s == cur || s !in d || regularDelta(transitions, numStates, alphabetSize, q, s) != nq) continue
+                if (s.toLong() == cur || s.toLong() !in d ||
+                    regularDelta(transitions, numStates, alphabetSize, q, s.toLong()) != nq
+                ) {
+                    continue
+                }
                 seen++
                 if (state.rng.nextInt(seen) == 0) pick = s
             }
             if (pick == -1) continue
-            sink.addChannelingIntSet(state, seq[i], pick)
+            sink.addChannelingIntSet(state, seq[i], pick.toLong())
             emitted++
         }
     }
@@ -190,7 +196,7 @@ internal class RegularInvariant(
                 if (!fwd[i][q]) continue
                 for (s in 1..alphabetSize) {
                     if (!regularSymbolAllowed(state, seq, i, s)) continue
-                    val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                    val nq = regularDelta(transitions, numStates, alphabetSize, q, s.toLong())
                     if (nq != 0) fwd[i + 1][nq] = true
                 }
             }
@@ -212,7 +218,7 @@ internal class RegularInvariant(
                 if (!fwd[i][q]) continue
                 for (s in 1..alphabetSize) {
                     if (!regularSymbolAllowed(state, seq, i, s)) continue
-                    if (regularDelta(transitions, numStates, alphabetSize, q, s) == t) {
+                    if (regularDelta(transitions, numStates, alphabetSize, q, s.toLong()) == t) {
                         fq = q
                         fs = s
                         break@outer
@@ -224,7 +230,7 @@ internal class RegularInvariant(
             t = fq
         }
         for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(seq[i])) state.assignment.setInt(seq[i], chosen[i])
+            if (!state.assumptions.isFrozenInt(seq[i])) state.assignment.setInt(seq[i], chosen[i].toLong())
         }
         return true
     }
@@ -240,10 +246,10 @@ internal fun buildAcceptingSet(accepting: IntArray): IntHashSet {
 }
 
 /** Look up `δ(state, symbol)` with 1-based addressing. Returns 0 for the dead state. */
-internal fun regularDelta(transitions: IntArray, numStates: Int, alphabetSize: Int, stateQ: Int, symbol: Int): Int {
+internal fun regularDelta(transitions: IntArray, numStates: Int, alphabetSize: Int, stateQ: Int, symbol: Long): Int {
     if (stateQ < 1 || stateQ > numStates) return 0
     if (symbol < 1 || symbol > alphabetSize) return 0
-    return transitions[(stateQ - 1) * alphabetSize + (symbol - 1)]
+    return transitions[(stateQ - 1) * alphabetSize + (symbol - 1).toInt()]
 }
 
 internal fun regularAccepts(
@@ -267,9 +273,9 @@ internal fun regularAccepts(
 internal fun regularSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int, s: Int): Boolean {
     val v = seq[i]
     return if (state.assumptions.isFrozenInt(v)) {
-        state.assignment.intValue(v) == s
+        state.assignment.intValue(v) == s.toLong()
     } else {
-        s in state.problem.intDomains[v]
+        s.toLong() in state.problem.intDomains[v]
     }
 }
 
@@ -281,7 +287,7 @@ internal fun regularAcceptDistance(
     transitions: IntArray,
     q0: Int,
     acceptingSet: IntHashSet,
-    getSym: (Int) -> Int,
+    getSym: (Int) -> Long,
 ): Int {
     val inf = seq.size + 1
     var dp = IntArray(numStates + 1) { inf }
@@ -293,9 +299,9 @@ internal fun regularAcceptDistance(
             val base = dp[q]
             if (base >= inf) continue
             for (sym in 1..alphabetSize) {
-                val nq = regularDelta(transitions, numStates, alphabetSize, q, sym)
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, sym.toLong())
                 if (nq == 0) continue
-                val cost = base + (if (sym == cur) 0 else 1)
+                val cost = base + (if (sym.toLong() == cur) 0 else 1)
                 if (cost < ndp[nq]) ndp[nq] = cost
             }
         }
@@ -334,9 +340,9 @@ internal fun regularRepairPath(
             if (base >= inf) continue
             for (s in 1..alphabetSize) {
                 if (!regularSymbolAllowed(state, seq, i, s)) continue
-                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s.toLong())
                 if (nq == 0) continue
-                val cost = base + if (s == cur) 0 else 1
+                val cost = base + if (s.toLong() == cur) 0 else 1
                 if (cost < dp[i + 1][nq]) {
                     dp[i + 1][nq] = cost
                     parentState[i + 1][nq] = q
@@ -376,7 +382,7 @@ internal fun regularForwardLayers(
     alphabetSize: Int,
     transitions: IntArray,
     q0: Int,
-    getSym: (Int) -> Int,
+    getSym: (Int) -> Long,
 ): Array<IntArray> {
     val inf = n + 1
     val fwd = Array(n + 1) { IntArray(numStates + 1) { inf } }
@@ -387,9 +393,9 @@ internal fun regularForwardLayers(
             val base = fwd[i][q]
             if (base >= inf) continue
             for (s in 1..alphabetSize) {
-                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s.toLong())
                 if (nq == 0) continue
-                val cost = base + (if (s == cur) 0 else 1)
+                val cost = base + (if (s.toLong() == cur) 0 else 1)
                 if (cost < fwd[i + 1][nq]) fwd[i + 1][nq] = cost
             }
         }
@@ -405,7 +411,7 @@ internal fun regularBackwardLayers(
     alphabetSize: Int,
     transitions: IntArray,
     acceptingSet: IntHashSet,
-    getSym: (Int) -> Int,
+    getSym: (Int) -> Long,
 ): Array<IntArray> {
     val inf = n + 1
     val bwd = Array(n + 1) { IntArray(numStates + 1) { inf } }
@@ -415,9 +421,9 @@ internal fun regularBackwardLayers(
         for (q in 1..numStates) {
             var best = inf
             for (s in 1..alphabetSize) {
-                val nq = regularDelta(transitions, numStates, alphabetSize, q, s)
+                val nq = regularDelta(transitions, numStates, alphabetSize, q, s.toLong())
                 if (nq == 0) continue
-                val c = (if (s == cur) 0 else 1) + bwd[i + 1][nq]
+                val c = (if (s.toLong() == cur) 0 else 1) + bwd[i + 1][nq]
                 if (c < best) best = c
             }
             bwd[i][q] = best

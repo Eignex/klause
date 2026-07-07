@@ -58,7 +58,7 @@ interface Invariant {
     fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
 
     /** Δ violation-degree if [intVar] were set to [newValue], without mutating state. */
-    fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int = 0
+    fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int = 0
 
     /**
      * Apply a committed move to this factor's payload. The assignment has already been
@@ -69,7 +69,7 @@ interface Invariant {
     fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
 
     /** Apply a committed int-set of [intVar] from [oldValue]; returns the Δ violation-degree. */
-    fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+    fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int = 0
 
     /**
      * Suggest moves that would (or might) repair this factor when violated. The default lists
@@ -81,8 +81,8 @@ interface Invariant {
         for (i in state.problem.factors[factorId].intVars) {
             val cur = state.assignment.intValue(i)
             val d = state.problem.intDomains[i]
-            if (cur < d.max) sink.addChannelingIntSet(state, i, cur + 1)
-            if (cur > d.min) sink.addChannelingIntSet(state, i, cur - 1)
+            if (cur < d.max) sink.addChannelingIntSet(state, i, cur + 1L)
+            if (cur > d.min) sink.addChannelingIntSet(state, i, cur - 1L)
         }
     }
 
@@ -137,8 +137,8 @@ interface Invariant {
         state: LocalSearchState,
         factorId: Int,
         intVar: Int,
-        oldValue: Int,
-        newValue: Int,
+        oldValue: Long,
+        newValue: Long,
         sink: ChannelingSink,
     ) {}
 
@@ -203,7 +203,7 @@ interface Invariant {
      *  after this factor's own [applyIntSet] has run. Only invoked when
      *  [maintainsIntBreakMakeIncrementallyForIntSet] is true. Net adjustment must equal
      *  the brute-force "subtract pre-set per-bool deltas, add post-set" pattern. */
-    fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int) {}
+    fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long) {}
 }
 
 /**

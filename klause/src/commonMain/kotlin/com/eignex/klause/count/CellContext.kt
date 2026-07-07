@@ -29,9 +29,9 @@ internal class CellContext private constructor(
     private val baseNumIntVars: Int,
 ) {
     /** Projection key of an enumerated [model]: chosen Boolean values (0/1) then integer values. */
-    fun projectionKey(model: Sample): List<Int> {
-        val key = ArrayList<Int>(boolSet.size + intSet.size)
-        for (v in boolSet) key.add(if (model.bools[v]) 1 else 0)
+    fun projectionKey(model: Sample): List<Long> {
+        val key = ArrayList<Long>(boolSet.size + intSet.size)
+        for (v in boolSet) key.add(if (model.bools[v]) 1L else 0L)
         for (v in intSet) key.add(model.ints[v])
         return key
     }
@@ -63,7 +63,7 @@ internal class CellContext private constructor(
         // For hashed cells, cap+1 models decide ">cap" while staying out of the exhaustion tail; the
         // un-hashed base has no parity slices and must be enumerated fully for an exact projected count.
         val models = if (hashes.isEmpty()) enumeration else enumeration.take(cap + 1)
-        val reps = LinkedHashMap<List<Int>, Sample>()
+        val reps = LinkedHashMap<List<Long>, Sample>()
         for (model in models) {
             val key = projectionKey(model)
             if (key !in reps) {

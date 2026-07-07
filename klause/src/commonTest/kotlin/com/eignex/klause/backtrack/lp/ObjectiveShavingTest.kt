@@ -94,7 +94,7 @@ class ObjectiveShavingTest {
             val n = rng.nextInt(2, 5)
             val cap = n // cost domain [0, n]
             // cost = Σ xᵢ over {0,1}ⁿ, with random covering rows; minimize cost.
-            val domains = Array(n + 1) { if (it < n) IntDomain(0, 1) else IntDomain(0, cap) }
+            val domains = Array(n + 1) { if (it < n) IntDomain(0, 1) else IntDomain(0, cap.toLong()) }
             val factors = ArrayList<Factor>()
             factors.add(Linear(IntArray(n + 1) { if (it < n) 1 else -1 }, IntArray(n + 1) { it }, LinearOp.EQ, 0))
             repeat(rng.nextInt(1, n)) {
@@ -146,7 +146,7 @@ class ObjectiveShavingTest {
         repeat(300) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
-            val domains = Array(n) { IntDomain(0, hi) }
+            val domains = Array(n) { IntDomain(0, hi.toLong()) }
             val factors = ArrayList<Factor>()
             repeat(rng.nextInt(1, 4)) { _ ->
                 val coeffs = LongArray(n) { rng.nextInt(-2, 3).toLong() }

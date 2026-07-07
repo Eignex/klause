@@ -45,7 +45,7 @@ class LpBranchingTest {
 
         val ordered = hints.order(VarRef.IntVar(0), sequenceOf(0, 1, 2, 3, 4, 5)).toList()
         // round(2/3)=1 first; ties (0,2 both dist 1) keep input order.
-        assertEquals(listOf(1, 0, 2, 3, 4, 5), ordered)
+        assertEquals(listOf(1L, 0L, 2L, 3L, 4L, 5L), ordered)
     }
 
     @Test
@@ -73,7 +73,7 @@ class LpBranchingTest {
     @Test
     fun `order is a no-op without a hint`() {
         val hints = LpHints(2, 0)
-        assertEquals(listOf(5, 0, 3), hints.order(VarRef.IntVar(1), sequenceOf(5, 0, 3)).toList())
+        assertEquals(listOf(5L, 0L, 3L), hints.order(VarRef.IntVar(1), sequenceOf(5, 0, 3)).toList())
     }
 
     @Test

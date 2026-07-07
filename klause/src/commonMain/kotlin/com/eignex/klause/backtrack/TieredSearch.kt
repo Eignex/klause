@@ -87,8 +87,8 @@ class TieredVariableSelector(
             TierVarSelect.RandomOrder -> randomFree(tier, session, rng)
             TierVarSelect.SmallestDomain -> bestFree(tier, session) { size, _, _ -> -size.toLong() }
             TierVarSelect.LargestDomain -> bestFree(tier, session) { size, _, _ -> size.toLong() }
-            TierVarSelect.SmallestLowerBound -> bestFree(tier, session) { _, min, _ -> -min.toLong() }
-            TierVarSelect.LargestUpperBound -> bestFree(tier, session) { _, _, max -> max.toLong() }
+            TierVarSelect.SmallestLowerBound -> bestFree(tier, session) { _, min, _ -> -min }
+            TierVarSelect.LargestUpperBound -> bestFree(tier, session) { _, _, max -> max }
             TierVarSelect.MaxRegret -> maxRegretFree(tier, session)
         }
 
@@ -97,11 +97,11 @@ class TieredVariableSelector(
      *  needs the second-smallest *value*, which [bestFree]'s `(size, min, max)` score can't see. */
     private fun maxRegretFree(tier: SearchTier, session: PropagationSession): VarRef? {
         var best: VarRef? = null
-        var bestRegret = Int.MIN_VALUE
+        var bestRegret = Long.MIN_VALUE
         for (v in tier.boolVars) {
-            if (session.boolValue(v) == null && 1 > bestRegret) {
+            if (session.boolValue(v) == null && 1L > bestRegret) {
                 best = VarRef.Bool(v)
-                bestRegret = 1
+                bestRegret = 1L
             }
         }
         for (v in tier.intVars) {
@@ -134,13 +134,13 @@ class TieredVariableSelector(
     private inline fun bestFree(
         tier: SearchTier,
         session: PropagationSession,
-        score: (size: Int, min: Int, max: Int) -> Long,
+        score: (size: Int, min: Long, max: Long) -> Long,
     ): VarRef? {
         var best: VarRef? = null
         var bestScore = Long.MIN_VALUE
         for (v in tier.boolVars) {
             if (session.boolValue(v) != null) continue
-            val s = score(2, 0, 1)
+            val s = score(2, 0L, 1L)
             if (s > bestScore) {
                 bestScore = s
                 best = VarRef.Bool(v)
@@ -201,11 +201,11 @@ class TieredValueSelector(
         return if (owner == 0) fallback else tiers[owner - 1].valueSelector
     }
 
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =
         selectorFor(varRef).values(session, varRef, rng)
 
-    override fun onConflict(varRef: VarRef, value: Int) = selectorFor(varRef).onConflict(varRef, value)
-    override fun onCommit(varRef: VarRef, value: Int) = selectorFor(varRef).onCommit(varRef, value)
+    override fun onConflict(varRef: VarRef, value: Long) = selectorFor(varRef).onConflict(varRef, value)
+    override fun onCommit(varRef: VarRef, value: Long) = selectorFor(varRef).onCommit(varRef, value)
 
     override fun onRestart() {
         for (tier in tiers) tier.valueSelector.onRestart()
