@@ -5,8 +5,6 @@ import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
-import com.eignex.klause.lp.Linearizer
-import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -109,23 +107,15 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 
     override val boolVars: IntArray = EmptyIntArray
 
+    override val extendsObjectiveCone: Boolean = true
+
     override fun asPropagator(): Propagator = LinearPropagator(boolVars, intVars, coeffs, vars, op, bound)
 
     override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
 
-    // Relaxation/presolve views (LP linearizer, exact linear row) stay 32-bit. A Linear whose
-    // coefficients or bound exceed Int range is simply not surfaced to them — sound, since the
-    // propagator/invariant above still enforce it; the relaxation just omits this row.
-    override fun asLinearizer(): Linearizer = if (fitsInt32(
-            coeffs,
-            bound,
-        )
-    ) {
-        LinearLinearizer(op, vars, IntArray(coeffs.size) { coeffs[it].toInt() }, bound.toInt())
-    } else {
-        NoLinearizer
-    }
-
+    // Relaxation/presolve views (LP linearizer via the Factor default, exact linear row) stay 32-bit. A
+    // Linear whose coefficients or bound exceed Int range is simply not surfaced to them — sound, since
+    // the propagator/invariant above still enforce it; the relaxation just omits this row.
     override fun linearRows(): List<LinearRow>? = if (fitsInt32(
             coeffs,
             bound,
@@ -138,7 +128,7 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 }
 
 /** True when every coefficient and the bound fit 32-bit range — the precondition for narrowing a wide
- *  [Linear]/[ReifiedLinear] to an Int-coefficient [LinearRow]/[Linearizer] relaxation view. */
+ *  [Linear]/[ReifiedLinear] to an Int-coefficient [LinearRow] relaxation view. */
 internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
     bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
         coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }

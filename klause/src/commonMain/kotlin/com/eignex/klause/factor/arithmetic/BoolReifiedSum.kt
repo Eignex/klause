@@ -8,7 +8,7 @@ import com.eignex.klause.solver.Lit
  * The Boolean fan-in of a reified weighted sum folded over its LP columns: `Σ coeffs·x_col + constant`,
  * with the declared `[lMin, lMax]` range of the `Σ coeffs·x_col` part over `x ∈ [0,1]`. A negative
  * literal `w·(1 − x)` folds to coefficient `−w` and `+w` into the constant. Shared by the reified
- * Boolean linearizers ([ReifiedPseudoBooleanLinearizer], [ReifiedCardinalityLinearizer]).
+ * Boolean `linearize` of [ReifiedPseudoBoolean] and [ReifiedCardinality].
  */
 internal class BoolReifiedSum private constructor(
     private val cols: IntArray,

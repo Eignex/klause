@@ -421,11 +421,11 @@ internal class LpEngine(
 
     /**
      * Drop each convex hull that adds no strength to the root LP optimum, rebuilding the relaxer once
-     * over the survivors. Per-factor hulls (every factor whose [com.eignex.klause.lp.Linearizer]
+     * over the survivors. Per-factor hulls (every factor whose [com.eignex.klause.solver.Factor.linearize]
      * emits a [com.eignex.klause.lp.Contribution.HULL] row) are pruned individually: each is solved
      * out in turn and kept only if its removal loosens the optimum, so two factors of the same family
      * are judged separately. The non-per-factor hulls (cumulative time-indexed, diffn, Boolean RLT) are
-     * emitted by the driver, not a Linearizer, so they carry no per-factor tag and are pruned by whole
+     * emitted by the driver, not a factor, so they carry no per-factor tag and are pruned by whole
      * family. A hull whose removal leaves the optimum unchanged (often because root propagation already
      * achieves the same bound) is pure per-node build cost and is dropped. This is the per-technique
      * counterpart of [LpEffortLadder]'s whole-simplex demotion, decided once before the persistent base

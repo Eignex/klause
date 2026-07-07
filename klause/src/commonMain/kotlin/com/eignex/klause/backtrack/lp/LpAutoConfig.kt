@@ -23,11 +23,11 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.schedulingViews
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 
 /**
@@ -256,15 +256,15 @@ object LpAutoConfig {
         } else {
             buildList {
                 fun admit(e: HullEstimate?) = e?.let { if (hullAdmitted(config, it)) add(it) }
-                // Per-factor hull sizes come from each factor's Linearizer.sizeEstimate (single source with
+                // Per-factor hull sizes come from each factor's lpSizeEstimate (single source with
                 // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
                 if (circuit) admit(circuitEstimate(problem))
-                if (constArrayElement) admit(hullEstimate(problem, LpTechnique.ELEMENT) { it is Element })
-                if (table) admit(hullEstimate(problem, LpTechnique.TABLE) { it is Table })
-                if (nValue) admit(hullEstimate(problem, LpTechnique.NVALUE) { it is NValue })
-                if (regular) admit(hullEstimate(problem, LpTechnique.REGULAR) { it is Regular })
-                if (mdd) admit(hullEstimate(problem, LpTechnique.MDD) { it is Mdd })
-                if (gccCount) admit(hullEstimate(problem, LpTechnique.GCC_COUNT) { it is GlobalCardinality })
+                if (constArrayElement) admit(hullEstimate(problem, LpTechnique.ELEMENT, HullFamily.ELEMENT))
+                if (table) admit(hullEstimate(problem, LpTechnique.TABLE, HullFamily.TABLE))
+                if (nValue) admit(hullEstimate(problem, LpTechnique.NVALUE, HullFamily.NVALUE))
+                if (regular) admit(hullEstimate(problem, LpTechnique.REGULAR, HullFamily.REGULAR))
+                if (mdd) admit(hullEstimate(problem, LpTechnique.MDD, HullFamily.MDD))
+                if (gccCount) admit(hullEstimate(problem, LpTechnique.GCC_COUNT, HullFamily.GCC_COUNT))
                 if (scheduling) admit(timeIndexedEstimate(problem))
             }
         }
@@ -394,16 +394,16 @@ object LpAutoConfig {
         return if (any) HullEstimate(LpTechnique.CIRCUIT, cols, rows) else null
     }
 
-    /** The aggregate hull size of every factor matching [applies] (one per-factor convex-hull family),
-     *  summing each factor's own [com.eignex.klause.lp.Linearizer.sizeEstimate] — the single source
-     *  shared with the build, so the gating estimate cannot drift from the rows actually emitted. */
-    private fun hullEstimate(problem: Problem, technique: LpTechnique, applies: (Factor) -> Boolean): HullEstimate? {
+    /** The aggregate hull size of every factor in the [family] convex-hull family, summing each factor's
+     *  own [com.eignex.klause.solver.Factor.lpSizeEstimate] — the single source shared with the build, so
+     *  the gating estimate cannot drift from the rows actually emitted. */
+    private fun hullEstimate(problem: Problem, technique: LpTechnique, family: HullFamily): HullEstimate? {
         var cols = 0L
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            if (!applies(f)) continue
-            val e = f.asLinearizer().sizeEstimate(problem.intDomains) ?: continue
+            if (f.hullFamily != family) continue
+            val e = f.lpSizeEstimate(problem.intDomains) ?: continue
             cols += e.cols
             rows += e.rows
             any = true

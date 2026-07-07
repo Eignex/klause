@@ -1,37 +1,75 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
-
 /**
- * A factor's contribution to the LP relaxation — the LP-engine analogue of [Propagator] (the CP
- * engine) and [Invariant] (the local-search engine). A factor with linear structure returns one
- * from [Factor.asLinearizer]; factors with no linear relaxation keep the [NoLinearizer] default and
- * emit nothing.
- *
- * The relaxation driver calls [linearize] once per relaxation build, passing the [RelaxationBuilder]
- * the factor emits into and the factor's index in [Problem.factors] as `factorId`. A single
- * linearize pass may mix [Contribution.CORE] and [Contribution.HULL] rows — the kind is chosen per
- * row at emit time, not per factor.
+ * A gated convex-hull family a factor's LP relaxation can belong to. A factor names its family once via
+ * [com.eignex.klause.solver.Factor.hullFamily]; the relaxation driver gates it with [HullFlags] and the
+ * LP auto-config groups factors by it — so neither pattern-matches the concrete factor type.
  */
-interface Linearizer {
-    /** Emit this factor's rows, columns, and auxiliary variables into [builder]. Default: nothing. */
-    fun linearize(builder: RelaxationBuilder, factorId: Int) {}
+enum class HullFamily {
+    /** Constant-array Element one-hot selector hull. */
+    ELEMENT,
 
-    /**
-     * An upper-bound estimate of the LP columns and rows this factor's convex-hull contribution would
-     * add under the declared [domains], or null when it contributes no sized hull — over its size cap,
-     * no applicable structure, or no hull at all. The LP auto-config sums these to keep the per-node
-     * tableau under budget, so the estimate must track [linearize]'s own caps and structure (the two
-     * live in the same class so they stay in step). Default: null.
-     */
-    fun sizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? = null
+    /** Table per-tuple selector hull. */
+    TABLE,
+
+    /** NValue one-hot value hull. */
+    NVALUE,
+
+    /** Regular layer-expanded DFA flow hull. */
+    REGULAR,
+
+    /** Mdd layered flow hull. */
+    MDD,
+
+    /** Count-variable GlobalCardinality one-hot selector hull. */
+    GCC_COUNT,
+
+    /** ArrayMinMax tight face (Anderson big-M) on top of the envelope. */
+    ARRAY_MIN_MAX,
+
+    /** Product McCormick envelope. */
+    PRODUCT,
 }
 
-/** The LP columns and rows a [Linearizer.sizeEstimate] predicts its hull adds (upper bounds). */
+/**
+ * The per-family convex-hull switches for one relaxation build — each names a gated hull the driver
+ * ([com.eignex.klause.lp.relaxation.CpToLpRelaxation]) can turn on. A factor's
+ * [com.eignex.klause.solver.Factor.hullFamilyEnabled] reads its own family's flag through [enabled]; the
+ * driver owns the values (from its plan) and never pattern-matches the factor type to pick one.
+ */
+class HullFlags(
+    /** Constant-array Element one-hot selector hull. */
+    val element: Boolean,
+    /** Table per-tuple selector hull. */
+    val table: Boolean,
+    /** NValue one-hot value hull. */
+    val nValue: Boolean,
+    /** Regular layer-expanded DFA flow hull. */
+    val regular: Boolean,
+    /** Mdd layered flow hull. */
+    val mdd: Boolean,
+    /** Count-variable GlobalCardinality one-hot selector hull. */
+    val gccCount: Boolean,
+    /** ArrayMinMax tight face (Anderson big-M) on top of the envelope. */
+    val arrayMinMax: Boolean,
+    /** Product McCormick envelope. */
+    val product: Boolean,
+) {
+    /** Whether [family]'s hull is switched on this build. */
+    fun enabled(family: HullFamily): Boolean = when (family) {
+        HullFamily.ELEMENT -> element
+        HullFamily.TABLE -> table
+        HullFamily.NVALUE -> nValue
+        HullFamily.REGULAR -> regular
+        HullFamily.MDD -> mdd
+        HullFamily.GCC_COUNT -> gccCount
+        HullFamily.ARRAY_MIN_MAX -> arrayMinMax
+        HullFamily.PRODUCT -> product
+    }
+}
+
+/** The LP columns and rows a factor's [com.eignex.klause.solver.Factor.lpSizeEstimate] predicts its
+ *  hull adds (upper bounds). */
 class LinearizerEstimate(
     /** Upper bound on the LP columns the hull contribution adds. */
     val cols: Long,
@@ -52,6 +90,3 @@ enum class Contribution {
     /** A bound-strengthening row the root pruner may drop when it adds no strength. */
     HULL,
 }
-
-/** The default [Linearizer] for factors with no linear relaxation: contributes nothing. */
-object NoLinearizer : Linearizer

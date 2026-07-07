@@ -2,12 +2,10 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.IntDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LinearLinearizerTest {
@@ -66,7 +64,7 @@ class LinearLinearizerTest {
         val linear = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 5)
         val builder = RecordingBuilder()
 
-        linear.asLinearizer().linearize(builder, factorId = 0)
+        linear.linearize(builder, factorId = 0)
 
         assertEquals(1, builder.rows.size)
         assertEquals(LinearOp.LE, builder.rows[0].op)
@@ -81,8 +79,7 @@ class LinearLinearizerTest {
         val allDifferent = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)
         val builder = RecordingBuilder()
 
-        assertSame(NoLinearizer, allDifferent.asLinearizer())
-        allDifferent.asLinearizer().linearize(builder, factorId = 0)
+        allDifferent.linearize(builder, factorId = 0)
         assertTrue(builder.rows.isEmpty())
     }
 }

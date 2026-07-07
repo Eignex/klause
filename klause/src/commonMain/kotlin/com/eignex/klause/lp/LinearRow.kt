@@ -9,7 +9,7 @@ import com.eignex.klause.solver.Factor
  * over the linear content of *any* factor uniformly instead of pattern-matching the concrete
  * [com.eignex.klause.factor.arithmetic.Linear] type.
  *
- * Distinct from a [Linearizer] relaxation row: a [LinearRow] is **solution-set exact** for its
+ * Distinct from a [Factor.linearize] relaxation row: a [LinearRow] is **solution-set exact** for its
  * originating factor (see [Factor.linearRows]); a relaxation row may be a superset.
  */
 class LinearRow(

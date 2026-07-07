@@ -1,17 +1,20 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.lp.HullFamily
+import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LinearRow
-import com.eignex.klause.lp.Linearizer
-import com.eignex.klause.lp.NoLinearizer
+import com.eignex.klause.lp.LinearizerEstimate
+import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 
 /**
  * Structural contract for a constraint in [Problem]: variable membership, remapping, and
- * structural identity. The deductive half is [Propagator] (returned by [asPropagator]), the
- * local-search half is [Invariant] (returned by [asInvariant]), and the LP-relaxation half is
- * [Linearizer] (returned by [asLinearizer]); each is a separate object whose allocation is deferred
- * to when the corresponding engine is initialised.
+ * structural identity. The deductive half is [Propagator] (returned by [asPropagator]) and the
+ * local-search half is [Invariant] (returned by [asInvariant]); each is a separate object whose
+ * allocation is deferred to when the corresponding engine is initialised, because it carries the
+ * engine's per-constraint state and precomputed structures. The LP-relaxation half needs no such
+ * state, so it is emitted directly by [linearize] rather than through a factory object.
  *
  * Variables touched by a factor split into two id spaces: Boolean vars in [boolVars] and
  * integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty; pure-integer factors
@@ -108,6 +111,16 @@ interface Factor {
     fun isValueAnonymous(): Boolean = false
 
     /**
+     * Whether this factor extends the LP **objective cone** (#571): it emits feasibility-defining
+     * (CORE) linear or Boolean rows that connect its variables, so the minimal linear+Boolean
+     * sub-relaxation grows through it. Big-M reified factors (whose rows are dropped in cone mode) and
+     * hard globals (which contribute no CORE rows there) return the default `false`, keeping them out
+     * of the cone. Read only when building the cone relaxation, to decide membership without matching
+     * the concrete factor type.
+     */
+    val extendsObjectiveCone: Boolean get() = false
+
+    /**
      * A copy of this factor with every *value-dependent constant* relabeled through [valueMap]
      * (`newValue = valueMap(oldValue)`) — the value analog of [remap]. Relabels things that
      * name domain values: an [com.eignex.klause.factor.global.GlobalCardinality] cover, a
@@ -147,7 +160,7 @@ interface Factor {
      * variables, or `null` (the default) when the factor has no exact linear form. "Exact" means the
      * conjunction of the returned rows accepts exactly the assignments this factor accepts — it *is*
      * the constraint, not a relaxation. A factor whose only linear form is a relaxation (big-M,
-     * convex hull) must return `null` here and expose that through [asLinearizer] instead.
+     * convex hull) must return `null` here and expose that through [linearize] instead.
      *
      * Lets presolve analyses (redundancy, domination) read the linear content of any factor
      * uniformly instead of pattern-matching the concrete
@@ -162,8 +175,47 @@ interface Factor {
     /** The [Invariant] the LS engine uses for this constraint. */
     fun asInvariant(): Invariant
 
-    /** The [Linearizer] the LP engine uses for this constraint. Default: [NoLinearizer] (no relaxation). */
-    fun asLinearizer(): Linearizer = NoLinearizer
+    /**
+     * Emit this factor's LP-relaxation rows, columns, and auxiliary variables into [builder] — the
+     * LP-engine analogue of [asPropagator] / [asInvariant], but a stateless emitter rather than a
+     * factory object. The driver calls it once per relaxation build, passing the factor's index in
+     * [Problem.factors] as [factorId]. A single pass may mix [com.eignex.klause.lp.Contribution.CORE]
+     * and [com.eignex.klause.lp.Contribution.HULL] rows — the kind is chosen per row at emit time.
+     *
+     * An exact linear row *is* the tightest valid relaxation, so the default emits the factor's
+     * [linearRows] when it exposes one; a factor whose only linear form is a relaxation (big-M, convex
+     * hull) returns `null` from [linearRows] and overrides this to emit that relaxation. Default when
+     * neither applies: nothing (no relaxation).
+     */
+    fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        linearRows()?.forEach { builder.linearRow(it.op, it.vars, it.coeffs, it.bound) }
+    }
+
+    /**
+     * An upper-bound estimate of the LP columns and rows this factor's convex-hull contribution would
+     * add under the declared [domains], or `null` when it contributes no sized hull — over its size cap,
+     * no applicable structure, or no hull at all. The LP auto-config sums these to keep the per-node
+     * tableau under budget, so the estimate must track [linearize]'s own caps and structure. Default: `null`.
+     */
+    fun lpSizeEstimate(@Suppress("UNUSED_PARAMETER") domains: Array<IntDomain>): LinearizerEstimate? = null
+
+    /**
+     * The gated convex-hull family this factor's [linearize] contributes to, or `null` (default) when it
+     * has no gated hull. Named once here and used both by [hullFamilyEnabled] (the relaxation driver's
+     * per-build gate) and by the LP auto-config (which groups factors by family), so neither place
+     * pattern-matches the concrete factor type.
+     */
+    val hullFamily: HullFamily? get() = null
+
+    /**
+     * Whether this factor's convex-hull family is switched on by the relaxation's [flags] for this
+     * build. Derived from [hullFamily]: a hull-emitting factor's family flag, else `true` (a factor with
+     * no gated hull emits no [com.eignex.klause.lp.Contribution.HULL] rows, so the flag never applies).
+     * The driver combines this with the build-level cone and per-factor suppression gates and exposes the
+     * result through [RelaxationBuilder.hullEnabled], which [linearize] consults before allocating its
+     * hull columns and rows.
+     */
+    fun hullFamilyEnabled(flags: HullFlags): Boolean = hullFamily?.let(flags::enabled) ?: true
 }
 
 /**

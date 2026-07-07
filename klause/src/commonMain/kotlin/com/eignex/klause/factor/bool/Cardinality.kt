@@ -1,9 +1,10 @@
 package com.eignex.klause.factor.bool
 
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -40,11 +41,17 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
 
     override val boolVars: IntArray = literals.litVars()
 
+    override val extendsObjectiveCone: Boolean = true
+
     override fun asPropagator(): Propagator = CardinalityPropagator(boolVars, intVars, literals, min, max)
 
     override fun asInvariant(): Invariant = CardinalityInvariant(boolVars, literals, min, max)
 
-    override fun asLinearizer(): Linearizer = CardinalityLinearizer(literals, min, max)
+    /** LP relaxation: the feasibility-defining bounds `min ≤ Σ literals ≤ max`. */
+    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = min.toLong())
+        builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())
+    }
 
     /** Factory methods for this factor. */
     companion object {

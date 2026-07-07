@@ -4,10 +4,10 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.IntDomain
 
 /**
- * The sink a [Linearizer] emits its LP relaxation into. A factor states linear constraints over the
- * problem's integer variables by raw id; the driver behind this interface maps each variable to its
- * LP column, caps the model, and tracks row provenance — a [Linearizer] never touches the underlying
- * tableau.
+ * The sink a factor's [com.eignex.klause.solver.Factor.linearize] emits its LP relaxation into. A factor
+ * states linear constraints over the problem's integer variables by raw id; the driver behind this
+ * interface maps each variable to its LP column, caps the model, and tracks row provenance — a factor
+ * never touches the underlying tableau.
  */
 interface RelaxationBuilder {
     /**
