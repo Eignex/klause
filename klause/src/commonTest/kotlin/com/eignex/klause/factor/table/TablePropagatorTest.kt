@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.intdomain.SurvivorsDomain
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,6 +35,27 @@ class TablePropagatorTest {
             .toList()
             .toSet()
         assertEquals(setOf(listOf(0, 1), listOf(2, 3)), results)
+    }
+
+    @Test
+    fun `enumerates allowed tuples over values beyond Int range`() {
+        // Two vars over the wide set domain {0, 5e9} (span > 2^31, small cardinality — a float-scaled
+        // bucket table). Allowed: (0, 5e9), (5e9, 0). The span-sized bitset support map cannot represent
+        // this span; the value-keyed path must prune soundly instead of truncating the value offset.
+        val b = 5_000_000_000L
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { SurvivorsDomain(0, b, longArrayOf(0, b)) },
+            factors = arrayOf<Factor>(
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, b, b, 0)),
+            ),
+        )
+        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+            .map { it.ints.toList() }
+            .toList()
+            .toSet()
+        assertEquals(setOf(listOf(0L, b), listOf(b, 0L)), results)
     }
 
     @Test

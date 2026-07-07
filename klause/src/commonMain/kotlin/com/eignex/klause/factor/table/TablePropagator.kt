@@ -5,6 +5,8 @@ import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
 
 /** CP propagator for [Table]. Constructed by [Table.asPropagator]. */
 internal class TablePropagator(
@@ -42,6 +44,21 @@ internal class TablePropagator(
         }
         val dirty = state.drainIntEventDirtyVars(factorId)
         if (s.started && dirty.isEmpty()) return true
+        // The bitset support map is indexed by (value − lo) and sized to the column span, which only
+        // works when every column's domain is within Int range and its span is modest. A wider column
+        // (a float-scaled table) takes the value-keyed path, which carries no span dependency.
+        val bitsetEligible = (0 until arity).all { col ->
+            val d = state.intDomains[xs[col]]
+            d.min >= Int.MIN_VALUE.toLong() && d.max <= Int.MAX_VALUE.toLong() && d.max - d.min < MAX_BITSET_SPAN
+        }
+        val ok = if (bitsetEligible) propagateBitset(state, s) else propagateWide(state, s)
+        if (ok) s.started = true
+        return ok
+    }
+
+    /** STR2 sweep + support filtering with a per-column span-sized bitset — the fast path for columns
+     *  whose domain is within Int range and narrow ([MAX_BITSET_SPAN]). */
+    private fun propagateBitset(state: PropagationState, s: TableStr2State): Boolean {
         val lo = LongArray(arity)
         val hi = LongArray(arity)
         val supportBits = arrayOfNulls<LongArray>(arity)
@@ -120,7 +137,68 @@ internal class TablePropagator(
                 if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
             }
         }
-        s.started = true
         return true
+    }
+
+    /** STR2 sweep + support filtering with a value-keyed support set per column — the path for columns
+     *  whose domain is outside Int range or too wide for a span-sized bitset. Support membership is by
+     *  value, so a tuple value beyond Int range prunes soundly; the bound tightening uses the min/max
+     *  supported value directly. (A column over a *contiguous* wide domain still enumerates it in the
+     *  removal sweep below; the realistic wide case is a small-cardinality set domain — a bucket table.) */
+    private fun propagateWide(state: PropagationState, s: TableStr2State): Boolean {
+        val supported = Array(arity) { LongHashSet(numTuples) }
+        val minSup = LongArray(arity) { Long.MAX_VALUE }
+        val maxSup = LongArray(arity) { Long.MIN_VALUE }
+        var i = 0
+        while (i < s.numValid) {
+            val row = s.validTuples[i]
+            var feasible = true
+            for (col in 0 until arity) {
+                val v = tuples[row * arity + col]
+                if (v !in state.intDomains[xs[col]]) {
+                    feasible = false
+                    break
+                }
+            }
+            if (!feasible) {
+                val last = s.numValid - 1
+                if (i != last) {
+                    s.validTuples[i] = s.validTuples[last]
+                    s.validTuples[last] = row
+                }
+                s.numValid = last
+            } else {
+                for (col in 0 until arity) {
+                    val v = tuples[row * arity + col]
+                    supported[col].add(v)
+                    if (v < minSup[col]) minSup[col] = v
+                    if (v > maxSup[col]) maxSup[col] = v
+                }
+                i++
+            }
+        }
+        if (s.numValid == 0) return false
+        val ant = collectHoleAndBoundAntecedents(state, xs)
+        for (col in 0 until arity) {
+            // Every surviving tuple contributed to every column, so numValid > 0 leaves each column with
+            // at least one supported value (minSup/maxSup are set).
+            if (!state.tightenIntMin(xs[col], minSup[col], ant)) return false
+            if (!state.tightenIntMax(xs[col], maxSup[col], ant)) return false
+            val sup = supported[col]
+            val toRemove = LongArrayList()
+            state.intDomains[xs[col]].forEach { value ->
+                if (value !in sup) toRemove.add(value)
+            }
+            for (k in 0 until toRemove.size) {
+                if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
+            }
+        }
+        return true
+    }
+
+    private companion object {
+        /** Columns whose domain is within Int range and narrower than this take the span-sized bitset
+         *  support path; wider columns take the value-keyed set path (sound for any magnitude). */
+        const val MAX_BITSET_SPAN: Long = 1L shl 24
     }
 }
