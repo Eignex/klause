@@ -4,7 +4,6 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
-import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.ArmCalibration
 import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.KlauseSearch
@@ -22,6 +21,11 @@ import com.eignex.klause.bench.source.ProblemKind
 import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
+import com.eignex.klause.bench.tune.BoTuning
+import com.eignex.klause.bench.tune.RandomTuner
+import com.eignex.klause.bench.tune.TuneEngine
+import com.eignex.klause.bench.tune.Tuner
+import com.eignex.klause.bench.tune.VizierTuner
 import kotlinx.serialization.decodeFromString
 import java.io.File
 import java.util.concurrent.Callable
@@ -68,7 +72,8 @@ object BenchCli {
             "preview" -> run(args.drop(1), preview = true)
             "calibrate" -> calibrate(args.drop(1))
             "reference" -> reference(args.drop(1))
-            else -> error("unknown command '$cmd' (commands: solve, preview, calibrate, reference, list)")
+            "tune" -> tune(args.drop(1))
+            else -> error("unknown command '$cmd' (commands: solve, preview, calibrate, reference, tune, list)")
         }
     }
 
@@ -147,6 +152,48 @@ object BenchCli {
         }
         println()
         println(ArmCalibration.render(ArmCalibration.scoreWinnerSets(arms, won)))
+    }
+
+    /** BO config search (task #24): ask a [Tuner] for config points over an engine's `ConfigSpace`,
+     *  evaluate each in-process on the COP selection (reference-normalised gap-to-optimum reward), and
+     *  print the greedy set-cover palette — the configs that together win the most instances. Filters:
+     *  `engine=ls|bt` `trials=N` `batch=M` `timeout=<ms>` `tuner=random|vizier` `seed=N` (+ the usual
+     *  `suite=`/`kind=`/… selection). COP-only: the in-process eval needs an objective, so pass
+     *  `kind=cop`. Depends only on the [Tuner] seam, so the optimizer backend is swappable. */
+    private fun tune(filterArgs: List<String>) {
+        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val engine = when (f["engine"]?.lowercase()) {
+            "bt", "backtrack", "cp" -> TuneEngine.BT
+            "ls", "localsearch", "local-search", null -> TuneEngine.LS
+            else -> error("tune engine must be ls | bt, got '${f["engine"]}'")
+        }
+        val instances = BenchLoad.resolveRefs(select(f)).filter { it.objective != null }
+        if (instances.isEmpty()) {
+            println("(no COP instances matched — the BO eval needs an objective; pass kind=cop)")
+            return
+        }
+        val trials = f["trials"]?.toIntOrNull()?.coerceAtLeast(1) ?: 32
+        val batch = f["batch"]?.toIntOrNull()?.coerceAtLeast(1) ?: 4
+        val budgetMs = f["timeout"]?.toLongOrNull() ?: 2000L
+        val seed = f["seed"]?.toLongOrNull() ?: 0L
+        val tunerId = f["tuner"]?.lowercase() ?: "random"
+        val tuner: Tuner = when (tunerId) {
+            "vizier" -> VizierTuner()
+            "random" -> RandomTuner(seed)
+            else -> error("tune tuner must be random | vizier, got '${f["tuner"]}'")
+        }
+        println("=== tune ($engine, $tunerId): ${instances.size} COP instance(s), $trials trials × ${budgetMs}ms ===")
+        val result = tuner.use {
+            when (engine) {
+                TuneEngine.LS -> BoTuning.tuneLs(instances, tuner, trials, batch, budgetMs, seed)
+                TuneEngine.BT -> BoTuning.tuneBt(instances, tuner, trials, batch, budgetMs, seed)
+            }
+        }
+        println(ArmCalibration.render(result.report))
+        println("\npalette configs (each slot's marginal instances):")
+        result.report.diverse.takeWhile { it.newlyCovered > 0 }.forEach { slot ->
+            println("  ${slot.rank}. +${slot.newlyCovered}: ${result.configs[slot.arm] ?: slot.arm}")
+        }
     }
 
     /** From a portfolio run's per-problem records: every contributing arm label (the ranking pool) and,
@@ -270,7 +317,7 @@ object BenchCli {
         // Decisive = a witness (SAT) or a proof (optimum / UNSAT); a pure timeout stores nothing.
         if (r.feasible == true || r.proven) {
             ReferenceEntry(
-                suiteOf(ref),
+                ReferenceStore.suiteOf(ref),
                 ref.name,
                 maximize,
                 r.objective,
@@ -286,16 +333,6 @@ object BenchCli {
     }.getOrElse {
         println("?? ${ref.name} ERROR: ${it.message ?: it::class.simpleName}")
         null
-    }
-
-    /** The instance's corpus id, for the reference table key (see [ReferenceEntry.suite]) — the source
-     *  collection for a fetched corpus, else a path-derived label. Distinguishes same-named instances
-     *  across corpora (e.g. a `queens` in hakank vs the XCSP3 archive). */
-    private fun suiteOf(ref: ProblemRef): String = when (val s = ref.source) {
-        is ProblemSource.External -> s.collection.id
-        is ProblemSource.ExternalIndexed -> s.collection.id
-        is ProblemSource.Vendored -> s.workspaceRelPath.substringBeforeLast('/', "vendored")
-        is ProblemSource.InCode -> "in-code"
     }
 
     /** Read `(optimize, maximize)` from the model's `solve` item (comments stripped) so the reference
