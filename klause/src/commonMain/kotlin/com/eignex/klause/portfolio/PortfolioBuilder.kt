@@ -72,7 +72,7 @@ object PortfolioBuilder {
     ): List<PortfolioWorker> {
         require(backtrackWorkers >= 0) { "backtrackWorkers must be ≥ 0" }
         val lsConfigs = if (lsLabels == listOf("all")) {
-            LocalSearchWorkerConfig.pool()
+            LocalSearchWorkerConfig.ranked(kind)
         } else {
             lsLabels.map { LocalSearchWorkerConfig.byLabel(it) }
         }

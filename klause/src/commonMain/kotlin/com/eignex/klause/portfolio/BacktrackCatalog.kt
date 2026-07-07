@@ -19,7 +19,7 @@ import com.eignex.klause.util.ArmCatalog
 
 /**
  * The public catalog of backtrack (complete-search) arm recipes — the backtrack counterpart of
- * [com.eignex.klause.localsearch.strategy.LsCatalog]. It maps the string-label boundary (CLI
+ * [LocalSearchCatalog]. It maps the string-label boundary (CLI
  * `bt-arm=`, a credit campaign, telemetry) to a fresh [BacktrackRecipe], and exposes the credit-ordered
  * per-[Kind] pool. [BacktrackWorkerConfig] wraps these recipes into runnable portfolio arms; a caller
  * outside `klause` (the CLI) resolves named backtrack pools through here into `PortfolioScenario.btPool`.
@@ -206,7 +206,7 @@ object BacktrackCatalog {
 
 /**
  * Typed identity of every backtrack catalog arm — the backtrack counterpart of
- * [com.eignex.klause.localsearch.strategy.LsArm]. [BacktrackCatalog] orders and instantiates these;
+ * [LocalSearchArm]. [BacktrackCatalog] orders and instantiates these;
  * [label] is the external name (CLI `bt-arm=` / campaign / telemetry), kept in lockstep with the built
  * recipe's label.
  */

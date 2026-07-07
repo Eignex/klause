@@ -5,12 +5,12 @@ import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.localsearch.strategy.LsCatalog
-import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
@@ -176,8 +176,8 @@ internal object SolveCore {
 
     /** Print the resolved LS arm pool (`dry-run`), one line per arm, to stderr so the solution
      *  protocol on stdout stays clean. A null pool prints the curated catalog. */
-    private fun printLsPool(pool: List<() -> LsRecipe>?) {
-        val recipes = pool?.map { it() } ?: LsCatalog.auto()
+    private fun printLsPool(pool: List<() -> LocalSearchRecipe>?) {
+        val recipes = pool?.map { it() } ?: LocalSearchCatalog.ranked(Kind.COP)
         errPrintln("ls dry-run: ${recipes.size} arm(s)")
         for (r in recipes) {
             val sources = r.strategy.sources.joinToString(",") { it.source.id.label }
@@ -275,7 +275,13 @@ internal object SolveCore {
         // edits) before consuming the portfolio knobs from the same params. A null pool keeps the
         // curated catalog. `dry-run-solver` lists the resolved pool and exits without solving.
         val params = EngineParams(common.engineParams)
-        val lsResolution = if (mix != EngineMix.BACKTRACK) resolveLsRecipes(params) else LsResolution(null, false)
+        val lsResolution = if (mix != EngineMix.BACKTRACK) {
+            resolveLocalSearchRecipes(
+                params,
+            )
+        } else {
+            LsResolution(null, false)
+        }
         if (lsResolution.dryRunSolver) {
             printLsPool(lsResolution.pool)
             return

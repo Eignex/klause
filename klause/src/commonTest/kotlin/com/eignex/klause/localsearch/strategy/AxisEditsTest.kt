@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch.strategy
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.MoveSourceCatalog
 import com.eignex.klause.localsearch.scoring.MoveScoring
+import com.eignex.klause.portfolio.LocalSearchCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -70,7 +71,7 @@ class AxisEditsTest {
 
     @Test
     fun `recipe axis edits rewrite both the satisfy and optimize strategies`() {
-        val recipe = LsCatalog.byLabel("cbls/fixed")
+        val recipe = LocalSearchCatalog.byLabel("cbls/fixed")
         assertTrue(recipe.optimizeStrategy != null, "the cbls arm carries an optimize strategy")
 
         val rescored = recipe.withScoring(MoveScoring.Raw)
@@ -84,7 +85,7 @@ class AxisEditsTest {
 
     @Test
     fun `removing a source from a recipe drops it from the sources axis`() {
-        val recipe = LsCatalog.byLabel("cbls/fixed")
+        val recipe = LocalSearchCatalog.byLabel("cbls/fixed")
         val violatedId = MoveSourceCatalog.idOf("violated")
         assertTrue(recipe.strategy.sources.any { it.source.id == violatedId }, "cbls draws violated repairs")
 

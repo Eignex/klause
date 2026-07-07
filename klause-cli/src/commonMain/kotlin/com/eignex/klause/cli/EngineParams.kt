@@ -36,8 +36,7 @@ import com.eignex.klause.localsearch.strategy.AxisToken
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibilityJump
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
-import com.eignex.klause.localsearch.strategy.LsCatalog
-import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
@@ -45,6 +44,7 @@ import com.eignex.klause.localsearch.strategy.WalkSat
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 
 /**
@@ -205,7 +205,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
  *  so parallel workers never share mutable strategy state). A null [pool] means the default curated
  *  pool — the portfolio builds it unchanged. [dryRunSolver] short-circuits the solve to print the
  *  resolved arm pool (the solver configuration) instead of solving. */
-internal class LsResolution(val pool: List<() -> LsRecipe>?, val dryRunSolver: Boolean)
+internal class LsResolution(val pool: List<() -> LocalSearchRecipe>?, val dryRunSolver: Boolean)
 
 private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
     "weighted" -> MoveScoring.Weighted
@@ -257,10 +257,10 @@ private fun namedFactory(
     smoothProb: Double,
     smoothFactor: Double,
     tabu: TabuFilter,
-): () -> LsRecipe = when (name) {
+): () -> LocalSearchRecipe = when (name) {
     "cbls" -> {
         {
-            LsRecipe(
+            LocalSearchRecipe(
                 "cbls",
                 cblsStrategy(noise, smoothProb, smoothFactor, tabu),
                 optimizeStrategy = cblsStrategy(noise, smoothProb, smoothFactor, tabu),
@@ -269,15 +269,15 @@ private fun namedFactory(
     }
 
     "feasibilityjump", "feasibility-jump", "fjump" -> {
-        { LsRecipe("fjump", FeasibilityJump()) }
+        { LocalSearchRecipe("fjump", FeasibilityJump()) }
     }
 
     "walksat" -> {
-        { LsRecipe("walksat", WalkSat(noise = noise ?: 0.5, tabu = tabu)) }
+        { LocalSearchRecipe("walksat", WalkSat(noise = noise ?: 0.5, tabu = tabu)) }
     }
 
     "probsat" -> {
-        { LsRecipe("probsat", ProbSat(cb = cb, tabu = tabu)) }
+        { LocalSearchRecipe("probsat", ProbSat(cb = cb, tabu = tabu)) }
     }
 
     "sa", "annealing" -> {
@@ -285,7 +285,7 @@ private fun namedFactory(
         // anneals on the objective at feasibility like the catalog sa/* arms, rather than being
         // ratcheted as a plain finder on a COP.
         {
-            LsRecipe(
+            LocalSearchRecipe(
                 "sa",
                 SimulatedAnnealing.optimizer(Geometric(initTemp, coolRate, minTemp), tabu = tabu),
                 optimizeStrategy = SimulatedAnnealing.optimizer(Geometric(initTemp, coolRate, minTemp), tabu = tabu),
@@ -297,13 +297,13 @@ private fun namedFactory(
 }
 
 /** A bare driver with no preset axes; its sources are supplied by a force-exactly `sources=` spec. */
-private fun bareRecipe(tabu: TabuFilter): LsRecipe = LsRecipe(
+private fun bareRecipe(tabu: TabuFilter): LocalSearchRecipe = LocalSearchRecipe(
     "bare",
     SourceDrivenStrategy(sources = emptyList(), tabu = tabu, feasibleDescent = FeasibleDescent.RatchetAsConstraint),
 )
 
 private fun applyEdits(
-    recipe: LsRecipe,
+    recipe: LocalSearchRecipe,
     sources: List<AxisToken>,
     scoring: List<AxisToken>,
     acceptance: List<AxisToken>,
@@ -312,7 +312,7 @@ private fun applyEdits(
     cb: Double,
     skewAlpha: Double,
     saTemperature: () -> Geometric,
-): LsRecipe {
+): LocalSearchRecipe {
     var r = recipe
     val src = sources.filter { it.appliesTo(r.label) }
     if (src.isNotEmpty()) r = r.withSources { AxisEdits.applySources(it, src) }
@@ -333,7 +333,7 @@ private fun applyEdits(
 
 /**
  * Resolve the `ls` engine's `--param` overrides into an arm pool. `strategy=` picks the base —
- * `auto` (default; the curated [LsCatalog] pool), a named recipe (`cbls`/`feasibilityjump`/`walksat`/
+ * `auto` (default; the curated [LocalSearchCatalog] pool), a named recipe (`cbls`/`feasibilityjump`/`walksat`/
  * `probsat`/`sa`), or `bare` (a driver whose sources come from a force-exactly `sources=` spec). The
  * axis keys then *edit* the base across all matching arms, presolve-style: `sources=` takes a bare
  * force-exactly list or `+`/`-` add/remove; `scoring`/`acceptance`/`restart` set a single value. Any
@@ -341,7 +341,7 @@ private fun applyEdits(
  * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run-solver=on` lists
  * the resolved arms instead of solving.
  */
-internal fun resolveLsRecipes(p: EngineParams): LsResolution {
+internal fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val dryRunSolver = p.bool("dry-run-solver") ?: false
     val noiseRaw = p.double("noise")
     val cbRaw = p.double("cb")
@@ -372,8 +372,8 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
     if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
         usageError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
     }
-    if (armLabel != null && armLabel !in LsCatalog.labels()) {
-        usageError("ls: arm=`$armLabel` is not a catalog arm (have ${LsCatalog.labels().joinToString()})")
+    if (armLabel != null && armLabel !in LocalSearchCatalog.labels()) {
+        usageError("ls: arm=`$armLabel` is not a catalog arm (have ${LocalSearchCatalog.labels().joinToString()})")
     }
     val strategyName = strategyRaw ?: if (sourcesSpec != null) "bare" else "auto"
 
@@ -393,7 +393,7 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
         ),
     )
 
-    fun edit(recipe: LsRecipe) = applyEdits(
+    fun edit(recipe: LocalSearchRecipe) = applyEdits(
         recipe,
         sources,
         scoring,
@@ -404,12 +404,14 @@ internal fun resolveLsRecipes(p: EngineParams): LsResolution {
         skewAlpha,
     ) { Geometric(initTemp, coolRate, minTemp) }
 
-    val pool: List<() -> LsRecipe>? = when {
-        armLabel != null -> listOf({ edit(LsCatalog.byLabel(armLabel)) })
+    val pool: List<() -> LocalSearchRecipe>? = when {
+        armLabel != null -> listOf({ edit(LocalSearchCatalog.byLabel(armLabel)) })
 
         strategyName == "auto" && !hasEdits -> null
 
-        strategyName == "auto" -> LsCatalog.factories().map { factory -> { edit(factory()) } }
+        // The CLI `auto` pool is the COP superset (all arms); the portfolio applies per-kind ordering
+        // to its own curated default (an explicit CLI pool is used as-is, like the backtrack side).
+        strategyName == "auto" -> LocalSearchCatalog.factories(Kind.COP).map { factory -> { edit(factory()) } }
 
         strategyName == "bare" -> {
             if (sources.isEmpty()) usageError("ls: strategy=bare needs a sources= spec")
@@ -496,7 +498,7 @@ internal fun buildPortfolioScenario(
     defaultEngine: EngineMix,
     defaultArms: Int,
     lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
-    lsPool: List<() -> LsRecipe>? = null,
+    lsPool: List<() -> LocalSearchRecipe>? = null,
     btPool: List<() -> BacktrackRecipe>? = null,
     annotationArm: BacktrackParams? = null,
 ): PortfolioScenario {
@@ -539,7 +541,7 @@ internal fun buildPortfolioScenario(
 
 /**
  * Resolve the `cp`/`mixed` engine's backtrack arm pool from `--param`, the backtrack analogue of
- * [resolveLsRecipes]. Two mutually-exclusive forms:
+ * [resolveLocalSearchRecipes]. Two mutually-exclusive forms:
  *  - `bt-arm=label,label` pins named [BacktrackCatalog] arms, each validated for [kind] (so a CSP
  *    rejects the COP-only LP/LinUCB arms); an unknown label is a hard usage error.
  *  - the per-solver override keys ([BACKTRACK_OVERRIDE_KEYS] — `var-selector`/`val-selector`/`luby`/…)
@@ -572,7 +574,7 @@ internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> Backtrack
         return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
     }
     if (edit == null) return null
-    // Edit every curated arm, exactly as resolveLsRecipes edits its pool. The edit rebuilds selectors
+    // Edit every curated arm, exactly as resolveLocalSearchRecipes edits its pool. The edit rebuilds selectors
     // per worker (fresh mutable state), so the wrapped factory stays safe across parallel slots.
     return BacktrackCatalog.factories(kind).map { factory -> { editRecipe(factory(), edit) } }
 }

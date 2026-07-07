@@ -5,7 +5,7 @@ import com.eignex.klause.solver.result.SearchEvent
 /**
  * A named backtrack (complete-search) recipe: a label plus a factory that builds its [BacktrackParams]
  * for a worker seed and event sink. The complete-search analogue of the local-search
- * [com.eignex.klause.localsearch.strategy.LsRecipe] — the public unit a portfolio arm wraps, so a
+ * [com.eignex.klause.localsearch.strategy.LocalSearchRecipe] — the public unit a portfolio arm wraps, so a
  * caller can inject a pool of named backtrack arms (`PortfolioScenario.btPool`, the CLI's backtrack
  * arm resolution) exactly the way it injects local-search recipes, rather than passing raw
  * [BacktrackParams] templates. A backtrack recipe holds no per-search mutable state, so [build] is a

@@ -4,7 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.localsearch.strategy.LsRecipe
+import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -66,9 +66,9 @@ data class PortfolioScenario(
      *  LP-intensity itself; an `OFF` emphasis disables LP, and overrides force individual techniques. */
     val lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
     /** Optional override of the local-search arm pool — per-arm factories (a fresh recipe per slot).
-     *  `null` uses the curated `LsCatalog` pool unchanged; a non-null pool is the CLI's resolved
+     *  `null` uses the curated `LocalSearchCatalog` pool unchanged; a non-null pool is the CLI's resolved
      *  recipes (a named base, or the curated pool with axis edits applied). */
-    val lsPool: List<() -> LsRecipe>? = null,
+    val lsPool: List<() -> LocalSearchRecipe>? = null,
     /** Optional override of the backtrack arm pool — per-arm [BacktrackRecipe] factories (a fresh
      *  recipe per slot, wrapping past the pool size), the exact backtrack analogue of [lsPool]. `null`
      *  uses the curated [BacktrackWorkerConfig] pool. */
@@ -160,7 +160,7 @@ internal object PortfolioComposition {
     fun compose(scenario: PortfolioScenario): List<WorkerConfig> {
         val count = scenario.arms
         return when (scenario.engine) {
-            EngineMix.LOCAL_SEARCH -> lsArms(count, scenario.lsPool)
+            EngineMix.LOCAL_SEARCH -> lsArms(scenario.kind, count, scenario.lsPool)
 
             EngineMix.BACKTRACK -> btArms(
                 scenario.kind,
@@ -176,11 +176,12 @@ internal object PortfolioComposition {
 
     /** The [count] LS arms — the curated pool ([pool] == null), else the CLI's resolved pool, each
      *  slot a fresh recipe (wrapping past the pool size). */
-    private fun lsArms(count: Int, pool: List<() -> LsRecipe>?): List<WorkerConfig> = if (pool == null) {
-        LocalSearchWorkerConfig.diverse(count)
-    } else {
-        List(count) { LocalSearchWorkerConfig(pool[it % pool.size]()) }
-    }
+    private fun lsArms(kind: Kind, count: Int, pool: List<() -> LocalSearchRecipe>?): List<WorkerConfig> =
+        if (pool == null) {
+            LocalSearchWorkerConfig.diverse(kind, count)
+        } else {
+            List(count) { LocalSearchWorkerConfig(pool[it % pool.size]()) }
+        }
 
     /** The [count] backtrack arms. [btPool] (when set) overrides the pool with injected templates.
      *  Otherwise the curated pool, with the model's [annotationArm] (#512) taking the last slot when
@@ -207,7 +208,7 @@ internal object PortfolioComposition {
         val lsCount = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
-        arms += lsArms(lsCount, scenario.lsPool)
+        arms += lsArms(scenario.kind, lsCount, scenario.lsPool)
         if (btCount > 0) {
             arms += btArms(scenario.kind, btCount, scenario.lpCeiling, scenario.btPool, scenario.annotationArm)
         }

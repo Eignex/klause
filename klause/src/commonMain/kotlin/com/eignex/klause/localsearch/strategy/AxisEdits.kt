@@ -38,7 +38,7 @@ class AxisToken(
     fun appliesTo(label: String): Boolean = selector == null || label.startsWith(selector)
 }
 
-/** Parsing and application of the four-axis edit grammar over a curated [LsRecipe] set. */
+/** Parsing and application of the four-axis edit grammar over a curated [LocalSearchRecipe] set. */
 object AxisEdits {
     /** Parse a comma-separated axis value into its [AxisToken]s (blanks skipped). */
     fun tokens(value: String): List<AxisToken> =
