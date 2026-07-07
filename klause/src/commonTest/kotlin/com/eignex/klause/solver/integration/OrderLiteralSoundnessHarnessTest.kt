@@ -122,7 +122,7 @@ class OrderLiteralSoundnessHarnessTest {
             "element",
             doms,
             arrayOf(
-                Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
                 NotEqualOnFix(4, 2),
                 NotEqualOnFix(4, 3),
             ),
@@ -188,7 +188,7 @@ class OrderLiteralSoundnessHarnessTest {
             "table",
             doms,
             arrayOf(
-                Table(xs = intArrayOf(0, 1, 2), tuples = tuples),
+                Table(xs = intArrayOf(0, 1, 2), tuples = LongArray(tuples.size) { tuples[it].toLong() }),
                 NotEqualOnFix(3, 0),
             ),
             brute(doms) { a -> listOf(a[0], a[1], a[2]) in allowed && a[3] != a[0] },
@@ -205,7 +205,7 @@ class OrderLiteralSoundnessHarnessTest {
             arrayOf(
                 GlobalCardinality(
                     xs = intArrayOf(0, 1, 2, 3),
-                    cover = intArrayOf(0, 1),
+                    cover = longArrayOf(0, 1),
                     countLow = intArrayOf(1, 1),
                     countHigh = intArrayOf(2, 2),
                 ),

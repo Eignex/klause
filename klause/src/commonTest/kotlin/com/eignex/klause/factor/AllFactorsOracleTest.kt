@@ -188,7 +188,7 @@ class AllFactorsOracleTest {
         // count[0]=#zeros, count[1]=#ones across xs=(2,3,4), all ∈ {0,1}; counts ∈ [0,3].
         val f = GlobalCardinality(
             xs = intArrayOf(2, 3, 4),
-            cover = intArrayOf(0, 1),
+            cover = longArrayOf(0, 1),
             countVars = intArrayOf(0, 1),
         )
         check(
@@ -254,7 +254,7 @@ class AllFactorsOracleTest {
         // result(0) = arr[idx(1)], arr = [5,7,9] constants, idx 1-based ∈ [1,3]. The constant
         // array is filtered to full GAC: result loses the gaps 6 and 8 (no position holds them),
         // and an idx position is dropped whenever its constant falls in a result hole.
-        val f = Element(idx = 1, result = 0, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1)
+        val f = Element(idx = 1, result = 0, arr = longArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 1)
         check(f, intDomains = arrayOf(IntDomain(4, 10), IntDomain(0, 4)), exactProbe = true, gac = true)
     }
 
@@ -262,7 +262,7 @@ class AllFactorsOracleTest {
         // result(0) = arr[idx(1)], arr = vars 2,3,4; idx 1-based ∈ [1,3]. Hole-aware var-array
         // GAC: idx drops a position whose element domain is disjoint from result's, and result
         // punches interior holes for values no reachable element can produce.
-        val f = Element(idx = 1, result = 0, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
+        val f = Element(idx = 1, result = 0, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
         check(
             f,
             intDomains = arrayOf(
@@ -282,7 +282,7 @@ class AllFactorsOracleTest {
         // arr[1] ∈ {5}, arr[2] ∈ {2,3}, result ∈ 0..5. GAC must keep all positions (each meets
         // result) and punch result to exactly {0,1,2,3,5} — value 4 has no reachable element, a
         // gap a bounds-union propagator would leave open.
-        val f = Element(idx = 1, result = 0, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
+        val f = Element(idx = 1, result = 0, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 1)
         check(
             f,
             intDomains = arrayOf(
@@ -436,7 +436,7 @@ class AllFactorsOracleTest {
     @Test fun `regular passes the brute-force propagation and repair oracles`() {
         // Even count of '0' over alphabet {0,1}. States 1-based: 1 = even (accept), 2 = odd.
         // Alphabet symbols are also 1-based; xs values map to symbol = value (1 or 2).
-        val transitions = intArrayOf(
+        val transitions = longArrayOf(
             2,
             1, // from state 1: '1' → 2, '2' → 1
             1,
@@ -461,7 +461,7 @@ class AllFactorsOracleTest {
             seq = intArrayOf(0, 1),
             numStatesPerLayer = intArrayOf(1, 2, 1),
             layerStarts = intArrayOf(0, 6, 12),
-            transitions = intArrayOf(
+            transitions = longArrayOf(
                 0, 1, 0, 0, 2, 1, // layer 0
                 0, 2, 0, 1, 1, 0, // layer 1
             ),
@@ -478,7 +478,7 @@ class AllFactorsOracleTest {
         // x0 ∈ {0,1}, x1 ∈ {0,1}, x2 ∈ {0,1}; allowed tuples: (0,0,0), (1,1,0), (1,0,1).
         val f = Table(
             xs = intArrayOf(0, 1, 2),
-            tuples = intArrayOf(0, 0, 0, 1, 1, 0, 1, 0, 1),
+            tuples = longArrayOf(0, 0, 0, 1, 1, 0, 1, 0, 1),
         )
         check(f, intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)), exactProbe = true)
     }
@@ -630,7 +630,7 @@ class AllFactorsOracleTest {
         // count[0]=#zeros, count[1]=#twos across xs=(2,3,4) ∈ {0,2}; counts ∈ [0,3].
         val f = GlobalCardinality(
             xs = intArrayOf(2, 3, 4),
-            cover = intArrayOf(0, 2),
+            cover = longArrayOf(0, 2),
             countVars = intArrayOf(0, 1),
         )
         checkPropagation(

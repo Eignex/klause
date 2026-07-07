@@ -23,7 +23,7 @@ class MddInvariantTest {
         seq = intArrayOf(0, 1),
         numStatesPerLayer = intArrayOf(1, 2, 1),
         layerStarts = intArrayOf(0, 6, 12),
-        transitions = intArrayOf(
+        transitions = longArrayOf(
             0, 1, 0, 0, 2, 1, // layer 0: s0 --1--> s0; s0 --2--> s1
             0, 2, 0, 1, 1, 0, // layer 1: s0 --2--> term; s1 --1--> term
         ),

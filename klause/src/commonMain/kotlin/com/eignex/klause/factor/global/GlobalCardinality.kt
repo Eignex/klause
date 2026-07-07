@@ -2,16 +2,18 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * Global Cardinality Constraint (GCC). Covers the four MiniZinc variants in one factor:
@@ -37,7 +39,7 @@ class GlobalCardinality(
     /** Variable ids the constraint ranges over. */
     val xs: IntArray,
     /** Values whose occurrence counts are bounded. */
-    val cover: IntArray,
+    val cover: LongArray,
     val countVars: IntArray? = null,
     val countLow: IntArray? = null,
     val countHigh: IntArray? = null,
@@ -83,7 +85,7 @@ class GlobalCardinality(
         bool(countVars != null)
         int(cover.size)
         for (i in cover.indices.sortedBy { cover[it] }) {
-            int(cover[i])
+            long(cover[i])
             if (countVars != null) {
                 int(countVars[i])
             } else {
@@ -99,9 +101,12 @@ class GlobalCardinality(
      *  cover stays distinct. */
     override fun remapValues(valueMap: (Int) -> Int): Factor? {
         if (countVars != null) return null
+        // A cover value beyond Int range can't pass through the `(Int)->Int` value map without truncating
+        // (which would alias two cover values); decline value symmetry instead — sound, no relabel.
+        if (!fitsInt32(cover)) return null
         return GlobalCardinality(
             xs,
-            IntArray(cover.size) { valueMap(cover[it]) },
+            LongArray(cover.size) { valueMap(cover[it].toInt()).toLong() },
             null,
             countLow,
             countHigh,
@@ -119,8 +124,8 @@ class GlobalCardinality(
     /** Cover value → its 0-based index in [cover]. Used for O(1) per-probe lookup during
      *  propagation and LS delta computation; `-1` for values outside the cover. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    val coverIndexByValue: IntIntMap =
-        IntIntMap.build(cover, IntArray(cover.size) { it }, absent = -1)
+    val coverIndexByValue: MutableLongIntMap =
+        MutableLongIntMap().apply { for (i in cover.indices) put(cover[i], i) }
 
     override fun asPropagator(): Propagator = GlobalCardinalityPropagator(
         boolVars,
@@ -149,5 +154,8 @@ class GlobalCardinality(
         { state, idx -> present(state, idx) },
     )
 
-    override fun asLinearizer(): Linearizer = GccCountLinearizer(xs, cover, countVars, presents)
+    // The LP relaxation's presence column is Int-typed; a cover value beyond Int range would truncate
+    // there and yield an unsound bound, so skip the relaxation for wide cover (the propagator enforces it).
+    override fun asLinearizer(): Linearizer =
+        if (fitsInt32(cover)) GccCountLinearizer(xs, cover, countVars, presents) else NoLinearizer
 }

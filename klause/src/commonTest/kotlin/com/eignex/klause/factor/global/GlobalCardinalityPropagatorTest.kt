@@ -112,7 +112,7 @@ class GlobalCardinalityPropagatorTest {
                 factors = arrayOf<Factor>(
                     GlobalCardinality(
                         xs = IntArray(n) { it },
-                        cover = inst.cover,
+                        cover = LongArray(inst.cover.size) { inst.cover[it].toLong() },
                         countLow = inst.low,
                         countHigh = inst.high,
                         closed = inst.closed,
@@ -169,7 +169,11 @@ class GlobalCardinalityPropagatorTest {
             numIntVars = k,
             intDomains = doms,
             factors = arrayOf<Factor>(
-                GlobalCardinality(xs = IntArray(n) { it }, cover = cover, countVars = IntArray(m) { n + it }),
+                GlobalCardinality(
+                    xs = IntArray(n) { it },
+                    cover = LongArray(cover.size) { cover[it].toLong() },
+                    countVars = IntArray(m) { n + it },
+                ),
             ),
         )
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
@@ -189,7 +193,7 @@ class GlobalCardinalityPropagatorTest {
             factors = arrayOf<Factor>(
                 GlobalCardinality(
                     xs = intArrayOf(0, 1, 2, 3, 4),
-                    cover = intArrayOf(0, 1, 2),
+                    cover = longArrayOf(0, 1, 2),
                     countVars = intArrayOf(5, 6, 7),
                 ),
             ),
@@ -214,7 +218,7 @@ class GlobalCardinalityPropagatorTest {
             factors = arrayOf<Factor>(
                 GlobalCardinality(
                     xs = intArrayOf(0, 1, 2, 3, 4, 5),
-                    cover = intArrayOf(0, 1, 2),
+                    cover = longArrayOf(0, 1, 2),
                     countLow = intArrayOf(1, 1, 1),
                     countHigh = intArrayOf(3, 3, 3),
                 ),
@@ -239,7 +243,7 @@ class GlobalCardinalityPropagatorTest {
             factors = arrayOf<Factor>(
                 GlobalCardinality(
                     xs = intArrayOf(0, 1, 2),
-                    cover = intArrayOf(1, 2, 3),
+                    cover = longArrayOf(1, 2, 3),
                     countLow = intArrayOf(0, 0, 0),
                     countHigh = intArrayOf(3, 3, 3),
                     closed = true,
@@ -274,7 +278,7 @@ class GlobalCardinalityPropagatorTest {
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(
-                GlobalCardinality(xs = intArrayOf(0, 1), cover = intArrayOf(1, 2), countVars = intArrayOf(2, 3)),
+                GlobalCardinality(xs = intArrayOf(0, 1), cover = longArrayOf(1, 2), countVars = intArrayOf(2, 3)),
             ),
         )
         val state = PropagationState(problem, Assumptions.None)
@@ -334,7 +338,12 @@ class GlobalCardinalityPropagatorTest {
                 numIntVars = n,
                 intDomains = Array(n) { IntDomain(0, 2) },
                 factors = arrayOf<Factor>(
-                    GlobalCardinality(xs = IntArray(n) { it }, cover = cover, countLow = low, countHigh = high),
+                    GlobalCardinality(
+                        xs = IntArray(n) { it },
+                        cover = LongArray(cover.size) { cover[it].toLong() },
+                        countLow = low,
+                        countHigh = high,
+                    ),
                     Linear(coeffs = IntArray(n) { 1 }, vars = IntArray(n) { it }, op = LinearOp.LE, bound = bound),
                 ),
             )

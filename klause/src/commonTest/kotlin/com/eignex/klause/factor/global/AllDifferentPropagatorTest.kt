@@ -155,7 +155,12 @@ class AllDifferentPropagatorTest {
             numIntVars = k,
             intDomains = Array(k) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) },
             factors = arrayOf<Factor>(
-                AllDifferent(IntArray(k) { it }, domainMin = lo, domainSize = hi - lo + 1, exceptSet = except),
+                AllDifferent(
+                    IntArray(k) { it },
+                    domainMin = lo.toLong(),
+                    domainSize = hi - lo + 1,
+                    exceptSet = LongArray(except.size) { except[it].toLong() },
+                ),
             ),
         )
     }
@@ -236,7 +241,9 @@ class AllDifferentPropagatorTest {
                 numBoolVars = 0,
                 numIntVars = k,
                 intDomains = Array(k) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) },
-                factors = arrayOf<Factor>(AllDifferent(IntArray(k) { it }, domainMin = lo, domainSize = hi - lo + 1)),
+                factors = arrayOf<Factor>(
+                    AllDifferent(IntArray(k) { it }, domainMin = lo.toLong(), domainSize = hi - lo + 1),
+                ),
             )
             // CDCL config so conflict analysis + clause learning (hence the Hall-set
             // explanations) actually run; no restarts to keep enumeration completeness simple.
@@ -380,7 +387,9 @@ class AllDifferentPropagatorTest {
                 numBoolVars = 0,
                 numIntVars = n,
                 intDomains = Array(n) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) },
-                factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = lo, domainSize = hi - lo + 1)),
+                factors = arrayOf<Factor>(
+                    AllDifferent(IntArray(n) { it }, domainMin = lo.toLong(), domainSize = hi - lo + 1),
+                ),
             )
             FactorPropagationOracle.assertGac(problem, "slack-staircase-n$n")
         }
@@ -458,7 +467,15 @@ class AllDifferentPropagatorTest {
             val (bLo, bHi, bFeas) = bruteBounds(lo, hi)
             val nLo = IntArray(n)
             val nHi = IntArray(n)
-            val feas = computeBoundsAllDifferent(lo, hi, nLo, nHi)
+            val loL = LongArray(n) { j -> lo[j].toLong() }
+            val hiL = LongArray(n) { j -> hi[j].toLong() }
+            val nLoL = LongArray(n)
+            val nHiL = LongArray(n)
+            val feas = computeBoundsAllDifferent(loL, hiL, nLoL, nHiL)
+            for (i in 0 until n) {
+                nLo[i] = nLoL[i].toInt()
+                nHi[i] = nHiL[i].toInt()
+            }
             assertEquals(bFeas, feas, "feasibility mismatch for lo=${lo.toList()} hi=${hi.toList()}")
             if (!bFeas) return@repeat
             feasibleCases++
@@ -560,7 +577,7 @@ class AllDifferentPropagatorTest {
         // Régin: every var must take 5.
         val factor = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
-            cover = intArrayOf(5),
+            cover = longArrayOf(5),
             countLow = intArrayOf(3),
             countHigh = intArrayOf(3),
             closed = false,
@@ -583,7 +600,7 @@ class AllDifferentPropagatorTest {
         // currently include 7 in their domains — Régin must punch 7 out.
         val factor = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
-            cover = intArrayOf(7),
+            cover = longArrayOf(7),
             countLow = intArrayOf(0),
             countHigh = intArrayOf(1),
             closed = false,
@@ -603,7 +620,7 @@ class AllDifferentPropagatorTest {
         // x0 ∈ [1, 4] → must drop 1 and 4.
         val factor = GlobalCardinality(
             xs = intArrayOf(0, 1),
-            cover = intArrayOf(2, 3),
+            cover = longArrayOf(2, 3),
             countLow = intArrayOf(0, 0),
             countHigh = intArrayOf(3, 3),
             closed = true,
@@ -622,7 +639,7 @@ class AllDifferentPropagatorTest {
         // cover = [9], lo = [2], hi = [5]. xs has 3 vars, only 1 contains 9.
         val factor = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
-            cover = intArrayOf(9),
+            cover = longArrayOf(9),
             countLow = intArrayOf(2),
             countHigh = intArrayOf(5),
             closed = false,
@@ -643,7 +660,7 @@ class AllDifferentPropagatorTest {
         // countVars[1] domain [0, 3] → should tighten min to 0, max to 2.
         val factor = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
-            cover = intArrayOf(3, 7),
+            cover = longArrayOf(3, 7),
             countVars = intArrayOf(3, 4),
             closed = false,
         )

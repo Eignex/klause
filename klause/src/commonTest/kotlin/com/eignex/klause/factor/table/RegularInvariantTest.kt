@@ -20,7 +20,7 @@ class RegularInvariantTest {
 
     // DFA: alphabet {1,2}, states {1,2}, q0=1, F={2}.
     // δ(1,1)=1, δ(1,2)=2, δ(2,1)=1, δ(2,2)=2. Accepts strings ending in 2.
-    private val transitions = intArrayOf(1, 2, 1, 2)
+    private val transitions = longArrayOf(1, 2, 1, 2)
 
     private fun endsWith2Factor(n: Int): Factor = Regular(
         seq = IntArray(n) { it },
@@ -156,7 +156,7 @@ class RegularInvariantTest {
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 7)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
-            assertEquals(2, s.ints[3], "sequence must end in 2; got ${s.ints.toList()}")
+            assertEquals(2L, s.ints[3], "sequence must end in 2; got ${s.ints.toList()}")
         }
     }
 }

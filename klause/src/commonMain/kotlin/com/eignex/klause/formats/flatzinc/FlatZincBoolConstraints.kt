@@ -143,11 +143,12 @@ internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: B
     val resultInt = channelBoolsToInts(intArrayOf(resultLit), "belem_res")[0]
     if (varArray) {
         val arrLits = evalBoolVarArray(c.args[1])
-        val arr = channelBoolsToInts(arrLits, "belem")
+        val arrIds = channelBoolsToInts(arrLits, "belem")
+        val arr = LongArray(arrIds.size) { arrIds[it].toLong() }
         factors.add(Element(idx = idx, result = resultInt, arr = arr, arrIsVars = true, indexOffset = 1))
     } else {
         val arrConst = evalBoolConstArray(c.args[1])
-        val arr = IntArray(arrConst.size) { if (arrConst[it]) 1 else 0 }
+        val arr = LongArray(arrConst.size) { if (arrConst[it]) 1L else 0L }
         factors.add(Element(idx = idx, result = resultInt, arr = arr, arrIsVars = false, indexOffset = 1))
     }
 }
@@ -187,7 +188,7 @@ internal fun FlatZincCompiler.emitTableBool(c: FznConstraint) {
     val xLits = evalBoolVarArray(c.args[0])
     val tuplesBool = evalBoolConstArray(c.args[1])
     val xs = channelBoolsToInts(xLits, "tbl")
-    val tuples = IntArray(tuplesBool.size) { if (tuplesBool[it]) 1 else 0 }
+    val tuples = LongArray(tuplesBool.size) { if (tuplesBool[it]) 1L else 0L }
     factors.add(Table(xs, tuples))
 }
 

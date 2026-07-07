@@ -23,12 +23,13 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.LongArrayList
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
-    emitAllDifferentExcept(vars, intArrayOf(0))
+    emitAllDifferentExcept(vars, longArrayOf(0))
 }
 
 private fun FlatZincCompiler.intVarUnionBounds(vars: IntArray): Pair<Long, Long>? {
@@ -44,17 +45,17 @@ private fun FlatZincCompiler.intVarUnionBounds(vars: IntArray): Pair<Long, Long>
 }
 
 /** Emit `alldifferent_except(xs, except)`. */
-private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: IntArray) {
+private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: LongArray) {
     emitAllDifferentCore(vars, exceptSet = except, boundsConsistent = false)
 }
 
-private fun FlatZincCompiler.emitAllDifferentCore(vars: IntArray, exceptSet: IntArray, boundsConsistent: Boolean) {
+private fun FlatZincCompiler.emitAllDifferentCore(vars: IntArray, exceptSet: LongArray, boundsConsistent: Boolean) {
     if (vars.size < 2) return
     val (lo, hi) = checkNotNull(intVarUnionBounds(vars))
     factors.add(
         AllDifferent(
             vars = vars,
-            domainMin = lo.toInt(),
+            domainMin = lo,
             domainSize = (hi - lo + 1).toInt(),
             exceptSet = exceptSet,
             boundsConsistent = boundsConsistent,
@@ -102,7 +103,7 @@ internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
     val seq = evalIntVarArray(c.args[0])
     val numStates = evalIntConst(c.args[1]).toInt()
     val numSymbols = evalIntConst(c.args[2]).toInt()
-    val transitions = evalIntConstArray(c.args[3])
+    val transitions = evalIntConstArrayLong(c.args[3])
     val q0 = evalIntConst(c.args[4]).toInt()
     val accepting: IntArray = when (val fSet = c.args[5]) {
         is FznExpr.IntSetLit -> IntArray(fSet.values.size) { fSet.values[it].toInt() }
@@ -121,15 +122,16 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
     val from = evalIntConstArray(c.args[4]) // edge source node (1..N)
     val to = evalIntConstArray(c.args[6]) // edge target node (0=terminal, else 1..N)
 
-    fun setOfExpr(e: FznExpr): IntArray = when (e) {
-        is FznExpr.IntSetLit -> IntArray(e.values.size) { e.values[it].toInt() }
-        is FznExpr.IntRangeLit -> IntArray((e.hi - e.lo + 1).toInt()) { (e.lo + it).toInt() }
+    fun setOfExpr(e: FznExpr): LongArray = when (e) {
+        is FznExpr.IntSetLit -> e.values.copyOf()
+        is FznExpr.IntRangeLit -> LongArray((e.hi - e.lo + 1).toInt()) { e.lo + it }
         else -> failHere("mdd: expected set literal label, got ${e::class.simpleName}")
     }
-    val labels: List<IntArray> = when (val la = c.args[5]) {
+    val labels: List<LongArray> = when (val la = c.args[5]) {
         is FznExpr.ArrayLit -> la.elements.map(::setOfExpr)
 
         is FznExpr.Ident -> (arrays[la.name] as? FlatZincArray.IntSetParam)?.values
+            ?.map { row -> LongArray(row.size) { row[it].toLong() } }
             ?: failHere("mdd: `${la.name}` is not a set-of-int parameter array")
 
         else -> failHere("mdd: unsupported label arg ${la::class.simpleName}")
@@ -147,19 +149,19 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
             localIdx[node - 1] = 0 // a node explicitly at terminal level
         }
     }
-    val perLayer = Array(numLayers) { IntArrayList() }
+    val perLayer = Array(numLayers) { LongArrayList() }
     for (e in from.indices) {
         val lyr = level[from[e] - 1] - 1
         if (lyr !in 0 until n) continue
         val src = localIdx[from[e] - 1]
         val dst = if (to[e] == 0) 0 else localIdx[to[e] - 1]
         for (v in labels[e]) {
-            perLayer[lyr].add(src)
+            perLayer[lyr].add(src.toLong())
             perLayer[lyr].add(v)
-            perLayer[lyr].add(dst)
+            perLayer[lyr].add(dst.toLong())
         }
     }
-    val transitions = IntArrayList()
+    val transitions = LongArrayList()
     val layerStarts = IntArray(numLayers) // = n + 1
     for (lyr in 0 until n) {
         layerStarts[lyr] = transitions.size
@@ -171,7 +173,7 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
             seq = seq,
             numStatesPerLayer = countPerLayer,
             layerStarts = layerStarts,
-            transitions = transitions.toIntArray(),
+            transitions = transitions.toLongArray(),
             initial = 0,
             accepting = intArrayOf(0),
             recordStride = 3,
@@ -182,7 +184,7 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
 internal fun FlatZincCompiler.emitTable(c: FznConstraint) {
     require(c.args.size == 2)
     val xs = evalIntVarArray(c.args[0])
-    val tuples = evalIntConstArray(c.args[1])
+    val tuples = evalIntConstArrayLong(c.args[1])
     factors.add(Table(xs, tuples))
 }
 
@@ -257,7 +259,7 @@ internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
     require(c.args.size == 1)
     val vars = evalIntVarArray(c.args[0])
     val bc = c.annotations.any { it.name == "bounds" }
-    emitAllDifferentCore(vars, exceptSet = EmptyIntArray, boundsConsistent = bc)
+    emitAllDifferentCore(vars, exceptSet = EmptyLongArray, boundsConsistent = bc)
 }
 
 /** Emit `circuit` / `subcircuit`, channeling to 0-based values when needed. */
@@ -373,7 +375,7 @@ internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) = emitCountComparison
 internal fun FlatZincCompiler.emitGcc(c: FznConstraint, variant: GccVariant) {
     require(c.args.size == if (variant.lowUp) 4 else 3)
     val xs = evalIntVarArray(c.args[0])
-    val cover = evalIntConstArray(c.args[1])
+    val cover = evalIntConstArrayLong(c.args[1])
     if (variant.lowUp) {
         val lo = evalIntConstArray(c.args[2])
         val up = evalIntConstArray(c.args[3])
@@ -415,7 +417,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, variant: GccVariant) {
 internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
     require(c.args.size == 3)
     val card = evalIntVarArray(c.args[0])
-    val value = evalIntConstArray(c.args[1])
+    val value = evalIntConstArrayLong(c.args[1])
     val base = evalIntVarArray(c.args[2])
     factors.add(GlobalCardinality(xs = base, cover = value, countVars = card))
 }
@@ -424,19 +426,19 @@ internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
 internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
     require(c.args.size == 3)
     val xs = evalIntVarArray(c.args[0])
-    val value = evalIntConst(c.args[1]).toInt()
+    val value = evalIntConst(c.args[1])
     val (countConst, countVar) = resolveIntConstOrVar(c.args[2])
     if (xs.isEmpty()) {
         if (countVar >= 0) factors.add(Linear(intArrayOf(1), intArrayOf(countVar), LinearOp.EQ, 0))
         return
     }
     if (countVar >= 0) {
-        factors.add(GlobalCardinality(xs = xs, cover = intArrayOf(value), countVars = intArrayOf(countVar)))
+        factors.add(GlobalCardinality(xs = xs, cover = longArrayOf(value), countVars = intArrayOf(countVar)))
     } else {
         factors.add(
             GlobalCardinality(
                 xs = xs,
-                cover = intArrayOf(value),
+                cover = longArrayOf(value),
                 countLow = intArrayOf(countConst),
                 countHigh = intArrayOf(countConst),
             ),
@@ -451,10 +453,10 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
     val xs = evalIntVarArray(c.args[1])
     val setValues = resolveSetLiteral(c.args[2])
     val cover = if (xs.isEmpty()) {
-        EmptyIntArray
+        EmptyLongArray
     } else {
         val (lo, hi) = checkNotNull(intVarUnionBounds(xs))
-        setValues.filter { it in lo..hi }.toIntArray()
+        setValues.filter { it in lo..hi }.map { it.toLong() }.toLongArray()
     }
     if (cover.isEmpty()) {
         factors.add(Linear(intArrayOf(1), intArrayOf(n), LinearOp.EQ, 0))

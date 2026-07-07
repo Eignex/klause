@@ -27,7 +27,14 @@ class GlobalCardinalityInvariantTest {
             numBoolVars = 0,
             numIntVars = n,
             intDomains = Array(n) { IntDomain(0, domainHi.toLong()) },
-            factors = arrayOf<Factor>(GlobalCardinality(xs, cover, countLow = countLow, countHigh = countHigh)),
+            factors = arrayOf<Factor>(
+                GlobalCardinality(
+                    xs,
+                    LongArray(cover.size) { cover[it].toLong() },
+                    countLow = countLow,
+                    countHigh = countHigh,
+                ),
+            ),
         )
     }
 

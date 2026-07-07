@@ -63,8 +63,8 @@ class RootBakerTest {
             ),
         )
         val baked = assertIs<PropagationResult.Implied>(bake(p, BakeConfig(probeIntBounds = true)))
-        assertEquals(1, baked.intMinOrNullCompat(0), "bound SAC should have lifted x.min to 1")
-        assertEquals(1, baked.intMinOrNullCompat(1), "bound SAC should have lifted y.min to 1")
+        assertEquals(1L, baked.intMinOrNullCompat(0), "bound SAC should have lifted x.min to 1")
+        assertEquals(1L, baked.intMinOrNullCompat(1), "bound SAC should have lifted y.min to 1")
     }
 
     @Test
@@ -75,7 +75,7 @@ class RootBakerTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(
-                Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 3, 3)),
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 0, 3, 3)),
             ),
         )
         val baked = assertIs<PropagationResult.Implied>(
@@ -102,7 +102,7 @@ class RootBakerTest {
         val baked = assertIs<PropagationResult.Implied>(
             bake(p, BakeConfig(probeIntBounds = true, probeBudgetPerVar = 1)),
         )
-        assertEquals(1, baked.intMinOrNullCompat(0))
+        assertEquals(1L, baked.intMinOrNullCompat(0))
     }
 
     @Test

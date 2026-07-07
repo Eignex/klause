@@ -13,7 +13,7 @@ internal class RegularPropagator(
     private val seq: IntArray,
     private val numStates: Int,
     private val alphabetSize: Int,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val q0: Int,
     private val accepting: IntArray,
 ) : Propagator {

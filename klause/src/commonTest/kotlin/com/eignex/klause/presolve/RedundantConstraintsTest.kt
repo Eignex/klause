@@ -76,7 +76,7 @@ class RedundantConstraintsTest {
         )
         val out = checkPreserved("dominated-le", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
-        assertEquals(3, (out.factors[0] as Linear).bound, "the tighter bound is kept")
+        assertEquals(3L, (out.factors[0] as Linear).bound, "the tighter bound is kept")
     }
 
     @Test
@@ -106,7 +106,7 @@ class RedundantConstraintsTest {
             ),
         )
         val out = checkPreserved("dominated-ge", problem, expectDrop = true)
-        assertEquals(4, (out.factors.single() as Linear).bound)
+        assertEquals(4L, (out.factors.single() as Linear).bound)
     }
 
     @Test
@@ -188,7 +188,7 @@ class RedundantConstraintsTest {
         // 2x+2y<=6 reduces to x+y<=3, dominated by the tighter x+y<=2.
         val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 1, 1, 1), le(6, 0, 2, 1, 2)))
         val out = checkPreserved("proportional-loose", problem, expectDrop = true)
-        assertEquals(2, (out.factors.single() as Linear).bound, "the tighter reduced bound survives")
+        assertEquals(2L, (out.factors.single() as Linear).bound, "the tighter reduced bound survives")
     }
 
     @Test

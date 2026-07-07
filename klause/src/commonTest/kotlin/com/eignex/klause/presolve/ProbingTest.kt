@@ -108,7 +108,7 @@ class ProbingTest {
             ),
         )
         val out = probed(problem)
-        assertEquals(2, out.intDomains[0].min, "the common lower bound x ≥ 2 is folded in")
+        assertEquals(2L, out.intDomains[0].min, "the common lower bound x ≥ 2 is folded in")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }
 
@@ -132,7 +132,7 @@ class ProbingTest {
             ),
         )
         val out = probed(problem)
-        assertEquals(0, out.intDomains[0].min, "a one-sided bound must not be applied")
+        assertEquals(0L, out.intDomains[0].min, "a one-sided bound must not be applied")
         assertTrue(units(out).isEmpty(), "no literal failed")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }

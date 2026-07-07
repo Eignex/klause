@@ -28,7 +28,7 @@ class CpToLpRelaxationTableHullTest {
         numIntVars = 2,
         intDomains = arrayOf(d0, d1),
         factors = arrayOf<Factor>(
-            Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 5, 2, 2, 4, 0)),
+            Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 5, 2, 2, 4, 0)),
         ),
     )
 

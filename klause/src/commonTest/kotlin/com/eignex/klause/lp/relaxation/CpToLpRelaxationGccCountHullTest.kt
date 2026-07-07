@@ -36,7 +36,7 @@ class CpToLpRelaxationGccCountHullTest {
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(
-                GlobalCardinality(xs = intArrayOf(0, 1), cover = intArrayOf(1, 2), countVars = intArrayOf(2, 3)),
+                GlobalCardinality(xs = intArrayOf(0, 1), cover = longArrayOf(1, 2), countVars = intArrayOf(2, 3)),
             ),
         )
         val maximizeTotalCount = LinearObjective(intCoefficients = longArrayOf(0, 0, -1, -1))
@@ -81,7 +81,11 @@ class CpToLpRelaxationGccCountHullTest {
                 numIntVars = n + coverSize,
                 intDomains = intDomains,
                 factors = arrayOf<Factor>(
-                    GlobalCardinality(xs = IntArray(n) { it }, cover = cover, countVars = countVars),
+                    GlobalCardinality(
+                        xs = IntArray(n) { it },
+                        cover = LongArray(cover.size) { cover[it].toLong() },
+                        countVars = countVars,
+                    ),
                 ),
             )
             val obj = LinearObjective(intCoefficients = objCoeffs)

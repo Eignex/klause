@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.toSortedLongArray
 
 /*
@@ -41,20 +41,20 @@ internal class ElementConstState(
     state: PropagationState,
     private val idx: Int,
     private val result: Int,
-    private val arr: IntArray,
+    private val arr: LongArray,
     private val indexOffset: Int,
 ) {
     private val len = arr.size
 
     // Static value-id universe over the distinct constants (ids in array first-occurrence order).
-    private val idOfValue = MutableIntIntMap()
-    private val valueOfId: IntArray
+    private val idOfValue = MutableLongIntMap()
+    private val valueOfId: LongArray
     private val idOfPos = IntArray(len)
     private val positionsOfId: Array<IntArray>
     private val numValues: Int
 
     init {
-        val vals = IntArrayList()
+        val vals = LongArrayList()
         val posLists = ArrayList<IntArrayList>()
         for (pos in 0 until len) {
             val v = arr[pos]
@@ -69,7 +69,7 @@ internal class ElementConstState(
             posLists[id].add(pos)
         }
         numValues = vals.size
-        valueOfId = vals.toIntArray()
+        valueOfId = vals.toLongArray()
         positionsOfId = Array(numValues) { posLists[it].toIntArray() }
     }
 
@@ -93,10 +93,8 @@ internal class ElementConstState(
         return true
     }
 
-    /** Value-id of the constant [value], or -1 when [value] is not one of the table's constants
-     *  (including any value outside the Int range the constant table can hold). */
-    private fun idFor(value: Long): Int =
-        if (value < Int.MIN_VALUE || value > Int.MAX_VALUE) -1 else idOfValue.getOrDefault(value.toInt(), -1)
+    /** Value-id of the constant [value], or -1 when [value] is not one of the table's constants. */
+    private fun idFor(value: Long): Int = idOfValue.getOrDefault(value, -1)
 
     /** True if either watched domain gained a value since the last fire (a backtrack restored it) —
      *  the support counts cannot be patched incrementally then, so the caller rebuilds. */
@@ -134,7 +132,7 @@ internal class ElementConstState(
         val idxSeed = LongArrayList()
         idxDom.forEach { iv ->
             val pos = iv - indexOffset
-            if (pos in 0 until len && arr[pos.toInt()].toLong() !in resDom) idxSeed.add(iv)
+            if (pos in 0 until len && arr[pos.toInt()] !in resDom) idxSeed.add(iv)
         }
         val resSeed = LongArrayList()
         resDom.forEach { rv ->
@@ -191,8 +189,8 @@ internal class ElementConstState(
                 val id = idOfPos[pos.toInt()]
                 val c = supportCount[id] - 1
                 supportCount[id] = c
-                if (c == 0 && valueOfId[id].toLong() in state.intDomains[result]) {
-                    resultToExclude.add(valueOfId[id].toLong())
+                if (c == 0 && valueOfId[id] in state.intDomains[result]) {
+                    resultToExclude.add(valueOfId[id])
                 }
             }
             // result removals → idx positions whose constant just left result.

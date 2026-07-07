@@ -215,7 +215,7 @@ class AffineEliminationTest {
             intDomains = arrayOf(IntDomain(1, 3), IntDomain(5, 7), IntDomain(0, 2)),
             factors = listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1), // x = y + 1
-                Element(idx = 0, result = 1, arr = intArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
+                Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
             ),
         )
         checkFeasibleSetPreserved("element-index-shift", problem)
@@ -233,7 +233,7 @@ class AffineEliminationTest {
             factors = listOf(
                 Linear(intArrayOf(1, -2), intArrayOf(0, 2), LinearOp.EQ, 1), // x = 2y + 1
                 Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1), // y <= 1 (keeps y non-contained)
-                Element(idx = 0, result = 1, arr = intArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
+                Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
             ),
         )
         checkRoundTrip("element-scaled-index", problem, expectEliminated = false, expectSat = true)
@@ -248,7 +248,7 @@ class AffineEliminationTest {
             intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 2)),
             factors = listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1), // x = y + 1
-                Table(intArrayOf(0, 1), intArrayOf(1, 1, 2, 2, 3, 3)), // (x, z) in {(1,1),(2,2),(3,3)}
+                Table(intArrayOf(0, 1), longArrayOf(1, 1, 2, 2, 3, 3)), // (x, z) in {(1,1),(2,2),(3,3)}
             ),
         )
         checkFeasibleSetPreserved("table-column-shift", problem)

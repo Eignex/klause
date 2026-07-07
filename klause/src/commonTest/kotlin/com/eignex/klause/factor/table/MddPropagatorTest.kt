@@ -24,7 +24,7 @@ class MddPropagatorTest {
             seq = intArrayOf(0, 1),
             numStatesPerLayer = intArrayOf(1, 1, 1),
             layerStarts = intArrayOf(0, 6, 12),
-            transitions = intArrayOf(
+            transitions = longArrayOf(
                 0, 1, 0, // layer 0: 0 --1--> 0
                 0, 2, 0, // layer 0: 0 --2--> 0
                 0, 1, 0, // layer 1: 0 --1--> 0
@@ -57,7 +57,7 @@ class MddPropagatorTest {
             seq = intArrayOf(0, 1),
             numStatesPerLayer = intArrayOf(1, 2, 1),
             layerStarts = intArrayOf(0, 6, 12),
-            transitions = intArrayOf(
+            transitions = longArrayOf(
                 0, 1, 0, 0, 2, 1, // layer 0: s0 --1--> s0, --2--> s1
                 0, 2, 0, 1, 1, 0, // layer 1: s0 --2--> term, s1 --1--> term
             ),
@@ -108,7 +108,7 @@ class MddPropagatorTest {
             seq = intArrayOf(0, 1),
             numStatesPerLayer = intArrayOf(1, 1, 1),
             layerStarts = intArrayOf(0, 8, 16),
-            transitions = intArrayOf(
+            transitions = longArrayOf(
                 0, 1, 0, 1, 0, 2, 0, 2, // layer 0: --1--> (w1), --2--> (w2)
                 0, 1, 0, 1, 0, 2, 0, 2, // layer 1: --1--> (w1), --2--> (w2)
             ),

@@ -24,7 +24,11 @@ class AllDifferentSeparatorTest {
             numIntVars = n,
             intDomains = Array(n) { IntDomain(domainMin.toLong(), domainMax.toLong()) },
             factors = arrayOf<Factor>(
-                AllDifferent(IntArray(n) { it }, domainMin = domainMin, domainSize = domainMax - domainMin + 1),
+                AllDifferent(
+                    IntArray(n) { it },
+                    domainMin = domainMin.toLong(),
+                    domainSize = domainMax - domainMin + 1,
+                ),
             ),
         )
         val session = PropagationSession(p)

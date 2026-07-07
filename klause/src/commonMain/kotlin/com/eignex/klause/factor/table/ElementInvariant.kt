@@ -9,7 +9,7 @@ import com.eignex.klause.localsearch.MoveSink
 internal class ElementInvariant(
     private val idx: Int,
     private val result: Int,
-    private val arr: IntArray,
+    private val arr: LongArray,
     private val arrIsVars: Boolean,
     private val indexOffset: Int,
 ) : Invariant {
@@ -23,7 +23,7 @@ internal class ElementInvariant(
         val pos = state.assignment.intValue(idx) - indexOffset
         if (pos < 0 || pos >= len) return true
         val p = pos.toInt()
-        val ev = if (arrIsVars) state.assignment.intValue(arr[p]) else arr[p].toLong()
+        val ev = if (arrIsVars) state.assignment.intValue(arr[p].toInt()) else arr[p]
         return state.assignment.intValue(result) != ev
     }
 
@@ -33,7 +33,7 @@ internal class ElementInvariant(
         val resultVal = state.assignment.intValue(result)
         val cap = state.violationSoftCap
         return elementDegreeAt(idxVal, resultVal, len, indexOffset, cap) { pos ->
-            if (arrIsVars) state.assignment.intValue(arr[pos]) else arr[pos].toLong()
+            if (arrIsVars) state.assignment.intValue(arr[pos].toInt()) else arr[pos]
         }
     }
 
@@ -45,16 +45,16 @@ internal class ElementInvariant(
         val newResult = if (intVar == result) newValue else curResult
         val cap = state.violationSoftCap
         val newDeg = elementDegreeAt(newIdx, newResult, len, indexOffset, cap) { pos ->
-            if (arrIsVars && arr[pos] == intVar) {
+            if (arrIsVars && arr[pos].toInt() == intVar) {
                 newValue
             } else if (arrIsVars) {
-                state.assignment.intValue(arr[pos])
+                state.assignment.intValue(arr[pos].toInt())
             } else {
-                arr[pos].toLong()
+                arr[pos]
             }
         }
         val oldDeg = elementDegreeAt(curIdx, curResult, len, indexOffset, cap) { pos ->
-            if (arrIsVars) state.assignment.intValue(arr[pos]) else arr[pos].toLong()
+            if (arrIsVars) state.assignment.intValue(arr[pos].toInt()) else arr[pos]
         }
         return newDeg - oldDeg
     }
@@ -70,7 +70,7 @@ internal class ElementInvariant(
         val inRange = pos >= 0 && pos < len
         val ev = if (inRange) {
             val p = pos.toInt()
-            if (arrIsVars) state.assignment.intValue(arr[p]) else arr[p].toLong()
+            if (arrIsVars) state.assignment.intValue(arr[p].toInt()) else arr[p]
         } else {
             Long.MIN_VALUE
         }
@@ -79,7 +79,7 @@ internal class ElementInvariant(
         if (inRange) {
             if (ev in state.problem.intDomains[result]) sink.addChannelingIntSet(state, result, ev)
             if (arrIsVars) {
-                val sel = arr[pos.toInt()]
+                val sel = arr[pos.toInt()].toInt()
                 if (resultVal in state.problem.intDomains[sel]) sink.addChannelingIntSet(state, sel, resultVal)
             }
         } else {
@@ -89,7 +89,7 @@ internal class ElementInvariant(
             if (target in idxDom && target != idxVal) sink.addChannelingIntSet(state, idx, target)
         }
         for (p in 0 until len) {
-            val evp = if (arrIsVars) state.assignment.intValue(arr[p]) else arr[p].toLong()
+            val evp = if (arrIsVars) state.assignment.intValue(arr[p].toInt()) else arr[p]
             if (evp == resultVal) {
                 val cand = (p + indexOffset).toLong()
                 if (cand != idxVal && cand in idxDom) {

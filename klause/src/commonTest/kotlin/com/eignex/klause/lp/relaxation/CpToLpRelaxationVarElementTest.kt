@@ -31,7 +31,7 @@ class CpToLpRelaxationVarElementTest {
             numIntVars = 4,
             intDomains = arrayOf(idx, IntDomain(0, 50), a0, a1),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L))

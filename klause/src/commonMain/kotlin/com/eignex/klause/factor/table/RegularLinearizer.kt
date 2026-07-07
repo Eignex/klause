@@ -23,7 +23,7 @@ internal class RegularLinearizer(
     private val seq: IntArray,
     private val numStates: Int,
     private val alphabetSize: Int,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val q0: Int,
     private val accepting: IntArray,
 ) : Linearizer {
@@ -34,7 +34,7 @@ internal class RegularLinearizer(
         val len = seq.size
         val s = alphabetSize
         val trans = transitions
-        fun delta(state: Int, sym: Long): Int = trans[(state - 1) * s + (sym - 1).toInt()] // 1-based; 0 = dead
+        fun delta(state: Int, sym: Long): Int = trans[(state - 1) * s + (sym - 1).toInt()].toInt() // 1-based; 0 = dead
         val ns = numStates
 
         val outCols = Array(len) { arrayOfNulls<IntArrayList>(ns + 1) }
@@ -132,7 +132,7 @@ internal class RegularLinearizer(
             reach[t].forEach { state ->
                 dom.forEach { sym ->
                     if (sym in 1..s) {
-                        val nxt = trans[(state - 1) * s + (sym - 1).toInt()]
+                        val nxt = trans[(state - 1) * s + (sym - 1).toInt()].toInt()
                         if (nxt != 0) {
                             reach[t + 1].add(nxt)
                             arcCount++

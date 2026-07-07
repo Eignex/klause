@@ -53,7 +53,7 @@ internal fun Lowering.assertMddNative(
             seq = seqIds,
             numStatesPerLayer = numStatesPerLayer.toIntArray(),
             layerStarts = layerStarts.toIntArray(),
-            transitions = transitions,
+            transitions = LongArray(transitions.size) { transitions[it].toLong() },
             initial = initial,
             accepting = accepting.toIntArray(),
             recordStride = recordStride,

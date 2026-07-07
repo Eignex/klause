@@ -11,7 +11,7 @@ internal class MddInvariant(
     private val seq: IntArray,
     private val numStatesPerLayer: IntArray,
     private val layerStarts: IntArray,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val initial: Int,
     private val accepting: IntArray,
     private val recordStride: Int,
@@ -104,13 +104,13 @@ internal class MddInvariant(
         var rec = layerStarts[p]
         val end = layerStarts[p + 1]
         while (rec < end) {
-            val from = transitions[rec]
+            val from = transitions[rec].toInt()
             val sym = transitions[rec + 1]
-            val to = transitions[rec + 2]
+            val to = transitions[rec + 2].toInt()
             val fq = st.forward[p][from]
             val bq = st.backward[p + 1][to]
             if (fq < inf && bq < inf) {
-                val cand = fq + (if (sym.toLong() == newValue) 0 else 1) + bq
+                val cand = fq + (if (sym == newValue) 0 else 1) + bq
                 if (cand < best) best = cand
             }
             rec += recordStride
@@ -136,8 +136,8 @@ internal class MddInvariant(
             var matchedDst = -1
             var p = start
             while (p < end) {
-                if (transitions[p] == path[i] && transitions[p + 1].toLong() == symbol) {
-                    matchedDst = transitions[p + 2]
+                if (transitions[p].toInt() == path[i] && transitions[p + 1] == symbol) {
+                    matchedDst = transitions[p + 2].toInt()
                     break
                 }
                 p += recordStride
@@ -146,10 +146,10 @@ internal class MddInvariant(
                 val d = state.problem.intDomains[seq[i]]
                 var q = start
                 while (q < end) {
-                    if (transitions[q] == path[i]) {
+                    if (transitions[q].toInt() == path[i]) {
                         val altSym = transitions[q + 1]
-                        if (altSym.toLong() != symbol && altSym.toLong() in d) {
-                            sink.addChannelingIntSet(state, seq[i], altSym.toLong())
+                        if (altSym != symbol && altSym in d) {
+                            sink.addChannelingIntSet(state, seq[i], altSym)
                         }
                     }
                     q += recordStride
@@ -166,11 +166,11 @@ internal class MddInvariant(
         val end = layerStarts[last + 1]
         var p = start
         while (p < end) {
-            if (transitions[p] == qPrev) {
+            if (transitions[p].toInt() == qPrev) {
                 val sym = transitions[p + 1]
-                val dst = transitions[p + 2]
-                if (sym.toLong() != curLast && sym.toLong() in d && accepting.any { it == dst }) {
-                    sink.addChannelingIntSet(state, seq[last], sym.toLong())
+                val dst = transitions[p + 2].toInt()
+                if (sym != curLast && sym in d && accepting.any { it == dst }) {
+                    sink.addChannelingIntSet(state, seq[last], sym)
                 }
             }
             p += recordStride
@@ -192,8 +192,8 @@ internal class MddInvariant(
             accepting,
         ) ?: return
         for (i in seq.indices) {
-            if (target[i].toLong() != state.assignment.intValue(seq[i])) {
-                sink.addChannelingIntSet(state, seq[i], target[i].toLong())
+            if (target[i] != state.assignment.intValue(seq[i])) {
+                sink.addChannelingIntSet(state, seq[i], target[i])
             }
         }
     }
@@ -220,23 +220,23 @@ internal class MddInvariant(
             val to = path[i + 1]
             val curWeight = mddRecordWeight(layerStarts, transitions, recordStride, from, cur, i)
             val d = state.problem.intDomains[seq[i]]
-            var pick = -1
+            var pick = -1L
             var seen = 0
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
             while (p < end) {
                 val sym = transitions[p + 1]
-                val sameCost = recordStride < 4 || transitions[p + 3] == curWeight
-                if (transitions[p] == from && transitions[p + 2] == to && sameCost &&
-                    sym.toLong() != cur && sym.toLong() in d
+                val sameCost = recordStride < 4 || transitions[p + 3].toInt() == curWeight
+                if (transitions[p].toInt() == from && transitions[p + 2].toInt() == to && sameCost &&
+                    sym != cur && sym in d
                 ) {
                     seen++
                     if (state.rng.nextInt(seen) == 0) pick = sym
                 }
                 p += recordStride
             }
-            if (pick == -1) continue
-            sink.addChannelingIntSet(state, seq[i], pick.toLong())
+            if (pick == -1L) continue
+            sink.addChannelingIntSet(state, seq[i], pick)
             emitted++
         }
     }
@@ -249,9 +249,9 @@ internal class MddInvariant(
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
             while (p < end) {
-                val from = transitions[p]
+                val from = transitions[p].toInt()
                 val sym = transitions[p + 1]
-                val to = transitions[p + 2]
+                val to = transitions[p + 2].toInt()
                 if (from < fwd[i].size && fwd[i][from] && mddSymbolAllowed(state, seq, i, sym)) fwd[i + 1][to] = true
                 p += recordStride
             }
@@ -264,19 +264,19 @@ internal class MddInvariant(
             }
         }
         if (target == -1) return false
-        val chosen = IntArray(n)
+        val chosen = LongArray(n)
         var totalWeight = 0L
         var t = target
         for (i in n - 1 downTo 0) {
-            var fs = -1
+            var fs = -1L
             var ff = -1
             var fw = 0
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
             while (p < end) {
-                val from = transitions[p]
+                val from = transitions[p].toInt()
                 val sym = transitions[p + 1]
-                if (transitions[p + 2] == t && from < fwd[i].size && fwd[i][from] && mddSymbolAllowed(
+                if (transitions[p + 2].toInt() == t && from < fwd[i].size && fwd[i][from] && mddSymbolAllowed(
                         state,
                         seq,
                         i,
@@ -285,12 +285,12 @@ internal class MddInvariant(
                 ) {
                     fs = sym
                     ff = from
-                    fw = if (recordStride == 4) transitions[p + 3] else 0
+                    fw = if (recordStride == 4) transitions[p + 3].toInt() else 0
                     break
                 }
                 p += recordStride
             }
-            if (fs == -1) return false
+            if (fs == -1L) return false
             chosen[i] = fs
             totalWeight += fw
             t = ff
@@ -303,7 +303,7 @@ internal class MddInvariant(
             }
         }
         for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(seq[i])) state.assignment.setInt(seq[i], chosen[i].toLong())
+            if (!state.assumptions.isFrozenInt(seq[i])) state.assignment.setInt(seq[i], chosen[i])
         }
         if (cost >= 0 && !state.assumptions.isFrozenInt(cost)) state.assignment.setInt(cost, totalWeight)
         return true
@@ -318,7 +318,7 @@ internal fun mddPathExists(
     state: LocalSearchState,
     seq: IntArray,
     layerStarts: IntArray,
-    transitions: IntArray,
+    transitions: LongArray,
     recordStride: Int,
     initial: Int,
     accepting: IntArray,
@@ -333,8 +333,8 @@ internal fun mddPathExists(
         var next = -1
         var p = start
         while (p < end) {
-            if (transitions[p] == current && transitions[p + 1].toLong() == symbol) {
-                next = transitions[p + 2]
+            if (transitions[p].toInt() == current && transitions[p + 1] == symbol) {
+                next = transitions[p + 2].toInt()
                 break
             }
             p += recordStride
@@ -349,7 +349,7 @@ internal fun mddPathExists(
 /** Destination state of the transition from [from] on [symbol] at layer [i], or -1 if none. */
 internal fun mddStep(
     layerStarts: IntArray,
-    transitions: IntArray,
+    transitions: LongArray,
     recordStride: Int,
     from: Int,
     symbol: Long,
@@ -358,7 +358,7 @@ internal fun mddStep(
     var p = layerStarts[i]
     val end = layerStarts[i + 1]
     while (p < end) {
-        if (transitions[p] == from && transitions[p + 1].toLong() == symbol) return transitions[p + 2]
+        if (transitions[p].toInt() == from && transitions[p + 1] == symbol) return transitions[p + 2].toInt()
         p += recordStride
     }
     return -1
@@ -367,7 +367,7 @@ internal fun mddStep(
 /** Weight of the transition from [from] on [symbol] at layer [i] (0 for a plain MDD). */
 internal fun mddRecordWeight(
     layerStarts: IntArray,
-    transitions: IntArray,
+    transitions: LongArray,
     recordStride: Int,
     from: Int,
     symbol: Long,
@@ -377,19 +377,19 @@ internal fun mddRecordWeight(
     var p = layerStarts[i]
     val end = layerStarts[i + 1]
     while (p < end) {
-        if (transitions[p] == from && transitions[p + 1].toLong() == symbol) return transitions[p + 3]
+        if (transitions[p].toInt() == from && transitions[p + 1] == symbol) return transitions[p + 3].toInt()
         p += recordStride
     }
     return 0
 }
 
 /** Symbol [s] is usable at layer [i]. */
-internal fun mddSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int, s: Int): Boolean {
+internal fun mddSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int, s: Long): Boolean {
     val v = seq[i]
     return if (state.assumptions.isFrozenInt(v)) {
-        state.assignment.intValue(v) == s.toLong()
+        state.assignment.intValue(v) == s
     } else {
-        s.toLong() in state.problem.intDomains[v]
+        s in state.problem.intDomains[v]
     }
 }
 
@@ -398,7 +398,7 @@ internal fun mddAcceptDistance(
     seq: IntArray,
     numStatesPerLayer: IntArray,
     layerStarts: IntArray,
-    transitions: IntArray,
+    transitions: LongArray,
     recordStride: Int,
     initial: Int,
     accepting: IntArray,
@@ -413,11 +413,11 @@ internal fun mddAcceptDistance(
         var p = layerStarts[i]
         val end = layerStarts[i + 1]
         while (p < end) {
-            val from = transitions[p]
+            val from = transitions[p].toInt()
             val base = dp[from]
             if (base < inf) {
-                val cost = base + (if (transitions[p + 1].toLong() == cur) 0 else 1)
-                val to = transitions[p + 2]
+                val cost = base + (if (transitions[p + 1] == cur) 0 else 1)
+                val to = transitions[p + 2].toInt()
                 if (cost < ndp[to]) ndp[to] = cost
             }
             p += recordStride
@@ -440,16 +440,16 @@ internal fun mddRepairPath(
     seq: IntArray,
     numStatesPerLayer: IntArray,
     layerStarts: IntArray,
-    transitions: IntArray,
+    transitions: LongArray,
     recordStride: Int,
     initial: Int,
     accepting: IntArray,
-): IntArray? {
+): LongArray? {
     val n = seq.size
     val inf = n + 1
     val dp = Array(n + 1) { IntArray(numStatesPerLayer[it]) { inf } }
     val parentState = Array(n + 1) { IntArray(numStatesPerLayer[it]) { -1 } }
-    val parentSymbol = Array(n + 1) { IntArray(numStatesPerLayer[it]) { -1 } }
+    val parentSymbol = Array(n + 1) { LongArray(numStatesPerLayer[it]) { -1L } }
     if (initial < dp[0].size) dp[0][initial] = 0
     for (i in 0 until n) {
         val cur = state.assignment.intValue(seq[i])
@@ -458,13 +458,13 @@ internal fun mddRepairPath(
         var p = layerStarts[i]
         val end = layerStarts[i + 1]
         while (p < end) {
-            val from = transitions[p]
+            val from = transitions[p].toInt()
             val sym = transitions[p + 1]
-            val to = transitions[p + 2]
-            val allowed = if (frozen) sym.toLong() == cur else sym.toLong() in d
+            val to = transitions[p + 2].toInt()
+            val allowed = if (frozen) sym == cur else sym in d
             val base = dp[i][from]
             if (allowed && base < inf) {
-                val cost = base + (if (sym.toLong() == cur) 0 else 1)
+                val cost = base + (if (sym == cur) 0 else 1)
                 if (cost < dp[i + 1][to]) {
                     dp[i + 1][to] = cost
                     parentState[i + 1][to] = from
@@ -483,7 +483,7 @@ internal fun mddRepairPath(
         }
     }
     if (bestState == -1) return null
-    val out = IntArray(n)
+    val out = LongArray(n)
     var s = bestState
     for (i in n downTo 1) {
         out[i - 1] = parentSymbol[i][s]
@@ -503,7 +503,7 @@ internal fun mddForwardLayers(
     n: Int,
     numStatesPerLayer: IntArray,
     layerStarts: IntArray,
-    transitions: IntArray,
+    transitions: LongArray,
     recordStride: Int,
     initial: Int,
     getSym: (Int) -> Long,
@@ -516,11 +516,11 @@ internal fun mddForwardLayers(
         var p = layerStarts[i]
         val end = layerStarts[i + 1]
         while (p < end) {
-            val from = transitions[p]
+            val from = transitions[p].toInt()
             val base = fwd[i][from]
             if (base < inf) {
-                val cost = base + (if (transitions[p + 1].toLong() == cur) 0 else 1)
-                val to = transitions[p + 2]
+                val cost = base + (if (transitions[p + 1] == cur) 0 else 1)
+                val to = transitions[p + 2].toInt()
                 if (cost < fwd[i + 1][to]) fwd[i + 1][to] = cost
             }
             p += recordStride
@@ -535,7 +535,7 @@ internal fun mddBackwardLayers(
     n: Int,
     numStatesPerLayer: IntArray,
     layerStarts: IntArray,
-    transitions: IntArray,
+    transitions: LongArray,
     recordStride: Int,
     accepting: IntArray,
     getSym: (Int) -> Long,
@@ -548,9 +548,9 @@ internal fun mddBackwardLayers(
         var p = layerStarts[i]
         val end = layerStarts[i + 1]
         while (p < end) {
-            val from = transitions[p]
-            val to = transitions[p + 2]
-            val c = (if (transitions[p + 1].toLong() == cur) 0 else 1) + bwd[i + 1][to]
+            val from = transitions[p].toInt()
+            val to = transitions[p + 2].toInt()
+            val c = (if (transitions[p + 1] == cur) 0 else 1) + bwd[i + 1][to]
             if (c < bwd[i][from]) bwd[i][from] = c
             p += recordStride
         }

@@ -40,7 +40,7 @@ class ElementPropagatorTest {
         // idx in [0,1] selects arr=[v2, v3]; result must equal arr[idx]. A level-1 decision forces
         // result ≥ 10 but squeezes both elements ≤ 5 — no position can supply result, so idx is
         // wiped and propagate returns false.
-        val factor = Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
+        val factor = Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -76,7 +76,7 @@ class ElementPropagatorTest {
                 numIntVars = 4,
                 intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
                 factors = arrayOf<Factor>(
-                    Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
+                    Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
                 ),
             )
             val brute = HashSet<List<Int>>()
@@ -97,7 +97,7 @@ class ElementPropagatorTest {
     @Test
     fun `enumerate matches brute force for constant array`() {
         // result == arr[idx] with constant arr=[5, 7, 5]. ints = [idx, result].
-        val arr = intArrayOf(5, 7, 5)
+        val arr = longArrayOf(5, 7, 5)
         for (seed in 1L..5L) {
             val problem = Problem(
                 numBoolVars = 0,
@@ -110,7 +110,7 @@ class ElementPropagatorTest {
             val brute = HashSet<List<Int>>()
             for (idx in 0..2) {
                 for (res in 0..9) {
-                    if (res == arr[idx]) brute.add(listOf(idx, res))
+                    if (res == arr[idx].toInt()) brute.add(listOf(idx, res))
                 }
             }
             assertEquals(brute, enumerate(problem, seed), "seed=$seed: const-array element must match brute force")
@@ -127,7 +127,7 @@ class ElementPropagatorTest {
         // result's occurrence-list wakeup — fires and rejects a sum over 60. A batched exclusion that
         // marked the var dirty without the event kind under-set the wake, so backtrack reached leaves
         // with r1 + r2 = 100 and emitted them as solutions (#865).
-        val arr = intArrayOf(50, 10)
+        val arr = longArrayOf(50, 10)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -141,8 +141,8 @@ class ElementPropagatorTest {
         val brute = HashSet<List<Int>>()
         for (i1 in 1..2) {
             for (i2 in 1..2) {
-                val r1 = arr[i1 - 1]
-                val r2 = arr[i2 - 1]
+                val r1 = arr[i1 - 1].toInt()
+                val r2 = arr[i2 - 1].toInt()
                 if (r1 + r2 <= 60) brute.add(listOf(i1, i2, r1, r2))
             }
         }
@@ -180,7 +180,7 @@ class ElementPropagatorTest {
 
     @Test
     fun `variable-array element subscribes to all kinds and consumes the delta`() {
-        val varArr = Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
+        val varArr = Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
         val varArrProp = varArr.asPropagator() as ElementPropagator
         assertTrue(varArrProp.consumesIntEventDelta, "var-array element must consume the dirty-var delta")
         val watches = varArrProp.initialIntEventWatches
@@ -196,7 +196,7 @@ class ElementPropagatorTest {
         assertEquals(setOf(0, 1, 2, 3), byVar.keys, "all of idx/result/array vars subscribed")
 
         // The constant-array path keeps occurrence wakeup (its own reversible domRef fast path).
-        val constArr = Element(idx = 0, result = 1, arr = intArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 0)
+        val constArr = Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 0)
         val constArrProp = constArr.asPropagator() as ElementPropagator
         assertNull(constArrProp.initialIntEventWatches)
         assertFalse(constArrProp.consumesIntEventDelta)
@@ -209,7 +209,7 @@ class ElementPropagatorTest {
         // 2=v2, 3=v3, 4=c.
         for (seed in 1L..6L) {
             val factors = listOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
                 ExcludeOnFix(src = 4, dst = 2),
                 ExcludeOnFix(src = 4, dst = 3),
             )
@@ -254,7 +254,7 @@ class ElementPropagatorTest {
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(2), arrIsVars = true, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(2), arrIsVars = true, indexOffset = 0),
             ),
         )
         val state = PropagationState(problem, Assumptions.None)
@@ -282,7 +282,7 @@ class ElementPropagatorTest {
 
         // Const array: result(0) = arr[idx(1) - 1], arr = [5,7,9], both vars over [0,10].
         run {
-            val arr = intArrayOf(5, 7, 9)
+            val arr = longArrayOf(5, 7, 9)
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 2,
@@ -293,7 +293,7 @@ class ElementPropagatorTest {
             for (res in 0..10) {
                 for (idxV in 0..10) {
                     val pos = idxV - 1
-                    if (pos in arr.indices && res == arr[pos]) brute.add(listOf(res, idxV))
+                    if (pos in arr.indices && res == arr[pos].toInt()) brute.add(listOf(res, idxV))
                 }
             }
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
@@ -308,7 +308,7 @@ class ElementPropagatorTest {
                 numIntVars = 4,
                 intDomains = arrayOf(IntDomain(0, 3), IntDomain(1, 2), IntDomain(0, 3), IntDomain(0, 3)),
                 factors = arrayOf<Factor>(
-                    Element(idx = 1, result = 0, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 1),
+                    Element(idx = 1, result = 0, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 1),
                 ),
             )
             val brute = HashSet<List<Int>>()
@@ -334,7 +334,7 @@ class ElementPropagatorTest {
         // support > 1, so removing one supporting idx position must NOT unsupport the result value
         // until the last one goes. Wide-ish domains + branching exercise rebuild / delta / cascade
         // and the trail rollback of the counts across deep backtracking.
-        val arr = intArrayOf(5, 7, 5, 9, 7, 5) // 5×3, 7×2, 9×1
+        val arr = longArrayOf(5, 7, 5, 9, 7, 5) // 5×3, 7×2, 9×1
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -344,7 +344,7 @@ class ElementPropagatorTest {
         val brute = HashSet<List<Int>>()
         for (res in 0..12) {
             for (idxV in 1..6) {
-                if (res == arr[idxV - 1]) brute.add(listOf(res, idxV))
+                if (res == arr[idxV - 1].toInt()) brute.add(listOf(res, idxV))
             }
         }
         val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 3L)).take(100_000)
@@ -357,8 +357,8 @@ class ElementPropagatorTest {
         // Two const Elements sharing the result var: each fire's prune feeds the other (cross-factor
         // cascade), and the incremental state of each must stay sound under interleaved push/pop.
         // result(0) = arrA[idxA(1)] and result(0) = arrB[idxB(2)], overlapping constant sets.
-        val arrA = intArrayOf(2, 4, 6, 4) // values {2,4,6}
-        val arrB = intArrayOf(4, 6, 6, 8) // values {4,6,8}; overlap {4,6}
+        val arrA = longArrayOf(2, 4, 6, 4) // values {2,4,6}
+        val arrB = longArrayOf(4, 6, 6, 8) // values {4,6,8}; overlap {4,6}
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -372,7 +372,7 @@ class ElementPropagatorTest {
         for (res in 0..9) {
             for (ia in 1..4) {
                 for (ib in 1..4) {
-                    if (res == arrA[ia - 1] && res == arrB[ib - 1]) brute.add(listOf(res, ia, ib))
+                    if (res == arrA[ia - 1].toInt() && res == arrB[ib - 1].toInt()) brute.add(listOf(res, ia, ib))
                 }
             }
         }

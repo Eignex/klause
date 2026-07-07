@@ -23,7 +23,7 @@ internal class MddLinearizer(
     private val seq: IntArray,
     private val numStatesPerLayer: IntArray,
     private val layerStarts: IntArray,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val initial: Int,
     private val accepting: IntArray,
     private val recordStride: Int,
@@ -44,7 +44,7 @@ internal class MddLinearizer(
         val outCols = Array(n) { arrayOfNulls<IntArrayList>(nspl[it]) }
         val inCols = Array(n + 1) { arrayOfNulls<IntArrayList>(nspl[it]) }
         val chanCols = Array(n) { IntArrayList() }
-        val chanVal = Array(n) { IntArrayList() }
+        val chanVal = Array(n) { LongArrayList() }
         val acceptingSet = IntHashSet(accepting.size).apply { for (a in accepting) add(a) }
         val acceptCols = IntArrayList()
         val costArcs = IntArrayList()
@@ -55,15 +55,15 @@ internal class MddLinearizer(
             var p = starts[layer]
             val end = starts[layer + 1]
             while (p < end) {
-                val src = trans[p]
+                val src = trans[p].toInt()
                 val value = trans[p + 1]
-                val dst = trans[p + 2]
-                if (src in reach[layer] && value.toLong() in declared) {
+                val dst = trans[p + 2].toInt()
+                if (src in reach[layer] && value in declared) {
                     // The arc is present while its value stays in seq[layer]'s live domain.
                     val col = builder.auxColumn(
                         0L,
-                        if (live.contains(value.toLong())) 1L else 0L,
-                        presence = intArrayOf(seq[layer], value),
+                        if (live.contains(value)) 1L else 0L,
+                        presence = intArrayOf(seq[layer], value.toInt()),
                     )
                     (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
                     (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)
@@ -72,7 +72,7 @@ internal class MddLinearizer(
                     if (layer == n - 1 && dst in acceptingSet) acceptCols.add(col)
                     if (stride == 4) {
                         costArcs.add(col)
-                        costWeight.add(trans[p + 3])
+                        costWeight.add(trans[p + 3].toInt())
                     }
                 }
                 p += stride
@@ -111,7 +111,7 @@ internal class MddLinearizer(
             val vals = LongArray(k + 1)
             for (i in 0 until k) {
                 cols[i] = chanCols[layer][i]
-                vals[i] = chanVal[layer][i].toLong()
+                vals[i] = chanVal[layer][i]
             }
             cols[k] = builder.intColumn(seq[layer])
             vals[k] = -1L
@@ -156,8 +156,8 @@ internal class MddLinearizer(
             var p = starts[layer]
             val end = starts[layer + 1]
             while (p < end) {
-                if (trans[p] in reach[layer] && trans[p + 1].toLong() in dom) {
-                    reach[layer + 1].add(trans[p + 2])
+                if (trans[p].toInt() in reach[layer] && trans[p + 1] in dom) {
+                    reach[layer + 1].add(trans[p + 2].toInt())
                     arcCount++
                 }
                 p += stride

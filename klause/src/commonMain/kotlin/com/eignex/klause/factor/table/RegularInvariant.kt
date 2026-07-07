@@ -12,7 +12,7 @@ internal class RegularInvariant(
     private val seq: IntArray,
     private val numStates: Int,
     private val alphabetSize: Int,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val q0: Int,
     private val accepting: IntArray,
 ) : Invariant {
@@ -246,17 +246,17 @@ internal fun buildAcceptingSet(accepting: IntArray): IntHashSet {
 }
 
 /** Look up `δ(state, symbol)` with 1-based addressing. Returns 0 for the dead state. */
-internal fun regularDelta(transitions: IntArray, numStates: Int, alphabetSize: Int, stateQ: Int, symbol: Long): Int {
+internal fun regularDelta(transitions: LongArray, numStates: Int, alphabetSize: Int, stateQ: Int, symbol: Long): Int {
     if (stateQ < 1 || stateQ > numStates) return 0
     if (symbol < 1 || symbol > alphabetSize) return 0
-    return transitions[(stateQ - 1) * alphabetSize + (symbol - 1).toInt()]
+    return transitions[(stateQ - 1) * alphabetSize + (symbol - 1).toInt()].toInt()
 }
 
 internal fun regularAccepts(
     state: LocalSearchState,
     seq: IntArray,
     q0: Int,
-    transitions: IntArray,
+    transitions: LongArray,
     numStates: Int,
     alphabetSize: Int,
     acceptingSet: IntHashSet,
@@ -284,7 +284,7 @@ internal fun regularAcceptDistance(
     seq: IntArray,
     numStates: Int,
     alphabetSize: Int,
-    transitions: IntArray,
+    transitions: LongArray,
     q0: Int,
     acceptingSet: IntHashSet,
     getSym: (Int) -> Long,
@@ -323,7 +323,7 @@ internal fun regularRepairPath(
     seq: IntArray,
     numStates: Int,
     alphabetSize: Int,
-    transitions: IntArray,
+    transitions: LongArray,
     q0: Int,
     acceptingSet: IntHashSet,
 ): IntArray? {
@@ -380,7 +380,7 @@ internal fun regularForwardLayers(
     n: Int,
     numStates: Int,
     alphabetSize: Int,
-    transitions: IntArray,
+    transitions: LongArray,
     q0: Int,
     getSym: (Int) -> Long,
 ): Array<IntArray> {
@@ -409,7 +409,7 @@ internal fun regularBackwardLayers(
     n: Int,
     numStates: Int,
     alphabetSize: Int,
-    transitions: IntArray,
+    transitions: LongArray,
     acceptingSet: IntHashSet,
     getSym: (Int) -> Long,
 ): Array<IntArray> {

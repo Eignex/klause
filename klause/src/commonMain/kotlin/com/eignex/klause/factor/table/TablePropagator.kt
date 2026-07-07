@@ -11,7 +11,7 @@ internal class TablePropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
     private val xs: IntArray,
-    private val tuples: IntArray,
+    private val tuples: LongArray,
     private val arity: Int,
     private val numTuples: Int,
 ) : Propagator {
@@ -58,7 +58,7 @@ internal class TablePropagator(
             var feasible = true
             for (col in 0 until arity) {
                 val v = tuples[row * arity + col]
-                if (v.toLong() !in state.intDomains[xs[col]]) {
+                if (v !in state.intDomains[xs[col]]) {
                     feasible = false
                     break
                 }
@@ -73,7 +73,7 @@ internal class TablePropagator(
             } else {
                 for (col in 0 until arity) {
                     val v = tuples[row * arity + col]
-                    val off = (v.toLong() - lo[col]).toInt()
+                    val off = (v - lo[col]).toInt()
                     val bits = requireNotNull(supportBits[col])
                     bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
                 }

@@ -434,7 +434,7 @@ object SmtLibQfLia {
                     val min = vars.minOf { intDomains[it].min }
                     val max = vars.maxOf { intDomains[it].max }
                     factors.add(
-                        AllDifferent(vars = vars, domainMin = min.toInt(), domainSize = (max - min + 1).toInt()),
+                        AllDifferent(vars = vars, domainMin = min, domainSize = (max - min + 1).toInt()),
                     )
                 } else {
                     assertPairwiseNe(terms)

@@ -17,7 +17,7 @@ import com.eignex.klause.util.IntArrayList
  */
 internal class TableLinearizer(
     private val xs: IntArray,
-    private val tuples: IntArray,
+    private val tuples: LongArray,
     private val arity: Int,
     private val numTuples: Int,
 ) : Linearizer {
@@ -33,11 +33,11 @@ internal class TableLinearizer(
             var liveFeasible = true
             for (col in 0 until arity) {
                 val v = tuples[t * arity + col]
-                if (v.toLong() !in declared[col]) {
+                if (v !in declared[col]) {
                     declaredFeasible = false
                     break
                 }
-                if (v.toLong() !in live[col]) liveFeasible = false
+                if (v !in live[col]) liveFeasible = false
             }
             if (!declaredFeasible) continue
             // The selector is present while every entry stays in its column's live domain — the
@@ -45,7 +45,7 @@ internal class TableLinearizer(
             val presence = IntArray(arity * 2)
             for (col in 0 until arity) {
                 presence[col * 2] = xs[col]
-                presence[col * 2 + 1] = tuples[t * arity + col]
+                presence[col * 2 + 1] = tuples[t * arity + col].toInt()
             }
             selCols.add(builder.auxColumn(0L, if (liveFeasible) 1L else 0L, presence = presence))
             rows.add(t)
@@ -59,7 +59,7 @@ internal class TableLinearizer(
             val vals = LongArray(k + 1)
             for (s in 0 until k) {
                 cols[s] = selCols[s]
-                vals[s] = -tuples[rows[s] * arity + col].toLong()
+                vals[s] = -tuples[rows[s] * arity + col]
             }
             cols[k] = builder.intColumn(xs[col])
             vals[k] = 1L

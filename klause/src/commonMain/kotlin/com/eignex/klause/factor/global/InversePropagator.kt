@@ -6,8 +6,8 @@ import com.eignex.klause.factor.global.internals.reginFilter
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.LongHashSet
 
 /** CP propagation logic for `inverse`. */
 internal class InversePropagator(
@@ -172,6 +172,6 @@ internal class InversePropagator(
     }
 
     companion object {
-        val NO_EXCEPT = IntHashSet()
+        val NO_EXCEPT = LongHashSet()
     }
 }

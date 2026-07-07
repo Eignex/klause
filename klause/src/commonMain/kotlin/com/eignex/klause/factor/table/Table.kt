@@ -1,8 +1,10 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -26,13 +28,13 @@ class Table private constructor(
     /** The variable ids forming each candidate tuple. */
     val xs: IntArray,
     /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
-    val tuples: IntArray,
+    val tuples: LongArray,
     /** The cached tuple-derived key fragment when copying from a factor over the *same* [tuples]
      *  (a pure variable [remap]); `null` forces a fresh computation when the tuples differ. */
     cachedTupleKey: LongArray?,
 ) : Factor {
 
-    constructor(xs: IntArray, tuples: IntArray) : this(xs, tuples, null)
+    constructor(xs: IntArray, tuples: LongArray) : this(xs, tuples, null)
 
     /** Number of variables per tuple. */
     val arity: Int = xs.size
@@ -71,7 +73,7 @@ class Table private constructor(
         var w = 2
         for (r in order) {
             val base = r * arity
-            for (c in 0 until arity) words[w++] = tuples[base + c].toLong()
+            for (c in 0 until arity) words[w++] = tuples[base + c]
         }
         words
     }.also { cachedTupleKey = it }
@@ -95,10 +97,10 @@ class Table private constructor(
     override fun substituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Factor? {
         if (scale == 0 || x !in xs) return null
         val cols = xs.indices.filter { xs[it] == x }
-        val kept = (0 until numTuples).filter { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0 } }
+        val kept = (0 until numTuples).filter { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0L } }
         if (kept.isEmpty()) return null
         val newXs = IntArray(arity) { if (xs[it] == x) replacement else xs[it] }
-        val newTuples = IntArray(kept.size * arity)
+        val newTuples = LongArray(kept.size * arity)
         var w = 0
         for (r in kept) {
             for (c in 0 until arity) {
@@ -116,7 +118,7 @@ class Table private constructor(
     override fun canSubstituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Boolean {
         if (scale == 0 || x !in xs) return false
         val cols = xs.indices.filter { xs[it] == x }
-        return (0 until numTuples).any { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0 } }
+        return (0 until numTuples).any { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0L } }
     }
 
     // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so rows are sorted. Encodes
@@ -129,7 +131,8 @@ class Table private constructor(
 
     /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the
      *  one value universe, so a single map relabels the whole table. */
-    override fun remapValues(valueMap: (Int) -> Int): Factor = Table(xs, IntArray(tuples.size) { valueMap(tuples[it]) })
+    override fun remapValues(valueMap: (Int) -> Int): Factor? =
+        if (fitsInt32(tuples)) Table(xs, LongArray(tuples.size) { valueMap(tuples[it].toInt()).toLong() }) else null
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs
@@ -158,5 +161,8 @@ class Table private constructor(
     override fun asInvariant(): Invariant =
         TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar)
 
-    override fun asLinearizer(): Linearizer = TableLinearizer(xs, tuples, arity, numTuples)
+    // The LP relaxation's presence column is Int-typed; skip it for tuple values beyond Int range (the
+    // propagator/invariant still enforce the table). Sound — a best-effort relaxation may omit a factor.
+    override fun asLinearizer(): Linearizer =
+        if (fitsInt32(tuples)) TableLinearizer(xs, tuples, arity, numTuples) else NoLinearizer
 }

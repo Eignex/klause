@@ -41,7 +41,7 @@ class CpToLpRelaxationElementHullTest {
             numIntVars = 2, // 0 = idx, 1 = result
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 20)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
             ),
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
@@ -59,7 +59,7 @@ class CpToLpRelaxationElementHullTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(2, 3), IntDomain(0, 20)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
             ),
         )
         val (sol, _) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
@@ -75,7 +75,7 @@ class CpToLpRelaxationElementHullTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 20)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
             ),
         )
         // maximize result <=> minimize -result; hull caps it at the largest entry 9.
@@ -94,7 +94,7 @@ class CpToLpRelaxationElementHullTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(1, 4), IntDomain(0, 20)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 1),
+                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 1),
             ),
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
@@ -120,7 +120,7 @@ class CpToLpRelaxationElementHullTest {
                 IntDomain(8, 9),
             ),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
             ),
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L, 0L)))

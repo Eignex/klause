@@ -149,7 +149,7 @@ object Xcsp3 {
             factors.add(
                 AllDifferent(
                     vars = vars,
-                    domainMin = domainMin(vars).toInt(),
+                    domainMin = domainMin(vars),
                     domainSize = domainSpan(vars).toInt(),
                 ),
             )
@@ -309,7 +309,7 @@ object Xcsp3 {
                 // No forbidden tuple ⇒ trivially satisfied; post nothing.
                 conflicts != null && conflicts.isEmpty() -> Unit
 
-                supports != null -> factors.add(Table(xs = vars, tuples = parseTuples(supports, vars)))
+                supports != null -> factors.add(Table(xs = vars, tuples = parseTuples(supports, vars).widenToLong()))
 
                 conflicts != null -> {
                     val allowed = negativeTable(vars, parseTuples(conflicts, vars))
@@ -317,7 +317,7 @@ object Xcsp3 {
                     if (allowed.isEmpty()) {
                         factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
                     } else {
-                        factors.add(Table(xs = vars, tuples = allowed))
+                        factors.add(Table(xs = vars, tuples = allowed.widenToLong()))
                     }
                 }
 
@@ -521,14 +521,28 @@ object Xcsp3 {
             val condEl = e.child("condition")
             if (condEl != null) {
                 val selected = newAuxVar(domainMin(arr), domainMin(arr) + domainSpan(arr) - 1)
-                factors.add(Element(idx = idx, result = selected, arr = arr, arrIsVars = true, indexOffset = offset))
+                factors.add(
+                    Element(
+                        idx = idx,
+                        result = selected,
+                        arr = arr.widenToLong(),
+                        arrIsVars = true,
+                        indexOffset = offset,
+                    ),
+                )
                 postCondition(intArrayOf(1), intArrayOf(selected), condEl.textContent.trim())
                 return
             }
             val value = e.child("value")?.textContent?.trim()
                 ?: throw UnsupportedXcsp3Exception("element: missing <value> or <condition>")
             factors.add(
-                Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = true, indexOffset = offset),
+                Element(
+                    idx = idx,
+                    result = singleTermVar(value),
+                    arr = arr.widenToLong(),
+                    arrIsVars = true,
+                    indexOffset = offset,
+                ),
             )
         }
 
@@ -555,7 +569,7 @@ object Xcsp3 {
                     tuples.add(rows[r][c])
                 }
             }
-            factors.add(Table(xs = intArrayOf(i, j, v), tuples = tuples.toIntArray()))
+            factors.add(Table(xs = intArrayOf(i, j, v), tuples = tuples.toIntArray().widenToLong()))
         }
 
         private fun channel(e: XmlElement) {
@@ -668,7 +682,7 @@ object Xcsp3 {
                     seq = seq,
                     numStates = q,
                     alphabetSize = s,
-                    transitions = table,
+                    transitions = table.widenToLong(),
                     q0 = stateOf(start),
                     accepting = accepting,
                 ),
@@ -858,8 +872,10 @@ object Xcsp3 {
         private fun cardinality(e: XmlElement) {
             val vars = listVars(e)
             val valuesEl = requireNotNull(e.child("values"))
-            val values = parseInts(valuesEl.textContent)
-                ?: throw UnsupportedXcsp3Exception("cardinality: non-constant <values>")
+            val values = (
+                parseInts(valuesEl.textContent)
+                    ?: throw UnsupportedXcsp3Exception("cardinality: non-constant <values>")
+                ).widenToLong()
             // closed="true" additionally forbids any variable taking a value outside <values>.
             val closed = valuesEl.attr("closed").equals("true", ignoreCase = true)
             val occursText = requireNotNull(e.child("occurs")).textContent.trim()
@@ -1336,6 +1352,8 @@ object Xcsp3 {
         private fun listVars(e: XmlElement): IntArray = refList(
             requireNotNull(e.child("list")).textContent,
         ).toIntArray()
+
+        private fun IntArray.widenToLong(): LongArray = LongArray(size) { this[it].toLong() }
 
         /** Parse whitespace-separated integer constants, or null if [text] is null or any token
          *  is not an integer (e.g. a variable reference) — callers treat null as "not constant".
