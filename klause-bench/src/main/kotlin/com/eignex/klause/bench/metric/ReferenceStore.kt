@@ -1,10 +1,6 @@
 package com.eignex.klause.bench.metric
 
-import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import java.io.File
 
 /**
@@ -12,7 +8,6 @@ import java.io.File
  * The gap-to-optimum BO reward reads this table, and it doubles as a soundness oracle (any solver
  * beating a [proven] optimum is a bug). [objective] is in the model's orientation ([maximize]).
  */
-@Serializable
 internal data class ReferenceEntry(
     /** The instance's corpus (its source collection id, e.g. `hakank` / `minizinc-benchmarks` /
      *  `xcsp3-cop-22to25`). Part of the table key: the same [problem] name can occur in different
@@ -37,13 +32,18 @@ internal data class ReferenceEntry(
 )
 
 /**
- * The vendored reference table (`klause-bench/reference/references.json`), instance-keyed. Merges are
- * **virtual-best**: a proven optimum always wins, and among unproven bounds the tighter objective
- * (lower for minimize, higher for maximize) wins — so references only ever tighten and unproven bounds
- * stay honest. Regenerable + incremental via `bench reference`.
+ * The vendored reference table (`klause-bench/reference/references.csv`), instance-keyed. CSV (a header
+ * plus one row per instance) rather than JSON: at ~20k entries it is a few times smaller and, being
+ * line-oriented, gives clean per-instance VCS diffs (a changed optimum touches one line, not the whole
+ * file). Merges are **virtual-best**: a proven optimum always wins, and among unproven bounds the
+ * tighter objective (lower for minimize, higher for maximize) wins — so references only ever tighten
+ * and unproven bounds stay honest. Regenerable + incremental via `bench reference`.
  */
 internal object ReferenceStore {
-    private fun file() = File(CorpusFetcher.workspaceRoot(), "klause-bench/reference/references.json")
+    private val COLUMNS =
+        listOf("suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "solver", "budgetMs")
+
+    private fun file() = File(CorpusFetcher.workspaceRoot(), "klause-bench/reference/references.csv")
 
     /** Table key: (suite, problem) — a bare name is not unique across corpora. */
     private fun key(e: ReferenceEntry) = e.suite to e.problem
@@ -51,7 +51,11 @@ internal object ReferenceStore {
     fun load(): Map<Pair<String, String>, ReferenceEntry> {
         val f = file()
         if (!f.isFile) return emptyMap()
-        return Reports.json.decodeFromString<List<ReferenceEntry>>(f.readText()).associateBy { key(it) }
+        return f.readLines().asSequence()
+            .drop(1) // header
+            .filter { it.isNotBlank() }
+            .map { decode(parseCsvLine(it)) }
+            .associateBy { key(it) }
     }
 
     /** Merge [incoming] into the table (virtual-best) and write it back sorted by (suite, problem).
@@ -79,7 +83,8 @@ internal object ReferenceStore {
         }
         val f = file()
         f.parentFile?.mkdirs()
-        f.writeText(Reports.json.encodeToString(table.values.sortedWith(compareBy({ it.suite }, { it.problem }))))
+        val rows = table.values.sortedWith(compareBy({ it.suite }, { it.problem })).map { encode(it) }
+        f.writeText((listOf(COLUMNS.joinToString(",")) + rows).joinToString("\n", postfix = "\n"))
         return Triple(added, tightened, unchanged)
     }
 
@@ -90,5 +95,65 @@ internal object ReferenceStore {
         val ao = a.objective ?: return false
         val bo = b.objective ?: return true
         return if (a.maximize) ao > bo else ao < bo
+    }
+
+    private fun encode(e: ReferenceEntry): String = listOf(
+        csv(e.suite),
+        csv(e.problem),
+        e.maximize.toString(),
+        e.objective?.toString().orEmpty(),
+        e.feasible?.toString().orEmpty(),
+        e.proven.toString(),
+        e.elapsedMs.toString(),
+        csv(e.solver),
+        e.budgetMs.toString(),
+    ).joinToString(",")
+
+    private fun decode(f: List<String>): ReferenceEntry {
+        require(f.size == COLUMNS.size) { "reference row has ${f.size} fields, expected ${COLUMNS.size}: $f" }
+        return ReferenceEntry(
+            suite = f[0],
+            problem = f[1],
+            maximize = f[2].toBoolean(),
+            objective = f[3].ifEmpty { null }?.toDouble(),
+            feasible = f[4].ifEmpty { null }?.toBoolean(),
+            proven = f[5].toBoolean(),
+            elapsedMs = f[6].toLong(),
+            solver = f[7],
+            budgetMs = f[8].toLong(),
+        )
+    }
+
+    /** RFC 4180: quote a field that holds a comma, quote, CR or LF; double any interior quote. */
+    private fun csv(s: String): String =
+        if (s.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"${s.replace("\"", "\"\"")}\"" else s
+
+    /** Split one CSV record into fields, honouring quoted fields and doubled interior quotes. */
+    private fun parseCsvLine(line: String): List<String> {
+        val out = ArrayList<String>()
+        val sb = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                inQuotes && c == '"' && i + 1 < line.length && line[i + 1] == '"' -> {
+                    sb.append('"')
+                    i++
+                }
+
+                c == '"' -> inQuotes = !inQuotes
+
+                c == ',' && !inQuotes -> {
+                    out.add(sb.toString())
+                    sb.clear()
+                }
+
+                else -> sb.append(c)
+            }
+            i++
+        }
+        out.add(sb.toString())
+        return out
     }
 }
