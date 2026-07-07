@@ -69,10 +69,10 @@ class FactorRemapTest {
             "ReifiedPseudoBoolean" to ReifiedPseudoBoolean(2, intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
             "AllDifferent" to AllDifferent(intArrayOf(0, 1, 2), 0, 3),
             "AllDifferent(opt)" to AllDifferent(intArrayOf(0, 1), 0, 2, intArrayOf(pos(3), pos(4))),
-            "Element(vars)" to Element(0, 1, intArrayOf(2, 3), arrIsVars = true, indexOffset = 1),
-            "Element(const)" to Element(0, 1, intArrayOf(5, 6), arrIsVars = false, indexOffset = 1),
+            "Element(vars)" to Element(0, 1, longArrayOf(2, 3), arrIsVars = true, indexOffset = 1),
+            "Element(const)" to Element(0, 1, longArrayOf(5, 6), arrIsVars = false, indexOffset = 1),
             "Product" to Product(0, 1, 2),
-            "Table" to Table(intArrayOf(0, 1), intArrayOf(0, 0, 1, 1)),
+            "Table" to Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
             "ArrayMinMax" to ArrayMinMax(0, intArrayOf(1, 2), max = true),
             "Sort" to Sort(intArrayOf(0, 1), intArrayOf(2, 3)),
             "LexLess" to LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true),
@@ -103,16 +103,16 @@ class FactorRemapTest {
             ),
             "GlobalCardinality(lohi)" to GlobalCardinality(
                 intArrayOf(0, 1, 2),
-                intArrayOf(0, 1),
+                longArrayOf(0, 1),
                 countLow = intArrayOf(0, 0),
                 countHigh = intArrayOf(3, 3),
             ),
             "GlobalCardinality(counts)" to GlobalCardinality(
                 intArrayOf(0, 1, 2),
-                intArrayOf(0, 1),
+                longArrayOf(0, 1),
                 countVars = intArrayOf(3, 4),
             ),
-            "Regular" to Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 2, 2, 1), 1, intArrayOf(2)),
+            "Regular" to Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2)),
             "GaussianXor" to GaussianXor(
                 listOf(Xor(intArrayOf(pos(0), pos(1)), 1), Xor(intArrayOf(pos(1), pos(2)), 0)),
             ),
@@ -128,10 +128,10 @@ class FactorRemapTest {
 
     @Test
     fun `constant element array is not remapped`() {
-        val out = Element(0, 1, intArrayOf(5, 6), arrIsVars = false, indexOffset = 1).remap(boolMap, intMap) as Element
+        val out = Element(0, 1, longArrayOf(5, 6), arrIsVars = false, indexOffset = 1).remap(boolMap, intMap) as Element
         assertEquals(100, out.idx)
         assertEquals(101, out.result)
-        assertTrue(out.arr.contentEquals(intArrayOf(5, 6)), "constant array must be untouched: ${out.arr.toList()}")
+        assertTrue(out.arr.contentEquals(longArrayOf(5, 6)), "constant array must be untouched: ${out.arr.toList()}")
         assertEquals(1, out.indexOffset)
     }
 

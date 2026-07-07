@@ -12,7 +12,7 @@ internal class MddPropagator(
     private val seq: IntArray,
     private val numStatesPerLayer: IntArray,
     private val layerStarts: IntArray,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val initial: Int,
     private val accepting: IntArray,
     private val recordStride: Int,

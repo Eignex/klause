@@ -59,7 +59,7 @@ private fun reginRebuild(
     val matchVal = IntArray(cap) { -1 }
     for (i in 0 until n) {
         val j = inc.matchVar[i]
-        if (j in 0 until cap && matchVal[j] == -1 && cache.valueOfId[j].toLong() in state.intDomains[vars[i]]) {
+        if (j in 0 until cap && matchVal[j] == -1 && cache.valueOfId[j] in state.intDomains[vars[i]]) {
             matchVar[i] = j
             matchVal[j] = i
         }
@@ -111,7 +111,7 @@ private fun reginDelta(
         var brokeMatch = false
         prev.forEach { v ->
             if (v !in cur) {
-                val vid = cache.idFor(v.toInt())
+                val vid = cache.idFor(v)
                 if (vid == matchedId) {
                     brokeMatch = true // matched edge broke → re-augment
                 } else if (inc.sccId[i] == inc.sccId[n + vid]) {
@@ -134,7 +134,7 @@ private fun reginDelta(
 private fun buildValuesPerVar(state: PropagationState, vars: IntArray, cache: ReginCache, n: Int): Array<IntArray> =
     Array(n) { i ->
         val list = IntArrayList()
-        state.intDomains[vars[i]].forEach { v -> list.add(cache.idFor(v.toInt())) }
+        state.intDomains[vars[i]].forEach { v -> list.add(cache.idFor(v)) }
         list.toIntArray()
     }
 
@@ -216,7 +216,7 @@ private fun reginSccReachPrune(
             if (reached[vNode]) continue
             val hall = sccHallVars.getOrPut(inc.sccId[vNode]) { hallVarsFrom(vNode, adj, n, vars) }
             val ant = collectHoleAndBoundAntecedents(state, hall)
-            if (!state.excludeIntValue(vars[i], cache.valueOfId[vid].toLong(), ant)) {
+            if (!state.excludeIntValue(vars[i], cache.valueOfId[vid], ant)) {
                 val withI = hall.copyOf(hall.size + 1)
                 withI[hall.size] = vars[i]
                 return withI

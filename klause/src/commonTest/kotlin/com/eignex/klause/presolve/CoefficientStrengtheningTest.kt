@@ -47,11 +47,11 @@ class CoefficientStrengtheningTest {
         }
         // Probing off: root propagation leaves x0 in [0,3] ⇒ d = 2*3 + 5*1 - 8 = 3, x2's 5 clamps to 3.
         val off = strengthenedTarget(probe = false)
-        assertEquals(3, off.coeffs[off.vars.indexOf(2)], "without probing, x2's coefficient clamps to 3")
+        assertEquals(3L, off.coeffs[off.vars.indexOf(2)], "without probing, x2's coefficient clamps to 3")
         // Probing on: SAC tightens x0 to [0,2] ⇒ d = 2*2 + 5*1 - 8 = 1, both coefficients clamp to 1.
         val on = strengthenedTarget(probe = true)
-        assertEquals(1, on.coeffs[on.vars.indexOf(2)], "with probing, x2's coefficient clamps to 1")
-        assertEquals(1, on.coeffs[on.vars.indexOf(0)], "with probing, x0's coefficient clamps to 1")
+        assertEquals(1L, on.coeffs[on.vars.indexOf(2)], "with probing, x2's coefficient clamps to 1")
+        assertEquals(1L, on.coeffs[on.vars.indexOf(0)], "with probing, x0's coefficient clamps to 1")
     }
 
     private fun evalLinear(f: Linear, assign: IntArray): Boolean {

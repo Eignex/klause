@@ -57,7 +57,7 @@ class LpHullPruningTest {
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            factors = arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 2, 2, 0))),
+            factors = arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 2, 2, 0))),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1)) // minimize x0 + x1
         val engine = LpEngine(
@@ -82,8 +82,8 @@ class LpHullPruningTest {
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(
-                Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 2, 2, 0)),
-                Table(xs = intArrayOf(2, 3), tuples = intArrayOf(0, 2, 2, 0)),
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 2, 2, 0)),
+                Table(xs = intArrayOf(2, 3), tuples = longArrayOf(0, 2, 2, 0)),
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 0, 0)) // minimize x0 + x1

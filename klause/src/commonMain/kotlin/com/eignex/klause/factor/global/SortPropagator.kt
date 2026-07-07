@@ -56,14 +56,16 @@ internal class SortPropagator(
     private val pq = MinHeap(n)
     private val s1 = IntStack(n)
     private val s2 = Stack2(n)
-    private val recup = IntArray(3)
-    private val recup2 = IntArray(3)
+
+    // (root, rightMost, maxX) triples read from Stack2: slots 0/1 are node ids, slot 2 is a value.
+    private val recup = LongArray(3)
+    private val recup2 = LongArray(3)
     private var currentScc = 0
 
-    private fun xlb(i: Int) = state.intDomains[xs[i]].min.toInt()
-    private fun xub(i: Int) = state.intDomains[xs[i]].max.toInt()
-    private fun ylb(i: Int) = state.intDomains[ys[i]].min.toInt()
-    private fun yub(i: Int) = state.intDomains[ys[i]].max.toInt()
+    private fun xlb(i: Int) = state.intDomains[xs[i]].min
+    private fun xub(i: Int) = state.intDomains[xs[i]].max
+    private fun ylb(i: Int) = state.intDomains[ys[i]].min
+    private fun yub(i: Int) = state.intDomains[ys[i]].max
 
     // The active state, set per propagate() so the bound accessors above stay terse.
     private lateinit var state: PropagationState
@@ -82,10 +84,10 @@ internal class SortPropagator(
 
         // (a) Normalize ys into a non-decreasing bound chain.
         for (i in 1 until n) {
-            if (!state.tightenIntMin(ys[i], ylb(i - 1).toLong(), ant)) return false
+            if (!state.tightenIntMin(ys[i], ylb(i - 1), ant)) return false
         }
         for (i in n - 2 downTo 0) {
-            if (!state.tightenIntMax(ys[i], yub(i + 1).toLong(), ant)) return false
+            if (!state.tightenIntMax(ys[i], yub(i + 1), ant)) return false
         }
 
         // (b1) Greedy matching f: assign each ys[j] (ascending) the available xs of smallest UB.
@@ -101,7 +103,7 @@ internal class SortPropagator(
             f[j] = popF(j) ?: return false
         }
         for (i in 0 until n) {
-            if (!state.tightenIntMax(ys[i], xub(f[i]).toLong(), ant)) return false
+            if (!state.tightenIntMax(ys[i], xub(f[i]), ant)) return false
         }
 
         // (b2) Greedy matching f': assign each ys[j] (descending) the available xs of largest LB.
@@ -117,7 +119,7 @@ internal class SortPropagator(
             fPrime[j] = popFPrime(j) ?: return false
         }
         for (i in 0 until n) {
-            if (!state.tightenIntMin(ys[i], xlb(fPrime[i]).toLong(), ant)) return false
+            if (!state.tightenIntMin(ys[i], xlb(fPrime[i]), ant)) return false
         }
 
         // (c) Condense the xy-intersection graph into SCCs, then tighten each xs to the range its
@@ -147,7 +149,7 @@ internal class SortPropagator(
                 var k = 0
                 while (k < n && sccSequences[c][k] != -1 && xlb(jprime) > yub(sccSequences[c][k])) k++
                 if (k >= n || sccSequences[c][k] == -1) return false
-                if (!state.tightenIntMin(xs[jprime], ylb(sccSequences[c][k]).toLong(), ant)) return false
+                if (!state.tightenIntMin(xs[jprime], ylb(sccSequences[c][k]), ant)) return false
                 j++
             }
             c++
@@ -166,7 +168,7 @@ internal class SortPropagator(
                 var k = 0
                 while (k < n && sccSequences[c][k] != -1 && xub(jprime) < ylb(sccSequences[c][k])) k++
                 if (k >= n || sccSequences[c][k] == -1) return false
-                if (!state.tightenIntMax(xs[jprime], yub(sccSequences[c][k]).toLong(), ant)) return false
+                if (!state.tightenIntMax(xs[jprime], yub(sccSequences[c][k]), ant)) return false
                 j++
             }
             c++
@@ -213,7 +215,7 @@ internal class SortPropagator(
             do {
                 i = s1.pop()
                 sccNumbers[i] = currentScc
-            } while (s1.size > 0 && i != recup[0])
+            } while (s1.size > 0 && i != recup[0].toInt())
             currentScc++
             s2.pop()
         }
@@ -232,7 +234,7 @@ internal class SortPropagator(
         } else {
             while (s2.peek(recup) && recup[2] < ylb(node)) {
                 var i = s1.pop()
-                while (i != recup[0]) {
+                while (i != recup[0].toInt()) {
                     sccNumbers[i] = currentScc
                     i = s1.pop()
                 }
@@ -241,8 +243,8 @@ internal class SortPropagator(
                 currentScc++
             }
             s1.push(node)
-            recup[0] = node
-            recup[1] = node
+            recup[0] = node.toLong()
+            recup[1] = node.toLong()
             recup[2] = xub(f[node])
             mergeStack(node)
             var i = 0
@@ -256,20 +258,20 @@ internal class SortPropagator(
 
     private fun mergeStack(node: Int) {
         s2.peek(recup2)
-        while (!s2.isEmpty() && yub(recup2[1]) >= xlb(f[node])) {
+        while (!s2.isEmpty() && yub(recup2[1].toInt()) >= xlb(f[node])) {
             recup[0] = recup2[0]
-            recup[1] = node
+            recup[1] = node.toLong()
             recup[2] = if (recup[2] > recup2[2]) recup[2] else recup2[2]
             s2.pop()
             s2.peek(recup2)
         }
-        s2.push(recup[0], recup[1], recup[2])
+        s2.push(recup[0].toInt(), recup[1].toInt(), recup[2])
     }
 
     /** Min-key priority queue over element ids; `pop` returns the element with the smallest key. */
     private class MinHeap(capacity: Int) {
         private val elems = IntArray(capacity)
-        private val keys = IntArray(capacity)
+        private val keys = LongArray(capacity)
         private var size = 0
 
         fun clear() {
@@ -278,7 +280,7 @@ internal class SortPropagator(
 
         fun isEmpty() = size == 0
 
-        fun add(elem: Int, key: Int) {
+        fun add(elem: Int, key: Long) {
             var i = size++
             elems[i] = elem
             keys[i] = key
@@ -342,7 +344,7 @@ internal class SortPropagator(
     private class Stack2(capacity: Int) {
         private val roots = IntArray(capacity)
         private val rightMosts = IntArray(capacity)
-        private val maxXs = IntArray(capacity)
+        private val maxXs = LongArray(capacity)
         private var size = 0
 
         fun clear() {
@@ -351,7 +353,7 @@ internal class SortPropagator(
 
         fun isEmpty() = size == 0
 
-        fun push(root: Int, rightMost: Int, maxX: Int) {
+        fun push(root: Int, rightMost: Int, maxX: Long) {
             roots[size] = root
             rightMosts[size] = rightMost
             maxXs[size] = maxX
@@ -362,10 +364,11 @@ internal class SortPropagator(
             if (size > 0) size--
         }
 
-        fun peek(out: IntArray): Boolean {
+        /** Writes `(root, rightMost, maxX)` into [out]; slots 0/1 are node ids, slot 2 a value. */
+        fun peek(out: LongArray): Boolean {
             if (size == 0) return false
-            out[0] = roots[size - 1]
-            out[1] = rightMosts[size - 1]
+            out[0] = roots[size - 1].toLong()
+            out[1] = rightMosts[size - 1].toLong()
             out[2] = maxXs[size - 1]
             return true
         }

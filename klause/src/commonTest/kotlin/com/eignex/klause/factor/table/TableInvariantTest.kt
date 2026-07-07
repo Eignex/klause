@@ -24,7 +24,7 @@ class TableInvariantTest {
             numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(
-                Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 1, 2, 3)),
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3)),
             ),
         )
         val state = LocalSearchState(problem, Random(0))
@@ -43,7 +43,7 @@ class TableInvariantTest {
             numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(
-                Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 1, 2, 3)),
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3)),
             ),
         )
         val state = LocalSearchState(problem, Random(0))
@@ -63,7 +63,7 @@ class TableInvariantTest {
             numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(
-                Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 1, 2, 3)),
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3)),
             ),
         )
         val state = LocalSearchState(problem, Random(0))
@@ -83,7 +83,7 @@ class TableInvariantTest {
             numIntVars = 3,
             intDomains = Array(3) { IntDomain(1, 9) },
             factors = arrayOf<Factor>(
-                Table(xs = intArrayOf(0, 1, 2), tuples = intArrayOf(1, 2, 3, 4, 5, 6)),
+                Table(xs = intArrayOf(0, 1, 2), tuples = longArrayOf(1, 2, 3, 4, 5, 6)),
             ),
         )
         val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))

@@ -393,7 +393,7 @@ internal class GccSeparator : CutSeparator {
         if (forcedSlots > n || totalCap < n) return null // distribution infeasible: leave it to propagation
 
         var forcedSum = 0L
-        for (k in cover.indices) forcedSum = addExact(forcedSum, mulExact(low[k], cover[k].toLong()))
+        for (k in cover.indices) forcedSum = addExact(forcedSum, mulExact(low[k], cover[k]))
 
         val order = cover.indices.sortedBy { cover[it] }
         return try {
@@ -407,13 +407,13 @@ internal class GccSeparator : CutSeparator {
     }
 
     /** Spread [remaining] free slots over the residual capacities in [order] (cheapest- or dearest-first). */
-    private fun fill(base: Long, remaining: Long, cover: IntArray, cap: LongArray, order: List<Int>): Long {
+    private fun fill(base: Long, remaining: Long, cover: LongArray, cap: LongArray, order: List<Int>): Long {
         var sum = base
         var left = remaining
         for (k in order) {
             if (left == 0L) break
             val take = minOf(cap[k], left)
-            sum = addExact(sum, mulExact(take, cover[k].toLong()))
+            sum = addExact(sum, mulExact(take, cover[k]))
             left -= take
         }
         return sum

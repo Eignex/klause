@@ -42,7 +42,16 @@ class CpToLpRelaxationRegularFlowHullTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = Array(3) { IntDomain(1, 2) },
-            factors = arrayOf<Factor>(Regular(intArrayOf(0, 1, 2), 2, 2, trans, q0 = 1, accepting = intArrayOf(1))),
+            factors = arrayOf<Factor>(
+                Regular(
+                    intArrayOf(0, 1, 2),
+                    2,
+                    2,
+                    LongArray(trans.size) { trans[it].toLong() },
+                    q0 = 1,
+                    accepting = intArrayOf(1),
+                ),
+            ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1)) // minimize Σ seq
         val r = CpToLpRelaxation(p, obj, regularHull = true).build(PropagationSession(p))
@@ -71,7 +80,14 @@ class CpToLpRelaxationRegularFlowHullTest {
                 numIntVars = len,
                 intDomains = Array(len) { IntDomain(1, alphabet.toLong()) },
                 factors = arrayOf<Factor>(
-                    Regular(IntArray(len) { it }, numStates, alphabet, trans, q0, acc.toIntArray()),
+                    Regular(
+                        IntArray(len) { it },
+                        numStates,
+                        alphabet,
+                        LongArray(trans.size) { trans[it].toLong() },
+                        q0,
+                        acc.toIntArray(),
+                    ),
                 ),
             )
             val obj = LinearObjective(intCoefficients = c)

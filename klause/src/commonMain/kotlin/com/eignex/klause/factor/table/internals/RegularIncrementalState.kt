@@ -23,7 +23,7 @@ internal class RegularIncrementalState(
     private val seq: IntArray,
     private val numStates: Int,
     private val alphabetSize: Int,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val q0: Int,
     private val accepting: IntArray,
 ) {
@@ -44,7 +44,7 @@ internal class RegularIncrementalState(
     private fun delta(stateQ: Int, symbol: Long): Int {
         if (stateQ < 1 || stateQ > numStates) return 0
         if (symbol < 1 || symbol > alphabetSize) return 0
-        return transitions[(stateQ - 1) * alphabetSize + (symbol - 1).toInt()]
+        return transitions[(stateQ - 1) * alphabetSize + (symbol - 1).toInt()].toInt()
     }
 
     private fun testBit(rev: RevLongArray, layer: Int, bit: Int): Boolean =

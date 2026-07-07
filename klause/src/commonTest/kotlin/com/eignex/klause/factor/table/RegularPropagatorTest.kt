@@ -69,7 +69,7 @@ class RegularPropagatorTest {
                         seq = IntArray(n) { it },
                         numStates = 2,
                         alphabetSize = 2,
-                        transitions = transitions,
+                        transitions = LongArray(transitions.size) { transitions[it].toLong() },
                         q0 = 1,
                         accepting = intArrayOf(1, 2),
                     ),
@@ -97,7 +97,7 @@ class RegularPropagatorTest {
                     numStates = 2,
                     alphabetSize = 2,
                     // T[(q-1)*S + (s-1)] :  (1,1)→1, (1,2)→2, (2,1)→1, (2,2)→2
-                    transitions = intArrayOf(1, 2, 1, 2),
+                    transitions = longArrayOf(1, 2, 1, 2),
                     q0 = 1,
                     accepting = intArrayOf(2),
                 ),
@@ -105,7 +105,7 @@ class RegularPropagatorTest {
         )
         // Every accepted string must end in 2.
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
-            assertEquals(2, sample.ints[3], "regular violated: ints=${sample.ints.toList()}")
+            assertEquals(2L, sample.ints[3], "regular violated: ints=${sample.ints.toList()}")
         }
     }
 
@@ -121,7 +121,7 @@ class RegularPropagatorTest {
                     seq = intArrayOf(0, 1, 2, 3),
                     numStates = 2,
                     alphabetSize = 2,
-                    transitions = intArrayOf(1, 2, 1, 2),
+                    transitions = longArrayOf(1, 2, 1, 2),
                     q0 = 1,
                     accepting = intArrayOf(2),
                 ),
@@ -171,7 +171,7 @@ class RegularPropagatorTest {
                         seq = IntArray(n) { it },
                         numStates = 2,
                         alphabetSize = 2,
-                        transitions = transitions,
+                        transitions = LongArray(transitions.size) { transitions[it].toLong() },
                         q0 = 1,
                         accepting = intArrayOf(1, 2),
                     ),
@@ -245,7 +245,14 @@ class RegularPropagatorTest {
                 numIntVars = n,
                 intDomains = domains,
                 factors = arrayOf<Factor>(
-                    Regular(IntArray(n) { it }, numStates, alphabet, transitions, q0, accepting),
+                    Regular(
+                        IntArray(n) { it },
+                        numStates,
+                        alphabet,
+                        LongArray(transitions.size) { transitions[it].toLong() },
+                        q0,
+                        accepting,
+                    ),
                 ),
             )
             val params = BacktrackParams(

@@ -306,7 +306,7 @@ class FactorConflictReasonTest {
                 ),
                 GlobalCardinality(
                     xs = intArrayOf(0, 1, 2, 3),
-                    cover = intArrayOf(1),
+                    cover = longArrayOf(1),
                     countLow = intArrayOf(2),
                     countHigh = intArrayOf(2),
                     closed = false,

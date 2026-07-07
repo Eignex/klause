@@ -8,21 +8,21 @@ import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 /** CP propagation logic for `global_cardinality`. */
 internal class GlobalCardinalityPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
     private val xs: IntArray,
-    private val cover: IntArray,
+    private val cover: LongArray,
     private val countVars: IntArray?,
     private val countLow: IntArray?,
     private val countHigh: IntArray?,
     private val closed: Boolean,
     private val presents: IntArray,
-    private val coverIndexByValue: IntIntMap,
+    private val coverIndexByValue: MutableLongIntMap,
     private val definitelyPresentGccFn: (Int, PropagationState) -> Boolean,
     private val definitelyAbsentGccFn: (Int, PropagationState) -> Boolean,
 ) : Propagator {
@@ -113,7 +113,7 @@ internal class GlobalCardinalityPropagator(
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
                 val toRemove = LongArrayList()
-                d.forEach { if (!coverIndexByValue.contains(it.toInt())) toRemove.add(it) }
+                d.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(x, toRemove[k], gccAntecedents)) return false
                 }
@@ -123,7 +123,7 @@ internal class GlobalCardinalityPropagator(
         val definite = IntArray(m)
         val possible = IntArray(m)
         for (k in cover.indices) {
-            val target = cover[k].toLong()
+            val target = cover[k]
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
                 if (d.min == d.max && d.min == target) definite[k]++
@@ -166,7 +166,7 @@ internal class GlobalCardinalityPropagator(
             for (i in 0 until n) {
                 val d = state.intDomains[effectiveXs[i]]
                 var found = false
-                d.forEach { if (!found && !coverIndexByValue.contains(it.toInt())) found = true }
+                d.forEach { if (!found && !coverIndexByValue.containsKey(it)) found = true }
                 hasOtherVar[i] = found
                 if (found) any = true
             }
@@ -193,7 +193,7 @@ internal class GlobalCardinalityPropagator(
         for (i in 0 until n) {
             val d = state.intDomains[effectiveXs[i]]
             for (k in 0 until m) {
-                if (cover[k].toLong() in d) {
+                if (cover[k] in d) {
                     val eIdx = flow.addEdge(varNode[i], covNode[k], 1)
                     xToCovEdgeIdx[i][k] = eIdx
                 }
@@ -264,13 +264,13 @@ internal class GlobalCardinalityPropagator(
                 if (eIdx < 0) continue
                 if (flow.flowOf(eIdx) > 0) continue
                 if (sccId[varNode[i]] == sccId[covNode[k]]) continue
-                if (!state.excludeIntValue(effectiveXs[i], cover[k].toLong(), gccAntecedents)) return false
+                if (!state.excludeIntValue(effectiveXs[i], cover[k], gccAntecedents)) return false
             }
             val oIdx = xToOtherEdgeIdx[i]
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[varNode[i]] != sccId[otherNode]) {
                 val d = state.intDomains[effectiveXs[i]]
                 val toRemove = LongArrayList()
-                d.forEach { if (!coverIndexByValue.contains(it.toInt())) toRemove.add(it) }
+                d.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
                 for (k in 0 until toRemove.size) {
                     if (!state.excludeIntValue(effectiveXs[i], toRemove[k], gccAntecedents)) return false
                 }

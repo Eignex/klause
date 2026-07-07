@@ -7,9 +7,11 @@ import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * Shared Régin domain-consistency filtering for the alldifferent family — `AllDifferent`
@@ -39,7 +41,7 @@ import com.eignex.klause.util.MutableIntObjectMap
 internal fun reginFilter(
     state: PropagationState,
     filteredVars: IntArray,
-    exceptSet: IntHashSet,
+    exceptSet: LongHashSet,
     cache: ReginCache? = null,
 ): IntArray? {
     val n = filteredVars.size
@@ -62,14 +64,13 @@ internal fun reginFilter(
     // id; each except value gets `n` capacity-1 copies (contiguous ids) so up to n vars share it.
     // Both maps key on domain values and store non-negative ids, so -1 is a safe "absent"
     // sentinel for the primitive lookup (no real id is negative).
-    val valueId = MutableIntIntMap() // non-except value → id
-    val exceptBase = MutableIntIntMap() // except value → first of its n copy ids
-    val idToValue = IntArrayList()
+    val valueId = MutableLongIntMap() // non-except value → id
+    val exceptBase = MutableLongIntMap() // except value → first of its n copy ids
+    val idToValue = LongArrayList()
     val valuesPerVar = Array(n) { i ->
         val d = state.intDomains[filteredVars[i]]
         val list = IntArrayList()
-        d.forEach { vLong ->
-            val v = vLong.toInt()
+        d.forEach { v ->
             if (v in exceptSet) {
                 var base = exceptBase.getOrDefault(v, -1)
                 if (base < 0) {
@@ -105,8 +106,8 @@ internal fun reginFilter(
     if (cache != null) {
         for (i in 0 until n) {
             if (!cache.matchedValue.containsKey(filteredVars[i])) continue
-            val prev = cache.matchedValue.getOrDefault(filteredVars[i], 0)
-            if (prev.toLong() !in state.intDomains[filteredVars[i]]) continue // edge broke
+            val prev = cache.matchedValue.getOrDefault(filteredVars[i], 0L)
+            if (prev !in state.intDomains[filteredVars[i]]) continue // edge broke
             if (prev in exceptSet) {
                 val base = exceptBase.getOrDefault(prev, -1)
                 if (base < 0) continue
@@ -222,7 +223,7 @@ internal fun reginFilter(
             if (reachedFromFree[valNode]) continue
             val hall = hallVarsFor(valNode)
             val ant = collectHoleAndBoundAntecedents(state, hall)
-            if (!state.excludeIntValue(filteredVars[i], value.toLong(), ant)) {
+            if (!state.excludeIntValue(filteredVars[i], value, ant)) {
                 // Excluding the value emptied var i's domain: the Hall set forced out i's last
                 // feasible value. Reason = the Hall set plus i.
                 val withI = hall.copyOf(hall.size + 1)
@@ -250,7 +251,7 @@ internal fun reginFilter(
  *  the cache simply **drifts** across push/pop (a stale post-backtrack matching just costs a few
  *  more augmenting searches), like CDCL watches — no longer a [PropagationState.SnapshottablePayload]. */
 internal class ReginCache {
-    val matchedValue = MutableIntIntMap()
+    val matchedValue = MutableIntLongMap()
 
     // Unchanged-domains fast-path state: the var-id list and each var's [IntDomain] ref at the
     // last successful (null-returning) fire. Drifts across backtrack — a stale entry only ever
@@ -279,11 +280,11 @@ internal class ReginCache {
     //      state, used by [reginIncremental] for the no-except, stable-var-set path. The universe
     //      gives values stable node ids across fires (the per-fire compaction in [reginFilter] does
     //      not), which is the prerequisite for carrying reversible graph state across fires. ----
-    private val idOfValue = MutableIntIntMap()
-    val valueOfId = IntArrayList()
+    private val idOfValue = MutableLongIntMap()
+    val valueOfId = LongArrayList()
 
     /** Stable id for a domain [value] (grows the universe on first sight). */
-    fun idFor(value: Int): Int {
+    fun idFor(value: Long): Int {
         var id = idOfValue.getOrDefault(value, -1)
         if (id < 0) {
             id = valueOfId.size
@@ -299,7 +300,7 @@ internal class ReginCache {
      *  universe outgrows the current capacity. A fresh state starts invalid ([ReginIncrementalState.valid]
      *  == 0), forcing a full rebuild that re-seeds it. */
     fun incremental(state: PropagationState, vars: IntArray): ReginIncrementalState {
-        for (vi in vars) state.intDomains[vi].forEach { v -> idFor(v.toInt()) }
+        for (vi in vars) state.intDomains[vi].forEach { v -> idFor(v) }
         val need = valueOfId.size
         val cur = inc
         if (cur == null || !cur.vars.contentEquals(vars) || cur.valueCap < need) {

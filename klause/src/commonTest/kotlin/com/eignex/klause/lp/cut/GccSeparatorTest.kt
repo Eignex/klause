@@ -41,7 +41,7 @@ class GccSeparatorTest {
         // (×1) = 3+1 = 4; max fills value 2 (×2) then value 1 (×1) = 3+4+1 = 8.
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2, 3, 4, 5),
-            cover = intArrayOf(0, 1, 2),
+            cover = longArrayOf(0, 1, 2),
             countLow = intArrayOf(1, 1, 1),
             countHigh = intArrayOf(3, 3, 3),
             closed = true,
@@ -55,7 +55,7 @@ class GccSeparatorTest {
         // cover {0,1,2}, each used at most once over 3 vars ⇒ AllDifferent over {0,1,2}: Σx in [3,3].
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
-            cover = intArrayOf(0, 1, 2),
+            cover = longArrayOf(0, 1, 2),
             countLow = intArrayOf(0, 0, 0),
             countHigh = intArrayOf(1, 1, 1),
             closed = true,
@@ -68,7 +68,7 @@ class GccSeparatorTest {
     fun `cut excludes no feasible closed distribution`() {
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2, 3),
-            cover = intArrayOf(0, 1, 2),
+            cover = longArrayOf(0, 1, 2),
             countLow = intArrayOf(1, 0, 0),
             countHigh = intArrayOf(2, 2, 2),
             closed = true,
@@ -98,7 +98,7 @@ class GccSeparatorTest {
     fun `open gcc is not separated`() {
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
-            cover = intArrayOf(1, 2),
+            cover = longArrayOf(1, 2),
             countLow = intArrayOf(0, 0),
             countHigh = intArrayOf(2, 2),
             closed = false,

@@ -26,8 +26,9 @@ class Regular(
     val numStates: Int,
     /** Number of input symbols. */
     val alphabetSize: Int,
-    /** `numStates × alphabetSize` row-major transition table; 0 means no transition. */
-    val transitions: IntArray,
+    /** `numStates × alphabetSize` row-major transition table; 0 means no transition. Entries are DFA
+     *  state ids (small); the symbol axis is the row-major column index (`1..alphabetSize`). */
+    val transitions: LongArray,
     /** Initial state. */
     val q0: Int,
     /** Accepting states. */
@@ -54,7 +55,7 @@ class Regular(
         int(numStates)
         int(alphabetSize)
         int(q0)
-        ints(transitions)
+        longs(transitions)
         ints(accepting)
         ints(seq)
     }
@@ -73,7 +74,7 @@ class Regular(
             seen[t] = true
             target[s] = t
         }
-        val newTransitions = IntArray(transitions.size)
+        val newTransitions = LongArray(transitions.size)
         for (q in 1..numStates) {
             for (s in 1..alphabetSize) {
                 newTransitions[(q - 1) * alphabetSize + (target[s] - 1)] = transitions[(q - 1) * alphabetSize + (s - 1)]

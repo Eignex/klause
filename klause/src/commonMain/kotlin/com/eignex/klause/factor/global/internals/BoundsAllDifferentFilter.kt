@@ -16,8 +16,8 @@ internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): 
     val n = vars.size
     if (n < 2) return null
 
-    val lo = IntArray(n) { state.intDomains[vars[it]].min.toInt() }
-    val hi = IntArray(n) { state.intDomains[vars[it]].max.toInt() }
+    val lo = LongArray(n) { state.intDomains[vars[it]].min }
+    val hi = LongArray(n) { state.intDomains[vars[it]].max }
     val newLo = lo.copyOf()
     val newHi = hi.copyOf()
 
@@ -28,8 +28,8 @@ internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): 
     if (!changed) return null
     val ant = collectHoleAndBoundAntecedents(state, vars)
     for (i in 0 until n) {
-        if (newLo[i] > lo[i] && !state.tightenIntMin(vars[i], newLo[i].toLong(), ant)) return vars
-        if (newHi[i] < hi[i] && !state.tightenIntMax(vars[i], newHi[i].toLong(), ant)) return vars
+        if (newLo[i] > lo[i] && !state.tightenIntMin(vars[i], newLo[i], ant)) return vars
+        if (newHi[i] < hi[i] && !state.tightenIntMax(vars[i], newHi[i], ant)) return vars
     }
     return null
 }
@@ -39,36 +39,38 @@ internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): 
  * with the bounds-consistent tightened bounds and return `true` if feasible, `false` if a Hall
  * interval is over-full. López-Ortiz / Quimper / van Beek / Tremblay / Marchand (CP-AI-OR 2003).
  */
-internal fun computeBoundsAllDifferent(lo: IntArray, hi: IntArray, newLo: IntArray, newHi: IntArray): Boolean {
+internal fun computeBoundsAllDifferent(lo: LongArray, hi: LongArray, newLo: LongArray, newHi: LongArray): Boolean {
     val n = lo.size
     lo.copyInto(newLo)
     hi.copyInto(newHi)
     if (n < 2) return true
 
     if (!raiseMins(lo, hi, newLo)) return false
-    val negLo = IntArray(n) { -hi[it] }
-    val negHi = IntArray(n) { -lo[it] }
+    val negLo = LongArray(n) { -hi[it] }
+    val negHi = LongArray(n) { -lo[it] }
     val negNewLo = negLo.copyOf()
     if (!raiseMins(negLo, negHi, negNewLo)) return false
     for (i in 0 until n) newHi[i] = -negNewLo[i]
     return true
 }
 
-private fun raiseMins(lo: IntArray, hi: IntArray, outLo: IntArray): Boolean {
+private fun raiseMins(lo: LongArray, hi: LongArray, outLo: LongArray): Boolean {
     val n = lo.size
     val minsorted = (0 until n).sortedBy { lo[it] }.toIntArray()
     val maxsorted = (0 until n).sortedBy { hi[it] }.toIntArray()
 
-    val bounds = IntArray(2 * n + 2)
+    // `bounds` holds the distinct interval endpoints (values, Long); `minrank`/`maxrank` index into
+    // it, and `t`/`h` are union-find pointer chains over those indices — all small Ints.
+    val bounds = LongArray(2 * n + 2)
     val minrank = IntArray(n)
     val maxrank = IntArray(n)
     var nb = 0
-    var last = Int.MIN_VALUE
+    var last = Long.MIN_VALUE
     var i = 0
     var j = 0
     while (i < n || j < n) {
-        val nextMin = if (i < n) lo[minsorted[i]] else Int.MAX_VALUE
-        val nextMax = if (j < n) hi[maxsorted[j]] + 1 else Int.MAX_VALUE
+        val nextMin = if (i < n) lo[minsorted[i]] else Long.MAX_VALUE
+        val nextMax = if (j < n) hi[maxsorted[j]] + 1 else Long.MAX_VALUE
         val takeMin = nextMin <= nextMax
         val value = if (takeMin) nextMin else nextMax
         if (nb == 0 || value != last) {
@@ -88,7 +90,9 @@ private fun raiseMins(lo: IntArray, hi: IntArray, outLo: IntArray): Boolean {
     bounds[nb + 1] = bounds[nb] + 2
 
     val t = IntArray(nb + 2)
-    val d = IntArray(nb + 2)
+    // Interval capacities (count of values between consecutive endpoints); Long, since a wide
+    // union domain can hold more values than fit in an Int.
+    val d = LongArray(nb + 2)
     val h = IntArray(nb + 2)
     for (k in 1..nb + 1) {
         t[k] = k - 1
@@ -101,7 +105,7 @@ private fun raiseMins(lo: IntArray, hi: IntArray, outLo: IntArray): Boolean {
         val y = maxrank[v]
         var z = pathmax(t, x + 1)
         val jj = t[z]
-        if (--d[z] == 0) {
+        if (--d[z] == 0L) {
             t[z] = z + 1
             z = pathmax(t, t[z])
             t[z] = jj

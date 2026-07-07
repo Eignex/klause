@@ -20,7 +20,7 @@ import com.eignex.klause.util.IntArrayList
 internal class ElementLinearizer(
     private val idx: Int,
     private val result: Int,
-    private val arr: IntArray,
+    private val arr: LongArray,
     private val arrIsVars: Boolean,
     private val indexOffset: Int,
 ) : Linearizer {
@@ -80,7 +80,7 @@ internal class ElementLinearizer(
         val resVals = LongArray(k + 1)
         for (t in 0 until k) {
             resCols[t] = selCols[t]
-            resVals[t] = arr[positions[t]].toLong()
+            resVals[t] = arr[positions[t]] // constant value, already Long
         }
         resCols[k] = builder.intColumn(result)
         resVals[k] = -1L
@@ -92,7 +92,7 @@ internal class ElementLinearizer(
         val resCol = builder.intColumn(result)
         val rDom = builder.declaredDomain(result)
         for (t in 0 until selCols.size) {
-            val arrVar = arr[positions[t]]
+            val arrVar = arr[positions[t]].toInt() // entry is a var id when arrIsVars
             val aDom = builder.declaredDomain(arrVar)
             val m = maxOf(rDom.max, aDom.max) - minOf(rDom.min, aDom.min)
             if (m < 0L) continue // empty domain — leave that position unconstrained (sound)

@@ -20,7 +20,7 @@ import com.eignex.klause.util.MutableIntObjectMap
  */
 internal class GccCountLinearizer(
     private val xs: IntArray,
-    private val cover: IntArray,
+    private val cover: LongArray,
     private val countVars: IntArray?,
     private val presents: IntArray,
 ) : Linearizer {
@@ -33,7 +33,7 @@ internal class GccCountLinearizer(
         if (cells == 0L || cells > MAX_GCC_CELLS) return
         // Selector columns contributing to each cover value's count, accumulated across all xs.
         val selByCover = MutableIntObjectMap<IntArrayList>()
-        for (v in cover) selByCover.put(v, IntArrayList())
+        for (v in cover) selByCover.put(v.toInt(), IntArrayList())
         for (x in xs) {
             val declared = builder.declaredDomain(x)
             val live = builder.liveDomain(x)
@@ -62,7 +62,7 @@ internal class GccCountLinearizer(
         }
         // Σ_i z_{i,cover(k)} − counts(k) = 0 per cover value (a cover value in no domain forces 0).
         for (k in cover.indices) {
-            val sel = selByCover[cover[k]] ?: continue
+            val sel = selByCover[cover[k].toInt()] ?: continue
             val cols = IntArray(sel.size + 1)
             val vals = LongArray(sel.size + 1)
             for (i in 0 until sel.size) {

@@ -22,7 +22,7 @@ internal class MddIncrementalState(
     private val seq: IntArray,
     private val numStatesPerLayer: IntArray,
     private val layerStarts: IntArray,
-    private val transitions: IntArray,
+    private val transitions: LongArray,
     private val initial: Int,
     private val accepting: IntArray,
     private val recordStride: Int,
@@ -66,10 +66,10 @@ internal class MddIncrementalState(
         var p = layerStarts[i]
         val end = layerStarts[i + 1]
         while (p < end) {
-            val src = transitions[p]
+            val src = transitions[p].toInt()
             val sym = transitions[p + 1]
-            val dst = transitions[p + 2]
-            if (src in 0 until numI && dst in 0 until numN && sym.toLong() in d.min..d.max && testBit(fwd, i, src)) {
+            val dst = transitions[p + 2].toInt()
+            if (src in 0 until numI && dst in 0 until numN && sym in d.min..d.max && testBit(fwd, i, src)) {
                 scratch[dst ushr 6] = scratch[dst ushr 6] or (1L shl (dst and 63))
             }
             p += recordStride
@@ -86,10 +86,10 @@ internal class MddIncrementalState(
         var p = layerStarts[i]
         val end = layerStarts[i + 1]
         while (p < end) {
-            val src = transitions[p]
+            val src = transitions[p].toInt()
             val sym = transitions[p + 1]
-            val dst = transitions[p + 2]
-            if (src in 0 until numI && dst in 0 until numN && sym.toLong() in d.min..d.max &&
+            val dst = transitions[p + 2].toInt()
+            if (src in 0 until numI && dst in 0 until numN && sym in d.min..d.max &&
                 testBit(fwd, i, src) && testBit(bwd, i + 1, dst)
             ) {
                 scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
@@ -128,13 +128,13 @@ internal class MddIncrementalState(
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
             while (p < end) {
-                val src = transitions[p]
+                val src = transitions[p].toInt()
                 val sym = transitions[p + 1]
-                val dst = transitions[p + 2]
-                if (sym.toLong() in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
+                val dst = transitions[p + 2].toInt()
+                if (sym in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
                     testBit(fwd, i, src) && testBit(bwd, i + 1, dst)
                 ) {
-                    val off = sym.toLong() - d.min
+                    val off = sym - d.min
                     survives[(off ushr 6).toInt()] = survives[(off ushr 6).toInt()] or (1L shl (off and 63L).toInt())
                 }
                 p += recordStride
@@ -165,11 +165,11 @@ internal class MddIncrementalState(
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
             while (p < end) {
-                val src = transitions[p]
+                val src = transitions[p].toInt()
                 val sym = transitions[p + 1]
-                val dst = transitions[p + 2]
-                val ww = transitions[p + 3].toLong()
-                if (sym.toLong() in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
+                val dst = transitions[p + 2].toInt()
+                val ww = transitions[p + 3]
+                if (sym in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
                     testBit(fwd, i, src) && testBit(fwd, i + 1, dst)
                 ) {
                     val nm = minCost[i][src] + ww

@@ -264,7 +264,7 @@ internal fun Lowering.assertAllDifferent(terms: List<IntExpr>) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
             val (dMin, span) = domainMinAndSpan(ids)
-            factors += AllDifferentFactor(ids, dMin.toInt(), span.toInt())
+            factors += AllDifferentFactor(ids, dMin, span.toInt())
             return
         }
     }
@@ -382,7 +382,7 @@ internal fun Lowering.assertAllDifferentOpt(expr: AllDifferentOpt) {
         val ids = IntArray(lifted.size) { intVarOf((lifted[it] as IntRef).name) }
         if (ids.toSet().size == ids.size) {
             val (dMin, span) = domainMinAndSpan(ids)
-            factors += AllDifferentFactor(ids, dMin.toInt(), span.toInt(), presents = presentLits)
+            factors += AllDifferentFactor(ids, dMin, span.toInt(), presents = presentLits)
             return
         }
     }
@@ -450,7 +450,7 @@ internal fun Lowering.assertGccOpt(expr: GccExprOpt) {
     val xsIds = liftToIntRefIds(expr.xs, "gccOpt", term = "xs")
     factors += GccFactor(
         xs = xsIds,
-        cover = expr.cover.toIntArray(),
+        cover = expr.cover.map { it.toLong() }.toLongArray(),
         countLow = expr.low.toIntArray(),
         countHigh = expr.high.toIntArray(),
         closed = expr.closed,
@@ -514,7 +514,7 @@ internal fun Lowering.assertRegular(expr: RegularExpr) {
         seq = seqIds,
         numStates = expr.numStates,
         alphabetSize = expr.alphabetSize,
-        transitions = expr.transitions.toIntArray(),
+        transitions = expr.transitions.map { it.toLong() }.toLongArray(),
         q0 = expr.q0,
         accepting = expr.accepting.toIntArray(),
     )

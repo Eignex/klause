@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
 
 /** CP propagation logic for `all_different`. */
 internal class AllDifferentPropagator(
@@ -16,9 +16,9 @@ internal class AllDifferentPropagator(
     val intVars: IntArray,
     private val vars: IntArray,
     private val presents: IntArray,
-    private val exceptSet: IntArray,
+    private val exceptSet: LongArray,
     private val boundsConsistent: Boolean,
-    private val exceptValues: IntHashSet,
+    private val exceptValues: LongHashSet,
     private val definitelyPresentPropFn: (Int, PropagationState) -> Boolean,
 ) : Propagator {
 

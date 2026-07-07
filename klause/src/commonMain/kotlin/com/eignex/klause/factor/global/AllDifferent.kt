@@ -4,6 +4,7 @@ import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
@@ -14,9 +15,10 @@ import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntIntMap
 
 /**
@@ -33,7 +35,7 @@ class AllDifferent(
     /** Integer variable ids required to be pairwise distinct. */
     val vars: IntArray,
     /** Minimum value across the shared value domain. */
-    val domainMin: Int,
+    val domainMin: Long,
     /** Number of values in the shared value domain. */
     val domainSize: Int,
     /** Per-position presence literals; empty for the non-opt fast path. When non-empty,
@@ -46,7 +48,7 @@ class AllDifferent(
      *  Empty for plain all-different — then this factor behaves exactly as before. Excepted
      *  values are modelled inside `reginFilter` as capacity-n value copies, so the exact
      *  Hall/matching machinery applies unchanged. */
-    val exceptSet: IntArray = EmptyIntArray,
+    val exceptSet: LongArray = EmptyLongArray,
     /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller
      *  asked for bounds-consistency rather than full GAC (e.g. ghoulomb's `distinct ::bounds`,
      *  Régin's matching/SCC/Hall machinery is then skipped in favour of a much cheaper
@@ -64,16 +66,16 @@ class AllDifferent(
     }
 
     /** Canonical excepted values (deduped, sorted) for [structuralKey] / [remap]. */
-    private val exceptSorted: IntArray =
-        if (exceptSet.isEmpty()) EmptyIntArray else exceptSet.distinct().sorted().toIntArray()
+    private val exceptSorted: LongArray =
+        if (exceptSet.isEmpty()) EmptyLongArray else exceptSet.distinct().sorted().toLongArray()
 
     /** Membership view of [exceptSet] for the hot value checks; the shared empty set when none. */
     @Suppress("EXPOSED_PROPERTY_TYPE")
-    val exceptValues: IntHashSet =
+    val exceptValues: LongHashSet =
         if (exceptSet.isEmpty()) {
             AllDifferentInvariant.NO_EXCEPT
         } else {
-            IntHashSet(
+            LongHashSet(
                 exceptSet.size,
             ).also { s -> for (e in exceptSet) s.add(e) }
         }
@@ -85,11 +87,11 @@ class AllDifferent(
     // filtering remains sound under "this position might still go absent".
 
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ALL_DIFFERENT) {
-        int(domainMin)
+        long(domainMin)
         int(domainSize)
         sortedInts(vars)
         sortedInts(presents)
-        sortedInts(exceptSorted)
+        longs(exceptSorted)
         bool(boundsConsistent)
     }
 
@@ -99,15 +101,21 @@ class AllDifferent(
 
     /** Plain all-different names no value, so any relabeling leaves it unchanged; with an
      *  excepted-value set the excepted values are named and must be relabeled too (#374). */
-    override fun remapValues(valueMap: (Int) -> Int): Factor = if (exceptSet.isEmpty()) {
+    override fun remapValues(valueMap: (Int) -> Int): Factor? = if (exceptSet.isEmpty()) {
         this
+    } else if (!fitsInt32(exceptSet)) {
+        // An excepted value beyond Int range can't ride the `(Int)->Int` relabeling without truncating;
+        // decline value symmetry (sound — plain all-different with wide except stays as-is, unrelabeled).
+        null
     } else {
         AllDifferent(
             vars,
             domainMin,
             domainSize,
             presents,
-            IntArray(exceptSet.size) { valueMap(exceptSet[it]) },
+            // valueMap is the engine's (Int) -> Int relabeling; excepted values ride through it
+            // via the Int bridge (relabeling is only defined over the compact Int value space).
+            LongArray(exceptSet.size) { valueMap(exceptSet[it].toInt()).toLong() },
             boundsConsistent,
         )
     }
@@ -161,15 +169,21 @@ class AllDifferent(
         }
         components.add(order.subList(start, order.size).map { vars[it] })
         if (components.size == 1) return FactorReduction.Unchanged
-        val replacement = components.mapNotNull { group ->
-            if (group.size < 2) return@mapNotNull null
+        val replacement = ArrayList<Factor>(components.size)
+        for (group in components) {
+            if (group.size < 2) continue
             var lo = Long.MAX_VALUE
             var hi = Long.MIN_VALUE
             for (v in group) {
                 lo = minOf(lo, domains[v].min)
                 hi = maxOf(hi, domains[v].max)
             }
-            AllDifferent(group.toIntArray(), domainMin = lo.toInt(), domainSize = (hi - lo + 1).toInt())
+            // domainSize is an Int-sized value-span used to size occurrence/matching scratch; a
+            // component whose value range overflows Int can't be represented, so leave the whole
+            // constraint intact rather than emit an unsound split (Régin GAC still runs on it).
+            val span = hi - lo + 1
+            if (span > Int.MAX_VALUE) return FactorReduction.Unchanged
+            replacement.add(AllDifferent(group.toIntArray(), domainMin = lo, domainSize = span.toInt()))
         }
         return FactorReduction.Rewrite(replacement)
     }

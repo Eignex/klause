@@ -2,9 +2,10 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapVars
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -35,8 +36,9 @@ class Element private constructor(
     val idx: Int,
     /** Result variable id (`result = arr(idx - indexOffset)`). */
     val result: Int,
-    /** The indexed array: variable ids when [arrIsVars], else constant values. */
-    val arr: IntArray,
+    /** The indexed array: variable ids (stored as [Long], each fits [Int]) when [arrIsVars], else
+     *  constant values (may span the full [Long] range). */
+    val arr: LongArray,
     /** Whether [arr] holds variable ids (true) or constants (false). */
     val arrIsVars: Boolean,
     /** Integer representing index 0 of [arr]. */
@@ -46,7 +48,7 @@ class Element private constructor(
     cachedArrKey: LongArray?,
 ) : Factor {
 
-    constructor(idx: Int, result: Int, arr: IntArray, arrIsVars: Boolean, indexOffset: Int = 1) :
+    constructor(idx: Int, result: Int, arr: LongArray, arrIsVars: Boolean, indexOffset: Int = 1) :
         this(idx, result, arr, arrIsVars, indexOffset, null)
 
     init {
@@ -59,10 +61,21 @@ class Element private constructor(
     // variable-array remap rewrites [arr], so its key is recomputed (cache not forwarded).
     private var cachedArrKey: LongArray? = cachedArrKey
 
-    private fun arrKey(): LongArray = cachedArrKey ?: StructuralKey.words { ints(arr) }.also { cachedArrKey = it }
+    private fun arrKey(): LongArray = cachedArrKey ?: StructuralKey.words {
+        long(arr.size.toLong())
+        for (x in arr) long(x)
+    }.also { cachedArrKey = it }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = if (arrIsVars) {
-        Element(intMap[idx], intMap[result], arr.remapVars(intMap), arrIsVars, indexOffset, null)
+        // Entries are var ids stored as Long; remap through the Int var map and restore to Long.
+        Element(
+            intMap[idx],
+            intMap[result],
+            LongArray(arr.size) { intMap[arr[it].toInt()].toLong() },
+            arrIsVars,
+            indexOffset,
+            null,
+        )
     } else {
         Element(intMap[idx], intMap[result], arr, arrIsVars, indexOffset, arrKey())
     }
@@ -73,7 +86,7 @@ class Element private constructor(
     // / array-variable roles read a value directly, so those decline. Requires `x` to appear solely as
     // the index (no double role) so the rewrite removes every occurrence.
     override fun substituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Factor? =
-        if (x == idx && scale == 1 && x != result && (!arrIsVars || x !in arr)) {
+        if (x == idx && scale == 1 && x != result && (!arrIsVars || x.toLong() !in arr)) {
             Element(replacement, result, arr, arrIsVars, indexOffset - offset)
         } else {
             null
@@ -101,7 +114,8 @@ class Element private constructor(
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray =
-        if (arrIsVars) intArrayOf(idx, result) + arr else intArrayOf(idx, result)
+        // When arrIsVars the entries are var ids stored as Long; narrow each back to an Int var id.
+        if (arrIsVars) intArrayOf(idx, result) + IntArray(arr.size) { arr[it].toInt() } else intArrayOf(idx, result)
 
     // A constant array is embedded in the key but is not part of [intVars], so its size must be added
     // explicitly; a variable array is already counted via [intVars].
@@ -121,15 +135,15 @@ class Element private constructor(
             val pos = idxDom.min - indexOffset
             if (pos < 0 || pos >= arr.size) return FactorReduction.Unchanged
             val p = pos.toInt()
-            if (!arrIsVars) return FactorReduction.Rewrite(listOf(resultEquals(arr[p].toLong())))
-            val v = arr[p]
+            if (!arrIsVars) return FactorReduction.Rewrite(listOf(resultEquals(arr[p])))
+            val v = arr[p].toInt() // entry is a var id when arrIsVars
             return if (v == result) FactorReduction.Rewrite(emptyList()) else FactorReduction.Rewrite(listOf(equate(v)))
         }
         if (!arrIsVars && arr.all { it == arr[0] }) {
             val lo = indexOffset
             val hi = indexOffset + arr.size - 1
             if (maxOf(idxDom.min, lo.toLong()) > minOf(idxDom.max, hi.toLong())) return FactorReduction.Unchanged
-            return FactorReduction.Rewrite(listOf(resultEquals(arr[0].toLong())), mapOf(idx to lo..hi))
+            return FactorReduction.Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi))
         }
         return FactorReduction.Unchanged
     }
@@ -158,5 +172,8 @@ class Element private constructor(
         indexOffset,
     )
 
-    override fun asLinearizer(): Linearizer = ElementLinearizer(idx, result, arr, arrIsVars, indexOffset)
+    // The LP relaxation's presence/const columns are Int-typed; skip it when a constant array value
+    // exceeds Int range (var-id arrays always fit). Sound — the propagator/invariant still enforce it.
+    override fun asLinearizer(): Linearizer =
+        if (fitsInt32(arr)) ElementLinearizer(idx, result, arr, arrIsVars, indexOffset) else NoLinearizer
 }

@@ -128,6 +128,13 @@ internal class StructuralKeyBuilder {
         for (x in xs) buf[size++] = x.toLong()
     }
 
+    /** A positional long array (order significant): length, then elements in order. */
+    fun longs(xs: LongArray) {
+        append(xs.size.toLong())
+        reserve(xs.size)
+        for (x in xs) buf[size++] = x
+    }
+
     /** A set-semantics int array (order insignificant): length, then elements ascending. */
     fun sortedInts(xs: IntArray) {
         append(xs.size.toLong())

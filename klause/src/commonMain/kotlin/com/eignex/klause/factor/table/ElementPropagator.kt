@@ -18,7 +18,7 @@ internal class ElementPropagator(
     val intVars: IntArray,
     private val idx: Int,
     private val result: Int,
-    private val arr: IntArray,
+    private val arr: LongArray,
     private val arrIsVars: Boolean,
     private val indexOffset: Int,
 ) : Propagator {
@@ -82,13 +82,16 @@ internal class ElementPropagator(
         var toExclude: LongArrayList? = null
         state.intDomains[idx].forEach { iv ->
             val pos = iv - indexOffset
-            if (pos in 0 until len && !elementDomainsIntersect(state.intDomains[arr[pos.toInt()]], resultDom)) {
+            if (pos in 0 until len && !elementDomainsIntersect(state.intDomains[arr[pos.toInt()].toInt()], resultDom)) {
                 (toExclude ?: LongArrayList().also { toExclude = it }).add(iv)
             }
         }
         toExclude?.let { ex ->
             for (i in 0 until ex.size) {
-                val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result, arr[(ex[i] - indexOffset).toInt()]))
+                val ant = collectHoleAndBoundAntecedents(
+                    state,
+                    intArrayOf(result, arr[(ex[i] - indexOffset).toInt()].toInt()),
+                )
                 if (!state.excludeIntValue(idx, ex[i], ant)) return false
             }
         }
@@ -104,7 +107,7 @@ internal class ElementPropagator(
         state.intDomains[result].forEach { rv ->
             var supported = false
             for (k in 0 until positions.size) {
-                if (rv in state.intDomains[arr[positions[k]]]) {
+                if (rv in state.intDomains[arr[positions[k]].toInt()]) {
                     supported = true
                     break
                 }
@@ -112,7 +115,7 @@ internal class ElementPropagator(
             if (!supported) (resExclude ?: LongArrayList().also { resExclude = it }).add(rv)
         }
         resExclude?.let { ex ->
-            val arrVars = IntArray(positions.size) { arr[positions[it]] }
+            val arrVars = IntArray(positions.size) { arr[positions[it]].toInt() }
             val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx) + arrVars)
             for (i in 0 until ex.size) if (!state.excludeIntValue(result, ex[i], ant)) return false
         }
@@ -121,7 +124,7 @@ internal class ElementPropagator(
         if (d.min == d.max) {
             val pos = d.min - indexOffset
             if (pos in 0 until len) {
-                val sel = arr[pos.toInt()]
+                val sel = arr[pos.toInt()].toInt()
                 val resD = state.intDomains[result]
                 var selExclude: LongArrayList? = null
                 state.intDomains[sel].forEach { v ->

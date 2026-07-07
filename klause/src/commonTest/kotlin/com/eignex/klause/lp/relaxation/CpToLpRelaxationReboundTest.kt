@@ -146,7 +146,7 @@ class CpToLpRelaxationReboundTest {
             0,
             2,
             arrayOf(IntDomain(0, 4), IntDomain(0, 5)),
-            arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 5, 2, 2, 4, 0))),
+            arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 5, 2, 2, 4, 0))),
         )
         val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0)), tableHull = true)
         val base = relaxer.build(PropagationSession(problem))
@@ -184,7 +184,7 @@ class CpToLpRelaxationReboundTest {
             4,
             Array(4) { IntDomain(0, 3) },
             arrayOf<Factor>(
-                GlobalCardinality(xs = intArrayOf(0, 1), cover = intArrayOf(1, 2), countVars = intArrayOf(2, 3)),
+                GlobalCardinality(xs = intArrayOf(0, 1), cover = longArrayOf(1, 2), countVars = intArrayOf(2, 3)),
             ),
         )
         val relaxer =
@@ -205,7 +205,7 @@ class CpToLpRelaxationReboundTest {
             2,
             arrayOf(IntDomain(0, 3), IntDomain(0, 9)),
             arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
             ),
         )
         val relaxer =

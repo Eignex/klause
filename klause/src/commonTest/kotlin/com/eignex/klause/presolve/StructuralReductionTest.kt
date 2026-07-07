@@ -31,14 +31,14 @@ class StructuralReductionTest {
             0,
             2,
             arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
-            listOf(Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false)),
+            listOf(Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false)),
         )
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
         assertEquals(listOf(1), eq.vars.toList())
-        assertEquals(20, eq.bound)
+        assertEquals(20L, eq.bound)
     }
 
     @Test
@@ -48,13 +48,13 @@ class StructuralReductionTest {
             0,
             5,
             Array(5) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
-            listOf(Element(idx = 0, result = 1, arr = intArrayOf(2, 3, 4), arrIsVars = true)),
+            listOf(Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true)),
         )
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
-        assertEquals(0, eq.bound)
+        assertEquals(0L, eq.bound)
         assertEquals(setOf(1, 2), eq.vars.toSet())
     }
 
@@ -65,7 +65,7 @@ class StructuralReductionTest {
             0,
             3,
             Array(3) { IntDomain(0, 9) }.also { it[0] = IntDomain(1, 1) },
-            listOf(Element(idx = 0, result = 1, arr = intArrayOf(1, 2), arrIsVars = true)),
+            listOf(Element(idx = 0, result = 1, arr = longArrayOf(1, 2), arrIsVars = true)),
         )
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.isEmpty(), "the vacuous element drops with no replacement")
@@ -78,13 +78,13 @@ class StructuralReductionTest {
             0,
             2,
             arrayOf(IntDomain(0, 5), IntDomain(0, 10)),
-            listOf(Element(idx = 0, result = 1, arr = intArrayOf(7, 7, 7), arrIsVars = false)),
+            listOf(Element(idx = 0, result = 1, arr = longArrayOf(7, 7, 7), arrIsVars = false)),
         )
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
-        assertEquals(7, theLinear(out).bound)
-        assertEquals(1, out.intDomains[0].min, "index lower bound clamped to the array's first position")
-        assertEquals(3, out.intDomains[0].max, "index upper bound clamped to the array's last position")
+        assertEquals(7L, theLinear(out).bound)
+        assertEquals(1L, out.intDomains[0].min, "index lower bound clamped to the array's first position")
+        assertEquals(3L, out.intDomains[0].max, "index upper bound clamped to the array's last position")
     }
 
     @Test
@@ -93,7 +93,7 @@ class StructuralReductionTest {
             0,
             2,
             arrayOf(IntDomain(1, 3), IntDomain(0, 100)),
-            listOf(Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false)),
+            listOf(Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false)),
         )
         assertTrue(Presolve.reduceStructural(problem).isEmpty, "no fixed index and a varied array is the no-op signal")
     }
@@ -111,7 +111,7 @@ class StructuralReductionTest {
         val ne = theLinear(out)
         assertEquals(LinearOp.NE, ne.op)
         assertEquals(setOf(0, 1), ne.vars.toSet())
-        assertEquals(0, ne.bound)
+        assertEquals(0L, ne.bound)
     }
 
     @Test

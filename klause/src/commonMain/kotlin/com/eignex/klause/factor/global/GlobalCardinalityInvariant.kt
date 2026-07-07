@@ -10,18 +10,18 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.MutableLongIntMap
 
 /** LS invariant logic for `global_cardinality`. */
 internal class GlobalCardinalityInvariant(
     private val xs: IntArray,
-    private val cover: IntArray,
+    private val cover: LongArray,
     private val countVars: IntArray?,
     private val countLow: IntArray?,
     private val countHigh: IntArray?,
     private val closed: Boolean,
     private val presents: IntArray,
-    private val coverIndexByValue: IntIntMap,
+    private val coverIndexByValue: MutableLongIntMap,
     private val presentGccInvFn: (LocalSearchState, Int) -> Boolean,
 ) : Invariant {
 
@@ -30,7 +30,7 @@ internal class GlobalCardinalityInvariant(
         for (i in xs.indices) {
             if (!presentGccInvFn(state, i)) continue
             val value = state.assignment.intValue(xs[i])
-            val idx = coverIndexByValue[value.toInt()]
+            val idx = coverIndexByValue.getOrDefault(value, -1)
             if (idx < 0) continue
             counts[idx]++
         }
@@ -53,9 +53,9 @@ internal class GlobalCardinalityInvariant(
         val occurrencesInXs = countPresentOccurrences(xs, intVar, state) { s, i -> presentGccInvFn(s, i) }
         if (occurrencesInXs > 0) {
             val old = state.assignment.intValue(intVar)
-            val oldIdx = coverIndexByValue[old.toInt()]
+            val oldIdx = coverIndexByValue.getOrDefault(old, -1)
             if (oldIdx >= 0) sim[oldIdx] -= occurrencesInXs
-            val newIdx = coverIndexByValue[newValue.toInt()]
+            val newIdx = coverIndexByValue.getOrDefault(newValue, -1)
             if (newIdx >= 0) sim[newIdx] += occurrencesInXs
         }
         val after = rawDegree(state, sim, ovVar = intVar, ovVal = newValue)
@@ -69,9 +69,9 @@ internal class GlobalCardinalityInvariant(
         val beforeDeg = state.factorDegree[factorId]
         val occurrencesInXs = countPresentOccurrences(xs, intVar, state) { s, i -> presentGccInvFn(s, i) }
         if (occurrencesInXs > 0) {
-            val oldIdx = coverIndexByValue[oldValue.toInt()]
+            val oldIdx = coverIndexByValue.getOrDefault(oldValue, -1)
             if (oldIdx >= 0) s.counts[oldIdx] -= occurrencesInXs
-            val curIdx = coverIndexByValue[cur.toInt()]
+            val curIdx = coverIndexByValue.getOrDefault(cur, -1)
             if (curIdx >= 0) s.counts[curIdx] += occurrencesInXs
         }
         val afterDeg = rawDegree(state, s.counts, ovVar = -1, ovVal = 0L)
@@ -85,7 +85,7 @@ internal class GlobalCardinalityInvariant(
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val wasP = presentGccInvFn(state, i)
-            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i]).toInt()]
+            val coverIdx = coverIndexByValue.getOrDefault(state.assignment.intValue(xs[i]), -1)
             if (coverIdx < 0) continue
             sim[coverIdx] += if (wasP) -1 else +1
         }
@@ -101,7 +101,7 @@ internal class GlobalCardinalityInvariant(
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
             val nowP = presentGccInvFn(state, i)
-            val coverIdx = coverIndexByValue[state.assignment.intValue(xs[i]).toInt()]
+            val coverIdx = coverIndexByValue.getOrDefault(state.assignment.intValue(xs[i]), -1)
             if (coverIdx < 0) continue
             s.counts[coverIdx] += if (nowP) +1 else -1
         }
@@ -146,18 +146,18 @@ internal class GlobalCardinalityInvariant(
                 for (i in xs.indices) {
                     if (!presentGccInvFn(state, i)) continue
                     val cur = state.assignment.intValue(xs[i])
-                    if (cur != coverVal.toLong() && coverVal.toLong() in state.problem.intDomains[xs[i]]) {
-                        sink.addChannelingIntSet(state, xs[i], coverVal.toLong())
+                    if (cur != coverVal && coverVal in state.problem.intDomains[xs[i]]) {
+                        sink.addChannelingIntSet(state, xs[i], coverVal)
                     }
                 }
             } else {
                 for (i in xs.indices) {
                     if (!presentGccInvFn(state, i)) continue
                     val cur = state.assignment.intValue(xs[i])
-                    if (cur != coverVal.toLong()) continue
+                    if (cur != coverVal) continue
                     val d = state.problem.intDomains[xs[i]]
                     var pick: Long? = null
-                    d.forEach { if (pick == null && it != coverVal.toLong()) pick = it }
+                    d.forEach { if (pick == null && it != coverVal) pick = it }
                     val p = pick
                     if (p != null) sink.addChannelingIntSet(state, xs[i], p)
                 }
@@ -167,11 +167,11 @@ internal class GlobalCardinalityInvariant(
             for (i in xs.indices) {
                 if (!presentGccInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
-                if (coverIndexByValue.contains(cur.toInt())) continue
+                if (coverIndexByValue.containsKey(cur)) continue
                 val d = state.problem.intDomains[xs[i]]
                 for (cv in cover) {
-                    if (cv.toLong() in d && cv.toLong() != cur) {
-                        sink.addChannelingIntSet(state, xs[i], cv.toLong())
+                    if (cv in d && cv != cur) {
+                        sink.addChannelingIntSet(state, xs[i], cv)
                         break
                     }
                 }
@@ -198,7 +198,7 @@ internal class GlobalCardinalityInvariant(
         for (i in xs.indices) {
             if (!presentGccInvFn(state, i)) continue
             if (state.assumptions.isFrozenInt(xs[i])) {
-                val idx = coverIndexByValue[state.assignment.intValue(xs[i]).toInt()]
+                val idx = coverIndexByValue.getOrDefault(state.assignment.intValue(xs[i]), -1)
                 if (idx >= 0) {
                     counts[idx]++
                 } else if (closed) {
@@ -215,7 +215,7 @@ internal class GlobalCardinalityInvariant(
             for (k in cover.indices) {
                 while (counts[k] < lo[k]) {
                     val pos = takeFreeFor(state, free, assigned, cover[k]) ?: return false
-                    state.assignment.setInt(xs[pos], cover[k].toLong())
+                    state.assignment.setInt(xs[pos], cover[k])
                     counts[k]++
                 }
             }
@@ -224,7 +224,7 @@ internal class GlobalCardinalityInvariant(
                 if (assigned[pos]) continue
                 val pick = pickUnderHigh(state, xs[pos], counts, hi) ?: return false
                 state.assignment.setInt(xs[pos], pick)
-                val idx = coverIndexByValue[pick.toInt()]
+                val idx = coverIndexByValue.getOrDefault(pick, -1)
                 if (idx >= 0) counts[idx]++
             }
         } else {
@@ -234,7 +234,7 @@ internal class GlobalCardinalityInvariant(
                 val pick = firstCoverInDomain(state, xs[pos])
                     ?: if (closed) return false else firstInDomain(state, xs[pos])
                 state.assignment.setInt(xs[pos], pick)
-                val idx = coverIndexByValue[pick.toInt()]
+                val idx = coverIndexByValue.getOrDefault(pick, -1)
                 if (idx >= 0) counts[idx]++
             }
             for (k in cover.indices) {
@@ -250,11 +250,11 @@ internal class GlobalCardinalityInvariant(
         return true
     }
 
-    private fun takeFreeFor(state: LocalSearchState, free: IntArrayList, assigned: BooleanArray, value: Int): Int? {
+    private fun takeFreeFor(state: LocalSearchState, free: IntArrayList, assigned: BooleanArray, value: Long): Int? {
         for (fi in 0 until free.size) {
             val pos = free[fi]
             if (assigned[pos]) continue
-            if (value.toLong() in state.problem.intDomains[xs[pos]]) {
+            if (value in state.problem.intDomains[xs[pos]]) {
                 assigned[pos] = true
                 return pos
             }
@@ -264,14 +264,14 @@ internal class GlobalCardinalityInvariant(
 
     private fun pickUnderHigh(state: LocalSearchState, varId: Int, counts: IntArray, hi: IntArray): Long? {
         for (k in cover.indices) {
-            if (counts[k] < hi[k] && cover[k].toLong() in state.problem.intDomains[varId]) return cover[k].toLong()
+            if (counts[k] < hi[k] && cover[k] in state.problem.intDomains[varId]) return cover[k]
         }
         return if (closed) null else firstInDomain(state, varId)
     }
 
     private fun firstCoverInDomain(state: LocalSearchState, varId: Int): Long? {
         val d = state.problem.intDomains[varId]
-        for (cv in cover) if (cv.toLong() in d) return cv.toLong()
+        for (cv in cover) if (cv in d) return cv
         return null
     }
 
@@ -307,7 +307,7 @@ internal class GlobalCardinalityInvariant(
             val p = if (controlled) !presentGccInvFn(state, i) else presentGccInvFn(state, i)
             if (!p) continue
             val v = if (xs[i] == ovVar) ovVal else state.assignment.intValue(xs[i])
-            if (!coverIndexByValue.contains(v.toInt())) deg++
+            if (!coverIndexByValue.containsKey(v)) deg++
         }
         return deg
     }

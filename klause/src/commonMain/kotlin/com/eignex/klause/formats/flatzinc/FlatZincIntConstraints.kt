@@ -162,7 +162,11 @@ internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Bo
     require(c.args.size == 3)
     val idx = resolveIntVar(c.args[0])
     val result = resolveIntVar(c.args[2])
-    val arr = if (varArray) evalIntVarArray(c.args[1]) else evalIntConstArray(c.args[1])
+    val arr = if (varArray) {
+        evalIntVarArray(c.args[1]).let { a -> LongArray(a.size) { a[it].toLong() } }
+    } else {
+        evalIntConstArrayLong(c.args[1])
+    }
     factors.add(Element(idx = idx, result = result, arr = arr, arrIsVars = varArray, indexOffset = 1))
 }
 

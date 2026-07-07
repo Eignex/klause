@@ -1,8 +1,10 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.NoLinearizer
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -34,8 +36,9 @@ class Mdd(
     val numStatesPerLayer: IntArray,
     /** Prefix-sum index into [transitions] per layer. */
     val layerStarts: IntArray,
-    /** Flat transition records; stride [recordStride]. */
-    val transitions: IntArray,
+    /** Flat transition records `(src, symbol, dst[, weight])`; stride [recordStride]. The symbol column
+     *  holds domain values (possibly wide); `src`/`dst`/`weight` are small ids read as [Int]. */
+    val transitions: LongArray,
     /** Start state. */
     val initial: Int,
     /** Accepting states at the final layer. */
@@ -75,7 +78,7 @@ class Mdd(
         int(cost)
         ints(numStatesPerLayer)
         ints(layerStarts)
-        ints(transitions)
+        longs(transitions)
         ints(accepting)
         ints(seq)
     }
@@ -85,11 +88,14 @@ class Mdd(
      *  symbols and there is no positional-variable/constant coupling (unlike Element). No bijection
      *  check is needed: records carry the symbol explicitly, so any map yields a valid diagram and the
      *  verification's key comparison decides whether the relabeling is actually a symmetry. */
-    override fun remapValues(valueMap: (Int) -> Int): Factor {
+    override fun remapValues(valueMap: (Int) -> Int): Factor? {
+        // Symbols beyond Int range can't pass through the `(Int)->Int` value map without truncating;
+        // decline value symmetry rather than relabel a wrong symbol (sound — no relabel).
+        if (!fitsInt32(transitions)) return null
         val newTransitions = transitions.copyOf()
         var p = 0
         while (p < newTransitions.size) {
-            newTransitions[p + 1] = valueMap(newTransitions[p + 1])
+            newTransitions[p + 1] = valueMap(newTransitions[p + 1].toInt()).toLong()
             p += recordStride
         }
         return Mdd(seq, numStatesPerLayer, layerStarts, newTransitions, initial, accepting, recordStride, cost)
@@ -113,14 +119,11 @@ class Mdd(
         cost,
     )
 
-    override fun asLinearizer(): Linearizer = MddLinearizer(
-        seq,
-        numStatesPerLayer,
-        layerStarts,
-        transitions,
-        initial,
-        accepting,
-        recordStride,
-        cost,
-    )
+    // The LP relaxation's arc presence column is Int-typed; skip it when a symbol exceeds Int range
+    // (the propagator/invariant still enforce the diagram). Sound — a relaxation may omit a factor.
+    override fun asLinearizer(): Linearizer = if (fitsInt32(transitions)) {
+        MddLinearizer(seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost)
+    } else {
+        NoLinearizer
+    }
 }

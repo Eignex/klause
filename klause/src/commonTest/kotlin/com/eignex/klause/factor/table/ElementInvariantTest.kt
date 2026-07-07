@@ -21,7 +21,7 @@ class ElementInvariantTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 30)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
         val state = LocalSearchState(problem, Random(0))
@@ -40,7 +40,7 @@ class ElementInvariantTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 30)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
         val state = LocalSearchState(problem, Random(0))
@@ -59,7 +59,7 @@ class ElementInvariantTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(-1, 5), IntDomain(0, 30)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
         val state = LocalSearchState(problem, Random(0))
@@ -77,7 +77,7 @@ class ElementInvariantTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 30)),
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
             ),
         )
         val state = LocalSearchState(problem, Random(0))
@@ -97,7 +97,7 @@ class ElementInvariantTest {
             numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 10) },
             factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = intArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
+                Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0),
             ),
         )
         val state = LocalSearchState(problem, Random(0))

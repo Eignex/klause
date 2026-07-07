@@ -28,7 +28,7 @@ class LagrangianAllDiffExceptTest {
             3,
             Array(3) { IntDomain(0, 1) },
             arrayOf<Factor>(
-                AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2, exceptSet = intArrayOf(0)),
+                AllDifferent(vars = intArrayOf(0, 1, 2), domainMin = 0, domainSize = 2, exceptSet = longArrayOf(0)),
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))

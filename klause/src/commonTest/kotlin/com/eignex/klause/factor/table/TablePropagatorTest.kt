@@ -25,7 +25,7 @@ class TablePropagatorTest {
             factors = arrayOf<Factor>(
                 Table(
                     xs = intArrayOf(0, 1),
-                    tuples = intArrayOf(0, 1, 2, 3),
+                    tuples = longArrayOf(0, 1, 2, 3),
                 ),
             ),
         )
@@ -46,7 +46,7 @@ class TablePropagatorTest {
             factors = arrayOf<Factor>(
                 Table(
                     xs = intArrayOf(0, 1),
-                    tuples = intArrayOf(0, 1, 2, 3),
+                    tuples = longArrayOf(0, 1, 2, 3),
                 ),
             ),
         )
@@ -64,7 +64,7 @@ class TablePropagatorTest {
             factors = arrayOf<Factor>(
                 Table(
                     xs = intArrayOf(0, 1, 2),
-                    tuples = intArrayOf(1, 2, 3, 1, 4, 5, 7, 8, 9),
+                    tuples = longArrayOf(1, 2, 3, 1, 4, 5, 7, 8, 9),
                 ),
             ),
         )
@@ -93,8 +93,10 @@ class TablePropagatorTest {
         )
         for ((idx, inst) in instances.withIndex()) {
             val varsOf = IntArray(inst.arity) { it }
-            val flat = IntArray(inst.tuples.size * inst.arity)
-            inst.tuples.forEachIndexed { r, t -> for (c in 0 until inst.arity) flat[r * inst.arity + c] = t[c] }
+            val flat = LongArray(inst.tuples.size * inst.arity)
+            inst.tuples.forEachIndexed { r, t ->
+                for (c in 0 until inst.arity) flat[r * inst.arity + c] = t[c].toLong()
+            }
             val brute = inst.tuples.filter { t -> t.all { it in inst.lo..inst.hi } }.map { it.toList() }.toHashSet()
             val problem = Problem(
                 numBoolVars = 0,
@@ -122,8 +124,8 @@ class TablePropagatorTest {
             val numRows = rng.nextInt(1, 9)
             val rows = ArrayList<List<Int>>(numRows)
             repeat(numRows) { rows.add(List(arity) { rng.nextInt(lo, hi + 1) }) }
-            val flat = IntArray(rows.size * arity)
-            rows.forEachIndexed { r, t -> for (c in 0 until arity) flat[r * arity + c] = t[c] }
+            val flat = LongArray(rows.size * arity)
+            rows.forEachIndexed { r, t -> for (c in 0 until arity) flat[r * arity + c] = t[c].toLong() }
             // Per-column random subdomain (still within [lo, hi]) to force pruning + cascades.
             val cdom = Array(arity) {
                 val a = rng.nextInt(lo, hi + 1)

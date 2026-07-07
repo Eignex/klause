@@ -11,16 +11,18 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableLongIntMap
 
 /** LS invariant logic for `all_different`. */
 internal class AllDifferentInvariant(
     private val vars: IntArray,
-    private val domainMin: Int,
+    private val domainMin: Long,
     private val domainSize: Int,
     private val presents: IntArray,
-    private val exceptValues: IntHashSet,
+    private val exceptValues: LongHashSet,
     private val occurrencesByVar: IntIntMap,
     private val presentInvFn: (LocalSearchState, Int) -> Boolean,
 ) : Invariant {
@@ -33,16 +35,13 @@ internal class AllDifferentInvariant(
                     "[$domainMin..${domainMin + domainSize - 1}]"
             }
         }
-        val counts = IntArray(domainSize)
+        val counts = MutableLongIntMap()
         var excess = 0
         for (i in vars.indices) {
             if (!presentInvFn(state, i)) continue
-            val value = state.assignment.intValue(vars[i]).toInt()
+            val value = state.assignment.intValue(vars[i])
             if (value in exceptValues) continue
-            val idx = value - domainMin
-            val prev = counts[idx]
-            counts[idx] = prev + 1
-            if (prev >= 1) excess++
+            if (counts.addTo(value, 1) >= 2) excess++
         }
         state.refPayload[factorId] = AllDifferentState(counts, excess)
     }
@@ -61,15 +60,13 @@ internal class AllDifferentInvariant(
         if (old == newValue) return 0
         val n = presentOccurrences(state, intVar)
         if (n == 0) return 0
-        val oldInt = old.toInt()
-        val newInt = newValue.toInt()
         var rawDelta = 0
-        if (oldInt !in exceptValues) {
-            val oldCount = s.counts[oldInt - domainMin]
+        if (old !in exceptValues) {
+            val oldCount = s.counts.getOrDefault(old, 0)
             rawDelta += excessOf(oldCount - n) - excessOf(oldCount)
         }
-        if (newInt !in exceptValues) {
-            val newCount = s.counts[newInt - domainMin]
+        if (newValue !in exceptValues) {
+            val newCount = s.counts.getOrDefault(newValue, 0)
             rawDelta += excessOf(newCount + n) - excessOf(newCount)
         }
         return compressViolation((s.excess + rawDelta).toLong(), state.violationSoftCap) -
@@ -78,22 +75,19 @@ internal class AllDifferentInvariant(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val s = state.refPayload[factorId] as AllDifferentState
-        val cur = state.assignment.intValue(intVar).toInt()
-        if (cur.toLong() == oldValue) return 0
+        val cur = state.assignment.intValue(intVar)
+        if (cur == oldValue) return 0
         val n = presentOccurrences(state, intVar)
         if (n == 0) return 0
-        val oldInt = oldValue.toInt()
         val before = s.excess
-        if (oldInt !in exceptValues) {
-            val oldIdx = oldInt - domainMin
-            val oldCount = s.counts[oldIdx]
-            s.counts[oldIdx] = oldCount - n
+        if (oldValue !in exceptValues) {
+            val oldCount = s.counts.getOrDefault(oldValue, 0)
+            s.counts.put(oldValue, oldCount - n)
             s.excess += excessOf(oldCount - n) - excessOf(oldCount)
         }
         if (cur !in exceptValues) {
-            val newIdx = cur - domainMin
-            val newCount = s.counts[newIdx]
-            s.counts[newIdx] = newCount + n
+            val newCount = s.counts.getOrDefault(cur, 0)
+            s.counts.put(cur, newCount + n)
             s.excess += excessOf(newCount + n) - excessOf(newCount)
         }
         return compressViolation(s.excess.toLong(), state.violationSoftCap) -
@@ -103,21 +97,21 @@ internal class AllDifferentInvariant(
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val s = state.refPayload[factorId] as AllDifferentState
-        val touchedIdx = IntArrayList()
+        val touchedVal = LongArrayList()
         val touchedDelta = IntArrayList()
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val value = state.assignment.intValue(vars[i]).toInt()
+            val value = state.assignment.intValue(vars[i])
             if (value in exceptValues) continue
             val wasP = presentInvFn(state, i)
             val delta = if (wasP) -1 else +1
-            touchedIdx.add(value - domainMin)
+            touchedVal.add(value)
             touchedDelta.add(delta)
         }
         var excessDelta = 0
         val snapshot = s.counts
-        for (k in 0 until touchedIdx.size) excessDelta += adjustExcess(snapshot, touchedIdx[k], touchedDelta[k])
-        for (k in touchedIdx.size - 1 downTo 0) adjustExcess(snapshot, touchedIdx[k], -touchedDelta[k])
+        for (k in 0 until touchedVal.size) excessDelta += adjustExcess(snapshot, touchedVal[k], touchedDelta[k])
+        for (k in touchedVal.size - 1 downTo 0) adjustExcess(snapshot, touchedVal[k], -touchedDelta[k])
         return compressViolation((s.excess + excessDelta).toLong(), state.violationSoftCap) -
             compressViolation(s.excess.toLong(), state.violationSoftCap)
     }
@@ -128,11 +122,11 @@ internal class AllDifferentInvariant(
         val before = s.excess
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
-            val value = state.assignment.intValue(vars[i]).toInt()
+            val value = state.assignment.intValue(vars[i])
             if (value in exceptValues) continue
             val nowP = presentInvFn(state, i)
             val delta = if (nowP) +1 else -1
-            s.excess += adjustExcess(s.counts, value - domainMin, delta)
+            s.excess += adjustExcess(s.counts, value, delta)
         }
         return compressViolation(s.excess.toLong(), state.violationSoftCap) -
             compressViolation(before.toLong(), state.violationSoftCap)
@@ -147,12 +141,12 @@ internal class AllDifferentInvariant(
      *  that is either an excepted value or not yet used. Mutates as it goes; a `false` result is
      *  retried by [seedByMatching], which recomputes from the frozen vars and overwrites the rest. */
     private fun seedGreedy(state: LocalSearchState): Boolean {
-        val used = IntHashSet(vars.size)
+        val used = LongHashSet(vars.size)
         for (i in vars.indices) {
             if (!presentInvFn(state, i)) continue
             val v = vars[i]
             if (!state.assumptions.isFrozenInt(v)) continue
-            val value = state.assignment.intValue(v).toInt()
+            val value = state.assignment.intValue(v)
             if (value !in exceptValues) used.add(value)
         }
         var allDistinct = true
@@ -161,15 +155,14 @@ internal class AllDifferentInvariant(
             val v = vars[i]
             if (state.assumptions.isFrozenInt(v)) continue
             val d = state.problem.intDomains[v]
-            var chosen = Int.MIN_VALUE
-            d.forEach { candLong ->
-                val cand = candLong.toInt()
-                if (chosen == Int.MIN_VALUE && (cand in exceptValues || !used.contains(cand))) chosen = cand
+            var chosen = Long.MIN_VALUE
+            d.forEach { cand ->
+                if (chosen == Long.MIN_VALUE && (cand in exceptValues || !used.contains(cand))) chosen = cand
             }
-            if (chosen == Int.MIN_VALUE) {
+            if (chosen == Long.MIN_VALUE) {
                 allDistinct = false
             } else {
-                state.assignment.setInt(v, chosen.toLong())
+                state.assignment.setInt(v, chosen)
                 if (chosen !in exceptValues) used.add(chosen)
             }
         }
@@ -193,22 +186,24 @@ internal class AllDifferentInvariant(
                 freeVars.add(v)
                 continue
             }
-            val value = state.assignment.intValue(v).toInt()
+            val value = state.assignment.intValue(v)
             if (value in exceptValues) continue
             val idx = value - domainMin
-            if (idx in 0 until domainSize) {
-                if (taken[idx]) return false
-                taken[idx] = true
+            if (idx in 0L until domainSize.toLong()) {
+                val ii = idx.toInt()
+                if (taken[ii]) return false
+                taken[ii] = true
             }
         }
         val m = freeVars.size
         val valuesPerVar = Array(m) { k ->
             val d = state.problem.intDomains[freeVars[k]]
             val allowed = IntArrayList()
-            d.forEach { candLong ->
-                val cand = candLong.toInt()
+            d.forEach { cand ->
                 val idx = cand - domainMin
-                if (idx in 0 until domainSize && cand !in exceptValues && !taken[idx]) allowed.add(idx)
+                if (idx in 0L until domainSize.toLong() && cand !in exceptValues && !taken[idx.toInt()]) {
+                    allowed.add(idx.toInt())
+                }
             }
             IntArray(allowed.size) { allowed[it] }
         }
@@ -223,20 +218,17 @@ internal class AllDifferentInvariant(
             val v = freeVars[k]
             val vid = matchVar[k]
             if (vid >= 0) {
-                state.assignment.setInt(v, (vid + domainMin).toLong())
+                state.assignment.setInt(v, vid + domainMin)
                 continue
             }
-            var chosen = Int.MIN_VALUE
-            state.problem.intDomains[v].forEach { candLong ->
-                val cand = candLong.toInt()
-                if (chosen == Int.MIN_VALUE &&
-                    cand in exceptValues
-                ) {
+            var chosen = Long.MIN_VALUE
+            state.problem.intDomains[v].forEach { cand ->
+                if (chosen == Long.MIN_VALUE && cand in exceptValues) {
                     chosen = cand
                 }
             }
-            if (chosen == Int.MIN_VALUE) return false
-            state.assignment.setInt(v, chosen.toLong())
+            if (chosen == Long.MIN_VALUE) return false
+            state.assignment.setInt(v, chosen)
         }
         return true
     }
@@ -244,56 +236,53 @@ internal class AllDifferentInvariant(
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val s = state.refPayload[factorId] as AllDifferentState
         if (s.excess == 0) return
-        var pickedIdx = -1
+        // Collect the duplicated values and scan them value-ascending, so the reservoir pick draws
+        // from the rng in a stable order (the count map's iteration order is unspecified).
+        val dupValues = LongArrayList()
+        s.counts.forEach { v, count -> if (count > 1) dupValues.add(v) }
+        if (dupValues.isEmpty()) return
+        dupValues.sort()
+        var value = 0L
         var seenDups = 0
-        for (idx in s.counts.indices) {
-            if (s.counts[idx] <= 1) continue
+        for (k in 0 until dupValues.size) {
             seenDups++
-            if (state.rng.nextInt(seenDups) == 0) pickedIdx = idx
+            if (state.rng.nextInt(seenDups) == 0) value = dupValues[k]
         }
-        if (pickedIdx == -1) return
-        val value = pickedIdx + domainMin
         var occupant = -1
         var seenOccupants = 0
         for (i in vars.indices) {
             val v = vars[i]
-            if (state.assignment.intValue(v).toInt() != value) continue
+            if (state.assignment.intValue(v) != value) continue
             if (!presentInvFn(state, i)) continue
             seenOccupants++
             if (state.rng.nextInt(seenOccupants) == 0) occupant = v
         }
         if (occupant == -1) return
         val d = state.problem.intDomains[occupant]
-        val targets = IntArray(MAX_REPAIR_TARGETS) { Int.MIN_VALUE }
+        val targets = LongArray(MAX_REPAIR_TARGETS) { Long.MIN_VALUE }
         var filled = 0
         var seenTargets = 0
-        d.forEach { targetLong ->
-            val target = targetLong.toInt()
-            if (target != value) {
-                val tIdx = target - domainMin
-                if (tIdx in s.counts.indices && s.counts[tIdx] == 0) {
-                    seenTargets++
-                    if (filled < MAX_REPAIR_TARGETS) {
-                        targets[filled++] = target
-                    } else {
-                        val r = state.rng.nextInt(seenTargets)
-                        if (r < MAX_REPAIR_TARGETS) targets[r] = target
-                    }
+        d.forEach { target ->
+            if (target != value && s.counts.getOrDefault(target, 0) == 0) {
+                seenTargets++
+                if (filled < MAX_REPAIR_TARGETS) {
+                    targets[filled++] = target
+                } else {
+                    val r = state.rng.nextInt(seenTargets)
+                    if (r < MAX_REPAIR_TARGETS) targets[r] = target
                 }
             }
         }
         if (filled > 0) {
-            for (i in 0 until filled) sink.addChannelingIntSet(state, occupant, targets[i].toLong())
+            for (i in 0 until filled) sink.addChannelingIntSet(state, occupant, targets[i])
             return
         }
         var swapsAdded = 0
         for (wLong in d.min..d.max) {
             if (swapsAdded >= MAX_SWAP_CANDIDATES) break
-            val w = wLong.toInt()
-            if (w == value) continue
+            if (wLong == value) continue
             if (wLong !in d) continue
-            val wIdx = w - domainMin
-            if (wIdx !in s.counts.indices || s.counts[wIdx] != 1) continue
+            if (s.counts.getOrDefault(wLong, 0) != 1) continue
             var holder = -1
             for (v in vars) {
                 if (state.assignment.intValue(v) == wLong) {
@@ -303,8 +292,8 @@ internal class AllDifferentInvariant(
             }
             if (holder == -1 || holder == occupant) continue
             val hd = state.problem.intDomains[holder]
-            if (value.toLong() !in hd) continue
-            sink.addCompound(listOf(Move.IntSet(occupant, w.toLong()), Move.IntSet(holder, value.toLong())))
+            if (value !in hd) continue
+            sink.addCompound(listOf(Move.IntSet(occupant, wLong), Move.IntSet(holder, value)))
             swapsAdded++
         }
         if (swapsAdded > 0) return
@@ -332,15 +321,15 @@ internal class AllDifferentInvariant(
         return countPresentOccurrences(vars, intVar, state) { s, i -> presentInvFn(s, i) }
     }
 
-    private fun adjustExcess(counts: IntArray, valueIdx: Int, delta: Int): Int {
-        val before = counts[valueIdx]
+    private fun adjustExcess(counts: MutableLongIntMap, value: Long, delta: Int): Int {
+        val before = counts.getOrDefault(value, 0)
         val after = before + delta
-        counts[valueIdx] = after
+        counts.put(value, after)
         return excessOf(after) - excessOf(before)
     }
 
     companion object {
-        val NO_EXCEPT = IntHashSet()
+        val NO_EXCEPT = LongHashSet()
         const val MAX_STRUCTURED_SWAPS: Int = 4
         const val SWAP_ATTEMPT_STRIDE: Int = 6
         const val MAX_REPAIR_TARGETS: Int = 4
@@ -348,4 +337,4 @@ internal class AllDifferentInvariant(
     }
 }
 
-internal class AllDifferentState(val counts: IntArray, var excess: Int)
+internal class AllDifferentState(val counts: MutableLongIntMap, var excess: Int)

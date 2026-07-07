@@ -82,7 +82,7 @@ class LpAutoConfigTest {
     fun `global cardinality enables cuts but not lagrangian`() {
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),
-            cover = intArrayOf(0, 1, 2),
+            cover = longArrayOf(0, 1, 2),
             countLow = intArrayOf(0, 0, 0),
             countHigh = intArrayOf(1, 1, 1),
             closed = true,
@@ -189,7 +189,7 @@ class LpAutoConfigTest {
             KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L shl 20)
             val nVars = 32
             val tableXs = intArrayOf(0, 1)
-            val tuples = IntArray(1024 * 2) { it % 2 } // 1024 two-column tuples
+            val tuples = LongArray(1024 * 2) { (it % 2).toLong() } // 1024 two-column tuples
             val xs = IntArray(nVars) { it + 2 } // NValue over fresh vars 2..33
             val total = 2 + nVars + 1 // table xs + nvalue xs + nvalue count var
             val domains = Array(total) { IntDomain(0, 31) }
@@ -386,21 +386,21 @@ class LpAutoConfigTest {
     @Test
     fun `element hull is enabled for both constant and variable arrays`() {
         val constArr = LpAutoConfig.recommend(
-            problem(Element(idx = 0, result = 1, arr = intArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 0)),
+            problem(Element(idx = 0, result = 1, arr = longArrayOf(5, 7, 9), arrIsVars = false, indexOffset = 0)),
         )
         assertTrue(constArr.lpPlan.bounding)
         assertTrue(constArr.lpPlan.element)
 
         // Variable arrays now also enable the element hull — they route to the big-M form.
         val varArr = LpAutoConfig.recommend(
-            problem(Element(idx = 0, result = 1, arr = intArrayOf(2), arrIsVars = true, indexOffset = 0)),
+            problem(Element(idx = 0, result = 1, arr = longArrayOf(2), arrIsVars = true, indexOffset = 0)),
         )
         assertTrue(varArr.lpPlan.element)
     }
 
     @Test
     fun `table enables table hull and bounding`() {
-        val r = LpAutoConfig.recommend(problem(Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 0, 1, 1))))
+        val r = LpAutoConfig.recommend(problem(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 0, 1, 1))))
         assertTrue(r.lpPlan.bounding)
         assertTrue(r.lpPlan.table)
     }

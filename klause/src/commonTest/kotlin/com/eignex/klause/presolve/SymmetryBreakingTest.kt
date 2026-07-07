@@ -265,7 +265,7 @@ class SymmetryBreakingTest {
             listOf(
                 GlobalCardinality(
                     xs = intArrayOf(0, 1, 2),
-                    cover = intArrayOf(0, 1, 2),
+                    cover = longArrayOf(0, 1, 2),
                     countLow = intArrayOf(0, 0, 0),
                     countHigh = intArrayOf(3, 3, 3),
                 ),
@@ -448,8 +448,8 @@ class SymmetryBreakingTest {
             4,
             arrayOf(IntDomain(1, 2), IntDomain(7, 8), IntDomain(1, 2), IntDomain(7, 8)),
             listOf(
-                Element(idx = 0, result = 1, arr = intArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
-                Element(idx = 2, result = 3, arr = intArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
+                Element(idx = 0, result = 1, arr = longArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
+                Element(idx = 2, result = 3, arr = longArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
             ),
         )
         checkSound("element-blocks", problem, expectReduced = true)
@@ -504,7 +504,7 @@ class SymmetryBreakingTest {
             listOf(
                 GlobalCardinality(
                     xs = intArrayOf(0, 1),
-                    cover = intArrayOf(0, 1),
+                    cover = longArrayOf(0, 1),
                     countLow = intArrayOf(0, 0),
                     countHigh = intArrayOf(2, 2),
                 ),
@@ -522,7 +522,7 @@ class SymmetryBreakingTest {
             0,
             2,
             arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
-            listOf(Table(intArrayOf(0, 1), intArrayOf(0, 1, 1, 0))),
+            listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0))),
         )
         checkSound("table-value", problem, expectReduced = true)
     }
@@ -536,7 +536,7 @@ class SymmetryBreakingTest {
             0,
             2,
             arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
-            listOf(Table(intArrayOf(0, 1), intArrayOf(0, 1))),
+            listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1))),
         )
         checkSound("table-asymmetric", problem, expectReduced = false)
     }
@@ -704,17 +704,17 @@ class SymmetryBreakingTest {
         distinct(diffn, Diffn(intArrayOf(1, 0), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1)), "x order")
 
         // Regular: automaton size, transition table, q0, accepting, sequence order.
-        val reg = Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 2, 2, 1), 1, intArrayOf(2))
-        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 1, 2, 1), 1, intArrayOf(2)), "transition")
-        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 2, 2, 1), 2, intArrayOf(2)), "q0")
-        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, intArrayOf(1, 2, 2, 1), 1, intArrayOf(1)), "accepting")
-        distinct(reg, Regular(intArrayOf(1, 0), 2, 2, intArrayOf(1, 2, 2, 1), 1, intArrayOf(2)), "seq order")
+        val reg = Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2))
+        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 1, 2, 1), 1, intArrayOf(2)), "transition")
+        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 2, intArrayOf(2)), "q0")
+        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(1)), "accepting")
+        distinct(reg, Regular(intArrayOf(1, 0), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2)), "seq order")
 
         // Mdd: initial, transition records, cost var, sequence order.
-        val mdd = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), intArrayOf(0, 0, 1), 0, intArrayOf(0), 3)
+        val mdd = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), longArrayOf(0, 0, 1), 0, intArrayOf(0), 3)
         distinct(
             mdd,
-            Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), intArrayOf(0, 1, 1), 0, intArrayOf(0), 3),
+            Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), longArrayOf(0, 1, 1), 0, intArrayOf(0), 3),
             "transition",
         )
         distinct(
@@ -723,7 +723,7 @@ class SymmetryBreakingTest {
                 intArrayOf(0),
                 intArrayOf(1, 1),
                 intArrayOf(0, 1),
-                intArrayOf(0, 0, 1, 0),
+                longArrayOf(0, 0, 1, 0),
                 0,
                 intArrayOf(0),
                 4,
@@ -768,12 +768,12 @@ class SymmetryBreakingTest {
             intArrayOf(0),
             numStates = 2,
             alphabetSize = 2,
-            transitions = intArrayOf(2, 1, 0, 0),
+            transitions = longArrayOf(2, 1, 0, 0),
             q0 = 1,
             accepting = intArrayOf(2),
         )
         val swapped = r.remapValues(swap(1, 2)) as Regular
-        assertEquals(listOf(1, 2, 0, 0), swapped.transitions.toList())
+        assertEquals(listOf(1L, 2L, 0L, 0L), swapped.transitions.toList())
         // A non-permutation of 1..alphabetSize can't relabel the columns ⇒ null.
         assertNull(r.remapValues { 1 })
     }
@@ -785,13 +785,13 @@ class SymmetryBreakingTest {
             intArrayOf(0),
             intArrayOf(1, 1),
             intArrayOf(0, 1),
-            intArrayOf(0, 1, 0),
+            longArrayOf(0, 1, 0),
             initial = 0,
             accepting = intArrayOf(0),
             recordStride = 3,
         )
         val swapped = m.remapValues(swap(1, 2)) as Mdd
-        assertEquals(listOf(0, 2, 0), swapped.transitions.toList())
+        assertEquals(listOf(0L, 2L, 0L), swapped.transitions.toList())
     }
 
     @Test
@@ -808,7 +808,7 @@ class SymmetryBreakingTest {
                     intArrayOf(0, 1),
                     numStates = 1,
                     alphabetSize = 2,
-                    transitions = intArrayOf(1, 1),
+                    transitions = longArrayOf(1, 1),
                     q0 = 1,
                     accepting = intArrayOf(1),
                 ),
@@ -830,7 +830,7 @@ class SymmetryBreakingTest {
                     intArrayOf(0),
                     numStates = 1,
                     alphabetSize = 2,
-                    transitions = intArrayOf(1, 0),
+                    transitions = longArrayOf(1, 0),
                     q0 = 1,
                     accepting = intArrayOf(1),
                 ),
@@ -843,7 +843,7 @@ class SymmetryBreakingTest {
     fun `element does not support value relabeling`() {
         // Element's idx is a variable that selects which constant is read; the value-symmetry verifier
         // relabels constants and can't model that coupling, so remapValues must stay null (#536).
-        val e = Element(idx = 0, result = 1, arr = intArrayOf(7, 8), arrIsVars = false, indexOffset = 1)
+        val e = Element(idx = 0, result = 1, arr = longArrayOf(7, 8), arrIsVars = false, indexOffset = 1)
         assertNull(e.remapValues { it })
     }
 

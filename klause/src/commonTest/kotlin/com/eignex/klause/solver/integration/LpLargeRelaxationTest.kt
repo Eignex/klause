@@ -165,7 +165,7 @@ class LpLargeRelaxationTest {
                 arrayOf<Factor>(
                     // A base linear row alongside the Table global.
                     Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
-                    Table(xs = intArrayOf(0, 1), tuples = intArrayOf(0, 5, 2, 2, 4, 0)),
+                    Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 5, 2, 2, 4, 0)),
                 ),
             )
             val resolved = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE, BacktrackParams(randomSeed = 1L))

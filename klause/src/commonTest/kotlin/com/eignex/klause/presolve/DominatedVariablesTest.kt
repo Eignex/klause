@@ -79,8 +79,8 @@ class DominatedVariablesTest {
         )
         checkDualFix("down-safe", problem, emptyMap(), setOf(0, 1))
         val out = fixed(problem, emptyMap())
-        assertEquals(0, out.intDomains[0].min)
-        assertEquals(0, out.intDomains[0].max)
+        assertEquals(0L, out.intDomains[0].min)
+        assertEquals(0L, out.intDomains[0].max)
     }
 
     @Test
@@ -107,8 +107,8 @@ class DominatedVariablesTest {
         )
         val out = fixed(problem, mapOf(0 to -1L))
         assertEquals(minObjective(problem, mapOf(0 to -1L)), minObjective(out, mapOf(0 to -1L)), "optimum changed")
-        assertEquals(5, out.intDomains[0].min)
-        assertEquals(5, out.intDomains[0].max)
+        assertEquals(5L, out.intDomains[0].min)
+        assertEquals(5L, out.intDomains[0].max)
     }
 
     @Test

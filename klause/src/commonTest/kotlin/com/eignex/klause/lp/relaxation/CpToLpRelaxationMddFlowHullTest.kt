@@ -27,7 +27,7 @@ class CpToLpRelaxationMddFlowHullTest {
     fun `cost-MDD flow hull gives the exact minimum path cost`() {
         // 2 layers, single state each; value 1 costs 5, value 2 costs 1. Minimum-cost accepted path
         // takes value 2 twice -> cost 2. seq = vars 0,1; cost = var 2.
-        val transitions = intArrayOf(
+        val transitions = longArrayOf(
             0, 1, 0, 5, 0, 2, 0, 1, // layer 0 records (src,value,dst,weight)
             0, 1, 0, 5, 0, 2, 0, 1, // layer 1
         )
@@ -91,7 +91,16 @@ class CpToLpRelaxationMddFlowHullTest {
                 numIntVars = n,
                 intDomains = Array(n) { IntDomain(1, alphabet.toLong()) },
                 factors = arrayOf<Factor>(
-                    Mdd(IntArray(n) { it }, spl, starts, trans.toIntArray(), 0, acc.toIntArray(), 3, -1),
+                    Mdd(
+                        IntArray(n) { it },
+                        spl,
+                        starts,
+                        trans.toIntArray().let { a -> LongArray(a.size) { a[it].toLong() } },
+                        0,
+                        acc.toIntArray(),
+                        3,
+                        -1,
+                    ),
                 ),
             )
             val obj = LinearObjective(intCoefficients = c)
