@@ -13,12 +13,8 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.GlobalCardinality
-import com.eignex.klause.factor.global.NValue
-import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.Mdd
-import com.eignex.klause.factor.table.Regular
-import com.eignex.klause.factor.table.Table
 import com.eignex.klause.lp.Contribution
+import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.LpRowPremises
@@ -297,47 +293,25 @@ internal class CpToLpRelaxation(
         return intIn to boolIn
     }
 
-    /** Whether [f] (a cone-relevant, non-big-M factor) shares any variable with the current cone. */
-    private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean = when (f) {
-        is Linear -> f.vars.any { intIn[it] }
-        is ArrayMinMax -> intIn[f.result] || f.xs.any { intIn[it] }
-        is Cardinality -> f.literals.any { boolIn[Lit.variable(it)] }
-        is Clause -> f.literals.any { boolIn[Lit.variable(it)] }
-        is PseudoBoolean -> f.literals.any { boolIn[Lit.variable(it)] }
-        else -> false // ReifiedLinear (dropped) and hard globals do not extend the cone
-    }
+    /** Whether [f] extends the cone ([Factor.extendsObjectiveCone]) and shares a variable with it. */
+    private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean =
+        f.extendsObjectiveCone && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
 
-    /** Add every variable of [f] to the cone; returns true when anything was newly added. */
+    /** Add every variable of a cone-extending [f] to the cone; true when anything was newly added. */
     private fun coneMark(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean {
+        if (!f.extendsObjectiveCone) return false
         var changed = false
-        fun addInt(v: Int) {
+        for (v in f.intVars) {
             if (!intIn[v]) {
                 intIn[v] = true
                 changed = true
             }
         }
-        fun addBool(lit: Int) {
-            val b = Lit.variable(lit)
+        for (b in f.boolVars) {
             if (!boolIn[b]) {
                 boolIn[b] = true
                 changed = true
             }
-        }
-        when (f) {
-            is Linear -> for (v in f.vars) addInt(v)
-
-            is ArrayMinMax -> {
-                addInt(f.result)
-                for (v in f.xs) addInt(v)
-            }
-
-            is Cardinality -> for (l in f.literals) addBool(l)
-
-            is Clause -> for (l in f.literals) addBool(l)
-
-            is PseudoBoolean -> for (l in f.literals) addBool(l)
-
-            else -> Unit
         }
         return changed
     }
@@ -373,7 +347,7 @@ internal class CpToLpRelaxation(
     private fun boolCost(b: Int): Long = objective?.boolWeights?.getOrElse(b) { 0L } ?: 0L
 
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
-     *  [RelaxationBuilder] so a factor's [com.eignex.klause.lp.Linearizer] can emit into it. */
+     *  [RelaxationBuilder] so a factor's [com.eignex.klause.solver.Factor.linearize] can emit into it. */
     private inner class Assembler(private val session: PropagationSession) : RelaxationBuilder {
         private val builder = LpBuilder()
         private val intCol = IntArray(problem.numIntVars) { -1 }
@@ -395,29 +369,29 @@ internal class CpToLpRelaxation(
 
         /** Whether the factor currently being linearized may contribute HULL rows: its convex-hull
          *  family flag is on and we are not in objective-cone mode (where the column-heavy hulls are
-         *  forced off). Set per factor before [Factor.asLinearizer]; consulted by the row emitters so a
+         *  forced off). Set per factor before [Factor.linearize]; consulted by the row emitters so a
          *  disabled family contributes only its CORE rows. CORE rows ignore it. */
         private var currentHullEnabled = true
 
-        /** The factor whose Linearizer is currently emitting, for attributing HULL rows to it. */
+        /** The factor currently emitting, for attributing HULL rows to it. */
         private var currentFactorId = -1
 
         /** Factors that emitted at least one HULL row, in factor order (the root pruner's candidates). */
         private val hullFactorIds = LinkedHashSet<Int>()
 
-        /** The plan flag gating [factor]'s HULL rows (its convex-hull family), false in cone mode.
-         *  A factor with no HULL contribution is unaffected — the flag only suppresses HULL rows. */
-        private fun hullEnabledFor(factor: Factor): Boolean = !objectiveCone && when (factor) {
-            is Element -> elementHull
-            is Table -> tableHull
-            is NValue -> nValueHull
-            is Regular -> regularHull
-            is Mdd -> mddHull
-            is GlobalCardinality -> gccCountHull
-            is ArrayMinMax -> linMaxTightFace
-            is Product -> productMcCormick
-            else -> true
-        }
+        /** The per-family convex-hull switches for this build, read polymorphically by each hull factor's
+         *  [Factor.hullFamilyEnabled]; combined with the cone and per-factor suppression gates when
+         *  [currentHullEnabled] is set, so the driver never matches factor types. */
+        private val hullFlags = HullFlags(
+            element = elementHull,
+            table = tableHull,
+            nValue = nValueHull,
+            regular = regularHull,
+            mdd = mddHull,
+            gccCount = gccCountHull,
+            arrayMinMax = linMaxTightFace,
+            product = productMcCormick,
+        )
 
         /** Auxiliary LP column with no backing CP variable (tag/colVarId = -1) — e.g. a circuit arc.
          *  [presence] names the `(intVar, value)` memberships that must all hold for the column to be
@@ -617,7 +591,7 @@ internal class CpToLpRelaxation(
             }
             // Cone mode is the minimal linear+Boolean objective-cone probe: the column-heavy hull /
             // circuit / cut / cumulative features are all forced off (see [objectiveCone]). The
-            // per-factor convex hulls are emitted by each factor's Linearizer in the main loop below
+            // per-factor convex hulls are emitted by each factor's linearize in the main loop below
             // (gated by [currentHullEnabled]); only the non-per-factor relaxations live here — circuit
             // arcs feed the subtour separator, and the cumulative rows span a scheduling view.
             if (!objectiveCone) {
@@ -639,11 +613,12 @@ internal class CpToLpRelaxation(
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
                 currentFactorId = factorId
-                currentHullEnabled = factorId !in suppressedHullFactors && hullEnabledFor(factor)
-                // Each factor's own Linearizer emits its rows; factors with no linear relaxation
-                // (hard globals, cut-only or scheduling-view factors) return NoLinearizer and contribute
-                // nothing here — they are handled by the separators and the blocks above.
-                factor.asLinearizer().linearize(this, factorId)
+                // Each factor emits its own rows; factors with no linear relaxation (hard globals,
+                // cut-only or scheduling-view factors) keep the default no-op [Factor.linearize] and
+                // contribute nothing here — they are handled by the separators and the blocks above.
+                currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
+                    factor.hullFamilyEnabled(hullFlags)
+                factor.linearize(this, factorId)
             }
 
             if (booleanRlt) buildBooleanRlt()

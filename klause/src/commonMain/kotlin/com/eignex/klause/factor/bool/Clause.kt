@@ -1,9 +1,10 @@
 package com.eignex.klause.factor.bool
 
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -49,6 +50,8 @@ class Clause(val literals: IntArray) : Factor {
     }
 
     override val boolVars: IntArray = literals.litVars()
+
+    override val extendsObjectiveCone: Boolean = true
     override val intVars: IntArray = EmptyIntArray
 
     /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
@@ -81,5 +84,8 @@ class Clause(val literals: IntArray) : Factor {
 
     override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals)
 
-    override fun asLinearizer(): Linearizer = ClauseLinearizer(literals)
+    /** LP relaxation: the feasibility-defining row `Σ literals ≥ 1`. */
+    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
+    }
 }

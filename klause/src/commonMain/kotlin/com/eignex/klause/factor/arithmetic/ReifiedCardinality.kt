@@ -6,7 +6,9 @@ import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.addExact
+import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -58,5 +60,19 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
 
     override fun asInvariant(): Invariant = ReifiedCardinalityInvariant(auxBoolVar, literals, min, max, boolVars)
 
-    override fun asLinearizer(): Linearizer = ReifiedCardinalityLinearizer(literals, min, max, auxBoolVar)
+    /**
+     * Indicator rows for `auxBoolVar ↔ (min ≤ #true literals ≤ max)`. Only the `aux = 1 ⇒ (count ≥ min ∧
+     * count ≤ max)` direction yields LP cuts (the `aux = 0` side is the disjunction `count < min ∨ count >
+     * max`, whose hull is the whole interval), so two CORE rows are emitted with declared `[0, 1]` big-Ms.
+     */
+    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        val sum = BoolReifiedSum.fold(builder, literals, weights = null)
+        val a = builder.boolColumn(auxBoolVar)
+        val lo = subExact(min.toLong(), sum.constant)
+        val hi = subExact(max.toLong(), sum.constant)
+        val mHi = maxOf(0L, subExact(sum.lMax, hi)) // aux=1 ⇒ count ≤ max
+        sum.reifiedRow(builder, a, mHi, LinearOp.LE, addExact(hi, mHi))
+        val mLo = maxOf(0L, subExact(lo, sum.lMin)) // aux=1 ⇒ count ≥ min
+        sum.reifiedRow(builder, a, -mLo, LinearOp.GE, subExact(lo, mLo))
+    }
 }

@@ -1,9 +1,10 @@
 package com.eignex.klause.factor.bool
 
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.lp.Linearizer
+import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -31,9 +32,19 @@ class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp,
 
     override val boolVars: IntArray = literals.litVars()
 
+    override val extendsObjectiveCone: Boolean = true
+
     override fun asPropagator(): Propagator = PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
     override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 
-    override fun asLinearizer(): Linearizer = PseudoBooleanLinearizer(weights, literals, op, bound)
+    /** LP relaxation: the feasibility-defining row `Σ weights·literals ⟨op⟩ bound`. */
+    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        val linearOp = when (op) {
+            PbOp.LE -> LinearOp.LE
+            PbOp.GE -> LinearOp.GE
+            PbOp.EQ -> LinearOp.EQ
+        }
+        builder.boolRow(literals, weights, linearOp, bound.toLong())
+    }
 }
