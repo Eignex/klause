@@ -186,6 +186,12 @@ object BenchCli {
             "XCSP3 reference needs the ${Xcsp3CpSatReference.IMAGE} image " +
                 "(build it: docker build -t ${Xcsp3CpSatReference.IMAGE} klause-bench/xcsp3-cpsat)"
         }
+        if (refs.any { it.format == Format.XCSP3 }) {
+            // Reap any containers left by an earlier interrupted run, and reap again on a graceful stop
+            // (each container is memory-capped, so a hard kill only ever leaves bounded, short-lived ones).
+            Xcsp3CpSatReference.reapStragglers()
+            Runtime.getRuntime().addShutdownHook(Thread { Xcsp3CpSatReference.reapStragglers() })
+        }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         // `workers=` pins each cp-sat/choco job to that many search workers (default 1): without it the
         // reference fans out to every core, so `jobs` concurrent solves would oversubscribe the machine.
