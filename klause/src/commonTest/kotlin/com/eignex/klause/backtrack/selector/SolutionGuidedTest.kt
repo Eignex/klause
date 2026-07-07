@@ -28,7 +28,7 @@ class SolutionGuidedTest {
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
         val values = guided.values(session, VarRef.IntVar(0), Random(0L)).toList()
-        assertEquals(listOf(0, 1, 2, 3, 4), values)
+        assertEquals(listOf(0L, 1L, 2L, 3L, 4L), values)
     }
 
     @Test
@@ -42,10 +42,10 @@ class SolutionGuidedTest {
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
         // Synthetic incumbent: v0 = 3.
-        guided.onSolution(Sample(BooleanArray(0), intArrayOf(3)))
+        guided.onSolution(Sample(BooleanArray(0), longArrayOf(3)))
         val values = guided.values(session, VarRef.IntVar(0), Random(0L)).toList()
         // 3 must come first; remaining is base's order minus 3.
-        assertEquals(listOf(3, 0, 1, 2, 4), values)
+        assertEquals(listOf(3L, 0L, 1L, 2L, 4L), values)
     }
 
     @Test
@@ -59,9 +59,9 @@ class SolutionGuidedTest {
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
         // IndomainMin on bool: false then true → 0, 1.
-        guided.onSolution(Sample(booleanArrayOf(true), IntArray(0)))
+        guided.onSolution(Sample(booleanArrayOf(true), LongArray(0)))
         val values = guided.values(session, VarRef.Bool(0), Random(0L)).toList()
-        assertEquals(listOf(1, 0), values, "saved true (=1) must be tried first")
+        assertEquals(listOf(1L, 0L), values, "saved true (=1) must be tried first")
     }
 
     @Test
@@ -75,9 +75,9 @@ class SolutionGuidedTest {
         )
         val session = PropagationSession(problem)
         val guided = SolutionGuided(IndomainMin)
-        guided.onSolution(Sample(BooleanArray(0), intArrayOf(0)))
+        guided.onSolution(Sample(BooleanArray(0), longArrayOf(0)))
         val values = guided.values(session, VarRef.IntVar(0), Random(0L)).toList()
-        assertEquals(listOf(2, 3, 4), values)
+        assertEquals(listOf(2L, 3L, 4L), values)
     }
 
     @Test
@@ -96,7 +96,7 @@ class SolutionGuidedTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0..3).toSet(), sat.assignment.ints.toSet())
+        assertEquals((0L..3L).toSet(), sat.assignment.ints.toSet())
     }
 
     @Test

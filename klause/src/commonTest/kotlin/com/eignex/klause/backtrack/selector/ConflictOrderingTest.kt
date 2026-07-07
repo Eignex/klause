@@ -101,6 +101,6 @@ class ConflictOrderingTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
+        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
     }
 }

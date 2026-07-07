@@ -7,7 +7,7 @@ import com.eignex.klause.util.IntArrayList
 
 /** LS implementation for [Circuit]: violation scoring and move proposal for the Hamiltonian-cycle
  *  constraint. */
-internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Int) -> Int) :
+internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Long) -> Int) :
     SuccessorCycleInvariant(succ, n, computeCost) {
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -19,14 +19,14 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
             val span = d.size
             if (span <= MAX_TARGETS) {
                 d.forEach { target ->
-                    if (target != cur && target != i) sink.addChannelingIntSet(state, v, target)
+                    if (target != cur && target != i.toLong()) sink.addChannelingIntSet(state, v, target)
                 }
             } else {
                 if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
                 if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
                 repeat(MAX_TARGETS) {
                     val target = d.valueAt(state.rng.nextInt(span))
-                    if (target != cur && target != i) sink.addChannelingIntSet(state, v, target)
+                    if (target != cur && target != i.toLong()) sink.addChannelingIntSet(state, v, target)
                 }
             }
         }
@@ -35,7 +35,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (n < 3) return
-        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]) }
+        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]).toInt() }
         val predOf = IntArray(n) { -1 }
         for (i in 0 until n) {
             val s = nextOf[i]
@@ -53,14 +53,14 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
             if (a == v || a == p) continue
             val b = nextOf[a]
             if (b == v) continue
-            if (nv !in state.problem.intDomains[succ[p]]) continue
-            if (v !in state.problem.intDomains[succ[a]]) continue
-            if (b !in state.problem.intDomains[succ[v]]) continue
+            if (nv.toLong() !in state.problem.intDomains[succ[p]]) continue
+            if (v.toLong() !in state.problem.intDomains[succ[a]]) continue
+            if (b.toLong() !in state.problem.intDomains[succ[v]]) continue
             sink.addCompound(
                 listOf(
-                    Move.IntSet(succ[p], nv),
-                    Move.IntSet(succ[a], v),
-                    Move.IntSet(succ[v], b),
+                    Move.IntSet(succ[p], nv.toLong()),
+                    Move.IntSet(succ[a], v.toLong()),
+                    Move.IntSet(succ[v], b.toLong()),
                 ),
             )
             emitted++
@@ -91,7 +91,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
             order[k] = cur
             val nx = state.assignment.intValue(succ[cur])
             if (nx < 0 || nx >= n) return
-            cur = nx
+            cur = nx.toInt()
         }
         if (cur != 0) return
         proposeReversals(state, order, sink, MAX_SWAP_CANDIDATES, STRUCTURED_ATTEMPT_STRIDE)
@@ -100,11 +100,16 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         for (i in 0 until n) {
             val target = (i + 1) % n
-            if (target !in state.problem.intDomains[succ[i]]) return false
-            if (state.assumptions.isFrozenInt(succ[i]) && state.assignment.intValue(succ[i]) != target) return false
+            if (target.toLong() !in state.problem.intDomains[succ[i]]) return false
+            if (state.assumptions.isFrozenInt(
+                    succ[i],
+                ) && state.assignment.intValue(succ[i]) != target.toLong()
+            ) {
+                return false
+            }
         }
         for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], (i + 1) % n)
+            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], ((i + 1) % n).toLong())
         }
         return true
     }
@@ -115,7 +120,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
         var cycleId = 0
         val effective = IntArray(n) { i ->
             val s = state.assignment.intValue(succ[i])
-            if (s < 0 || s >= n || s == i) -1 else s
+            if (s < 0 || s >= n || s == i.toLong()) -1 else s.toInt()
         }
         val posOnPath = IntArray(n) { -1 }
         val pathBuf = IntArrayList()
@@ -148,8 +153,8 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
                 if (si < 0 || sj < 0) continue
                 val di = state.problem.intDomains[succ[i]]
                 val dj = state.problem.intDomains[succ[j]]
-                if (sj !in di.min..di.max || si !in dj.min..dj.max) continue
-                sink.addCompound(listOf(Move.IntSet(succ[i], sj), Move.IntSet(succ[j], si)))
+                if (sj.toLong() !in di.min..di.max || si.toLong() !in dj.min..dj.max) continue
+                sink.addCompound(listOf(Move.IntSet(succ[i], sj.toLong()), Move.IntSet(succ[j], si.toLong())))
                 swapsAdded++
             }
         }

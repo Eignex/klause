@@ -10,5 +10,5 @@ import kotlin.random.Random
  */
 object SmallestLowerBound : VariableSelector {
     override fun pick(session: PropagationSession, rng: Random): VarRef? =
-        pickByDomainMetric(session, maximize = false, boolScore = 0) { it.min }
+        pickByDomainMetric(session, maximize = false, boolScore = 0L) { it.min }
 }

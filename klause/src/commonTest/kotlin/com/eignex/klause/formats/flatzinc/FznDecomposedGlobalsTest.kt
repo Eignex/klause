@@ -19,7 +19,7 @@ class FznDecomposedGlobalsTest {
         val program = parseFlatZinc(src)
         val ids = vars.map { program.intVarsByName.getValue(it) }
         return BacktrackSolver(program.problem).enumerate(BacktrackParams(randomSeed = 0L))
-            .map { s -> ids.map { s.ints[it] } }
+            .map { s -> ids.map { s.ints[it].toInt() } }
             .toHashSet()
     }
 

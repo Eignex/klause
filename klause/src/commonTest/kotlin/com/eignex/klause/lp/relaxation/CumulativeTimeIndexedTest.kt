@@ -38,7 +38,7 @@ class CumulativeTimeIndexedTest {
         disjunctive: Boolean = false,
     ): Problem {
         val n = starts.size
-        val domains = Array(n + 1) { if (it < n) starts[it] else IntDomain(0, horizon) }
+        val domains = Array(n + 1) { if (it < n) starts[it] else IntDomain(0, horizon.toLong()) }
         val factors = ArrayList<Factor>()
         for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, durations[i]))
         factors.add(
@@ -223,9 +223,9 @@ class CumulativeTimeIndexedTest {
             val durations = IntArray(n) { rng.nextInt(1, 4) }
             val resources = IntArray(n) { rng.nextInt(1, 3) }
             val capacity = rng.nextInt(1, 4)
-            val starts = Array(n) { IntDomain(rng.nextInt(0, 3), 3 + rng.nextInt(0, 3)) }
+            val starts = Array(n) { IntDomain(rng.nextInt(0, 3).toLong(), (3 + rng.nextInt(0, 3)).toLong()) }
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
-            val p = makespanProblem(starts, durations, resources, capacity, horizon)
+            val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
             val optimum = bruteOptimum(n, starts, durations, resources, capacity) ?: return@repeat
             val bound = makespanBound(p, n, timeIndexed = true)
             assertTrue(
@@ -249,9 +249,9 @@ class CumulativeTimeIndexedTest {
             val durations = IntArray(n) { rng.nextInt(1, 4) }
             val resources = IntArray(n) { rng.nextInt(1, 3) }
             val capacity = rng.nextInt(1, 4)
-            val starts = Array(n) { IntDomain(0, rng.nextInt(2, 5)) }
+            val starts = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
-            val p = makespanProblem(starts, durations, resources, capacity, horizon)
+            val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
             val optimum = bruteOptimum(n, starts, durations, resources, capacity)
             val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
             val params = BacktrackParams(
@@ -308,7 +308,7 @@ class CumulativeTimeIndexedTest {
                 return
             }
             for (v in starts[i].min..starts[i].max) {
-                s[i] = v
+                s[i] = v.toInt()
                 rec(i + 1)
             }
         }

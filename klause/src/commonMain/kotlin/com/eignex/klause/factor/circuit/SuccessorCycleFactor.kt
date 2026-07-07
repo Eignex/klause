@@ -17,5 +17,5 @@ abstract class SuccessorCycleFactor(
     final override val boolVars: IntArray = EmptyIntArray
     final override val intVars: IntArray = succ
 
-    protected abstract fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int
+    protected abstract fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int
 }

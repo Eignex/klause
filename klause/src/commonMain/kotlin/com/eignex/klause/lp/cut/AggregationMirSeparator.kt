@@ -167,7 +167,7 @@ internal class AggregationMirSeparator : CutSeparator {
                 val coeff = if (flip) -factor.coeffs[idx] else factor.coeffs[idx]
                 cols[idx] = col
                 a[idx] = coeff
-                val lo = ctx.problem.intDomains[factor.vars[idx]].min.toLong()
+                val lo = ctx.problem.intDomains[factor.vars[idx]].min
                 loOf.put(col, lo)
                 b = addExact(b, -mulExact(coeff, lo)) // shift to y_j = x_j − lo_j
             }

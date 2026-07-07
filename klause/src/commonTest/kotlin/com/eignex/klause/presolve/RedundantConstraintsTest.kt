@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  */
 class RedundantConstraintsTest {
 
-    private fun isFeasible(problem: Problem, ints: IntArray): Boolean {
+    private fun isFeasible(problem: Problem, ints: LongArray): Boolean {
         var a = Assumptions.None
         for (v in 0 until problem.numIntVars) a = a.withInt(v, ints[v])
         return problem.propagate(a) !is PropagationResult.Unsat
@@ -33,7 +33,7 @@ class RedundantConstraintsTest {
 
     private fun feasibleCount(problem: Problem): Int {
         val n = problem.numIntVars
-        val ints = IntArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.intDomains[it].min }
         var count = 0
         while (true) {
             if (isFeasible(problem, ints.copyOf())) count++
@@ -61,7 +61,7 @@ class RedundantConstraintsTest {
         return out
     }
 
-    private fun dom(n: Int, hi: Int) = Array(n) { IntDomain(0, hi) }
+    private fun dom(n: Int, hi: Int) = Array(n) { IntDomain(0, hi.toLong()) }
     private fun le(b: Int, vararg vc: Int) =
         Linear(IntArray(vc.size / 2) { vc[2 * it + 1] }, IntArray(vc.size / 2) { vc[2 * it] }, LinearOp.LE, b)
 

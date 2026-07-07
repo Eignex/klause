@@ -65,11 +65,11 @@ internal class InversePropagator(
         val gLo = gOffset
         val gHi = gOffset + g.size - 1
         for (i in f.indices) {
-            if (!state.tightenIntMin(f[i], gLo)) {
+            if (!state.tightenIntMin(f[i], gLo.toLong())) {
                 cache.conflictVars = intArrayOf(f[i])
                 return false
             }
-            if (!state.tightenIntMax(f[i], gHi)) {
+            if (!state.tightenIntMax(f[i], gHi.toLong())) {
                 cache.conflictVars = intArrayOf(f[i])
                 return false
             }
@@ -77,11 +77,11 @@ internal class InversePropagator(
         val fLo = fOffset
         val fHi = fOffset + f.size - 1
         for (i in g.indices) {
-            if (!state.tightenIntMin(g[i], fLo)) {
+            if (!state.tightenIntMin(g[i], fLo.toLong())) {
                 cache.conflictVars = intArrayOf(g[i])
                 return false
             }
-            if (!state.tightenIntMax(g[i], fHi)) {
+            if (!state.tightenIntMax(g[i], fHi.toLong())) {
                 cache.conflictVars = intArrayOf(g[i])
                 return false
             }
@@ -89,17 +89,18 @@ internal class InversePropagator(
         for (i in f.indices) {
             val d = state.intDomains[f[i]]
             if (d.min != d.max) continue
-            val gIdx = d.min - gOffset
-            if (gIdx !in g.indices) {
+            val gIdxLong = d.min - gOffset
+            if (gIdxLong !in g.indices) {
                 cache.conflictVars = intArrayOf(f[i])
                 return false
             }
+            val gIdx = gIdxLong.toInt()
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
-            if (!state.tightenIntMin(g[gIdx], i + fOffset, ant)) {
+            if (!state.tightenIntMin(g[gIdx], (i + fOffset).toLong(), ant)) {
                 cache.conflictVars = intArrayOf(f[i], g[gIdx])
                 return false
             }
-            if (!state.tightenIntMax(g[gIdx], i + fOffset, ant)) {
+            if (!state.tightenIntMax(g[gIdx], (i + fOffset).toLong(), ant)) {
                 cache.conflictVars = intArrayOf(f[i], g[gIdx])
                 return false
             }
@@ -107,17 +108,18 @@ internal class InversePropagator(
         for (i in g.indices) {
             val d = state.intDomains[g[i]]
             if (d.min != d.max) continue
-            val fIdx = d.min - fOffset
-            if (fIdx !in f.indices) {
+            val fIdxLong = d.min - fOffset
+            if (fIdxLong !in f.indices) {
                 cache.conflictVars = intArrayOf(g[i])
                 return false
             }
+            val fIdx = fIdxLong.toInt()
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[i]))
-            if (!state.tightenIntMin(f[fIdx], i + gOffset, ant)) {
+            if (!state.tightenIntMin(f[fIdx], (i + gOffset).toLong(), ant)) {
                 cache.conflictVars = intArrayOf(g[i], f[fIdx])
                 return false
             }
-            if (!state.tightenIntMax(f[fIdx], i + gOffset, ant)) {
+            if (!state.tightenIntMax(f[fIdx], (i + gOffset).toLong(), ant)) {
                 cache.conflictVars = intArrayOf(g[i], f[fIdx])
                 return false
             }
@@ -127,17 +129,17 @@ internal class InversePropagator(
         fun pair(i: Int, gIdx: Int): Boolean {
             val jVal = gIdx + gOffset
             val iVal = i + fOffset
-            val fHas = jVal in state.intDomains[f[i]]
-            val gHas = iVal in state.intDomains[g[gIdx]]
+            val fHas = jVal.toLong() in state.intDomains[f[i]]
+            val gHas = iVal.toLong() in state.intDomains[g[gIdx]]
             if (fHas && !gHas) {
                 val ant = state.composeIntVarAtomAntecedents(intArrayOf(g[gIdx]))
-                if (!state.excludeIntValue(f[i], jVal, ant)) {
+                if (!state.excludeIntValue(f[i], jVal.toLong(), ant)) {
                     cache.conflictVars = intArrayOf(f[i], g[gIdx])
                     return false
                 }
             } else if (!fHas && gHas) {
                 val ant = state.composeIntVarAtomAntecedents(intArrayOf(f[i]))
-                if (!state.excludeIntValue(g[gIdx], iVal, ant)) {
+                if (!state.excludeIntValue(g[gIdx], iVal.toLong(), ant)) {
                     cache.conflictVars = intArrayOf(f[i], g[gIdx])
                     return false
                 }

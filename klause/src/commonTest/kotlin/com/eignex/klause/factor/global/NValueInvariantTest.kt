@@ -18,7 +18,7 @@ class NValueInvariantTest {
     private fun problem(domainHi: Int = 3): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 4,
-        intDomains = Array(4) { IntDomain(0, domainHi) },
+        intDomains = Array(4) { IntDomain(0, domainHi.toLong()) },
         factors = arrayOf<Factor>(NValue(n = 0, xs = intArrayOf(1, 2, 3))),
     )
 

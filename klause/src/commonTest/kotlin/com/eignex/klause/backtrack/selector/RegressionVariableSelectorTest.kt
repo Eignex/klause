@@ -25,14 +25,14 @@ class RegressionVariableSelectorTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, n - 1) },
+            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
         )
         val r = BacktrackSolver(problem).solve(
             BacktrackParams(variableSelector = RegressionVariableSelector.linUcb(seed = 1L), randomSeed = 0L),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0 until n).toSet(), sat.assignment.ints.toSet(), "not a permutation")
+        assertEquals((0L until n.toLong()).toSet(), sat.assignment.ints.toSet(), "not a permutation")
     }
 
     @Test

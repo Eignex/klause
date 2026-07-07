@@ -92,10 +92,10 @@ internal object CoefficientStrengthening {
     /** Two equalities pinning integer variable [v] to consecutive values — jointly unsatisfiable, so
      *  the bake propagation reports `Unsat`. */
     private fun intContradiction(v: Int, domains: Array<IntDomain>): List<Factor> {
-        val c = if (domains[v].min < Int.MAX_VALUE) domains[v].min else domains[v].min - 1
+        val c = if (domains[v].min < Long.MAX_VALUE) domains[v].min else domains[v].min - 1
         return listOf(
-            Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, c),
-            Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, c + 1),
+            Linear(longArrayOf(1), intArrayOf(v), LinearOp.EQ, c),
+            Linear(longArrayOf(1), intArrayOf(v), LinearOp.EQ, c + 1),
         )
     }
 

@@ -127,7 +127,7 @@ class ImplicitNeighbourhoodTest {
         state.assignment.setInt(2, 0)
         state.recompute()
         state.seedImplicitFeasible()
-        assertTrue(state.assignment.intValue(0) == 2, "frozen var must keep its value")
+        assertTrue(state.assignment.intValue(0) == 2L, "frozen var must keep its value")
     }
 
     @Test

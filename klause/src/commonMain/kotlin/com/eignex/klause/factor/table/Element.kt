@@ -119,22 +119,23 @@ class Element private constructor(
         val idxDom = domains[idx]
         if (idxDom.min == idxDom.max) {
             val pos = idxDom.min - indexOffset
-            if (pos !in arr.indices) return FactorReduction.Unchanged
-            if (!arrIsVars) return FactorReduction.Rewrite(listOf(resultEquals(arr[pos])))
-            val v = arr[pos]
+            if (pos < 0 || pos >= arr.size) return FactorReduction.Unchanged
+            val p = pos.toInt()
+            if (!arrIsVars) return FactorReduction.Rewrite(listOf(resultEquals(arr[p].toLong())))
+            val v = arr[p]
             return if (v == result) FactorReduction.Rewrite(emptyList()) else FactorReduction.Rewrite(listOf(equate(v)))
         }
         if (!arrIsVars && arr.all { it == arr[0] }) {
             val lo = indexOffset
             val hi = indexOffset + arr.size - 1
-            if (maxOf(idxDom.min, lo) > minOf(idxDom.max, hi)) return FactorReduction.Unchanged
-            return FactorReduction.Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi))
+            if (maxOf(idxDom.min, lo.toLong()) > minOf(idxDom.max, hi.toLong())) return FactorReduction.Unchanged
+            return FactorReduction.Rewrite(listOf(resultEquals(arr[0].toLong())), mapOf(idx to lo..hi))
         }
         return FactorReduction.Unchanged
     }
 
     /** The equality `result = [value]`. */
-    private fun resultEquals(value: Int): Linear = Linear(intArrayOf(1), intArrayOf(result), LinearOp.EQ, value)
+    private fun resultEquals(value: Long): Linear = Linear(longArrayOf(1L), intArrayOf(result), LinearOp.EQ, value)
 
     /** The equality `result = [v]` between the result and an array variable. */
     private fun equate(v: Int): Linear = Linear(intArrayOf(1, -1), intArrayOf(result, v), LinearOp.EQ, 0)

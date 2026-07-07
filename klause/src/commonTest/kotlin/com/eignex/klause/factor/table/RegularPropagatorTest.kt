@@ -63,7 +63,7 @@ class RegularPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(ranges[it].first, ranges[it].second) },
+                intDomains = Array(n) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) },
                 factors = arrayOf<Factor>(
                     Regular(
                         seq = IntArray(n) { it },
@@ -77,7 +77,7 @@ class RegularPropagatorTest {
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
     }
@@ -180,7 +180,7 @@ class RegularPropagatorTest {
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "Regular+Linear (bound=$bound): solution set must equal brute force")
         }
     }
@@ -239,7 +239,7 @@ class RegularPropagatorTest {
                 }
             }
             rec(0)
-            val domains = Array(n) { IntDomain(ranges[it].first, ranges[it].second) }
+            val domains = Array(n) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) }
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
@@ -253,7 +253,9 @@ class RegularPropagatorTest {
                 variableSelector = Vsids(),
                 maxLearnedClauses = 500,
             )
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000).map { it.ints.toList() }.toHashSet()
+            val found = BacktrackSolver(
+                problem,
+            ).enumerate(params).take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "trial #$trial (Q=$numStates |Σ|=$alphabet n=$n q0=$q0): must equal brute force")
         }
     }

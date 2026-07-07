@@ -26,7 +26,7 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
             sb.append("$name = ${sample.ints[id]};\n")
         }
         for ((name, b) in program.floatVarsByName) {
-            sb.append("$name = ${b.valueOf(sample.ints[b.varId])};\n")
+            sb.append("$name = ${b.valueOf(sample.ints[b.varId].toInt())};\n")
         }
         for ((name, layout) in program.setVarsByName) {
             sb.append("$name = ${renderSet(sample, layout)};\n")
@@ -48,7 +48,7 @@ private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {
 private fun renderScalar(program: FlatZincProgram, sample: Sample, name: String): String {
     program.setVarsByName[name]?.let { return renderSet(sample, it) }
     program.boolVarsByName[name]?.let { return sample.bools[it].toString() }
-    program.floatVarsByName[name]?.let { b -> return b.valueOf(sample.ints[b.varId]).toString() }
+    program.floatVarsByName[name]?.let { b -> return b.valueOf(sample.ints[b.varId].toInt()).toString() }
     program.intVarsByName[name]?.let { return sample.ints[it].toString() }
     throw IllegalArgumentException("output: unknown var `$name`")
 }
@@ -100,7 +100,7 @@ private fun renderArray(program: FlatZincProgram, sample: Sample, name: String):
 
                     FlatZincArray.Vars.ElementKind.Float -> {
                         val b = requireNotNull(arr.floatBucketings)[i]
-                        sb.append(b.valueOf(sample.ints[arr.varIds[i]]))
+                        sb.append(b.valueOf(sample.ints[arr.varIds[i]].toInt()))
                     }
                 }
             }

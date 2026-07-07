@@ -32,7 +32,7 @@ class TrailResidentAtomSoundnessTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = numVars,
-            intDomains = Array(numVars) { IntDomain(0, hi) },
+            intDomains = Array(numVars) { IntDomain(0, hi.toLong()) },
             factors = arrayOf<Factor>(),
         )
         return PropagationState(problem, Assumptions.None).also { it.undoLogging = true }
@@ -43,9 +43,9 @@ class TrailResidentAtomSoundnessTest {
     private fun materializeAllAtoms(s: PropagationState, numVars: Int, hi: Int) {
         for (v in 0 until numVars) {
             for (k in 0..hi) {
-                s.atomVarGe(v, k)
-                s.atomVarLe(v, k)
-                s.atomVarEq(v, k)
+                s.atomVarGe(v, k.toLong())
+                s.atomVarLe(v, k.toLong())
+                s.atomVarEq(v, k.toLong())
             }
         }
     }
@@ -80,14 +80,14 @@ class TrailResidentAtomSoundnessTest {
         s.currentLevel = s.levelToDecisionVar.size
         s.currentFactor = -1
         return when (rng.nextInt(3)) {
-            0 -> s.tightenIntMin(v, rng.nextInt(d.min + 1, d.max + 1))
+            0 -> s.tightenIntMin(v, rng.nextInt((d.min + 1).toInt(), (d.max + 1).toInt()).toLong())
 
             // v >= lo
-            1 -> s.tightenIntMax(v, rng.nextInt(d.min, d.max))
+            1 -> s.tightenIntMax(v, rng.nextInt(d.min.toInt(), d.max.toInt()).toLong())
 
             // v <= hi
             else -> { // carve an interior value (falls back to an edge tighten if at a bound)
-                val value = rng.nextInt(d.min, d.max + 1)
+                val value = rng.nextInt(d.min.toInt(), (d.max + 1).toInt()).toLong()
                 s.excludeIntValue(v, value)
             }
         }

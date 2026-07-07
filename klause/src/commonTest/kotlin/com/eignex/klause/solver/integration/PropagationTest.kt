@@ -110,7 +110,7 @@ class PropagationTest {
     fun `IntEq forces value`() {
         val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)))
         val r = implied(p.propagate())
-        assertEquals(mapOf(0 to 7), r.ints)
+        assertEquals(mapOf(0 to 7L), r.ints)
     }
 
     @Test
@@ -132,7 +132,7 @@ class PropagationTest {
                 ),
             )
         val r = implied(p.propagate())
-        assertEquals(mapOf(0 to 3), r.ints)
+        assertEquals(mapOf(0 to 3L), r.ints)
     }
 
     @Test
@@ -164,7 +164,7 @@ class PropagationTest {
                 ),
             )
         val r = implied(p.propagate())
-        assertEquals(mapOf(0 to 6), r.ints)
+        assertEquals(mapOf(0 to 6L), r.ints)
     }
 
     @Test
@@ -240,7 +240,7 @@ class PropagationTest {
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))
-        assertEquals(mapOf(0 to 5), r.ints)
+        assertEquals(mapOf(0 to 5L), r.ints)
     }
 
     @Test
@@ -298,7 +298,7 @@ class PropagationTest {
         )
         val r = implied(p.propagate(Assumptions(ints = mapOf(1 to 3))))
         // x must be 0 (since 2x ≤ 10 - 9 = 1 → x ≤ 0; combined with domain ≥ 0 → singleton)
-        assertEquals(mapOf(0 to 0), r.ints)
+        assertEquals(mapOf(0 to 0L), r.ints)
     }
 
     @Test
@@ -338,7 +338,7 @@ class PropagationTest {
             ),
         )
         val r = implied(p.propagate())
-        assertEquals(mapOf(0 to 3, 1 to 0), r.ints)
+        assertEquals(mapOf(0 to 3L, 1 to 0L), r.ints)
     }
 
     @Test

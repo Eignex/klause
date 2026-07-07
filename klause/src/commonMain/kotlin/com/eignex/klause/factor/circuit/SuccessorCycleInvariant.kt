@@ -11,7 +11,7 @@ import com.eignex.klause.util.IntIntMap
 internal open class SuccessorCycleInvariant(
     protected val succ: IntArray,
     protected val n: Int,
-    protected val computeCost: (LocalSearchState, Int, Int) -> Int,
+    protected val computeCost: (LocalSearchState, Int, Long) -> Int,
 ) : Invariant {
 
     protected val positionOfVar: IntIntMap = IntIntMap.build(succ, IntArray(n) { it }, absent = -1)
@@ -19,14 +19,14 @@ internal open class SuccessorCycleInvariant(
     override val providesImplicitNeighbourhood: Boolean get() = true
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        state.intPayload[factorId] = computeCost(state, -1, 0)
+        state.intPayload[factorId] = computeCost(state, -1, 0L)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int = state.intPayload[factorId]
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val pos = positionOfVar[intVar]
         if (pos < 0) return 0
         val oldCost = state.intPayload[factorId]
@@ -34,10 +34,10 @@ internal open class SuccessorCycleInvariant(
         return newCost - oldCost
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         if (positionOfVar[intVar] < 0) return 0
         val oldCost = state.intPayload[factorId]
-        val newCost = computeCost(state, -1, 0)
+        val newCost = computeCost(state, -1, 0L)
         state.intPayload[factorId] = newCost
         return newCost - oldCost
     }
@@ -86,8 +86,8 @@ internal open class SuccessorCycleInvariant(
     private fun appendEdge(state: LocalSearchState, from: Int, to: Int, parts: ArrayList<Move>): Boolean {
         val v = succ[from]
         if (state.assumptions.isFrozenInt(v)) return false
-        if (to !in state.problem.intDomains[v]) return false
-        parts.add(Move.IntSet(v, to))
+        if (to.toLong() !in state.problem.intDomains[v]) return false
+        parts.add(Move.IntSet(v, to.toLong()))
         return true
     }
 

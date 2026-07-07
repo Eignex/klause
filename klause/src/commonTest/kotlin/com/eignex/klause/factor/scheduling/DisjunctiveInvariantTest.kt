@@ -60,7 +60,7 @@ class DisjunctiveInvariantTest {
         val starts = sample.ints
         val occ = BooleanArray(3)
         for (i in 0 until 3) {
-            val slot = starts[i]
+            val slot = starts[i].toInt()
             assertTrue(!occ[slot], "double-booked at slot $slot in ${starts.toList()}")
             occ[slot] = true
         }

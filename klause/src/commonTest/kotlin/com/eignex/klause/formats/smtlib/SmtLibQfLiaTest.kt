@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class SmtLibQfLiaTest {
 
-    private fun solve(text: String): IntArray {
+    private fun solve(text: String): LongArray {
         val r = BacktrackSolver(SmtLibQfLia.parse(text).problem).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints
@@ -109,7 +109,7 @@ class SmtLibQfLiaTest {
         """.trimIndent()
         assertTrue(SmtLibQfLia.parse(text).problem.factors.any { it is AllDifferent }, "expected AllDifferent")
         val ints = solve(text)
-        assertEquals(setOf(1, 2, 3), listOf(ints[0], ints[1], ints[2]).toSet())
+        assertEquals(setOf(1L, 2L, 3L), listOf(ints[0], ints[1], ints[2]).toSet())
     }
 
     @Test

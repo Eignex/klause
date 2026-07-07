@@ -84,17 +84,17 @@ internal fun Lowering.liftMul(left: IntExpr, right: IntExpr): IntExpr {
     val aDom = intDomains[intVarOf(aRef.name)]
     val bDom = intDomains[intVarOf(bRef.name)]
     val cornersLong = longArrayOf(
-        aDom.min.toLong() * bDom.min,
-        aDom.min.toLong() * bDom.max,
-        aDom.max.toLong() * bDom.min,
-        aDom.max.toLong() * bDom.max,
+        aDom.min * bDom.min,
+        aDom.min * bDom.max,
+        aDom.max * bDom.min,
+        aDom.max * bDom.max,
     )
     val pMin = cornersLong.min()
     val pMax = cornersLong.max()
     require(pMin >= Int.MIN_VALUE && pMax <= Int.MAX_VALUE) {
         "IntMul product domain overflows Int: $aDom * $bDom = [$pMin, $pMax]"
     }
-    val productDomain = IntDomain(pMin.toInt(), pMax.toInt())
+    val productDomain = IntDomain(pMin, pMax)
     val resultName = newAuxIntVar(productDomain)
     factors += Product(intVarOf(aRef.name), intVarOf(bRef.name), intVarOf(resultName))
     return IntRef(resultName)
@@ -125,15 +125,15 @@ internal fun Lowering.liftElement(index: IntExpr, items: List<IntExpr>): IntExpr
     // For each j the index could take, link the aux to items[j] when index = j; for
     // out-of-bounds j, force index ≠ j.
     for (j in idxDom.min..idxDom.max) {
-        if (j in items.indices) {
+        if (j >= 0 && j < items.size) {
             assertExpr(
                 Implies(
-                    IntCompare(idxLifted, IntCmpOp.EQ, IntLit(j)),
-                    IntCompare(auxRef, IntCmpOp.EQ, itemsLifted[j]),
+                    IntCompare(idxLifted, IntCmpOp.EQ, IntLit(j.toInt())),
+                    IntCompare(auxRef, IntCmpOp.EQ, itemsLifted[j.toInt()]),
                 ),
             )
         } else {
-            assertExpr(IntCompare(idxLifted, IntCmpOp.NE, IntLit(j)))
+            assertExpr(IntCompare(idxLifted, IntCmpOp.NE, IntLit(j.toInt())))
         }
     }
     return auxRef
@@ -170,7 +170,7 @@ internal fun Lowering.liftAbs(child: IntExpr): IntExpr {
     val lifted = lift(child)
     val d = domainOf(lifted)
     val absMax = maxOf(if (d.min < 0) -d.min else d.min, if (d.max < 0) -d.max else d.max)
-    val auxName = newAuxIntVar(IntDomain(0, absMax))
+    val auxName = newAuxIntVar(IntDomain(0L, absMax))
     val operandId = intVarOf(materializeIntVar(lifted).name)
     factors += IntFunctionLowering.absFactors(operandId, intVarOf(auxName)) { newBoolVar() }
     return IntRef(auxName)
@@ -187,7 +187,7 @@ internal fun Lowering.newAuxIntVar(domain: IntDomain): String {
 internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
     is IntRef -> intDomains[intVarOf(expr.name)]
 
-    is IntLit -> IntDomain(expr.value, expr.value)
+    is IntLit -> IntDomain(expr.value.toLong(), expr.value.toLong())
 
     is IntScale -> {
         val c = expr.coeff.toLong()
@@ -204,8 +204,8 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
             hi = c * d.min
         }
         IntDomain(
-            checkedInt(lo) { "IntScale domain min ($c · ${d.min})" },
-            checkedInt(hi) { "IntScale domain max ($c · ${d.max})" },
+            checkedInt(lo) { "IntScale domain min ($c · ${d.min})" }.toLong(),
+            checkedInt(hi) { "IntScale domain max ($c · ${d.max})" }.toLong(),
         )
     }
 
@@ -217,7 +217,7 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
             lo += d.min
             hi += d.max
         }
-        IntDomain(checkedInt(lo) { "IntSum domain min" }, checkedInt(hi) { "IntSum domain max" })
+        IntDomain(checkedInt(lo) { "IntSum domain min" }.toLong(), checkedInt(hi) { "IntSum domain max" }.toLong())
     }
 
     else -> error("domainOf called on non-affine expression: $expr")

@@ -17,7 +17,7 @@ internal enum class Relation { LE, GE, EQ }
  * tighter than the declared ones are recorded (a declared bound holds everywhere). Parallel
  * arrays: premise `k` is `x_{vars[k]} ≤ thresholds[k]` when `isUpper[k]`, else `≥`.
  */
-internal class LpRowPremises(val vars: IntArray, val isUpper: BooleanArray, val thresholds: IntArray)
+internal class LpRowPremises(val vars: IntArray, val isUpper: BooleanArray, val thresholds: LongArray)
 
 /** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
 internal enum class Sense { MINIMIZE, MAXIMIZE }

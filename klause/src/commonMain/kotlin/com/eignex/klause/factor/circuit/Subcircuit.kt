@@ -54,8 +54,8 @@ class Subcircuit(
      * Graded cost for the subcircuit. 0 iff included set forms a single cycle (or is empty).
      * O(n).
      */
-    override fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Int): Int {
-        val effective = IntArray(n) { i ->
+    override fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int {
+        val effective = LongArray(n) { i ->
             if (i == replaceAt) replaceWith else state.assignment.intValue(succ[i])
         }
         var numOob = 0
@@ -68,7 +68,7 @@ class Subcircuit(
                 numOob++
                 continue
             }
-            if (s != i) {
+            if (s != i.toLong()) {
                 included[i] = true
                 numIncluded++
             }
@@ -76,7 +76,9 @@ class Subcircuit(
         for (i in 0 until n) {
             if (!included[i]) continue
             val s = effective[i]
-            if (s in 0 until n && !included[s] && effective[s] in 0 until n && effective[s] == s) {
+            if (s in 0 until n && !included[s.toInt()] && effective[s.toInt()] in 0 until n &&
+                effective[s.toInt()] == s
+            ) {
                 numPointToExcluded++
             }
         }
@@ -86,7 +88,7 @@ class Subcircuit(
                 -1
             } else {
                 val s = effective[i]
-                if (s in 0 until n && s != i && included[s]) s else -1
+                if (s in 0 until n && s != i.toLong() && included[s.toInt()]) s.toInt() else -1
             }
         }
         val scan = cycleScan(next, n)

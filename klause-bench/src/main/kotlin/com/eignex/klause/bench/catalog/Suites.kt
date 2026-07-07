@@ -127,10 +127,10 @@ internal object Suites {
                 idx == 0 -> IntDomain(0, 0)
 
                 // mark[0] pinned to 0
-                idx < m -> IntDomain(0, maxLen)
+                idx < m -> IntDomain(0, maxLen.toLong())
 
                 // marks
-                else -> IntDomain(1, maxLen) // differences
+                else -> IntDomain(1, maxLen.toLong()) // differences
             }
         }
         val factors = ArrayList<Factor>()

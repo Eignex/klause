@@ -32,7 +32,7 @@ class ChannelDslTest {
             val i = compiled.decode(schema.idx, s)
             val flags = listOf(schema.b0, schema.b1, schema.b2, schema.b3).map { compiled.decode(it, s) }
             for (j in flags.indices) {
-                assertTrue(flags[j] == (i == j), "i=$i flags=$flags mismatch at j=$j")
+                assertTrue(flags[j] == (i == j.toLong()), "i=$i flags=$flags mismatch at j=$j")
             }
         }
     }
@@ -58,7 +58,7 @@ class ChannelDslTest {
             val i = compiled.decode(schema.idx, s)
             val flags = listOf(schema.a, schema.b, schema.c).map { compiled.decode(it, s) }
             for (j in flags.indices) {
-                assertTrue(flags[j] == (i == 5 + j), "i=$i flags=$flags mismatch at j=$j")
+                assertTrue(flags[j] == (i == (5 + j).toLong()), "i=$i flags=$flags mismatch at j=$j")
             }
         }
     }

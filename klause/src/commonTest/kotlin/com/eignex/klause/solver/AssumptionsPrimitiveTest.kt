@@ -73,6 +73,6 @@ class AssumptionsPrimitiveTest {
     fun `legacy bools and ints map views match the primitive arrays`() {
         val a = Assumptions(bools = mapOf(0 to true, 3 to false), ints = mapOf(4 to 1))
         assertEquals(mapOf(0 to true, 3 to false), a.bools)
-        assertEquals(mapOf(4 to 1), a.ints)
+        assertEquals(mapOf(4 to 1L), a.ints)
     }
 }

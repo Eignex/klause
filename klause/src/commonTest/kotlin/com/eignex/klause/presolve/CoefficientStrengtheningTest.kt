@@ -89,14 +89,19 @@ class CoefficientStrengtheningTest {
     private fun assertLinearEquivalent(domains: Array<IntRange>, original: Linear) {
         val numVars = domains.size
         val problem =
-            Problem(0, numVars, Array(numVars) { IntDomain(domains[it].first, domains[it].last) }, listOf(original))
+            Problem(
+                0,
+                numVars,
+                Array(numVars) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
+                listOf(original),
+            )
         // The rewrite may produce one factor (lifted / gcd-reduced), none (dropped ⇒ always-true), or
         // a multi-factor contradiction (an indivisible equality ⇒ infeasible); the feasible set is the
         // conjunction of whatever rewritten factors remain.
         val rewritten = strengthened(problem).factors.filterIsInstance<Linear>()
         val values = Array(numVars) { v ->
             val d = problem.intDomains[v]
-            IntArray(d.size) { d.valueAt(it) }
+            IntArray(d.size) { d.valueAt(it).toInt() }
         }
         val assign = IntArray(numVars)
         enumerateMixed(values) { idx ->

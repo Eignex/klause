@@ -119,7 +119,7 @@ class SymmetryPropagatorTest {
                     factors.add(Linear(IntArray(n) { 1 }, xs, LinearOp.LE, rng.nextInt(0, n * d + 1)))
                 }
             }
-            val problem = Problem(0, n, Array(n) { IntDomain(0, d) }, factors)
+            val problem = Problem(0, n, Array(n) { IntDomain(0, d.toLong()) }, factors)
             val broken = problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
             val origSat = BruteForceSolver(problem).solve(BruteForceParams(randomSeed = 0L)) is SolveResult.Sat
             val brokenSat = BacktrackSolver(broken).solve(BacktrackParams(randomSeed = 1L)) is SolveResult.Sat

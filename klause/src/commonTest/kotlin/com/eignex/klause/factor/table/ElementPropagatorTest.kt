@@ -64,7 +64,7 @@ class ElementPropagatorTest {
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
-        .map { it.ints.toList() }
+        .map { it.ints.map { v -> v.toInt() } }
         .toHashSet()
 
     @Test
@@ -230,7 +230,7 @@ class ElementPropagatorTest {
             }
             val found = BacktrackSolver(problem)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-                .take(100_000).map { it.ints.toList() }.toHashSet()
+                .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: delta-gated element + interior holes must match brute")
         }
     }
@@ -262,7 +262,7 @@ class ElementPropagatorTest {
         state.currentLevel = 1
         check(state.tightenIntMin(1, 1)) { "tighten result min failed" }
         check(problem.propagators[0].propagate(state, 0)) { "element propagate failed" }
-        check(state.intDomains[2].min == 1) { "channel must lift the element's min to 1" }
+        check(state.intDomains[2].min == 1L) { "channel must lift the element's min to 1" }
 
         val ant = state.intMinAntecedents[2]
         assertNotNull(ant, "the channeled bound is search-derived; its reason must not be a leaf")
@@ -297,7 +297,7 @@ class ElementPropagatorTest {
                 }
             }
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "const-array Element: enumerated set must equal brute force")
         }
 
@@ -323,7 +323,7 @@ class ElementPropagatorTest {
                 }
             }
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "var-array Element: enumerated set must equal brute force")
         }
     }
@@ -348,7 +348,7 @@ class ElementPropagatorTest {
             }
         }
         val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 3L)).take(100_000)
-            .map { it.ints.toList() }.toHashSet()
+            .map { it.ints.map { v -> v.toInt() } }.toHashSet()
         assertEquals(brute, found, "duplicate-constant const Element: enumerated set must equal brute force")
     }
 
@@ -377,7 +377,7 @@ class ElementPropagatorTest {
             }
         }
         val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 5L)).take(100_000)
-            .map { it.ints.toList() }.toHashSet()
+            .map { it.ints.map { v -> v.toInt() } }.toHashSet()
         assertEquals(brute, found, "coupled const Elements: enumerated set must equal brute force")
     }
 }

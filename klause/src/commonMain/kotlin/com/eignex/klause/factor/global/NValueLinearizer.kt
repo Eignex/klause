@@ -8,7 +8,8 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 /**
  * One-hot value model for one [NValue] `n = |distinct(xs)|` (and the AtMost / AtLeast variants): a
@@ -30,8 +31,8 @@ internal class NValueLinearizer(
         for (x in xs) cells += builder.declaredDomain(x).size.toLong()
         if (cells == 0L || cells > MAX_NVALUE_CELLS) return
         val yCols = IntArrayList()
-        val yByValue = MutableIntIntMap()
-        fun yOf(v: Int): Int {
+        val yByValue = MutableLongIntMap()
+        fun yOf(v: Long): Int {
             val existing = yByValue.getOrDefault(v, -1) // columns are non-negative, so -1 marks absent
             if (existing >= 0) return existing
             // The "used" indicator is free in [0,1] regardless of the live domains — an empty
@@ -45,10 +46,10 @@ internal class NValueLinearizer(
             val declared = builder.declaredDomain(x)
             val live = builder.liveDomain(x)
             val sel = IntArrayList()
-            val selVal = IntArrayList()
+            val selVal = LongArrayList()
             declared.forEach { v ->
                 // The selector z_xv is present while value v stays in x's live domain.
-                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v))
+                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v.toInt()))
                 sel.add(z)
                 selVal.add(v)
                 builder.row(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL) // y_v ≥ z
@@ -61,7 +62,7 @@ internal class NValueLinearizer(
             val cVals = LongArray(k + 1)
             for (s in 0 until k) {
                 cCols[s] = sel[s]
-                cVals[s] = selVal[s].toLong()
+                cVals[s] = selVal[s]
             }
             cCols[k] = builder.intColumn(x)
             cVals[k] = -1L

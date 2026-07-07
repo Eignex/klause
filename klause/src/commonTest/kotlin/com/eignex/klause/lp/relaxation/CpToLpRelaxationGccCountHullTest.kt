@@ -70,7 +70,7 @@ class CpToLpRelaxationGccCountHullTest {
             val cover = IntArray(coverSize) { it + 1 } // distinct values 1..coverSize
             // Var ids: 0..n-1 = xs, n..n+coverSize-1 = count vars (domain [0, n]).
             val intDomains = Array(n + coverSize) {
-                if (it < n) IntDomain(doms[it].first, doms[it].second) else IntDomain(0, n)
+                if (it < n) IntDomain(doms[it].first.toLong(), doms[it].second.toLong()) else IntDomain(0, n.toLong())
             }
             val countVars = IntArray(coverSize) { n + it }
             val cx = LongArray(n) { rng.nextInt(-3, 4).toLong() }

@@ -127,7 +127,9 @@ class LpAutoConfigTest {
         val factors = ArrayList<Factor>()
         for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, 3))
         factors.add(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
-        val domains = Array(n + 1) { if (it < n) IntDomain(0, startHi) else IntDomain(0, startHi + 3) }
+        val domains = Array(
+            n + 1,
+        ) { if (it < n) IntDomain(0, startHi.toLong()) else IntDomain(0, (startHi + 3).toLong()) }
         return Problem(0, n + 1, domains, factors.toTypedArray())
     }
 
@@ -159,7 +161,7 @@ class LpAutoConfigTest {
         try {
             KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L shl 20)
             val n = 32
-            val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n) }
+            val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n.toLong()) }
             val big = Problem(0, n + 1, domains, arrayOf<Factor>(NValue(n, IntArray(n) { it })))
             val rBig = LpAutoConfig.recommend(big)
             assertFalse(rBig.lpPlan.nValue, "the over-budget NValue hull must be shed")

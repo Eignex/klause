@@ -7,6 +7,7 @@ import com.eignex.klause.lp.LinearizerEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 /**
@@ -37,13 +38,13 @@ internal class GccCountLinearizer(
             val declared = builder.declaredDomain(x)
             val live = builder.liveDomain(x)
             val sel = IntArrayList()
-            val selVal = IntArrayList()
+            val selVal = LongArrayList()
             declared.forEach { v ->
                 // The selector z_xv is present while value v stays in x's live domain.
-                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v))
+                val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = intArrayOf(x, v.toInt()))
                 sel.add(z)
                 selVal.add(v)
-                selByCover[v]?.add(z) // only cover values carry a count row
+                selByCover[v.toInt()]?.add(z) // only cover values carry a count row
             }
             val k = sel.size
             if (k == 0) return // a variable with no declared values — leave it to propagation
@@ -53,7 +54,7 @@ internal class GccCountLinearizer(
             val cVals = LongArray(k + 1)
             for (s in 0 until k) {
                 cCols[s] = sel[s]
-                cVals[s] = selVal[s].toLong()
+                cVals[s] = selVal[s]
             }
             cCols[k] = builder.intColumn(x)
             cVals[k] = -1L

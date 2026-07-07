@@ -77,9 +77,9 @@ class CpToLpRelaxationDiffnTest {
             val horizon = xHi + 4
             val domains = Array(2 * n + 1) { i ->
                 when {
-                    i < n -> IntDomain(0, xHi)
-                    i < 2 * n -> IntDomain(0, yHi)
-                    else -> IntDomain(0, horizon)
+                    i < n -> IntDomain(0, xHi.toLong())
+                    i < 2 * n -> IntDomain(0, yHi.toLong())
+                    else -> IntDomain(0, horizon.toLong())
                 }
             }
             val factors = ArrayList<Factor>()

@@ -89,17 +89,17 @@ object Xcsp3 {
             varIds[name] = domains.size
             domains.add(dom)
         }
-        private fun newAuxVar(lo: Int, hi: Int): Int {
+        private fun newAuxVar(lo: Long, hi: Long): Int {
             domains.add(IntDomain(lo, hi))
             return domains.size - 1
         }
         override fun newBool(): Int = nextBool++
 
         private fun parseDomain(text: String): IntDomain {
-            val values = HashSet<Int>()
+            val values = HashSet<Long>()
             for (tok in text.split(Regex("\\s+")).filter { it.isNotBlank() }) {
                 val r = tok.split("..")
-                if (r.size == 2) for (v in r[0].toInt()..r[1].toInt()) values.add(v) else values.add(tok.toInt())
+                if (r.size == 2) for (v in r[0].toLong()..r[1].toLong()) values.add(v) else values.add(tok.toLong())
             }
             if (values.isEmpty()) throw UnsupportedXcsp3Exception("empty domain")
             val lo = values.min()
@@ -146,7 +146,13 @@ object Xcsp3 {
             if (e.child("except") != null) throw UnsupportedXcsp3Exception("allDifferent with <except>")
             val vars = refList(listText(e)).toIntArray()
             if (vars.isEmpty()) throw UnsupportedXcsp3Exception("allDifferent: empty list")
-            factors.add(AllDifferent(vars = vars, domainMin = domainMin(vars), domainSize = domainSpan(vars)))
+            factors.add(
+                AllDifferent(
+                    vars = vars,
+                    domainMin = domainMin(vars).toInt(),
+                    domainSize = domainSpan(vars).toInt(),
+                ),
+            )
         }
 
         private fun sum(e: XmlElement) {
@@ -186,19 +192,19 @@ object Xcsp3 {
             return when {
                 node is FExpr.Ref -> ref(node.name)
 
-                node is FExpr.Num -> newAuxVar(node.value, node.value)
+                node is FExpr.Num -> newAuxVar(node.value.toLong(), node.value.toLong())
 
                 node is FExpr.Call && node.fn in REL -> {
                     val r = relationParts(node)
                     if (r.vars.isEmpty()) {
                         // Constant relation: a fixed 0/1 term.
-                        val v = if (constRelationHolds(r.op, r.bound)) 1 else 0
+                        val v = if (constRelationHolds(r.op, r.bound)) 1L else 0L
                         newAuxVar(v, v)
                     } else {
                         // Reify the relation onto a fresh bool, then channel it to a 0/1 int var.
                         val aux = newBool()
                         factors.add(ReifiedLinear(aux, r.coeffs, r.vars, r.op, r.bound))
-                        val ch = newAuxVar(0, 1)
+                        val ch = newAuxVar(0L, 1L)
                         factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
                         ch
                     }
@@ -206,15 +212,19 @@ object Xcsp3 {
 
                 else -> {
                     val lin = linear(node)
-                    if (lin.coeffs.isEmpty()) newAuxVar(lin.constant, lin.constant) else materializeVar(lin)
+                    if (lin.coeffs.isEmpty()) {
+                        newAuxVar(lin.constant.toLong(), lin.constant.toLong())
+                    } else {
+                        materializeVar(lin)
+                    }
                 }
             }
         }
 
         /** Min/max of a linear expression over its variables' domains. */
-        private fun linBounds(lin: Lin): Pair<Int, Int> {
-            var lo = lin.constant
-            var hi = lin.constant
+        private fun linBounds(lin: Lin): Pair<Long, Long> {
+            var lo = lin.constant.toLong()
+            var hi = lin.constant.toLong()
             for ((v, c) in lin.coeffs) {
                 val d = domains[v]
                 if (c >= 0) {
@@ -483,12 +493,12 @@ object Xcsp3 {
             val values = parseInts(e.child("values")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("count: only constant <values> supported")
             if (values.size != 1) throw UnsupportedXcsp3Exception("count: only a single value supported")
-            val cnt = newAuxVar(0, vars.size)
+            val cnt = newAuxVar(0L, vars.size.toLong())
             // Reify equalities and sum their 0/1 channels into `cnt`.
             val channels = IntArray(vars.size) { i ->
                 val aux = newBool()
                 factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, values[0]))
-                val ch = newAuxVar(0, 1)
+                val ch = newAuxVar(0L, 1L)
                 factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
                 ch
             }
@@ -683,7 +693,7 @@ object Xcsp3 {
                     starts = starts,
                     durations = durations,
                     resources = resources,
-                    capacity = if (capVar == null) cap else domains[capVar].max,
+                    capacity = if (capVar == null) cap else domains[capVar].max.toInt(),
                     durationVars = durationVars,
                     resourceVars = resourceVars,
                     capacityVar = capVar ?: -1,
@@ -713,7 +723,7 @@ object Xcsp3 {
         private fun taskDims(text: String): Pair<IntArray, IntArray> {
             parseInts(text)?.let { return it to IntArray(0) }
             val vars = refList(text).toIntArray()
-            return IntArray(vars.size) { domains[vars[it]].max } to vars
+            return IntArray(vars.size) { domains[vars[it]].max.toInt() } to vars
         }
 
         private fun circuit(e: XmlElement) {
@@ -890,10 +900,10 @@ object Xcsp3 {
         }
 
         /** Reify `x == value` onto a fresh 0/1 int var. */
-        private fun eqValue01(x: Int, value: Int): Int {
+        private fun eqValue01(x: Int, value: Long): Int {
             val eq = newBool()
-            factors.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
-            val ch = newAuxVar(0, 1)
+            factors.add(ReifiedLinear(eq, longArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
+            val ch = newAuxVar(0L, 1L)
             factors.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
             return ch
         }
@@ -918,7 +928,7 @@ object Xcsp3 {
                         throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
                     }
                     for (b in loadVars.indices) {
-                        val ind = IntArray(items.size) { i -> eqValue01(items[i], b + offset) }
+                        val ind = IntArray(items.size) { i -> eqValue01(items[i], (b + offset).toLong()) }
                         factors.add(Linear(sizes + -1, ind + loadVars[b], LinearOp.EQ, 0))
                     }
                 }
@@ -931,7 +941,7 @@ object Xcsp3 {
                         throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
                     }
                     for (b in limits.indices) {
-                        val ind = IntArray(items.size) { i -> eqValue01(items[i], b + offset) }
+                        val ind = IntArray(items.size) { i -> eqValue01(items[i], (b + offset).toLong()) }
                         factors.add(Linear(sizes.copyOf(), ind, LinearOp.LE, limits[b]))
                     }
                 }
@@ -949,7 +959,7 @@ object Xcsp3 {
                     }
                     val loBin = items.minOf { domains[it].min }
                     val hiBin = items.maxOf { domains[it].max }
-                    if ((hiBin - loBin + 1).toLong() * items.size > negTableCap) {
+                    if ((hiBin - loBin + 1) * items.size > negTableCap) {
                         throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
                     }
                     for (b in loBin..hiBin) {
@@ -990,16 +1000,17 @@ object Xcsp3 {
         private fun distinctCountVar(vars: IntArray, except: Set<Int> = emptySet()): Int {
             val loV = vars.minOf { domains[it].min }
             val hiV = vars.maxOf { domains[it].max }
-            if ((hiV - loV + 1).toLong() * vars.size > negTableCap) {
+            if ((hiV - loV + 1) * vars.size > negTableCap) {
                 throw UnsupportedXcsp3Exception("nValues: value range too large to decompose")
             }
             val used = ArrayList<Int>()
             for (v in loV..hiV) {
-                if (v in except) continue
-                val eqLits = vars.map { reifyLinear(intArrayOf(1), intArrayOf(it), LinearOp.EQ, v) }
+                val vi = v.toInt()
+                if (vi in except) continue
+                val eqLits = vars.map { reifyLinear(intArrayOf(1), intArrayOf(it), LinearOp.EQ, vi) }
                 used.add(litTo01(tseitinOr(eqLits)))
             }
-            val cnt = newAuxVar(0, used.size)
+            val cnt = newAuxVar(0L, used.size.toLong())
             val coeffs = IntArray(used.size + 1) { if (it < used.size) 1 else -1 }
             factors.add(Linear(coeffs, (used + cnt).toIntArray(), LinearOp.EQ, 0))
             return cnt
@@ -1208,7 +1219,7 @@ object Xcsp3 {
 
         /** Channel a literal to a fresh 0/1 int var equal to its truth value. */
         private fun litTo01(lit: Int): Int {
-            val ch = newAuxVar(0, 1)
+            val ch = newAuxVar(0L, 1L)
             val b = reifyLinear(intArrayOf(1), intArrayOf(ch), LinearOp.GE, 1) // b ⟺ ch = 1
             factors.add(Clause(intArrayOf(Lit.negate(b), lit))) // b → lit
             factors.add(Clause(intArrayOf(b, Lit.negate(lit)))) // lit → b
@@ -1249,9 +1260,9 @@ object Xcsp3 {
                 )
             }
             val da = domains[a]
-            if (da.min < 0) throw UnsupportedXcsp3Exception("div/mod with a possibly-negative dividend")
+            if (da.min < 0L) throw UnsupportedXcsp3Exception("div/mod with a possibly-negative dividend")
             val q = newAuxVar(da.min / k, da.max / k)
-            val r = newAuxVar(0, k - 1)
+            val r = newAuxVar(0L, (k - 1).toLong())
             factors.add(Linear(intArrayOf(1, -k, -1), intArrayOf(a, q, r), LinearOp.EQ, 0)) // a = k·q + r
             return Lin(mapOf((if (mod) r else q) to 1), 0)
         }
@@ -1264,8 +1275,8 @@ object Xcsp3 {
             factors.add(Linear(intArrayOf(1, 1), intArrayOf(v, neg), LinearOp.EQ, 0)) // neg = −v
             val hi = maxOf(-d.min, d.max)
             val lo = when {
-                d.min <= 0 && d.max >= 0 -> 0
-                d.min > 0 -> d.min
+                d.min <= 0L && d.max >= 0L -> 0L
+                d.min > 0L -> d.min
                 else -> -d.max
             }
             val a = newAuxVar(lo, hi)
@@ -1289,19 +1300,16 @@ object Xcsp3 {
         }
 
         /** Integer bounds of the product `a * b` over the two variables' domains. */
-        private fun productBounds(a: Int, b: Int): Pair<Int, Int> {
+        private fun productBounds(a: Int, b: Int): Pair<Long, Long> {
             val da = domains[a]
             val db = domains[b]
             val corners = listOf(
-                da.min.toLong() * db.min,
-                da.min.toLong() * db.max,
-                da.max.toLong() * db.min,
-                da.max.toLong() * db.max,
+                da.min * db.min,
+                da.min * db.max,
+                da.max * db.min,
+                da.max * db.max,
             )
-            val lo = corners.min()
-            val hi = corners.max()
-            if (lo < Int.MIN_VALUE || hi > Int.MAX_VALUE) throw UnsupportedXcsp3Exception("product domain overflow")
-            return lo.toInt() to hi.toInt()
+            return corners.min() to corners.max()
         }
 
         private fun addLin(a: Lin, b: Lin): Lin {
@@ -1317,7 +1325,7 @@ object Xcsp3 {
             varIds[t]?.let { return it }
             return when (val node = FExpr.parse(t)) {
                 is FExpr.Ref -> ref(node.name)
-                is FExpr.Num -> newAuxVar(node.value, node.value)
+                is FExpr.Num -> newAuxVar(node.value.toLong(), node.value.toLong())
                 else -> throw UnsupportedXcsp3Exception("expected a single variable/constant, got '$text'")
             }
         }
@@ -1419,7 +1427,7 @@ object Xcsp3 {
         private fun domainValues(v: Int): List<Int> {
             val d = domains[v]
             val out = ArrayList<Int>(d.size)
-            for (k in 0 until d.size) out.add(d.valueAt(k))
+            for (k in 0 until d.size) out.add(d.valueAt(k).toInt())
             return out
         }
 

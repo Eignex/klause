@@ -150,7 +150,13 @@ private fun FlatZincCompiler.buildIntSweepNode(c: FznConstraint, definedId: Int)
                 } catch (_: Exception) {
                     return null
                 }
-                DefinitionalSweep.SweepNode.ElementDef(definedId, idx, null, consts, offset = 1)
+                DefinitionalSweep.SweepNode.ElementDef(
+                    definedId,
+                    idx,
+                    null,
+                    LongArray(consts.size) { consts[it].toLong() },
+                    offset = 1,
+                )
             } else {
                 val arr = try {
                     evalIntVarArray(c.args[1])
@@ -250,7 +256,7 @@ private fun FlatZincCompiler.buildBoolSweepNode(c: FznConstraint, definedId: Int
             } catch (_: Exception) {
                 return null
             }
-            DefinitionalSweep.SweepNode.SetInReif(definedId, x, values)
+            DefinitionalSweep.SweepNode.SetInReif(definedId, x, LongArray(values.size) { values[it].toLong() })
         }
 
         "array_bool_and", "array_bool_or" -> {

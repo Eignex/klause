@@ -8,16 +8,16 @@ import com.eignex.klause.localsearch.MoveSink
 /** Mutable state object for the current best extremum across `xs`. */
 class ArrayMinMaxState(
     /** The current min or max value across the operand variables. */
-    var bestValue: Int,
+    var bestValue: Long,
 )
 
 /** LS invariant for [ArrayMinMax]: violation tracking and repair for `result = max/min(xs)`. */
 internal class ArrayMinMaxInvariant(private val result: Int, private val xs: IntArray, private val max: Boolean) :
     Invariant {
 
-    private fun cmp(a: Int, b: Int): Boolean = if (max) a > b else a < b
+    private fun cmp(a: Long, b: Long): Boolean = if (max) a > b else a < b
 
-    private fun computeBest(state: LocalSearchState): Int {
+    private fun computeBest(state: LocalSearchState): Long {
         var best = state.assignment.intValue(xs[0])
         for (i in 1 until xs.size) {
             val v = state.assignment.intValue(xs[i])
@@ -26,13 +26,13 @@ internal class ArrayMinMaxInvariant(private val result: Int, private val xs: Int
         return best
     }
 
-    private fun degreeFor(resultValue: Int, best: Int, softCap: Int): Int {
-        val d = resultValue.toLong() - best
+    private fun degreeFor(resultValue: Long, best: Long, softCap: Int): Int {
+        val d = resultValue - best
         return compressViolation(if (d < 0) -d else d, softCap)
     }
 
-    private fun simulateBest(state: LocalSearchState, intVar: Int, newValue: Int): Int {
-        var best = Int.MIN_VALUE
+    private fun simulateBest(state: LocalSearchState, intVar: Int, newValue: Long): Long {
+        var best = Long.MIN_VALUE
         var init = false
         for (v in xs) {
             val current = if (v == intVar) newValue else state.assignment.intValue(v)
@@ -60,7 +60,7 @@ internal class ArrayMinMaxInvariant(private val result: Int, private val xs: Int
         return degreeFor(state.assignment.intValue(result), s.bestValue, state.violationSoftCap)
     }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val s = state.refPayload[factorId] as ArrayMinMaxState
         val oldDeg = degreeFor(state.assignment.intValue(result), s.bestValue, state.violationSoftCap)
         val newBest = simulateBest(state, intVar, newValue)
@@ -68,7 +68,7 @@ internal class ArrayMinMaxInvariant(private val result: Int, private val xs: Int
         return degreeFor(newResult, newBest, state.violationSoftCap) - oldDeg
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val s = state.refPayload[factorId] as ArrayMinMaxState
         val resultNow = state.assignment.intValue(result)
         val oldResult = if (intVar == result) oldValue else resultNow

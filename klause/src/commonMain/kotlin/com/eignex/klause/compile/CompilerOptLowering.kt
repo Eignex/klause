@@ -23,7 +23,7 @@ import com.eignex.klause.model.Not
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongHashSet
 
 /*
  * Reified (sub-expression-position) lowering for global constraints. Each entry-point
@@ -85,16 +85,16 @@ internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
     // Compute the union of static domains for each x_i. Each xs entry must lift to a
     // bare IntRef so we can look up its domain — non-bare arithmetic on opt vars at this
     // position isn't supported (matches the non-opt convention).
-    val unionSet = IntHashSet()
+    val unionSet = LongHashSet()
     for (i in expr.xs.indices) {
         val xLifted = lift(expr.xs[i])
         val d = domainOf(xLifted)
         for (v in d.min..d.max) unionSet.add(v)
     }
     // Iterate in ascending value order (was a sorted set; commonMain has no sortedSetOf).
-    val perValue: List<IntExpr> = unionSet.toIntArray().sorted().map { v ->
+    val perValue: List<IntExpr> = unionSet.toLongArray().sorted().map { v ->
         val anyHolds = expr.xs.indices.map { i ->
-            And(listOf(expr.presents[i], IntCompare(expr.xs[i], IntCmpOp.EQ, IntLit(v))))
+            And(listOf(expr.presents[i], IntCompare(expr.xs[i], IntCmpOp.EQ, IntLit(v.toInt()))))
         }
         indicatorInt(if (anyHolds.size == 1) anyHolds[0] else Or(anyHolds))
     }
@@ -213,7 +213,7 @@ internal fun Lowering.reifyCircuit(expr: CircuitExpr): Int {
         if (i == 0) {
             IntLit(0)
         } else {
-            IntRef(newAuxIntVar(IntDomain(1, n - 1)))
+            IntRef(newAuxIntVar(IntDomain(1L, (n - 1).toLong())))
         }
     }
     // 4. AllDifferent over the non-zero positions.
@@ -250,7 +250,7 @@ internal fun Lowering.reifySubcircuit(expr: SubcircuitExpr): Int {
     val pieces = mutableListOf<BoolExpr>()
     pieces += allDiffAsAnd(expr.succ)
     if (n == 0) return tseitinAnd(pieces)
-    val posVars: List<IntExpr> = (0 until n).map { IntRef(newAuxIntVar(IntDomain(0, n - 1))) }
+    val posVars: List<IntExpr> = (0 until n).map { IntRef(newAuxIntVar(IntDomain(0L, (n - 1).toLong()))) }
     val succIndex0: List<IntExpr> = expr.succ.map { s ->
         if (offset == 0) s else IntSum(listOf(s, IntLit(-offset)))
     }
@@ -287,8 +287,8 @@ private fun Lowering.cumulativeTimeTabling(
     presents: List<BoolExpr>?,
 ): Int {
     // Bound the horizon via static domains: [minEstAcrossTasks, maxLctAcrossTasks).
-    var horizonLo = Int.MAX_VALUE
-    var horizonHi = Int.MIN_VALUE
+    var horizonLo = Long.MAX_VALUE
+    var horizonHi = Long.MIN_VALUE
     for (i in starts.indices) {
         val sLifted = lift(starts[i])
         val d = domainOf(sLifted)
@@ -307,8 +307,8 @@ private fun Lowering.cumulativeTimeTabling(
             if (d == 0 || r == 0) continue
             val runsAt = And(
                 listOf(
-                    IntCompare(starts[i], IntCmpOp.LE, IntLit(t)),
-                    IntCompare(IntSum(listOf(starts[i], IntLit(d))), IntCmpOp.GT, IntLit(t)),
+                    IntCompare(starts[i], IntCmpOp.LE, IntLit(t.toInt())),
+                    IntCompare(IntSum(listOf(starts[i], IntLit(d))), IntCmpOp.GT, IntLit(t.toInt())),
                 ),
             )
             val gated: BoolExpr = if (presents == null) {

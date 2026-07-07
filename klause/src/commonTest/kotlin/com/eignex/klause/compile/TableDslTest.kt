@@ -29,7 +29,7 @@ class TableDslTest {
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 11)).take(10).toList()
         assertTrue(samples.isNotEmpty())
-        val allowed = setOf(0 to 1, 2 to 2, 3 to 0)
+        val allowed = setOf(0L to 1L, 2L to 2L, 3L to 0L)
         for (s in samples) {
             val xv = compiled.decode(schema.x, s)
             val yv = compiled.decode(schema.y, s)
@@ -55,7 +55,7 @@ class TableDslTest {
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
         assertTrue(samples.isNotEmpty())
-        val forbidden = setOf(1 to 1, 2 to 2)
+        val forbidden = setOf(1L to 1L, 2L to 2L)
         for (s in samples) {
             val xv = compiled.decode(schema.x, s)
             val yv = compiled.decode(schema.y, s)
@@ -81,7 +81,7 @@ class TableDslTest {
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 25)).take(20).toList()
         assertTrue(samples.isNotEmpty())
-        val allowed = setOf(0 to 0, 2 to 1)
+        val allowed = setOf(0L to 0L, 2L to 1L)
         for (s in samples) {
             if (!compiled.decode(schema.flag, s)) continue
             val xv = compiled.decode(schema.x, s)

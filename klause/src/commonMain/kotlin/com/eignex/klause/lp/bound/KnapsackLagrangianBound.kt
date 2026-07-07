@@ -358,7 +358,7 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             val c = intCoef[i]
             if (c == 0L) continue
             val dom = session.intDomain(i)
-            total = addExact(total, mulExact(c, if (c >= 0L) dom.min.toLong() else dom.max.toLong()))
+            total = addExact(total, mulExact(c, if (c >= 0L) dom.min else dom.max))
         }
         return total
     }

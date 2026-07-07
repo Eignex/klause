@@ -6,7 +6,7 @@ import com.eignex.klause.localsearch.MoveSink
 
 /** LS implementation for [Subcircuit]: violation scoring and move proposal for the optional-cycle
  *  constraint. */
-internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Int) -> Int) :
+internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearchState, Int, Long) -> Int) :
     SuccessorCycleInvariant(succ, n, computeCost) {
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -15,7 +15,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
             val v = succ[i]
             val cur = state.assignment.intValue(v)
             val d = state.problem.intDomains[v]
-            if (i != cur && i in d) sink.addChannelingIntSet(state, v, i)
+            if (i.toLong() != cur && i.toLong() in d) sink.addChannelingIntSet(state, v, i.toLong())
             val span = d.size
             if (span <= MAX_TARGETS) {
                 d.forEach { target ->
@@ -34,7 +34,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (n < 2) return
-        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]) }
+        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]).toInt() }
         val active = BooleanArray(n)
         var activeCount = 0
         for (i in 0 until n) {
@@ -67,11 +67,15 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
                     if (a == v || a == p) continue
                     val b = nextOf[a]
                     if (b == v) continue
-                    if (nv !in state.problem.intDomains[succ[p]]) continue
-                    if (v !in state.problem.intDomains[succ[a]]) continue
-                    if (b !in state.problem.intDomains[succ[v]]) continue
+                    if (nv.toLong() !in state.problem.intDomains[succ[p]]) continue
+                    if (v.toLong() !in state.problem.intDomains[succ[a]]) continue
+                    if (b.toLong() !in state.problem.intDomains[succ[v]]) continue
                     sink.addCompound(
-                        listOf(Move.IntSet(succ[p], nv), Move.IntSet(succ[a], v), Move.IntSet(succ[v], b)),
+                        listOf(
+                            Move.IntSet(succ[p], nv.toLong()),
+                            Move.IntSet(succ[a], v.toLong()),
+                            Move.IntSet(succ[v], b.toLong()),
+                        ),
                     )
                     emitted++
                 }
@@ -82,9 +86,9 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
                     val p = predOf[v]
                     val nv = nextOf[v]
                     if (p < 0) continue
-                    if (nv !in state.problem.intDomains[succ[p]]) continue
-                    if (v !in state.problem.intDomains[succ[v]]) continue
-                    sink.addCompound(listOf(Move.IntSet(succ[p], nv), Move.IntSet(succ[v], v)))
+                    if (nv.toLong() !in state.problem.intDomains[succ[p]]) continue
+                    if (v.toLong() !in state.problem.intDomains[succ[v]]) continue
+                    sink.addCompound(listOf(Move.IntSet(succ[p], nv.toLong()), Move.IntSet(succ[v], v.toLong())))
                     emitted++
                 }
 
@@ -93,9 +97,9 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
                     val u = excludedNodes[state.rng.nextInt(excludedNodes.size)]
                     val a = activeNodes[state.rng.nextInt(activeCount)]
                     val b = nextOf[a]
-                    if (u !in state.problem.intDomains[succ[a]]) continue
-                    if (b !in state.problem.intDomains[succ[u]]) continue
-                    sink.addCompound(listOf(Move.IntSet(succ[a], u), Move.IntSet(succ[u], b)))
+                    if (u.toLong() !in state.problem.intDomains[succ[a]]) continue
+                    if (b.toLong() !in state.problem.intDomains[succ[u]]) continue
+                    sink.addCompound(listOf(Move.IntSet(succ[a], u.toLong()), Move.IntSet(succ[u], b.toLong())))
                     emitted++
                 }
             }
@@ -110,7 +114,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
      *  the active cycle into an order array and delegates to the shared reversal generator. */
     private fun proposeActiveReversals(state: LocalSearchState, sink: MoveSink) {
         if (n < 2) return
-        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]) }
+        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]).toInt() }
         var firstActive = -1
         var activeCount = 0
         for (i in 0 until n) {
@@ -138,11 +142,16 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
         if (n < 2) return false
         for (i in 0 until n) {
             val target = (i + 1) % n
-            if (target !in state.problem.intDomains[succ[i]]) return false
-            if (state.assumptions.isFrozenInt(succ[i]) && state.assignment.intValue(succ[i]) != target) return false
+            if (target.toLong() !in state.problem.intDomains[succ[i]]) return false
+            if (state.assumptions.isFrozenInt(
+                    succ[i],
+                ) && state.assignment.intValue(succ[i]) != target.toLong()
+            ) {
+                return false
+            }
         }
         for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], (i + 1) % n)
+            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], ((i + 1) % n).toLong())
         }
         return true
     }

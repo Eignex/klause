@@ -550,7 +550,7 @@ internal object SolveCore {
         }
         val t0 = nowMillis()
         var best: Sample? = null
-        var bestObj = if (solvable.maximize) Int.MIN_VALUE else Int.MAX_VALUE
+        var bestObj = if (solvable.maximize) Long.MIN_VALUE else Long.MAX_VALUE
         for (sample in solver.enumerate(params)) {
             if (deadline != null && nowMillis() > deadline) break
             val v = sample.ints[objVarId]

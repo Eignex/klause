@@ -9,17 +9,23 @@ import com.eignex.klause.util.LongArrayList
  * an [Assumptions] set so a frozen variable never enters the candidate list. LS-only — the
  * propagation contract doesn't use it.
  *
- * Backs `BoolFlip` / `IntSet` additions with a single resizable [LongArray] lane (one Long
- * per move: bit 63 = kind, bits 0..30 = varId, bits 31..62 = value), so a fill-clear cycle
- * — the dominant pattern during local search — touches no per-move objects. Compound moves
- * are boxed in a small side list (only the AllDifferent and Circuit factors use them, and
- * neither mixes compounds with primitives within a single propose call).
+ * Backs `BoolFlip` / `IntSet` additions with a resizable [LongArray] key lane (one Long per
+ * move: bit 63 = kind, bits 0..30 = varId) paired with a value lane (the `IntSet` target value,
+ * which spans the full [Long] domain range), so a fill-clear cycle — the dominant pattern during
+ * local search — touches no per-move objects. Compound moves are boxed in a small side list (only
+ * the AllDifferent and Circuit factors use them, and neither mixes compounds with primitives
+ * within a single propose call).
  *
  * [list] materializes [Move] objects lazily on first read and caches them until the next
  * mutation. Callers that never read [list] on an empty sink pay zero per-add allocation.
  */
 class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private val lane = LongArrayList(INITIAL_CAPACITY)
+
+    /** Parallel value lane: `valueLane[i]` is the `IntSet` target value for `lane[i]` (unused for a
+     *  `BoolFlip`, padded 0). Kept apart from the key lane because a domain value now spans the full
+     *  [Long] range and no longer fits the packed key word. */
+    private val valueLane = LongArrayList(INITIAL_CAPACITY)
 
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on first compound move
     private var compounds: ArrayList<Move.Compound>? = null
@@ -76,15 +82,17 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         if (assumptions.isFrozenBool(varId)) return
         if (invariants?.isDefinedBool(varId) == true) return
         lane.add(encodeBoolFlip(varId))
+        valueLane.add(0L)
         cachedList = null
     }
 
     /** Queue an int-set move on `intVar`. */
-    fun addIntSet(varId: Int, newValue: Int) {
+    fun addIntSet(varId: Int, newValue: Long) {
         if (assumptions.isFrozenInt(varId)) return
         if (invariants?.isDefinedInt(varId) == true) return
         if (ownedByOther(varId)) return
-        lane.add(encodeIntSet(varId, newValue))
+        lane.add(encodeIntSet(varId))
+        valueLane.add(newValue)
         cachedList = null
     }
 
@@ -131,6 +139,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     /** Discard all queued moves. */
     fun clear() {
         lane.clear()
+        valueLane.clear()
         compounds = null
         cachedList = null
         proposer = NO_PROPOSER
@@ -148,7 +157,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      *  decomposition of `x in S` / per-period choice / `course(i) = p` over int vars). Without
      *  channeling synthesis, the engine chases one indicator flip at a time after every int change.
      */
-    fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Int) {
+    fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Long) {
         if (assumptions.isFrozenInt(varId)) return
         when (val m = state.synthesizeChannelingMove(varId, newValue)) {
             is Move.IntSet -> addIntSet(varId, newValue)
@@ -162,7 +171,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         val total = lane.size + (compoundsRef?.size ?: 0)
         if (total == 0) return emptyList()
         val out = ArrayList<Move>(total)
-        for (i in 0 until lane.size) out.add(decode(lane[i]))
+        for (i in 0 until lane.size) out.add(decode(lane[i], valueLane[i]))
         if (compoundsRef != null) out.addAll(compoundsRef)
         return out
     }
@@ -179,17 +188,14 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
         internal fun encodeBoolFlip(varId: Int): Long = varId.toLong() and VAR_MASK
 
-        /** Layout: bit 63 = 1, bits 31..62 = value (32 bits), bits 0..30 = varId (31 bits). */
-        internal fun encodeIntSet(varId: Int, newValue: Int): Long = KIND_BIT or
-            (varId.toLong() and VAR_MASK) or
-            ((newValue.toLong() and 0xFFFF_FFFFL) shl 31)
+        /** Layout: bit 63 = kind (1 = IntSet), bits 0..30 = varId. The `IntSet` target value rides
+         *  the parallel value lane, not this word. */
+        internal fun encodeIntSet(varId: Int): Long = KIND_BIT or (varId.toLong() and VAR_MASK)
 
-        internal fun decode(packed: Long): Move = if (packed and KIND_BIT == 0L) {
+        internal fun decode(packed: Long, value: Long): Move = if (packed and KIND_BIT == 0L) {
             Move.BoolFlip((packed and VAR_MASK).toInt())
         } else {
-            val varId = (packed and VAR_MASK).toInt()
-            val value = (packed ushr 31).toInt()
-            Move.IntSet(varId, value)
+            Move.IntSet((packed and VAR_MASK).toInt(), value)
         }
     }
 }

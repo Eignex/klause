@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.argsortByIntKey
+import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 
 /**
@@ -28,9 +28,9 @@ internal class DisjunctivePropagator(
 
     /** Snapshot effective per-task durations. Returns null if any duration var is not
      *  fixed at this fixpoint pass — propagation defers in that case (sound). */
-    private fun effDurOrNull(state: PropagationState): IntArray? {
-        if (durationVars.isEmpty()) return durations
-        val out = IntArray(n)
+    private fun effDurOrNull(state: PropagationState): LongArray? {
+        if (durationVars.isEmpty()) return LongArray(n) { durations[it].toLong() }
+        val out = LongArray(n)
         for (i in 0 until n) {
             val d = state.intDomains[durationVars[i]]
             if (d.min != d.max) return null
@@ -51,8 +51,8 @@ internal class DisjunctivePropagator(
         return collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
     }
 
-    private fun isActive(state: PropagationState, i: Int, effDur: IntArray): Boolean =
-        effDur[i] != 0 && OptPresence.isDefinitelyPresent(presents, i, state)
+    private fun isActive(state: PropagationState, i: Int, effDur: LongArray): Boolean =
+        effDur[i] != 0L && OptPresence.isDefinitelyPresent(presents, i, state)
 
     private fun reasonOver(state: PropagationState, taskIdx: IntArrayList): IntArray? {
         val vars = IntArrayList()
@@ -65,7 +65,7 @@ internal class DisjunctivePropagator(
     }
 
     /** Two tasks each forced strictly after the other — implied by just those two starts. */
-    private fun mutualPrecedenceReason(state: PropagationState, effDur: IntArray): IntArray? {
+    private fun mutualPrecedenceReason(state: PropagationState, effDur: LongArray): IntArray? {
         for (i in 0 until n) {
             if (!isActive(state, i, effDur)) continue
             val di = state.intDomains[starts[i]]
@@ -84,14 +84,14 @@ internal class DisjunctivePropagator(
     }
 
     /** Tasks whose compulsory parts stack two-deep over one time point — a unit-resource overload. */
-    private fun profileOverloadReason(state: PropagationState, effDur: IntArray): IntArray? {
+    private fun profileOverloadReason(state: PropagationState, effDur: LongArray): IntArray? {
         val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!isActive(state, i, effDur)) continue
             val dom = state.intDomains[starts[i]]
-            profile.addTask(lst = dom.max, ect = dom.min + effDur[i], resource = 1)
+            profile.addTask(lst = dom.max, ect = dom.min + effDur[i], resource = 1L)
         }
-        if (profile.build(cap = 1)) return null
+        if (profile.build(cap = 1L)) return null
         val t = profile.overloadTime
         val covering = IntArrayList()
         for (i in 0 until n) {
@@ -103,7 +103,7 @@ internal class DisjunctivePropagator(
     }
 
     /** A window `[t1, t2)` whose fully-contained tasks' durations sum past its length cannot pack. */
-    private fun energeticWindowReason(state: PropagationState, effDur: IntArray): IntArray? {
+    private fun energeticWindowReason(state: PropagationState, effDur: LongArray): IntArray? {
         for (a in 0 until n) {
             if (!isActive(state, a, effDur)) continue
             val t1 = state.intDomains[starts[a]].min
@@ -118,10 +118,10 @@ internal class DisjunctivePropagator(
                     val dom = state.intDomains[starts[i]]
                     if (dom.min >= t1 && dom.max + effDur[i] <= t2) {
                         inside.add(i)
-                        load += effDur[i].toLong()
+                        load += effDur[i]
                     }
                 }
-                if (load > (t2 - t1).toLong() && inside.size >= 2) return reasonOver(state, inside)
+                if (load > t2 - t1 && inside.size >= 2) return reasonOver(state, inside)
             }
         }
         return null
@@ -139,21 +139,21 @@ internal class DisjunctivePropagator(
     /** Build the mandatory profile from each task's `[lst, ect)` compulsory part; fail on
      *  level > 1; shave any non-fixed task's start endpoints if placement would create
      *  an additional unit-overlap with the mandatory profile. */
-    private fun timeTable(state: PropagationState, effDur: IntArray): Boolean {
+    private fun timeTable(state: PropagationState, effDur: LongArray): Boolean {
         val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
-            if (d == 0) continue
+            if (d == 0L) continue
             val dom = state.intDomains[starts[i]]
-            profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1)
+            profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1L)
         }
-        if (!profile.build(cap = 1)) return false
+        if (!profile.build(cap = 1L)) return false
         val ant = state.composeIntVarAtomAntecedents(intVars)
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
-            if (d == 0) continue
+            if (d == 0L) continue
             val v = starts[i]
             val dom = state.intDomains[v]
             if (dom.min == dom.max) continue
@@ -162,7 +162,7 @@ internal class DisjunctivePropagator(
             val ownsMandatory = lstI < ectI
             var newMin = dom.min
             while (newMin <= state.intDomains[v].max) {
-                if (profile.overloadsAt(newMin, newMin + d, r = 1, cap = 1, ownsMandatory, lstI, ectI)) {
+                if (profile.overloadsAt(newMin, newMin + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
                     newMin++
                 } else {
                     break
@@ -172,7 +172,7 @@ internal class DisjunctivePropagator(
             if (newMin != state.intDomains[v].min && !state.tightenIntMin(v, newMin, ant)) return false
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
-                if (profile.overloadsAt(newMax, newMax + d, r = 1, cap = 1, ownsMandatory, lstI, ectI)) {
+                if (profile.overloadsAt(newMax, newMax + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
                     newMax--
                 } else {
                     break
@@ -186,17 +186,17 @@ internal class DisjunctivePropagator(
 
     /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
      *  i must come strictly after j. Tighten `start_i.min ≥ est_j + dur_j`. */
-    private fun detectablePrecedences(state: PropagationState, effDur: IntArray): Boolean {
+    private fun detectablePrecedences(state: PropagationState, effDur: LongArray): Boolean {
         val ant = state.composeIntVarAtomAntecedents(intVars)
         for (i in 0 until n) {
-            if (effDur[i] == 0) continue
+            if (effDur[i] == 0L) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var newMinI = di.min
             for (j in 0 until n) {
                 if (j == i) continue
-                if (effDur[j] == 0) continue
+                if (effDur[j] == 0L) continue
                 if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
                 val dj = state.intDomains[starts[j]]
                 if (di.min + effDur[i] > dj.max) {
@@ -212,13 +212,13 @@ internal class DisjunctivePropagator(
         return true
     }
 
-    private fun edgeFinding(state: PropagationState, effDur: IntArray): Boolean {
+    private fun edgeFinding(state: PropagationState, effDur: LongArray): Boolean {
         if (n < 2) return true
         return forwardPass(state, effDur, reversed = false) && forwardPass(state, effDur, reversed = true)
     }
 
     @Suppress("ReturnCount")
-    private fun forwardPass(state: PropagationState, effDur: IntArray, reversed: Boolean): Boolean {
+    private fun forwardPass(state: PropagationState, effDur: LongArray, reversed: Boolean): Boolean {
         val active = IntArrayList()
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
@@ -228,9 +228,9 @@ internal class DisjunctivePropagator(
         if (m < 2) return true
 
         val taskIds = IntArray(m) { active[it] }
-        val durs = IntArray(m) { effDur[taskIds[it]] }
-        val ests = IntArray(m)
-        val lcts = IntArray(m)
+        val durs = LongArray(m) { effDur[taskIds[it]] }
+        val ests = LongArray(m)
+        val lcts = LongArray(m)
         for (t in 0 until m) {
             val dom = state.intDomains[starts[taskIds[t]]]
             if (!reversed) {
@@ -241,21 +241,21 @@ internal class DisjunctivePropagator(
                 lcts[t] = -dom.min
             }
         }
-        val energies = LongArray(m) { durs[it].toLong() }
+        val energies = LongArray(m) { durs[it] }
 
-        val estOrder = argsortByIntKey(m) { ests[it] }
+        val estOrder = argsortBy(m) { a, b -> ests[a].compareTo(ests[b]) }
         val leafPos = IntArray(m)
         for (leafIdx in 0 until m) leafPos[estOrder[leafIdx]] = leafIdx
-        val lctOrder = argsortByIntKey(m) { lcts[it] }
+        val lctOrder = argsortBy(m) { a, b -> lcts[a].compareTo(lcts[b]) }
 
-        val tree = CumulativeThetaTree(n = m, capacity = 1)
+        val tree = CumulativeThetaTree(n = m, capacity = 1L)
         tree.setLeafOrder(leafPos)
         val ant = state.composeIntVarAtomAntecedents(intVars)
 
         var k = 0
         while (k < m) {
-            val tau = lcts[lctOrder[k]].toLong()
-            while (k < m && lcts[lctOrder[k]].toLong() == tau) {
+            val tau = lcts[lctOrder[k]]
+            while (k < m && lcts[lctOrder[k]] == tau) {
                 val j = lctOrder[k]
                 tree.activate(j, ests[j], energies[j])
                 k++
@@ -268,8 +268,7 @@ internal class DisjunctivePropagator(
                 val envWith = tree.envOfTheta()
                 tree.deactivate(cand)
                 if (envWith <= tau) continue
-                if (envTheta > Int.MAX_VALUE.toLong()) continue
-                val bound = envTheta.toInt()
+                val bound = envTheta
                 val v = starts[taskIds[cand]]
                 if (!reversed) {
                     if (bound > state.intDomains[v].min && !state.tightenIntMin(v, bound, ant)) return false

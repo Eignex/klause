@@ -443,7 +443,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
                 factors += Cardinality.exactlyOne(lits)
             }
 
-            is IntSpec -> bindIntName(name, newIntVar(IntDomain(entry.min, entry.max)))
+            is IntSpec -> bindIntName(name, newIntVar(IntDomain(entry.min.toLong(), entry.max.toLong())))
 
             is SetSpec -> {
                 // Allocate one indicator bool per universe element. Universe is
@@ -469,7 +469,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
                 // Floats are bucketed inline so [Problem.factors] stays pure int+bool;
                 // floatMetaIntervals / floatMetaBuckets / floatMetaIntVarIds record the per-var
                 // bucket params the float-linear lowering reads to build the scaled-integer factor.
-                val intId = newIntVar(IntDomain(0, entry.buckets - 1))
+                val intId = newIntVar(IntDomain(0L, (entry.buckets - 1).toLong()))
                 bindIntName(name, intId)
                 floatDecoders[name] = entry
                 val fid = floatMetaIntervals.size
@@ -542,8 +542,8 @@ private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
 
             intVarIdByName.containsKey(base) -> {
                 val d = intDomains[intVarIdByName.getValue(base)]
-                val default = 0.coerceIn(d.min, d.max)
-                assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(default))))
+                val default = 0L.coerceIn(d.min, d.max)
+                assertExpr(Implies(absent, IntCompare(IntRef(base), IntCmpOp.EQ, IntLit(default.toInt()))))
             }
 
             nominalIndicators.containsKey(base) -> {

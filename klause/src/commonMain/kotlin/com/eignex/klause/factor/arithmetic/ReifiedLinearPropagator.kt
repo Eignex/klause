@@ -119,6 +119,6 @@ internal class ReifiedLinearPropagator(
         if (b % c != 0L) return true
         val value = b / c
         if (value < Int.MIN_VALUE.toLong() || value > Int.MAX_VALUE.toLong()) return true
-        return value.toInt() !in state.intDomains[vars[0]]
+        return value !in state.intDomains[vars[0]]
     }
 }

@@ -26,7 +26,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         degree(state.violationSoftCap) { state.assignment.intValue(xs[it]) }
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val cap = state.violationSoftCap
         val before = degree(cap) { state.assignment.intValue(xs[it]) }
         val after = degree(cap) {
@@ -36,7 +36,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         return after - before
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val cap = state.violationSoftCap
         val after = degree(cap) { state.assignment.intValue(xs[it]) }
         val before = degree(cap) {
@@ -46,10 +46,10 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         return after - before
     }
 
-    private inline fun degree(softCap: Int, valueAt: (Int) -> Int): Int {
+    private inline fun degree(softCap: Int, valueAt: (Int) -> Long): Int {
         var raw = 0L
         for (i in 0 until xs.size - 1) {
-            val overshoot = valueAt(i) + gap.toLong() - valueAt(i + 1)
+            val overshoot = valueAt(i) + gap - valueAt(i + 1)
             if (overshoot > 0L) raw += overshoot
         }
         return compressViolation(raw, softCap)
@@ -77,7 +77,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
     }
 
     /** Snap [v] to [target] if reachable; otherwise to the nearest domain bound in that direction. */
-    private fun snap(state: LocalSearchState, sink: MoveSink, v: Int, target: Int, lowering: Boolean) {
+    private fun snap(state: LocalSearchState, sink: MoveSink, v: Int, target: Long, lowering: Boolean) {
         val d = state.problem.intDomains[v]
         val cur = state.assignment.intValue(v)
         val pick = when {
@@ -102,7 +102,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         var first = true
         for (i in indices) {
             val d = state.problem.intDomains[xs[i]]
-            val cur = state.assignment.intValue(xs[i]).toLong()
+            val cur = state.assignment.intValue(xs[i])
             if (first) {
                 target[i] = cur
                 first = false
@@ -114,9 +114,9 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
             }
         }
         // Distinct-var dedup (last write wins) keeps the compound well-formed if a var repeats.
-        val parts = LinkedHashMap<Int, Int>()
+        val parts = LinkedHashMap<Int, Long>()
         for (i in 0 until n) {
-            if (target[i] != state.assignment.intValue(xs[i]).toLong()) parts[xs[i]] = target[i].toInt()
+            if (target[i] != state.assignment.intValue(xs[i])) parts[xs[i]] = target[i]
         }
         if (parts.isNotEmpty()) sink.addCompound(parts.map { Move.IntSet(it.key, it.value) })
     }
@@ -141,13 +141,13 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
             val v = xs[i]
             val d = state.problem.intDomains[v]
             if (state.assumptions.isFrozenInt(v)) {
-                val fv = state.assignment.intValue(v).toLong()
+                val fv = state.assignment.intValue(v)
                 if (fv < floor) return false // a frozen value already breaks the chain
                 floor = fv + gap
             } else {
-                val pick = maxOf(d.min.toLong(), floor)
+                val pick = maxOf(d.min, floor)
                 if (pick > d.max) return false
-                state.assignment.setInt(v, pick.toInt())
+                state.assignment.setInt(v, pick)
                 floor = pick + gap
             }
         }

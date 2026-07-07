@@ -21,7 +21,7 @@ class SelectorPortfolioTest {
     private fun simpleAllDifferent(n: Int) = Problem(
         numBoolVars = 0,
         numIntVars = n,
-        intDomains = Array(n) { IntDomain(0, n - 1) },
+        intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
         factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
     )
 
@@ -41,7 +41,7 @@ class SelectorPortfolioTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0..4).toSet(), sat.assignment.ints.toSet())
+        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
     }
 
     @Test
@@ -96,7 +96,7 @@ class SelectorPortfolioTest {
         portfolio.variableSelector.onConflict(VarRef.IntVar(0))
         portfolio.variableSelector.onConflict(VarRef.IntVar(1))
         portfolio.variableSelector.onSolution(
-            Sample(BooleanArray(0), intArrayOf(0)),
+            Sample(BooleanArray(0), longArrayOf(0)),
         )
         portfolio.variableSelector.onRestart()
         val firstStats = requireNotNull(lastStats)

@@ -25,7 +25,7 @@ class PropagationStateBatchExcludeTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = numVars,
-            intDomains = Array(numVars) { IntDomain(0, hi) },
+            intDomains = Array(numVars) { IntDomain(0, hi.toLong()) },
             factors = arrayOf<Factor>(),
         )
         return PropagationState(problem, Assumptions.None).also { it.undoLogging = true }
@@ -34,9 +34,9 @@ class PropagationStateBatchExcludeTest {
     private fun materializeAllAtoms(s: PropagationState, numVars: Int, hi: Int) {
         for (v in 0 until numVars) {
             for (k in 0..hi) {
-                s.atomVarGe(v, k)
-                s.atomVarLe(v, k)
-                s.atomVarEq(v, k)
+                s.atomVarGe(v, k.toLong())
+                s.atomVarLe(v, k.toLong())
+                s.atomVarEq(v, k.toLong())
             }
         }
     }
@@ -76,7 +76,7 @@ class PropagationStateBatchExcludeTest {
             val k = rng.nextInt(0, hi + 1)
             repeat(k) { picked.add(rng.nextInt(0, hi + 1)) }
             if (picked.size > hi) picked.remove(picked.first()) // keep a survivor
-            val values = picked.toIntArray().also { it.sort() }
+            val values = picked.map { it.toLong() }.toLongArray().also { it.sort() }
 
             val seq = freshState(1, hi)
             materializeAllAtoms(seq, 1, hi)
@@ -97,7 +97,7 @@ class PropagationStateBatchExcludeTest {
         val s = freshState(1, 4)
         materializeAllAtoms(s, 1, 4)
         enterLevel(s, 0)
-        assertEquals(false, s.excludeIntValues(0, intArrayOf(0, 1, 2, 3, 4), null), "excluding all → conflict")
+        assertEquals(false, s.excludeIntValues(0, longArrayOf(0, 1, 2, 3, 4), null), "excluding all → conflict")
     }
 
     @Test
@@ -108,7 +108,7 @@ class PropagationStateBatchExcludeTest {
         // 2 is already a hole; 7,9 are out of range — all no-ops, domain unchanged.
         s.excludeIntValue(0, 2)
         val before = s.intDomains[0]
-        assertEquals(true, s.excludeIntValues(0, intArrayOf(2, 7, 9), null))
+        assertEquals(true, s.excludeIntValues(0, longArrayOf(2, 7, 9), null))
         assertEquals(before, s.intDomains[0])
     }
 
@@ -140,13 +140,13 @@ class PropagationStateBatchExcludeTest {
                     if (d.min != d.max) {
                         enterLevel(s, v)
                         // Exclude a random non-empty subset of the live domain, keeping a survivor.
-                        val picked = mutableSetOf<Int>()
-                        val live = ArrayList<Int>()
+                        val picked = mutableSetOf<Long>()
+                        val live = ArrayList<Long>()
                         d.forEach { live.add(it) }
                         val take = rng.nextInt(1, live.size)
                         repeat(take) { picked.add(live[rng.nextInt(live.size)]) }
                         if (picked.size >= live.size) picked.remove(picked.first())
-                        val values = picked.toIntArray().also { it.sort() }
+                        val values = picked.toLongArray().also { it.sort() }
                         if (s.excludeIntValues(v, values, null)) marks.addLast(s.mark())
                     }
                 }

@@ -350,7 +350,7 @@ internal fun Lowering.reifySetEq(expr: SetEq): Int {
 internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
     val layout = materializeSet(expr.set)
     val n = layout.size
-    val aux = newAuxIntVar(IntDomain(0, n))
+    val aux = newAuxIntVar(IntDomain(0, n.toLong()))
     val auxId = intVarOf(aux)
     // Channel each indicator bool to a 0/1 int via ReifiedLinear (PB factor takes bool
     // literals only, but the count here is an int var), then assert Σ ints − count = 0.

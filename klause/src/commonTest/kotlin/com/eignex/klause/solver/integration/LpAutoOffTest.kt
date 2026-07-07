@@ -30,7 +30,7 @@ class LpAutoOffTest {
         // One always-true row so the relaxation is non-empty and the simplex actually runs each node;
         // its bound (Σx ≥ 0) is hopelessly loose, so it can never prune.
         factors.add(Linear(IntArray(n) { 1 }, IntArray(n) { it }, LinearOp.GE, 0))
-        val p = Problem(0, n, Array(n) { IntDomain(0, n - 2) }, factors.toTypedArray()) // n vars, n-1 values
+        val p = Problem(0, n, Array(n) { IntDomain(0, (n - 2).toLong()) }, factors.toTypedArray()) // n vars, n-1 values
         val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
         val res = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
 

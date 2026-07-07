@@ -2,10 +2,10 @@ package com.eignex.klause.solver.intdomain
 
 import com.eignex.klause.solver.IntConsumer
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.binarySearchLong
 
 /** Survivor list: the sorted present values, with `>= 1` interior gap. */
-internal class SurvivorsDomain(override val min: Int, override val max: Int, private val survivors: IntArray) :
+internal class SurvivorsDomain(override val min: Long, override val max: Long, private val survivors: LongArray) :
     AbstractIntDomain() {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
@@ -14,43 +14,43 @@ internal class SurvivorsDomain(override val min: Int, override val max: Int, pri
 
     override val size: Int get() = survivors.size
 
-    override fun contains(value: Int): Boolean = value in min..max && survivors.binarySearchInt(value) >= 0
+    override fun contains(value: Long): Boolean = value in min..max && survivors.binarySearchLong(value) >= 0
 
-    override fun valueAt(i: Int): Int = survivors[i]
+    override fun valueAt(i: Int): Long = survivors[i]
 
-    override fun excludeValue(value: Int): IntDomain {
-        val idx = survivors.binarySearchInt(value)
+    override fun excludeValue(value: Long): IntDomain {
+        val idx = survivors.binarySearchLong(value)
         if (idx < 0) return this
-        val out = IntArray(survivors.size - 1)
+        val out = LongArray(survivors.size - 1)
         survivors.copyInto(out, 0, 0, idx)
         survivors.copyInto(out, idx, idx + 1, survivors.size)
         return intDomainFromSurvivors(out)
     }
 
-    override fun withMinAtLeast(newMin: Int): IntDomain {
+    override fun withMinAtLeast(newMin: Long): IntDomain {
         if (newMin <= min) return this
         check(newMin <= max) { "withMinAtLeast($newMin) empties domain [$min..$max]" }
-        val lb = survivors.binarySearchInt(newMin)
+        val lb = survivors.binarySearchLong(newMin)
         val start = if (lb >= 0) lb else -(lb + 1) // first survivor >= newMin
         check(start < survivors.size) { "withMinAtLeast($newMin): only holes remained above $newMin" }
         return intDomainFromSurvivors(survivors.copyOfRange(start, survivors.size))
     }
 
-    override fun withMaxAtMost(newMax: Int): IntDomain {
+    override fun withMaxAtMost(newMax: Long): IntDomain {
         if (newMax >= max) return this
         check(newMax >= min) { "withMaxAtMost($newMax) empties domain [$min..$max]" }
-        val lb = survivors.binarySearchInt(newMax)
+        val lb = survivors.binarySearchLong(newMax)
         val end = if (lb >= 0) lb + 1 else -(lb + 1) // first index strictly above newMax
         check(end > 0) { "withMaxAtMost($newMax): only holes remained below $newMax" }
         return intDomainFromSurvivors(survivors.copyOfRange(0, end))
     }
 
-    override fun includeInteriorValue(value: Int): IntDomain {
+    override fun includeInteriorValue(value: Long): IntDomain {
         require(value > min && value < max) { "includeInteriorValue($value) outside ($min, $max)" }
-        val idx = survivors.binarySearchInt(value)
+        val idx = survivors.binarySearchLong(value)
         require(idx < 0) { "includeInteriorValue($value): not a hole" }
         val insertAt = -(idx + 1)
-        val out = IntArray(survivors.size + 1)
+        val out = LongArray(survivors.size + 1)
         survivors.copyInto(out, 0, 0, insertAt)
         out[insertAt] = value
         survivors.copyInto(out, insertAt + 1, insertAt, survivors.size)
@@ -72,11 +72,11 @@ internal class SurvivorsDomain(override val min: Int, override val max: Int, pri
         }
     }
 
-    override fun forEachHoleInRange(lo: Int, hi: Int, action: IntConsumer) {
+    override fun forEachHoleInRange(lo: Long, hi: Long, action: IntConsumer) {
         val from = if (lo > min) lo else min
         val to = if (hi < max) hi else max
         if (from > to) return
-        val lb = survivors.binarySearchInt(from)
+        val lb = survivors.binarySearchLong(from)
         var i = if (lb >= 0) lb else -(lb + 1) // first survivor >= from
         var pos = from
         while (pos <= to) {

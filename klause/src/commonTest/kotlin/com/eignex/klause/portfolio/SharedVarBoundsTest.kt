@@ -12,8 +12,8 @@ class SharedVarBoundsTest {
     @Test
     fun `unset bounds are the open interval`() {
         val vb = SharedVarBounds(numIntVars = 2)
-        assertEquals(Int.MIN_VALUE, vb.lowerOf(0))
-        assertEquals(Int.MAX_VALUE, vb.lowerOf(0).let { vb.upperOf(0) })
+        assertEquals(Long.MIN_VALUE, vb.lowerOf(0))
+        assertEquals(Long.MAX_VALUE, vb.lowerOf(0).let { vb.upperOf(0) })
     }
 
     @Test
@@ -30,7 +30,7 @@ class SharedVarBoundsTest {
     fun `out-of-range variables are ignored`() {
         val vb = SharedVarBounds(numIntVars = 1)
         vb.publish(5, lower = 0, upper = 0) // no such variable
-        assertEquals(Int.MIN_VALUE, vb.lowerOf(5))
-        assertEquals(Int.MAX_VALUE, vb.upperOf(5))
+        assertEquals(Long.MIN_VALUE, vb.lowerOf(5))
+        assertEquals(Long.MAX_VALUE, vb.upperOf(5))
     }
 }

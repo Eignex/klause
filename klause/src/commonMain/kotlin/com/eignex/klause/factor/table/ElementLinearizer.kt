@@ -39,7 +39,7 @@ internal class ElementLinearizer(
         if (arr.size > MAX_ELEM) return null
         val declared = domains[idx]
         var k = 0L
-        for (p in arr.indices) if ((p + indexOffset) in declared) k++
+        for (p in arr.indices) if ((p + indexOffset).toLong() in declared) k++
         if (k == 0L) return null
         // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
         // Σ y = 1 + index channel + two big-M rows per selector (2 + 2k).
@@ -53,8 +53,10 @@ internal class ElementLinearizer(
         val live = builder.liveDomain(idx)
         for (p in 0 until arr.size) {
             val idxVal = p + off
-            if (idxVal !in declared) continue
-            selCols.add(builder.auxColumn(0L, if (idxVal in live) 1L else 0L, presence = intArrayOf(idx, idxVal)))
+            if (idxVal.toLong() !in declared) continue
+            selCols.add(
+                builder.auxColumn(0L, if (idxVal.toLong() in live) 1L else 0L, presence = intArrayOf(idx, idxVal)),
+            )
             positions.add(p)
         }
         val k = selCols.size
@@ -92,7 +94,7 @@ internal class ElementLinearizer(
         for (t in 0 until selCols.size) {
             val arrVar = arr[positions[t]]
             val aDom = builder.declaredDomain(arrVar)
-            val m = maxOf(rDom.max, aDom.max).toLong() - minOf(rDom.min, aDom.min).toLong()
+            val m = maxOf(rDom.max, aDom.max) - minOf(rDom.min, aDom.min)
             if (m < 0L) continue // empty domain — leave that position unconstrained (sound)
             val arrCol = builder.intColumn(arrVar)
             val y = selCols[t]

@@ -5,8 +5,8 @@ import kotlin.random.Random
 
 /** Largest value first (`indomain_max`). For bools: `true` then `false`. */
 object IndomainMax : ValueSelector {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
-        is VarRef.Bool -> sequenceOf(1, 0)
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
+        is VarRef.Bool -> sequenceOf(1L, 0L)
         is VarRef.IntVar -> domainValuesDescending(session.intDomain(varRef.varId))
     }
 }

@@ -25,6 +25,6 @@ import kotlin.random.Random
  *    pruning-heavy first-fail problems.
  */
 internal class MaxSd(private val maxProbes: Int = 32) : ValueSelector {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> =
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =
         probeAndOrder(session, varRef, rng, maxProbes, ascending = false)
 }

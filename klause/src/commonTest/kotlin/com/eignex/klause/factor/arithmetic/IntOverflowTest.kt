@@ -42,8 +42,8 @@ class IntOverflowTest {
     @Test
     fun `Linear running sum is Long-clean`() {
         val factor = Linear(intArrayOf(BIG), intArrayOf(0), LinearOp.LE, bound = 1000)
-        val state = stateFor(0, arrayOf(IntDomain(0, WIDE)), factor)
-        state.assignment.setInt(0, WIDE)
+        val state = stateFor(0, arrayOf(IntDomain(0, WIDE.toLong())), factor)
+        state.assignment.setInt(0, WIDE.toLong())
         state.recompute()
         assertEquals(PRODUCT, state.longPayload[0])
         assertTrue(state.factors[0].isViolated(state, 0), "2^32 > 1000 must be violated")
@@ -54,13 +54,13 @@ class IntOverflowTest {
     fun `Linear deltaIfIntSet predicts the Long degree change`() {
         // EQ at bound 0: var=0 satisfies, var=WIDE drives the sum to 2^32 (violated).
         val factor = Linear(intArrayOf(BIG), intArrayOf(0), LinearOp.EQ, bound = 0)
-        val state = stateFor(0, arrayOf(IntDomain(0, WIDE)), factor)
+        val state = stateFor(0, arrayOf(IntDomain(0, WIDE.toLong())), factor)
         state.assignment.setInt(0, 0)
         state.recompute()
         assertFalse(state.factors[0].isViolated(state, 0))
 
-        val predicted = state.factors[0].deltaIfIntSet(state, 0, 0, WIDE)
-        state.apply(Move.IntSet(0, WIDE))
+        val predicted = state.factors[0].deltaIfIntSet(state, 0, 0, WIDE.toLong())
+        state.apply(Move.IntSet(0, WIDE.toLong()))
         val observed = state.factors[0].violationDegree(state, 0)
         assertTrue(observed > 0, "sum 2^32 != 0 must be violated")
         assertEquals(observed, predicted, "delta must predict the true Long degree, not a wrapped one")
@@ -76,9 +76,9 @@ class IntOverflowTest {
             op = LinearOp.LE,
             bound = 1000,
         )
-        val state = stateFor(1, arrayOf(IntDomain(0, WIDE)), factor)
+        val state = stateFor(1, arrayOf(IntDomain(0, WIDE.toLong())), factor)
         state.assignment.setBool(0, true) // aux demands the body hold
-        state.assignment.setInt(0, WIDE)
+        state.assignment.setInt(0, WIDE.toLong())
         state.recompute()
         assertEquals(PRODUCT, state.longPayload[0])
         assertTrue(state.factors[0].isViolated(state, 0), "aux=true but body 2^32 > 1000 does not hold")
@@ -122,9 +122,13 @@ class IntOverflowTest {
     fun `Product compares operands in Long`() {
         // a = b = 2^20 → a·b = 2^40 (which wraps to 0 in Int). result pinned to 0 must be violated.
         val factor = Product(a = 0, b = 1, result = 2)
-        val state = stateFor(0, arrayOf(IntDomain(0, BIG), IntDomain(0, BIG), IntDomain(0, 0)), factor)
-        state.assignment.setInt(0, BIG)
-        state.assignment.setInt(1, BIG)
+        val state = stateFor(
+            0,
+            arrayOf(IntDomain(0, BIG.toLong()), IntDomain(0, BIG.toLong()), IntDomain(0, 0)),
+            factor,
+        )
+        state.assignment.setInt(0, BIG.toLong())
+        state.assignment.setInt(1, BIG.toLong())
         state.assignment.setInt(2, 0)
         state.recompute()
         assertEquals(0, BIG * BIG, "2^40 wraps to 0 in Int") // documents the hazard

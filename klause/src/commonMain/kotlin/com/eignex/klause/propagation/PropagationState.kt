@@ -14,10 +14,11 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
-internal const val NO_CARVE: Int = Int.MIN_VALUE
+internal const val NO_CARVE: Long = Long.MIN_VALUE
 
 /** Blocking-literal slot with no blocker (#200): the watcher always fires. Lit ids are
  *  non-negative ([Lit.make] = `var shl 1 | sign`), so −1 is a safe sentinel. */
@@ -168,7 +169,7 @@ class PropagationState(
     // interior hole materialized after the carve reads its level/reason from here. Lazily
     // allocated, maintained while [undoLogging], truncated on backtrack via the undo log.
     internal val holeHistAnt: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
-    internal val holeHistVal: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    internal val holeHistVal: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
     /**
@@ -209,22 +210,14 @@ class PropagationState(
             val d = intDomains[v]
             val orig = problem.intDomains[v]
             if (d.min > orig.min) {
-                val key = (v.toLong() shl 33) or (0L shl 32) or
-                    (d.min.toLong() - Int.MIN_VALUE.toLong())
-                if (seen.add(key)) {
-                    out.add(
-                        Lit.make(atomVarGe(v, d.min), false),
-                    )
-                }
+                // Dedup on the atom's virtual-var id: it is a unique identity per (v, GE, d.min),
+                // so the threshold value need not be packed into the key (it may exceed 32 bits).
+                val atom = atomVarGe(v, d.min)
+                if (seen.add(atom.toLong())) out.add(Lit.make(atom, false))
             }
             if (d.max < orig.max) {
-                val key = (v.toLong() shl 33) or (1L shl 32) or
-                    (d.max.toLong() - Int.MIN_VALUE.toLong())
-                if (seen.add(key)) {
-                    out.add(
-                        Lit.make(atomVarLe(v, d.max), false),
-                    )
-                }
+                val atom = atomVarLe(v, d.max)
+                if (seen.add(atom.toLong())) out.add(Lit.make(atom, false))
             }
         }
         if (out.size == 0) return null
@@ -406,15 +399,15 @@ class PropagationState(
     /** Allocate (or look up) the atom for `[intVar ≥ threshold]` and return its virtual
      *  variable id (past the bool var space). Pair with [Lit.make]
      *  to encode as a positive or negative literal. */
-    fun atomVarGe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = AtomKind.GE, threshold = threshold)
+    fun atomVarGe(intVar: Int, threshold: Long): Int = allocAtom(intVar, kind = AtomKind.GE, threshold = threshold)
 
     /** Allocate (or look up) the atom for `[intVar ≤ threshold]`. */
-    fun atomVarLe(intVar: Int, threshold: Int): Int = allocAtom(intVar, kind = AtomKind.LE, threshold = threshold)
+    fun atomVarLe(intVar: Int, threshold: Long): Int = allocAtom(intVar, kind = AtomKind.LE, threshold = threshold)
 
     /** Allocate (or look up) the atom for `[intVar = value]`. The negative-polarity literal
      *  of this atom encodes `[intVar ≠ value]`; share the same atom id rather than allocating
      *  a dedicated `Ne` kind. */
-    fun atomVarEq(intVar: Int, value: Int): Int = allocAtom(intVar, kind = AtomKind.EQ, threshold = value)
+    fun atomVarEq(intVar: Int, value: Long): Int = allocAtom(intVar, kind = AtomKind.EQ, threshold = value)
 
     /** True iff bool [v] is currently assigned (by decision or propagation). Primitive — lets
      *  hot factor loops test assignment without the `Boolean?` box that `boolValues[v]` allocates.
@@ -650,34 +643,34 @@ class PropagationState(
     fun pinBool(v: Int, value: Boolean, antecedents: IntArray?): Boolean = pinBoolImpl(v, value, antecedents)
 
     /** Raise int `v`'s lower bound to [lo]; returns false on conflict. */
-    fun tightenIntMin(v: Int, lo: Int): Boolean = tightenIntMinImpl(v, lo, null)
+    fun tightenIntMin(v: Int, lo: Long): Boolean = tightenIntMinImpl(v, lo, null)
 
     /** Variant that records [antecedents] — bool literals (false in the current state)
      *  whose collective truth forced this lower-bound tightening. Used by the conflict
      *  analyzer to walk the implication graph backwards through int-domain factors. */
-    fun tightenIntMin(v: Int, lo: Int, antecedents: IntArray?): Boolean = tightenIntMinImpl(v, lo, antecedents)
+    fun tightenIntMin(v: Int, lo: Long, antecedents: IntArray?): Boolean = tightenIntMinImpl(v, lo, antecedents)
 
     /** Lower int `v`'s upper bound to [hi]; returns false on conflict. */
-    fun tightenIntMax(v: Int, hi: Int): Boolean = tightenIntMaxImpl(v, hi, null)
+    fun tightenIntMax(v: Int, hi: Long): Boolean = tightenIntMaxImpl(v, hi, null)
 
     /** As [tightenIntMax] with explicit conflict [antecedents]. */
-    fun tightenIntMax(v: Int, hi: Int, antecedents: IntArray?): Boolean = tightenIntMaxImpl(v, hi, antecedents)
+    fun tightenIntMax(v: Int, hi: Long, antecedents: IntArray?): Boolean = tightenIntMaxImpl(v, hi, antecedents)
 
     /** Pin int `v` to [value]; returns false on conflict. */
-    fun setInt(v: Int, value: Int): Boolean = setIntImpl(v, value, null)
+    fun setInt(v: Int, value: Long): Boolean = setIntImpl(v, value, null)
 
     /** As [setInt] with explicit conflict [antecedents]. */
-    fun setInt(v: Int, value: Int, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
+    fun setInt(v: Int, value: Long, antecedents: IntArray?): Boolean = setIntImpl(v, value, antecedents)
 
     /** Punch a hole in `v`'s domain at [value]. Returns `true` on success (including the
      *  no-op case when [value] is already absent), `false` on conflict (would empty the
      *  domain). When [value] is at the current endpoint, this is equivalent to a
      *  bound-tighten by one; when it's interior, it transitions the domain to sparse
      *  representation. */
-    fun excludeIntValue(v: Int, value: Int): Boolean = excludeIntValueImpl(v, value, null)
+    fun excludeIntValue(v: Int, value: Long): Boolean = excludeIntValueImpl(v, value, null)
 
     /** Forbid [value] for int `v`; returns false on conflict. */
-    fun excludeIntValue(v: Int, value: Int, antecedents: IntArray?): Boolean =
+    fun excludeIntValue(v: Int, value: Long, antecedents: IntArray?): Boolean =
         excludeIntValueImpl(v, value, antecedents)
 
     /** Pop one bool var that's been dirtied since the last call, or `-1` if none. */

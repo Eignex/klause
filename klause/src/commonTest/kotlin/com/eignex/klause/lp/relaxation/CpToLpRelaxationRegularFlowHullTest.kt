@@ -69,7 +69,7 @@ class CpToLpRelaxationRegularFlowHullTest {
             val p = Problem(
                 numBoolVars = 0,
                 numIntVars = len,
-                intDomains = Array(len) { IntDomain(1, alphabet) },
+                intDomains = Array(len) { IntDomain(1, alphabet.toLong()) },
                 factors = arrayOf<Factor>(
                     Regular(IntArray(len) { it }, numStates, alphabet, trans, q0, acc.toIntArray()),
                 ),

@@ -59,7 +59,7 @@ class AffineEliminationTest {
         val reduced = original.withPassDelta(delta, BakeConfig.NONE)
         val reconstruct = delta.reconstruct ?: { it }
         val origFeasible = feasibleSet(original)
-        val reconstructed = HashSet<List<Int>>()
+        val reconstructed = HashSet<List<Long>>()
         enumerate(reduced.intDomains) { assign ->
             if (isFeasible(reduced, Sample(BooleanArray(0), assign))) {
                 val full = reconstruct(Sample(BooleanArray(0), assign.copyOf()))
@@ -70,8 +70,8 @@ class AffineEliminationTest {
         assertEquals(origFeasible, reconstructed, "$name: feasible set not preserved")
     }
 
-    private fun feasibleSet(problem: Problem): Set<List<Int>> {
-        val out = HashSet<List<Int>>()
+    private fun feasibleSet(problem: Problem): Set<List<Long>> {
+        val out = HashSet<List<Long>>()
         enumerate(problem.intDomains) { assign ->
             if (isFeasible(problem, Sample(BooleanArray(0), assign))) out.add(assign.toList())
         }
@@ -79,9 +79,9 @@ class AffineEliminationTest {
     }
 
     /** Enumerate every integer assignment over [domains] (bounds only; small domains). */
-    private fun enumerate(domains: Array<IntDomain>, body: (IntArray) -> Unit) {
+    private fun enumerate(domains: Array<IntDomain>, body: (LongArray) -> Unit) {
         val n = domains.size
-        val assign = IntArray(n) { domains[it].min }
+        val assign = LongArray(n) { domains[it].min }
         while (true) {
             body(assign)
             var i = 0

@@ -63,7 +63,7 @@ class MddInvariantTest {
         val rng = Random(99)
         repeat(400) { step ->
             val v = rng.nextInt(2)
-            val nv = 1 + rng.nextInt(2)
+            val nv = 1L + rng.nextInt(2)
             val before = state.factors[0].violationDegree(state, 0)
             val predicted = state.factors[0].deltaIfIntSet(state, 0, v, nv)
             state.apply(Move.IntSet(v, nv))
@@ -154,7 +154,7 @@ class MddInvariantTest {
             val a = s.ints[0]
             val b = s.ints[1]
             assertTrue(
-                (a == 1 && b == 2) || (a == 2 && b == 1),
+                (a == 1L && b == 2L) || (a == 2L && b == 1L),
                 "rejected word ($a,$b)",
             )
         }

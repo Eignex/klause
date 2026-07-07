@@ -103,13 +103,13 @@ class OrderLiteralSoundnessHarnessTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = domains.size,
-            intDomains = Array(domains.size) { IntDomain(domains[it].first, domains[it].last) },
+            intDomains = Array(domains.size) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
             factors = factors,
         )
         for (seed in 1L..seeds) {
             val found = BacktrackSolver(problem)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids(), maxLearnedClauses = 1_000))
-                .take(200_000).map { it.ints.toList() }.toHashSet()
+                .take(200_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(expected, found, "$label seed=$seed: backtrack solution set must equal brute force")
         }
     }

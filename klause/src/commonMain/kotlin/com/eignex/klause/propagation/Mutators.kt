@@ -6,6 +6,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /** Push every pin in `a` as a fresh decision; return `false` (so [PropagationState.seeded] becomes
  *  `false`) on the first contradiction. Direct primitive-array iteration so the early
@@ -70,7 +71,7 @@ internal fun PropagationState.pinBoolAsDecision(v: Int, value: Boolean): Boolean
 }
 
 /** Push an int var as a new decision. */
-internal fun PropagationState.setIntAsDecision(v: Int, value: Int): Boolean {
+internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
@@ -84,7 +85,7 @@ internal fun PropagationState.setIntAsDecision(v: Int, value: Int): Boolean {
  * two same-level bound atoms that 1UIP cannot collapse). The caller must ensure `hi`
  * strictly narrows the domain (`hi in d.min until d.max`) so the level is non-empty.
  */
-internal fun PropagationState.setIntMaxAsDecision(v: Int, hi: Int): Boolean {
+internal fun PropagationState.setIntMaxAsDecision(v: Int, hi: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
@@ -92,7 +93,7 @@ internal fun PropagationState.setIntMaxAsDecision(v: Int, hi: Int): Boolean {
 }
 
 /** Push an int lower-bound tightening (`v ≥ lo`) as a new decision. See [setIntMaxAsDecision]. */
-internal fun PropagationState.setIntMinAsDecision(v: Int, lo: Int): Boolean {
+internal fun PropagationState.setIntMinAsDecision(v: Int, lo: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
@@ -150,7 +151,7 @@ internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, bas
  * it can prune feasible assignments. Values absent from the root domain are global facts and
  * need no citation.
  */
-internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: IntRange, base: IntArray?): IntArray? {
+internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange, base: IntArray?): IntArray? {
     var out: IntArrayList? = null
     val orig = problem.intDomains[v]
     for (value in crossed) {
@@ -165,10 +166,10 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: IntRange, 
     return out?.toIntArray() ?: base
 }
 
-internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Int, antecedents: IntArray?): Boolean =
+internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Long, antecedents: IntArray?): Boolean =
     tightenBoundImpl(v, lo, antecedents, isMin = true)
 
-internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: IntArray?): Boolean =
+internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Long, antecedents: IntArray?): Boolean =
     tightenBoundImpl(v, hi, antecedents, isMin = false)
 
 /**
@@ -178,7 +179,7 @@ internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Int, antecedents: In
  */
 private inline fun PropagationState.tightenBoundImpl(
     v: Int,
-    bound: Int,
+    bound: Long,
     antecedents: IntArray?,
     isMin: Boolean,
 ): Boolean {
@@ -246,7 +247,7 @@ private inline fun PropagationState.tightenBoundImpl(
  * domain whose sole value is [value]). On conflict, seeds the factor core with the
  * level / reason fields already tracked for the min and max sides.
  */
-internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedents: IntArray?): Boolean {
+internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, antecedents: IntArray?): Boolean {
     val d = intDomains[v]
     if (value !in d) return true
     if (d.min == d.max && d.min == value) {
@@ -353,8 +354,8 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Int, antecedent
  */
 internal fun PropagationState.citeCrossedSearchHoles(
     v: Int,
-    from: Int,
-    until: Int,
+    from: Long,
+    until: Long,
     prior: IntDomain,
     base: IntArray?,
 ): IntArray? {
@@ -390,7 +391,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
  * [excludeIntValueImpl] over [values]. Returns false, seeding the conflict core, when the
  * exclusions empty the domain.
  */
-internal fun PropagationState.excludeIntValues(v: Int, values: IntArray, antecedents: IntArray?): Boolean {
+internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antecedents: IntArray?): Boolean {
     if (values.isEmpty()) return true
     val d = intDomains[v]
     val newDomain = d.excludeValues(values)
@@ -406,13 +407,13 @@ internal fun PropagationState.excludeIntValues(v: Int, values: IntArray, anteced
     val newMax = newDomain.max
 
     // Interior carves (strictly inside the surviving span); the rest land on a moved endpoint.
-    var interior: IntArrayList? = null
+    var interior: LongArrayList? = null
     var excluded = 0
     for (i in values.indices) {
         val value = values[i]
         if (value !in d) continue
         excluded++
-        if (value in newMin..newMax) (interior ?: IntArrayList().also { interior = it }).add(value)
+        if (value in newMin..newMax) (interior ?: LongArrayList().also { interior = it }).add(value)
     }
     if (currentFactor >= 0) propagations += excluded
 
@@ -480,7 +481,7 @@ internal fun PropagationState.seedConflictFactor(fid: Int) {
     conflictSeedFactors.add(fid)
 }
 
-internal fun PropagationState.setIntImpl(v: Int, value: Int, antecedents: IntArray?): Boolean =
+internal fun PropagationState.setIntImpl(v: Int, value: Long, antecedents: IntArray?): Boolean =
     tightenIntMinImpl(v, value, antecedents) && tightenIntMaxImpl(v, value, antecedents)
 
 /**
@@ -491,7 +492,7 @@ internal fun PropagationState.setIntImpl(v: Int, value: Int, antecedents: IntArr
  * eq-atoms) rather than O(span). It is a root-seed input (no antecedents; presolve does not learn), so
  * per-hole reasons are not recorded — the excluded values are unconditional facts of the folded domain.
  */
-internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: IntArray): Boolean {
+internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: LongArray): Boolean {
     val d = intDomains[v]
     var kept = 0
     for (s in survivors) if (s in d) kept++
@@ -506,7 +507,7 @@ internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: IntArray
     val filtered = if (kept == survivors.size) {
         survivors
     } else {
-        IntArray(kept).also { out ->
+        LongArray(kept).also { out ->
             var j = 0
             for (s in survivors) if (s in d) out[j++] = s
         }

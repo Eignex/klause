@@ -8,7 +8,7 @@ import com.eignex.klause.solver.intdomain.ContiguousDomain
  *  `d.forEach { … }` is unchanged. */
 fun interface IntConsumer {
     /** Receive one domain [value] from an [IntDomain] iteration. */
-    fun accept(value: Int)
+    fun accept(value: Long)
 }
 
 /**
@@ -44,24 +44,26 @@ fun interface IntConsumer {
  * implementation detail.
  */
 interface IntDomain {
-    /** Inclusive lower bound; always an in-domain value. */
-    val min: Int
+    /** Inclusive lower bound; always an in-domain value. May exceed 32-bit range. */
+    val min: Long
 
-    /** Inclusive upper bound; always an in-domain value. */
-    val max: Int
+    /** Inclusive upper bound; always an in-domain value. May exceed 32-bit range. */
+    val max: Long
 
-    /** Number of values in the domain (O(1)). */
+    /** Number of values in the domain (O(1)). An index/count kept 32-bit: a *materialisable* domain
+     *  never holds more than [Int.MAX_VALUE] present values, even when its value span is far wider
+     *  (a wide [ContiguousDomain] reports [Int.MAX_VALUE] — its values are never enumerated). */
     val size: Int
 
     /** True iff [value] lies in the domain. */
-    operator fun contains(value: Int): Boolean
+    operator fun contains(value: Long): Boolean
 
     /** The `i`-th value present in the domain (0-indexed, ascending). */
-    fun valueAt(i: Int): Int
+    fun valueAt(i: Int): Long
 
     /** Return a new domain with [value] excluded, or `this` if [value] is absent (idempotent).
      *  Throws if removing [value] would empty the domain. */
-    fun excludeValue(value: Int): IntDomain
+    fun excludeValue(value: Long): IntDomain
 
     /**
      * Return a domain with every value in [values] excluded, `this` if none are present
@@ -70,22 +72,22 @@ interface IntDomain {
      * Merges in a single pass keeping survivors — O(present + values), span-independent for the
      * wide reps. Only the value *set* is contractual; the resulting rep is an implementation detail.
      */
-    fun excludeValues(values: IntArray): IntDomain?
+    fun excludeValues(values: LongArray): IntDomain?
 
     /** Copy of the domain with its min raised to at least [newMin]. `this` when already covered;
      *  throws on empty. */
-    fun withMinAtLeast(newMin: Int): IntDomain
+    fun withMinAtLeast(newMin: Long): IntDomain
 
     /** Copy of the domain with its max tightened to at most [newMax]. `this` when already covered;
      *  throws on empty. */
-    fun withMaxAtMost(newMax: Int): IntDomain
+    fun withMaxAtMost(newMax: Long): IntDomain
 
     /**
      * Inverse of an interior [excludeValue]: put [value] (strictly inside `min..max` and currently
      * absent) back into the domain. Exists for the undo journal — an interior carve is journaled as
      * the carved value alone instead of a full prior-domain snapshot.
      */
-    fun includeInteriorValue(value: Int): IntDomain
+    fun includeInteriorValue(value: Long): IntDomain
 
     /** Invoke [action] for each value present in the domain, ascending. */
     fun forEach(action: IntConsumer)
@@ -97,21 +99,13 @@ interface IntDomain {
     /** Invoke [action] for each value in `[lo, hi]` carved *out* of the domain (an interior hole),
      *  ascending, clamped to `[min, max]`. Span-independent for the wide reps — it walks the
      *  runs / survivors crossed, not every integer in the range. */
-    fun forEachHoleInRange(lo: Int, hi: Int, action: IntConsumer)
+    fun forEachHoleInRange(lo: Long, hi: Long, action: IntConsumer)
 
     /** Nearest in-domain value to [value] (clamps to the bounds). */
-    fun clamp(value: Int): Int = when {
+    fun clamp(value: Long): Long = when {
         value < min -> min
         value > max -> max
         else -> value
-    }
-
-    /** Nearest in-`[min, max]` value to a `Long` [value], returned as `Int`. A target beyond `Int`
-     *  range necessarily lies past the corresponding bound, so it clamps to [min] / [max]. */
-    fun clampLong(value: Long): Int = when {
-        value < min -> min
-        value > max -> max
-        else -> value.toInt()
     }
 
     /** Factory for [IntDomain]; the bitset/wide-rep cutoff is
@@ -119,6 +113,6 @@ interface IntDomain {
     companion object {
         /** Construct the contiguous domain `(min..max)`. Source-compatible with the former class
          *  constructor, so existing `IntDomain(min, max)` call sites are unchanged. */
-        operator fun invoke(min: Int, max: Int): IntDomain = ContiguousDomain(min, max)
+        operator fun invoke(min: Long, max: Long): IntDomain = ContiguousDomain(min, max)
     }
 }

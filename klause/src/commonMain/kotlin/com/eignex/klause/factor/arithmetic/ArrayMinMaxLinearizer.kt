@@ -31,7 +31,7 @@ internal class ArrayMinMaxLinearizer(private val result: Int, private val xs: In
         for (i in 0 until n) {
             val x = xs[i]
             val xDom = builder.declaredDomain(x)
-            val m = maxOf(rDom.max, xDom.max).toLong() - minOf(rDom.min, xDom.min).toLong()
+            val m = maxOf(rDom.max, xDom.max) - minOf(rDom.min, xDom.min)
             if (m < 0L) continue
             val xCol = builder.intColumn(x)
             val z = sel[i]

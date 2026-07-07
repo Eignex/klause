@@ -10,20 +10,20 @@ internal class ValuePrecedeInvariant(private val s: Int, private val t: Int, pri
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
         val i = firstStOccurrence(state)
-        return i >= 0 && state.assignment.intValue(xs[i]) == t
+        return i >= 0 && state.assignment.intValue(xs[i]) == t.toLong()
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         compressViolation(badTCount(state, intVar = -1, newValue = 0).toLong(), state.violationSoftCap)
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val cap = state.violationSoftCap
         val after = compressViolation(badTCount(state, intVar, newValue).toLong(), cap)
         val before = compressViolation(badTCount(state, -1, 0).toLong(), cap)
         return after - before
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int = 0
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int = 0
 
     override val providesImplicitNeighbourhood: Boolean get() = true
 
@@ -32,25 +32,25 @@ internal class ValuePrecedeInvariant(private val s: Int, private val t: Int, pri
         var firstBadT = -1
         for (i in xs.indices) {
             val v = state.assignment.intValue(xs[i])
-            if (v == s) {
+            if (v == s.toLong()) {
                 firstS = i
                 break
             }
-            if (v == t && firstBadT < 0) firstBadT = i
+            if (v == t.toLong() && firstBadT < 0) firstBadT = i
         }
         if (firstBadT < 0 || firstBadT > firstS) return
         val badVar = xs[firstBadT]
         val badDom = state.problem.intDomains[badVar]
-        for (cand in intArrayOf(badDom.min, badDom.max)) {
-            if (cand != t && cand in badDom) {
+        for (cand in longArrayOf(badDom.min, badDom.max)) {
+            if (cand != t.toLong() && cand in badDom) {
                 sink.addChannelingIntSet(state, badVar, cand)
                 break
             }
         }
         for (i in 0..firstBadT) {
             val v = xs[i]
-            if (s in state.problem.intDomains[v] && state.assignment.intValue(v) != s) {
-                sink.addChannelingIntSet(state, v, s)
+            if (s.toLong() in state.problem.intDomains[v] && state.assignment.intValue(v) != s.toLong()) {
+                sink.addChannelingIntSet(state, v, s.toLong())
                 break
             }
         }
@@ -65,10 +65,10 @@ internal class ValuePrecedeInvariant(private val s: Int, private val t: Int, pri
             val i = state.rng.nextInt(xs.size)
             val v = state.assignment.intValue(xs[i])
             val d = state.problem.intDomains[xs[i]]
-            var pick = -1
+            var pick = -1L
             var seen = 0
             d.forEach { w ->
-                if (w != v && (w == s || (w != t && v != s))) {
+                if (w != v && (w == s.toLong() || (w != t.toLong() && v != s.toLong()))) {
                     seen++
                     if (state.rng.nextInt(seen) == 0) pick = w
                 }
@@ -83,12 +83,12 @@ internal class ValuePrecedeInvariant(private val s: Int, private val t: Int, pri
         for (i in xs.indices) {
             val v = xs[i]
             if (state.assumptions.isFrozenInt(v)) {
-                if (state.assignment.intValue(v) == t) return false
+                if (state.assignment.intValue(v) == t.toLong()) return false
                 continue
             }
             val d = state.problem.intDomains[v]
-            var pick = -1
-            d.forEach { if (pick < 0 && it != t) pick = it }
+            var pick = -1L
+            d.forEach { if (pick < 0 && it != t.toLong()) pick = it }
             if (pick < 0) return false
             state.assignment.setInt(v, pick)
         }
@@ -98,17 +98,17 @@ internal class ValuePrecedeInvariant(private val s: Int, private val t: Int, pri
     private fun firstStOccurrence(state: LocalSearchState): Int {
         for (i in xs.indices) {
             val v = state.assignment.intValue(xs[i])
-            if (v == s || v == t) return i
+            if (v == s.toLong() || v == t.toLong()) return i
         }
         return -1
     }
 
-    private fun badTCount(state: LocalSearchState, intVar: Int, newValue: Int): Int {
+    private fun badTCount(state: LocalSearchState, intVar: Int, newValue: Long): Int {
         var count = 0
         for (i in xs.indices) {
             val v = if (xs[i] == intVar) newValue else state.assignment.intValue(xs[i])
-            if (v == s) return count
-            if (v == t) count++
+            if (v == s.toLong()) return count
+            if (v == t.toLong()) count++
         }
         return count
     }

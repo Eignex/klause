@@ -30,7 +30,7 @@ class BitsetDomainTest {
     @Test
     fun `bitset rep excludeValue advances past a chain of removed endpoints`() {
         var d = ContiguousDomain(0, 30).excludeValue(20)
-        for (v in 0..5) d = d.excludeValue(v)
+        for (v in 0..5) d = d.excludeValue(v.toLong())
         assertEquals(6, d.min)
         d = d.excludeValue(6)
         assertEquals(7, d.min)
@@ -57,9 +57,9 @@ class BitsetDomainTest {
     @Test
     fun `forEachHoleInRange should emit only holes in requested range`() {
         val d = ContiguousDomain(0, 20).excludeValue(5).excludeValue(9)
-        val holes = mutableListOf<Int>()
+        val holes = mutableListOf<Long>()
         d.forEachHoleInRange(-10, 8) { holes.add(it) }
-        assertEquals(listOf(5), holes)
+        assertEquals(listOf(5L), holes)
     }
 
     @Test
@@ -89,16 +89,16 @@ class BitsetDomainTest {
         val d = ContiguousDomain(5, 20).excludeValue(10).excludeValue(15)
         val expected = (5..20).filter { it != 10 && it != 15 }
         for ((i, v) in expected.withIndex()) {
-            assertEquals(v, d.valueAt(i), "valueAt($i)")
+            assertEquals(v.toLong(), d.valueAt(i), "valueAt($i)")
         }
     }
 
     @Test
     fun `bitset rep forEach matches expected sequence`() {
         val d = ContiguousDomain(0, 80).excludeValue(40)
-        val seen = mutableListOf<Int>()
+        val seen = mutableListOf<Long>()
         d.forEach { seen.add(it) }
-        val expected = (0..80).filter { it != 40 }
+        val expected = (0..80).filter { it != 40 }.map { it.toLong() }
         assertEquals(expected, seen)
     }
 

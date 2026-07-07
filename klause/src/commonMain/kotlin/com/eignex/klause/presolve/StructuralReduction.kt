@@ -27,7 +27,7 @@ internal object StructuralReduction {
                     added.addAll(reduction.replacement)
                     for ((v, range) in reduction.tightenedBounds) {
                         val d = domains ?: problem.intDomains.copyOf().also { domains = it }
-                        d[v] = d[v].withMinAtLeast(range.first).withMaxAtMost(range.last)
+                        d[v] = d[v].withMinAtLeast(range.first.toLong()).withMaxAtMost(range.last.toLong())
                     }
                 }
             }

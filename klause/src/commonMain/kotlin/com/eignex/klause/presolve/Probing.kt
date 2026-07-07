@@ -114,10 +114,10 @@ internal object Probing {
 
     /** Lower bound `propagate` implied for int [i] — a singleton pin counts as a lower bound at the
      *  pinned value — or `null` when this polarity implied nothing about [i]'s lower bound. */
-    private fun impliedMin(implied: PropagationResult.Implied, i: Int): Int? =
+    private fun impliedMin(implied: PropagationResult.Implied, i: Int): Long? =
         implied.intValueOrNull(i) ?: implied.intMinOrNullCompat(i)
 
     /** Upper bound `propagate` implied for int [i]; mirror of [impliedMin]. */
-    private fun impliedMax(implied: PropagationResult.Implied, i: Int): Int? =
+    private fun impliedMax(implied: PropagationResult.Implied, i: Int): Long? =
         implied.intValueOrNull(i) ?: implied.intMaxOrNullCompat(i)
 }

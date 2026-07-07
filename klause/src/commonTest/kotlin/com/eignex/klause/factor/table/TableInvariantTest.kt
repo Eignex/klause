@@ -92,7 +92,7 @@ class TableInvariantTest {
         val allowed = setOf(listOf(1, 2, 3), listOf(4, 5, 6))
         for (s in samples) {
             assertTrue(
-                s.ints.toList() in allowed,
+                s.ints.map { it.toInt() } in allowed,
                 "assignment ${s.ints.toList()} not in table",
             )
         }

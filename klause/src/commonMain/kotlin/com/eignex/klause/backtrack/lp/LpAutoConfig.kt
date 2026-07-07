@@ -378,7 +378,13 @@ object LpAutoConfig {
             if (n < 2) continue
             var arcs = 0L
             for (i in 0 until n) {
-                problem.intDomains[succ[i]].forEach { j -> if ((selfLoops || j != i) && j in 0 until n) arcs++ }
+                problem.intDomains[succ[i]].forEach { j ->
+                    if ((selfLoops || j != i.toLong()) &&
+                        j in 0L until n
+                    ) {
+                        arcs++
+                    }
+                }
             }
             if (arcs == 0L || arcs > CpToLpRelaxation.MAX_CIRCUIT_ARCS) continue
             any = true
@@ -413,8 +419,8 @@ object LpAutoConfig {
         var any = false
         for (v in schedulingViews(problem)) {
             val n = v.starts.size
-            var t0 = Int.MAX_VALUE
-            var t1 = Int.MIN_VALUE
+            var t0 = Long.MAX_VALUE
+            var t1 = Long.MIN_VALUE
             var c = 0L
             var ok = true
             for (i in 0 until n) {
@@ -424,11 +430,11 @@ object LpAutoConfig {
                     break
                 }
                 if (dom.min < t0) t0 = dom.min
-                val end = dom.max.toLong() + v.durations[i]
-                if (end > t1) t1 = end.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-                c += (dom.max - dom.min + 1).toLong()
+                val end = dom.max + v.durations[i]
+                if (end > t1) t1 = end
+                c += dom.max - dom.min + 1
             }
-            val horizon = t1.toLong() - t0
+            val horizon = t1 - t0
             if (!ok || horizon <= 0 || horizon > CpToLpRelaxation.MAX_TI_HORIZON || c > CpToLpRelaxation.MAX_TI_COLS) {
                 continue
             }

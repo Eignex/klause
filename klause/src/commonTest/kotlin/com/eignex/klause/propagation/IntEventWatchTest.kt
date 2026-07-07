@@ -81,7 +81,7 @@ class IntEventWatchTest {
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-            .take(100_000).map { it.ints.toList() }.toHashSet()
+            .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     @Test
     fun `strict-less-than chain via bound events enumerates exactly the brute-force set`() {
@@ -93,7 +93,7 @@ class IntEventWatchTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, hi) },
+            intDomains = Array(n) { IntDomain(0, hi.toLong()) },
             factors = factors,
         )
         val brute = HashSet<List<Int>>()
@@ -123,7 +123,7 @@ class IntEventWatchTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, hi) },
+            intDomains = Array(n) { IntDomain(0, hi.toLong()) },
             factors = factors,
         )
         val brute = HashSet<List<Int>>()

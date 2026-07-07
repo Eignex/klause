@@ -99,7 +99,7 @@ class PropagationStateExcludeTest {
         assertEquals(0, d.min)
         assertEquals(10, d.max)
         assertEquals(8, d.size)
-        for (h in intArrayOf(3, 5, 7)) assertFalse(h in d, "$h should be a hole")
-        for (k in intArrayOf(0, 1, 2, 4, 6, 8, 9, 10)) assertTrue(k in d, "$k should remain in domain")
+        for (h in longArrayOf(3, 5, 7)) assertFalse(h in d, "$h should be a hole")
+        for (k in longArrayOf(0, 1, 2, 4, 6, 8, 9, 10)) assertTrue(k in d, "$k should remain in domain")
     }
 }

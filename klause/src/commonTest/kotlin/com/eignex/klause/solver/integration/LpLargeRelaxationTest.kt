@@ -66,7 +66,7 @@ class LpLargeRelaxationTest {
                 repeat(rng.nextInt(1, 4)) { _ -> cons.add(LongArray(n) { rng.nextLong(-3, 4) } to rng.nextLong(0, 15)) }
 
                 val brute = bruteMin(n, ub, cost, cons)
-                val domains = Array(n) { IntDomain(0, ub[it]) }
+                val domains = Array(n) { IntDomain(0, ub[it].toLong()) }
                 val factors = cons.map { (c, r) ->
                     Linear(
                         c.map { it.toInt() }.toIntArray(),
@@ -119,7 +119,9 @@ class LpLargeRelaxationTest {
                 }
                 val brute = bruteMinLinked(nx, ub, geCons)
 
-                val domains = Array(nx + 1) { if (it < nx) IntDomain(0, ub[it]) else IntDomain(0, zUb) }
+                val domains = Array(
+                    nx + 1,
+                ) { if (it < nx) IntDomain(0, ub[it].toLong()) else IntDomain(0, zUb.toLong()) }
                 val factors = ArrayList<Factor>()
                 for ((c, r) in geCons) factors.add(Linear(c, IntArray(nx) { it }, LinearOp.GE, r))
                 // z >= Σx : Σx − z ≤ 0.
@@ -197,7 +199,7 @@ class LpLargeRelaxationTest {
                     cons.add(Triple(IntArray(n) { rng.nextInt(-2, 3) }, op, rng.nextInt(-3, 6)))
                 }
                 val brute = bruteMinX0(n, ub, cons)
-                val domains = Array(n) { IntDomain(0, ub[it]) }
+                val domains = Array(n) { IntDomain(0, ub[it].toLong()) }
                 val factors = cons.map { (c, op, r) -> Linear(c, IntArray(n) { it }, op, r) }.toTypedArray<Factor>()
                 val problem = Problem(0, n, domains, factors)
                 val obj = LinearObjective(intCoefficients = LongArray(n) { if (it == 0) 1L else 0L })
@@ -245,7 +247,7 @@ class LpLargeRelaxationTest {
                 repeat(rng.nextInt(1, 4)) { _ -> cons.add(LongArray(n) { rng.nextLong(-3, 4) } to rng.nextLong(0, 15)) }
                 val brute = bruteMin(n, ub, cost, cons)
 
-                val domains = Array(n) { IntDomain(0, ub[it]) }
+                val domains = Array(n) { IntDomain(0, ub[it].toLong()) }
                 val factors = cons.map { (c, r) ->
                     Linear(c.map { it.toInt() }.toIntArray(), IntArray(n) { it }, LinearOp.LE, r.toInt())
                 }.toTypedArray<Factor>()

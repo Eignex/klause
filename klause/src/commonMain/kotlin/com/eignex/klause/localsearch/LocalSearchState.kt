@@ -462,7 +462,7 @@ class LocalSearchState(
             if (n.outIsBool) {
                 if (assignment.boolValue(n.out) != (v != 0L)) applyBoolFlip(n.out)
             } else {
-                if (assignment.intValue(n.out) != v.toInt()) applyIntSet(n.out, v.toInt())
+                if (assignment.intValue(n.out) != v) applyIntSet(n.out, v)
             }
         }
     }
@@ -582,7 +582,7 @@ class LocalSearchState(
      * Sibling factors of other shapes (multi-var reified linear, LE/GE reified, etc.) are skipped —
      * only single-var EQ channeling has a deterministic "which indicator flips" answer.
      */
-    fun synthesizeChannelingMove(intVar: Int, newValue: Int): Move {
+    fun synthesizeChannelingMove(intVar: Int, newValue: Long): Move {
         val cur = assignment.intValue(intVar)
         if (cur == newValue) return Move.IntSet(intVar, newValue)
         // Each sibling factor mentioning intVar contributes its own consistency-preserving update
@@ -718,7 +718,7 @@ class LocalSearchState(
         markMovedVar = { boolConfChange[boolVar] = false },
     )
 
-    private fun applyIntSet(intVar: Int, newValue: Int) {
+    private fun applyIntSet(intVar: Int, newValue: Long) {
         val old = assignment.intValue(intVar)
         if (old == newValue) return
         applyMove(
@@ -749,7 +749,7 @@ class LocalSearchState(
 
     /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var `v` with
      *  target value [newValue]. */
-    internal inline fun forEachIntFactorDelta(v: Int, newValue: Int, action: (factorId: Int, delta: Int) -> Unit) {
+    internal inline fun forEachIntFactorDelta(v: Int, newValue: Long, action: (factorId: Int, delta: Int) -> Unit) {
         for (factorId in problem.lsIntOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
         }

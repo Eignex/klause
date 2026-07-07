@@ -15,11 +15,11 @@ import com.eignex.klause.solver.IntDomain
 internal fun pickByDomainMetric(
     session: PropagationSession,
     maximize: Boolean,
-    boolScore: Int,
-    intScore: (IntDomain) -> Int,
+    boolScore: Long,
+    intScore: (IntDomain) -> Long,
 ): VarRef? {
     var best: VarRef? = null
-    var bestScore = if (maximize) Int.MIN_VALUE else Int.MAX_VALUE
+    var bestScore = if (maximize) Long.MIN_VALUE else Long.MAX_VALUE
     val problem = session.problem
     for (v in 0 until problem.numBoolVars) {
         if (session.boolValue(v) == null && improves(boolScore, bestScore, maximize)) {
@@ -40,5 +40,5 @@ internal fun pickByDomainMetric(
 }
 
 /** True when [candidate] beats [best] in [maximize]'s direction (strict, so ties keep the earlier). */
-private fun improves(candidate: Int, best: Int, maximize: Boolean): Boolean =
+private fun improves(candidate: Long, best: Long, maximize: Boolean): Boolean =
     if (maximize) candidate > best else candidate < best

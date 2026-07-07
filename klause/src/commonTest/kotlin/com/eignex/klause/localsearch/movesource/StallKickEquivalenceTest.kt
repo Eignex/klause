@@ -141,7 +141,7 @@ class StallKickEquivalenceTest {
         }
     }
 
-    private fun collectIntSets(move: Move, onSet: (Int, Int) -> Unit) {
+    private fun collectIntSets(move: Move, onSet: (Int, Long) -> Unit) {
         when (move) {
             is Move.IntSet -> onSet(move.varId, move.newValue)
             is Move.Compound -> for (p in move.parts) collectIntSets(p, onSet)

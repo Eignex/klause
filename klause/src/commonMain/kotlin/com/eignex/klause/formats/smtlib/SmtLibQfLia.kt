@@ -126,10 +126,10 @@ object SmtLibQfLia {
 
         override fun newBool(): Int = nextBool++
         private fun newInt(): Int {
-            intDomains.add(IntDomain(unboundedIntLo, unboundedIntHi))
+            intDomains.add(IntDomain(unboundedIntLo.toLong(), unboundedIntHi.toLong()))
             return nextInt++
         }
-        private fun newInt(lo: Int, hi: Int): Int {
+        private fun newInt(lo: Long, hi: Long): Int {
             intDomains.add(IntDomain(lo, hi))
             return nextInt++
         }
@@ -238,8 +238,8 @@ object SmtLibQfLia {
                     if (strictBounds) throw UnsupportedSmtException("no provable upper bound for '$name'")
                     vhi = unboundedIntHi.toLong()
                 }
-                val clo = vlo.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong()).toInt()
-                val chi = vhi.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong()).toInt()
+                val clo = vlo.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong())
+                val chi = vhi.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong())
                 intDomains[v] = if (clo <= chi) IntDomain(clo, chi) else IntDomain(clo, clo)
             }
         }
@@ -433,7 +433,9 @@ object SmtLibQfLia {
                     val vars = simpleVars.toIntArray()
                     val min = vars.minOf { intDomains[it].min }
                     val max = vars.maxOf { intDomains[it].max }
-                    factors.add(AllDifferent(vars = vars, domainMin = min, domainSize = max - min + 1))
+                    factors.add(
+                        AllDifferent(vars = vars, domainMin = min.toInt(), domainSize = (max - min + 1).toInt()),
+                    )
                 } else {
                     assertPairwiseNe(terms)
                 }
@@ -455,7 +457,7 @@ object SmtLibQfLia {
 
         /** Channel a bool literal to a fresh 0/1 int term. */
         private fun litToIntTerm(lit: Int): LinComb {
-            val z = newInt(0, 1)
+            val z = newInt(0L, 1L)
             val w = newBool() // w ⇔ lit
             val wlit = Lit.make(w, true)
             factors.add(Clause(intArrayOf(Lit.negate(wlit), lit)))

@@ -121,7 +121,7 @@ class AllDifferentPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 4,
-                intDomains = Array(4) { IntDomain(0, hi) },
+                intDomains = Array(4) { IntDomain(0, hi.toLong()) },
                 factors = factors,
             )
             val brute = HashSet<List<Int>>()
@@ -135,7 +135,7 @@ class AllDifferentPropagatorTest {
             }
             val found = BacktrackSolver(problem)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-                .take(100_000).map { it.ints.toList() }.toHashSet()
+                .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(
                 brute,
                 found,
@@ -153,7 +153,7 @@ class AllDifferentPropagatorTest {
         return Problem(
             numBoolVars = 0,
             numIntVars = k,
-            intDomains = Array(k) { IntDomain(ranges[it].first, ranges[it].second) },
+            intDomains = Array(k) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) },
             factors = arrayOf<Factor>(
                 AllDifferent(IntArray(k) { it }, domainMin = lo, domainSize = hi - lo + 1, exceptSet = except),
             ),
@@ -188,7 +188,7 @@ class AllDifferentPropagatorTest {
             rec(0, IntArray(k))
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(allDiffExcept(ranges, except)).enumerate(params)
-                .take(100_000).map { it.ints.toList() }.toHashSet()
+                .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx (except=${except.toList()}): solver set must equal brute")
         }
     }
@@ -235,7 +235,7 @@ class AllDifferentPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = k,
-                intDomains = Array(k) { IntDomain(ranges[it].first, ranges[it].second) },
+                intDomains = Array(k) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) },
                 factors = arrayOf<Factor>(AllDifferent(IntArray(k) { it }, domainMin = lo, domainSize = hi - lo + 1)),
             )
             // CDCL config so conflict analysis + clause learning (hence the Hall-set
@@ -246,7 +246,7 @@ class AllDifferentPropagatorTest {
                 maxLearnedClauses = 1_000,
             )
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
     }
@@ -354,9 +354,9 @@ class AllDifferentPropagatorTest {
         val d3 = session.intDomain(3)
         assertEquals(1, d3.min)
         assertEquals(7, d3.max)
-        for (h in 3..5) assertTrue(h !in d3, "value $h should be a hole, got $d3")
+        for (h in 3..5) assertTrue(h.toLong() !in d3, "value $h should be a hole, got $d3")
         for (k in intArrayOf(1, 2, 6, 7)) {
-            assertTrue(k in d3, "value $k should remain; got $d3")
+            assertTrue(k.toLong() in d3, "value $k should remain; got $d3")
         }
     }
 
@@ -379,7 +379,7 @@ class AllDifferentPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(ranges[it].first, ranges[it].second) },
+                intDomains = Array(n) { IntDomain(ranges[it].first.toLong(), ranges[it].second.toLong()) },
                 factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = lo, domainSize = hi - lo + 1)),
             )
             FactorPropagationOracle.assertGac(problem, "slack-staircase-n$n")
@@ -721,12 +721,12 @@ class AllDifferentPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 4,
-                intDomains = Array(4) { IntDomain(1, sizes[it]) },
+                intDomains = Array(4) { IntDomain(1, sizes[it].toLong()) },
                 factors = arrayOf(alldiff()),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "alldifferent instance #$idx: backtrack solution set must equal brute force")
         }
     }
@@ -754,12 +754,12 @@ class AllDifferentPropagatorTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 6,
-            intDomains = Array(6) { IntDomain(1, sizes[it]) },
+            intDomains = Array(6) { IntDomain(1, sizes[it].toLong()) },
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4, 5), domainMin = 1, domainSize = 6)),
         )
         val params = BacktrackParams(randomSeed = 7L, variableSelector = Vsids(), maxLearnedClauses = 2_000)
         val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-            .map { it.ints.toList() }.toHashSet()
+            .map { s -> s.ints.map { it.toInt() } }.toHashSet()
         assertEquals(brute, found, "large alldifferent: backtrack solution set must equal brute force")
     }
 
@@ -786,7 +786,7 @@ class AllDifferentPropagatorTest {
     )
 
     /** Drive [state] into an AllDifferent conflict by pinning two vars to [value]. */
-    private fun failPinnedPair(state: PropagationState, a: Int, b: Int, value: Int): Boolean {
+    private fun failPinnedPair(state: PropagationState, a: Int, b: Int, value: Long): Boolean {
         state.undoLogging = true
         state.currentLevel = 1
         check(state.tightenIntMin(a, value) && state.tightenIntMax(a, value)) { "pin $a failed" }
@@ -854,7 +854,7 @@ class AllDifferentPropagatorTest {
 
     private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-            .take(100_000).map { it.ints.toList() }.toHashSet()
+            .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
 
     private fun assertBoundOnly(watches: IntArray?, vars: IntArray) {
         val pairs = watches!!.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()

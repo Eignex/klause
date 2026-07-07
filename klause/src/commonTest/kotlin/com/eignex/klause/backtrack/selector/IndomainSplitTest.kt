@@ -22,9 +22,9 @@ class IndomainSplitTest {
         )
         val session = PropagationSession(problem)
         val values = IndomainSplit.values(session, VarRef.IntVar(0), rng).toList()
-        assertEquals(5, values.first())
+        assertEquals(5L, values.first())
         // The trailing walk completes the domain without repeating the midpoint.
-        assertEquals((0..10).toList().sorted(), values.sorted())
+        assertEquals((0L..10L).toList().sorted(), values.sorted())
     }
 
     @Test
@@ -36,6 +36,6 @@ class IndomainSplitTest {
             factors = arrayOf<Factor>(),
         )
         val session = PropagationSession(problem)
-        assertEquals(11, IndomainSplit.values(session, VarRef.IntVar(0), rng).first())
+        assertEquals(11L, IndomainSplit.values(session, VarRef.IntVar(0), rng).first())
     }
 }

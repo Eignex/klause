@@ -9,5 +9,5 @@ import kotlin.random.Random
  */
 object SmallestDomain : VariableSelector {
     override fun pick(session: PropagationSession, rng: Random): VarRef? =
-        pickByDomainMetric(session, maximize = false, boolScore = 2) { it.size }
+        pickByDomainMetric(session, maximize = false, boolScore = 2L) { it.size.toLong() }
 }

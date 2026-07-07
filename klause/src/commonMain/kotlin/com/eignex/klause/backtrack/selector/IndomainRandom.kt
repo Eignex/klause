@@ -10,8 +10,8 @@ private const val INDOMAIN_EAGER_MAX = 32
 
 /** Uniformly random shuffle of the domain (`indomain_random`). */
 object IndomainRandom : ValueSelector {
-    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Int> = when (varRef) {
-        is VarRef.Bool -> if (rng.nextBoolean()) sequenceOf(1, 0) else sequenceOf(0, 1)
+    override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
+        is VarRef.Bool -> if (rng.nextBoolean()) sequenceOf(1L, 0L) else sequenceOf(0L, 1L)
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
@@ -22,7 +22,7 @@ object IndomainRandom : ValueSelector {
                 n <= INDOMAIN_EAGER_MAX -> {
                     // Small domain: materialise the non-hole values and Fisher-Yates shuffle in
                     // place (cheaper than the lazy coroutine + map for a handful of values).
-                    val arr = IntArray(n) { d.valueAt(it) }
+                    val arr = LongArray(n) { d.valueAt(it) }
                     for (i in n - 1 downTo 1) {
                         val j = rng.nextInt(i + 1)
                         val tmp = arr[i]

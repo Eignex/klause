@@ -31,7 +31,7 @@ class ProbingTest {
         problem.withPassDelta(Presolve.probe(problem, cap, Cancellation.Never), BakeConfig.NONE)
 
     /** Whether [ints] is feasible against [problem] (every int pinned, propagation not Unsat). */
-    private fun isFeasible(problem: Problem, ints: IntArray, bools: BooleanArray): Boolean {
+    private fun isFeasible(problem: Problem, ints: LongArray, bools: BooleanArray): Boolean {
         var a = Assumptions.None
         for (v in 0 until problem.numIntVars) a = a.withInt(v, ints[v])
         for (v in 0 until problem.numBoolVars) a = a.withBool(v, bools[v])
@@ -44,7 +44,7 @@ class ProbingTest {
         val n = problem.numIntVars
         val nb = problem.numBoolVars
         val found = HashSet<String>()
-        val ints = IntArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.intDomains[it].min }
         while (true) {
             for (mask in 0 until (1 shl nb)) {
                 val bits = BooleanArray(nb) { (mask shr it) and 1 == 1 }

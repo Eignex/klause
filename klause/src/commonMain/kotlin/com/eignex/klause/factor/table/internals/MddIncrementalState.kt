@@ -69,7 +69,7 @@ internal class MddIncrementalState(
             val src = transitions[p]
             val sym = transitions[p + 1]
             val dst = transitions[p + 2]
-            if (src in 0 until numI && dst in 0 until numN && sym in d.min..d.max && testBit(fwd, i, src)) {
+            if (src in 0 until numI && dst in 0 until numN && sym.toLong() in d.min..d.max && testBit(fwd, i, src)) {
                 scratch[dst ushr 6] = scratch[dst ushr 6] or (1L shl (dst and 63))
             }
             p += recordStride
@@ -89,7 +89,7 @@ internal class MddIncrementalState(
             val src = transitions[p]
             val sym = transitions[p + 1]
             val dst = transitions[p + 2]
-            if (src in 0 until numI && dst in 0 until numN && sym in d.min..d.max &&
+            if (src in 0 until numI && dst in 0 until numN && sym.toLong() in d.min..d.max &&
                 testBit(fwd, i, src) && testBit(bwd, i + 1, dst)
             ) {
                 scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
@@ -122,7 +122,7 @@ internal class MddIncrementalState(
             val d = state.intDomains[seq[i]]
             val span = d.max - d.min + 1
             if (span <= 0) continue
-            val survives = LongArray((span + 63) ushr 6)
+            val survives = LongArray(((span + 63) ushr 6).toInt())
             val numI = numStatesPerLayer[i]
             val numN = numStatesPerLayer[i + 1]
             var p = layerStarts[i]
@@ -131,17 +131,17 @@ internal class MddIncrementalState(
                 val src = transitions[p]
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2]
-                if (sym in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
+                if (sym.toLong() in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
                     testBit(fwd, i, src) && testBit(bwd, i + 1, dst)
                 ) {
-                    val off = sym - d.min
-                    survives[off ushr 6] = survives[off ushr 6] or (1L shl (off and 63))
+                    val off = sym.toLong() - d.min
+                    survives[(off ushr 6).toInt()] = survives[(off ushr 6).toInt()] or (1L shl (off and 63L).toInt())
                 }
                 p += recordStride
             }
             for (s in d.min..d.max) {
                 val off = s - d.min
-                if (((survives[off ushr 6] ushr (off and 63)) and 1L) == 0L) {
+                if (((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) == 0L) {
                     if (!state.excludeIntValue(seq[i], s, ant)) return false
                 }
             }
@@ -169,7 +169,7 @@ internal class MddIncrementalState(
                 val sym = transitions[p + 1]
                 val dst = transitions[p + 2]
                 val ww = transitions[p + 3].toLong()
-                if (sym in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
+                if (sym.toLong() in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
                     testBit(fwd, i, src) && testBit(fwd, i + 1, dst)
                 ) {
                     val nm = minCost[i][src] + ww
@@ -190,12 +190,8 @@ internal class MddIncrementalState(
             }
         }
         if (bestLo == inf) return false
-        if (bestLo > Int.MAX_VALUE.toLong()) return false
-        if (bestHi < Int.MIN_VALUE.toLong()) return false
-        val loBound = if (bestLo < Int.MIN_VALUE.toLong()) Int.MIN_VALUE else bestLo.toInt()
-        val hiBound = if (bestHi > Int.MAX_VALUE.toLong()) Int.MAX_VALUE else bestHi.toInt()
-        if (!state.tightenIntMin(cost, loBound, ant)) return false
-        if (!state.tightenIntMax(cost, hiBound, ant)) return false
+        if (!state.tightenIntMin(cost, bestLo, ant)) return false
+        if (!state.tightenIntMax(cost, bestHi, ant)) return false
         return true
     }
 

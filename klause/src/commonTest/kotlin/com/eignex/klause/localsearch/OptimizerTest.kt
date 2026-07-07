@@ -78,7 +78,7 @@ class OptimizerTest {
             intCoefficients = longArrayOf(1L),
             constant = 10L,
         )
-        val s = Sample(bools = booleanArrayOf(true, true, false), ints = intArrayOf(4))
+        val s = Sample(bools = booleanArrayOf(true, true, false), ints = longArrayOf(4))
 
         assertEquals(15.0, obj.evaluate(s))
     }

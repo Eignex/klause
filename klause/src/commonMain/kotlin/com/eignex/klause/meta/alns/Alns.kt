@@ -198,7 +198,7 @@ internal class Alns(
         val freedBoolSet = IntHashSet().apply { for (b in freed.bools) add(b) }
         val freedIntSet = IntHashSet().apply { for (i in freed.ints) add(i) }
         val pinnedBools = HashMap<Int, Boolean>(problem.numBoolVars)
-        val pinnedInts = HashMap<Int, Int>(problem.numIntVars)
+        val pinnedInts = HashMap<Int, Long>(problem.numIntVars)
         for (b in 0 until problem.numBoolVars) {
             if (b !in freedBoolSet) pinnedBools[b] = incumbent.bools[b]
         }

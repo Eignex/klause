@@ -2,29 +2,30 @@ package com.eignex.klause.solver.intdomain
 
 import com.eignex.klause.solver.IntConsumer
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /** Interval-run list: flattened sorted disjoint present runs `[lo0,hi0, lo1,hi1, …]`, `>= 2` runs,
  *  strict gaps between them, `runs[0] == min`, `runs[last] == max`. */
-internal class RunsDomain(override val min: Int, override val max: Int, private val runs: IntArray) :
+internal class RunsDomain(override val min: Long, override val max: Long, private val runs: LongArray) :
     AbstractIntDomain() {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
         require(runs.size >= 4 && runs.size % 2 == 0) { "RunsDomain needs >= 2 runs" }
     }
 
+    // Saturates at Int.MAX_VALUE (a run may span more than 32 bits); such a domain is never enumerated.
     override val size: Int = run {
-        var s = 0
+        var s = 0L
         var k = 0
         while (k < runs.size) {
             s += runs[k + 1] - runs[k] + 1
             k += 2
         }
-        s
+        s.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
     /** Index of the run containing [value], or `-1`. Assumes `value in min..max`. */
-    private fun runIndexContaining(value: Int): Int {
+    private fun runIndexContaining(value: Long): Int {
         var lo = 0
         var hi = (runs.size shr 1) - 1
         var ans = -1
@@ -42,7 +43,7 @@ internal class RunsDomain(override val min: Int, override val max: Int, private 
     }
 
     /** Smallest run index `k` with `runs[2k+1] >= from`. */
-    private fun runFirstEndGe(from: Int): Int {
+    private fun runFirstEndGe(from: Long): Int {
         var lo = 0
         var hi = (runs.size shr 1) - 1
         var ans = runs.size shr 1
@@ -58,26 +59,27 @@ internal class RunsDomain(override val min: Int, override val max: Int, private 
         return ans
     }
 
-    override fun contains(value: Int): Boolean = value in min..max && runIndexContaining(value) >= 0
+    override fun contains(value: Long): Boolean = value in min..max && runIndexContaining(value) >= 0
 
-    override fun valueAt(i: Int): Int {
+    override fun valueAt(i: Int): Long {
         var rem = i
         var k = 0
         while (k < runs.size) {
             val len = runs[k + 1] - runs[k] + 1
             if (rem < len) return runs[k] + rem
-            rem -= len
+            // Only reached when rem >= len, so len <= rem <= Int.MAX and this narrowing is exact.
+            rem -= len.toInt()
             k += 2
         }
         error("valueAt($i) out of range; size=$size")
     }
 
-    override fun excludeValue(value: Int): IntDomain {
+    override fun excludeValue(value: Long): IntDomain {
         if (!contains(value)) return this
         val k = runIndexContaining(value)
         val rlo = runs[k shl 1]
         val rhi = runs[(k shl 1) + 1]
-        val out = IntArrayList(runs.size + 2)
+        val out = LongArrayList(runs.size + 2)
         for (i in 0 until k) {
             out.add(runs[i shl 1])
             out.add(runs[(i shl 1) + 1])
@@ -110,10 +112,10 @@ internal class RunsDomain(override val min: Int, override val max: Int, private 
         return intDomainFromRuns(out)
     }
 
-    override fun withMinAtLeast(newMin: Int): IntDomain {
+    override fun withMinAtLeast(newMin: Long): IntDomain {
         if (newMin <= min) return this
         check(newMin <= max) { "withMinAtLeast($newMin) empties domain [$min..$max]" }
-        val out = IntArrayList(runs.size)
+        val out = LongArrayList(runs.size)
         val rcount = runs.size shr 1
         var k = 0
         while (k < rcount) {
@@ -136,10 +138,10 @@ internal class RunsDomain(override val min: Int, override val max: Int, private 
         return intDomainFromRuns(out)
     }
 
-    override fun withMaxAtMost(newMax: Int): IntDomain {
+    override fun withMaxAtMost(newMax: Long): IntDomain {
         if (newMax >= max) return this
         check(newMax >= min) { "withMaxAtMost($newMax) empties domain [$min..$max]" }
-        val out = IntArrayList(runs.size)
+        val out = LongArrayList(runs.size)
         val rcount = runs.size shr 1
         var k = 0
         while (k < rcount) {
@@ -154,7 +156,7 @@ internal class RunsDomain(override val min: Int, override val max: Int, private 
         return intDomainFromRuns(out)
     }
 
-    override fun includeInteriorValue(value: Int): IntDomain {
+    override fun includeInteriorValue(value: Long): IntDomain {
         require(value > min && value < max) { "includeInteriorValue($value) outside ($min, $max)" }
         val rcount = runs.size shr 1
         // `value` is a hole strictly inside the bounds: it lies in the gap between run k (ends below
@@ -163,7 +165,7 @@ internal class RunsDomain(override val min: Int, override val max: Int, private 
         while (k < rcount - 1 && !(runs[(k shl 1) + 1] < value && value < runs[(k + 1) shl 1])) k++
         val touchLeft = value == runs[(k shl 1) + 1] + 1
         val touchRight = value == runs[(k + 1) shl 1] - 1
-        val out = IntArrayList(runs.size + 2)
+        val out = LongArrayList(runs.size + 2)
         var i = 0
         while (i < rcount) {
             if (i == k) {
@@ -231,7 +233,7 @@ internal class RunsDomain(override val min: Int, override val max: Int, private 
         }
     }
 
-    override fun forEachHoleInRange(lo: Int, hi: Int, action: IntConsumer) {
+    override fun forEachHoleInRange(lo: Long, hi: Long, action: IntConsumer) {
         val from = if (lo > min) lo else min
         val to = if (hi < max) hi else max
         if (from > to) return

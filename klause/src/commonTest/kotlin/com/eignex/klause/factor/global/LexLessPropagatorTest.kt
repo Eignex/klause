@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 class LexLessPropagatorTest {
 
-    private fun lexLess(xs: List<Int>, ys: List<Int>, strict: Boolean): Boolean {
+    private fun lexLess(xs: List<Long>, ys: List<Long>, strict: Boolean): Boolean {
         val len = minOf(xs.size, ys.size)
         for (i in 0 until len) {
             if (xs[i] < ys[i]) return true
@@ -170,7 +170,7 @@ class LexLessPropagatorTest {
         state.currentFactor = 0
         check(problem.propagators[0].propagate(state, 0)) { "lex propagate should narrow, not fail" }
         state.currentFactor = -1
-        check(state.intDomains[1].max == 1) { "lex should have tightened x1.max to 1" }
+        check(state.intDomains[1].max == 1L) { "lex should have tightened x1.max to 1" }
 
         // Seed a conflict that forbids the two tail atoms (both currently hold), forcing the
         // 1UIP loop to resolve `[x1 ≤ 1]` through its recorded antecedent.

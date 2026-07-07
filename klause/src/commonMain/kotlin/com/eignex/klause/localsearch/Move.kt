@@ -16,7 +16,7 @@ sealed interface Move {
         /** Integer variable id to set. */
         val varId: Int,
         /** New value to assign. */
-        val newValue: Int,
+        val newValue: Long,
     ) : Move
 
     /**

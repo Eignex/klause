@@ -214,7 +214,7 @@ class FlatZincParseTest {
         for (step in 0 until 4) {
             assertTrue(!visited[node], "revisit at step $step: ${sample.ints.toList()}")
             visited[node] = true
-            node = sample.ints[node] - 1
+            node = (sample.ints[node] - 1).toInt()
         }
         assertEquals(0, node, "circuit should close in 4 steps: ${sample.ints.toList()}")
     }
@@ -234,7 +234,7 @@ class FlatZincParseTest {
         assertNotNull(sample)
         val occ = IntArray(8)
         for (i in 0 until 3) {
-            val start = sample.ints[i]
+            val start = sample.ints[i].toInt()
             for (t in start until start + 2) if (t in occ.indices) occ[t]++
         }
         for (t in occ.indices) assertTrue(occ[t] <= 1, "capacity violated at t=$t: ${sample.ints.toList()}")
@@ -266,8 +266,8 @@ class FlatZincParseTest {
         val sample = LocalSearchSolver(program.problem)
             .sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 3L)).assignment
         assertNotNull(sample)
-        val xVal = program.floatVarsByName.getValue("x").valueOf(sample.ints[0])
-        val yVal = program.floatVarsByName.getValue("y").valueOf(sample.ints[1])
+        val xVal = program.floatVarsByName.getValue("x").valueOf(sample.ints[0].toInt())
+        val yVal = program.floatVarsByName.getValue("y").valueOf(sample.ints[1].toInt())
         // Allow a small tolerance for rounding through the bucket/scale pipeline.
         assertTrue(xVal + yVal <= 5.0 + 0.5, "x+y = ${xVal + yVal}")
     }

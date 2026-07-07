@@ -95,7 +95,7 @@ internal class ResumableMinimize(
     private var best: Sample? = null
     private var bestObj: Double = Double.POSITIVE_INFINITY
     private val singleObj = objective.singleIntObjective()
-    private var objVarBest: Int? = null
+    private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
     private val sink = SolveStatsSink(backend = "backtrack")
 
@@ -135,7 +135,7 @@ internal class ResumableMinimize(
     private val phase = PhaseSaving(problem.numBoolVars, problem.numIntVars, params)
     private val onConflictTick: () -> Unit = phase::onConflictTick
     private var pendingBlock: Sample? = null
-    private var lastObjBoundAsserted: Int? = null
+    private var lastObjBoundAsserted: Long? = null
     private val restart = RestartController(params)
     private val vivifyEnabled = params.vivification && params.assumptions.isEmpty
     private var vivifyCursor = 0

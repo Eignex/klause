@@ -213,16 +213,16 @@ internal class SymmetryPropagator(
         }
     }
 
-    private fun lo(state: PropagationState, v: Int, isBool: Boolean): Int =
-        if (isBool) (if (state.boolValues[v] == true) 1 else 0) else state.intDomains[v].min
+    private fun lo(state: PropagationState, v: Int, isBool: Boolean): Long =
+        if (isBool) (if (state.boolValues[v] == true) 1L else 0L) else state.intDomains[v].min
 
-    private fun hi(state: PropagationState, v: Int, isBool: Boolean): Int =
-        if (isBool) (if (state.boolValues[v] == false) 0 else 1) else state.intDomains[v].max
+    private fun hi(state: PropagationState, v: Int, isBool: Boolean): Long =
+        if (isBool) (if (state.boolValues[v] == false) 0L else 1L) else state.intDomains[v].max
 
-    private fun tightenHi(state: PropagationState, v: Int, isBool: Boolean, newHi: Int, ant: IntArray?): Boolean =
+    private fun tightenHi(state: PropagationState, v: Int, isBool: Boolean, newHi: Long, ant: IntArray?): Boolean =
         if (isBool) (newHi >= 1 || state.pinBool(v, false, ant)) else state.tightenIntMax(v, newHi, ant)
 
-    private fun tightenLo(state: PropagationState, v: Int, isBool: Boolean, newLo: Int, ant: IntArray?): Boolean =
+    private fun tightenLo(state: PropagationState, v: Int, isBool: Boolean, newLo: Long, ant: IntArray?): Boolean =
         if (isBool) (newLo <= 0 || state.pinBool(v, true, ant)) else state.tightenIntMin(v, newLo, ant)
 
     /** The premise of a tightening at α: the fixed-equal prefix, the α pair, and (when strict) the

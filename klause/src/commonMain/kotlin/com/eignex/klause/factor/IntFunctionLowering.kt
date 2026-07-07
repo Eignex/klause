@@ -69,25 +69,25 @@ internal object IntFunctionLowering {
         if (domainB.min == domainB.max && domainB.min > 0 && domainA.min >= 0) {
             val bConst = domainB.min
             val q = quotient ?: freshInt(IntDomain(domainA.min / bConst, domainA.max / bConst))
-            val rem = remainder ?: freshInt(IntDomain(0, bConst - 1))
-            out += Linear(intArrayOf(1, -bConst, -1), intArrayOf(a, q, rem), LinearOp.EQ, 0)
+            val rem = remainder ?: freshInt(IntDomain(0L, bConst - 1))
+            out += Linear(longArrayOf(1L, -bConst, -1L), intArrayOf(a, q, rem), LinearOp.EQ, 0L)
             if (remainder != null) {
                 // A supplied (FZN-declared) rem may carry a wider/signed domain — bound it.
                 out += Linear(intArrayOf(1), intArrayOf(rem), LinearOp.GE, 0)
-                out += Linear(intArrayOf(1), intArrayOf(rem), LinearOp.LE, bConst - 1)
+                out += Linear(longArrayOf(1L), intArrayOf(rem), LinearOp.LE, bConst - 1)
             }
             return TruncDivMod(q, rem, out)
         }
         val bMag = maxOf(abs(domainB.min), abs(domainB.max))
         val aMag = maxOf(abs(domainA.min), abs(domainA.max))
-        val qDomain = if (bMag == 0) IntDomain(-aMag, aMag) else IntDomain(-aMag - 1, aMag + 1)
+        val qDomain = if (bMag == 0L) IntDomain(-aMag, aMag) else IntDomain(-aMag - 1, aMag + 1)
         val q = quotient ?: freshInt(qDomain)
         val rem = remainder ?: freshInt(IntDomain(-bMag + 1, bMag - 1))
         val prod = freshInt(IntDomain(-aMag - bMag - 1, aMag + bMag + 1))
         out += Product(a = q, b = b, result = prod)
         out += Linear(intArrayOf(1, 1, -1), intArrayOf(prod, rem, a), LinearOp.EQ, 0)
         // |rem| < |b|, channeling |b| via an abs reification: absB ≥ b, absB ≥ −b, (absB = b ∨ absB = −b).
-        val absB = freshInt(IntDomain(0, bMag))
+        val absB = freshInt(IntDomain(0L, bMag))
         out += Linear(intArrayOf(1, -1), intArrayOf(b, absB), LinearOp.LE, 0)
         out += Linear(intArrayOf(-1, -1), intArrayOf(b, absB), LinearOp.LE, 0)
         val absBpa = freshBool()

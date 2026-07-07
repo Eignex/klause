@@ -30,7 +30,7 @@ import kotlin.math.min
  */
 internal object AnytimeCounter {
 
-    private class Node(val depth: Int, val bools: Map<Int, Boolean>, val ints: Map<Int, Int>)
+    private class Node(val depth: Int, val bools: Map<Int, Boolean>, val ints: Map<Int, Long>)
 
     fun run(problem: Problem, config: ExactCountConfig): Sequence<Count> = sequence {
         val boolVars = config.samplingSet
@@ -86,11 +86,11 @@ internal object AnytimeCounter {
             val d = node.depth
             val isBool = d < boolVars.size
             val varId = if (isBool) boolVars[d] else intVars[d - boolVars.size]
-            val values: List<Int> = if (isBool) listOf(0, 1) else valuesOf(problem, varId)
+            val values: List<Long> = if (isBool) listOf(0L, 1L) else valuesOf(problem, varId)
 
             for (raw in values) {
                 if (checks >= config.maxChecks) break
-                val childBools = if (isBool) node.bools + (varId to (raw == 1)) else node.bools
+                val childBools = if (isBool) node.bools + (varId to (raw == 1L)) else node.bools
                 val childInts = if (isBool) node.ints else node.ints + (varId to raw)
                 checks++
                 sinceReport++
@@ -123,7 +123,7 @@ internal object AnytimeCounter {
         maxDecisions = config.maxDecisionsPerCheck,
     )
 
-    private fun valuesOf(problem: Problem, intVar: Int): List<Int> {
+    private fun valuesOf(problem: Problem, intVar: Int): List<Long> {
         val dom = problem.intDomains[intVar]
         return List(dom.size) { dom.valueAt(it) }
     }

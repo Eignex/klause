@@ -68,7 +68,8 @@ internal fun reginFilter(
     val valuesPerVar = Array(n) { i ->
         val d = state.intDomains[filteredVars[i]]
         val list = IntArrayList()
-        d.forEach { v ->
+        d.forEach { vLong ->
+            val v = vLong.toInt()
             if (v in exceptSet) {
                 var base = exceptBase.getOrDefault(v, -1)
                 if (base < 0) {
@@ -105,7 +106,7 @@ internal fun reginFilter(
         for (i in 0 until n) {
             if (!cache.matchedValue.containsKey(filteredVars[i])) continue
             val prev = cache.matchedValue.getOrDefault(filteredVars[i], 0)
-            if (prev !in state.intDomains[filteredVars[i]]) continue // edge broke
+            if (prev.toLong() !in state.intDomains[filteredVars[i]]) continue // edge broke
             if (prev in exceptSet) {
                 val base = exceptBase.getOrDefault(prev, -1)
                 if (base < 0) continue
@@ -221,7 +222,7 @@ internal fun reginFilter(
             if (reachedFromFree[valNode]) continue
             val hall = hallVarsFor(valNode)
             val ant = collectHoleAndBoundAntecedents(state, hall)
-            if (!state.excludeIntValue(filteredVars[i], value, ant)) {
+            if (!state.excludeIntValue(filteredVars[i], value.toLong(), ant)) {
                 // Excluding the value emptied var i's domain: the Hall set forced out i's last
                 // feasible value. Reason = the Hall set plus i.
                 val withI = hall.copyOf(hall.size + 1)
@@ -298,7 +299,7 @@ internal class ReginCache {
      *  universe outgrows the current capacity. A fresh state starts invalid ([ReginIncrementalState.valid]
      *  == 0), forcing a full rebuild that re-seeds it. */
     fun incremental(state: PropagationState, vars: IntArray): ReginIncrementalState {
-        for (vi in vars) state.intDomains[vi].forEach { v -> idFor(v) }
+        for (vi in vars) state.intDomains[vi].forEach { v -> idFor(v.toInt()) }
         val need = valueOfId.size
         val cur = inc
         if (cur == null || !cur.vars.contentEquals(vars) || cur.valueCap < need) {

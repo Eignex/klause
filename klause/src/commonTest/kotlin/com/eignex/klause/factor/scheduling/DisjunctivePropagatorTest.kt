@@ -133,7 +133,7 @@ class DisjunctivePropagatorTest {
             }
             val found = BacktrackSolver(problem)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-                .take(100_000).map { it.ints.toList() }.toHashSet()
+                .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: disjunctive const-duration enumeration must match brute force")
         }
     }
@@ -149,7 +149,7 @@ class DisjunctivePropagatorTest {
                 numBoolVars = 0,
                 numIntVars = 6,
                 intDomains = Array(6) { i ->
-                    if (i < 3) IntDomain(0, 3) else IntDomain(durVals[i - 3], durVals[i - 3])
+                    if (i < 3) IntDomain(0, 3) else IntDomain(durVals[i - 3].toLong(), durVals[i - 3].toLong())
                 },
                 factors = listOf<Factor>(
                     Disjunctive(
@@ -176,7 +176,7 @@ class DisjunctivePropagatorTest {
             }
             val found = BacktrackSolver(problem)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-                .take(100_000).map { it.ints.toList() }.toHashSet()
+                .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: disjunctive var-duration enumeration must match brute force")
         }
     }
@@ -274,7 +274,7 @@ class DisjunctivePropagatorTest {
         for (s in samples) {
             val occ = BooleanArray(3)
             for (i in 0 until 3) {
-                val slot = s.ints[i]
+                val slot = s.ints[i].toInt()
                 assertTrue(slot in 0..2, "out-of-range slot $slot in ${s.ints.toList()}")
                 assertTrue(!occ[slot], "double-booked at slot $slot in ${s.ints.toList()}")
                 occ[slot] = true

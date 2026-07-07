@@ -17,8 +17,11 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
         "float_lin_ne" -> LinearOp.NE
         else -> failHere("unhandled float linear ${c.name}")
     }
-    postLinear(scaled.coeffs, scaled.vars, op, scaled.bound.toInt(), if (reified) resolveBoolLit(c.args[3]) else null)
+    postLinear(scaled.coeffs.toLongs(), scaled.vars, op, scaled.bound, if (reified) resolveBoolLit(c.args[3]) else null)
 }
+
+/** Widen scaled-float `Int` coefficients to the `Long` the linear factors now carry. */
+private fun IntArray.toLongs(): LongArray = LongArray(size) { this[it].toLong() }
 
 /** Lower `int2float` as a scaled linear equality on bucket indices. */
 internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
@@ -112,7 +115,7 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
         vars = intArrayOf(varSide.varId)
     }
     val finalBound = if (op == LinearOp.LE && strict) scaledBound - 1 else scaledBound
-    postLinear(coeffs, vars, op, finalBound.toInt(), if (reified) resolveBoolLit(c.args[2]) else null)
+    postLinear(coeffs.toLongs(), vars, op, finalBound, if (reified) resolveBoolLit(c.args[2]) else null)
 }
 
 /** Strict float linear compare lowered to `<= bound - 1` in scaled space. */
@@ -120,10 +123,10 @@ internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: B
     val scaled = resolveScaledFloatLinear(c, reified)
     val strictBound = scaled.bound - 1
     postLinear(
-        scaled.coeffs,
+        scaled.coeffs.toLongs(),
         scaled.vars,
         LinearOp.LE,
-        strictBound.toInt(),
+        strictBound,
         if (reified) resolveBoolLit(c.args[3]) else null,
     )
 }

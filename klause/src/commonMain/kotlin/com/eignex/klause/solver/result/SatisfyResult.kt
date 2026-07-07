@@ -224,7 +224,7 @@ private fun Assumptions.dropInt(id: Int): Assumptions {
     val idx = intKeys.toList().indexOf(id)
     if (idx < 0) return this
     val nk = IntArray(intKeys.size - 1)
-    val nv = IntArray(intKeys.size - 1)
+    val nv = LongArray(intKeys.size - 1)
     intKeys.copyInto(nk, 0, 0, idx)
     intValues.copyInto(nv, 0, 0, idx)
     intKeys.copyInto(nk, idx, idx + 1)
@@ -286,7 +286,7 @@ internal fun projectSeedConflictToAssumptions(input: Assumptions, conflictLevels
         }
     }
     val ik = IntArray(ic)
-    val iv = IntArray(ic)
+    val iv = LongArray(ic)
     w = 0
     for (i in 0 until ni) {
         if (intHit[i]) {

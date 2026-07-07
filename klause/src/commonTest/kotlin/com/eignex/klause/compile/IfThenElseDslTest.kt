@@ -33,7 +33,7 @@ class IfThenElseDslTest {
             val xv = compiled.decode(schema.x, s)
             val yv = compiled.decode(schema.y, s)
             val picked = if (flag) xv else yv
-            assertTrue(picked == 5, "flag=$flag x=$xv y=$yv selected=$picked, expected 5")
+            assertTrue(picked == 5L, "flag=$flag x=$xv y=$yv selected=$picked, expected 5")
         }
     }
 

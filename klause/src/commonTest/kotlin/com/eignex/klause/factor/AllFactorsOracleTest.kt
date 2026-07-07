@@ -581,8 +581,8 @@ class AllFactorsOracleTest {
 
     /** Build a holey domain `[lo..hi]` minus each value in [holes]. */
     private fun holey(lo: Int, hi: Int, vararg holes: Int): IntDomain {
-        var d = IntDomain(lo, hi)
-        for (h in holes) d = d.excludeValue(h)
+        var d = IntDomain(lo.toLong(), hi.toLong())
+        for (h in holes) d = d.excludeValue(h.toLong())
         return d
     }
 

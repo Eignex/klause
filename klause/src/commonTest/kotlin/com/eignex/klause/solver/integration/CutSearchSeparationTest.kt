@@ -49,7 +49,7 @@ class CutSearchSeparationTest {
                 }
                 val brute = bruteMin(n, ub, cost, cons)
 
-                val domains = Array(n) { IntDomain(0, ub) }
+                val domains = Array(n) { IntDomain(0, ub.toLong()) }
                 val factors = ArrayList<Factor>()
                 factors.add(AllDifferent(vars, domainMin = 0, domainSize = ub + 1))
                 for ((c, r) in cons) factors.add(Linear(c, vars, LinearOp.LE, r))
@@ -92,7 +92,7 @@ class CutSearchSeparationTest {
             val problem = Problem(
                 0,
                 n,
-                Array(n) { IntDomain(0, ub) },
+                Array(n) { IntDomain(0, ub.toLong()) },
                 arrayOf<Factor>(
                     AllDifferent(vars, domainMin = 0, domainSize = ub + 1),
                     Linear(IntArray(n) { 1 }, vars, LinearOp.GE, n * 2),
@@ -144,7 +144,7 @@ class CutSearchSeparationTest {
                 val factors = ArrayList<Factor>()
                 factors.add(AllDifferent(vars, domainMin = 0, domainSize = ub + 1))
                 for ((c, r) in cons) factors.add(Linear(c, vars, LinearOp.LE, r))
-                val problem = Problem(0, n, Array(n) { IntDomain(0, ub) }, factors.toTypedArray())
+                val problem = Problem(0, n, Array(n) { IntDomain(0, ub.toLong()) }, factors.toTypedArray())
                 val obj = LinearObjective(intCoefficients = cost)
 
                 when (val res = BacktrackSolver(problem).minimize(obj, searchCutParams(60L))) {

@@ -41,7 +41,7 @@ class CumulativeRelaxationTest {
     ): Problem {
         val n = starts.size
         val m = n // makespan var id
-        val domains = Array(n + 1) { if (it < n) starts[it] else IntDomain(0, horizon) }
+        val domains = Array(n + 1) { if (it < n) starts[it] else IntDomain(0, horizon.toLong()) }
         val factors = ArrayList<Factor>()
         for (i in 0 until n) {
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(m, i), LinearOp.GE, durations[i]))
@@ -186,10 +186,10 @@ class CumulativeRelaxationTest {
             val durations = IntArray(n) { rng.nextInt(1, 4) }
             val resources = IntArray(n) { rng.nextInt(1, 3) }
             val capacity = rng.nextInt(1, 4)
-            val starts = Array(n) { IntDomain(rng.nextInt(0, 3), hi + rng.nextInt(0, 3)) }
+            val starts = Array(n) { IntDomain(rng.nextInt(0, 3).toLong(), (hi + rng.nextInt(0, 3)).toLong()) }
             // Ensure every domain is non-empty and the horizon covers any feasible end.
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
-            val p = makespanProblem(starts, durations, resources, capacity, horizon)
+            val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
             val optimum = bruteOptimum(n, starts, durations, resources, capacity) ?: return@repeat // infeasible
             val bound = makespanBound(p, makespanVar = n, cumulative = true)
             assertTrue(
@@ -216,9 +216,9 @@ class CumulativeRelaxationTest {
             val durations = IntArray(n) { rng.nextInt(1, 4) }
             val resources = IntArray(n) { rng.nextInt(1, 3) }
             val capacity = rng.nextInt(1, 4)
-            val starts = Array(n) { IntDomain(0, rng.nextInt(2, 5)) }
+            val starts = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
-            val p = makespanProblem(starts, durations, resources, capacity, horizon)
+            val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
             val optimum = bruteOptimum(n, starts, durations, resources, capacity)
             val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
             val params = BacktrackParams(randomSeed = 7L, lubyRestartBase = 8L, lpConfig = LpConfig.AGGRESSIVE)
@@ -268,7 +268,7 @@ class CumulativeRelaxationTest {
                 return
             }
             for (v in starts[i].min..starts[i].max) {
-                s[i] = v
+                s[i] = v.toInt()
                 rec(i + 1)
             }
         }

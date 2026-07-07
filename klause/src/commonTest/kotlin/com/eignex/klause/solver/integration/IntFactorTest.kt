@@ -121,6 +121,6 @@ class IntFactorTest {
         val sink = MoveSink()
         state.factors[0].proposeRepairMoves(state, 0, sink)
         val targets = sink.list.filterIsInstance<Move.IntSet>().map { it.newValue }.toSet()
-        assertEquals(setOf(6, 8), targets)
+        assertEquals(setOf(6L, 8L), targets)
     }
 }

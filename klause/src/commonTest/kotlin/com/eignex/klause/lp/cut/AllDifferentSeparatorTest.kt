@@ -22,7 +22,7 @@ class AllDifferentSeparatorTest {
         val p = Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(domainMin, domainMax) },
+            intDomains = Array(n) { IntDomain(domainMin.toLong(), domainMax.toLong()) },
             factors = arrayOf<Factor>(
                 AllDifferent(IntArray(n) { it }, domainMin = domainMin, domainSize = domainMax - domainMin + 1),
             ),

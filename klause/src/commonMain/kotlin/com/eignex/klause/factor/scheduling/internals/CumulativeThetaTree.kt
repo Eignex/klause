@@ -38,14 +38,14 @@ package com.eignex.klause.factor.scheduling.internals
  *  - `NO_ENV = Long.MIN_VALUE / 2` leaves ~4·10^18 of headroom under non-negative-energy
  *    addition, which is well past any feasible cumulative instance.
  */
-class CumulativeThetaTree(private val n: Int, capacity: Int) {
+class CumulativeThetaTree(private val n: Int, capacity: Long) {
 
     init {
         require(n >= 0) { "task count must be non-negative, got $n" }
         require(capacity >= 0) { "capacity must be non-negative, got $capacity" }
     }
 
-    private val capacityL: Long = capacity.toLong()
+    private val capacityL: Long = capacity
 
     private val leafBase: Int = run {
         var p = 1
@@ -86,12 +86,12 @@ class CumulativeThetaTree(private val n: Int, capacity: Int) {
 
     /** Activate (or update) task [id] with the given EST and energy contribution.
      *  `taskEnergy` must be non-negative; pass `duration * resource` for cumulative. */
-    fun activate(id: Int, est: Int, taskEnergy: Long) {
+    fun activate(id: Int, est: Long, taskEnergy: Long) {
         require(id in 0 until n) { "task id $id out of 0..${n - 1}" }
         require(taskEnergy >= 0L) { "task energy must be non-negative, got $taskEnergy" }
         val k = leafOf[id]
         energy[k] = taskEnergy
-        env[k] = capacityL * est.toLong() + taskEnergy
+        env[k] = capacityL * est + taskEnergy
         siftUp(k)
     }
 
@@ -119,12 +119,12 @@ class CumulativeThetaTree(private val n: Int, capacity: Int) {
     fun energyOfTheta(): Long = energy[1]
 
     /** Root envelope if [id] were activated with (`est`, [taskEnergy]), without mutating the tree. */
-    fun envIfActivated(id: Int, est: Int, taskEnergy: Long): Long {
+    fun envIfActivated(id: Int, est: Long, taskEnergy: Long): Long {
         require(id in 0 until n) { "task id $id out of 0..${n - 1}" }
         require(taskEnergy >= 0L) { "task energy must be non-negative, got $taskEnergy" }
         var k = leafOf[id]
         var e = taskEnergy
-        var ev = capacityL * est.toLong() + taskEnergy
+        var ev = capacityL * est + taskEnergy
         while (k > 1) {
             val parent = k ushr 1
             val left = parent shl 1

@@ -22,7 +22,7 @@ class LpCutTest {
     private fun allDiff(n: Int, hi: Int): Problem = Problem(
         numBoolVars = 0,
         numIntVars = n,
-        intDomains = Array(n) { IntDomain(0, hi) },
+        intDomains = Array(n) { IntDomain(0, hi.toLong()) },
         factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = hi + 1)),
     )
 

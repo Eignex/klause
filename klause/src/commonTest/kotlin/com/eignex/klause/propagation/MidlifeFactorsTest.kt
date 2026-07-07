@@ -29,7 +29,7 @@ class MidlifeFactorsTest {
         (0 until state.problem.numIntVars).map { state.intDomains[it].min to state.intDomains[it].max }
 
     /** Bake [factors] from scratch (non-incremental) and read the resulting int bounds. */
-    private fun freshBounds(factors: List<Factor>): List<Pair<Int, Int>> {
+    private fun freshBounds(factors: List<Factor>): List<Pair<Long, Long>> {
         val state = PropagationState(Problem(0, 3, domains(), factors), Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
         return intBounds(state)

@@ -34,15 +34,15 @@ internal class ReifiedLinearLinearizer(
             val dom = builder.liveDomain(vars[k])
             val dec = builder.declaredDomain(vars[k])
             if (c >= 0L) {
-                lMin = addExact(lMin, mulExact(c, dom.min.toLong()))
-                lMax = addExact(lMax, mulExact(c, dom.max.toLong()))
-                lMinD = addExact(lMinD, mulExact(c, dec.min.toLong()))
-                lMaxD = addExact(lMaxD, mulExact(c, dec.max.toLong()))
+                lMin = addExact(lMin, mulExact(c, dom.min))
+                lMax = addExact(lMax, mulExact(c, dom.max))
+                lMinD = addExact(lMinD, mulExact(c, dec.min))
+                lMaxD = addExact(lMaxD, mulExact(c, dec.max))
             } else {
-                lMin = addExact(lMin, mulExact(c, dom.max.toLong()))
-                lMax = addExact(lMax, mulExact(c, dom.min.toLong()))
-                lMinD = addExact(lMinD, mulExact(c, dec.max.toLong()))
-                lMaxD = addExact(lMaxD, mulExact(c, dec.min.toLong()))
+                lMin = addExact(lMin, mulExact(c, dom.max))
+                lMax = addExact(lMax, mulExact(c, dom.min))
+                lMinD = addExact(lMinD, mulExact(c, dec.max))
+                lMaxD = addExact(lMaxD, mulExact(c, dec.min))
             }
         }
         val a = builder.boolColumn(auxBoolVar)

@@ -62,7 +62,7 @@ class LocalSearchImprovementsTest {
         val factor = Cardinality.atMostOne(IntArray(n) { Lit.make(it, true) })
         val problem = Problem(n, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = LongArray(n) { 1L })
-        val optimum = Sample(BooleanArray(n) { false }, intArrayOf())
+        val optimum = Sample(BooleanArray(n) { false }, longArrayOf())
         val first = LocalSearchSolver(problem).improvements(
             obj,
             LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L, initialAssignment = optimum),

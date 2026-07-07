@@ -27,7 +27,7 @@ internal class LinearInvariant(
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
         linearDegree(state.longPayload[factorId], op, bound, state.violationSoftCap)
 
-    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Int): Int {
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val coeff = findCoeff(coeffs, vars, intVar)
         val old = state.assignment.intValue(intVar)
         val sum = state.longPayload[factorId]
@@ -37,7 +37,7 @@ internal class LinearInvariant(
         return linearDegree(newSum, op, bound, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
-    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Int): Int {
+    override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val coeff = findCoeff(coeffs, vars, intVar)
         val cur = state.assignment.intValue(intVar)
         val oldSum = state.longPayload[factorId]
@@ -71,7 +71,7 @@ internal class LinearInvariant(
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c * cur
             val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true) ?: continue
-            val clamped = state.problem.intDomains[v].clampLong(target)
+            val clamped = state.problem.intDomains[v].clamp(target)
             if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
     }
@@ -84,8 +84,8 @@ internal class LinearInvariant(
         state: LocalSearchState,
         factorId: Int,
         intVar: Int,
-        oldValue: Int,
-        newValue: Int,
+        oldValue: Long,
+        newValue: Long,
         sink: ChannelingSink,
     ) {
         if (op != LinearOp.EQ || state.violated.contains(factorId)) return
@@ -111,7 +111,7 @@ internal class LinearInvariant(
         val cu = coeffs[bestIdx]
         val uShift = -drift / cu // (uShift * cu) cancels the drift
         val curU = state.assignment.intValue(u)
-        val newU = curU + uShift.toInt()
+        val newU = curU + uShift
         if (newU == curU) return
         val dom = state.problem.intDomains[u]
         if (newU < dom.min || newU > dom.max) return
@@ -161,7 +161,7 @@ internal class LinearInvariant(
                     if (needNumerator % cb != 0L) continue
                     val deltaB = needNumerator / cb
                     val newA = va + delta
-                    val newB = vb + deltaB.toInt()
+                    val newB = vb + deltaB
                     if (newA == va && newB == vb) continue
                     val domA = state.problem.intDomains[vars[a]]
                     val domB = state.problem.intDomains[vars[b]]
@@ -220,7 +220,7 @@ internal class LinearInvariant(
                 else -> 0
             }
             val target = cur + direction * maxStep
-            val clamped = dom.clampLong(target)
+            val clamped = dom.clamp(target)
             if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
     }

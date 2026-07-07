@@ -21,9 +21,9 @@ class IntBitChannelTest {
     )
 
     /** Value `x` reconstructed from its channel bits (least-significant first), offset by `min`. */
-    private fun decode(model: Sample, min: Int, bits: IntArray): Int {
-        var v = min
-        for (i in bits.indices) if (model.bools[bits[i]]) v += 1 shl i
+    private fun decode(model: Sample, min: Int, bits: IntArray): Long {
+        var v = min.toLong()
+        for (i in bits.indices) if (model.bools[bits[i]]) v += 1L shl i
         return v
     }
 
@@ -34,7 +34,7 @@ class IntBitChannelTest {
         assertEquals(3, ch.bitsPerVar[0].size)
         assertEquals(3, ch.allBits().size)
 
-        val seen = HashSet<Int>()
+        val seen = HashSet<Long>()
         for (m in BacktrackSolver(ch.problem).enumerate(BacktrackParams())) {
             // The original int var keeps its id, so its value is readable directly...
             val x = m.ints[0]
@@ -42,7 +42,7 @@ class IntBitChannelTest {
             assertEquals(x, decode(m, 2, ch.bitsPerVar[0]), "bits disagree with int value")
             assertTrue(seen.add(x), "value $x enumerated twice")
         }
-        assertEquals((2..9).toSet(), seen)
+        assertEquals((2L..9L).toSet(), seen)
     }
 
     @Test
@@ -53,7 +53,7 @@ class IntBitChannelTest {
         assertEquals(3, ch.bitsPerVar[0].size)
 
         val values = BacktrackSolver(ch.problem).enumerate(BacktrackParams()).map { it.ints[0] }.toList()
-        assertEquals((0..5).toList().sorted(), values.sorted())
+        assertEquals((0L..5L).toList().sorted(), values.sorted())
         assertEquals(6, values.size)
     }
 
@@ -64,7 +64,7 @@ class IntBitChannelTest {
         assertTrue(ch.bitsPerVar[0].isEmpty())
         assertEquals(0, ch.allBits().size)
         val values = BacktrackSolver(ch.problem).enumerate(BacktrackParams()).map { it.ints[0] }.toList()
-        assertEquals(listOf(4), values)
+        assertEquals(listOf(4L), values)
     }
 
     @Test
@@ -75,7 +75,7 @@ class IntBitChannelTest {
         assertEquals(2, ch.bitsPerVar[1].size) // width 2 for 0..2
         assertEquals(4, ch.allBits().size)
 
-        val combos = HashSet<Pair<Int, Int>>()
+        val combos = HashSet<Pair<Long, Long>>()
         for (m in BacktrackSolver(ch.problem).enumerate(BacktrackParams())) {
             assertEquals(m.ints[0], decode(m, 0, ch.bitsPerVar[0]))
             assertEquals(m.ints[1], decode(m, 0, ch.bitsPerVar[1]))

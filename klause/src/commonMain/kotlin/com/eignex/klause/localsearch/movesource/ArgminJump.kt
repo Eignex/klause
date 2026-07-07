@@ -84,7 +84,7 @@ class ArgminJump(
         if (bestVal != cur) sink.addChannelingIntSet(state, v, bestVal)
     }
 
-    private fun weightedIntSetDelta(state: LocalSearchState, weights: DoubleArray, v: Int, newValue: Int): Double {
+    private fun weightedIntSetDelta(state: LocalSearchState, weights: DoubleArray, v: Int, newValue: Long): Double {
         var wd = 0.0
         state.forEachIntFactorDelta(v, newValue) { fid, delta -> wd += weights[fid] * delta }
         return wd

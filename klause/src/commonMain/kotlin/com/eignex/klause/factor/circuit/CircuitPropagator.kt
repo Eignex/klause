@@ -31,7 +31,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         val nextFixed = IntArray(n) { -1 }
         for (i in 0 until n) {
             val d = state.intDomains[succ[i]]
-            if (d.min == d.max && d.min in 0 until n) nextFixed[i] = d.min
+            if (d.min == d.max && d.min in 0 until n) nextFixed[i] = d.min.toInt()
         }
         val state0 = IntArray(n) // 0 unvisited, 1 on current path, 2 done
         val pos = IntArray(n) { -1 }
@@ -68,19 +68,19 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         if (n == 1) {
             val v = succ[0]
             val d = state.intDomains[v]
-            if (0 !in d) return false
-            if (d.min != 0 && !state.tightenIntMin(v, 0)) return false
-            if (d.max != 0 && !state.tightenIntMax(v, 0)) return false
+            if (0L !in d) return false
+            if (d.min != 0L && !state.tightenIntMin(v, 0L)) return false
+            if (d.max != 0L && !state.tightenIntMax(v, 0L)) return false
             return true
         }
         for (i in succ.indices) {
             val v = succ[i]
             val d = state.intDomains[v]
-            if (d.min == i && d.min < d.max) {
+            if (d.min == i.toLong() && d.min < d.max) {
                 if (!state.tightenIntMin(v, d.min + 1, ant)) return false
-            } else if (d.max == i && d.min < d.max) {
+            } else if (d.max == i.toLong() && d.min < d.max) {
                 if (!state.tightenIntMax(v, d.max - 1, ant)) return false
-            } else if (d.min == d.max && d.min == i) {
+            } else if (d.min == d.max && d.min == i.toLong()) {
                 return false
             }
         }
@@ -89,7 +89,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             val v = succ[i]
             val d = state.intDomains[v]
             if (d.min == d.max) {
-                val target = d.min
+                val target = d.min.toInt()
                 if (pred[target] != -1) return false
                 pred[target] = i
             }
@@ -111,7 +111,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
                     cur = -2
                     break
                 }
-                cur = sD.min
+                cur = sD.min.toInt()
             }
             if (cur in 0 until n && posOnPath[cur] >= 0) {
                 val cycleLen = path.size - posOnPath[cur]
@@ -131,15 +131,15 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
             val start = c.head
             val chainNodes = c.length
             if (chainNodes == n) {
-                if (start !in d) return false
-                if (!state.tightenIntMin(v, start, ant)) return false
-                if (!state.tightenIntMax(v, start, ant)) return false
+                if (start.toLong() !in d) return false
+                if (!state.tightenIntMin(v, start.toLong(), ant)) return false
+                if (!state.tightenIntMax(v, start.toLong(), ant)) return false
             } else {
-                if (start == d.min && d.min < d.max) {
+                if (start.toLong() == d.min && d.min < d.max) {
                     if (!state.tightenIntMin(v, d.min + 1, ant)) return false
-                } else if (start == d.max && d.min < d.max) {
+                } else if (start.toLong() == d.max && d.min < d.max) {
                     if (!state.tightenIntMax(v, d.max - 1, ant)) return false
-                } else if (d.min == d.max && d.min == start) {
+                } else if (d.min == d.max && d.min == start.toLong()) {
                     return false
                 }
             }
@@ -164,8 +164,9 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         val predAdj = Array(total) { IntArrayList() }
         for (i in 0 until n) {
             val from = if (i == 0) source else i
-            state.intDomains[succ[i]].forEach { y ->
-                if (y in 0 until n) {
+            state.intDomains[succ[i]].forEach { yLong ->
+                if (yLong in 0 until n) {
+                    val y = yLong.toInt()
                     succAdj[from].add(y)
                     predAdj[y].add(from)
                 }
@@ -175,11 +176,11 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         for (v in 0 until n) if (idom[v] == -1) return false // source cannot reach every node
         for (x in 1 until n) {
             val dvals = IntArrayList()
-            state.intDomains[succ[x]].forEach { y -> if (y in 0 until n) dvals.add(y) }
+            state.intDomains[succ[x]].forEach { y -> if (y in 0 until n) dvals.add(y.toInt()) }
             for (k in 0 until dvals.size) {
                 val y = dvals[k]
                 if (y != x && dominates(idom, source, y, x)) {
-                    if (!state.excludeIntValue(succ[x], y, ant)) return false
+                    if (!state.excludeIntValue(succ[x], y.toLong(), ant)) return false
                 }
             }
         }
@@ -272,7 +273,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     private fun stronglyConnected(state: PropagationState): Boolean {
         val rev = Array(n) { IntArrayList() }
         for (i in 0 until n) {
-            state.intDomains[succ[i]].forEach { k -> if (k in 0 until n) rev[k].add(i) }
+            state.intDomains[succ[i]].forEach { k -> if (k in 0 until n) rev[k.toInt()].add(i) }
         }
         // A Hamiltonian circuit visits every node, so from node 0 all n must be reachable both
         // forward (over candidate successors) and backward — any node in range is a tour edge.

@@ -69,7 +69,7 @@ class SubcircuitPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(los[it], his[it]) },
+                intDomains = Array(n) { IntDomain(los[it].toLong(), his[it].toLong()) },
                 factors = arrayOf<Factor>(Subcircuit(succ = IntArray(n) { it })),
             )
             val result = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L))
@@ -86,7 +86,7 @@ class SubcircuitPropagatorTest {
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(lo, hi) },
+            intDomains = Array(n) { IntDomain(lo.toLong(), hi.toLong()) },
             factors = arrayOf<Factor>(factor),
         )
     }
@@ -111,7 +111,7 @@ class SubcircuitPropagatorTest {
         // Empty subcircuit: every node's self-loop value is forced in domain.
         val n = 3
         val problem = problem(n)
-        val result = problem.propagate(Assumptions(ints = (0 until n).associate { it to it }))
+        val result = problem.propagate(Assumptions(ints = (0 until n).associate { it to it.toLong() }))
         assertTrue(result is Implied, "all self-loops (empty subcircuit) must propagate without conflict; got $result")
     }
 
@@ -145,7 +145,7 @@ class SubcircuitPropagatorTest {
         val brute = setOf(listOf(0, 1), listOf(1, 0))
         val problem = problem(2)
         val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L))
-            .take(10_000).map { it.ints.toList() }.toHashSet()
+            .take(10_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
         assertEquals(brute, found, "n=2 subcircuit must enumerate exactly 2 valid assignments")
     }
 }

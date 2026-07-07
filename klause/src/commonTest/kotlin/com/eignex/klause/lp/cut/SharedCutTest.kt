@@ -115,7 +115,7 @@ class SharedCutTest {
         var checked = 0
         repeat(300) {
             val n = rng.nextInt(2, 4)
-            val domains = Array(n) { IntDomain(0, rng.nextInt(2, 5)) }
+            val domains = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
             val factors = ArrayList<Factor>()
             repeat(rng.nextInt(1, 4)) {
                 val k = rng.nextInt(2, n + 1)
@@ -149,7 +149,7 @@ class SharedCutTest {
                         return
                     }
                     for (value in domains[v].min..domains[v].max) {
-                        x[v] = value
+                        x[v] = value.toInt()
                         recurse(v + 1)
                     }
                 }

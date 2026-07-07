@@ -11,7 +11,7 @@ import com.eignex.klause.util.IntHashSet
  * of one [Move.Compound]. The pin set guards against two sibling factors proposing conflicting shifts
  * of the same int variable; the first to claim it wins.
  */
-class ChannelingSink internal constructor(intVar: Int, newValue: Int) {
+class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
     private val parts = ArrayList<Move>(INITIAL_PARTS)
     private val pinned = IntHashSet()
 

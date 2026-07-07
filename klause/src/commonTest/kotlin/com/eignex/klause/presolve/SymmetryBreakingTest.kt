@@ -48,7 +48,7 @@ import kotlin.test.assertTrue
  */
 class SymmetryBreakingTest {
 
-    private fun isFeasible(problem: Problem, bools: BooleanArray, ints: IntArray): Boolean {
+    private fun isFeasible(problem: Problem, bools: BooleanArray, ints: LongArray): Boolean {
         var a = Assumptions.None
         for (v in 0 until problem.numBoolVars) a = a.withBool(v, bools[v])
         for (v in 0 until problem.numIntVars) a = a.withInt(v, ints[v])
@@ -59,7 +59,7 @@ class SymmetryBreakingTest {
     private fun countFeasible(problem: Problem): Int {
         val b = problem.numBoolVars
         val n = problem.numIntVars
-        val ints = IntArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.intDomains[it].min }
         var count = 0
         while (true) {
             for (mask in 0 until (1 shl b).coerceAtLeast(1)) {

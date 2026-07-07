@@ -8,8 +8,9 @@ import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.toSortedIntArray
+import com.eignex.klause.util.toSortedLongArray
 
 /*
  * Reversible, delta-driven GAC for the constant-array element constraint `result = arr(idx)` — the
@@ -92,6 +93,11 @@ internal class ElementConstState(
         return true
     }
 
+    /** Value-id of the constant [value], or -1 when [value] is not one of the table's constants
+     *  (including any value outside the Int range the constant table can hold). */
+    private fun idFor(value: Long): Int =
+        if (value < Int.MIN_VALUE || value > Int.MAX_VALUE) -1 else idOfValue.getOrDefault(value.toInt(), -1)
+
     /** True if either watched domain gained a value since the last fire (a backtrack restored it) —
      *  the support counts cannot be patched incrementally then, so the caller rebuilds. */
     private fun widened(idxDom: IntDomain, resDom: IntDomain): Boolean {
@@ -118,21 +124,21 @@ internal class ElementConstState(
         val counts = IntArray(numValues)
         idxDom.forEach { iv ->
             val pos = iv - indexOffset
-            if (pos in 0 until len) counts[idOfPos[pos]]++
+            if (pos in 0 until len) counts[idOfPos[pos.toInt()]]++
         }
         for (id in 0 until numValues) supportCount[id] = counts[id]
         valid.set(1)
 
         // Seed: idx positions whose constant is not a live result value, and result values with no
         // supporting position (no constant, or zero live positions). Applying them feeds the cascade.
-        val idxSeed = IntArrayList()
+        val idxSeed = LongArrayList()
         idxDom.forEach { iv ->
             val pos = iv - indexOffset
-            if (pos in 0 until len && arr[pos] !in resDom) idxSeed.add(iv)
+            if (pos in 0 until len && arr[pos.toInt()].toLong() !in resDom) idxSeed.add(iv)
         }
-        val resSeed = IntArrayList()
+        val resSeed = LongArrayList()
         resDom.forEach { rv ->
-            val id = idOfValue.getOrDefault(rv, -1)
+            val id = idFor(rv)
             if (id < 0 || counts[id] == 0) resSeed.add(rv)
         }
         return applyThenCascade(state, idxSeed, resSeed)
@@ -142,20 +148,20 @@ internal class ElementConstState(
     private fun delta(state: PropagationState): Boolean {
         val idxRem = removedSince(domRefIdx.value, state.intDomains[idx])
         val resRem = removedSince(domRefResult.value, state.intDomains[result])
-        return cascade(state, idxRem ?: IntArrayList(), resRem ?: IntArrayList())
+        return cascade(state, idxRem ?: LongArrayList(), resRem ?: LongArrayList())
     }
 
     /** Values present in [prev] but gone from [cur] (ascending). `null` when [prev] is null or the
      *  ref is unchanged (no delta). */
-    private fun removedSince(prev: IntDomain?, cur: IntDomain): IntArrayList? {
+    private fun removedSince(prev: IntDomain?, cur: IntDomain): LongArrayList? {
         if (prev == null || prev === cur) return null
-        val out = IntArrayList()
+        val out = LongArrayList()
         prev.forEach { v -> if (v !in cur) out.add(v) }
         return out
     }
 
     /** Apply the seed exclusions (rebuild path), then cascade their removals to the GAC fixpoint. */
-    private fun applyThenCascade(state: PropagationState, idxSeed: IntArrayList, resSeed: IntArrayList): Boolean {
+    private fun applyThenCascade(state: PropagationState, idxSeed: LongArrayList, resSeed: LongArrayList): Boolean {
         if (idxSeed.size > 0) {
             val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
             if (!state.excludeIntValues(idx, sortedDistinct(idxSeed), ant)) return false
@@ -173,29 +179,31 @@ internal class ElementConstState(
      * processing result removals yields the idx positions holding those constants to prune. Each
      * applied prune is the next round's removal set, so the cascade runs until no value leaves.
      */
-    private fun cascade(state: PropagationState, idxRem0: IntArrayList, resRem0: IntArrayList): Boolean {
+    private fun cascade(state: PropagationState, idxRem0: LongArrayList, resRem0: LongArrayList): Boolean {
         var idxRem = idxRem0
         var resRem = resRem0
         while (idxRem.size > 0 || resRem.size > 0) {
             // idx removals → decrement support → result values that dropped to zero support.
-            val resultToExclude = IntArrayList()
+            val resultToExclude = LongArrayList()
             for (i in 0 until idxRem.size) {
                 val pos = idxRem[i] - indexOffset
                 if (pos !in 0 until len) continue
-                val id = idOfPos[pos]
+                val id = idOfPos[pos.toInt()]
                 val c = supportCount[id] - 1
                 supportCount[id] = c
-                if (c == 0 && valueOfId[id] in state.intDomains[result]) resultToExclude.add(valueOfId[id])
+                if (c == 0 && valueOfId[id].toLong() in state.intDomains[result]) {
+                    resultToExclude.add(valueOfId[id].toLong())
+                }
             }
             // result removals → idx positions whose constant just left result.
-            val idxToExclude = IntArrayList()
+            val idxToExclude = LongArrayList()
             val idxDom = state.intDomains[idx]
             for (i in 0 until resRem.size) {
-                val id = idOfValue.getOrDefault(resRem[i], -1)
+                val id = idFor(resRem[i])
                 if (id < 0) continue
                 for (pos in positionsOfId[id]) {
                     val iv = pos + indexOffset
-                    if (iv in idxDom) idxToExclude.add(iv)
+                    if (iv.toLong() in idxDom) idxToExclude.add(iv.toLong())
                 }
             }
 
@@ -217,9 +225,9 @@ internal class ElementConstState(
         return true
     }
 
-    private fun sortedDistinct(list: IntArrayList): IntArray = list.toSortedIntArray()
+    private fun sortedDistinct(list: LongArrayList): LongArray = list.toSortedLongArray()
 
     private companion object {
-        val EMPTY = IntArrayList()
+        val EMPTY = LongArrayList()
     }
 }

@@ -19,8 +19,8 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
     val xDom = intDomains[x]
     if (varArray) {
         val ys = resolveSetVarArray(c.args[1])
-        for (vi in xDom.min..xDom.max) {
-            val yIdx = vi - xDom.min
+        for (vi in xDom.min.toInt()..xDom.max.toInt()) {
+            val yIdx = vi - xDom.min.toInt()
             if (yIdx !in ys.indices) {
                 factors.add(Clause(intArrayOf()))
                 continue
@@ -262,7 +262,7 @@ internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
         is FznExpr.Ident -> {
             val nVar = resolveIntVar(nExpr)
             val channels = IntArray(s.indicatorBoolIds.size) { i ->
-                val ch = allocInt("__card_chan_${s.name}_${s.elements[i]}", 0, 1)
+                val ch = allocInt("__card_chan_${s.name}_${s.elements[i]}", 0L, 1L)
                 channelBoolTo01(factors, s.indicatorBoolIds[i], ch)
                 ch
             }

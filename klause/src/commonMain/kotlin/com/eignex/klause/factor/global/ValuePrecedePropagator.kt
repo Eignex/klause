@@ -57,18 +57,18 @@ internal class ValuePrecedePropagator(
             return reason
         }
         var alpha = st.alpha.value
-        while (alpha < n && s !in state.intDomains[xs[alpha]]) alpha++
+        while (alpha < n && s.toLong() !in state.intDomains[xs[alpha]]) alpha++
         if (alpha != st.alpha.value) st.alpha.set(alpha)
         val upTo = if (alpha == n) n - 1 else alpha
         for (j in st.prunedUpTo.value..upTo) {
             val v = xs[j]
-            if (t in state.intDomains[v] && !state.excludeIntValue(v, t, reason())) return false
+            if (t.toLong() in state.intDomains[v] && !state.excludeIntValue(v, t.toLong(), reason())) return false
         }
         if (upTo + 1 > st.prunedUpTo.value) st.prunedUpTo.set(upTo + 1)
         var firstForcedT = -1
         for (j in 0 until n) {
             val d = state.intDomains[xs[j]]
-            if (d.min == d.max && d.min == t) {
+            if (d.min == d.max && d.min == t.toLong()) {
                 firstForcedT = j
                 break
             }
@@ -77,7 +77,7 @@ internal class ValuePrecedePropagator(
             var candidate = -1
             var count = 0
             for (k in 0 until firstForcedT) {
-                if (s in state.intDomains[xs[k]]) {
+                if (s.toLong() in state.intDomains[xs[k]]) {
                     candidate = k
                     count++
                     if (count > 1) break
@@ -86,8 +86,8 @@ internal class ValuePrecedePropagator(
             if (count == 0) return false
             if (count == 1) {
                 val v = xs[candidate]
-                if (!state.tightenIntMin(v, s, reason())) return false
-                if (!state.tightenIntMax(v, s, reason())) return false
+                if (!state.tightenIntMin(v, s.toLong(), reason())) return false
+                if (!state.tightenIntMax(v, s.toLong(), reason())) return false
             }
         }
         st.started = true

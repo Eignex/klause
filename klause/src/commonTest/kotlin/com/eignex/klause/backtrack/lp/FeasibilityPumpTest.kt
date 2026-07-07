@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  */
 class FeasibilityPumpTest {
 
-    private fun satisfies(f: Linear, x: IntArray): Boolean {
+    private fun satisfies(f: Linear, x: LongArray): Boolean {
         var s = 0L
         for (i in f.vars.indices) s += f.coeffs[i].toLong() * x[f.vars[i]]
         return when (f.op) {

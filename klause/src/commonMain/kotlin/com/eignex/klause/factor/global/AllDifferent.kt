@@ -148,7 +148,7 @@ class AllDifferent(
         val order = vars.indices.sortedBy { domains[vars[it]].min }
         val components = ArrayList<List<Int>>()
         var start = 0
-        var runningMax = domains[vars[order[0]]].max
+        var runningMax: Long = domains[vars[order[0]]].max
         for (k in 1 until order.size) {
             val d = domains[vars[order[k]]]
             if (d.min <= runningMax) {
@@ -163,13 +163,13 @@ class AllDifferent(
         if (components.size == 1) return FactorReduction.Unchanged
         val replacement = components.mapNotNull { group ->
             if (group.size < 2) return@mapNotNull null
-            var lo = Int.MAX_VALUE
-            var hi = Int.MIN_VALUE
+            var lo = Long.MAX_VALUE
+            var hi = Long.MIN_VALUE
             for (v in group) {
                 lo = minOf(lo, domains[v].min)
                 hi = maxOf(hi, domains[v].max)
             }
-            AllDifferent(group.toIntArray(), domainMin = lo, domainSize = hi - lo + 1)
+            AllDifferent(group.toIntArray(), domainMin = lo.toInt(), domainSize = (hi - lo + 1).toInt())
         }
         return FactorReduction.Rewrite(replacement)
     }

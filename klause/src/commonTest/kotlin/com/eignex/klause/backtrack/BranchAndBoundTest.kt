@@ -115,7 +115,7 @@ class BranchAndBoundTest {
         assertEquals(6, sum, "optimal disjunctive schedule sums to 0+2+4=6; got ${sample.ints.toList()}")
         val occ = IntArray(8)
         for (i in 0 until 3) {
-            val s = sample.ints[i]
+            val s = sample.ints[i].toInt()
             for (t in s until s + 2) if (t in occ.indices) occ[t]++
         }
         for (t in occ.indices) assertTrue(occ[t] <= 1, "disjunctive violated at t=$t")

@@ -168,7 +168,7 @@ internal object DuplicateColumns {
         return Array(numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
     }
 
-    private fun IntDomain.isContiguous(): Boolean = size == max - min + 1
+    private fun IntDomain.isContiguous(): Boolean = size.toLong() == max - min + 1
 }
 
 /** A single duplicate-column aggregation: the surviving aggregate [keep] absorbs [drop]. Both

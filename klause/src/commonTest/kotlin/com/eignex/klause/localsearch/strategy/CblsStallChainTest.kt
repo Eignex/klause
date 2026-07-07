@@ -48,7 +48,7 @@ class CblsStallChainTest {
         assumptions: Assumptions = Assumptions.None,
     ): LocalSearchState {
         val state = LocalSearchState(problem, Random(7), assumptions)
-        for (i in vals.indices) state.assignment.setInt(i, vals[i])
+        for (i in vals.indices) state.assignment.setInt(i, vals[i].toLong())
         state.recompute()
         return state
     }

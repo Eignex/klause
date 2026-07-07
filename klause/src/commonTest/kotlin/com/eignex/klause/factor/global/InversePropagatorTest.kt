@@ -62,7 +62,11 @@ class InversePropagatorTest {
             rec(0)
 
             val doms = Array(k) {
-                if (it < n) IntDomain(fr[it].first, fr[it].second) else IntDomain(gr[it - n].first, gr[it - n].second)
+                if (it < n) {
+                    IntDomain(fr[it].first.toLong(), fr[it].second.toLong())
+                } else {
+                    IntDomain(gr[it - n].first.toLong(), gr[it - n].second.toLong())
+                }
             }
             val problem = Problem(
                 numBoolVars = 0,
@@ -72,7 +76,7 @@ class InversePropagatorTest {
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
     }
@@ -87,8 +91,8 @@ class InversePropagatorTest {
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        val f = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2])
-        val g = listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5])
+        val f = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2]).map { it.toInt() }
+        val g = listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]).map { it.toInt() }
         // For each i: g[f[i]] = i.
         for (i in 0..2) assertEquals(i, g[f[i]], "g[f[$i]]=g[${f[i]}]=${g[f[i]]} ≠ $i")
     }
@@ -111,8 +115,8 @@ class InversePropagatorTest {
         )
         val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
-        val f = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2])
-        val g = listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5])
+        val f = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2]).map { it.toInt() }
+        val g = listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]).map { it.toInt() }
         // For each i (1-based): g[f[i] - 1] = i.
         for (i in 1..3) assertEquals(i, g[f[i - 1] - 1], "g[f[$i]]=${g[f[i - 1] - 1]} ≠ $i")
     }
@@ -207,7 +211,11 @@ class InversePropagatorTest {
             }
             rec(0)
             val doms = Array(k) {
-                if (it < n) IntDomain(fr[it].first, fr[it].second) else IntDomain(gr[it - n].first, gr[it - n].second)
+                if (it < n) {
+                    IntDomain(fr[it].first.toLong(), fr[it].second.toLong())
+                } else {
+                    IntDomain(gr[it - n].first.toLong(), gr[it - n].second.toLong())
+                }
             }
             val problem = Problem(
                 numBoolVars = 0,
@@ -222,7 +230,8 @@ class InversePropagatorTest {
                 variableSelector = Vsids(),
                 maxLearnedClauses = 500,
             )
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000).map { it.ints.toList() }.toHashSet()
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "trial #$trial (n=$n off=$off): must equal brute force")
         }
     }

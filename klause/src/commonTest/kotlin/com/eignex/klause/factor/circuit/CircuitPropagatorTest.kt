@@ -84,7 +84,7 @@ class CircuitPropagatorTest {
             val doms = Array(nNodes) {
                 val a = rng.nextInt(nNodes)
                 val b = rng.nextInt(nNodes)
-                IntDomain(minOf(a, b), maxOf(a, b))
+                IntDomain(minOf(a, b).toLong(), maxOf(a, b).toLong())
             }
             val problem = Problem(
                 numBoolVars = 0,
@@ -153,7 +153,7 @@ class CircuitPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { v -> IntDomain(los[v], his[v]) },
+                intDomains = Array(n) { v -> IntDomain(los[v].toLong(), his[v].toLong()) },
                 factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { v -> v })),
             )
             val result = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L))
@@ -206,13 +206,13 @@ class CircuitPropagatorTest {
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
-        .map { it.ints.toList() }
+        .map { s -> s.ints.map { it.toInt() } }
         .toHashSet()
 
     private fun problemOf(factor: Factor, n: Int) = Problem(
         numBoolVars = 0,
         numIntVars = n,
-        intDomains = Array(n) { IntDomain(0, n - 1) },
+        intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
         factors = arrayOf(factor),
     )
 
@@ -300,7 +300,7 @@ class CircuitPropagatorTest {
             for (step in 0 until 4) {
                 assertFalse(visited[node], "revisit at step $step in ${s.ints.toList()}")
                 visited[node] = true
-                node = s.ints[node]
+                node = s.ints[node].toInt()
             }
             assertEquals(0, node, "must close cycle in ${s.ints.toList()}")
         }
@@ -477,11 +477,11 @@ class CircuitPropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = n,
-                intDomains = Array(n) { IntDomain(0, n - 1) },
+                intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
                 factors = arrayOf<Factor>(Subcircuit(succ = IntArray(n) { it })),
             )
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
-                .map { it.ints.toList() }.toHashSet()
+                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "subcircuit n=$n: enumerated set must equal brute force")
         }
     }

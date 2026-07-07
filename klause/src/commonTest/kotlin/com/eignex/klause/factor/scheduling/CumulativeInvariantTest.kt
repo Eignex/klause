@@ -110,7 +110,7 @@ class CumulativeInvariantTest {
         val occ = IntArray(8)
         for (i in 0 until 3) {
             for (t in starts[i] until starts[i] + 2) {
-                if (t in occ.indices) occ[t]++
+                if (t in occ.indices) occ[t.toInt()]++
             }
         }
         for (t in occ.indices) assertTrue(occ[t] <= 1, "unary capacity broken at t=$t in ${starts.toList()}")

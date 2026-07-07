@@ -388,7 +388,7 @@ class BacktrackSolverTest {
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
         )
         val models = BacktrackSolver(p).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
-        assertEquals(setOf(1, 2), models.map { it.ints[0] }.toSet())
+        assertEquals(setOf(1L, 2L), models.map { it.ints[0] }.toSet())
     }
 
     @Test
@@ -522,7 +522,7 @@ class BacktrackSolverTest {
             val p = Problem(
                 numBoolVars = numBool,
                 numIntVars = 2,
-                intDomains = arrayOf(IntDomain(lo, hi), IntDomain(lo, hi)),
+                intDomains = arrayOf(IntDomain(lo.toLong(), hi.toLong()), IntDomain(lo.toLong(), hi.toLong())),
                 factors = factors.toTypedArray(),
             )
 
@@ -547,7 +547,7 @@ class BacktrackSolverTest {
             val params =
                 BacktrackParams(randomSeed = seed.toLong(), variableSelector = Vsids(), maxLearnedClauses = 1_000)
             val raw = BacktrackSolver(p).enumerate(params).take(brute.size + 10)
-                .map { s -> s.bools.map { if (it) 1 else 0 } + s.ints.toList() }.toList()
+                .map { s -> s.bools.map { if (it) 1 else 0 } + s.ints.map { it.toInt() } }.toList()
             assertEquals(raw.size, raw.toHashSet().size, "seed $seed: a solution was yielded more than once")
             assertEquals(brute, raw.toHashSet(), "seed $seed: enumeration must equal the brute-force feasible set")
         }

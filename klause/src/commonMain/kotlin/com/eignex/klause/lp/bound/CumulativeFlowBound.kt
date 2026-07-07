@@ -9,8 +9,8 @@ import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
 
 /**
  * Preemptive min-cost-flow feasibility bound for the scheduling globals (#454). The exact
@@ -71,17 +71,17 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
     /** `Σ Eᵢ − maxflow`: the work that cannot be preemptively placed (positive ⇒ infeasible). */
     private fun deficit(view: SchedulingView, session: PropagationSession): Long {
         val n = view.starts.size
-        val est = IntArray(n)
-        val deadline = IntArray(n) // lstᵢ + durᵢ
+        val est = LongArray(n)
+        val deadline = LongArray(n) // lstᵢ + durᵢ
         var totalWork = 0L
         val active = BooleanArray(n)
         for (i in 0 until n) {
             val dom = session.intDomain(view.starts[i])
             est[i] = dom.min
-            deadline[i] = addExactInt(dom.max, view.durations[i])
+            deadline[i] = addExact(dom.max, view.durations[i].toLong())
             if (view.durations[i] > 0 && view.resources[i] > 0) {
                 active[i] = true
-                totalWork = addExact(totalWork, mulExact(view.durations[i].toLong(), view.resources[i].toLong()))
+                totalWork = addExact(totalWork, mulExact(view.durations[i].toLong(), view.resources[i]))
             }
         }
         if (totalWork == 0L) return 0L
@@ -95,20 +95,20 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
         val source = 0
         val sink = n + intervals + 1
         val flow = MaxFlow(sink + 1)
-        val cap = view.capacity.toLong()
+        val cap = view.capacity
         for (i in 0 until n) {
             if (!active[i]) continue
-            flow.addEdge(source, 1 + i, mulExact(view.durations[i].toLong(), view.resources[i].toLong()))
+            flow.addEdge(source, 1 + i, mulExact(view.durations[i].toLong(), view.resources[i]))
         }
         for (k in 0 until intervals) {
-            val len = (bps[k + 1] - bps[k]).toLong()
+            val len = bps[k + 1] - bps[k]
             val node = n + 1 + k
             flow.addEdge(node, sink, mulExact(cap, len))
             for (i in 0 until n) {
                 if (!active[i]) continue
                 // Interval [bps[k], bps[k+1]) is usable by task i iff it lies inside [estᵢ, deadlineᵢ).
                 if (bps[k] >= est[i] && bps[k + 1] <= deadline[i]) {
-                    flow.addEdge(1 + i, node, mulExact(view.resources[i].toLong(), len))
+                    flow.addEdge(1 + i, node, mulExact(view.resources[i], len))
                 }
             }
         }
@@ -116,14 +116,14 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
     }
 
     /** Sorted distinct release/deadline values over the active tasks — the interval boundaries. */
-    private fun breakpoints(est: IntArray, deadline: IntArray, active: BooleanArray): IntArray {
-        val set = IntHashSet()
+    private fun breakpoints(est: LongArray, deadline: LongArray, active: BooleanArray): LongArray {
+        val set = LongHashSet()
         for (i in est.indices) {
             if (!active[i]) continue
             set.add(est[i])
             set.add(deadline[i])
         }
-        val arr = set.toIntArray()
+        val arr = set.toLongArray()
         arr.sort()
         return arr
     }
@@ -140,12 +140,6 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
             lits.add(session.boundLeLit(view.starts[i], dom.max, positive = false))
         }
         return lits.toIntArray()
-    }
-
-    private fun addExactInt(a: Int, b: Int): Int {
-        val r = a.toLong() + b.toLong()
-        if (r > Int.MAX_VALUE || r < Int.MIN_VALUE) throw LpOverflowException("deadline overflow: $a + $b")
-        return r.toInt()
     }
 
     internal companion object {

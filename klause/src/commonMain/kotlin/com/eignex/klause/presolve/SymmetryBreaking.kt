@@ -163,16 +163,19 @@ internal object SymmetryBreaking {
         // The anonymous fast path needs no multiset; otherwise key every factor — but lazily, so a
         // candidate-free model (or a fired budget) never pays for the (wide-table-) expensive keying.
         val base: Map<StructuralKey, Int> by lazy { PresolveShared.structuralKeyMultiset(problem.factors.asList()) }
-        var lo = Int.MAX_VALUE
-        var hi = Int.MIN_VALUE
+        var lo = Long.MAX_VALUE
+        var hi = Long.MIN_VALUE
         for (d in problem.intDomains) {
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
         }
         if (lo > hi) return null
+        // The value pins ([ValuePrecede], value-swap relabeling) reason in Int value space, so skip the
+        // whole phase when the domain values fall outside Int range — sound, it only forgoes value pins.
+        if (lo < Int.MIN_VALUE || hi > Int.MAX_VALUE) return null
         // Size skip: the incidence scan below visits every value in [lo, hi] against every int
         // variable, so a wide span across many variables is too costly to be worth the value pins.
-        if ((hi.toLong() - lo + 1) * problem.numIntVars > VALUE_ORBIT_SCAN_BUDGET) return null
+        if ((hi - lo + 1) * problem.numIntVars > VALUE_ORBIT_SCAN_BUDGET) return null
         // Group values by domain-incidence signature: same set of containing variables ⇒ a candidate
         // orbit (a swap within it maps every domain to itself). The incident variable ids, in
         // ascending order, are the signature words.
@@ -183,7 +186,7 @@ internal object SymmetryBreaking {
             if (cancellation()) return null
             val sig = LongArrayList()
             for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.add(x.toLong())
-            if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
+            if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value.toInt())
         }
         val orbits = ArrayList<List<Int>>()
         for (candidate in incidence.values) {
@@ -279,9 +282,13 @@ internal object SymmetryBreaking {
         return PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remapValues(swap) }
     }
 
-    /** Whether every value in [d] lies in [values]. */
+    /** Whether every value in [d] lies in [values]. The orbit [values] are Int-range (the caller skips
+     *  value symmetry otherwise), so any out-of-Int-range domain value is trivially not a member. */
     private fun domainWithin(d: IntDomain, values: IntHashSet): Boolean {
-        for (v in d.min..d.max) if (v in d && v !in values) return false
+        for (v in d.min..d.max) {
+            if (v !in d) continue
+            if (v < Int.MIN_VALUE || v > Int.MAX_VALUE || v.toInt() !in values) return false
+        }
         return true
     }
 
@@ -314,26 +321,29 @@ internal object SymmetryBreaking {
         // carry a distinct marker word so they never collide; within a form, equal domains yield equal keys
         // and distinct domains distinct keys, so the colour partition — and thus every generator found — is
         // identical to the all-holes seed, at O(min(holes, survivors)) rather than O(span).
-        val holeCount = (d.max.toLong() - d.min + 1) - d.size
-        if (d.size <= holeCount) {
+        val holeCount = (d.max - d.min + 1) - d.size
+        // Only the survivor form when [size] is a genuine small count: a wide contiguous/huge-run domain
+        // saturates [size] at Int.MAX, so its `holeCount` looks positive though it is hole-free/few-holed;
+        // it takes the hole form below (forEachHole is empty/small), never allocating a span-sized array.
+        if (d.size < Int.MAX_VALUE && d.size <= holeCount) {
             val words = LongArray(4 + d.size)
             words[0] = SPACE_INT
             words[1] = SEED_DOMAIN_SURVIVORS
-            words[2] = d.min.toLong()
-            words[3] = d.max.toLong()
+            words[2] = d.min
+            words[3] = d.max
             var i = 4
-            d.forEach { words[i++] = it.toLong() }
+            d.forEach { words[i++] = it }
             return RefineKey(words)
         }
-        val holes = IntArrayList()
+        val holes = LongArrayList()
         d.forEachHole { holes.add(it) }
         val words = LongArray(5 + holes.size)
         words[0] = SPACE_INT
         words[1] = SEED_DOMAIN
-        words[2] = d.min.toLong()
-        words[3] = d.max.toLong()
+        words[2] = d.min
+        words[3] = d.max
         words[4] = holes.size.toLong()
-        for (i in 0 until holes.size) words[5 + i] = holes[i].toLong()
+        for (i in 0 until holes.size) words[5 + i] = holes[i]
         return RefineKey(words)
     }
 

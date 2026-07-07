@@ -25,8 +25,8 @@ class SymmetricAllDifferentPropagatorTest {
         )
         BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(40).forEach { sample ->
             for (i in 0..3) {
-                val v = sample.ints[i]
-                assertTrue(sample.ints[v] == i, "self-inverse violated at $i: ints=${sample.ints.toList()}")
+                val v = sample.ints[i].toInt()
+                assertTrue(sample.ints[v] == i.toLong(), "self-inverse violated at $i: ints=${sample.ints.toList()}")
             }
         }
     }

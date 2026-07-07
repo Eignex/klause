@@ -22,9 +22,9 @@ internal class SchedulingView(
     /** Constant per-task durations (`durations[i] == 0` tasks consume no resource). */
     val durations: IntArray,
     /** Per-task minimum resource demand. */
-    val resources: IntArray,
+    val resources: LongArray,
     /** Declared (maximum) capacity, `> 0`. */
-    val capacity: Int,
+    val capacity: Long,
 )
 
 /** Every [Cumulative] / [Disjunctive] of [problem], normalized; factors the relaxations cannot soundly
@@ -35,17 +35,21 @@ internal fun schedulingViews(problem: Problem): List<SchedulingView> {
         when (f) {
             is Cumulative -> {
                 if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty() || f.starts.isEmpty()) continue
-                val cap = if (f.capacityVar >= 0) problem.intDomains[f.capacityVar].max else f.capacity
-                if (cap <= 0) continue
-                val res = IntArray(f.starts.size) { i ->
-                    if (f.resourceVars.isNotEmpty()) problem.intDomains[f.resourceVars[i]].min else f.resources[i]
+                val cap = if (f.capacityVar >= 0) problem.intDomains[f.capacityVar].max else f.capacity.toLong()
+                if (cap <= 0L) continue
+                val res = LongArray(f.starts.size) { i ->
+                    if (f.resourceVars.isNotEmpty()) {
+                        problem.intDomains[f.resourceVars[i]].min
+                    } else {
+                        f.resources[i].toLong()
+                    }
                 }
                 out.add(SchedulingView(f.starts, f.durations, res, cap))
             }
 
             is Disjunctive -> {
                 if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty() || f.starts.isEmpty()) continue
-                out.add(SchedulingView(f.starts, f.durations, IntArray(f.starts.size) { 1 }, capacity = 1))
+                out.add(SchedulingView(f.starts, f.durations, LongArray(f.starts.size) { 1L }, capacity = 1L))
             }
 
             else -> Unit

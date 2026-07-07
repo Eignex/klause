@@ -65,7 +65,7 @@ class RestartPolicyTest {
         state.restart()
         for (b in 0..5) state.assignment.setBool(b, false)
 
-        val best = Sample(bools = booleanArrayOf(true, true, true, true, true, true), ints = intArrayOf())
+        val best = Sample(bools = booleanArrayOf(true, true, true, true, true, true), ints = longArrayOf())
         val policy = AdaptivePerturbationRestart(perturbationStrength = 2)
         policy.restart(state, bestSoFar = best)
 

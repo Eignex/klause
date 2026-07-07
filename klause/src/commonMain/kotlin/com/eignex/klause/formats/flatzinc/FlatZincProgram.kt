@@ -133,8 +133,8 @@ sealed interface FlatZincArray {
     /** Parameter int array. */
     data class IntParam(
         override val name: String,
-        /** Constant values. */
-        val values: IntArray,
+        /** Constant values. May exceed 32-bit range (e.g. large linear coefficients). */
+        val values: LongArray,
     ) : FlatZincArray {
         override val length: Int get() = values.size
     }

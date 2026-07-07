@@ -30,7 +30,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         for (i in succ.indices) {
             val d = state.intDomains[succ[i]]
             if (d.min != d.max) continue
-            val target = d.min
+            val target = d.min.toInt()
             if (claimed[target] != -1) return false
             claimed[target] = i
             if (target != i) pred[target] = i
@@ -50,10 +50,10 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             var cur = s
             while (cur in 0 until n && !visited[cur] && posOnPath[cur] < 0) {
                 val d = state.intDomains[succ[cur]]
-                if (d.min != d.max || d.min == cur) break
+                if (d.min != d.max || d.min == cur.toLong()) break
                 posOnPath[cur] = path.size
                 path.add(cur)
-                cur = d.min
+                cur = d.min.toInt()
             }
             if (cur in 0 until n && posOnPath[cur] >= 0) {
                 val cycleLen = path.size - posOnPath[cur]
@@ -72,11 +72,11 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             val start = c.head
             val chainNodes = c.length
             if (start != i && includedCount > chainNodes) {
-                if (start == d.min && d.min < d.max) {
+                if (start.toLong() == d.min && d.min < d.max) {
                     if (!state.tightenIntMin(v, d.min + 1, ant)) return false
-                } else if (start == d.max && d.min < d.max) {
+                } else if (start.toLong() == d.max && d.min < d.max) {
                     if (!state.tightenIntMax(v, d.max - 1, ant)) return false
-                } else if (d.min == d.max && d.min == start) {
+                } else if (d.min == d.max && d.min == start.toLong()) {
                     return false
                 }
             }
@@ -97,7 +97,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         var mandCount = 0
         var root = -1
         for (i in 0 until n) {
-            if (i !in state.intDomains[succ[i]]) {
+            if (i.toLong() !in state.intDomains[succ[i]]) {
                 mandatory[i] = true
                 mandCount++
                 if (root < 0) root = i
@@ -106,7 +106,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         if (mandCount < 2) return true
         val rev = Array(n) { IntArrayList() }
         for (i in 0 until n) {
-            state.intDomains[succ[i]].forEach { j -> if (j != i && j in 0 until n) rev[j].add(i) }
+            state.intDomains[succ[i]].forEach { j -> if (j != i.toLong() && j in 0 until n) rev[j.toInt()].add(i) }
         }
         // Only mandatory nodes must be mutually reachable; a self-loop (v == u) is an opt-out, not a
         // tour edge, so it never carries reachability.

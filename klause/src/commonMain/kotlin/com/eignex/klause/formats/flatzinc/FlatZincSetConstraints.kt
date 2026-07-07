@@ -82,7 +82,7 @@ internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
     }
     val xVar = resolveIntVar(elem)
     val dom = intDomains[xVar]
-    emitSetInVarInt(xVar, dom.min, dom.max, layout, rExpr)
+    emitSetInVarInt(xVar, dom.min.toInt(), dom.max.toInt(), layout, rExpr)
 }
 
 private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, rExpr: FznExpr?) {
@@ -102,7 +102,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
     val membershipLits = IntArrayList()
     for (v in values) {
         // Skip hole values to avoid dead channels and unnecessary reifications.
-        if (v !in dom) continue
+        if (v.toLong() !in dom) continue
         val chan = allocBool("__set_in_lit_chan_${xVar}_$v")
         factors.add(
             ReifiedLinear(
@@ -345,7 +345,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
         for (i in set.elements.indices) {
             val elem = set.elements[i]
             val ind = set.indicatorBoolIds[i]
-            val ch = allocInt("__setlex_${label}_${set.name}_$elem", lo, hi)
+            val ch = allocInt("__setlex_${label}_${set.name}_$elem", lo.toLong(), hi.toLong())
             channels[i] = ch
             factors.add(
                 ReifiedLinear(
@@ -383,7 +383,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
                 ),
             )
         }
-        val maxVar = allocInt("__setlex_${label}max_${set.name}_${factors.size}", lo, hi)
+        val maxVar = allocInt("__setlex_${label}max_${set.name}_${factors.size}", lo.toLong(), hi.toLong())
         if (channels.isEmpty()) {
             factors.add(Linear(intArrayOf(1), intArrayOf(maxVar), LinearOp.EQ, lo))
         } else {

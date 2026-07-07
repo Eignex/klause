@@ -21,7 +21,7 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
     private val boolPhaseTracking = params.phaseSaving || params.targetPhasing
     private val boolPhase: BooleanArray? = if (boolPhaseTracking) BooleanArray(numBoolVars) else null
     private val boolPhaseSet: BooleanArray? = if (boolPhaseTracking) BooleanArray(numBoolVars) else null
-    private val intPhase: IntArray? = if (params.phaseSaving) IntArray(numIntVars) else null
+    private val intPhase: LongArray? = if (params.phaseSaving) LongArray(numIntVars) else null
     private val intPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(numIntVars) else null
     private val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(numBoolVars) else null
     private val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(numBoolVars) else null
@@ -36,29 +36,29 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
      * the cached value is the target phase, the saved phase, or a rephase-mode fixed/random polarity;
      * for an integer it is the saved value. [rng] supplies the `RANDOM` rephase mode's coin flip.
      */
-    fun applyPhase(varRef: VarRef, values: Sequence<Int>, rng: Random? = null): Sequence<Int> = when (varRef) {
+    fun applyPhase(varRef: VarRef, values: Sequence<Long>, rng: Random? = null): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> {
             val v = varRef.varId
-            val savedFirst: Int? = if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[v]) {
-                if (boolPhase[v]) 1 else 0
+            val savedFirst: Long? = if (boolPhase != null && boolPhaseSet != null && boolPhaseSet[v]) {
+                if (boolPhase[v]) 1L else 0L
             } else {
                 null
             }
             // Target phasing rotates the polarity source; plain phase saving just uses the
             // saved value. The chosen value (if any) is tried first, with the heuristic's
             // order filling the rest.
-            val preferred: Int? = if (boolTarget != null && boolTargetSet != null) {
+            val preferred: Long? = if (boolTarget != null && boolTargetSet != null) {
                 when (rephaseMode) {
                     // Target: the deepest conflict-free phase, falling back to saved.
-                    RephaseMode.TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1 else 0) else savedFirst
+                    RephaseMode.TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1L else 0L) else savedFirst
 
                     RephaseMode.SAVED -> savedFirst
 
-                    RephaseMode.TRUE -> 1
+                    RephaseMode.TRUE -> 1L
 
-                    RephaseMode.FALSE -> 0
+                    RephaseMode.FALSE -> 0L
 
-                    RephaseMode.RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1 else 0
+                    RephaseMode.RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1L else 0L
                 }
             } else {
                 savedFirst

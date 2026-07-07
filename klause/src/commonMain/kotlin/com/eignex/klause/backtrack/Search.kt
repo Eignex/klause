@@ -83,14 +83,14 @@ internal sealed interface TrailNode {
 /** What [TrailNode.applyNext] returns: the actual value pushed (bools encoded as 0/1
  *  so the value heuristic callbacks see the original heuristic-emitted form) plus the
  *  session's [PropagationResult]. */
-internal data class ApplyOutcome(val value: Int, val result: PropagationResult)
+internal data class ApplyOutcome(val value: Long, val result: PropagationResult)
 
-internal class BoolNode(override val varRef: VarRef.Bool, valueSeq: Sequence<Int>) : TrailNode {
+internal class BoolNode(override val varRef: VarRef.Bool, valueSeq: Sequence<Long>) : TrailNode {
     private val iter = valueSeq.iterator()
     override fun applyNext(session: PropagationSession): ApplyOutcome? {
         if (!iter.hasNext()) return null
         val v = iter.next()
-        return ApplyOutcome(v, session.pinBool(varRef.varId, v != 0))
+        return ApplyOutcome(v, session.pinBool(varRef.varId, v != 0L))
     }
 }
 
@@ -102,10 +102,10 @@ internal class BoolNode(override val varRef: VarRef.Bool, valueSeq: Sequence<Int
  * The split point `s` is the value heuristic's preferred value (clamped into `[min, max-1]`
  * so both children are non-empty); the side holding that preferred value is explored first.
  */
-internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Int>) : TrailNode {
-    private val preferred: Int = valueSeq.firstOrNull() ?: 0
+internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Long>) : TrailNode {
+    private val preferred: Long = valueSeq.firstOrNull() ?: 0L
     private var step = 0
-    private var split = 0
+    private var split = 0L
     private var lowerFirst = true
     private var resolved = false
 
@@ -158,7 +158,7 @@ internal fun BacktrackSolver.driveSearch(
     // [pruneIf] lower-bound check, and it bounds non-linear-defined objectives too.
     objectiveVar: Int = -1,
     objectiveAscending: Boolean = true,
-    objectiveBest: () -> Int? = { null },
+    objectiveBest: () -> Long? = { null },
     // LP-learned Farkas nogoods (#247) pending registration; drained at each restart while the
     // trail is at root, so their bound atoms are no longer all-false. Null when learning is off.
     lpNogoods: LpNogoodPool? = null,
@@ -268,7 +268,7 @@ internal fun BacktrackSolver.driveSearch(
     // at the root, once per improving value. Returns true iff that makes the root
     // infeasible — the remaining objective space is empty, so the search is exhausted
     // (optimum proven). Must be called only when the session is at the root.
-    var lastObjBoundAsserted: Int? = null
+    var lastObjBoundAsserted: Long? = null
     fun assertObjectiveBoundAtRoot(): Boolean {
         if (objectiveVar < 0) return false
         val best = objectiveBest() ?: return false
@@ -519,7 +519,7 @@ internal fun BacktrackSolver.driveSearch(
     }
 }
 
-internal fun BacktrackSolver.makeNode(varRef: VarRef, values: Sequence<Int>): TrailNode = when (varRef) {
+internal fun BacktrackSolver.makeNode(varRef: VarRef, values: Sequence<Long>): TrailNode = when (varRef) {
     is VarRef.Bool -> BoolNode(varRef, values)
     is VarRef.IntVar -> IntNode(varRef, values)
 }

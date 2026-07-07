@@ -43,7 +43,7 @@ class PresolveSessionTest {
         val reference = PresolveShared.rebuildProblem(base(f0, f2, g), listOf(f0, f2, g), domains())
         assertEquals(bounds(reference), bounds(got))
         assertEquals(3, got.factors.size)
-        assertEquals(0 to 5, got.intDomains[2].min to got.intDomains[2].max) // x2 upper-bounded through the chain
+        assertEquals(0L to 5L, got.intDomains[2].min to got.intDomains[2].max) // x2 upper-bounded through the chain
     }
 
     @Test
@@ -65,7 +65,7 @@ class PresolveSessionTest {
             arrayOf(IntDomain(0, 3), IntDomain(0, 10), IntDomain(0, 10)),
         )
         assertEquals(bounds(reference), bounds(got))
-        assertEquals(0 to 3, got.intDomains[2].min to got.intDomains[2].max) // x2 upper-bounded through the chain
+        assertEquals(0L to 3L, got.intDomains[2].min to got.intDomains[2].max) // x2 upper-bounded through the chain
     }
 
     @Test

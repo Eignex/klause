@@ -20,7 +20,7 @@ class CombinedCountTest {
     private fun ints(count: Int, lo: Int, hi: Int, vararg factors: Factor) = Problem(
         numBoolVars = 0,
         numIntVars = count,
-        intDomains = Array(count) { IntDomain(lo, hi) },
+        intDomains = Array(count) { IntDomain(lo.toLong(), hi.toLong()) },
         factors = arrayOf(*factors),
     )
 

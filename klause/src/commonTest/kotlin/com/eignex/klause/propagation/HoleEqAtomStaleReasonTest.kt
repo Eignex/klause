@@ -30,7 +30,7 @@ class HoleEqAtomStaleReasonTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = numVars,
-            intDomains = Array(numVars) { IntDomain(0, hi) },
+            intDomains = Array(numVars) { IntDomain(0, hi.toLong()) },
             factors = arrayOf<Factor>(),
         )
         return PropagationState(problem, Assumptions.None).also { it.undoLogging = true }
