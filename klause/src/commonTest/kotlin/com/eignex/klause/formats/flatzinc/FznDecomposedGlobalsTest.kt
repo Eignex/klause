@@ -2,8 +2,12 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.global.AllDifferent
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Brute-force equivalence for globals handled at the FlatZinc emit site. Most are lowered to
@@ -45,6 +49,21 @@ class FznDecomposedGlobalsTest {
 
     private val names = listOf("x1", "x2", "x3")
     private fun decl(hi: Int) = "var 0..$hi: x1; var 0..$hi: x2; var 0..$hi: x3;\n"
+
+    @Test
+    fun `all_different over a value span beyond Int range lowers to pairwise not-equal`() {
+        // A value span > 2^31 (reachable for wide/unbounded int vars) would truncate AllDifferent's
+        // Int-sized value-indexed scratch, so the emit site decomposes to pairwise != instead.
+        val src = "var 0..5000000000: x1; var 0..5000000000: x2; var 0..5000000000: x3;\n" +
+            "constraint all_different_int([x1, x2, x3]);\nsolve satisfy;"
+        val factors = parseFlatZinc(src).problem.factors
+        assertTrue(factors.none { it is AllDifferent }, "wide-span alldifferent must not build a value-indexed factor")
+        assertEquals(
+            3,
+            factors.filterIsInstance<Linear>().count { it.op == LinearOp.NE },
+            "expected C(3,2) pairwise !=",
+        )
+    }
 
     @Test
     fun `all_equal matches brute force`() {
