@@ -167,7 +167,7 @@ object BenchCli {
     /** Harvest per-instance reference optima/bounds into the committed table (see [ReferenceStore]) —
      *  the gap-to-optimum BO reward + a soundness oracle. Runs the reference solver (`backend=`, default
      *  `cp-sat`) over the selection — cache-replayed if already solved — then merges each optimize
-     *  instance's `{objective, proven}` into `klause-bench/reference/references.json` (virtual-best).
+     *  instance's `{objective, proven}` into `klause-bench/reference/references.csv` (virtual-best).
      *  Optimize instances only (pass `kind=cop`); match the cached run's `timeout=` to replay it. */
     private fun reference(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
