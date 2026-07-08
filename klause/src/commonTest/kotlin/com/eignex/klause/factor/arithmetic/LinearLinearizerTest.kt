@@ -14,7 +14,7 @@ class LinearLinearizerTest {
         data class Row(
             val op: LinearOp,
             val vars: List<Int>,
-            val coeffs: List<Int>,
+            val coeffs: List<Long>,
             val bound: Long,
             val contribution: Contribution,
         )
@@ -24,7 +24,7 @@ class LinearLinearizerTest {
         override fun linearRow(
             op: LinearOp,
             intVars: IntArray,
-            coeffs: IntArray,
+            coeffs: LongArray,
             bound: Long,
             contribution: Contribution,
         ) {
@@ -71,7 +71,7 @@ class LinearLinearizerTest {
         assertEquals(5L, builder.rows[0].bound)
         assertEquals(Contribution.CORE, builder.rows[0].contribution)
         assertEquals(linear.vars.toList(), builder.rows[0].vars)
-        assertEquals(linear.coeffs.map { it.toInt() }, builder.rows[0].coeffs)
+        assertEquals(linear.coeffs.toList(), builder.rows[0].coeffs)
     }
 
     @Test

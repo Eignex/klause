@@ -113,22 +113,11 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 
     override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
 
-    // Relaxation/presolve views (LP linearizer via the Factor default, exact linear row) stay 32-bit. A
-    // Linear whose coefficients or bound exceed Int range is simply not surfaced to them — sound, since
-    // the propagator/invariant above still enforce it; the relaxation just omits this row.
-    override fun linearRows(): List<LinearRow>? = if (fitsInt32(
-            coeffs,
-            bound,
-        )
-    ) {
-        listOf(LinearRow(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound))
-    } else {
-        null
-    }
+    override fun linearRows(): List<LinearRow> = listOf(LinearRow(coeffs, vars, op, bound))
 }
 
-/** True when every coefficient and the bound fit 32-bit range — the precondition for narrowing a wide
- *  [Linear]/[ReifiedLinear] to an Int-coefficient [LinearRow] relaxation view. */
+/** True when every coefficient and the bound fit 32-bit range — the precondition for the Int-coefficient
+ *  reasoning a consumer keeps (ReifiedLinear's big-M rows, GCD modulus fixing, coefficient strengthening). */
 internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
     bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
         coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }

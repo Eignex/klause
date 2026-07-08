@@ -53,7 +53,7 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
     // LP relaxation is these rows (via the [Factor.linearize] default).
     override fun linearRows(): List<LinearRow> = buildList {
         for (i in 0 until xs.size - 1) {
-            add(LinearRow(intArrayOf(1, -1), intArrayOf(xs[i + 1], xs[i]), LinearOp.GE, gap.toLong()))
+            add(LinearRow(longArrayOf(1, -1), intArrayOf(xs[i + 1], xs[i]), LinearOp.GE, gap.toLong()))
         }
     }
 }

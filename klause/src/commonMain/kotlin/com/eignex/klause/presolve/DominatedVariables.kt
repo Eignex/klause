@@ -63,7 +63,7 @@ internal object DominatedVariables {
                 for (row in rows) {
                     for (i in row.vars.indices) {
                         val a = row.coeffs[i]
-                        if (a == 0) continue
+                        if (a == 0L) continue
                         // Lowering is safe iff (LE ∧ a>0) ∨ (GE ∧ a<0); raising is the complement.
                         val loweringSafe = if (row.op == LinearOp.LE) a > 0 else a < 0
                         if (loweringSafe) upSafe[row.vars[i]] = false else downSafe[row.vars[i]] = false

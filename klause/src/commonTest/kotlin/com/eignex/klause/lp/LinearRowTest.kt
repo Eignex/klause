@@ -13,13 +13,13 @@ class LinearRowTest {
 
     @Test
     fun `Linear exposes its own row exactly`() {
-        val rows = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 5).linearRows()!!
+        val rows = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 5).linearRows()
         assertEquals(1, rows.size)
         val r = rows[0]
         assertEquals(LinearOp.LE, r.op)
         assertEquals(5L, r.bound)
         assertTrue(r.vars.contentEquals(intArrayOf(0, 1)))
-        assertTrue(r.coeffs.contentEquals(intArrayOf(2, -1)))
+        assertTrue(r.coeffs.contentEquals(longArrayOf(2, -1)))
     }
 
     @Test
@@ -30,7 +30,7 @@ class LinearRowTest {
         for (r in rows) {
             assertEquals(LinearOp.GE, r.op)
             assertEquals(1L, r.bound)
-            assertTrue(r.coeffs.contentEquals(intArrayOf(1, -1)))
+            assertTrue(r.coeffs.contentEquals(longArrayOf(1, -1)))
         }
         assertTrue(rows[0].vars.contentEquals(intArrayOf(1, 0)))
         assertTrue(rows[1].vars.contentEquals(intArrayOf(2, 1)))

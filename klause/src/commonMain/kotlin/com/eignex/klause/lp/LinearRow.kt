@@ -14,7 +14,7 @@ import com.eignex.klause.solver.Factor
  */
 class LinearRow(
     /** Coefficient of each term, parallel to [vars]. */
-    val coeffs: IntArray,
+    val coeffs: LongArray,
     /** Integer variable id of each term, parallel to [coeffs]. */
     val vars: IntArray,
     /** Relational operator comparing `Σ coeffs·vars` against [bound]. */
