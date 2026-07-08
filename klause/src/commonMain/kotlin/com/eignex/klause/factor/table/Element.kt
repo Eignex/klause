@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
-import com.eignex.klause.lp.LinearizerEstimate
+import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -195,7 +195,7 @@ class Element private constructor(
         if (arrIsVars) resultBigM(builder, selCols, positions) else resultChannel(builder, selCols, positions)
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
         if (arr.size > MAX_ELEM) return null
         val declared = domains[idx]
         var k = 0L
@@ -203,7 +203,7 @@ class Element private constructor(
         if (k == 0L) return null
         // Constant array: Σ y = 1 + index channel + result channel (3 rows). Variable array:
         // Σ y = 1 + index channel + two big-M rows per selector (2 + 2k).
-        return LinearizerEstimate(cols = k, rows = if (arrIsVars) 2L + 2L * k else 3L)
+        return LpSizeEstimate(cols = k, rows = if (arrIsVars) 2L + 2L * k else 3L)
     }
 
     /** The shared one-hot selectors `Σ_p y_p = 1` and index channel `Σ_p (p + off)·y_p = idx`. */

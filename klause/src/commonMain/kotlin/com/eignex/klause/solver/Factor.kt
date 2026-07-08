@@ -4,7 +4,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LinearRow
-import com.eignex.klause.lp.LinearizerEstimate
+import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 
@@ -197,7 +197,7 @@ interface Factor {
      * no applicable structure, or no hull at all. The LP auto-config sums these to keep the per-node
      * tableau under budget, so the estimate must track [linearize]'s own caps and structure. Default: `null`.
      */
-    fun lpSizeEstimate(@Suppress("UNUSED_PARAMETER") domains: Array<IntDomain>): LinearizerEstimate? = null
+    fun lpSizeEstimate(@Suppress("UNUSED_PARAMETER") domains: Array<IntDomain>): LpSizeEstimate? = null
 
     /**
      * The gated convex-hull family this factor's [linearize] contributes to, or `null` (default) when it

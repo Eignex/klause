@@ -70,7 +70,7 @@ class HullFlags(
 
 /** The LP columns and rows a factor's [com.eignex.klause.solver.Factor.lpSizeEstimate] predicts its
  *  hull adds (upper bounds). */
-class LinearizerEstimate(
+class LpSizeEstimate(
     /** Upper bound on the LP columns the hull contribution adds. */
     val cols: Long,
     /** Upper bound on the LP rows the hull contribution adds. */
