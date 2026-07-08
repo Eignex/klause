@@ -158,12 +158,12 @@ object BenchCli {
     }
 
     /** BO config search (task #24): greedy residual rounds ([BoTuning]) that ask a [Tuner] for config
-     *  points over an engine's `ConfigSpace`, evaluate each in-process on the COP selection
-     *  (reference-normalised gap-to-optimum reward), and build a diverse palette one complement per
-     *  round. Filters: `engine=ls|bt` `rounds=N` (palette size) `trials=M` (per-round asks) `batch=B`
-     *  `timeout=<ms>` `tuner=random|vizier` `warm-start=true|false` `seed=N` (+ the usual
-     *  `suite=`/`kind=`/… selection). COP-only: the in-process eval needs an objective, so pass
-     *  `kind=cop`. Depends only on the [Tuner] seam, so the optimizer backend is swappable. */
+     *  points over an engine's `ConfigSpace`, evaluate each in-process on the selection, and build a
+     *  diverse palette one complement per round. The reward is per instance kind — gap-to-optimum for a
+     *  COP, time-to-first-feasible for a CSP — so `kind=cop` and `kind=csp` both work. Filters:
+     *  `engine=ls|bt` `rounds=N` (palette size) `trials=M` (per-round asks) `batch=B` `timeout=<ms>`
+     *  `tuner=random|vizier` `warm-start=true|false` `seed=N` (+ the usual `suite=`/`kind=`/… selection).
+     *  Depends only on the [Tuner] seam, so the optimizer backend is swappable. */
     private fun tune(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val engine = when (f["engine"]?.lowercase()) {
@@ -171,9 +171,11 @@ object BenchCli {
             "ls", "localsearch", "local-search", null -> TuneEngine.LS
             else -> error("tune engine must be ls | bt, got '${f["engine"]}'")
         }
-        val instances = BenchLoad.resolveRefs(select(f)).filter { it.objective != null }
+        // COP (objective) → gap-to-optimum reward; CSP (satisfy) → time-to-first-feasible. The `select`
+        // `kind=cop|csp` filter picks which; a mixed selection is scored per-instance by its own kind.
+        val instances = BenchLoad.resolveRefs(select(f))
         if (instances.isEmpty()) {
-            println("(no COP instances matched — the BO eval needs an objective; pass kind=cop)")
+            println("(no instances matched the selection)")
             return
         }
         val rounds = f["rounds"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
@@ -189,7 +191,7 @@ object BenchCli {
             else -> error("tune tuner must be random | vizier, got '${f["tuner"]}'")
         }
         println(
-            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${instances.size} COP instance(s), " +
+            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${instances.size} instance(s), " +
                 "$rounds rounds × $trials trials × ${budgetMs}ms ===",
         )
         val result = tuner.use {

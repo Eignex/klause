@@ -30,6 +30,17 @@ class BoTuningTest {
         )
     }
 
+    /** A CSP instance from a constraints-only OPB (no `min:`) — objective null, so the loop scores it by
+     *  time-to-first-feasible rather than gap-to-optimum. */
+    private fun csp(name: String, opb: String): ResolvedProblem {
+        val parsed = Opb.parse(opb)
+        return ResolvedProblem(
+            ref = ProblemRef(name, Format.OPB, ProblemSource.Vendored("test/$name"), Category.CSP, Expected.Unknown),
+            problem = parsed.problem,
+            objective = null,
+        )
+    }
+
     /** A deterministic [Tuner] that cycles through a fixed list of config points — so the residual-round
      *  mechanics can be asserted exactly (no RNG), and, as a third [Tuner] impl, it re-proves the seam. */
     private class CyclingTuner(private val points: List<Map<String, Any>>) : Tuner {
@@ -109,6 +120,28 @@ class BoTuningTest {
             result.palette.all { it.label in result.configs.keys },
             "every palette entry is one of the evaluated configs",
         )
+    }
+
+    @Test
+    fun `the BO loop tunes CSP instances via the time-to-feasible reward`() {
+        val instances = listOf(
+            csp("csp-a", "+1 x1 +1 x2 >= 1 ;\n"),
+            csp("csp-b", "+1 x1 +1 x3 >= 1 ;\n+1 x2 +1 x3 >= 1 ;\n"),
+        )
+        val result =
+            BoTuning.tuneBt(
+                instances,
+                RandomTuner(seed = 1),
+                rounds = 2,
+                trials = 4,
+                batch = 2,
+                budgetMs = 200,
+                seed = 7,
+            )
+
+        assertTrue(result.palette.isNotEmpty(), "a CSP selection yields a palette")
+        // These CSP instances are satisfiable, so a solving config earns positive coverage.
+        assertTrue(result.palette.first().gain > 0.0, "a config that reaches feasibility covers instances")
     }
 
     @Test
