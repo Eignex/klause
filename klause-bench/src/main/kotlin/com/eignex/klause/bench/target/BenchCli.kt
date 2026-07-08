@@ -25,6 +25,7 @@ import com.eignex.klause.bench.tools.ProfileEvent
 import com.eignex.klause.bench.tools.ProfileScope
 import com.eignex.klause.bench.tune.BoTuning
 import com.eignex.klause.bench.tune.RandomTuner
+import com.eignex.klause.bench.tune.StratifiedPool
 import com.eignex.klause.bench.tune.TuneEngine
 import com.eignex.klause.bench.tune.Tuner
 import com.eignex.klause.bench.tune.VizierTuner
@@ -214,9 +215,11 @@ object BenchCli {
         }
         // COP (objective) → gap-to-optimum reward; CSP (satisfy) → time-to-first-feasible. The `select`
         // `kind=cop|csp` filter picks which; a mixed selection is scored per-instance by its own kind.
-        val instances = BenchLoad.resolveRefs(select(f))
-        if (instances.isEmpty()) {
-            println("(no instances matched the selection)")
+        // The pool is stratified from references.csv and resolves lazily — only each round's mini-batch is
+        // built, so a huge selection never materialises (the point of #35).
+        val pool = StratifiedPool(select(f))
+        if (!pool.isNotEmpty()) {
+            println("(no referenced instances matched — a stratified pool needs references.csv rows)")
             return
         }
         val rounds = f["rounds"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
@@ -232,17 +235,18 @@ object BenchCli {
             "random" -> RandomTuner(seed)
             else -> error("tune tuner must be random | vizier, got '${f["tuner"]}'")
         }
+        val strata = pool.strata()
         println(
-            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${instances.size}-instance pool, " +
-                "$rounds rounds × $trials trials × sample $sample × ${budgetMs}ms ===",
+            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${strata.values.sum()} instances over " +
+                "${strata.size} strata, $rounds rounds × $trials trials × sample $sample × ${budgetMs}ms ===",
         )
         val result = tuner.use {
             when (engine) {
                 TuneEngine.LS ->
-                    BoTuning.tuneLs(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
+                    BoTuning.tuneLs(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
 
                 TuneEngine.BT ->
-                    BoTuning.tuneBt(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
+                    BoTuning.tuneBt(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
             }
         }
         // The residual-round palette is the primary output: each round's marginal coverage gain, then
