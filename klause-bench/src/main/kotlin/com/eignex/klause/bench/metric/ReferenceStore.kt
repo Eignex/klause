@@ -77,14 +77,26 @@ internal object ReferenceStore {
         is ProblemSource.InCode -> "in-code"
     }
 
-    fun load(): Map<Pair<String, String>, ReferenceEntry> {
-        val f = file()
-        if (!f.isFile) return emptyMap()
+    fun load(): Map<Pair<String, String>, ReferenceEntry> = readCsv(file()).associateBy { key(it) }
+
+    /** Read any references.csv-schema file — the committed oracle table, or a per-run result table
+     *  emitted by `solve` — into entries. Lets the analysis (`credit`) read results in the same schema. */
+    fun readCsv(f: File): List<ReferenceEntry> {
+        if (!f.isFile) return emptyList()
         return f.readLines().asSequence()
             .drop(1) // header
             .filter { it.isNotBlank() }
             .map { decode(parseCsvLine(it)) }
-            .associateBy { key(it) }
+            .toList()
+    }
+
+    /** Write [entries] to [f] in the references.csv schema (header + one row per entry, sorted by
+     *  (suite, problem)) — the single-sourced encoding, used for both the committed table and result
+     *  tables. */
+    fun writeCsv(f: File, entries: List<ReferenceEntry>) {
+        f.parentFile?.mkdirs()
+        val rows = entries.sortedWith(compareBy({ it.suite }, { it.problem })).map { encode(it) }
+        f.writeText((listOf(COLUMNS.joinToString(",")) + rows).joinToString("\n", postfix = "\n"))
     }
 
     /** Merge [incoming] into the table (virtual-best) and write it back sorted by (suite, problem).
@@ -139,12 +151,7 @@ internal object ReferenceStore {
         return updated to unmatched
     }
 
-    private fun write(table: Map<Pair<String, String>, ReferenceEntry>) {
-        val f = file()
-        f.parentFile?.mkdirs()
-        val rows = table.values.sortedWith(compareBy({ it.suite }, { it.problem })).map { encode(it) }
-        f.writeText((listOf(COLUMNS.joinToString(",")) + rows).joinToString("\n", postfix = "\n"))
-    }
+    private fun write(table: Map<Pair<String, String>, ReferenceEntry>) = writeCsv(file(), table.values.toList())
 
     /** Whether [a] is a strictly better reference than [b]: proven beats unproven; among feasible
      *  bounds the tighter objective wins; any feasible beats none. */

@@ -124,6 +124,10 @@ internal object SolveMetric {
         println("=== solve ($tag; ${budget.timeoutMillis}ms budget) -> output/$tag/ ===")
         var feasible = 0
         var proved = 0
+        // Feature columns (structure/format/…) are joined onto each result row from the committed
+        // oracle table, so `output/<tag>.csv` is analysable by structure/size out of the box.
+        val features = ReferenceStore.load()
+        val resultRows = ArrayList<ReferenceEntry>(entries.size)
         for (entry in entries) {
             val optimize = entry.objective != null
             val kind = if (optimize) "optimize" else "satisfy"
@@ -144,13 +148,43 @@ internal object SolveMetric {
                 errorRecord(entry, solverId, settings, budget, kind, timestamp, sha)
             }
             File(outDir, flat(entry) + ".json").writeText(Reports.json.encodeToString(rec))
+            val suite = ReferenceStore.suiteOf(entry.ref)
+            resultRows += resultRow(suite, rec, tag, features[suite to rec.problem])
             if (rec.feasible == true) feasible++
             if (rec.proven) proved++
             val mark = if (rec.feasible == null && !rec.proven) "??" else "ok"
             println("$mark [${rec.problem}] $kind = ${display(rec)}")
         }
-        println("\n$feasible/${entries.size} feasible, $proved proved  (output/$tag/)")
+        // A per-run result table in the references.csv schema (solver = this config's tag) — the input
+        // `bench credit` compares, keyed by (suite, problem), sliceable by the joined feature columns.
+        ReferenceStore.writeCsv(File("output", "$tag.csv"), resultRows)
+        println("\n$feasible/${entries.size} feasible, $proved proved  (output/$tag/, output/$tag.csv)")
         return outDir
+    }
+
+    /** This run's result for one instance as a references.csv-schema row: `solver` is the config [tag],
+     *  `elapsedMs` the time-used proxy (time-to-best when solved, else the budget — matching the
+     *  `compare.sh` convention), and the source-text features are joined from the committed table
+     *  ([ref], null when the instance has no oracle entry). */
+    internal fun resultRow(suite: String, rec: SolveRecord, tag: String, ref: ReferenceEntry?): ReferenceEntry {
+        val solved = rec.feasible != null
+        val elapsed = if (solved) (rec.timeToBestMs ?: rec.budgetMs) else rec.budgetMs
+        return ReferenceEntry(
+            suite = suite,
+            problem = rec.problem,
+            maximize = rec.maximize,
+            objective = rec.objective,
+            feasible = rec.feasible,
+            proven = rec.proven,
+            elapsedMs = elapsed,
+            solver = tag,
+            budgetMs = rec.budgetMs,
+            format = ref?.format.orEmpty(),
+            structure = ref?.structure.orEmpty(),
+            numGlobal = ref?.numGlobal,
+            numLinear = ref?.numLinear,
+            boolHeavy = ref?.boolHeavy,
+        )
     }
 
     /** Filesystem-safe, self-sufficient config identifier: solver + engine + processors + search mode
