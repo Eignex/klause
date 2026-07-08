@@ -31,6 +31,17 @@ internal data class ReferenceEntry(
     val elapsedMs: Long,
     val solver: String,
     val budgetMs: Long,
+    // --- Source-text features (from `bench classify`); blank/null until an instance is classified. ---
+    /** Source format: `minizinc` / `xcsp3` / `opb` / `dimacs` / …. */
+    val format: String = "",
+    /** Structure class: `pseudo-boolean` / `sat` / `global` / `linear` / `arithmetic` (blank = unclassified). */
+    val structure: String = "",
+    /** Global-constraint uses counted in the source (null = unclassified). */
+    val numGlobal: Int? = null,
+    /** Linear-arithmetic constraints counted in the source (null = unclassified). */
+    val numLinear: Int? = null,
+    /** Bool-dominated (more bool than int variable declarations); null = unclassified. */
+    val boolHeavy: Boolean? = null,
 )
 
 /**
@@ -42,8 +53,14 @@ internal data class ReferenceEntry(
  * and unproven bounds stay honest. Regenerable + incremental via `bench reference`.
  */
 internal object ReferenceStore {
-    private val COLUMNS =
-        listOf("suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "solver", "budgetMs")
+    private val COLUMNS = listOf(
+        "suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "solver", "budgetMs",
+        "format", "structure", "numGlobal", "numLinear", "boolHeavy",
+    )
+
+    /** The oracle-only prefix — a legacy row (pre-features) has exactly this many columns and decodes
+     *  with blank/null features, so the schema extension stays backward-compatible. */
+    private const val ORACLE_COLUMNS = 9
 
     private fun file() = File(CorpusFetcher.workspaceRoot(), "klause-bench/reference/references.csv")
 
@@ -93,11 +110,40 @@ internal object ReferenceStore {
                 else -> unchanged++
             }
         }
+        write(table)
+        return Triple(added, tightened, unchanged)
+    }
+
+    /** Merge source-derived [features] (keyed by (suite, problem)) into the table, leaving the oracle
+     *  fields untouched. Returns (updated, unmatched). */
+    fun mergeFeatures(features: Map<Pair<String, String>, InstanceFeatures>): Pair<Int, Int> {
+        val table = load().toMutableMap()
+        var updated = 0
+        var unmatched = 0
+        for ((k, feat) in features) {
+            val old = table[k]
+            if (old == null) {
+                unmatched++
+                continue
+            }
+            table[k] = old.copy(
+                format = feat.format,
+                structure = feat.structure,
+                numGlobal = feat.numGlobal,
+                numLinear = feat.numLinear,
+                boolHeavy = feat.boolHeavy,
+            )
+            updated++
+        }
+        write(table)
+        return updated to unmatched
+    }
+
+    private fun write(table: Map<Pair<String, String>, ReferenceEntry>) {
         val f = file()
         f.parentFile?.mkdirs()
         val rows = table.values.sortedWith(compareBy({ it.suite }, { it.problem })).map { encode(it) }
         f.writeText((listOf(COLUMNS.joinToString(",")) + rows).joinToString("\n", postfix = "\n"))
-        return Triple(added, tightened, unchanged)
     }
 
     /** Whether [a] is a strictly better reference than [b]: proven beats unproven; among feasible
@@ -119,10 +165,18 @@ internal object ReferenceStore {
         e.elapsedMs.toString(),
         csv(e.solver),
         e.budgetMs.toString(),
+        csv(e.format),
+        csv(e.structure),
+        e.numGlobal?.toString().orEmpty(),
+        e.numLinear?.toString().orEmpty(),
+        e.boolHeavy?.toString().orEmpty(),
     ).joinToString(",")
 
+    /** Parse one CSV data row into a [ReferenceEntry] (test seam over the private decode). */
+    fun parseRow(line: String): ReferenceEntry = decode(parseCsvLine(line))
+
     private fun decode(f: List<String>): ReferenceEntry {
-        require(f.size == COLUMNS.size) { "reference row has ${f.size} fields, expected ${COLUMNS.size}: $f" }
+        require(f.size >= ORACLE_COLUMNS) { "reference row has ${f.size} fields, expected >= $ORACLE_COLUMNS: $f" }
         return ReferenceEntry(
             suite = f[0],
             problem = f[1],
@@ -133,6 +187,12 @@ internal object ReferenceStore {
             elapsedMs = f[6].toLong(),
             solver = f[7],
             budgetMs = f[8].toLong(),
+            // Features are absent in a legacy (oracle-only) row — default to blank/null.
+            format = f.getOrElse(9) { "" },
+            structure = f.getOrElse(10) { "" },
+            numGlobal = f.getOrNull(11)?.ifEmpty { null }?.toInt(),
+            numLinear = f.getOrNull(12)?.ifEmpty { null }?.toInt(),
+            boolHeavy = f.getOrNull(13)?.ifEmpty { null }?.toBoolean(),
         )
     }
 
