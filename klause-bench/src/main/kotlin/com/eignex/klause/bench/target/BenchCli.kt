@@ -11,6 +11,7 @@ import com.eignex.klause.bench.metric.InstanceFeatures
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.ReferenceEntry
 import com.eignex.klause.bench.metric.ReferenceStore
+import com.eignex.klause.bench.metric.ResultCredit
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
@@ -39,8 +40,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * Single entry point for the bench: `./gradlew :klause-bench:bench --args="<command>"`.
  *
  * The bench does one thing — **solve** a **selection** of problems with one solver, as a subprocess,
- * saving per-problem output (see [SolveMetric]); the offline `output/compare.sh` / `output/credit.sh`
- * scripts analyse the saved dirs. The run form:
+ * saving per-problem output (see [SolveMetric]) plus a per-run `output/<config>.csv` result table in
+ * the references.csv schema; the `credit` command / `output/credit.sh` compare those tables, and the
+ * `output/compare.sh` MiniZinc-Challenge Borda scorer reads the saved dirs. The run form:
  *
  *   `bench solve [filters…]`   e.g. `bench solve suite=smtlib-core backend=choco`
  *
@@ -58,6 +60,8 @@ import java.util.concurrent.atomic.AtomicInteger
  *    arms into a diverse palette by per-problem best-holder wins (see [calibrate]).
  *  - `reference [filters…]` — harvest per-instance reference optima/bounds (default `backend=cp-sat`)
  *    into the committed table (see [reference]); the gap-to-optimum reward + a soundness oracle.
+ *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
+ *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `list` — suites; `list <suite>` — problems in a suite.
  */
@@ -87,8 +91,13 @@ object BenchCli {
 
             "tune" -> tune(args.drop(1))
 
+            "credit" -> credit(args.drop(1))
+
             else ->
-                error("unknown command '$cmd' (commands: solve, preview, calibrate, reference, classify, tune, list)")
+                error(
+                    "unknown command '$cmd' " +
+                        "(commands: solve, preview, calibrate, reference, classify, tune, credit, list)",
+                )
         }
     }
 
@@ -121,9 +130,25 @@ object BenchCli {
         )
     }
 
+    /** Credit between per-run result CSVs (emitted by `solve` as `output/<config>.csv`, references.csv
+     *  schema): `credit [--by structure|format] <a.csv> <b.csv> [c.csv …]`. Joins on (suite, problem),
+     *  picks each instance's winner(s), and reports win-share + a greedy diverse set-cover
+     *  ([ResultCredit]). `--by` slices the credit within each feature-column value. Include the
+     *  committed `references.csv` itself as a file to score against the cp-sat baseline. */
+    private fun credit(args: List<String>) {
+        val by = args.zipWithNext().firstOrNull { it.first == "--by" }?.second
+        val files = args
+            .filterIndexed { i, a -> !a.startsWith("--") && args.getOrNull(i - 1) != "--by" }
+            .map { File(it) }
+        require(files.size >= 2) { "credit needs >= 2 result CSVs (got ${files.size})" }
+        files.firstOrNull { !it.isFile }?.let { error("no such result CSV: $it") }
+        print(ResultCredit.credit(files, by))
+    }
+
     /** Run `solve` over the [filterArgs] selection (or just print it when [preview]). `solve` is the
-     *  bench's one measurement: one solver per invocation, as a subprocess, saving per-problem
-     *  output (see [SolveMetric]); offline `output/compare.sh` / `output/credit.sh` analyse the dirs. */
+     *  bench's one measurement: one solver per invocation, as a subprocess, saving per-problem output
+     *  (see [SolveMetric]) plus an `output/<config>.csv` result table that `credit` / `output/credit.sh`
+     *  compare; `output/compare.sh` does Borda scoring over the dirs. */
     private fun run(filterArgs: List<String>, preview: Boolean) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val refs = select(f)
