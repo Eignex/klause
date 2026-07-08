@@ -420,9 +420,13 @@ internal object RedundantConstraints {
      *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
      *  the dominance ratio check), so skip them. */
     private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
+        // The subsumption index (GCD reduction, coefficient map) reasons in Int; a row whose
+        // coefficients exceed Int range is left out of it — the row is still enforced elsewhere.
+        if (!fitsInt32(row.coeffs, row.bound)) return null
+        val intCoeffs = IntArray(row.coeffs.size) { row.coeffs[it].toInt() }
         val (coeffs, bound) = when (row.op) {
-            LinearOp.LE -> row.coeffs to row.bound
-            LinearOp.GE -> negated(row.coeffs) to -row.bound
+            LinearOp.LE -> intCoeffs to row.bound
+            LinearOp.GE -> negated(intCoeffs) to -row.bound
             else -> return null
         }
         val g = PresolveShared.gcdOf(coeffs)
@@ -572,16 +576,22 @@ internal object RedundantConstraints {
 
     /** A single exact [LinearRow] as its `≤`-normalised [IneqForm] (an `=` row carries its opposite
      *  direction and is never dropped); `null` for a `≠` row. */
-    private fun rowForm(row: LinearRow): IneqForm? = when (row.op) {
-        LinearOp.LE -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = false)
+    private fun rowForm(row: LinearRow): IneqForm? {
+        // The normalised-form key reasons in Int; a row whose coefficients exceed Int range is not
+        // keyed for redundancy (it is still enforced by its originating factor).
+        if (!fitsInt32(row.coeffs, row.bound)) return null
+        val coeffs = IntArray(row.coeffs.size) { row.coeffs[it].toInt() }
+        return when (row.op) {
+            LinearOp.LE -> reducedIneq(row.vars, coeffs, row.bound, ::leKey, fromEq = false)
 
-        LinearOp.GE -> reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = false)
+            LinearOp.GE -> reducedIneq(row.vars, negated(coeffs), -row.bound, ::leKey, fromEq = false)
 
-        LinearOp.EQ -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = true).copyWithOpposite(
-            reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = true),
-        )
+            LinearOp.EQ -> reducedIneq(row.vars, coeffs, row.bound, ::leKey, fromEq = true).copyWithOpposite(
+                reducedIneq(row.vars, negated(coeffs), -row.bound, ::leKey, fromEq = true),
+            )
 
-        LinearOp.NE -> null
+            LinearOp.NE -> null
+        }
     }
 
     private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {

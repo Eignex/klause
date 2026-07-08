@@ -10,6 +10,8 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.lp.LpModel
+import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -70,6 +72,23 @@ class CpToLpRelaxationReboundTest {
         val fresh = relaxer.build(node)
         val reboundModel = base.rebound(node).model
         assertSameModel(fresh.model, reboundModel)
+    }
+
+    @Test
+    fun `a linear row over coefficients beyond Int range bounds soundly`() {
+        // 3e9·x >= 6e9 over x in [0,10], minimize x. The exact row carries Long coefficients into the
+        // relaxation, so the LP optimum is x = 2.
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
+            arrayOf<Factor>(Linear(longArrayOf(3_000_000_000L), intArrayOf(0), LinearOp.GE, 6_000_000_000L)),
+        )
+        val r = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val sol = solveLp(r.model)
+        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(2.0, sol.objectiveValue, 1e-6, "3e9·x >= 6e9 gives min x = 2")
     }
 
     @Test

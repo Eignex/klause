@@ -538,7 +538,7 @@ internal class CpToLpRelaxation(
         @Suppress("LongParameterList")
         private fun addIntRow(
             vars: IntArray,
-            coeffs: IntArray,
+            coeffs: LongArray,
             auxCol: Int,
             auxCoeff: Long,
             rel: Relation,
@@ -551,7 +551,7 @@ internal class CpToLpRelaxation(
             val vals = LongArray(vars.size + extra)
             for (k in vars.indices) {
                 cols[k] = intColumn(vars[k])
-                vals[k] = coeffs[k].toLong()
+                vals[k] = coeffs[k]
             }
             if (auxCol >= 0) {
                 cols[vars.size] = auxCol
@@ -747,7 +747,7 @@ internal class CpToLpRelaxation(
         override fun linearRow(
             op: LinearOp,
             intVars: IntArray,
-            coeffs: IntArray,
+            coeffs: LongArray,
             bound: Long,
             contribution: Contribution,
         ) {

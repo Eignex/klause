@@ -18,7 +18,7 @@ interface RelaxationBuilder {
     fun linearRow(
         op: LinearOp,
         intVars: IntArray,
-        coeffs: IntArray,
+        coeffs: LongArray,
         bound: Long,
         contribution: Contribution = Contribution.CORE,
     )
