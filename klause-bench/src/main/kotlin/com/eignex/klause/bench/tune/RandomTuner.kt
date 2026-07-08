@@ -15,18 +15,19 @@ internal class RandomTuner(seed: Long = 0L) : Tuner {
     private val rng = Random(seed)
     private var counter = 0
 
-    override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String): TuningStudy = object : TuningStudy {
-        override fun suggest(count: Int): List<Suggestion> =
-            List(count) { Suggestion(handle = "$studyId/random-${counter++}", values = space.sample(rng)) }
+    override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String, noisy: Boolean): TuningStudy =
+        object : TuningStudy {
+            override fun suggest(count: Int): List<Suggestion> =
+                List(count) { Suggestion(handle = "$studyId/random-${counter++}", values = space.sample(rng)) }
 
-        /** Random search does not learn, so a reported objective is ignored. */
-        override fun complete(suggestion: Suggestion, objective: Double) = Unit
+            /** Random search does not learn, so a reported objective is ignored. */
+            override fun complete(suggestion: Suggestion, objective: Double) = Unit
 
-        /** Random search does not learn, so a warm-start observation is ignored. */
-        override fun observe(values: Map<String, Any>, objective: Double) = Unit
+            /** Random search does not learn, so a warm-start observation is ignored. */
+            override fun observe(values: Map<String, Any>, objective: Double) = Unit
 
-        override fun close() = Unit
-    }
+            override fun close() = Unit
+        }
 
     override fun close() = Unit
 }

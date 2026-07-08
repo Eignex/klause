@@ -45,13 +45,14 @@ class BoTuningTest {
      *  mechanics can be asserted exactly (no RNG), and, as a third [Tuner] impl, it re-proves the seam. */
     private class CyclingTuner(private val points: List<Map<String, Any>>) : Tuner {
         private var next = 0
-        override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String) = object : TuningStudy {
-            override fun suggest(count: Int): List<Suggestion> =
-                List(count) { Suggestion("t$next", points[next++ % points.size]) }
-            override fun complete(suggestion: Suggestion, objective: Double) = Unit
-            override fun observe(values: Map<String, Any>, objective: Double) = Unit
-            override fun close() = Unit
-        }
+        override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String, noisy: Boolean) =
+            object : TuningStudy {
+                override fun suggest(count: Int): List<Suggestion> =
+                    List(count) { Suggestion("t$next", points[next++ % points.size]) }
+                override fun complete(suggestion: Suggestion, objective: Double) = Unit
+                override fun observe(values: Map<String, Any>, objective: Double) = Unit
+                override fun close() = Unit
+            }
         override fun close() = Unit
     }
 
@@ -78,6 +79,7 @@ class BoTuningTest {
             batch = 3,
             warmStart = true,
             studyId = "test",
+            sampleSize = 4, // = pool size, so every trial sees all four instances → deterministic
         )
         val palette = result.palette
 
@@ -153,5 +155,67 @@ class BoTuningTest {
         assertEquals(5, coerced["cbls.tabu"], "Double 4.7 rounds to Int 5")
         assertEquals("cbls", coerced["family"], "categorical stays a String")
         assertTrue(coerced["cbls.noise"] is Double, "double param stays Double")
+    }
+
+    @Test
+    fun `each trial evaluates only its mini-batch, not the whole pool`() {
+        val pool = List(8) { cop("p$it", "min: 1 x1 ;\n+1 x1 >= 0 ;\n") }
+        var evalCalls = 0
+        BoTuning.tune(
+            space = ConfigSpace(listOf(CategoricalParam("arm", listOf("A", "B", "C")))),
+            decode = { it.getValue("arm") as String },
+            reward = { _, _ ->
+                evalCalls++
+                0.5
+            },
+            instances = pool,
+            tuner = RandomTuner(seed = 3),
+            rounds = 2,
+            trials = 3,
+            batch = 1,
+            warmStart = true,
+            studyId = "batch",
+            sampleSize = 2,
+            sampleSeed = 3,
+        )
+        // A full-set loop would solve pool(8) × trials(3) × rounds(2) = 48; the mini-batch caps new
+        // solves at rounds × trials × sampleSize regardless of pool size.
+        assertTrue(evalCalls <= 2 * 3 * 2, "evals bounded by rounds×trials×sampleSize, got $evalCalls")
+        assertTrue(evalCalls < pool.size * 2 * 3, "far below a full-set sweep")
+    }
+
+    @Test
+    fun `mini-batch tuning tells the study its observations are noisy`() {
+        var sawNoisy: Boolean? = null
+        val recording = object : Tuner {
+            override fun openStudy(
+                space: ConfigSpace,
+                maximize: Boolean,
+                studyId: String,
+                noisy: Boolean,
+            ): TuningStudy {
+                sawNoisy = noisy
+                return object : TuningStudy {
+                    override fun suggest(count: Int) = List(count) { Suggestion("t", mapOf("arm" to "A")) }
+                    override fun complete(suggestion: Suggestion, objective: Double) = Unit
+                    override fun observe(values: Map<String, Any>, objective: Double) = Unit
+                    override fun close() = Unit
+                }
+            }
+            override fun close() = Unit
+        }
+        BoTuning.tune(
+            space = ConfigSpace(listOf(CategoricalParam("arm", listOf("A")))),
+            decode = { it.getValue("arm") as String },
+            reward = { _, _ -> 0.5 },
+            instances = listOf(cop("i0", "min: 1 x1 ;\n+1 x1 >= 0 ;\n")),
+            tuner = recording,
+            rounds = 1,
+            trials = 1,
+            batch = 1,
+            warmStart = false,
+            studyId = "noisy",
+        )
+        assertEquals(true, sawNoisy, "mini-batch evaluation opens noisy studies")
     }
 }

@@ -161,8 +161,9 @@ object BenchCli {
      *  points over an engine's `ConfigSpace`, evaluate each in-process on the selection, and build a
      *  diverse palette one complement per round. The reward is per instance kind — gap-to-optimum for a
      *  COP, time-to-first-feasible for a CSP — so `kind=cop` and `kind=csp` both work. Filters:
-     *  `engine=ls|bt` `rounds=N` (palette size) `trials=M` (per-round asks) `batch=B` `timeout=<ms>`
-     *  `tuner=random|vizier` `warm-start=true|false` `seed=N` (+ the usual `suite=`/`kind=`/… selection).
+     *  `engine=ls|bt` `rounds=N` (palette size) `trials=M` (per-round asks) `batch=B` `sample=K`
+     *  (problems evaluated per trial — mini-batch, so the selection is a *pool* to sample from)
+     *  `timeout=<ms>` `tuner=random|vizier` `warm-start=true|false` `seed=N` (+ the usual `suite=`/`kind=`/…).
      *  Depends only on the [Tuner] seam, so the optimizer backend is swappable. */
     private fun tune(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
@@ -184,6 +185,7 @@ object BenchCli {
         val budgetMs = f["timeout"]?.toLongOrNull() ?: 2000L
         val seed = f["seed"]?.toLongOrNull() ?: 0L
         val warmStart = f["warm-start"]?.toBoolean() ?: true
+        val sample = f["sample"]?.toIntOrNull()?.coerceAtLeast(1) ?: BoTuning.DEFAULT_SAMPLE_SIZE
         val tunerId = f["tuner"]?.lowercase() ?: "random"
         val tuner: Tuner = when (tunerId) {
             "vizier" -> VizierTuner()
@@ -191,13 +193,16 @@ object BenchCli {
             else -> error("tune tuner must be random | vizier, got '${f["tuner"]}'")
         }
         println(
-            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${instances.size} instance(s), " +
-                "$rounds rounds × $trials trials × ${budgetMs}ms ===",
+            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${instances.size}-instance pool, " +
+                "$rounds rounds × $trials trials × sample $sample × ${budgetMs}ms ===",
         )
         val result = tuner.use {
             when (engine) {
-                TuneEngine.LS -> BoTuning.tuneLs(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart)
-                TuneEngine.BT -> BoTuning.tuneBt(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart)
+                TuneEngine.LS ->
+                    BoTuning.tuneLs(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
+
+                TuneEngine.BT ->
+                    BoTuning.tuneBt(instances, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
             }
         }
         // The residual-round palette is the primary output: each round's marginal coverage gain, then

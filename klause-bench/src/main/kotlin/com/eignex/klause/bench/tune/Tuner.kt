@@ -16,8 +16,9 @@ internal data class Suggestion(val handle: String, val values: Map<String, Any>)
  */
 internal interface Tuner : AutoCloseable {
     /** Open (or reopen) a study named [studyId] that optimizes one objective over [space], [maximize] or
-     *  minimize. */
-    fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String): TuningStudy
+     *  minimize. [noisy] tells the optimizer the reported objectives are noisy estimates (mini-batch
+     *  evaluation) so it fits an observation-noise model instead of trusting each measurement exactly. */
+    fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String, noisy: Boolean = false): TuningStudy
 
     /** Release backend resources (e.g. the gRPC channel). */
     override fun close()
