@@ -78,7 +78,14 @@ class KnapsackCoverSeparatorTest {
                 numBoolVars = n,
                 numIntVars = 0,
                 intDomains = emptyArray(),
-                factors = arrayOf<Factor>(PseudoBoolean(LongArray(weights.size) { weights[it].toLong() }, posLits(n), PbOp.LE, bnd.toLong())),
+                factors = arrayOf<Factor>(
+                    PseudoBoolean(
+                        LongArray(weights.size) { i -> weights[i].toLong() },
+                        posLits(n),
+                        PbOp.LE,
+                        bnd.toLong(),
+                    ),
+                ),
             )
             val obj = LinearObjective(boolWeights = LongArray(n) { -rng.nextInt(0, 4).toLong() })
             val r = CpToLpRelaxation(p, obj).build(PropagationSession(p))
@@ -126,7 +133,7 @@ class KnapsackCoverSeparatorTest {
             val cliqueSize = rng.nextInt(2, n + 1)
             val cliqueVars = (0 until cliqueSize).toSet()
             val factors = arrayOf<Factor>(
-                PseudoBoolean(LongArray(weights.size) { weights[it].toLong() }, posLits(n), PbOp.LE, bnd.toLong()),
+                PseudoBoolean(LongArray(weights.size) { i -> weights[i].toLong() }, posLits(n), PbOp.LE, bnd.toLong()),
                 Cardinality(IntArray(cliqueSize) { i -> Lit.make(i, true) }, min = 0, max = 1),
             )
             val p = Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = factors)

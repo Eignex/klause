@@ -130,10 +130,9 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `skips an affine fold whose coefficient would overflow Int`() {
-        // x = 100000*y folded into 100000*x + y <= 500000 needs a coefficient of 10^10, outside the
-        // Int range the Linear coalescer accepts. The pivot is left un-eliminated (sound) rather than
-        // folded with a wrapped/overflowing coefficient.
+    fun `folds an affine substitution whose product coefficient exceeds Int range`() {
+        // x = 100000*y folded into 100000*x + y <= 500000 yields a coefficient of 10^10 — beyond Int
+        // but well within Long, so the pivot is eliminated with the wide coefficient carried exactly.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -143,7 +142,23 @@ class AffineEliminationTest {
                 Linear(intArrayOf(100000, 1), intArrayOf(0, 1), LinearOp.LE, 500000),
             ),
         )
-        checkRoundTrip("int-overflow fold", problem, expectEliminated = false, expectSat = true)
+        checkRoundTrip("wide fold", problem, expectEliminated = true, expectSat = true)
+    }
+
+    @Test
+    fun `skips an affine fold whose product coefficient would overflow Long`() {
+        // x = 5e9*y folded into 5e9*x + y <= 10e9 needs 2.5e19, past Long. The fold would overflow, so
+        // the pivot is left un-eliminated (sound) rather than wrapping the coefficient.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 10_000_000_000L), IntDomain(0, 2)),
+            factors = listOf(
+                Linear(longArrayOf(1, -5_000_000_000L), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(longArrayOf(5_000_000_000L, 1), intArrayOf(0, 1), LinearOp.LE, 10_000_000_000L),
+            ),
+        )
+        checkRoundTrip("long-overflow fold", problem, expectEliminated = false, expectSat = true)
     }
 
     @Test

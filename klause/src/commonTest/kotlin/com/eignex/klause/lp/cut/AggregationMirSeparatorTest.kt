@@ -166,11 +166,21 @@ class AggregationMirSeparatorTest {
                 val lits = IntArray(k) { j -> Lit.make(vars[j], rng.nextBoolean()) }
                 when (rng.nextInt(3)) {
                     0 -> factors.add(
-                        PseudoBoolean(LongArray(k) { rng.nextInt(1, 4).toLong() }, lits, PbOp.LE, rng.nextInt(0, 2 * k).toLong()),
+                        PseudoBoolean(
+                            LongArray(k) { rng.nextInt(1, 4).toLong() },
+                            lits,
+                            PbOp.LE,
+                            rng.nextInt(0, 2 * k).toLong(),
+                        ),
                     )
 
                     1 -> factors.add(
-                        PseudoBoolean(LongArray(k) { rng.nextInt(1, 4).toLong() }, lits, PbOp.GE, rng.nextInt(0, 2 * k).toLong()),
+                        PseudoBoolean(
+                            LongArray(k) { rng.nextInt(1, 4).toLong() },
+                            lits,
+                            PbOp.GE,
+                            rng.nextInt(0, 2 * k).toLong(),
+                        ),
                     )
 
                     else -> {

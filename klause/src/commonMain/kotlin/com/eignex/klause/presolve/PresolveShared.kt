@@ -191,16 +191,16 @@ internal object PresolveShared {
         return RootBaker.reseed(base, bakeConfig)
     }
 
-    fun gcdOf(xs: IntArray): Int {
-        var g = 0
+    fun gcdOf(xs: LongArray): Long {
+        var g = 0L
         for (x in xs) g = gcd(g, x)
         return g
     }
 
-    private fun gcd(a: Int, b: Int): Int {
+    private fun gcd(a: Long, b: Long): Long {
         var x = if (a < 0) -a else a
         var y = if (b < 0) -b else b
-        while (y != 0) {
+        while (y != 0L) {
             val t = x % y
             x = y
             y = t
@@ -208,7 +208,7 @@ internal object PresolveShared {
         return x
     }
 
-    fun divAll(xs: IntArray, g: Int): IntArray = IntArray(xs.size) { xs[it] / g }
+    fun divAll(xs: LongArray, g: Long): LongArray = LongArray(xs.size) { xs[it] / g }
 
     /** Multiset of [Factor.structuralKey] over [factors] — the constraint set keyed for comparison
      *  against a transform of itself. */

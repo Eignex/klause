@@ -116,12 +116,6 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     override fun linearRows(): List<LinearRow> = listOf(LinearRow(coeffs, vars, op, bound))
 }
 
-/** True when every coefficient and the bound fit 32-bit range — the precondition for the Int-coefficient
- *  reasoning a consumer keeps (ReifiedLinear's big-M rows, GCD modulus fixing, coefficient strengthening). */
-internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
-    bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
-        coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
-
 /** Low 32 bits mask for packing/unpacking a `(image, coeff)` pair in [Linear.remapStructuralHash]. */
 private const val LOW_WORD = 0xFFFFFFFFL
 

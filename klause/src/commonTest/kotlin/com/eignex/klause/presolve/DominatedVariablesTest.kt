@@ -275,7 +275,12 @@ class DominatedVariablesTest {
     fun `negative-weight pseudo-boolean LE flips the safe direction`() {
         // `-b0 <= 0` (always true): a rising sum violates LE, and with weight -1 the rising value is
         // b0 = false ⇒ false-unsafe ⇒ the safe pin is true. Optimum (no objective) is preserved.
-        val problem = Problem(1, 0, emptyArray(), listOf(PseudoBoolean(longArrayOf(-1), intArrayOf(pos(0)), PbOp.LE, 0L)))
+        val problem = Problem(
+            1,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(longArrayOf(-1), intArrayOf(pos(0)), PbOp.LE, 0L)),
+        )
         val out = fixed(problem, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
         assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")

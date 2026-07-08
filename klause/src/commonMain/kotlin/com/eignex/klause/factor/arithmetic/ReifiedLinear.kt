@@ -8,6 +8,7 @@ import com.eignex.klause.factor.bool.internals.linearResidual
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.mulExact
@@ -88,11 +89,20 @@ class ReifiedLinear private constructor(
      * when its M equals the M the declared range would give; a non-global row carries the live bounds it
      * leaned on as premises (the engine derives them — see [RelaxationBuilder.bigMRow]).
      *
-     * Best-effort: a reified row whose coefficients/bound exceed 32-bit range is simply not relaxed (the
+     * Best-effort: a reified row whose activity or big-M overflows Long is left unrelaxed (the
      * propagator/invariant still enforce it). Sound to skip.
      */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        if (!fitsInt32(coeffs, bound)) return
+        // Best-effort: a reified row whose activity or big-M overflows Long is left unrelaxed (the
+        // exact helpers below signal it); the propagator and invariant still enforce the constraint.
+        try {
+            emitBigMRows(builder)
+        } catch (_: LpOverflowException) {
+            return
+        }
+    }
+
+    private fun emitBigMRows(builder: RelaxationBuilder) {
         var lMin = 0L
         var lMax = 0L
         var lMinD = 0L

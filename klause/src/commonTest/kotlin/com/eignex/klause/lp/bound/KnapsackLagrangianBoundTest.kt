@@ -22,8 +22,12 @@ class KnapsackLagrangianBoundTest {
 
     private fun ceil(a: Long, b: Long): Long = if (a % b > 0L) a / b + 1 else a / b
 
-    private fun pb(weights: IntArray, vars: IntArray, op: PbOp, bound: Int): PseudoBoolean =
-        PseudoBoolean(LongArray(weights.size) { weights[it].toLong() }, IntArray(vars.size) { Lit.make(vars[it], true) }, op, bound.toLong())
+    private fun pb(weights: IntArray, vars: IntArray, op: PbOp, bound: Int): PseudoBoolean = PseudoBoolean(
+        LongArray(weights.size) { weights[it].toLong() },
+        IntArray(vars.size) { Lit.make(vars[it], true) },
+        op,
+        bound.toLong(),
+    )
 
     @Test
     fun `exact knapsack bound on a forced cover-style instance`() {
