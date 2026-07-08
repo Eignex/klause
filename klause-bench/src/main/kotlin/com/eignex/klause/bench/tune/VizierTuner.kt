@@ -39,11 +39,14 @@ internal class VizierTuner(
 
     /** Create the study (reused by display name, so idempotent) and hand back a live [TuningStudy].
      *  `Study.name` is left unset — it is OUTPUT_ONLY and the OSS server rejects a create that sets it. */
-    override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String): TuningStudy {
+    override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String, noisy: Boolean): TuningStudy {
         val goal = if (maximize) StudySpec.MetricSpec.GoalType.MAXIMIZE else StudySpec.MetricSpec.GoalType.MINIMIZE
         val spec = StudySpec.newBuilder()
             .setAlgorithm(ALGORITHM)
             .addMetrics(StudySpec.MetricSpec.newBuilder().setMetricId(REWARD).setGoal(goal))
+        // Mini-batch rewards are noisy estimates — tell the GP to fit a noise variance rather than
+        // interpolate exactly through each measurement (else it over-fits the luck of the draw).
+        if (noisy) spec.observationNoise = StudySpec.ObservationNoise.HIGH
         for (p in space.params) spec.addParameters(parameterSpec(p))
         val study = Study.newBuilder().setDisplayName(studyId).setStudySpec(spec).build()
         val name = stub.createStudy(
