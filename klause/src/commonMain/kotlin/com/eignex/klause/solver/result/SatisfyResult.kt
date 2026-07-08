@@ -205,18 +205,7 @@ private fun Assumptions.dropBool(id: Int): Assumptions {
     boolValues.copyInto(nv, 0, 0, idx)
     boolKeys.copyInto(nk, idx, idx + 1)
     boolValues.copyInto(nv, idx, idx + 1)
-    return Assumptions(
-        nk,
-        nv,
-        intKeys,
-        intValues,
-        intMinKeys,
-        intMinValues,
-        intMaxKeys,
-        intMaxValues,
-        intHoleVarIds,
-        intHoleValues,
-    )
+    return Assumptions(nk, nv, intKeys, intValues, deductions.withoutSetRestrictions())
 }
 
 /** Sorted-array deletion helper for [Assumptions.intKeys]. */
@@ -229,18 +218,7 @@ private fun Assumptions.dropInt(id: Int): Assumptions {
     intValues.copyInto(nv, 0, 0, idx)
     intKeys.copyInto(nk, idx, idx + 1)
     intValues.copyInto(nv, idx, idx + 1)
-    return Assumptions(
-        boolKeys,
-        boolValues,
-        nk,
-        nv,
-        intMinKeys,
-        intMinValues,
-        intMaxKeys,
-        intMaxValues,
-        intHoleVarIds,
-        intHoleValues,
-    )
+    return Assumptions(boolKeys, boolValues, nk, nv, deductions.withoutSetRestrictions())
 }
 
 /**

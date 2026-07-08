@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.DeducedRestrictions
 import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -136,15 +137,17 @@ sealed interface PropagationResult {
             boolValues = boolValues.copyOf(),
             intKeys = intKeys.copyOf(),
             intValues = intValues.copyOf(),
-            intMinKeys = intMinKeys.copyOf(),
-            intMinValues = intMinValues.copyOf(),
-            intMaxKeys = intMaxKeys.copyOf(),
-            intMaxValues = intMaxValues.copyOf(),
-            intHoleVarIds = intHoleVarIds.copyOf(),
-            intHoleValues = intHoleValues.copyOf(),
-            intSetKeys = intSetKeys.copyOf(),
-            intSetOffsets = intSetOffsets.copyOf(),
-            intSetValues = intSetValues.copyOf(),
+            deductions = DeducedRestrictions(
+                intMinKeys = intMinKeys.copyOf(),
+                intMinValues = intMinValues.copyOf(),
+                intMaxKeys = intMaxKeys.copyOf(),
+                intMaxValues = intMaxValues.copyOf(),
+                intHoleVarIds = intHoleVarIds.copyOf(),
+                intHoleValues = intHoleValues.copyOf(),
+                intSetKeys = intSetKeys.copyOf(),
+                intSetOffsets = intSetOffsets.copyOf(),
+                intSetValues = intSetValues.copyOf(),
+            ),
         )
 
         /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like

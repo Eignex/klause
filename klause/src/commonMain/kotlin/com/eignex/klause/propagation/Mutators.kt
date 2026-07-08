@@ -25,36 +25,36 @@ internal fun PropagationState.seedAssumptions(a: Assumptions): Boolean {
     // Non-singleton bound tightenings ride at the same decision level as int pins —
     // they're seed-time inputs, not propagated conclusions. Each takes its own level
     // so the conflict analyzer can attribute backjumps to the specific tightening.
-    val minK = a.intMinKeys
-    val minV = a.intMinValues
+    val minK = a.deductions.intMinKeys
+    val minV = a.deductions.intMinValues
     for (i in minK.indices) {
         levelToDecisionVar.add(problem.numBoolVars + minK[i])
         currentLevel = levelToDecisionVar.size
         currentFactor = -1
         if (!tightenIntMinImpl(minK[i], minV[i], null)) return false
     }
-    val maxK = a.intMaxKeys
-    val maxV = a.intMaxValues
+    val maxK = a.deductions.intMaxKeys
+    val maxV = a.deductions.intMaxValues
     for (i in maxK.indices) {
         levelToDecisionVar.add(problem.numBoolVars + maxK[i])
         currentLevel = levelToDecisionVar.size
         currentFactor = -1
         if (!tightenIntMaxImpl(maxK[i], maxV[i], null)) return false
     }
-    val holeIds = a.intHoleVarIds
-    val holeVals = a.intHoleValues
+    val holeIds = a.deductions.intHoleVarIds
+    val holeVals = a.deductions.intHoleValues
     for (i in holeIds.indices) {
         levelToDecisionVar.add(problem.numBoolVars + holeIds[i])
         currentLevel = levelToDecisionVar.size
         currentFactor = -1
         if (!excludeIntValueImpl(holeIds[i], holeVals[i], null)) return false
     }
-    val setKeys = a.intSetKeys
+    val setKeys = a.deductions.intSetKeys
     for (i in setKeys.indices) {
         levelToDecisionVar.add(problem.numBoolVars + setKeys[i])
         currentLevel = levelToDecisionVar.size
         currentFactor = -1
-        if (!restrictIntToSurvivors(setKeys[i], a.intSetSurvivorsAt(i))) return false
+        if (!restrictIntToSurvivors(setKeys[i], a.deductions.intSetSurvivorsAt(i))) return false
     }
     return true
 }

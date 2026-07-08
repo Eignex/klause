@@ -6,11 +6,7 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.binarySearchInt
-import com.eignex.klause.util.toSortedIntArray
-import com.eignex.klause.util.toSortedLongArray
 
 /**
  * Per-call constraint on the solver: pin specific variables to specific values for the
@@ -28,6 +24,11 @@ import com.eignex.klause.util.toSortedLongArray
  * solver may return `null` / `Unknown` rather than reporting `Unsat` (local-search
  * cannot prove UNSAT).
  *
+ * The exact pins are the user/search-facing contract ([withBool] / [withInt] / [mergedWith]). The
+ * presolve-derived bound tightenings, holes, and set-restrictions produced by SAC-at-root and
+ * bake-time probing ride alongside in [deductions] — they are applied together at seed time but never
+ * originate from the pin API.
+ *
  * Storage is parallel primitive arrays sorted ascending by key — no autoboxing on any
  * read, no `HashMap` allocations on merge, and binary-search lookup for [boolValueOrNull]
  * / [intValueOrNull]. The [bools] / [ints] map views are kept for the bake-time
@@ -44,45 +45,9 @@ class Assumptions internal constructor(
     val intKeys: IntArray,
     /** Pinned values aligned with [intKeys]. */
     val intValues: LongArray,
-    /** Int var ids with an additional `≥ minValue` lower-bound tightening (no exact pin),
-     *  ascending. Disjoint from [intKeys]. Used by SAC-at-root to record bound deductions
-     *  that aren't yet singletons. */
-    val intMinKeys: IntArray = EmptyIntArray,
-    /** Lower-bound values aligned with [intMinKeys]. */
-    val intMinValues: LongArray = EmptyLongArray,
-    /** Int var ids with an additional `≤ maxValue` upper-bound tightening (no exact pin),
-     *  ascending. Disjoint from [intKeys]. */
-    val intMaxKeys: IntArray = EmptyIntArray,
-    /** Upper-bound values aligned with [intMaxKeys]. */
-    val intMaxValues: LongArray = EmptyLongArray,
-    /** Interior holes: parallel `(varId, value)` rows, lexicographically sorted by
-     *  `(varId, value)`. Each row encodes `v ≠ value` for that var. Disjoint from
-     *  [intKeys]; values strictly inside the var's [min, max] bounds (or its assumed
-     *  bounds). Used by SAC-at-root to record value-level deductions that fall between
-     *  bound shifts. */
-    val intHoleVarIds: IntArray = EmptyIntArray,
-    /** Forbidden values aligned with [intHoleVarIds]. */
-    val intHoleValues: LongArray = EmptyLongArray,
-    /** Compact set-restrictions `v ∈ {survivors}` for variables the bake reduced to a sparse survivor
-     *  set — recorded here instead of one interior hole per excluded value, which for a wide-but-sparse
-     *  domain (few survivors over a huge span) is O(span) to record and to seed. Var ids ascending;
-     *  disjoint from [intKeys]. CSR layout: variable `intSetKeys[i]`'s ascending survivors are
-     *  `intSetValues[intSetOffsets[i] until intSetOffsets[i + 1]]`. [intSetOffsets] has size
-     *  `intSetKeys.size + 1` (or is empty when there are no set-restrictions). */
-    val intSetKeys: IntArray = EmptyIntArray,
-    /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
-    val intSetOffsets: IntArray = EmptyIntArray,
-    /** Concatenated ascending survivor values, sliced per variable by [intSetOffsets]. */
-    val intSetValues: LongArray = EmptyLongArray,
+    /** Presolve-derived bound/hole/set narrowings applied alongside the pins; disjoint from [intKeys]. */
+    val deductions: DeducedRestrictions = DeducedRestrictions.None,
 ) {
-
-    /** Survivors of set-restricted var at index [i] into [intSetKeys], as an ascending array. */
-    fun intSetSurvivorsAt(i: Int): LongArray = intSetValues.copyOfRange(intSetOffsets[i], intSetOffsets[i + 1])
-
-    /** Invoke [action] once per set-restricted variable with its ascending survivor array. */
-    inline fun forEachIntSet(action: (id: Int, survivors: LongArray) -> Unit) {
-        for (i in intSetKeys.indices) action(intSetKeys[i], intSetSurvivorsAt(i))
-    }
 
     /** True iff no bool or int variable is pinned. */
     val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
@@ -111,33 +76,6 @@ class Assumptions internal constructor(
         return if (idx >= 0) intValues[idx] else null
     }
 
-    /** Lower-bound tightening for int [id], or `null` if none. */
-    fun intMinOrNull(id: Int): Long? {
-        val idx = intMinKeys.binarySearchInt(id)
-        return if (idx >= 0) intMinValues[idx] else null
-    }
-
-    /** Upper-bound tightening for int [id], or `null` if none. */
-    fun intMaxOrNull(id: Int): Long? {
-        val idx = intMaxKeys.binarySearchInt(id)
-        return if (idx >= 0) intMaxValues[idx] else null
-    }
-
-    /** Invoke [action] for each lower-bound tightening `(id, value)`. */
-    inline fun forEachIntMin(action: (id: Int, value: Long) -> Unit) {
-        for (i in intMinKeys.indices) action(intMinKeys[i], intMinValues[i])
-    }
-
-    /** Invoke [action] for each upper-bound tightening `(id, value)`. */
-    inline fun forEachIntMax(action: (id: Int, value: Long) -> Unit) {
-        for (i in intMaxKeys.indices) action(intMaxKeys[i], intMaxValues[i])
-    }
-
-    /** Invoke [action] for each interior hole `(id, forbiddenValue)`. */
-    inline fun forEachIntHole(action: (id: Int, value: Long) -> Unit) {
-        for (i in intHoleVarIds.indices) action(intHoleVarIds[i], intHoleValues[i])
-    }
-
     /** Primitive iteration over bool pins in ascending-key order. No allocation. */
     inline fun forEachBool(action: (id: Int, value: Boolean) -> Unit) {
         for (i in boolKeys.indices) action(boolKeys[i], boolValues[i])
@@ -153,21 +91,12 @@ class Assumptions internal constructor(
      * semantics — the Session abstraction relies on this). Returns a fresh
      * [Assumptions]; the inputs are untouched.
      *
-     * Primitive sorted-merge in O(n + m); no `HashMap`, no autoboxing.
+     * Primitive sorted-merge in O(n + m); no `HashMap`, no autoboxing. The [deductions] merge is
+     * delegated to [DeducedRestrictions.mergedWith] under the merged exact-pin set.
      */
     fun mergedWith(other: Assumptions): Assumptions {
-        if (other.isEmpty &&
-            other.intMinKeys.isEmpty() && other.intMaxKeys.isEmpty() &&
-            other.intHoleVarIds.isEmpty() && other.intSetKeys.isEmpty()
-        ) {
-            return this
-        }
-        if (this.isEmpty &&
-            intMinKeys.isEmpty() && intMaxKeys.isEmpty() &&
-            intHoleVarIds.isEmpty() && intSetKeys.isEmpty()
-        ) {
-            return other
-        }
+        if (other.isEmpty && other.deductions.isEmpty) return this
+        if (this.isEmpty && deductions.isEmpty) return other
         val mergedBoolKeys = IntArrayList(boolKeys.size + other.boolKeys.size)
         val mergedBoolValues = ArrayList<Boolean>(boolKeys.size + other.boolKeys.size)
         sortedMergeBools(
@@ -188,94 +117,28 @@ class Assumptions internal constructor(
             mergedIntKeys,
             mergedIntValues,
         )
-        // Bound tightenings: take max for mins, min for maxes; on overlap with an
-        // exact int pin from either side, drop the bound (the pin subsumes).
+        // Bound/hole/set tightenings drop any var that is now exactly pinned (the pin subsumes).
         val pinned = IntHashSet()
         for (i in 0 until mergedIntKeys.size) pinned.add(mergedIntKeys[i])
-        val minMap = MutableIntLongMap()
-        forEachIntMin { k, v -> if (k !in pinned) minMap.put(k, v) }
-        other.forEachIntMin { k, v ->
-            if (k !in pinned) minMap.put(k, maxOf(minMap.getOrDefault(k, Long.MIN_VALUE), v))
-        }
-        val maxMap = MutableIntLongMap()
-        forEachIntMax { k, v -> if (k !in pinned) maxMap.put(k, v) }
-        other.forEachIntMax { k, v ->
-            if (k !in pinned) maxMap.put(k, minOf(maxMap.getOrDefault(k, Long.MAX_VALUE), v))
-        }
-        val minKList = IntArrayList(minMap.size)
-        minMap.forEach { k, _ -> minKList.add(k) }
-        val minK = minKList.toSortedIntArray()
-        val maxKList = IntArrayList(maxMap.size)
-        maxMap.forEach { k, _ -> maxKList.add(k) }
-        val maxK = maxKList.toSortedIntArray()
-        // Holes: union of (varId, value) pairs, dropping pinned vars. The value is now a full Long
-        // (may exceed 32-bit range) so it can no longer be packed with the id into a single Long;
-        // dedupe per var via a set of forbidden values, then flatten sorted by (id, value).
-        val holeMap = LinkedHashMap<Int, LongHashSet>()
-        forEachIntHole { id, v -> if (id !in pinned) holeMap.getOrPut(id) { LongHashSet() }.add(v) }
-        other.forEachIntHole { id, v -> if (id !in pinned) holeMap.getOrPut(id) { LongHashSet() }.add(v) }
-        val holeCount = holeMap.values.sumOf { it.size }
-        val holeIds = IntArray(holeCount)
-        val holeVals = LongArray(holeCount)
-        var holePos = 0
-        for (id in holeMap.keys.toIntArray().also { it.sort() }) {
-            for (v in holeMap.getValue(id).toSortedLongArray()) {
-                holeIds[holePos] = id
-                holeVals[holePos] = v
-                holePos++
-            }
-        }
-        // Set-restrictions: per-var survivor sets, [other] winning on overlap (last-write, as with
-        // pins), dropping any var now exactly pinned (the pin subsumes). Survivors are already ascending.
-        val setMap = LinkedHashMap<Int, LongArray>()
-        forEachIntSet { id, sv -> if (id !in pinned) setMap[id] = sv }
-        other.forEachIntSet { id, sv -> if (id !in pinned) setMap[id] = sv }
-        val setK = setMap.keys.toIntArray().also { it.sort() }
-        val setOffsets = IntArray(setK.size + 1)
-        val setVals = LongArrayList(setK.size)
-        for (i in setK.indices) {
-            for (x in setMap.getValue(setK[i])) setVals.add(x)
-            setOffsets[i + 1] = setVals.size
-        }
+        val mergedDeductions = deductions.mergedWith(other.deductions, pinned)
         return Assumptions(
             boolKeys = mergedBoolKeys.toIntArray(),
             boolValues = BooleanArray(mergedBoolValues.size) { mergedBoolValues[it] },
             intKeys = mergedIntKeys.toIntArray(),
             intValues = mergedIntValues.toLongArray(),
-            intMinKeys = minK,
-            intMinValues = LongArray(minK.size) { minMap.getOrDefault(minK[it], 0L) },
-            intMaxKeys = maxK,
-            intMaxValues = LongArray(maxK.size) { maxMap.getOrDefault(maxK[it], 0L) },
-            intHoleVarIds = holeIds,
-            intHoleValues = holeVals,
-            intSetKeys = setK,
-            intSetOffsets = if (setK.isEmpty()) EmptyIntArray else setOffsets,
-            intSetValues = setVals.toLongArray(),
+            deductions = mergedDeductions,
         )
     }
 
-    /** Rebuild with a subset of fields replaced; every unspecified field is carried over unchanged.
-     *  The set-restriction fields ([intSetKeys] / [intSetOffsets] / [intSetValues]) default to the
-     *  current values, so the `with*` builders preserve them exactly as they preserve holes. */
+    /** Rebuild with a subset of fields replaced; every unspecified field (including [deductions]) is
+     *  carried over unchanged. */
     private fun copy(
         boolKeys: IntArray = this.boolKeys,
         boolValues: BooleanArray = this.boolValues,
         intKeys: IntArray = this.intKeys,
         intValues: LongArray = this.intValues,
-        intMinKeys: IntArray = this.intMinKeys,
-        intMinValues: LongArray = this.intMinValues,
-        intMaxKeys: IntArray = this.intMaxKeys,
-        intMaxValues: LongArray = this.intMaxValues,
-        intHoleVarIds: IntArray = this.intHoleVarIds,
-        intHoleValues: LongArray = this.intHoleValues,
-        intSetKeys: IntArray = this.intSetKeys,
-        intSetOffsets: IntArray = this.intSetOffsets,
-        intSetValues: LongArray = this.intSetValues,
-    ): Assumptions = Assumptions(
-        boolKeys, boolValues, intKeys, intValues,
-        intMinKeys, intMinValues, intMaxKeys, intMaxValues,
-        intHoleVarIds, intHoleValues, intSetKeys, intSetOffsets, intSetValues,
-    )
+        deductions: DeducedRestrictions = this.deductions,
+    ): Assumptions = Assumptions(boolKeys, boolValues, intKeys, intValues, deductions)
 
     /** Return a fresh [Assumptions] that also pins bool [id] to [value]. Existing
      *  bool pin on [id] is overwritten. */
@@ -303,45 +166,12 @@ class Assumptions internal constructor(
      *  int pin on [id] is overwritten; any prior bound tightening on [id] is dropped
      *  since the exact pin subsumes it. */
     fun withInt(id: Int, value: Long): Assumptions {
-        val minIdx = intMinKeys.binarySearchInt(id)
-        val maxIdx = intMaxKeys.binarySearchInt(id)
-        val newMinK: IntArray
-        val newMinV: LongArray
-        if (minIdx >= 0) {
-            newMinK = IntArray(intMinKeys.size - 1)
-            newMinV = LongArray(intMinKeys.size - 1)
-            intMinKeys.copyInto(newMinK, 0, 0, minIdx)
-            intMinValues.copyInto(newMinV, 0, 0, minIdx)
-            intMinKeys.copyInto(newMinK, minIdx, minIdx + 1)
-            intMinValues.copyInto(newMinV, minIdx, minIdx + 1)
-        } else {
-            newMinK = intMinKeys
-            newMinV = intMinValues
-        }
-        val newMaxK: IntArray
-        val newMaxV: LongArray
-        if (maxIdx >= 0) {
-            newMaxK = IntArray(intMaxKeys.size - 1)
-            newMaxV = LongArray(intMaxKeys.size - 1)
-            intMaxKeys.copyInto(newMaxK, 0, 0, maxIdx)
-            intMaxValues.copyInto(newMaxV, 0, 0, maxIdx)
-            intMaxKeys.copyInto(newMaxK, maxIdx, maxIdx + 1)
-            intMaxValues.copyInto(newMaxV, maxIdx, maxIdx + 1)
-        } else {
-            newMaxK = intMaxKeys
-            newMaxV = intMaxValues
-        }
+        val newDeductions = deductions.withoutBounds(id)
         val idx = intKeys.binarySearchInt(id)
         return if (idx >= 0) {
             val nv = intValues.copyOf()
             nv[idx] = value
-            copy(
-                intValues = nv,
-                intMinKeys = newMinK,
-                intMinValues = newMinV,
-                intMaxKeys = newMaxK,
-                intMaxValues = newMaxV,
-            )
+            copy(intValues = nv, deductions = newDeductions)
         } else {
             val insert = -(idx + 1)
             val nk = IntArray(intKeys.size + 1)
@@ -352,89 +182,22 @@ class Assumptions internal constructor(
             nv[insert] = value
             intKeys.copyInto(nk, insert + 1, insert)
             intValues.copyInto(nv, insert + 1, insert)
-            copy(
-                intKeys = nk,
-                intValues = nv,
-                intMinKeys = newMinK,
-                intMinValues = newMinV,
-                intMaxKeys = newMaxK,
-                intMaxValues = newMaxV,
-            )
+            copy(intKeys = nk, intValues = nv, deductions = newDeductions)
         }
     }
 
     /** Return a fresh [Assumptions] with [id]'s lower bound tightened to at least [value].
      *  Used by SAC-at-root to accumulate non-singleton deductions. */
-    fun withTightenedMin(id: Int, value: Long): Assumptions {
-        val idx = intMinKeys.binarySearchInt(id)
-        return if (idx >= 0) {
-            val nv = intMinValues.copyOf()
-            nv[idx] = maxOf(nv[idx], value)
-            copy(intMinValues = nv)
-        } else {
-            val insert = -(idx + 1)
-            val nk = IntArray(intMinKeys.size + 1)
-            val nv = LongArray(intMinKeys.size + 1)
-            intMinKeys.copyInto(nk, 0, 0, insert)
-            intMinValues.copyInto(nv, 0, 0, insert)
-            nk[insert] = id
-            nv[insert] = value
-            intMinKeys.copyInto(nk, insert + 1, insert)
-            intMinValues.copyInto(nv, insert + 1, insert)
-            copy(intMinKeys = nk, intMinValues = nv)
-        }
-    }
+    fun withTightenedMin(id: Int, value: Long): Assumptions = copy(deductions = deductions.withTightenedMin(id, value))
+
+    /** Return a fresh [Assumptions] with [id]'s upper bound tightened to at most [value]. */
+    fun withTightenedMax(id: Int, value: Long): Assumptions = copy(deductions = deductions.withTightenedMax(id, value))
 
     /** Return a fresh [Assumptions] with [id ≠ value] punched in as an interior-hole
      *  assumption. Idempotent if the hole already exists. Caller is responsible for
      *  ensuring [value] is in the var's current effective domain — the engine will
      *  raise on attempts to exclude a singleton's sole value, mirroring tighten-on-pin. */
-    fun withIntHole(id: Int, value: Long): Assumptions {
-        var lo = 0
-        var hi = intHoleVarIds.size
-        while (lo < hi) {
-            val mid = (lo + hi) ushr 1
-            val midId = intHoleVarIds[mid]
-            val midVal = intHoleValues[mid]
-            val cmp = if (midId != id) midId - id else midVal.compareTo(value)
-            when {
-                cmp < 0 -> lo = mid + 1
-                cmp > 0 -> hi = mid
-                else -> return this // already present
-            }
-        }
-        val insert = lo
-        val nk = IntArray(intHoleVarIds.size + 1)
-        val nv = LongArray(intHoleValues.size + 1)
-        intHoleVarIds.copyInto(nk, 0, 0, insert)
-        intHoleValues.copyInto(nv, 0, 0, insert)
-        nk[insert] = id
-        nv[insert] = value
-        intHoleVarIds.copyInto(nk, insert + 1, insert)
-        intHoleValues.copyInto(nv, insert + 1, insert)
-        return copy(intHoleVarIds = nk, intHoleValues = nv)
-    }
-
-    /** Return a fresh [Assumptions] with [id]'s upper bound tightened to at most [value]. */
-    fun withTightenedMax(id: Int, value: Long): Assumptions {
-        val idx = intMaxKeys.binarySearchInt(id)
-        return if (idx >= 0) {
-            val nv = intMaxValues.copyOf()
-            nv[idx] = minOf(nv[idx], value)
-            copy(intMaxValues = nv)
-        } else {
-            val insert = -(idx + 1)
-            val nk = IntArray(intMaxKeys.size + 1)
-            val nv = LongArray(intMaxKeys.size + 1)
-            intMaxKeys.copyInto(nk, 0, 0, insert)
-            intMaxValues.copyInto(nv, 0, 0, insert)
-            nk[insert] = id
-            nv[insert] = value
-            intMaxKeys.copyInto(nk, insert + 1, insert)
-            intMaxValues.copyInto(nv, insert + 1, insert)
-            copy(intMaxKeys = nk, intMaxValues = nv)
-        }
-    }
+    fun withIntHole(id: Int, value: Long): Assumptions = copy(deductions = deductions.withIntHole(id, value))
 
     /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
      *  [Problem]'s failed-literal probing and by tests; hot paths should call
@@ -464,15 +227,7 @@ class Assumptions internal constructor(
             boolValues.contentEquals(other.boolValues) &&
             intKeys.contentEquals(other.intKeys) &&
             intValues.contentEquals(other.intValues) &&
-            intMinKeys.contentEquals(other.intMinKeys) &&
-            intMinValues.contentEquals(other.intMinValues) &&
-            intMaxKeys.contentEquals(other.intMaxKeys) &&
-            intMaxValues.contentEquals(other.intMaxValues) &&
-            intHoleVarIds.contentEquals(other.intHoleVarIds) &&
-            intHoleValues.contentEquals(other.intHoleValues) &&
-            intSetKeys.contentEquals(other.intSetKeys) &&
-            intSetOffsets.contentEquals(other.intSetOffsets) &&
-            intSetValues.contentEquals(other.intSetValues)
+            deductions == other.deductions
     }
 
     override fun hashCode(): Int {
@@ -480,15 +235,7 @@ class Assumptions internal constructor(
         h = 31 * h + boolValues.contentHashCode()
         h = 31 * h + intKeys.contentHashCode()
         h = 31 * h + intValues.contentHashCode()
-        h = 31 * h + intMinKeys.contentHashCode()
-        h = 31 * h + intMinValues.contentHashCode()
-        h = 31 * h + intMaxKeys.contentHashCode()
-        h = 31 * h + intMaxValues.contentHashCode()
-        h = 31 * h + intHoleVarIds.contentHashCode()
-        h = 31 * h + intHoleValues.contentHashCode()
-        h = 31 * h + intSetKeys.contentHashCode()
-        h = 31 * h + intSetOffsets.contentHashCode()
-        h = 31 * h + intSetValues.contentHashCode()
+        h = 31 * h + deductions.hashCode()
         return h
     }
 
