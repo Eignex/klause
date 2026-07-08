@@ -26,8 +26,8 @@ class OpbTest {
         assertEquals(3, out.problem.factors.size)
         val first = out.problem.factors[0] as PseudoBoolean
         assertEquals(PbOp.GE, first.op)
-        assertEquals(8, first.bound)
-        assertEquals(listOf(1, 4, 2, 5, 2), first.weights.toList())
+        assertEquals(8L, first.bound)
+        assertEquals(listOf(1L, 4L, 2L, 5L, 2L), first.weights.toList())
         assertEquals(
             listOf(0, 1, 2, 3, 4).map { Lit.make(it, true) },
             first.literals.toList(),

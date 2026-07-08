@@ -30,8 +30,8 @@ class Diffn(
     val xs: IntArray,
     /** Second-vector variable ids. */
     val ys: IntArray,
-    val widths: IntArray,
-    val heights: IntArray,
+    val widths: LongArray,
+    val heights: LongArray,
     val widthVars: IntArray? = null,
     val heightVars: IntArray? = null,
     val nonStrict: Boolean = false,
@@ -62,8 +62,8 @@ class Diffn(
      *  folds in the constant sizes, the var-size split, and the [nonStrict] flag (#531). */
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DIFFN) {
         bool(nonStrict)
-        ints(widths)
-        ints(heights)
+        longs(widths)
+        longs(heights)
         ints(xs)
         ints(ys)
         ints(widthVars ?: EmptyIntArray)

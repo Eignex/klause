@@ -427,8 +427,8 @@ class SymmetryBreakingTest {
             0,
             emptyArray(),
             listOf(
-                PseudoBoolean(intArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
-                PseudoBoolean(intArrayOf(1, 2), intArrayOf(pos(2), pos(3)), PbOp.LE, 2),
+                PseudoBoolean(longArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L),
+                PseudoBoolean(longArrayOf(1, 2), intArrayOf(pos(2), pos(3)), PbOp.LE, 2L),
             ),
         )
         checkSound("bool-rows", problem, expectReduced = true)
@@ -445,8 +445,8 @@ class SymmetryBreakingTest {
             0,
             emptyArray(),
             listOf(
-                PseudoBoolean(intArrayOf(1, 2, 4), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 5),
-                PseudoBoolean(intArrayOf(1, 2, 4), intArrayOf(pos(3), pos(4), pos(5)), PbOp.LE, 5),
+                PseudoBoolean(longArrayOf(1, 2, 4), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 5L),
+                PseudoBoolean(longArrayOf(1, 2, 4), intArrayOf(pos(3), pos(4), pos(5)), PbOp.LE, 5L),
             ),
         )
         val broken = broken(problem)
@@ -609,8 +609,8 @@ class SymmetryBreakingTest {
             "cardinality max",
         )
         distinct(
-            ReifiedPseudoBoolean(0, intArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 4),
-            ReifiedPseudoBoolean(0, intArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 5),
+            ReifiedPseudoBoolean(0, longArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 4L),
+            ReifiedPseudoBoolean(0, longArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 5L),
             "pb bound",
         )
         // Circuit / Subcircuit: position-faithful, and distinct from each other.
@@ -692,32 +692,32 @@ class SymmetryBreakingTest {
         fun distinct(a: Factor, b: Factor, why: String) = assertNotEquals(a.structuralKey(), b.structuralKey(), why)
 
         // Cumulative: capacity, the constant duration/resource arrays, the var/const split, and order.
-        val cum = Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(1, 1), 2)
-        distinct(cum, Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(1, 1), 3), "capacity")
-        distinct(cum, Cumulative(intArrayOf(0, 1), intArrayOf(1, 2), intArrayOf(1, 1), 2), "duration")
-        distinct(cum, Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(2, 1), 2), "resource")
-        distinct(cum, Cumulative(intArrayOf(1, 0), intArrayOf(1, 1), intArrayOf(1, 1), 2), "start order")
+        val cum = Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 2L)
+        distinct(cum, Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 3L), "capacity")
+        distinct(cum, Cumulative(intArrayOf(0, 1), longArrayOf(1, 2), longArrayOf(1, 1), 2L), "duration")
+        distinct(cum, Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(2, 1), 2L), "resource")
+        distinct(cum, Cumulative(intArrayOf(1, 0), longArrayOf(1, 1), longArrayOf(1, 1), 2L), "start order")
         distinct(
             cum,
-            Cumulative(intArrayOf(0, 1), intArrayOf(1, 1), intArrayOf(1, 1), 2, capacityVar = 5),
+            Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 2L, capacityVar = 5),
             "capacityVar",
         )
 
         // Disjunctive.
-        val dis = Disjunctive(intArrayOf(0, 1), intArrayOf(1, 1))
-        distinct(dis, Disjunctive(intArrayOf(0, 1), intArrayOf(1, 2)), "duration")
-        distinct(dis, Disjunctive(intArrayOf(1, 0), intArrayOf(1, 1)), "start order")
+        val dis = Disjunctive(intArrayOf(0, 1), longArrayOf(1, 1))
+        distinct(dis, Disjunctive(intArrayOf(0, 1), longArrayOf(1, 2)), "duration")
+        distinct(dis, Disjunctive(intArrayOf(1, 0), longArrayOf(1, 1)), "start order")
         distinct(dis, cum, "disjunctive vs cumulative")
 
         // Diffn: the nonStrict flag, constant sizes, and coordinate order.
-        val diffn = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1))
+        val diffn = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1))
         distinct(
             diffn,
-            Diffn(intArrayOf(0, 1), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1), nonStrict = true),
+            Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1), nonStrict = true),
             "nonStrict",
         )
-        distinct(diffn, Diffn(intArrayOf(0, 1), intArrayOf(2, 3), intArrayOf(2, 1), intArrayOf(1, 1)), "width")
-        distinct(diffn, Diffn(intArrayOf(1, 0), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1)), "x order")
+        distinct(diffn, Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 1), longArrayOf(1, 1)), "width")
+        distinct(diffn, Diffn(intArrayOf(1, 0), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1)), "x order")
 
         // Regular: automaton size, transition table, q0, accepting, sequence order.
         val reg = Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2))
@@ -769,8 +769,8 @@ class SymmetryBreakingTest {
             4,
             arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             listOf(
-                Disjunctive(intArrayOf(0, 1), intArrayOf(1, 1)),
-                Disjunctive(intArrayOf(2, 3), intArrayOf(1, 1)),
+                Disjunctive(intArrayOf(0, 1), longArrayOf(1, 1)),
+                Disjunctive(intArrayOf(2, 3), longArrayOf(1, 1)),
             ),
         )
         checkBreakingSound("disjunctive-blocks", problem)

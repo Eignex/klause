@@ -184,6 +184,29 @@ internal fun FlatZincCompiler.tryEvalIntConstArray(e: FznExpr): IntArray? = when
     else -> null
 }
 
+/** Nullable variant of [evalIntConstArrayLong] — used where the values may exceed 32-bit range
+ *  (scheduling durations / rectangle sizes) but the caller must still distinguish a constant array
+ *  from a variable one. */
+internal fun FlatZincCompiler.tryEvalIntConstArrayLong(e: FznExpr): LongArray? = when (e) {
+    is FznExpr.ArrayLit -> {
+        val out = LongArray(e.elements.size)
+        var ok = true
+        for (i in e.elements.indices) {
+            val v = evalIntConstOrNull(e.elements[i]) ?: run {
+                ok = false
+                0L
+            }
+            out[i] = v
+            if (!ok) break
+        }
+        if (ok) out else null
+    }
+
+    is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.IntParam)?.values?.copyOf()
+
+    else -> null
+}
+
 internal fun FlatZincCompiler.evalFloatConstArray(e: FznExpr): DoubleArray = when (e) {
     is FznExpr.ArrayLit -> DoubleArray(e.elements.size) { evalFloatConst(e.elements[it]) }
 

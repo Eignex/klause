@@ -33,9 +33,9 @@ class CumulativeRelaxationTest {
      */
     private fun makespanProblem(
         starts: Array<IntDomain>,
-        durations: IntArray,
-        resources: IntArray,
-        capacity: Int,
+        durations: LongArray,
+        resources: LongArray,
+        capacity: Long,
         horizon: Int,
         disjunctive: Boolean = false,
     ): Problem {
@@ -44,7 +44,7 @@ class CumulativeRelaxationTest {
         val domains = Array(n + 1) { if (it < n) starts[it] else IntDomain(0, horizon.toLong()) }
         val factors = ArrayList<Factor>()
         for (i in 0 until n) {
-            factors.add(Linear(intArrayOf(1, -1), intArrayOf(m, i), LinearOp.GE, durations[i]))
+            factors.add(Linear(longArrayOf(1, -1), intArrayOf(m, i), LinearOp.GE, durations[i]))
         }
         factors.add(
             if (disjunctive) {
@@ -70,8 +70,8 @@ class CumulativeRelaxationTest {
         // 3 unit tasks of length 3, capacity 1: total energy 9 must serialise ⇒ makespan ≥ 9.
         val p = makespanProblem(
             starts = Array(3) { IntDomain(0, 20) },
-            durations = intArrayOf(3, 3, 3),
-            resources = intArrayOf(1, 1, 1),
+            durations = longArrayOf(3, 3, 3),
+            resources = longArrayOf(1, 1, 1),
             capacity = 1,
             horizon = 20,
         )
@@ -85,8 +85,8 @@ class CumulativeRelaxationTest {
         // 4 tasks, demand 1, length 2, capacity 2: energy 8 over capacity 2 ⇒ makespan ≥ 4.
         val p = makespanProblem(
             starts = Array(4) { IntDomain(0, 20) },
-            durations = intArrayOf(2, 2, 2, 2),
-            resources = intArrayOf(1, 1, 1, 1),
+            durations = longArrayOf(2, 2, 2, 2),
+            resources = longArrayOf(1, 1, 1, 1),
             capacity = 2,
             horizon = 20,
         )
@@ -99,8 +99,8 @@ class CumulativeRelaxationTest {
         // Whole horizon (t1 = 0): 0 + (2 + 2) = 4. Window t1 = 5: 5 + 2 (task 1) = 7 > 4.
         val p = makespanProblem(
             starts = arrayOf(IntDomain(0, 20), IntDomain(5, 20)),
-            durations = intArrayOf(2, 2),
-            resources = intArrayOf(1, 1),
+            durations = longArrayOf(2, 2),
+            resources = longArrayOf(1, 1),
             capacity = 1,
             horizon = 20,
         )
@@ -111,8 +111,8 @@ class CumulativeRelaxationTest {
     fun `disjunctive factor gets the one-machine bound`() {
         val p = makespanProblem(
             starts = Array(3) { IntDomain(0, 20) },
-            durations = intArrayOf(2, 3, 4),
-            resources = intArrayOf(1, 1, 1),
+            durations = longArrayOf(2, 3, 4),
+            resources = longArrayOf(1, 1, 1),
             capacity = 1,
             horizon = 20,
             disjunctive = true,
@@ -135,7 +135,7 @@ class CumulativeRelaxationTest {
             Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.EQ, 2), // end0 - start0 = 2
             Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.EQ, 2), // end1 - start1 = 2
             ArrayMinMax(result = 4, xs = intArrayOf(2, 3), max = true), // makespan = max(end)
-            Cumulative(intArrayOf(0, 1), intArrayOf(2, 2), intArrayOf(1, 1), capacity = 1),
+            Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), capacity = 1),
         )
         val p = Problem(0, 5, domains, factors)
         // Energy 4 at capacity 1 ⇒ makespan ≥ 4.
@@ -149,7 +149,7 @@ class CumulativeRelaxationTest {
             0,
             3,
             Array(3) { IntDomain(0, 20) },
-            arrayOf<Factor>(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), 1)),
+            arrayOf<Factor>(Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), 1)),
         )
         assertTrue(!CumulativeRelaxation(p).applicable, "no verified makespan ⇒ no plan")
     }
@@ -166,8 +166,8 @@ class CumulativeRelaxationTest {
                 Linear(intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.GE, 0),
                 Cumulative(
                     starts = intArrayOf(0, 1),
-                    durations = intArrayOf(2, 2),
-                    resources = intArrayOf(1, 1),
+                    durations = longArrayOf(2, 2),
+                    resources = longArrayOf(1, 1),
                     capacity = 1,
                     durationVars = intArrayOf(2, 3),
                 ),
@@ -183,9 +183,9 @@ class CumulativeRelaxationTest {
         repeat(120) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
-            val durations = IntArray(n) { rng.nextInt(1, 4) }
-            val resources = IntArray(n) { rng.nextInt(1, 3) }
-            val capacity = rng.nextInt(1, 4)
+            val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
+            val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
+            val capacity = rng.nextInt(1, 4).toLong()
             val starts = Array(n) { IntDomain(rng.nextInt(0, 3).toLong(), (hi + rng.nextInt(0, 3)).toLong()) }
             // Ensure every domain is non-empty and the horizon covers any feasible end.
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
@@ -213,9 +213,9 @@ class CumulativeRelaxationTest {
         var infeasible = 0
         repeat(45) { iter ->
             val n = rng.nextInt(2, 4)
-            val durations = IntArray(n) { rng.nextInt(1, 4) }
-            val resources = IntArray(n) { rng.nextInt(1, 3) }
-            val capacity = rng.nextInt(1, 4)
+            val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
+            val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
+            val capacity = rng.nextInt(1, 4).toLong()
             val starts = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
             val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
@@ -244,16 +244,16 @@ class CumulativeRelaxationTest {
     private fun bruteOptimum(
         n: Int,
         starts: Array<IntDomain>,
-        durations: IntArray,
-        resources: IntArray,
-        capacity: Int,
-    ): Int? {
+        durations: LongArray,
+        resources: LongArray,
+        capacity: Long,
+    ): Long? {
         val s = IntArray(n)
-        var best: Int? = null
+        var best: Long? = null
         fun feasible(): Boolean {
             val horizon = (0 until n).maxOf { s[it] + durations[it] }
             for (t in 0 until horizon) {
-                var load = 0
+                var load = 0L
                 for (k in 0 until n) if (s[k] <= t && t < s[k] + durations[k]) load += resources[k]
                 if (load > capacity) return false
             }

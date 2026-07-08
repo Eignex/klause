@@ -15,8 +15,8 @@ import com.eignex.klause.localsearch.MoveSink
 internal class DiffnInvariant(
     private val xs: IntArray,
     private val ys: IntArray,
-    private val widths: IntArray,
-    private val heights: IntArray,
+    private val widths: LongArray,
+    private val heights: LongArray,
     private val widthVars: IntArray?,
     private val heightVars: IntArray?,
     private val nonStrict: Boolean,
@@ -42,12 +42,12 @@ internal class DiffnInvariant(
     }
 
     private fun rw(s: LocalSearchState, i: Int, ov: Int, nv: Long): Long {
-        val wv = widthVars ?: return widths[i].toLong()
+        val wv = widthVars ?: return widths[i]
         return if (wv[i] == ov) nv else s.assignment.intValue(wv[i])
     }
 
     private fun rh(s: LocalSearchState, i: Int, ov: Int, nv: Long): Long {
-        val hv = heightVars ?: return heights[i].toLong()
+        val hv = heightVars ?: return heights[i]
         return if (hv[i] == ov) nv else s.assignment.intValue(hv[i])
     }
 

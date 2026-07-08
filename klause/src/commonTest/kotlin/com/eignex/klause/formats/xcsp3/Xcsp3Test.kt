@@ -988,7 +988,7 @@ class Xcsp3Test {
         """.trimIndent()
         val p = Xcsp3.parse(xml).problem
         val cumulative = p.factors.filterIsInstance<Cumulative>().single()
-        assertEquals(listOf(2, 2, 2, 2), cumulative.durations.toList())
+        assertEquals(listOf(2L, 2L, 2L, 2L), cumulative.durations.toList())
         sat(xml)
     }
 }

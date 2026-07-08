@@ -44,8 +44,8 @@ class DiffnInvariantTest {
         val factor = Diffn(
             xs = intArrayOf(0, 1, 2, 3),
             ys = intArrayOf(4, 5, 6, 7),
-            widths = intArrayOf(2, 1, 2, 1),
-            heights = intArrayOf(1, 2, 2, 1),
+            widths = longArrayOf(2, 1, 2, 1),
+            heights = longArrayOf(1, 2, 2, 1),
         )
         val problem = Problem(0, 8, Array(8) { IntDomain(0, 4) }, listOf(factor))
         val state = LocalSearchState(problem, Random(7))
@@ -72,8 +72,8 @@ class DiffnInvariantTest {
             factor = Diffn(
                 xs = intArrayOf(0, 1, 2, 3),
                 ys = intArrayOf(4, 5, 6, 7),
-                widths = intArrayOf(2, 1, 2, 1),
-                heights = intArrayOf(1, 2, 2, 1),
+                widths = longArrayOf(2, 1, 2, 1),
+                heights = longArrayOf(1, 2, 2, 1),
             ),
             probeVars = intArrayOf(0, 1, 2, 3, 4, 5, 6, 7),
             valueRange = 0..4,
@@ -91,8 +91,8 @@ class DiffnInvariantTest {
             factor = Diffn(
                 xs = intArrayOf(0, 1, 2, 3),
                 ys = intArrayOf(4, 5, 6, 7),
-                widths = IntArray(4),
-                heights = IntArray(4),
+                widths = LongArray(4),
+                heights = LongArray(4),
                 widthVars = intArrayOf(8, 9, 10, 11),
                 heightVars = intArrayOf(12, 13, 14, 15),
             ),

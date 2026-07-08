@@ -78,10 +78,10 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
         for (i in 0 until n) {
             val dom = session.intDomain(view.starts[i])
             est[i] = dom.min
-            deadline[i] = addExact(dom.max, view.durations[i].toLong())
+            deadline[i] = addExact(dom.max, view.durations[i])
             if (view.durations[i] > 0 && view.resources[i] > 0) {
                 active[i] = true
-                totalWork = addExact(totalWork, mulExact(view.durations[i].toLong(), view.resources[i]))
+                totalWork = addExact(totalWork, mulExact(view.durations[i], view.resources[i]))
             }
         }
         if (totalWork == 0L) return 0L
@@ -98,7 +98,7 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
         val cap = view.capacity
         for (i in 0 until n) {
             if (!active[i]) continue
-            flow.addEdge(source, 1 + i, mulExact(view.durations[i].toLong(), view.resources[i]))
+            flow.addEdge(source, 1 + i, mulExact(view.durations[i], view.resources[i]))
         }
         for (k in 0 until intervals) {
             val len = bps[k + 1] - bps[k]

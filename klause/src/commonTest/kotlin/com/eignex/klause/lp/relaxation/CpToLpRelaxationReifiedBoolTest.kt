@@ -56,7 +56,7 @@ class CpToLpRelaxationReifiedBoolTest {
             numBoolVars = nBool,
             numIntVars = 0,
             intDomains = arrayOf(),
-            factors = arrayOf<Factor>(ReifiedPseudoBoolean(aux, weights, lits, op, bound)),
+            factors = arrayOf<Factor>(ReifiedPseudoBoolean(aux, LongArray(weights.size) { weights[it].toLong() }, lits, op, bound.toLong())),
         )
 
     @Test

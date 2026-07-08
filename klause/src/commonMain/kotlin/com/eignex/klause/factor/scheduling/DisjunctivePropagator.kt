@@ -18,7 +18,7 @@ import kotlin.math.max
 internal class DisjunctivePropagator(
     val intVars: IntArray,
     private val starts: IntArray,
-    private val durations: IntArray,
+    private val durations: LongArray,
     private val presents: IntArray,
     private val durationVars: IntArray,
     private val n: Int,
@@ -29,7 +29,7 @@ internal class DisjunctivePropagator(
     /** Snapshot effective per-task durations. Returns null if any duration var is not
      *  fixed at this fixpoint pass — propagation defers in that case (sound). */
     private fun effDurOrNull(state: PropagationState): LongArray? {
-        if (durationVars.isEmpty()) return LongArray(n) { durations[it].toLong() }
+        if (durationVars.isEmpty()) return LongArray(n) { durations[it] }
         val out = LongArray(n)
         for (i in 0 until n) {
             val d = state.intDomains[durationVars[i]]

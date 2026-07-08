@@ -9,7 +9,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.IntLongMap
 
 /**
  * LS invariant for [ReifiedCardinality]: reified cardinality violation tracking and repair.
@@ -22,9 +22,9 @@ internal class ReifiedCardinalityInvariant(
     private val boolVars: IntArray,
 ) : Invariant {
 
-    private val signedByVar: IntIntMap = buildSignedLitsByVar(literals, exclude = auxBoolVar)
+    private val signedByVar: IntLongMap = buildSignedLitsByVar(literals, exclude = auxBoolVar)
 
-    private fun reifSignedFor(v: Int): Int = signedByVar[v]
+    private fun reifSignedFor(v: Int): Long = signedByVar[v]
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
@@ -57,7 +57,7 @@ internal class ReifiedCardinalityInvariant(
             reifDegree(total, !aux, cap) - reifDegree(total, aux, cap)
         } else {
             val signed = reifSignedFor(boolVar)
-            if (signed == 0) return 0
+            if (signed == 0L) return 0
             val pre = state.assignment.boolValue(boolVar)
             val change = if (pre) -signed else signed
             reifDegree(total + change, aux, cap) - reifDegree(total, aux, cap)
@@ -72,7 +72,7 @@ internal class ReifiedCardinalityInvariant(
             return reifDegree(oldTotal, newAux, cap) - reifDegree(oldTotal, !newAux, cap)
         }
         val signed = reifSignedFor(boolVar)
-        if (signed == 0) return 0
+        if (signed == 0L) return 0
         val pre = !state.assignment.boolValue(boolVar)
         val change = if (pre) -signed else signed
         val newTotal = oldTotal + change

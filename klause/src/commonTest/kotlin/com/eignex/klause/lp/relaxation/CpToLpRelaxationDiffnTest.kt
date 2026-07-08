@@ -55,7 +55,7 @@ class CpToLpRelaxationDiffnTest {
         }
         val factors = ArrayList<Factor>()
         for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(lVar, i), LinearOp.GE, 2))
-        factors.add(Diffn(IntArray(n) { it }, IntArray(n) { n + it }, intArrayOf(2, 2, 2), intArrayOf(2, 2, 2)))
+        factors.add(Diffn(IntArray(n) { it }, IntArray(n) { n + it }, longArrayOf(2, 2, 2), longArrayOf(2, 2, 2)))
         val p = Problem(0, 2 * n + 1, domains, factors.toTypedArray())
 
         assertEquals(2.0, stripLengthBound(p, lVar, diffn = false), eps, "bare LP sees only L ≥ xs+2")
@@ -69,8 +69,8 @@ class CpToLpRelaxationDiffnTest {
         var nontrivial = 0
         repeat(400) { _ ->
             val n = rng.nextInt(2, 4)
-            val w = IntArray(n) { rng.nextInt(1, 4) }
-            val h = IntArray(n) { rng.nextInt(1, 4) }
+            val w = LongArray(n) { rng.nextInt(1, 4).toLong() }
+            val h = LongArray(n) { rng.nextInt(1, 4).toLong() }
             val xHi = rng.nextInt(3, 7)
             val yHi = rng.nextInt(2, 5)
             val lVar = 2 * n
@@ -83,7 +83,7 @@ class CpToLpRelaxationDiffnTest {
                 }
             }
             val factors = ArrayList<Factor>()
-            for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(lVar, i), LinearOp.GE, w[i]))
+            for (i in 0 until n) factors.add(Linear(longArrayOf(1, -1), intArrayOf(lVar, i), LinearOp.GE, w[i]))
             factors.add(Diffn(IntArray(n) { it }, IntArray(n) { n + it }, w, h))
             val p = Problem(0, 2 * n + 1, domains, factors.toTypedArray())
 
@@ -95,11 +95,11 @@ class CpToLpRelaxationDiffnTest {
                 val ySep = py[a] + h[a] <= py[b] || py[b] + h[b] <= py[a]
                 return !xSep && !ySep
             }
-            var brute: Int? = null
+            var brute: Long? = null
             fun rec(i: Int) {
                 if (i == n) {
                     for (a in 0 until n) for (b in a + 1 until n) if (overlaps(a, b)) return
-                    var l = 0
+                    var l = 0L
                     for (k in 0 until n) l = maxOf(l, px[k] + w[k])
                     if (brute == null || l < brute!!) brute = l
                     return

@@ -263,8 +263,8 @@ class RedundantConstraintsTest {
             0,
             emptyArray(),
             listOf(
-                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 3),
-                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+                PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 3L),
+                PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L),
             ),
         )
         val out = checkPbPreserved("pb-dominated", problem, expectDrop = true)
@@ -279,9 +279,9 @@ class RedundantConstraintsTest {
             0,
             emptyArray(),
             listOf(
-                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 2),
-                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 3),
-                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.GE, 1),
+                PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 2L),
+                PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 3L),
+                PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.GE, 1L),
             ),
         )
         val out = checkPbPreserved("pb-eq-dominates", problem, expectDrop = true)
@@ -296,8 +296,8 @@ class RedundantConstraintsTest {
             0,
             emptyArray(),
             listOf(
-                PseudoBoolean(intArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
-                PseudoBoolean(intArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+                PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L),
+                PseudoBoolean(longArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L),
             ),
         )
         checkPbPreserved("pb-independent", problem, expectDrop = false)
@@ -312,7 +312,7 @@ class RedundantConstraintsTest {
             emptyArray(),
             listOf(
                 Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1),
-                PseudoBoolean(intArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 2),
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 2L),
             ),
         )
         checkPbPreserved("clique-implies-knapsack", problem, expectDrop = true)
@@ -328,7 +328,7 @@ class RedundantConstraintsTest {
             emptyArray(),
             listOf(
                 Cardinality(intArrayOf(pos(1), pos(2)), min = 0, max = 1),
-                PseudoBoolean(intArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 7),
+                PseudoBoolean(longArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 7L),
             ),
         )
         checkPbPreserved("clique-partial-cover", problem, expectDrop = true)
@@ -343,7 +343,7 @@ class RedundantConstraintsTest {
             emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-                PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 1),
+                PseudoBoolean(longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 1L),
             ),
         )
         checkPbPreserved("clique-from-clause", problem, expectDrop = true)
@@ -359,7 +359,7 @@ class RedundantConstraintsTest {
             emptyArray(),
             listOf(
                 Cardinality(intArrayOf(pos(1), pos(2)), min = 0, max = 1),
-                PseudoBoolean(intArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6),
+                PseudoBoolean(longArrayOf(5, 2, 2), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6L),
             ),
         )
         checkPbPreserved("clique-not-implied", problem, expectDrop = false)

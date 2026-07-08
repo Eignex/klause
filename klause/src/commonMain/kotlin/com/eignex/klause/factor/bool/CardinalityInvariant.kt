@@ -8,7 +8,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.IntLongMap
 
 /** LS invariant for [Cardinality]: violation scoring and break/make maintenance for `min ≤ count ≤ max`. */
 internal class CardinalityInvariant(
@@ -19,9 +19,9 @@ internal class CardinalityInvariant(
 ) : Invariant {
 
     /** Signed contribution of each variable to the count, built from [literals]. */
-    private val signedByVar: IntIntMap = buildSignedLitsByVar(literals)
+    private val signedByVar: IntLongMap = buildSignedLitsByVar(literals)
 
-    private fun signedForVar(v: Int): Int = signedByVar[v]
+    private fun signedForVar(v: Int): Long = signedByVar[v]
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var count = 0L
@@ -33,8 +33,8 @@ internal class CardinalityInvariant(
 
     /** Cached max |`signedByVar[v]`| across `boolVars`. Bounds the change `n` can
      *  see from a single flip, used by [updateBoolBreakMakeForFlip]'s early-out. */
-    private val maxAbsSigned: Int = run {
-        var m = 0
+    private val maxAbsSigned: Long = run {
+        var m = 0L
         for (v in boolVars) {
             val s = signedByVar[v]
             val a = if (s < 0) -s else s
@@ -59,7 +59,7 @@ internal class CardinalityInvariant(
     /** Compressed Δ violation-degree if `u` (currently `uVal`) were flipped at true-count `n`. */
     private fun signedDelta(n: Long, u: Int, uVal: Boolean, softCap: Int): Int {
         val signedU = signedForVar(u)
-        if (signedU == 0) return 0
+        if (signedU == 0L) return 0
         val changeU = if (uVal) -signedU else signedU
         return cardDegree(n + changeU, softCap) - cardDegree(n, softCap)
     }
@@ -155,7 +155,7 @@ internal class CardinalityInvariant(
      *  when both pre- and post-flip counts sit strictly inside the interior. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val signedFlipped = signedForVar(flippedVar)
-        if (signedFlipped == 0) return
+        if (signedFlipped == 0L) return
         val newN = state.longPayload[factorId]
         val flippedPost = state.assignment.boolValue(flippedVar)
         val changeV = if (flippedPost) signedFlipped else -signedFlipped

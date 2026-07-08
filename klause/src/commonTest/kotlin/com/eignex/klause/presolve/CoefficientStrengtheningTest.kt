@@ -178,7 +178,7 @@ class CoefficientStrengtheningTest {
         // 2*x0 + 4*x1 = 5 over booleans: even left-hand side can never equal 5.
         val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true))
         assertInfeasibleAfterStrengthen(
-            Problem(2, 0, emptyArray(), listOf(PseudoBoolean(intArrayOf(2, 4), lits, PbOp.EQ, 5))),
+            Problem(2, 0, emptyArray(), listOf(PseudoBoolean(longArrayOf(2, 4), lits, PbOp.EQ, 5L))),
         )
     }
 
@@ -205,20 +205,20 @@ class CoefficientStrengtheningTest {
     @Test
     fun `gcd reduction preserves pseudo-boolean constraints`() {
         val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(2, 4, 6), lits, PbOp.LE, 7))
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(2, 4, 6), lits, PbOp.GE, 7))
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(2, 4, 6), lits, PbOp.EQ, 8))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(2, 4, 6), lits, PbOp.LE, 7L))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(2, 4, 6), lits, PbOp.GE, 7L))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(2, 4, 6), lits, PbOp.EQ, 8L))
     }
 
     @Test
     fun `knapsack lifting preserves the feasible set`() {
         val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, 1, 1), lits, PbOp.LE, 3)) // d=4, w0=5 clamps to 4
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(10, 2, 3), lits, PbOp.LE, 4))
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(3, 3, 3), lits, PbOp.LE, 9)) // redundant: drops
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, -2, 1), lits, PbOp.LE, 2)) // negative weight normalized
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(5, 1, 1), lits, PbOp.LE, 3L)) // d=4, w0=5 clamps to 4
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(10, 2, 3), lits, PbOp.LE, 4L))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(3, 3, 3), lits, PbOp.LE, 9L)) // redundant: drops
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(5, -2, 1), lits, PbOp.LE, 2L)) // negative weight normalized
         val mixed = intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true))
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(6, 2, 1), mixed, PbOp.LE, 4))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(6, 2, 1), mixed, PbOp.LE, 4L))
     }
 
     @Test
@@ -227,8 +227,8 @@ class CoefficientStrengtheningTest {
         repeat(500) {
             val n = 2 + rng.nextInt(3) // 2..4
             val lits = IntArray(n) { i -> Lit.make(i, rng.nextBoolean()) }
-            val weights = IntArray(n) { rng.nextInt(9) - 3 } // -3..5
-            assertPbEquivalent(n, PseudoBoolean(weights, lits, PbOp.LE, rng.nextInt(15) - 3))
+            val weights = LongArray(n) { (rng.nextInt(9) - 3).toLong() } // -3..5
+            assertPbEquivalent(n, PseudoBoolean(weights, lits, PbOp.LE, (rng.nextInt(15) - 3).toLong()))
         }
     }
 
@@ -236,10 +236,10 @@ class CoefficientStrengtheningTest {
     fun `ge and eq pseudo-boolean lifting`() {
         val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
         // GE: complemented to <= then lifted.
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, 1, 1), lits, PbOp.GE, 2))
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(10, 2, 3), lits, PbOp.GE, 9))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(5, 1, 1), lits, PbOp.GE, 2L))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(10, 2, 3), lits, PbOp.GE, 9L))
         // EQ: not liftable by clamping — must stay feasible-set-equivalent (no wrong clamp).
-        assertPbEquivalent(3, PseudoBoolean(intArrayOf(5, 1, 1), lits, PbOp.EQ, 3))
+        assertPbEquivalent(3, PseudoBoolean(longArrayOf(5, 1, 1), lits, PbOp.EQ, 3L))
     }
 
     @Test
@@ -301,8 +301,8 @@ class CoefficientStrengtheningTest {
         repeat(400) {
             val n = 2 + rng.nextInt(3)
             val lits = IntArray(n) { i -> Lit.make(i, rng.nextBoolean()) }
-            val weights = IntArray(n) { 1 + rng.nextInt(6) }
-            assertPbEquivalent(n, PseudoBoolean(weights, lits, PbOp.GE, rng.nextInt(15)))
+            val weights = LongArray(n) { (1 + rng.nextInt(6)).toLong() }
+            assertPbEquivalent(n, PseudoBoolean(weights, lits, PbOp.GE, rng.nextInt(15).toLong()))
         }
     }
 

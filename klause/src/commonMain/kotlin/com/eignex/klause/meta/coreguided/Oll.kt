@@ -106,11 +106,11 @@ internal object Oll {
         if (lb > Int.MAX_VALUE) return sample
         for (s in softs) if (s.weight > Int.MAX_VALUE) return sample
 
-        val weights = IntArray(softs.size) { softs[it].weight.toInt() }
+        val weights = LongArray(softs.size) { softs[it].weight }
         val negLits = IntArray(softs.size) { Lit.negate(softs[it].lit) }
         val factors = ArrayList<Factor>(base.factors.size + 1)
         for (f in base.factors) factors.add(f)
-        factors.add(PseudoBoolean(weights = weights, literals = negLits, op = PbOp.LE, bound = lb.toInt()))
+        factors.add(PseudoBoolean(weights = weights, literals = negLits, op = PbOp.LE, bound = lb))
         val problem = Problem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,

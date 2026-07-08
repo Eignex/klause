@@ -20,8 +20,8 @@ class CumulativeInvariantTest {
     private fun threeTasksUnary(): Problem {
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(2, 2, 2),
-            resources = intArrayOf(1, 1, 1),
+            durations = longArrayOf(2, 2, 2),
+            resources = longArrayOf(1, 1, 1),
             capacity = 1,
         )
         return Problem(
@@ -58,8 +58,8 @@ class CumulativeInvariantTest {
     fun `graded cost equals the summed overage`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(3, 3),
-            resources = intArrayOf(2, 2),
+            durations = longArrayOf(3, 3),
+            resources = longArrayOf(2, 2),
             capacity = 3,
         )
         val problem = Problem(
@@ -120,8 +120,8 @@ class CumulativeInvariantTest {
     fun `var resources flip overage as the resource var changes`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(2, 2),
-            resources = intArrayOf(1, 1), // ubs
+            durations = longArrayOf(2, 2),
+            resources = longArrayOf(1, 1), // ubs
             capacity = 1,
             resourceVars = intArrayOf(2, 3),
         )
@@ -147,8 +147,8 @@ class CumulativeInvariantTest {
     fun `var capacity flips overage as the capacity var changes`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(2, 2),
-            resources = intArrayOf(1, 1),
+            durations = longArrayOf(2, 2),
+            resources = longArrayOf(1, 1),
             capacity = 2,
             capacityVar = 2,
         )
@@ -173,8 +173,8 @@ class CumulativeInvariantTest {
     fun `var durations rescale task footprint`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(3, 3), // ubs
-            resources = intArrayOf(1, 1),
+            durations = longArrayOf(3, 3), // ubs
+            resources = longArrayOf(1, 1),
             capacity = 1,
             durationVars = intArrayOf(2, 3),
         )

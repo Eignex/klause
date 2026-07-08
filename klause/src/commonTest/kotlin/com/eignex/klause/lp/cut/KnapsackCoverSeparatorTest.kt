@@ -33,7 +33,7 @@ class KnapsackCoverSeparatorTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(PseudoBoolean(intArrayOf(3, 3, 2), posLits(3), PbOp.LE, 4)),
+            factors = arrayOf<Factor>(PseudoBoolean(longArrayOf(3, 3, 2), posLits(3), PbOp.LE, 4L)),
         )
         val r = CpToLpRelaxation(p, LinearObjective(boolWeights = longArrayOf(-1, -1, 0))).build(PropagationSession(p))
         val sol = requireNotNull(RevisedSimplex(r.model).solve())
@@ -55,7 +55,7 @@ class KnapsackCoverSeparatorTest {
             numBoolVars = 3,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = arrayOf<Factor>(PseudoBoolean(intArrayOf(3, 3, 3), posLits(3), PbOp.LE, 4)),
+            factors = arrayOf<Factor>(PseudoBoolean(longArrayOf(3, 3, 3), posLits(3), PbOp.LE, 4L)),
         )
         val r = CpToLpRelaxation(p, LinearObjective(boolWeights = longArrayOf(-1, -1, -1))).build(PropagationSession(p))
         val sol = requireNotNull(RevisedSimplex(r.model).solve())
@@ -78,7 +78,7 @@ class KnapsackCoverSeparatorTest {
                 numBoolVars = n,
                 numIntVars = 0,
                 intDomains = emptyArray(),
-                factors = arrayOf<Factor>(PseudoBoolean(weights, posLits(n), PbOp.LE, bnd)),
+                factors = arrayOf<Factor>(PseudoBoolean(LongArray(weights.size) { weights[it].toLong() }, posLits(n), PbOp.LE, bnd.toLong())),
             )
             val obj = LinearObjective(boolWeights = LongArray(n) { -rng.nextInt(0, 4).toLong() })
             val r = CpToLpRelaxation(p, obj).build(PropagationSession(p))
@@ -126,7 +126,7 @@ class KnapsackCoverSeparatorTest {
             val cliqueSize = rng.nextInt(2, n + 1)
             val cliqueVars = (0 until cliqueSize).toSet()
             val factors = arrayOf<Factor>(
-                PseudoBoolean(weights, posLits(n), PbOp.LE, bnd),
+                PseudoBoolean(LongArray(weights.size) { weights[it].toLong() }, posLits(n), PbOp.LE, bnd.toLong()),
                 Cardinality(IntArray(cliqueSize) { i -> Lit.make(i, true) }, min = 0, max = 1),
             )
             val p = Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = factors)

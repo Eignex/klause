@@ -294,7 +294,7 @@ class CpToLpRelaxationReboundTest {
             Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.GE, 3),
             Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.GE, 3),
             Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.GE, 3),
-            Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1),
+            Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1L),
         )
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 20) }, factors)
         val relaxer =

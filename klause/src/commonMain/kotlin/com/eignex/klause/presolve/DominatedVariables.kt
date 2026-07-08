@@ -156,7 +156,7 @@ internal object DominatedVariables {
      *  rising / falling sum can violate the row, so the value that moves the sum that way is unsafe. */
     private fun markBoolMonotoneLiteral(
         lit: Int,
-        weight: Int,
+        weight: Long,
         riseUnsafe: Boolean,
         fallUnsafe: Boolean,
         trueSafe: BooleanArray,
@@ -164,7 +164,7 @@ internal object DominatedVariables {
     ) {
         val v = Lit.variable(lit)
         val signedW = if (Lit.isPositive(lit)) weight else -weight
-        if (signedW == 0) return
+        if (signedW == 0L) return
         // The value that raises the sum: true if signedW > 0, else false. Mirror for lowering.
         if (riseUnsafe) (if (signedW > 0) trueSafe else falseSafe)[v] = false
         if (fallUnsafe) (if (signedW > 0) falseSafe else trueSafe)[v] = false

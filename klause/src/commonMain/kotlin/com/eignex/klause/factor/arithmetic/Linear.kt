@@ -122,11 +122,6 @@ internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
     bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
         coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
-/** True when every value in [values] fits 32-bit range. The value-symmetry relabel (`remapValues`) is
- *  `(Int)`-typed, so a value-carrying global (GCC cover, Table tuples, Mdd symbols, AllDifferent
- *  except-set) declines value symmetry (`null`) when wide, to avoid truncating two values into one. */
-internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
-
 /** Low 32 bits mask for packing/unpacking a `(image, coeff)` pair in [Linear.remapStructuralHash]. */
 private const val LOW_WORD = 0xFFFFFFFFL
 

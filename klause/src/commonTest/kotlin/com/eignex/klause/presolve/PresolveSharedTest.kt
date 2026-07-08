@@ -85,7 +85,7 @@ class PresolveSharedTest {
             2,
             0,
             emptyArray(),
-            listOf(PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2)),
+            listOf(PseudoBoolean(longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L)),
         )
         assertTrue(Presolve.amoCliques(problem).isEmpty())
     }
@@ -97,7 +97,7 @@ class PresolveSharedTest {
             2,
             0,
             emptyArray(),
-            listOf(PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 1)),
+            listOf(PseudoBoolean(longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 1L)),
         )
         assertEquals(listOf(setOf(pos(0), pos(1))), Presolve.amoCliques(problem))
     }
@@ -109,7 +109,7 @@ class PresolveSharedTest {
             3,
             0,
             emptyArray(),
-            listOf(PseudoBoolean(intArrayOf(5, 4, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6)),
+            listOf(PseudoBoolean(longArrayOf(5, 4, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6L)),
         )
         assertEquals(listOf(setOf(pos(0), pos(1))), Presolve.amoCliques(problem))
     }

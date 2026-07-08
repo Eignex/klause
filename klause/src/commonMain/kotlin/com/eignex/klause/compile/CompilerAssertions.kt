@@ -171,10 +171,10 @@ internal fun Lowering.assertExpr(expr: BoolExpr) {
         is PseudoBooleanExpr -> {
             val lits = lowerAllBool(expr.lits)
             factors += PseudoBoolean(
-                weights = expr.weights.toIntArray(),
+                weights = LongArray(expr.weights.size) { expr.weights[it].toLong() },
                 literals = lits,
                 op = expr.op,
-                bound = expr.bound,
+                bound = expr.bound.toLong(),
             )
         }
 
@@ -357,9 +357,9 @@ internal fun Lowering.assertCumulative(expr: CumulativeExpr) {
     val ids = liftToIntRefIds(expr.starts, "cumulative")
     factors += CumulativeFactor(
         starts = ids,
-        durations = expr.durations.toIntArray(),
-        resources = expr.resources.toIntArray(),
-        capacity = expr.capacity,
+        durations = LongArray(expr.durations.size) { expr.durations[it].toLong() },
+        resources = LongArray(expr.resources.size) { expr.resources[it].toLong() },
+        capacity = expr.capacity.toLong(),
     )
 }
 
@@ -412,9 +412,9 @@ internal fun Lowering.assertCumulativeOpt(expr: CumulativeExprOpt) {
     val ids = liftToIntRefIds(expr.starts, "cumulativeOpt")
     factors += CumulativeFactor(
         starts = ids,
-        durations = expr.durations.toIntArray(),
-        resources = expr.resources.toIntArray(),
-        capacity = expr.capacity,
+        durations = LongArray(expr.durations.size) { expr.durations[it].toLong() },
+        resources = LongArray(expr.resources.size) { expr.resources[it].toLong() },
+        capacity = expr.capacity.toLong(),
         presents = lowerPresences(expr.presents),
     )
 }
@@ -423,7 +423,7 @@ internal fun Lowering.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
     val ids = liftToIntRefIds(expr.starts, "disjunctiveOpt")
     factors += DisjunctiveFactor(
         starts = ids,
-        durations = expr.durations.toIntArray(),
+        durations = LongArray(expr.durations.size) { expr.durations[it].toLong() },
         presents = lowerPresences(expr.presents),
     )
 }
@@ -462,7 +462,7 @@ internal fun Lowering.assertDisjunctive(expr: DisjunctiveExpr) {
     val ids = liftToIntRefIds(expr.starts, "disjunctive")
     factors += DisjunctiveFactor(
         starts = ids,
-        durations = expr.durations.toIntArray(),
+        durations = LongArray(expr.durations.size) { expr.durations[it].toLong() },
     )
 }
 
@@ -499,8 +499,8 @@ internal fun Lowering.assertDiffn(expr: DiffnExpr) {
     factors += DiffnFactor(
         xs = xIds,
         ys = yIds,
-        widths = expr.widths.toIntArray(),
-        heights = expr.heights.toIntArray(),
+        widths = LongArray(expr.widths.size) { expr.widths[it].toLong() },
+        heights = LongArray(expr.heights.size) { expr.heights[it].toLong() },
     )
 }
 

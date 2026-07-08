@@ -29,9 +29,9 @@ import kotlin.math.min
  */
 internal class CumulativeInvariant(
     private val starts: IntArray,
-    private val durations: IntArray,
-    private val resources: IntArray,
-    private val capacity: Int,
+    private val durations: LongArray,
+    private val resources: LongArray,
+    private val capacity: Long,
     private val presents: IntArray,
     private val durationVars: IntArray,
     private val resourceVars: IntArray,
@@ -43,13 +43,13 @@ internal class CumulativeInvariant(
 ) : Invariant {
 
     private fun curDur(state: LocalSearchState, i: Int): Long =
-        if (durationVars.isEmpty()) durations[i].toLong() else state.assignment.intValue(durationVars[i])
+        if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
 
     private fun curRes(state: LocalSearchState, i: Int): Long =
-        if (resourceVars.isEmpty()) resources[i].toLong() else state.assignment.intValue(resourceVars[i])
+        if (resourceVars.isEmpty()) resources[i] else state.assignment.intValue(resourceVars[i])
 
     private fun curCap(state: LocalSearchState): Long = if (capacityVar < 0) {
-        capacity.toLong()
+        capacity
     } else {
         state.assignment.intValue(
             capacityVar,
@@ -406,9 +406,9 @@ internal class CumulativeInvariant(
         var hi = Long.MIN_VALUE
         for (i in 0 until n) {
             val dUb = if (durationVars.isEmpty()) {
-                durations[i].toLong()
+                durations[i]
             } else {
-                max(durations[i].toLong(), state.problem.intDomains[durationVars[i]].max)
+                max(durations[i], state.problem.intDomains[durationVars[i]].max)
             }
             val cand = max(state.problem.intDomains[starts[i]].max, state.assignment.intValue(starts[i])) + dUb
             hi = max(hi, cand)

@@ -12,7 +12,10 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.IntLongMap
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntLongMap
 
 internal fun linearHolds(sum: Long, op: LinearOp, bound: Long): Boolean = when (op) {
     LinearOp.LE -> sum <= bound
@@ -31,13 +34,13 @@ internal fun linearDegree(sum: Long, op: LinearOp, bound: Long, softCap: Int): I
     }
 }
 
-internal fun pbHolds(sum: Long, op: PbOp, bound: Int): Boolean = when (op) {
+internal fun pbHolds(sum: Long, op: PbOp, bound: Long): Boolean = when (op) {
     PbOp.LE -> sum <= bound
     PbOp.GE -> sum >= bound
-    PbOp.EQ -> sum == bound.toLong()
+    PbOp.EQ -> sum == bound
 }
 
-internal fun pbDistance(sum: Long, op: PbOp, bound: Int): Long = when (op) {
+internal fun pbDistance(sum: Long, op: PbOp, bound: Long): Long = when (op) {
     PbOp.LE -> if (sum > bound) sum - bound else 0L
     PbOp.GE -> if (sum < bound) bound - sum else 0L
     PbOp.EQ -> if (sum >= bound) sum - bound else bound - sum
@@ -137,13 +140,13 @@ internal fun snapLinearTarget(op: LinearOp, bound: Long, coeff: Long, sumWithout
     }
 }
 
-internal fun pbDegree(sum: Long, op: PbOp, bound: Int, softCap: Int): Int {
+internal fun pbDegree(sum: Long, op: PbOp, bound: Long, softCap: Int): Int {
     if (pbHolds(sum, op, bound)) return 0
     return compressViolation(pbDistance(sum, op, bound), softCap)
 }
 
-internal fun buildSignedWeightByVar(weights: IntArray, literals: IntArray, exclude: Int = -1): IntIntMap {
-    val signs = MutableIntIntMap()
+internal fun buildSignedWeightByVar(weights: LongArray, literals: IntArray, exclude: Int = -1): IntLongMap {
+    val signs = MutableIntLongMap()
     for (i in literals.indices) {
         val v = Lit.variable(literals[i])
         if (v == exclude) continue
@@ -151,21 +154,21 @@ internal fun buildSignedWeightByVar(weights: IntArray, literals: IntArray, exclu
         signs.addTo(v, s)
     }
     val keys = IntArrayList(signs.size)
-    val values = IntArrayList(signs.size)
+    val values = LongArrayList(signs.size)
     signs.forEach { k, value ->
         keys.add(k)
         values.add(value)
     }
-    return IntIntMap.build(
+    return IntLongMap.build(
         keys = keys.toIntArray(),
-        values = values.toIntArray(),
+        values = values.toLongArray(),
         absent = 0,
     )
 }
 
-internal fun signedFlipDelta(state: LocalSearchState, signedByVar: IntIntMap, boolVar: Int, current: Boolean): Int {
+internal fun signedFlipDelta(state: LocalSearchState, signedByVar: IntLongMap, boolVar: Int, current: Boolean): Long {
     val signed = signedByVar[boolVar]
-    if (signed == 0) return 0
+    if (signed == 0L) return 0L
     val pre = if (current) state.assignment.boolValue(boolVar) else !state.assignment.boolValue(boolVar)
     return if (pre) -signed else signed
 }
@@ -175,7 +178,7 @@ internal inline fun reifiedBoolDelta(
     factorId: Int,
     boolVar: Int,
     auxBoolVar: Int,
-    signedByVar: IntIntMap,
+    signedByVar: IntLongMap,
     degreeAt: (total: Long, aux: Boolean, softCap: Int) -> Int,
 ): Int {
     val aux = state.assignment.boolValue(auxBoolVar)
@@ -194,7 +197,7 @@ internal inline fun reifiedBoolApply(
     factorId: Int,
     boolVar: Int,
     auxBoolVar: Int,
-    signedByVar: IntIntMap,
+    signedByVar: IntLongMap,
     degreeAt: (total: Long, aux: Boolean, softCap: Int) -> Int,
 ): Int {
     val oldTotal = state.longPayload[factorId]
@@ -215,7 +218,7 @@ internal inline fun reifiedBoolUpdateBreakMake(
     factorId: Int,
     flippedVar: Int,
     auxBoolVar: Int,
-    signedByVar: IntIntMap,
+    signedByVar: IntLongMap,
     boolVars: IntArray,
     degreeAt: (total: Long, aux: Boolean, softCap: Int) -> Int,
 ) {
@@ -229,7 +232,7 @@ internal inline fun reifiedBoolUpdateBreakMake(
     } else {
         oldAux = newAux
         val signedFlipped = signedByVar[flippedVar]
-        if (signedFlipped == 0) return
+        if (signedFlipped == 0L) return
         val flippedPost = state.assignment.boolValue(flippedVar)
         val changeV = if (flippedPost) signedFlipped else -signedFlipped
         oldTotal = newTotal - changeV
@@ -245,7 +248,7 @@ internal inline fun reifiedBoolUpdateBreakMake(
             postDelta = degreeAt(newTotal, !newAux, cap) - newDeg
         } else {
             val signedU = signedByVar[u]
-            if (signedU == 0) {
+            if (signedU == 0L) {
                 preDelta = 0
                 postDelta = 0
             } else {
@@ -308,14 +311,14 @@ internal fun pbFalseFormAntecedents(
  *  share before their op-specific feasibility tests. */
 internal class PbRanges(val litLo: LongArray, val litHi: LongArray, val sumLo: Long, val sumHi: Long)
 
-internal fun pbLitRanges(state: PropagationState, weights: IntArray, literals: IntArray): PbRanges {
+internal fun pbLitRanges(state: PropagationState, weights: LongArray, literals: IntArray): PbRanges {
     val n = literals.size
     val litLo = LongArray(n)
     val litHi = LongArray(n)
     var sumLo = 0L
     var sumHi = 0L
     for (i in 0 until n) {
-        val w = weights[i].toLong()
+        val w = weights[i]
         val b = state.boolValues[Lit.variable(literals[i])]
         val lo: Long
         val hi: Long
@@ -346,7 +349,7 @@ internal fun pbLitRanges(state: PropagationState, weights: IntArray, literals: I
 // extraLit threads a reif-var pin into each implied propagation's antecedents (0 = none).
 internal fun propagatePbBounds(
     state: PropagationState,
-    weights: IntArray,
+    weights: LongArray,
     literals: IntArray,
     op: PbOp,
     bound: Long,
@@ -361,7 +364,7 @@ internal fun propagatePbBounds(
         PbOp.EQ -> if (sumLo > bound || sumHi < bound) return false
     }
     for (i in 0 until literals.size) {
-        val w = weights[i].toLong()
+        val w = weights[i]
         if (w == 0L) continue
         val v = Lit.variable(literals[i])
         if (state.boolValues[v] != null) continue
@@ -387,11 +390,11 @@ private fun pbFeasible(op: PbOp, lo: Long, hi: Long, bound: Long): Boolean = whe
     PbOp.EQ -> lo <= bound && hi >= bound
 }
 
-internal fun pbSumRange(state: PropagationState, weights: IntArray, literals: IntArray): LongArray {
+internal fun pbSumRange(state: PropagationState, weights: LongArray, literals: IntArray): LongArray {
     var lo = 0L
     var hi = 0L
     for (i in literals.indices) {
-        val w = weights[i].toLong()
+        val w = weights[i]
         val v = Lit.variable(literals[i])
         val b = state.boolValues[v]
         when {
@@ -421,26 +424,26 @@ internal fun buildParityByVar(boolVars: IntArray, literals: IntArray): CoeffLook
     return CoeffLookup.build(boolVars, parities)
 }
 
-internal fun buildSignedLitsByVar(literals: IntArray, exclude: Int = -1): IntIntMap {
-    val signs = MutableIntIntMap()
+internal fun buildSignedLitsByVar(literals: IntArray, exclude: Int = -1): IntLongMap {
+    val signs = MutableIntLongMap()
     for (lit in literals) {
         val v = Lit.variable(lit)
         if (v == exclude) continue
-        signs.addTo(v, if (Lit.isPositive(lit)) 1 else -1)
+        signs.addTo(v, if (Lit.isPositive(lit)) 1L else -1L)
     }
     val keys = IntArrayList(signs.size)
-    val values = IntArrayList(signs.size)
+    val values = LongArrayList(signs.size)
     signs.forEach { k, value ->
         keys.add(k)
         values.add(value)
     }
-    return IntIntMap.build(keys = keys.toIntArray(), values = values.toIntArray(), absent = 0)
+    return IntLongMap.build(keys = keys.toIntArray(), values = values.toLongArray(), absent = 0)
 }
 
 internal inline fun nonReifiedBoolUpdateBreakMakeLoop(
     state: LocalSearchState,
     flippedVar: Int,
-    signedByVar: IntIntMap,
+    signedByVar: IntLongMap,
     boolVars: IntArray,
     oldSum: Long,
     newSum: Long,
@@ -451,7 +454,7 @@ internal inline fun nonReifiedBoolUpdateBreakMakeLoop(
     val newDeg = degreeAt(newSum, cap)
     for (u in boolVars) {
         val signedU = signedByVar[u]
-        if (signedU == 0) continue
+        if (signedU == 0L) continue
         val uPost = state.assignment.boolValue(u)
         val uPre = if (u == flippedVar) !uPost else uPost
         val oldChangeU = if (uPre) -signedU else signedU

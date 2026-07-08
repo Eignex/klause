@@ -17,14 +17,14 @@ import com.eignex.klause.util.EmptyIntArray
  * true, 0 when false). Payload at `intPayload(factorId)` is the current weighted sum. Terms pair
  * [weights] with [literals]; the sum is compared by [op] against [bound].
  */
-class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp, val bound: Int) : Factor {
+class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp, val bound: Long) : Factor {
 
     override val intVars: IntArray = EmptyIntArray
 
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.PSEUDO_BOOLEAN) {
         enum(op)
-        int(bound)
-        pairsByKey(literals) { weights[it].toLong() }
+        long(bound)
+        pairsByKey(literals) { weights[it] }
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
@@ -45,6 +45,6 @@ class PseudoBoolean(val weights: IntArray, val literals: IntArray, val op: PbOp,
             PbOp.GE -> LinearOp.GE
             PbOp.EQ -> LinearOp.EQ
         }
-        builder.boolRow(literals, weights, linearOp, bound.toLong())
+        builder.boolRow(literals, weights, linearOp, bound)
     }
 }

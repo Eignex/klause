@@ -250,7 +250,7 @@ class DominatedVariablesTest {
             2,
             0,
             emptyArray(),
-            listOf(PseudoBoolean(intArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.LE, 4)),
+            listOf(PseudoBoolean(longArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.LE, 4L)),
         )
         val outLe = fixed(le, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(le, emptyMap()), minObjectiveBools(outLe, emptyMap()), "LE optimum changed")
@@ -264,7 +264,7 @@ class DominatedVariablesTest {
             2,
             0,
             emptyArray(),
-            listOf(PseudoBoolean(intArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.GE, 1)),
+            listOf(PseudoBoolean(longArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.GE, 1L)),
         )
         val outGe = fixed(ge, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(ge, emptyMap()), minObjectiveBools(outGe, emptyMap()), "GE optimum changed")
@@ -275,7 +275,7 @@ class DominatedVariablesTest {
     fun `negative-weight pseudo-boolean LE flips the safe direction`() {
         // `-b0 <= 0` (always true): a rising sum violates LE, and with weight -1 the rising value is
         // b0 = false ⇒ false-unsafe ⇒ the safe pin is true. Optimum (no objective) is preserved.
-        val problem = Problem(1, 0, emptyArray(), listOf(PseudoBoolean(intArrayOf(-1), intArrayOf(pos(0)), PbOp.LE, 0)))
+        val problem = Problem(1, 0, emptyArray(), listOf(PseudoBoolean(longArrayOf(-1), intArrayOf(pos(0)), PbOp.LE, 0L)))
         val out = fixed(problem, emptyMap(), emptyMap())
         assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
         assertTrue(hasUnit(out, Lit.make(0, true)), "b0 should be pinned true")
@@ -288,7 +288,7 @@ class DominatedVariablesTest {
             2,
             0,
             emptyArray(),
-            listOf(PseudoBoolean(intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 1)),
+            listOf(PseudoBoolean(longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.EQ, 1L)),
         )
         assertTrue(
             Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap()).isEmpty,

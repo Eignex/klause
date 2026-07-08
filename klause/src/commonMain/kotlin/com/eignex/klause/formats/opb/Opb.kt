@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntDoubleMap
 
 /** Parsed OPB instance and optional objective. */
@@ -70,7 +71,7 @@ object Opb {
                 "OPB constraint missing right-hand side: ${stmt.joinToString(" ")}"
             }
             val (weights, literals) = parseTerms(stmt.subList(0, opIdx))
-            val rhs = stmt[opIdx + 1].toIntOrNull()
+            val rhs = stmt[opIdx + 1].toLongOrNull()
                 ?: error("OPB constraint rhs not an integer: '${stmt[opIdx + 1]}'")
             val pbOp = when (stmt[opIdx]) {
                 ">=" -> PbOp.GE
@@ -84,7 +85,7 @@ object Opb {
             }
             factors.add(
                 PseudoBoolean(
-                    weights = weights.toIntArray(),
+                    weights = weights.toLongArray(),
                     literals = literals.toIntArray(),
                     op = pbOp,
                     bound = rhs,
@@ -109,15 +110,15 @@ object Opb {
     }
 
     /** Parse `coef var` pairs into aligned weights and literals. */
-    private fun parseTerms(tokens: List<String>): Pair<IntArrayList, IntArrayList> {
+    private fun parseTerms(tokens: List<String>): Pair<LongArrayList, IntArrayList> {
         require(tokens.size % 2 == 0) {
             "OPB term sequence must alternate coefficient/variable, got: ${tokens.joinToString(" ")}"
         }
-        val weights = IntArrayList()
+        val weights = LongArrayList()
         val literals = IntArrayList()
         var idx = 0
         while (idx < tokens.size) {
-            val coef = tokens[idx].toIntOrNull()
+            val coef = tokens[idx].toLongOrNull()
                 ?: error("OPB coefficient not an integer: '${tokens[idx]}'")
             val varToken = tokens[idx + 1]
             val negated = varToken.startsWith("~")

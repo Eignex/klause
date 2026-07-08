@@ -30,7 +30,9 @@ class DisjunctivePropagatorTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Disjunctive(starts = intArrayOf(0, 1, 2, 3), durations = intArrayOf(1, 1, 1, 1))),
+            factors = arrayOf<Factor>(
+                Disjunctive(starts = intArrayOf(0, 1, 2, 3), durations = longArrayOf(1, 1, 1, 1)),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -57,7 +59,7 @@ class DisjunctivePropagatorTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(3, 3, 3))),
+            factors = arrayOf<Factor>(Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(3, 3, 3))),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -83,7 +85,7 @@ class DisjunctivePropagatorTest {
         // Two unit-resource tasks, durations 3 and 3, starts in [0, 5]. A level-1 decision
         // squeezes both starts' max down to 2, so each task occupies a window [est, 2+3) = [0, 5)
         // of length 5 while their combined energy is 6 > 5 — an energetic overload.
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(3, 3))
+        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(3, 3))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -108,7 +110,7 @@ class DisjunctivePropagatorTest {
         // 3 tasks, durations 2, 2, 1 over starts 0..3 must not overlap. The window is tight, so
         // the solver hits many overload/precedence conflicts and learns clauses off the new
         // intVars antecedents — if any antecedent were unsound a feasible tuple would be pruned.
-        val durs = intArrayOf(2, 2, 1)
+        val durs = longArrayOf(2, 2, 1)
         for (seed in 1L..5L) {
             val problem = Problem(
                 numBoolVars = 0,
@@ -154,7 +156,7 @@ class DisjunctivePropagatorTest {
                 factors = listOf<Factor>(
                     Disjunctive(
                         starts = intArrayOf(0, 1, 2),
-                        durations = intArrayOf(1, 1, 1), // ignored: durationVars takes precedence
+                        durations = longArrayOf(1, 1, 1), // ignored: durationVars takes precedence
                         durationVars = intArrayOf(3, 4, 5),
                     ),
                 ),
@@ -185,7 +187,7 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `pairwise detectable precedence pushes the earliest start`() {
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(3, 1))
+        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(3, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -210,7 +212,7 @@ class DisjunctivePropagatorTest {
         // dom_2 = [0, 4], task 2 collapses to the singleton {4} → Implied.ints[2] = 4.
         // Pairwise detectable precedences alone cannot derive this because no single
         // pair triggers (est_i + dur_i ≤ lst_j for every i, j pair in [0, 3] dom).
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(2, 2, 2))
+        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -230,7 +232,7 @@ class DisjunctivePropagatorTest {
         // the union overflows the window, so it must end before all of {0, 1}, forcing
         // start_2.max ≤ lct({0,1}) − sum_dur({0,1}) − dur_2 = 6 − 4 − 2 = 0. With dom_2 =
         // [0, 4] task 2 collapses to {0}.
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(2, 2, 2))
+        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -248,7 +250,7 @@ class DisjunctivePropagatorTest {
         // (mandatory part [1, 2)), task 1 (dur 1, dom [0, 3]) can legitimately run at t=0,
         // before task 0. A flat-add detection would wrongly force task 1 after task 0
         // (start ≥ 2); the sound Env(Θ ∪ {i}) insertion must leave t=0 reachable.
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(1, 1))
+        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(1, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -261,7 +263,7 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `BacktrackSolver enumerates exactly the 6 disjunctive schedules of three unit tasks`() {
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(1, 1, 1))
+        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(1, 1, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -284,7 +286,7 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `pure pairwise infeasibility is caught`() {
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(1, 1))
+        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(1, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,

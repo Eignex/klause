@@ -47,7 +47,7 @@ class Disjunctive(
     /** Task start-time variable ids. */
     val starts: IntArray,
     /** Constant per-task durations. */
-    val durations: IntArray,
+    val durations: LongArray,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks impose
      *  no no-overlap obligation. The cost / propagation passes route through the
      *  Cumulative LS-cost delegate and reuse its opt machinery. */
@@ -77,7 +77,7 @@ class Disjunctive(
     /** Position-faithful: keeps the task arrays in order and folds in the constant durations and the
      *  var/const split (#531). */
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DISJUNCTIVE) {
-        ints(durations)
+        longs(durations)
         ints(starts)
         ints(presents)
         ints(durationVars)
@@ -92,8 +92,8 @@ class Disjunctive(
     private val cumulativeBacking: Cumulative = Cumulative(
         starts = starts,
         durations = durations,
-        resources = IntArray(n) { 1 },
-        capacity = 1,
+        resources = LongArray(n) { 1L },
+        capacity = 1L,
         presents = presents,
         durationVars = durationVars,
     )

@@ -24,10 +24,10 @@ import com.eignex.klause.util.EmptyIntArray
  */
 class ReifiedPseudoBoolean(
     override val auxBoolVar: Int,
-    val weights: IntArray,
+    val weights: LongArray,
     val literals: IntArray,
     val op: PbOp,
-    val bound: Int,
+    val bound: Long,
 ) : ReifiedFactor {
 
     override val intVars: IntArray = EmptyIntArray
@@ -40,8 +40,8 @@ class ReifiedPseudoBoolean(
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_PSEUDO_BOOLEAN) {
         int(auxBoolVar)
         enum(op)
-        int(bound)
-        pairsByKey(literals) { weights[it].toLong() }
+        long(bound)
+        pairsByKey(literals) { weights[it] }
     }
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)
@@ -66,7 +66,7 @@ class ReifiedPseudoBoolean(
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         val sum = BoolReifiedSum.fold(builder, literals, weights)
         val a = builder.boolColumn(auxBoolVar)
-        val b = subExact(bound.toLong(), sum.constant)
+        val b = subExact(bound, sum.constant)
         when (op) {
             PbOp.LE -> {
                 val m1 = maxOf(0L, subExact(sum.lMax, b)) // aux=1 ⇒ L ≤ bound

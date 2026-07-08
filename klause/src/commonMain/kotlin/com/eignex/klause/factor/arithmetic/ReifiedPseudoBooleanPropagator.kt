@@ -13,10 +13,10 @@ import com.eignex.klause.solver.Lit
 /** CP propagator for [ReifiedPseudoBoolean]: reified pseudo-Boolean propagation. */
 internal class ReifiedPseudoBooleanPropagator(
     private val auxBoolVar: Int,
-    private val weights: IntArray,
+    private val weights: LongArray,
     private val literals: IntArray,
     private val op: PbOp,
-    private val bound: Int,
+    private val bound: Long,
     val boolVars: IntArray,
     val intVars: IntArray,
 ) : Propagator {
@@ -59,7 +59,7 @@ internal class ReifiedPseudoBooleanPropagator(
 
     private fun propagatePbNotEqual(
         state: PropagationState,
-        weights: IntArray,
+        weights: LongArray,
         literals: IntArray,
         bound: Long,
         extraLit: Int = 0,
@@ -69,7 +69,7 @@ internal class ReifiedPseudoBooleanPropagator(
         val sumHi = r.sumHi
         if (sumLo == bound && sumHi == bound) return false
         for (i in literals.indices) {
-            val w = weights[i].toLong()
+            val w = weights[i]
             if (w == 0L) continue
             val v = Lit.variable(literals[i])
             if (state.boolValues[v] != null) continue

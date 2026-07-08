@@ -350,10 +350,10 @@ class PropagationTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 PseudoBoolean(
-                    weights = intArrayOf(1, 1, 3),
+                    weights = longArrayOf(1, 1, 3),
                     literals = intArrayOf(lit(0, true), lit(1, true), lit(2, true)),
                     op = PbOp.LE,
-                    bound = 2,
+                    bound = 2L,
                 ),
             ),
         )
@@ -370,10 +370,10 @@ class PropagationTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 PseudoBoolean(
-                    weights = intArrayOf(1, 5),
+                    weights = longArrayOf(1, 5),
                     literals = intArrayOf(lit(0, true), lit(1, true)),
                     op = PbOp.GE,
-                    bound = 5,
+                    bound = 5L,
                 ),
             ),
         )
@@ -389,10 +389,10 @@ class PropagationTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(
                 PseudoBoolean(
-                    weights = intArrayOf(2, 3),
+                    weights = longArrayOf(2, 3),
                     literals = intArrayOf(lit(0, true), lit(1, true)),
                     op = PbOp.EQ,
-                    bound = 5,
+                    bound = 5L,
                 ),
             ),
         )
@@ -464,10 +464,10 @@ class PropagationTest {
             factors = arrayOf<Factor>(
                 ReifiedPseudoBoolean(
                     auxBoolVar = 0,
-                    weights = intArrayOf(5, 5),
+                    weights = longArrayOf(5, 5),
                     literals = intArrayOf(lit(1, true), lit(2, true)),
                     op = PbOp.GE,
-                    bound = 20,
+                    bound = 20L,
                 ),
             ),
         )

@@ -142,7 +142,7 @@ class CpToLpRelaxationTest {
             numIntVars = 0,
             intDomains = arrayOf(),
             factors = arrayOf<Factor>(
-                PseudoBoolean(intArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4),
+                PseudoBoolean(longArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4L),
             ),
         )
         val (sol, _) = solve(p, LinearObjective(boolWeights = longArrayOf(-1L, -1L)))

@@ -247,14 +247,14 @@ internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
     val s = resolveSetVar(c.args[0])
     when (val nExpr = c.args[1]) {
         is FznExpr.IntLit -> {
-            val coeffs = IntArray(s.indicatorBoolIds.size) { 1 }
+            val coeffs = LongArray(s.indicatorBoolIds.size) { 1L }
             val lits = IntArray(s.indicatorBoolIds.size) { Lit.make(s.indicatorBoolIds[it], true) }
             factors.add(
                 PseudoBoolean(
                     coeffs,
                     lits,
                     PbOp.EQ,
-                    nExpr.value.toInt(),
+                    nExpr.value,
                 ),
             )
         }

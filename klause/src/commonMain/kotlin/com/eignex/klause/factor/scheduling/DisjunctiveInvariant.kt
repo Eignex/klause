@@ -14,7 +14,7 @@ import kotlin.math.max
  */
 internal class DisjunctiveInvariant(
     private val starts: IntArray,
-    private val durations: IntArray,
+    private val durations: LongArray,
     private val presents: IntArray,
     private val durationVars: IntArray,
     /** Unit-capacity CumulativeInvariant backing for LS cost and repair moves. */
@@ -83,5 +83,5 @@ internal class DisjunctiveInvariant(
 
     /** Current duration of task [i]: the constant, or the duration variable's value. */
     private fun durationOf(state: LocalSearchState, i: Int): Long =
-        if (durationVars.isEmpty()) durations[i].toLong() else state.assignment.intValue(durationVars[i])
+        if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
 }

@@ -12,29 +12,29 @@ import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.IntLongMap
 
 /**
  * LS invariant for [ReifiedPseudoBoolean]: reified pseudo-Boolean violation tracking and repair.
  */
 internal class ReifiedPseudoBooleanInvariant(
     private val auxBoolVar: Int,
-    private val weights: IntArray,
+    private val weights: LongArray,
     private val literals: IntArray,
     private val op: PbOp,
-    private val bound: Int,
+    private val bound: Long,
     private val boolVars: IntArray,
 ) : Invariant {
 
-    private val signedByVar: IntIntMap = buildSignedWeightByVar(weights, literals, exclude = auxBoolVar)
+    private val signedByVar: IntLongMap = buildSignedWeightByVar(weights, literals, exclude = auxBoolVar)
 
-    private fun reifSignedFor(v: Int): Int = signedByVar[v]
+    private fun reifSignedFor(v: Int): Long = signedByVar[v]
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0L
         for (i in literals.indices) {
             if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
-                sum += weights[i].toLong()
+                sum += weights[i]
             }
         }
         state.longPayload[factorId] = sum
@@ -63,7 +63,7 @@ internal class ReifiedPseudoBooleanInvariant(
             reifDegree(total, !aux, cap) - reifDegree(total, aux, cap)
         } else {
             val signed = reifSignedFor(boolVar)
-            if (signed == 0) return 0
+            if (signed == 0L) return 0
             val pre = state.assignment.boolValue(boolVar)
             val change = if (pre) -signed else signed
             reifDegree(total + change, aux, cap) - reifDegree(total, aux, cap)
@@ -78,7 +78,7 @@ internal class ReifiedPseudoBooleanInvariant(
             return reifDegree(oldTotal, newAux, cap) - reifDegree(oldTotal, !newAux, cap)
         }
         val signed = reifSignedFor(boolVar)
-        if (signed == 0) return 0
+        if (signed == 0L) return 0
         val pre = !state.assignment.boolValue(boolVar)
         val change = if (pre) -signed else signed
         val newTotal = oldTotal + change
@@ -100,7 +100,7 @@ internal class ReifiedPseudoBooleanInvariant(
             val v = Lit.variable(lit)
             if (v == auxBoolVar) continue
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
-            val change = if (isTrue) -weights[i].toLong() else weights[i].toLong()
+            val change = if (isTrue) -weights[i] else weights[i]
             val newDist = pbDistance(sum + change, op, bound)
             val improvesSame = if (wantHolds) newDist <= curDist else newDist >= curDist
             if (improvesSame) sink.addBoolFlip(v)

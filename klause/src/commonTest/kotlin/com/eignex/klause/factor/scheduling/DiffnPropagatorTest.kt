@@ -44,8 +44,8 @@ class DiffnPropagatorTest {
                 Diffn(
                     xs = intArrayOf(0, 2, 4),
                     ys = intArrayOf(1, 3, 5),
-                    widths = intArrayOf(2, 1, 1),
-                    heights = intArrayOf(1, 1, 1),
+                    widths = longArrayOf(2, 1, 1),
+                    heights = longArrayOf(1, 1, 1),
                 ),
             ),
         )
@@ -70,8 +70,8 @@ class DiffnPropagatorTest {
                 Diffn(
                     xs = intArrayOf(0, 1, 2),
                     ys = intArrayOf(3, 4, 5),
-                    widths = intArrayOf(2, 2, 2),
-                    heights = intArrayOf(2, 2, 2),
+                    widths = longArrayOf(2, 2, 2),
+                    heights = longArrayOf(2, 2, 2),
                 ),
             ),
         )
@@ -102,8 +102,8 @@ class DiffnPropagatorTest {
             val rects = 2 + rng.nextInt(2) // 2 or 3 rectangles
             val xs = IntArray(rects) { 2 * it }
             val ys = IntArray(rects) { 2 * it + 1 }
-            val widths = IntArray(rects) { 1 + rng.nextInt(2) }
-            val heights = IntArray(rects) { 1 + rng.nextInt(2) }
+            val widths = LongArray(rects) { 1L + rng.nextInt(2) }
+            val heights = LongArray(rects) { 1L + rng.nextInt(2) }
             val doms = Array(2 * rects) { IntDomain(0, 3) }
             val problem = Problem(
                 numBoolVars = 0,
@@ -125,8 +125,8 @@ class DiffnPropagatorTest {
                 Diffn(
                     xs = intArrayOf(0, 2),
                     ys = intArrayOf(1, 3),
-                    widths = intArrayOf(2, 2),
-                    heights = intArrayOf(2, 2),
+                    widths = longArrayOf(2, 2),
+                    heights = longArrayOf(2, 2),
                 ),
             ),
         )
@@ -147,8 +147,8 @@ class DiffnPropagatorTest {
                 Diffn(
                     xs = intArrayOf(0, 2),
                     ys = intArrayOf(1, 3),
-                    widths = intArrayOf(1, 1),
-                    heights = intArrayOf(1, 1),
+                    widths = longArrayOf(1, 1),
+                    heights = longArrayOf(1, 1),
                 ),
             ),
         )
@@ -165,8 +165,8 @@ class DiffnPropagatorTest {
         val factor = Diffn(
             xs = intArrayOf(0, 1),
             ys = intArrayOf(2, 3),
-            widths = intArrayOf(3, 3),
-            heights = intArrayOf(2, 2),
+            widths = longArrayOf(3, 3),
+            heights = longArrayOf(2, 2),
         )
         val problem = Problem(
             numBoolVars = 0,
@@ -195,8 +195,8 @@ class DiffnPropagatorTest {
                 Diffn(
                     xs = intArrayOf(0, 2),
                     ys = intArrayOf(1, 3),
-                    widths = intArrayOf(2, 2),
-                    heights = intArrayOf(2, 2),
+                    widths = longArrayOf(2, 2),
+                    heights = longArrayOf(2, 2),
                 ),
             ),
         )

@@ -73,7 +73,9 @@ internal object CoefficientStrengthening {
             }
 
         is PseudoBoolean ->
-            if (factor.op == PbOp.EQ && indivisible(factor.weights, factor.bound)) {
+            if (factor.op == PbOp.EQ && fitsInt32(factor.weights, factor.bound) &&
+                indivisible(IntArray(factor.weights.size) { factor.weights[it].toInt() }, factor.bound.toInt())
+            ) {
                 boolContradiction(factor.literals[0])
             } else {
                 null
@@ -236,16 +238,20 @@ internal object CoefficientStrengthening {
     }
 
     private fun strengthenPb(factor: PseudoBoolean): Factor? {
-        val g = PresolveShared.gcdOf(factor.weights)
+        // GCD reduction and knapsack lifting reason in Int; a pseudo-Boolean whose weights or bound
+        // exceed Int range is left unstrengthened (still enforced by its propagator).
+        if (!fitsInt32(factor.weights, factor.bound)) return null
+        val intWeights = IntArray(factor.weights.size) { factor.weights[it].toInt() }
+        val g = PresolveShared.gcdOf(intWeights)
         val gcdReduced: PseudoBoolean = if (g <= 1) {
             factor
         } else {
-            when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
+            when (val reduced = reduceBound(toRel(factor.op), factor.bound.toInt(), g)) {
                 is Reduced.Bound -> PseudoBoolean(
-                    PresolveShared.divAll(factor.weights, g),
+                    PresolveShared.divAll(intWeights, g).let { a -> LongArray(a.size) { a[it].toLong() } },
                     factor.literals.copyOf(),
                     factor.op,
-                    reduced.bound,
+                    reduced.bound.toLong(),
                 )
 
                 Reduced.Drop -> return null
@@ -284,21 +290,22 @@ internal object CoefficientStrengthening {
                     input.weights.copyOf(),
                     IntArray(input.literals.size) { Lit.negate(input.literals[it]) },
                     PbOp.LE,
-                    nb.toInt(),
+                    nb,
                 )
             }
         }
         val n = pb.literals.size
         val weights = IntArray(n)
         val lits = IntArray(n)
-        var bound = pb.bound.toLong()
+        var bound = pb.bound
         for (i in 0 until n) {
-            if (pb.weights[i] < 0) {
-                weights[i] = -pb.weights[i]
+            val wi = pb.weights[i].toInt()
+            if (wi < 0) {
+                weights[i] = -wi
                 lits[i] = Lit.negate(pb.literals[i])
                 bound += weights[i]
             } else {
-                weights[i] = pb.weights[i]
+                weights[i] = wi
                 lits[i] = pb.literals[i]
             }
         }
@@ -320,7 +327,7 @@ internal object CoefficientStrengthening {
         if (!changed) return input
         val newBound = newSum - d
         if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return input
-        return PseudoBoolean(lifted, lits, PbOp.LE, newBound.toInt())
+        return PseudoBoolean(LongArray(lifted.size) { lifted[it].toLong() }, lits, PbOp.LE, newBound)
     }
 
     private fun toRel(op: LinearOp): Rel = when (op) {

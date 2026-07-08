@@ -49,6 +49,26 @@ class MddInvariantTest {
     }
 
     @Test
+    fun `cost-MDD seed sets the cost var to an edge weight beyond Int range`() {
+        // A single accepted path (symbol 1) whose edge weight is 3e9. seedFeasible sums the path weight
+        // in Long and assigns it to the cost variable, so a weight past 2^31 lands intact.
+        val factor = Mdd(
+            seq = intArrayOf(0),
+            numStatesPerLayer = intArrayOf(1, 1),
+            layerStarts = intArrayOf(0, 4),
+            transitions = longArrayOf(0, 1, 0, 3_000_000_000L),
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 4,
+            cost = 1,
+        )
+        val problem = Problem(0, 2, arrayOf(IntDomain(1, 1), IntDomain(0, 5_000_000_000L)), arrayOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        assertTrue(state.factors[0].seedFeasible(state, 0), "the single accepted path must seed")
+        assertEquals(3_000_000_000L, state.assignment.intValue(1))
+    }
+
+    @Test
     fun `incremental degree and delta match a full recompute over a stream of moves`() {
         val problem = Problem(
             numBoolVars = 0,

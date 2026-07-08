@@ -34,7 +34,7 @@ class LinearLinearizerTest {
         // Unused by the Linear path under test.
         override fun boolRow(
             literals: IntArray,
-            weights: IntArray?,
+            weights: LongArray?,
             op: LinearOp,
             bound: Long,
             contribution: Contribution,
