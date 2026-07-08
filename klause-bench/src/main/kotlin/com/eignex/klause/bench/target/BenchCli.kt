@@ -210,8 +210,9 @@ object BenchCli {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         val engine = when (f["engine"]?.lowercase()) {
             "bt", "backtrack", "cp" -> TuneEngine.BT
+            "mixed", "pf", "portfolio" -> TuneEngine.MIXED
             "ls", "localsearch", "local-search", null -> TuneEngine.LS
-            else -> error("tune engine must be ls | bt, got '${f["engine"]}'")
+            else -> error("tune engine must be ls | bt | mixed, got '${f["engine"]}'")
         }
         // COP (objective) → gap-to-optimum reward; CSP (satisfy) → time-to-first-feasible. The `select`
         // `kind=cop|csp` filter picks which; a mixed selection is scored per-instance by its own kind.
@@ -240,17 +241,25 @@ object BenchCli {
             "=== tune ($engine, $tunerId, warm-start=$warmStart): ${strata.values.sum()} instances over " +
                 "${strata.size} strata, $rounds rounds × $trials trials × sample $sample × ${budgetMs}ms ===",
         )
-        val result = tuner.use {
+        tuner.use {
             when (engine) {
                 TuneEngine.LS ->
-                    BoTuning.tuneLs(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
+                    printPalette(BoTuning.tuneLs(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample))
 
                 TuneEngine.BT ->
-                    BoTuning.tuneBt(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample)
+                    printPalette(BoTuning.tuneBt(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample))
+
+                TuneEngine.MIXED ->
+                    printMixed(
+                        BoTuning.tuneMixed(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample),
+                    )
             }
         }
-        // The residual-round palette is the primary output: each round's marginal coverage gain, then
-        // the cumulative coverage after it — the concave curve flattens where added arms stop paying off.
+    }
+
+    /** Print an LS/BT single-engine tune's residual-round palette: each round's marginal coverage gain,
+     *  then the cumulative coverage after it — the concave curve flattens where added arms stop paying. */
+    private fun printPalette(result: BoTuning.Result) {
         println("residual-round palette (round: +marginal coverage → cumulative):")
         result.palette.forEach { slot ->
             val gain = (slot.gain * COVERAGE_DECIMALS).toLong() / COVERAGE_DECIMALS
@@ -258,6 +267,31 @@ object BenchCli {
             println("  r${slot.round}. +$gain → $cover   ${slot.assignment}")
         }
         if (result.palette.isEmpty()) println("  (no config improved coverage — check the reward / instances)")
+    }
+
+    /** Print the MIXED campaign's three set-cover projections: the mixed order with its emergent LS:BT
+     *  split (the data-derived pool ratio), then the pure per-engine orders — the covering slots of each. */
+    private fun printMixed(result: BoTuning.MixedResult) {
+        fun engineOf(label: String) = result.configs[label]?.get("engine") ?: "?"
+        val mixed = result.mixed.diverse.filter { it.newlyCovered > 0 }
+        val ls = mixed.count { engineOf(it.arm) == "ls" }
+        val bt = mixed.count { engineOf(it.arm) == "bt" }
+        println("mixed palette (${mixed.size} covering arms; emergent LS:BT = $ls:$bt):")
+        mixed.forEach { s ->
+            println(
+                "  ${s.rank}. [${engineOf(
+                    s.arm,
+                )}] +${s.newlyCovered} → ${s.cumulativeCovered}   ${result.configs[s.arm]}",
+            )
+        }
+        if (mixed.isEmpty()) println("  (no config improved coverage — check the reward / instances)")
+        for ((name, report) in listOf("ls order" to result.ls, "bt order" to result.bt)) {
+            val cover = report.diverse.filter { it.newlyCovered > 0 }
+            println("$name (${cover.size} covering of ${report.diverse.size} evaluated):")
+            cover.forEach { s ->
+                println("  ${s.rank}. +${s.newlyCovered} → ${s.cumulativeCovered}   ${result.configs[s.arm]}")
+            }
+        }
     }
 
     /** From a portfolio run's per-problem records: every contributing arm label (the ranking pool) and,

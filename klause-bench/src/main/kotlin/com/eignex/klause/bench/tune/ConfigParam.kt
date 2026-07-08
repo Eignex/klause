@@ -73,8 +73,10 @@ internal class DoubleParam(
  */
 internal open class ConfigSpace(val params: List<ConfigParam>) {
     /** A lazy random point: draw each active param in declaration order, so a param's [activeIn] sees
-     *  the choices its gate depends on. Inactive params are simply absent from the assignment. */
-    fun sample(rng: Random): Map<String, Any> {
+     *  the choices its gate depends on. Inactive params are simply absent from the assignment.
+     *  Overridable so a nested space (e.g. [UnifiedConfigSpace]) can draw a parent choice then its
+     *  sub-space, rather than gating every child param on the parent in the flat [params] list. */
+    open fun sample(rng: Random): Map<String, Any> {
         val assignment = LinkedHashMap<String, Any>()
         for (p in params) if (p.activeIn(assignment)) assignment[p.name] = p.sample(rng)
         return assignment

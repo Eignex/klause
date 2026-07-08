@@ -148,6 +148,54 @@ class BoTuningTest {
     }
 
     @Test
+    fun `the mixed search evaluates both engines and projects engine-pure orders`() {
+        val instances = listOf(
+            cop("m-a", "min: 1 x1 +2 x2 +3 x3 ;\n+1 x1 +1 x2 >= 1 ;\n+1 x2 +1 x3 >= 1 ;\n"),
+            cop("m-b", "min: 3 x1 +1 x2 +1 x3 ;\n+1 x1 +1 x3 >= 1 ;\n+1 x2 +1 x3 >= 2 ;\n"),
+        )
+        val result = BoTuning.tuneMixed(
+            UniformPool(instances),
+            RandomTuner(seed = 2),
+            rounds = 3,
+            trials = 6,
+            batch = 2,
+            budgetMs = 20,
+            seed = 5,
+        )
+        val engines = result.configs.values.mapNotNull { it["engine"] as? String }.toSet()
+        assertEquals(setOf("ls", "bt"), engines, "one campaign evaluates both engines")
+        assertTrue(
+            result.ls.diverse.all { result.configs.getValue(it.arm)["engine"] == "ls" },
+            "the ls projection is engine-pure",
+        )
+        assertTrue(
+            result.bt.diverse.all { result.configs.getValue(it.arm)["engine"] == "bt" },
+            "the bt projection is engine-pure",
+        )
+        assertTrue(result.ls.diverse.isNotEmpty() && result.bt.diverse.isNotEmpty(), "both pure orders are non-empty")
+    }
+
+    @Test
+    fun `the exploration floor forces the lagging engine under a one-engine-biased tuner`() {
+        // A tuner that only ever suggests an LS config; the floor must still get BT evaluated so the BT
+        // projection isn't starved.
+        val lsOnly = CyclingTuner(listOf(UnifiedConfigSpace.samplePinned("ls", Random(0))))
+        val result = BoTuning.tuneMixed(
+            UniformPool(listOf(cop("f-a", "min: 1 x1 ;\n+1 x1 >= 0 ;\n"))),
+            lsOnly,
+            rounds = 1,
+            trials = 10,
+            batch = 1,
+            budgetMs = 20,
+            seed = 1,
+        )
+        assertTrue(
+            result.configs.values.any { it["engine"] == "bt" },
+            "the floor forced BT even though the tuner only suggested LS",
+        )
+    }
+
+    @Test
     fun `coerce rounds a Double integer param and clamps to the declared domain`() {
         // A tuner may hand cbls.tabu (an IntParam in [0,20]) back as a Double; the loop must round it.
         val coerced = LocalSearchConfigSpace.coerce(
