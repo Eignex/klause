@@ -95,7 +95,7 @@ class LpAutoConfigTest {
 
     @Test
     fun `cumulative enables energetic reasoning only`() {
-        val p = problem(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
+        val p = problem(Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1L))
         val r = LpAutoConfig.recommend(p)
         assertTrue(r.lpPlan.energeticReasoning)
         assertFalse(r.lpPlan.bounding)
@@ -111,7 +111,7 @@ class LpAutoConfigTest {
             Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.GE, 3),
             Linear(intArrayOf(1, -1), intArrayOf(3, 1), LinearOp.GE, 3),
             Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.GE, 3),
-            Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1),
+            Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1L),
         )
         val p = Problem(0, 4, Array(4) { IntDomain(0, 20) }, factors)
         val r = LpAutoConfig.recommend(p)
@@ -126,7 +126,7 @@ class LpAutoConfigTest {
         val n = 3
         val factors = ArrayList<Factor>()
         for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, 3))
-        factors.add(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
+        factors.add(Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1L))
         val domains = Array(
             n + 1,
         ) { if (it < n) IntDomain(0, startHi.toLong()) else IntDomain(0, (startHi + 3).toLong()) }
@@ -214,7 +214,7 @@ class LpAutoConfigTest {
         val p = problem(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
             AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6),
-            Cumulative(intArrayOf(0, 1, 2), intArrayOf(1, 1, 1), intArrayOf(1, 1, 1), capacity = 1),
+            Cumulative(intArrayOf(0, 1, 2), longArrayOf(1, 1, 1), longArrayOf(1, 1, 1), capacity = 1L),
         )
         val off = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.OFF))
         assertFalse(
@@ -285,7 +285,7 @@ class LpAutoConfigTest {
             tasks,
             Array(tasks) { IntDomain(0, 5) },
             arrayOf<Factor>(
-                Cumulative(IntArray(tasks) { it }, IntArray(tasks) { 3 }, IntArray(tasks) { 1 }, capacity = 1),
+                Cumulative(IntArray(tasks) { it }, LongArray(tasks) { 3L }, LongArray(tasks) { 1L }, capacity = 1L),
             ),
         )
         // 27 tasks: ~20k scan ops per check, under the per-check budget — full cadence.
@@ -407,7 +407,7 @@ class LpAutoConfigTest {
 
     @Test
     fun `pseudo-boolean enables cover cuts`() {
-        val pb = PseudoBoolean(intArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4)
+        val pb = PseudoBoolean(longArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4L)
         val r = LpAutoConfig.recommend(Problem(2, 0, emptyArray(), arrayOf<Factor>(pb)))
         assertTrue(r.lpPlan.cuts)
         assertTrue(r.lpPlan.bounding)
@@ -425,7 +425,7 @@ class LpAutoConfigTest {
     @Test
     fun `caller-set flags are never turned off`() {
         // A Cumulative-only problem would not enable lpBounding, but an explicit base setting stays.
-        val p = problem(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1))
+        val p = problem(Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1L))
         val r = LpAutoConfig.recommend(p, BacktrackParams(lpPlan = LpPlan(bounding = true, gomory = false)))
         assertTrue(r.lpPlan.bounding)
         assertFalse(r.lpPlan.gomory)

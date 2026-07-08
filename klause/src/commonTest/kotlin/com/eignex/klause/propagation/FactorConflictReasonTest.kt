@@ -110,10 +110,10 @@ class FactorConflictReasonTest {
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
                 PseudoBoolean(
-                    weights = intArrayOf(3, 4),
+                    weights = longArrayOf(3, 4),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.LE,
-                    bound = 5,
+                    bound = 5L,
                 ),
             ),
         )
@@ -140,10 +140,10 @@ class FactorConflictReasonTest {
                 Clause(intArrayOf(Lit.make(3, false), Lit.make(1, true))),
                 ReifiedPseudoBoolean(
                     auxBoolVar = 2,
-                    weights = intArrayOf(3, 4),
+                    weights = longArrayOf(3, 4),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.LE,
-                    bound = 5,
+                    bound = 5L,
                 ),
             ),
         )

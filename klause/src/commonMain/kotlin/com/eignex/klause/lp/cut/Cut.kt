@@ -3,6 +3,7 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -458,7 +459,7 @@ internal fun conflictGraph(problem: Problem): ConflictGraph {
 
             is Cardinality -> if (factor.max == 1) atMostOne(factor.literals)
 
-            is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1 && factor.weights.all { it == 1 }) {
+            is PseudoBoolean -> if (factor.op == PbOp.LE && factor.bound == 1L && factor.weights.all { it == 1L }) {
                 atMostOne(factor.literals)
             }
 
@@ -494,9 +495,13 @@ internal class KnapsackCoverSeparator : CutSeparator {
         for (factor in ctx.problem.factors) {
             if (factor !is PseudoBoolean || factor.op != PbOp.LE) continue
             if (factor.weights.any { it <= 0 } || factor.literals.any { !Lit.isPositive(it) }) continue
+            // The cover/lifting DP is indexed by weight in Int space; a weight or bound beyond Int range
+            // is left without a cover cut (the pseudo-Boolean is still enforced by its propagator).
+            if (!fitsInt32(factor.weights, factor.bound)) continue
+            val intWeights = IntArray(factor.weights.size) { factor.weights[it].toInt() }
             val k = factor.literals.size
             if (k < 2) continue
-            val b = factor.bound.toLong()
+            val b = factor.bound
             val cols = IntArray(k)
             val xstar = DoubleArray(k)
             var ok = true
@@ -518,7 +523,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
             for (i in order) {
                 inCover[i] = true
                 coverCount++
-                wsum = addExact(wsum, factor.weights[i].toLong())
+                wsum = addExact(wsum, factor.weights[i])
                 if (wsum > b) break
             }
             if (wsum <= b) continue // whole set fits under the bound — no cover, no cut
@@ -530,7 +535,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
                     if (cw - factor.weights[i] > b) {
                         inCover[i] = false
                         coverCount--
-                        cw -= factor.weights[i].toLong()
+                        cw -= factor.weights[i]
                     }
                 }
             }
@@ -552,14 +557,14 @@ internal class KnapsackCoverSeparator : CutSeparator {
                 val groupOf = cliquePartition(k, factor.literals, conflict)
                 val nonCover = (0 until k).filter { !inCover[it] }.sortedByDescending { factor.weights[it] }
                 for (kk in nonCover) {
-                    val cap = b - factor.weights[kk].toLong()
+                    val cap = b - factor.weights[kk]
                     val maxv = if (cap < 0) {
                         0L
                     } else {
                         gubKnapsackMax(
                             liftedPos,
                             liftedCoeff,
-                            factor.weights,
+                            intWeights,
                             groupOf,
                             cap.toInt(),
                         )

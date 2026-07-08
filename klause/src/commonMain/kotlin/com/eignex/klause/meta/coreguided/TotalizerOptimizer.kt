@@ -211,10 +211,10 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
                     thresholdFactors.add(
                         ReifiedPseudoBoolean(
                             auxBoolVar = aux,
-                            weights = weightsInt,
+                            weights = LongArray(weightsInt.size) { weightsInt[it].toLong() },
                             literals = selectorLits,
                             op = PbOp.GE,
-                            bound = k,
+                            bound = k.toLong(),
                         ),
                     )
                     solver = null // a fresh factor + bool var were added — force a rebuild

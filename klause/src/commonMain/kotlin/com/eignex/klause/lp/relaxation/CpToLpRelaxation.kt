@@ -565,13 +565,13 @@ internal class CpToLpRelaxation(
          * `+w·x_b`, a negative literal `+w·(1 − x_b) = w − w·x_b`; the `+w` constants accumulate
          * and move to the right-hand side. [weights] of `null` means unit weights (cardinality).
          */
-        private fun addBoolRow(literals: IntArray, weights: IntArray?, rel: Relation, rhs: Long) {
+        private fun addBoolRow(literals: IntArray, weights: LongArray?, rel: Relation, rhs: Long) {
             val cols = IntArray(literals.size)
             val vals = LongArray(literals.size)
             var constant = 0L
             for (k in literals.indices) {
                 val lit = literals[k]
-                val w = (weights?.get(k) ?: 1).toLong()
+                val w = weights?.get(k) ?: 1L
                 cols[k] = boolColumn(Lit.variable(lit))
                 if (Lit.isPositive(lit)) {
                     vals[k] = w
@@ -758,7 +758,7 @@ internal class CpToLpRelaxation(
 
         override fun boolRow(
             literals: IntArray,
-            weights: IntArray?,
+            weights: LongArray?,
             op: LinearOp,
             bound: Long,
             contribution: Contribution,

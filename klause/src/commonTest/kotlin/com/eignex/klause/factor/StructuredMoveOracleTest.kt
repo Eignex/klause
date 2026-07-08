@@ -32,7 +32,7 @@ class StructuredMoveOracleTest {
 
     @Test fun `equal-duration disjunctive start-swaps preserve no-overlap`() {
         oneFactor(
-            Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(2, 2, 2)),
+            Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2)),
             arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 6)),
         )
     }
@@ -44,8 +44,8 @@ class StructuredMoveOracleTest {
             Diffn(
                 xs = intArrayOf(0, 1),
                 ys = intArrayOf(2, 3),
-                widths = intArrayOf(1, 1),
-                heights = intArrayOf(1, 1),
+                widths = longArrayOf(1, 1),
+                heights = longArrayOf(1, 1),
             ),
             arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
         )

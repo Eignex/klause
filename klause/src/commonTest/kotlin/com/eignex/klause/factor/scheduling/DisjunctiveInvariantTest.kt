@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 class DisjunctiveInvariantTest {
 
     private fun threeUnitTasks(): Problem {
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = intArrayOf(1, 1, 1))
+        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(1, 1, 1))
         return Problem(
             numBoolVars = 0,
             numIntVars = 3,

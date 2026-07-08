@@ -144,10 +144,10 @@ class LocalSearchStateRecomputeTest {
             ),
             Xor(intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(4, true)), targetParity = 1),
             PseudoBoolean(
-                weights = intArrayOf(2, 1, 3, 1),
+                weights = longArrayOf(2, 1, 3, 1),
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, false), Lit.make(3, true)),
                 op = PbOp.LE,
-                bound = 4,
+                bound = 4L,
             ),
         )
         return Case("boolHeavy", Problem(numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(), factors = factors))

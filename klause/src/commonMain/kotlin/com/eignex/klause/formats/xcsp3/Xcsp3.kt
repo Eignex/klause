@@ -717,7 +717,7 @@ object Xcsp3 {
                     starts = starts,
                     durations = durations,
                     resources = resources,
-                    capacity = if (capVar == null) cap else domains[capVar].max.toInt(),
+                    capacity = if (capVar == null) cap.toLong() else domains[capVar].max,
                     durationVars = durationVars,
                     resourceVars = resourceVars,
                     capacityVar = capVar ?: -1,
@@ -731,7 +731,7 @@ object Xcsp3 {
                     if (durationVars.isEmpty()) {
                         // start + duration(const) = end  ⟺  start − end = −duration
                         val vars = intArrayOf(starts[i], ends[i])
-                        factors.add(Linear(intArrayOf(1, -1), vars, LinearOp.EQ, -durations[i]))
+                        factors.add(Linear(longArrayOf(1, -1), vars, LinearOp.EQ, -durations[i]))
                     } else {
                         // start + duration(var) − end = 0
                         val vars = intArrayOf(starts[i], durationVars[i], ends[i])
@@ -744,10 +744,10 @@ object Xcsp3 {
         /** Resolve a cumulative dimension list (`<lengths>`/`<heights>`) to (constants-or-upper-bounds,
          *  variable ids). Constant when every entry is an integer; otherwise each entry is a variable and
          *  the constant array holds its domain upper bound (used by [Cumulative] for horizon sizing). */
-        private fun taskDims(text: String): Pair<IntArray, IntArray> {
-            parseInts(text)?.let { return it to IntArray(0) }
+        private fun taskDims(text: String): Pair<LongArray, IntArray> {
+            parseInts(text)?.let { return it.widenToLong() to IntArray(0) }
             val vars = refList(text).toIntArray()
-            return IntArray(vars.size) { domains[vars[it]].max.toInt() } to vars
+            return LongArray(vars.size) { domains[vars[it]].max } to vars
         }
 
         private fun circuit(e: XmlElement) {
@@ -1094,9 +1094,9 @@ object Xcsp3 {
             factors.add(
                 Cumulative(
                     starts = starts,
-                    durations = durations,
-                    resources = IntArray(starts.size) { 1 },
-                    capacity = 1,
+                    durations = durations.widenToLong(),
+                    resources = LongArray(starts.size) { 1L },
+                    capacity = 1L,
                 ),
             )
         }

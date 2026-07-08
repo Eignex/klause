@@ -31,12 +31,12 @@ internal class BoolReifiedSum private constructor(
 
     companion object {
         /** Fold [literals] (with optional [weights]; `null` = unit) over their Boolean columns. */
-        fun fold(builder: RelaxationBuilder, literals: IntArray, weights: IntArray?): BoolReifiedSum {
+        fun fold(builder: RelaxationBuilder, literals: IntArray, weights: LongArray?): BoolReifiedSum {
             val coeffByCol = LinkedHashMap<Int, Long>()
             var constant = 0L
             for (k in literals.indices) {
                 val lit = literals[k]
-                val w = (weights?.get(k) ?: 1).toLong()
+                val w = weights?.get(k) ?: 1L
                 val col = builder.boolColumn(Lit.variable(lit))
                 val c = if (Lit.isPositive(lit)) w else -w
                 if (!Lit.isPositive(lit)) constant = addExact(constant, w)

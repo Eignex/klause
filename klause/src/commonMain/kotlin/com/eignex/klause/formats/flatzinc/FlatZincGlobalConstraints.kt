@@ -206,16 +206,16 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
     require(c.args.size == 4)
     val xs = evalIntVarArray(c.args[0])
     val ys = evalIntVarArray(c.args[1])
-    val wConst = tryEvalIntConstArray(c.args[2])
-    val hConst = tryEvalIntConstArray(c.args[3])
+    val wConst = tryEvalIntConstArrayLong(c.args[2])
+    val hConst = tryEvalIntConstArrayLong(c.args[3])
     val wVars = if (wConst == null) evalIntVarArray(c.args[2]) else null
     val hVars = if (hConst == null) evalIntVarArray(c.args[3]) else null
     factors.add(
         Diffn(
             xs = xs,
             ys = ys,
-            widths = wConst ?: EmptyIntArray,
-            heights = hConst ?: EmptyIntArray,
+            widths = wConst ?: EmptyLongArray,
+            heights = hConst ?: EmptyLongArray,
             widthVars = wVars,
             heightVars = hVars,
             nonStrict = nonStrict,
@@ -309,7 +309,7 @@ internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
     val starts = evalIntVarArray(c.args[0])
     val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
     val (resources, resourceVars) = resolveIntArrayConstOrVars(c.args[2])
-    val (capacity, capacityVar) = resolveIntConstOrVar(c.args[3])
+    val (capacity, capacityVar) = resolveLongConstOrVar(c.args[3])
     factors.add(
         Cumulative(
             starts = starts,
@@ -344,11 +344,11 @@ internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
 }
 
 /** Returns `(constOrUbValues, vars)` for int arrays. */
-private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<IntArray, IntArray> {
-    val asConst = tryEvalIntConstArray(e)
+private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<LongArray, IntArray> {
+    val asConst = tryEvalIntConstArrayLong(e)
     if (asConst != null) return asConst to EmptyIntArray
     val vars = evalIntVarArray(e)
-    val ubs = IntArray(vars.size) { intDomains[vars[it]].max.toInt() }
+    val ubs = LongArray(vars.size) { intDomains[vars[it]].max }
     return ubs to vars
 }
 
@@ -358,6 +358,14 @@ private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
     if (asConst != null) return asConst.toInt() to -1
     val varId = resolveIntVar(e)
     return intDomains[varId].max.toInt() to varId
+}
+
+/** Returns `(constOrUb, varId)` for int scalar arguments whose value may exceed 32-bit range. */
+private fun FlatZincCompiler.resolveLongConstOrVar(e: FznExpr): Pair<Long, Int> {
+    val asConst = evalIntConstOrNull(e)
+    if (asConst != null) return asConst to -1
+    val varId = resolveIntVar(e)
+    return intDomains[varId].max to varId
 }
 
 /** Shared body for `{exactly,at_least,at_most}_int`. */

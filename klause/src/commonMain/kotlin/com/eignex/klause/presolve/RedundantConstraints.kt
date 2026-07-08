@@ -16,6 +16,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
 
@@ -545,24 +546,24 @@ internal object RedundantConstraints {
         if (knapsack.weights.any { it <= 0 }) return false
         // Every weight is > 0 (guarded above), so 0 doubles as the "literal not in the knapsack"
         // sentinel for [MutableIntIntMap.getOrDefault].
-        val weightByLit = MutableIntIntMap(knapsack.literals.size)
+        val weightByLit = MutableIntLongMap(knapsack.literals.size)
         for (i in knapsack.literals.indices) weightByLit.put(knapsack.literals[i], knapsack.weights[i])
         val assigned = IntHashSet()
         var activity = 0L
         for (clique in cliques) {
-            var maxW = 0
+            var maxW = 0L
             var any = false
             for (lit in clique) {
                 if (lit in assigned) continue
-                val w = weightByLit.getOrDefault(lit, 0)
-                if (w == 0) continue
+                val w = weightByLit.getOrDefault(lit, 0L)
+                if (w == 0L) continue
                 any = true
                 assigned.add(lit)
                 if (w > maxW) maxW = w
             }
             if (any) activity += maxW
         }
-        for (lit in knapsack.literals) if (lit !in assigned) activity += weightByLit.getOrDefault(lit, 0)
+        for (lit in knapsack.literals) if (lit !in assigned) activity += weightByLit.getOrDefault(lit, 0L)
         return activity <= knapsack.bound
     }
 
@@ -615,14 +616,20 @@ internal object RedundantConstraints {
             }
         }
 
-        is PseudoBoolean -> when (f.op) {
-            PbOp.LE -> reducedIneq(f.literals, f.weights, f.bound.toLong(), ::pbKey, fromEq = false)
+        is PseudoBoolean -> if (!fitsInt32(f.weights, f.bound)) {
+            null
+        } else {
+            val w = IntArray(f.weights.size) { f.weights[it].toInt() }
+            val b = f.bound
+            when (f.op) {
+                PbOp.LE -> reducedIneq(f.literals, w, b, ::pbKey, fromEq = false)
 
-            PbOp.GE -> reducedIneq(f.literals, negated(f.weights), -f.bound.toLong(), ::pbKey, fromEq = false)
+                PbOp.GE -> reducedIneq(f.literals, negated(w), -b, ::pbKey, fromEq = false)
 
-            PbOp.EQ -> reducedIneq(f.literals, f.weights, f.bound.toLong(), ::pbKey, fromEq = true).copyWithOpposite(
-                reducedIneq(f.literals, negated(f.weights), -f.bound.toLong(), ::pbKey, fromEq = true),
-            )
+                PbOp.EQ -> reducedIneq(f.literals, w, b, ::pbKey, fromEq = true).copyWithOpposite(
+                    reducedIneq(f.literals, negated(w), -b, ::pbKey, fromEq = true),
+                )
+            }
         }
 
         else -> null

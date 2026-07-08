@@ -12,28 +12,28 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.IntLongMap
+import com.eignex.klause.util.MutableLongObjectMap
 
 /** LS invariant for [PseudoBoolean]: violation scoring and break/make maintenance. */
 internal class PseudoBooleanInvariant(
     private val boolVars: IntArray,
-    private val weights: IntArray,
+    private val weights: LongArray,
     private val literals: IntArray,
     private val op: PbOp,
-    private val bound: Int,
+    private val bound: Long,
 ) : Invariant {
 
     /** Signed contribution of each variable to the weighted sum. */
-    private val signedByVar: IntIntMap = buildSignedWeightByVar(weights, literals, exclude = -1)
+    private val signedByVar: IntLongMap = buildSignedWeightByVar(weights, literals, exclude = -1)
 
-    private fun signedForVar(v: Int): Int = signedByVar[v]
+    private fun signedForVar(v: Int): Long = signedByVar[v]
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0L
         for (i in literals.indices) {
             if (Lit.evaluate(literals[i], state.assignment.boolValue(Lit.variable(literals[i])))) {
-                sum += weights[i].toLong()
+                sum += weights[i]
             }
         }
         state.longPayload[factorId] = sum
@@ -85,8 +85,8 @@ internal class PseudoBooleanInvariant(
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (literals.size < 2) return
         val sum = state.longPayload[factorId]
-        val trueByWeight = MutableIntObjectMap<IntArrayList>()
-        val falseByWeight = MutableIntObjectMap<IntArrayList>()
+        val trueByWeight = MutableLongObjectMap<IntArrayList>()
+        val falseByWeight = MutableLongObjectMap<IntArrayList>()
         for (i in literals.indices) {
             val lit = literals[i]
             val v = Lit.variable(lit)
@@ -142,7 +142,7 @@ internal class PseudoBooleanInvariant(
 
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
         val signedFlipped = signedForVar(flippedVar)
-        if (signedFlipped == 0) return
+        if (signedFlipped == 0L) return
         val newSum = state.longPayload[factorId]
         val flippedPost = state.assignment.boolValue(flippedVar)
         val changeV = if (flippedPost) signedFlipped else -signedFlipped

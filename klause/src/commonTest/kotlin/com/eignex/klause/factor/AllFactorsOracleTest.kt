@@ -70,10 +70,10 @@ class AllFactorsOracleTest {
 
     @Test fun `pseudo-boolean passes the brute-force propagation and repair oracles`() {
         val f = PseudoBoolean(
-            weights = intArrayOf(3, -2, 5),
+            weights = longArrayOf(3, -2, 5),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
             op = PbOp.LE,
-            bound = 4,
+            bound = 4L,
         )
         check(f, numBoolVars = 3, exactProbe = true)
     }
@@ -102,10 +102,10 @@ class AllFactorsOracleTest {
     @Test fun `reified pseudo-boolean passes the brute-force propagation and repair oracles`() {
         val f = ReifiedPseudoBoolean(
             auxBoolVar = 0,
-            weights = intArrayOf(1, 1, 1),
+            weights = longArrayOf(1, 1, 1),
             literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
             op = PbOp.LE,
-            bound = 1,
+            bound = 1L,
         )
         check(f, numBoolVars = 4, exactProbe = true)
     }
@@ -369,15 +369,15 @@ class AllFactorsOracleTest {
     @Test fun `cumulative passes the brute-force propagation and repair oracles`() {
         val f = Cumulative(
             starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(2, 1, 1),
-            resources = intArrayOf(1, 1, 1),
-            capacity = 2,
+            durations = longArrayOf(2, 1, 1),
+            resources = longArrayOf(1, 1, 1),
+            capacity = 2L,
         )
         check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
     }
 
     @Test fun `disjunctive passes the brute-force propagation and repair oracles`() {
-        val f = Disjunctive(starts = intArrayOf(0, 1), durations = intArrayOf(2, 1))
+        val f = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(2, 1))
         check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
     }
 
@@ -389,8 +389,8 @@ class AllFactorsOracleTest {
         val f = Diffn(
             xs = intArrayOf(0, 1),
             ys = intArrayOf(2, 3),
-            widths = intArrayOf(2, 1),
-            heights = intArrayOf(1, 2),
+            widths = longArrayOf(2, 1),
+            heights = longArrayOf(1, 2),
         )
         check(
             f,
@@ -410,8 +410,8 @@ class AllFactorsOracleTest {
         val f = Diffn(
             xs = intArrayOf(0, 1),
             ys = intArrayOf(2, 3),
-            widths = IntArray(0),
-            heights = IntArray(0),
+            widths = LongArray(0),
+            heights = LongArray(0),
             widthVars = intArrayOf(4, 5),
             heightVars = intArrayOf(6, 7),
         )
@@ -541,9 +541,9 @@ class AllFactorsOracleTest {
         check(
             Cumulative(
                 starts = intArrayOf(0, 1, 2),
-                durations = intArrayOf(3, 3, 3),
-                resources = intArrayOf(2, 2, 2),
-                capacity = 2,
+                durations = longArrayOf(3, 3, 3),
+                resources = longArrayOf(2, 2, 2),
+                capacity = 2L,
             ),
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             exactProbe = true,
@@ -559,10 +559,10 @@ class AllFactorsOracleTest {
         // PseudoBoolean: weighted-sum residual (bool path) above the cap.
         check(
             PseudoBoolean(
-                weights = intArrayOf(5, 5, 5),
+                weights = longArrayOf(5, 5, 5),
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
                 op = PbOp.LE,
-                bound = 2,
+                bound = 2L,
             ),
             numBoolVars = 3,
             exactProbe = true,

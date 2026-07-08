@@ -19,10 +19,10 @@ import kotlin.test.assertTrue
 class LpSuccessStatsTest {
 
     /** `min M  s.t.  M ≥ startᵢ + durᵢ,  cumulative(...)`; ints 0..n-1 starts, n is the makespan. */
-    private fun makespanProblem(n: Int, durations: IntArray, resources: IntArray, capacity: Int, hi: Int): Problem {
+    private fun makespanProblem(n: Int, durations: LongArray, resources: LongArray, capacity: Long, hi: Int): Problem {
         val domains = Array(n + 1) { if (it < n) IntDomain(0, hi.toLong()) else IntDomain(0, (hi + 6).toLong()) }
         val factors = ArrayList<Factor>()
-        for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, durations[i]))
+        for (i in 0 until n) factors.add(Linear(longArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, durations[i]))
         factors.add(Cumulative(IntArray(n) { it }, durations, resources, capacity))
         return Problem(0, n + 1, domains, factors.toTypedArray())
     }
@@ -30,7 +30,7 @@ class LpSuccessStatsTest {
     @Test
     fun `lp success counters populate on a bounded cumulative minimize`() {
         val n = 5
-        val p = makespanProblem(n, intArrayOf(3, 2, 4, 2, 3), intArrayOf(1, 2, 1, 2, 1), capacity = 2, hi = 8)
+        val p = makespanProblem(n, longArrayOf(3, 2, 4, 2, 3), longArrayOf(1, 2, 1, 2, 1), capacity = 2L, hi = 8)
         val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
         val params = BacktrackParams(randomSeed = 7L, lpConfig = LpConfig.AGGRESSIVE)
         val res = BacktrackSolver(p).minimize(obj, params)

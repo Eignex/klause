@@ -45,8 +45,8 @@ class CumulativePropagatorTest {
             factors = arrayOf<Factor>(
                 Cumulative(
                     starts = intArrayOf(0, 1),
-                    durations = intArrayOf(2, 3),
-                    resources = intArrayOf(2, 3),
+                    durations = longArrayOf(2, 3),
+                    resources = longArrayOf(2, 3),
                     capacity = 3,
                     resourceVars = intArrayOf(2, 3),
                 ),
@@ -81,8 +81,8 @@ class CumulativePropagatorTest {
             factors = arrayOf<Factor>(
                 Cumulative(
                     starts = intArrayOf(0, 1, 2, 3),
-                    durations = intArrayOf(4, 1, 1, 1),
-                    resources = intArrayOf(5, 1, 1, 1),
+                    durations = longArrayOf(4, 1, 1, 1),
+                    resources = longArrayOf(5, 1, 1, 1),
                     capacity = 5,
                     resourceVars = intArrayOf(4, 5, 6, 7),
                 ),
@@ -105,9 +105,9 @@ class CumulativePropagatorTest {
             val tasks = 2 + rng.nextInt(2) // 2 or 3 tasks
             val starts = IntArray(tasks) { it }
             val resourceVars = IntArray(tasks) { tasks + it }
-            val durations = IntArray(tasks) { 1 + rng.nextInt(2) } // 1 or 2
-            val resourceUbs = IntArray(tasks) { 3 }
-            val capacity = 2 + rng.nextInt(2) // 2 or 3
+            val durations = LongArray(tasks) { 1L + rng.nextInt(2) } // 1 or 2
+            val resourceUbs = LongArray(tasks) { 3L }
+            val capacity = (2 + rng.nextInt(2)).toLong() // 2 or 3
             val doms = ArrayList<IntDomain>()
             repeat(tasks) { doms.add(IntDomain(0, 2)) } // start domains
             repeat(tasks) { doms.add(IntDomain(0, 2)) } // height domains
@@ -138,8 +138,8 @@ class CumulativePropagatorTest {
         // pinned far away (t=8), so it does not cover the overloaded point and must not be cited.
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(2, 2, 2),
-            resources = intArrayOf(2, 2, 2),
+            durations = longArrayOf(2, 2, 2),
+            resources = longArrayOf(2, 2, 2),
             capacity = 2,
         )
         val problem = Problem(
@@ -179,7 +179,7 @@ class CumulativePropagatorTest {
         // occupied intervals [s, s+2) to be pairwise disjoint, i.e. pairwise |s_i − s_j| ≥ 2. The
         // tight domain makes the propagator overload and shave often, exercising the sharp reasons.
         val span = 5
-        val dur = 2
+        val dur = 2L
         for (seed in 1L..5L) {
             val problem = Problem(
                 numBoolVars = 0,
@@ -192,8 +192,8 @@ class CumulativePropagatorTest {
                 factors = arrayOf<Factor>(
                     Cumulative(
                         starts = intArrayOf(0, 1, 2),
-                        durations = intArrayOf(dur, dur, dur),
-                        resources = intArrayOf(1, 1, 1),
+                        durations = longArrayOf(dur, dur, dur),
+                        resources = longArrayOf(1, 1, 1),
                         capacity = 1,
                     ),
                 ),
@@ -224,7 +224,7 @@ class CumulativePropagatorTest {
         // exactly when both use the resource (r=1) and their [s, s+2) intervals overlap (|s0−s1| < 2).
         // ints = [s0, s1, r0, r1]. This drives the variable-resource sharp reason (`¬[r_k ≥ 1]` cited).
         val span = 3
-        val dur = 2
+        val dur = 2L
         for (seed in 1L..5L) {
             val problem = Problem(
                 numBoolVars = 0,
@@ -238,8 +238,8 @@ class CumulativePropagatorTest {
                 factors = arrayOf<Factor>(
                     Cumulative(
                         starts = intArrayOf(0, 1),
-                        durations = intArrayOf(dur, dur),
-                        resources = intArrayOf(1, 1),
+                        durations = longArrayOf(dur, dur),
+                        resources = longArrayOf(1, 1),
                         capacity = 1,
                         resourceVars = intArrayOf(2, 3),
                     ),
@@ -266,8 +266,8 @@ class CumulativePropagatorTest {
     fun `overload check detects energy infeasibility that time-tabling misses`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(3, 3, 3),
-            resources = intArrayOf(1, 1, 1),
+            durations = longArrayOf(3, 3, 3),
+            resources = longArrayOf(1, 1, 1),
             capacity = 1,
         )
         val p = Problem(
@@ -287,8 +287,8 @@ class CumulativePropagatorTest {
     fun `propagator fails when forced overlap exceeds capacity`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(2, 2),
-            resources = intArrayOf(2, 2),
+            durations = longArrayOf(2, 2),
+            resources = longArrayOf(2, 2),
             capacity = 2,
         )
         val problem = Problem(
@@ -305,8 +305,8 @@ class CumulativePropagatorTest {
     fun `propagator shaves a start that would overlap a mandatory part`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(4, 2),
-            resources = intArrayOf(1, 1),
+            durations = longArrayOf(4, 2),
+            resources = longArrayOf(1, 1),
             capacity = 1,
         )
         val problem = Problem(
@@ -324,8 +324,8 @@ class CumulativePropagatorTest {
     fun `propagator rejects a pin that would force overlap with a mandatory part`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(4, 2),
-            resources = intArrayOf(1, 1),
+            durations = longArrayOf(4, 2),
+            resources = longArrayOf(1, 1),
             capacity = 1,
         )
         val problem = Problem(
@@ -342,8 +342,8 @@ class CumulativePropagatorTest {
     fun `BacktrackSolver finds a feasible 3-task unary schedule`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(2, 2, 2),
-            resources = intArrayOf(1, 1, 1),
+            durations = longArrayOf(2, 2, 2),
+            resources = longArrayOf(1, 1, 1),
             capacity = 1,
         )
         val problem = Problem(
@@ -379,8 +379,8 @@ class CumulativePropagatorTest {
         // the result is Implied(intMin=3 for C), not Unsat.
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(2, 2, 2),
-            resources = intArrayOf(2, 2, 3),
+            durations = longArrayOf(2, 2, 2),
+            resources = longArrayOf(2, 2, 3),
             capacity = 3,
         )
         val problem = Problem(
@@ -402,8 +402,8 @@ class CumulativePropagatorTest {
     fun `edge-finding is silent when no deduction applies`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
-            durations = intArrayOf(1, 1, 1),
-            resources = intArrayOf(1, 1, 1),
+            durations = longArrayOf(1, 1, 1),
+            resources = longArrayOf(1, 1, 1),
             capacity = 3,
         )
         val problem = Problem(
@@ -427,8 +427,8 @@ class CumulativePropagatorTest {
         // (start ≥ 2); the sound env(Θ ∪ {i}) insertion must leave t=0 feasible.
         val factor = Cumulative(
             starts = intArrayOf(0, 1),
-            durations = intArrayOf(1, 1),
-            resources = intArrayOf(1, 1),
+            durations = longArrayOf(1, 1),
+            resources = longArrayOf(1, 1),
             capacity = 1,
         )
         val problem = Problem(
@@ -494,9 +494,9 @@ class CumulativePropagatorTest {
                 factors = arrayOf<Factor>(
                     Cumulative(
                         starts = IntArray(k) { it },
-                        durations = inst.durs,
-                        resources = inst.res,
-                        capacity = inst.cap,
+                        durations = LongArray(inst.durs.size) { inst.durs[it].toLong() },
+                        resources = LongArray(inst.res.size) { inst.res[it].toLong() },
+                        capacity = inst.cap.toLong(),
                     ),
                 ),
             )
@@ -513,8 +513,8 @@ class CumulativePropagatorTest {
     fun `single task never overloads`() {
         val factor = Cumulative(
             starts = intArrayOf(0),
-            durations = intArrayOf(2),
-            resources = intArrayOf(1),
+            durations = longArrayOf(2),
+            resources = longArrayOf(1),
             capacity = 1,
         )
         val problem = Problem(
@@ -533,8 +533,8 @@ class CumulativePropagatorTest {
         // when its resource demand exceeds capacity.
         val factor = Cumulative(
             starts = intArrayOf(0),
-            durations = intArrayOf(0),
-            resources = intArrayOf(5),
+            durations = longArrayOf(0),
+            resources = longArrayOf(5),
             capacity = 1,
         )
         val problem = Problem(
@@ -550,8 +550,8 @@ class CumulativePropagatorTest {
     fun `zero capacity with a positive task is infeasible`() {
         val factor = Cumulative(
             starts = intArrayOf(0),
-            durations = intArrayOf(1),
-            resources = intArrayOf(1),
+            durations = longArrayOf(1),
+            resources = longArrayOf(1),
             capacity = 0,
         )
         val problem = Problem(
@@ -802,22 +802,22 @@ class CumulativePropagatorTest {
         assertBoundOnly(
             Cumulative(
                 starts = intArrayOf(0, 1),
-                durations = intArrayOf(2, 2),
-                resources = intArrayOf(1, 1),
+                durations = longArrayOf(2, 2),
+                resources = longArrayOf(1, 1),
                 capacity = 1,
             )
                 .asPropagator().initialIntEventWatches,
             intArrayOf(0, 1),
         )
         assertBoundOnly(
-            Diffn(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), widths = intArrayOf(1, 1), heights = intArrayOf(1, 1))
+            Diffn(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), widths = longArrayOf(1, 1), heights = longArrayOf(1, 1))
                 .asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
             Disjunctive(
                 starts = intArrayOf(0, 1, 2),
-                durations = intArrayOf(2, 1, 1),
+                durations = longArrayOf(2, 1, 1),
             ).asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2),
         )
@@ -837,7 +837,7 @@ class CumulativePropagatorTest {
     fun `disjunctive with interior holes punched mid-search enumerates exactly brute force`() {
         // 3 tasks (durations 2,1,1) over starts 0..3 must not overlap; a co-constraint carves var3's
         // fixed value out of starts 0 and 1 — punching interior holes the bound-only filter ignores.
-        val durs = intArrayOf(2, 1, 1)
+        val durs = longArrayOf(2, 1, 1)
         for (seed in 1L..5L) {
             val factors = listOf<Factor>(
                 Disjunctive(starts = intArrayOf(0, 1, 2), durations = durs),

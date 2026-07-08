@@ -87,9 +87,9 @@ class IntOverflowTest {
     @Test
     fun `PseudoBoolean weighted sum is Long-clean`() {
         // WIDE literals, each weight BIG, all true → Σ = 2^32; LE 1000 is violated.
-        val weights = IntArray(WIDE) { BIG }
+        val weights = LongArray(WIDE) { BIG.toLong() }
         val literals = IntArray(WIDE) { Lit.make(it, true) }
-        val factor = PseudoBoolean(weights, literals, PbOp.LE, bound = 1000)
+        val factor = PseudoBoolean(weights, literals, PbOp.LE, bound = 1000L)
         val state = stateFor(WIDE, emptyArray(), factor)
         for (v in 0 until WIDE) state.assignment.setBool(v, true)
         state.recompute()
@@ -101,14 +101,14 @@ class IntOverflowTest {
     fun `ReifiedPseudoBoolean weighted sum is Long-clean`() {
         // bool 0 = aux; bools 1..WIDE = body literals, each weight BIG.
         val n = WIDE
-        val weights = IntArray(n) { BIG }
+        val weights = LongArray(n) { BIG.toLong() }
         val literals = IntArray(n) { Lit.make(it + 1, true) }
         val factor = ReifiedPseudoBoolean(
             auxBoolVar = 0,
             weights = weights,
             literals = literals,
             op = PbOp.LE,
-            bound = 1000,
+            bound = 1000L,
         )
         val state = stateFor(n + 1, emptyArray(), factor)
         state.assignment.setBool(0, true) // aux demands the relation hold

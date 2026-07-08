@@ -48,7 +48,7 @@ class OccurrenceDedupTest {
     fun `pseudo boolean with same var twice dedups occurrence list`() {
         val a = 0
         val factor = PseudoBoolean(
-            weights = intArrayOf(2, 3),
+            weights = longArrayOf(2, 3),
             literals = intArrayOf(Lit.make(a, true), Lit.make(a, false)),
             op = PbOp.LE,
             bound = 4,

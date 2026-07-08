@@ -31,16 +31,16 @@ class CumulativeTimeIndexedTest {
     /** `min M  s.t.  M ≥ startᵢ + durᵢ,  cumulative(...)`; ints `0..n-1` starts, `n` is the makespan. */
     private fun makespanProblem(
         starts: Array<IntDomain>,
-        durations: IntArray,
-        resources: IntArray,
-        capacity: Int,
+        durations: LongArray,
+        resources: LongArray,
+        capacity: Long,
         horizon: Int,
         disjunctive: Boolean = false,
     ): Problem {
         val n = starts.size
         val domains = Array(n + 1) { if (it < n) starts[it] else IntDomain(0, horizon.toLong()) }
         val factors = ArrayList<Factor>()
-        for (i in 0 until n) factors.add(Linear(intArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, durations[i]))
+        for (i in 0 until n) factors.add(Linear(longArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, durations[i]))
         factors.add(
             if (disjunctive) {
                 Disjunctive(IntArray(n) { it }, durations)
@@ -83,7 +83,7 @@ class CumulativeTimeIndexedTest {
             0,
             3,
             Array(3) { IntDomain(0, 20) },
-            arrayOf<Factor>(Cumulative(intArrayOf(0, 1, 2), intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), 1)),
+            arrayOf<Factor>(Cumulative(intArrayOf(0, 1, 2), longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), 1)),
         )
         assertEquals(0.0, sumStartBound(p, intArrayOf(0, 1, 2), timeIndexed = false), eps)
         assertEquals(9.0, sumStartBound(p, intArrayOf(0, 1, 2), timeIndexed = true), eps)
@@ -96,7 +96,7 @@ class CumulativeTimeIndexedTest {
             0,
             3,
             Array(3) { IntDomain(0, 20) },
-            arrayOf<Factor>(Disjunctive(intArrayOf(0, 1, 2), intArrayOf(2, 3, 4))),
+            arrayOf<Factor>(Disjunctive(intArrayOf(0, 1, 2), longArrayOf(2, 3, 4))),
         )
         // Serial by SPT: starts 0, 2, 5 ⇒ Σ = 7 (the plain LP gives 0).
         assertEquals(0.0, sumStartBound(p, intArrayOf(0, 1, 2), timeIndexed = false), eps)
@@ -120,8 +120,8 @@ class CumulativeTimeIndexedTest {
         // resource rows lift the bound past the energetic window on this multi-capacity profile.
         val p = makespanProblem(
             starts = arrayOf(IntDomain(0, 6), IntDomain(3, 5), IntDomain(4, 9), IntDomain(2, 6)),
-            durations = intArrayOf(3, 2, 3, 2),
-            resources = intArrayOf(3, 1, 2, 2),
+            durations = longArrayOf(3, 2, 3, 2),
+            resources = longArrayOf(3, 1, 2, 2),
             capacity = 3,
             horizon = 14,
         )
@@ -202,8 +202,8 @@ class CumulativeTimeIndexedTest {
         // Horizon 100000 ≫ MAX_TI_HORIZON: the builder emits nothing, so the bound matches plain.
         val p = makespanProblem(
             starts = Array(2) { IntDomain(0, 100_000) },
-            durations = intArrayOf(3, 3),
-            resources = intArrayOf(1, 1),
+            durations = longArrayOf(3, 3),
+            resources = longArrayOf(1, 1),
             capacity = 1,
             horizon = 100_006,
         )
@@ -220,9 +220,9 @@ class CumulativeTimeIndexedTest {
         var strengthened = 0
         repeat(150) { _ ->
             val n = rng.nextInt(2, 4)
-            val durations = IntArray(n) { rng.nextInt(1, 4) }
-            val resources = IntArray(n) { rng.nextInt(1, 3) }
-            val capacity = rng.nextInt(1, 4)
+            val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
+            val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
+            val capacity = rng.nextInt(1, 4).toLong()
             val starts = Array(n) { IntDomain(rng.nextInt(0, 3).toLong(), (3 + rng.nextInt(0, 3)).toLong()) }
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
             val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
@@ -246,9 +246,9 @@ class CumulativeTimeIndexedTest {
         var optimal = 0
         repeat(60) { iter ->
             val n = rng.nextInt(2, 4)
-            val durations = IntArray(n) { rng.nextInt(1, 4) }
-            val resources = IntArray(n) { rng.nextInt(1, 3) }
-            val capacity = rng.nextInt(1, 4)
+            val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
+            val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
+            val capacity = rng.nextInt(1, 4).toLong()
             val starts = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
             val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
             val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
@@ -284,16 +284,16 @@ class CumulativeTimeIndexedTest {
     private fun bruteOptimum(
         n: Int,
         starts: Array<IntDomain>,
-        durations: IntArray,
-        resources: IntArray,
-        capacity: Int,
-    ): Int? {
+        durations: LongArray,
+        resources: LongArray,
+        capacity: Long,
+    ): Long? {
         val s = IntArray(n)
-        var best: Int? = null
+        var best: Long? = null
         fun feasible(): Boolean {
             val horizon = (0 until n).maxOf { s[it] + durations[it] }
             for (t in 0 until horizon) {
-                var load = 0
+                var load = 0L
                 for (k in 0 until n) if (s[k] <= t && t < s[k] + durations[k]) load += resources[k]
                 if (load > capacity) return false
             }

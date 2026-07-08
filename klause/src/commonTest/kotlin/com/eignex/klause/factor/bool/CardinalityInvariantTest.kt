@@ -229,10 +229,10 @@ class CardinalityInvariantTest {
     @Test
     fun `pseudo boolean LE stays consistent`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(3, 2, 1, 5, 4),
+            weights = longArrayOf(3, 2, 1, 5, 4),
             literals = IntArray(5) { Lit.make(it, positive = true) },
             op = PbOp.LE,
-            bound = 7,
+            bound = 7L,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -240,7 +240,7 @@ class CardinalityInvariantTest {
     @Test
     fun `pseudo boolean GE with negative literals stays consistent`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(2, 4, 3, 1),
+            weights = longArrayOf(2, 4, 3, 1),
             literals = intArrayOf(
                 Lit.make(0, true),
                 Lit.make(1, false),
@@ -248,7 +248,7 @@ class CardinalityInvariantTest {
                 Lit.make(3, false),
             ),
             op = PbOp.GE,
-            bound = 5,
+            bound = 5L,
         )
         assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
     }
@@ -256,10 +256,10 @@ class CardinalityInvariantTest {
     @Test
     fun `pseudo boolean EQ stays consistent`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(1, 1, 1, 1, 1),
+            weights = longArrayOf(1, 1, 1, 1, 1),
             literals = IntArray(5) { Lit.make(it, positive = true) },
             op = PbOp.EQ,
-            bound = 3,
+            bound = 3L,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -267,10 +267,10 @@ class CardinalityInvariantTest {
     @Test
     fun `pseudo boolean with negative weights stays consistent`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(2, -3, 4, -1),
+            weights = longArrayOf(2, -3, 4, -1),
             literals = IntArray(4) { Lit.make(it, positive = true) },
             op = PbOp.LE,
-            bound = 1,
+            bound = 1L,
         )
         assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
     }
@@ -307,10 +307,10 @@ class CardinalityInvariantTest {
     fun `reified pseudo boolean LE stays consistent`() {
         val factor = ReifiedPseudoBoolean(
             auxBoolVar = 5,
-            weights = intArrayOf(2, 3, 1, 4, 2),
+            weights = longArrayOf(2, 3, 1, 4, 2),
             literals = IntArray(5) { Lit.make(it, positive = true) },
             op = PbOp.LE,
-            bound = 6,
+            bound = 6L,
         )
         assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
     }
@@ -319,7 +319,7 @@ class CardinalityInvariantTest {
     fun `reified pseudo boolean GE with negative literals stays consistent`() {
         val factor = ReifiedPseudoBoolean(
             auxBoolVar = 4,
-            weights = intArrayOf(3, 2, 4, 1),
+            weights = longArrayOf(3, 2, 4, 1),
             literals = intArrayOf(
                 Lit.make(0, true),
                 Lit.make(1, false),
@@ -327,7 +327,7 @@ class CardinalityInvariantTest {
                 Lit.make(3, false),
             ),
             op = PbOp.GE,
-            bound = 5,
+            bound = 5L,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -336,10 +336,10 @@ class CardinalityInvariantTest {
     fun `reified pseudo boolean EQ stays consistent`() {
         val factor = ReifiedPseudoBoolean(
             auxBoolVar = 4,
-            weights = intArrayOf(1, 1, 1, 1),
+            weights = longArrayOf(1, 1, 1, 1),
             literals = IntArray(4) { Lit.make(it, positive = true) },
             op = PbOp.EQ,
-            bound = 2,
+            bound = 2L,
         )
         assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
     }
@@ -427,7 +427,7 @@ class CardinalityInvariantTest {
             targetParity = 1,
         )
         val pb = PseudoBoolean(
-            weights = intArrayOf(2, 1, 3, 2),
+            weights = longArrayOf(2, 1, 3, 2),
             literals = intArrayOf(
                 Lit.make(1, true),
                 Lit.make(3, false),
@@ -435,7 +435,7 @@ class CardinalityInvariantTest {
                 Lit.make(5, true),
             ),
             op = PbOp.LE,
-            bound = 4,
+            bound = 4L,
         )
         assertConsistent(Problem(6, 0, emptyArray(), listOf<Factor>(card, xor, pb)))
     }

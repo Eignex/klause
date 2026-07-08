@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 /** #454: preemptive max-flow feasibility bound for the scheduling globals. */
 class CumulativeFlowBoundTest {
 
-    private fun problem(n: Int, spanHi: Int, durations: IntArray, resources: IntArray, capacity: Int): Problem =
+    private fun problem(n: Int, spanHi: Int, durations: LongArray, resources: LongArray, capacity: Long): Problem =
         Problem(
             0,
             n,
@@ -22,14 +22,14 @@ class CumulativeFlowBoundTest {
 
     @Test
     fun `feasible cumulative is not flagged`() {
-        val p = problem(2, 5, intArrayOf(2, 2), intArrayOf(1, 1), capacity = 2)
+        val p = problem(2, 5, longArrayOf(2, 2), longArrayOf(1, 1), capacity = 2)
         assertTrue(!CumulativeFlowBound(p).isInfeasible(PropagationSession(p)))
     }
 
     @Test
     fun `preemptive over-subscription is detected`() {
         // 3 unit tasks of length 3, capacity 1, starts in [0,3] ⇒ horizon 6, but 9 work needs 9 ⇒ infeasible.
-        val p = problem(3, 3, intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1)
+        val p = problem(3, 3, longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1)
         assertTrue(CumulativeFlowBound(p).isInfeasible(PropagationSession(p)))
     }
 
@@ -41,14 +41,14 @@ class CumulativeFlowBoundTest {
             0,
             2,
             arrayOf(IntDomain(0, 0), IntDomain(0, 0)),
-            arrayOf<Factor>(Cumulative(intArrayOf(0, 1), intArrayOf(2, 2), intArrayOf(1, 1), capacity = 1)),
+            arrayOf<Factor>(Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), capacity = 1)),
         )
         assertTrue(CumulativeFlowBound(p).isInfeasible(PropagationSession(p)))
     }
 
     @Test
     fun `over-subscription yields a well-formed nogood`() {
-        val p = problem(3, 3, intArrayOf(3, 3, 3), intArrayOf(1, 1, 1), capacity = 1)
+        val p = problem(3, 3, longArrayOf(3, 3, 3), longArrayOf(1, 1, 1), capacity = 1)
         val clause = CumulativeFlowBound(p).explain(PropagationSession(p))
         assertTrue(clause != null && clause.isNotEmpty(), "expected a non-empty flow explanation")
         assertTrue(clause.all { it >= 0 }, "every literal must be a well-formed atom")
@@ -56,7 +56,7 @@ class CumulativeFlowBoundTest {
 
     @Test
     fun `feasible cumulative has no explanation`() {
-        val p = problem(2, 5, intArrayOf(2, 2), intArrayOf(1, 1), capacity = 2)
+        val p = problem(2, 5, longArrayOf(2, 2), longArrayOf(1, 1), capacity = 2)
         assertTrue(CumulativeFlowBound(p).explain(PropagationSession(p)) == null)
     }
 
@@ -67,9 +67,9 @@ class CumulativeFlowBoundTest {
         repeat(500) { _ ->
             val n = rng.nextInt(2, 4)
             val spanHi = rng.nextInt(1, 5)
-            val durations = IntArray(n) { rng.nextInt(1, 4) }
-            val resources = IntArray(n) { rng.nextInt(1, 3) }
-            val capacity = rng.nextInt(1, 4)
+            val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
+            val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
+            val capacity = rng.nextInt(1, 4).toLong()
             val p = problem(n, spanHi, durations, resources, capacity)
             val session = PropagationSession(p)
             if (!CumulativeFlowBound(p).isInfeasible(session)) return@repeat
@@ -86,16 +86,16 @@ class CumulativeFlowBoundTest {
         n: Int,
         mins: IntArray,
         maxs: IntArray,
-        durations: IntArray,
-        resources: IntArray,
-        capacity: Int,
+        durations: LongArray,
+        resources: LongArray,
+        capacity: Long,
     ): Boolean {
         val start = IntArray(n)
         fun rec(i: Int): Boolean {
             if (i == n) {
                 val horizon = (0 until n).maxOf { start[it] + durations[it] }
                 for (t in 0 until horizon) {
-                    var load = 0
+                    var load = 0L
                     for (k in 0 until n) if (start[k] <= t && t < start[k] + durations[k]) load += resources[k]
                     if (load > capacity) return false
                 }

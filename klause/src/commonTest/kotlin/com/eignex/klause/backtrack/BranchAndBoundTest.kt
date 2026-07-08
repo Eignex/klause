@@ -100,7 +100,7 @@ class BranchAndBoundTest {
         // start time is 0 + 2 + 4 = 6 (any non-overlapping schedule has the same
         // sum, so any feasible is optimal).
         val starts = intArrayOf(0, 1, 2)
-        val durations = intArrayOf(2, 2, 2)
+        val durations = longArrayOf(2, 2, 2)
         val factor = Disjunctive(starts = starts, durations = durations)
         val problem = Problem(
             numBoolVars = 0,

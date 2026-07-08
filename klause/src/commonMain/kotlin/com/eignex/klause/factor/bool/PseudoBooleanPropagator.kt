@@ -10,10 +10,10 @@ import com.eignex.klause.propagation.Propagator
 internal class PseudoBooleanPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val weights: IntArray,
+    private val weights: LongArray,
     private val literals: IntArray,
     private val op: PbOp,
-    private val bound: Int,
+    private val bound: Long,
 ) : Propagator {
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =

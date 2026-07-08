@@ -15,8 +15,8 @@ internal class DiffnPropagator(
     val intVars: IntArray,
     private val xs: IntArray,
     private val ys: IntArray,
-    private val widths: IntArray,
-    private val heights: IntArray,
+    private val widths: LongArray,
+    private val heights: LongArray,
     private val widthVars: IntArray?,
     private val heightVars: IntArray?,
     private val nonStrict: Boolean,
@@ -35,11 +35,11 @@ internal class DiffnPropagator(
             for (i in 0 until n) {
                 val wI = widths[i]
                 val hI = heights[i]
-                if (nonStrict && (wI == 0 || hI == 0)) continue
+                if (nonStrict && (wI == 0L || hI == 0L)) continue
                 for (j in i + 1 until n) {
                     val wJ = widths[j]
                     val hJ = heights[j]
-                    if (nonStrict && (wJ == 0 || hJ == 0)) continue
+                    if (nonStrict && (wJ == 0L || hJ == 0L)) continue
                     val xMust = state.intDomains[xs[i]].max < state.intDomains[xs[j]].min + wJ &&
                         state.intDomains[xs[j]].max < state.intDomains[xs[i]].min + wI
                     val yMust = state.intDomains[ys[i]].max < state.intDomains[ys[j]].min + hJ &&
@@ -86,9 +86,9 @@ internal class DiffnPropagator(
     private fun sweepAxis(
         state: PropagationState,
         pos: IntArray,
-        size: IntArray,
+        size: LongArray,
         opos: IntArray,
-        osize: IntArray,
+        osize: LongArray,
     ): Boolean {
         val ant = state.composeIntVarAtomAntecedents(intVars)
         for (i in 0 until n) {
@@ -151,9 +151,9 @@ internal class DiffnPropagator(
         i: Int,
         x: Long,
         pos: IntArray,
-        size: IntArray,
+        size: LongArray,
         opos: IntArray,
-        osize: IntArray,
+        osize: LongArray,
     ): Boolean {
         // Forbidden orthogonal-origin intervals contributed by rectangles whose compulsory primary
         // part overlaps [x, x+size[i]).
@@ -192,8 +192,8 @@ internal class DiffnPropagator(
     private fun propagateVarSizeSoundOnly(state: PropagationState): Boolean {
         val wvars = widthVars
         val hvars = heightVars
-        fun wMin(i: Int): Long = if (wvars == null) widths[i].toLong() else state.intDomains[wvars[i]].min
-        fun hMin(i: Int): Long = if (hvars == null) heights[i].toLong() else state.intDomains[hvars[i]].min
+        fun wMin(i: Int): Long = if (wvars == null) widths[i] else state.intDomains[wvars[i]].min
+        fun hMin(i: Int): Long = if (hvars == null) heights[i] else state.intDomains[hvars[i]].min
         for (i in 0 until n) {
             for (j in i + 1 until n) {
                 val wI = wMin(i)

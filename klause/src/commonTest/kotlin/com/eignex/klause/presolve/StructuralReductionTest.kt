@@ -191,9 +191,9 @@ class StructuralReductionTest {
             listOf(
                 Cumulative(
                     starts = intArrayOf(0, 1, 2),
-                    durations = intArrayOf(2, 2, 2),
-                    resources = intArrayOf(3, 3, 3),
-                    capacity = 4,
+                    durations = longArrayOf(2, 2, 2),
+                    resources = longArrayOf(3, 3, 3),
+                    capacity = 4L,
                 ),
             ),
         )
@@ -212,9 +212,9 @@ class StructuralReductionTest {
             listOf(
                 Cumulative(
                     starts = intArrayOf(0, 1, 2),
-                    durations = intArrayOf(2, 2, 2),
-                    resources = intArrayOf(1, 1, 1),
-                    capacity = 4,
+                    durations = longArrayOf(2, 2, 2),
+                    resources = longArrayOf(1, 1, 1),
+                    capacity = 4L,
                 ),
             ),
         )

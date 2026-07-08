@@ -63,10 +63,11 @@ class FactorRemapTest {
             "Clause" to Clause(intArrayOf(pos(0), neg(1))),
             "Cardinality" to Cardinality(intArrayOf(pos(0), pos(1)), 1, 2),
             "Xor" to Xor(intArrayOf(pos(0), pos(1)), 1),
-            "PseudoBoolean" to PseudoBoolean(intArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+            "PseudoBoolean" to PseudoBoolean(longArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L),
             "ReifiedLinear" to ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
             "ReifiedCardinality" to ReifiedCardinality(2, intArrayOf(pos(0), pos(1)), 1, 2),
-            "ReifiedPseudoBoolean" to ReifiedPseudoBoolean(2, intArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2),
+            "ReifiedPseudoBoolean" to
+                ReifiedPseudoBoolean(2, longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L),
             "AllDifferent" to AllDifferent(intArrayOf(0, 1, 2), 0, 3),
             "AllDifferent(opt)" to AllDifferent(intArrayOf(0, 1), 0, 2, intArrayOf(pos(3), pos(4))),
             "Element(vars)" to Element(0, 1, longArrayOf(2, 3), arrIsVars = true, indexOffset = 1),
@@ -81,23 +82,23 @@ class FactorRemapTest {
             "NValue" to NValue(0, intArrayOf(1, 2, 3)),
             "Circuit" to Circuit(intArrayOf(1, 2, 0)),
             "Subcircuit" to Subcircuit(intArrayOf(0, 1, 2)),
-            "Cumulative" to Cumulative(intArrayOf(0, 1), intArrayOf(2, 2), intArrayOf(1, 1), 3),
+            "Cumulative" to Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 3L),
             "Cumulative(vars)" to Cumulative(
                 intArrayOf(0, 1),
-                intArrayOf(2, 2),
-                intArrayOf(1, 1),
-                3,
+                longArrayOf(2, 2),
+                longArrayOf(1, 1),
+                3L,
                 durationVars = intArrayOf(2, 3),
                 resourceVars = intArrayOf(4, 5),
                 capacityVar = 6,
             ),
-            "Disjunctive" to Disjunctive(intArrayOf(0, 1), intArrayOf(2, 2)),
-            "Diffn" to Diffn(intArrayOf(0, 1), intArrayOf(2, 3), intArrayOf(1, 1), intArrayOf(1, 1)),
+            "Disjunctive" to Disjunctive(intArrayOf(0, 1), longArrayOf(2, 2)),
+            "Diffn" to Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1)),
             "Diffn(vars)" to Diffn(
                 intArrayOf(0, 1),
                 intArrayOf(2, 3),
-                intArrayOf(1, 1),
-                intArrayOf(1, 1),
+                longArrayOf(1, 1),
+                longArrayOf(1, 1),
                 widthVars = intArrayOf(4, 5),
                 heightVars = intArrayOf(6, 7),
             ),
@@ -149,16 +150,17 @@ class FactorRemapTest {
 
     @Test
     fun `cumulative capacityVar sentinel survives and a real one remaps`() {
-        val constCap = Cumulative(intArrayOf(0), intArrayOf(2), intArrayOf(1), 3).remap(boolMap, intMap) as Cumulative
+        val constCap =
+            Cumulative(intArrayOf(0), longArrayOf(2), longArrayOf(1), 3L).remap(boolMap, intMap) as Cumulative
         assertEquals(-1, constCap.capacityVar)
-        val varCap = Cumulative(intArrayOf(0), intArrayOf(2), intArrayOf(1), 3, capacityVar = 6)
+        val varCap = Cumulative(intArrayOf(0), longArrayOf(2), longArrayOf(1), 3L, capacityVar = 6)
             .remap(boolMap, intMap) as Cumulative
         assertEquals(106, varCap.capacityVar)
     }
 
     @Test
     fun `null diffn size-vars stay null`() {
-        val out = Diffn(intArrayOf(0), intArrayOf(1), intArrayOf(1), intArrayOf(1)).remap(boolMap, intMap) as Diffn
+        val out = Diffn(intArrayOf(0), intArrayOf(1), longArrayOf(1), longArrayOf(1)).remap(boolMap, intMap) as Diffn
         assertNull(out.widthVars)
         assertNull(out.heightVars)
     }

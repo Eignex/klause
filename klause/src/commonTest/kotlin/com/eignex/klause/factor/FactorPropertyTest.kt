@@ -53,20 +53,20 @@ class FactorPropertyTest {
 
     @Test fun `pseudo boolean delta matches apply`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(3, -2, 5, 1),
+            weights = longArrayOf(3, -2, 5, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, true)),
             op = PbOp.LE,
-            bound = 4,
+            bound = 4L,
         )
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 4)
     }
 
     @Test fun `pseudo boolean ge delta matches apply`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(2, 1, 1, 1),
+            weights = longArrayOf(2, 1, 1, 1),
             literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
             op = PbOp.GE,
-            bound = 3,
+            bound = 3L,
         )
         runFactorPropertyCheck(factor, numBoolVars = 4, intDomains = emptyDomains, seed = 5)
     }
@@ -227,10 +227,10 @@ class FactorPropertyTest {
     @Test fun `reified pseudo boolean delta matches apply`() {
         val factor = ReifiedPseudoBoolean(
             auxBoolVar = 0,
-            weights = intArrayOf(2, 1, 3, 1),
+            weights = longArrayOf(2, 1, 3, 1),
             literals = intArrayOf(Lit.make(1, true), Lit.make(2, false), Lit.make(3, true), Lit.make(4, true)),
             op = PbOp.LE,
-            bound = 4,
+            bound = 4L,
         )
         runFactorPropertyCheck(factor, numBoolVars = 5, intDomains = emptyDomains, seed = 17)
     }
@@ -267,10 +267,10 @@ class FactorPropertyTest {
                 max = 2,
             ) to FactorEnv(numBoolVars = 3),
             PseudoBoolean(
-                weights = intArrayOf(3, -2, 5),
+                weights = longArrayOf(3, -2, 5),
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
                 op = PbOp.LE,
-                bound = 4,
+                bound = 4L,
             ) to FactorEnv(numBoolVars = 3),
             Xor(
                 literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
@@ -305,10 +305,10 @@ class FactorPropertyTest {
             ) to FactorEnv(numBoolVars = 1, intDomains = arrayOf(IntDomain(-2, 3), IntDomain(-2, 3))),
             ReifiedPseudoBoolean(
                 auxBoolVar = 0,
-                weights = intArrayOf(2, 1, 3),
+                weights = longArrayOf(2, 1, 3),
                 literals = intArrayOf(Lit.make(1, true), Lit.make(2, true), Lit.make(3, false)),
                 op = PbOp.LE,
-                bound = 3,
+                bound = 3L,
             ) to FactorEnv(numBoolVars = 4),
             ReifiedCardinality(
                 auxBoolVar = 0,

@@ -821,10 +821,10 @@ class ArithmeticPropagatorTest {
             factors = arrayOf<Factor>(
                 ReifiedPseudoBoolean(
                     auxBoolVar = 2,
-                    weights = intArrayOf(2, 3),
+                    weights = longArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.EQ,
-                    bound = 5,
+                    bound = 5L,
                 ),
             ),
         )
@@ -843,10 +843,10 @@ class ArithmeticPropagatorTest {
             factors = arrayOf<Factor>(
                 ReifiedPseudoBoolean(
                     auxBoolVar = 2,
-                    weights = intArrayOf(2, 3),
+                    weights = longArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.EQ,
-                    bound = 5,
+                    bound = 5L,
                 ),
             ),
         )
@@ -865,10 +865,10 @@ class ArithmeticPropagatorTest {
             factors = arrayOf<Factor>(
                 ReifiedPseudoBoolean(
                     auxBoolVar = 2,
-                    weights = intArrayOf(2, 3),
+                    weights = longArrayOf(2, 3),
                     literals = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
                     op = PbOp.EQ,
-                    bound = 5,
+                    bound = 5L,
                 ),
             ),
         )

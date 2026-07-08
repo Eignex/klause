@@ -67,9 +67,9 @@ class BacktrackSolverTest {
         val n = 6
         val factor = Cumulative(
             starts = IntArray(n) { it },
-            durations = IntArray(n) { 2 },
-            resources = IntArray(n) { 1 },
-            capacity = 1,
+            durations = LongArray(n) { 2L },
+            resources = LongArray(n) { 1L },
+            capacity = 1L,
         )
         val p = Problem(
             numBoolVars = 0,

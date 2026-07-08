@@ -20,9 +20,9 @@ import com.eignex.klause.util.argsortBy
 internal class CumulativePropagator(
     val intVars: IntArray,
     private val starts: IntArray,
-    private val durations: IntArray,
-    private val resources: IntArray,
-    private val capacity: Int,
+    private val durations: LongArray,
+    private val resources: LongArray,
+    private val capacity: Long,
     private val presents: IntArray,
     private val durationVars: IntArray,
     private val resourceVars: IntArray,
@@ -55,14 +55,14 @@ internal class CumulativePropagator(
         val res = LongArray(n)
         for (i in 0 until n) {
             if (durationVars.isEmpty()) {
-                dur[i] = durations[i].toLong()
+                dur[i] = durations[i]
             } else {
                 val d = state.intDomains[durationVars[i]]
                 if (d.min != d.max) return null
                 dur[i] = d.min
             }
             if (resourceVars.isEmpty()) {
-                res[i] = resources[i].toLong()
+                res[i] = resources[i]
             } else {
                 val d = state.intDomains[resourceVars[i]]
                 if (d.min != d.max) return null
@@ -70,7 +70,7 @@ internal class CumulativePropagator(
             }
         }
         val cap = if (capacityVar < 0) {
-            capacity.toLong()
+            capacity
         } else {
             val d = state.intDomains[capacityVar]
             if (d.min != d.max) return null
@@ -270,16 +270,16 @@ internal class CumulativePropagator(
     }
 
     private fun minDur(state: PropagationState, i: Int): Long =
-        if (durationVars.isEmpty()) durations[i].toLong() else state.intDomains[durationVars[i]].min
+        if (durationVars.isEmpty()) durations[i] else state.intDomains[durationVars[i]].min
 
     private fun maxDur(state: PropagationState, i: Int): Long =
-        if (durationVars.isEmpty()) durations[i].toLong() else state.intDomains[durationVars[i]].max
+        if (durationVars.isEmpty()) durations[i] else state.intDomains[durationVars[i]].max
 
     private fun minHeight(state: PropagationState, i: Int): Long =
-        if (resourceVars.isEmpty()) resources[i].toLong() else state.intDomains[resourceVars[i]].min
+        if (resourceVars.isEmpty()) resources[i] else state.intDomains[resourceVars[i]].min
 
     private fun capMax(state: PropagationState): Long =
-        if (capacityVar < 0) capacity.toLong() else state.intDomains[capacityVar].max
+        if (capacityVar < 0) capacity else state.intDomains[capacityVar].max
 
     /**
      * Naive energetic reasoning (after Baptiste–Le Pape–Nuijten, as in choco's `energyNaive`). For

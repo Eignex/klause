@@ -68,7 +68,7 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
     private fun overSubscribedChecked(c: Cumulative, session: PropagationSession): Boolean {
         val n = c.starts.size
         if (n == 0 || n > MAX_TASKS) return false
-        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max else c.capacity.toLong()
+        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max else c.capacity
 
         // Per definitely-present task: earliest start, latest start, min duration, min demand.
         val est = LongArray(n)
@@ -120,7 +120,7 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
     private fun explainChecked(c: Cumulative, session: PropagationSession): IntArray? {
         val n = c.starts.size
         if (n == 0 || n > MAX_TASKS) return null
-        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max else c.capacity.toLong()
+        val capacity = if (c.capacityVar >= 0) session.intDomain(c.capacityVar).max else c.capacity
         val est = LongArray(n)
         val lst = LongArray(n)
         val dur = LongArray(n)
@@ -194,8 +194,8 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
     }
 
     /** Live minimum of the per-task variable (when [vars] is set) else the [const] fallback. */
-    private fun minOrConst(session: PropagationSession, vars: IntArray, i: Int, const: Int): Long =
-        if (vars.isNotEmpty()) session.intDomain(vars[i]).min else const.toLong()
+    private fun minOrConst(session: PropagationSession, vars: IntArray, i: Int, const: Long): Long =
+        if (vars.isNotEmpty()) session.intDomain(vars[i]).min else const
 
     /** Minimum time task `[est, lst]+dur` must spend inside `[t1, t2)` over all its placements. */
     private fun mandatoryOverlap(est: Long, lst: Long, dur: Long, t1: Long, t2: Long): Long {

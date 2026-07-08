@@ -246,7 +246,13 @@ internal class Lowering(val config: KlauseConfig) {
         is PseudoBooleanExpr -> {
             val lits = lowerAllBool(expr.lits)
             val aux = newBoolVar()
-            factors += ReifiedPseudoBoolean(aux, expr.weights.toIntArray(), lits, expr.op, expr.bound)
+            factors += ReifiedPseudoBoolean(
+                aux,
+                LongArray(expr.weights.size) { expr.weights[it].toLong() },
+                lits,
+                expr.op,
+                expr.bound.toLong(),
+            )
             Lit.make(aux, positive = true)
         }
 

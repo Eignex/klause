@@ -59,11 +59,11 @@ class Cumulative(
     val starts: IntArray,
     /** Per-task duration: constant fallback / upper bound (when [durationVars] is set this
      *  holds the var's domain ub, used for horizon sizing). */
-    val durations: IntArray,
+    val durations: LongArray,
     /** Per-task resource demand: same dual role as [durations]. */
-    val resources: IntArray,
+    val resources: LongArray,
     /** Capacity: constant fallback / upper bound (when [capacityVar] ≥ 0 holds the var's ub). */
-    val capacity: Int,
+    val capacity: Long,
     /** Per-task presence literals; empty for the non-opt fast path. Absent tasks contribute
      *  zero energy / zero compulsory part. Theta-tree leaves stay inactive for
      *  definitely-absent tasks; unpinned-presence tasks are excluded from edge-finding too
@@ -122,8 +122,8 @@ class Cumulative(
         if (durationVars.isNotEmpty() || resourceVars.isNotEmpty() || capacityVar >= 0 || n < 2) {
             return FactorReduction.Unchanged
         }
-        var min1 = Int.MAX_VALUE
-        var min2 = Int.MAX_VALUE
+        var min1 = Long.MAX_VALUE
+        var min2 = Long.MAX_VALUE
         for (r in resources) {
             if (r > capacity) return FactorReduction.Unchanged
             if (r < min1) {
@@ -133,7 +133,7 @@ class Cumulative(
                 min2 = r
             }
         }
-        if (min1.toLong() + min2.toLong() <= capacity.toLong()) return FactorReduction.Unchanged
+        if (min1 + min2 <= capacity) return FactorReduction.Unchanged
         return FactorReduction.Rewrite(listOf(Disjunctive(starts, durations, presents)))
     }
 
@@ -141,10 +141,10 @@ class Cumulative(
      *  constants — durations/resources/capacity and the var/const split — so two non-equivalent
      *  cumulatives never collide (#531). */
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CUMULATIVE) {
-        int(capacity)
+        long(capacity)
         int(capacityVar)
-        ints(durations)
-        ints(resources)
+        longs(durations)
+        longs(resources)
         ints(starts)
         ints(presents)
         ints(durationVars)

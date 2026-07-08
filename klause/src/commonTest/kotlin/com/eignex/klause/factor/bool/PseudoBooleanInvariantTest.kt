@@ -17,10 +17,10 @@ class PseudoBooleanInvariantTest {
     @Test
     fun `LE violated when weighted sum exceeds bound`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(3, 2, 1),
+            weights = longArrayOf(3, 2, 1),
             literals = IntArray(3) { Lit.make(it, true) },
             op = PbOp.LE,
-            bound = 4,
+            bound = 4L,
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -30,12 +30,27 @@ class PseudoBooleanInvariantTest {
     }
 
     @Test
+    fun `LE violated for weights and bound beyond Int range`() {
+        val factor = PseudoBoolean(
+            weights = longArrayOf(3_000_000_000L, 3_000_000_000L),
+            literals = IntArray(2) { Lit.make(it, true) },
+            op = PbOp.LE,
+            bound = 5_000_000_000L,
+        )
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (v in 0..1) state.assignment.setBool(v, true) // sum = 6e9 > 5e9
+        state.recompute()
+        assertTrue(state.factors[0].isViolated(state, 0))
+    }
+
+    @Test
     fun `LE satisfied when sum equals bound`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(3, 2, 1),
+            weights = longArrayOf(3, 2, 1),
             literals = IntArray(3) { Lit.make(it, true) },
             op = PbOp.LE,
-            bound = 6,
+            bound = 6L,
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -47,10 +62,10 @@ class PseudoBooleanInvariantTest {
     @Test
     fun `GE violated when sum below bound`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(2, 3),
+            weights = longArrayOf(2, 3),
             literals = IntArray(2) { Lit.make(it, true) },
             op = PbOp.GE,
-            bound = 4,
+            bound = 4L,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -65,10 +80,10 @@ class PseudoBooleanInvariantTest {
         // weights=[3,2,1], bound=4. v0=true, rest false → sum=3 satisfied.
         // Flipping v1 true: sum→5 > 4 → delta > 0.
         val factor = PseudoBoolean(
-            weights = intArrayOf(3, 2, 1),
+            weights = longArrayOf(3, 2, 1),
             literals = IntArray(3) { Lit.make(it, true) },
             op = PbOp.LE,
-            bound = 4,
+            bound = 4L,
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -84,10 +99,10 @@ class PseudoBooleanInvariantTest {
     @Test
     fun `apply eliminates GE violation and zeroes cost`() {
         val factor = PseudoBoolean(
-            weights = intArrayOf(2, 3),
+            weights = longArrayOf(2, 3),
             literals = IntArray(2) { Lit.make(it, true) },
             op = PbOp.GE,
-            bound = 4,
+            bound = 4L,
         )
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
@@ -104,10 +119,10 @@ class PseudoBooleanInvariantTest {
     fun `repair proposes only flips that reduce distance`() {
         // weights=[3,2,1], bound=4. All true → sum=6 > 4. Flipping any var to false reduces sum.
         val factor = PseudoBoolean(
-            weights = intArrayOf(3, 2, 1),
+            weights = longArrayOf(3, 2, 1),
             literals = IntArray(3) { Lit.make(it, true) },
             op = PbOp.LE,
-            bound = 4,
+            bound = 4L,
         )
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))

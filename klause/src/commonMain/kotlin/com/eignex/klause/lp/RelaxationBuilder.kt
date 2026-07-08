@@ -31,7 +31,7 @@ interface RelaxationBuilder {
      */
     fun boolRow(
         literals: IntArray,
-        weights: IntArray?,
+        weights: LongArray?,
         op: LinearOp,
         bound: Long,
         contribution: Contribution = Contribution.CORE,

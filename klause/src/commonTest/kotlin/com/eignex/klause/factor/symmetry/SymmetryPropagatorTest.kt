@@ -87,8 +87,8 @@ class SymmetryPropagatorTest {
             0,
             emptyArray(),
             listOf(
-                PseudoBoolean(intArrayOf(1, 2), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 2),
-                PseudoBoolean(intArrayOf(1, 2), intArrayOf(Lit.make(2, true), Lit.make(3, true)), PbOp.LE, 2),
+                PseudoBoolean(longArrayOf(1, 2), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 2L),
+                PseudoBoolean(longArrayOf(1, 2), intArrayOf(Lit.make(2, true), Lit.make(3, true)), PbOp.LE, 2L),
             ),
         )
         assertSoundUnderSearch("bool-rows", problem)

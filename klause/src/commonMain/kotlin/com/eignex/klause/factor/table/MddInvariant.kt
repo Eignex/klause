@@ -226,7 +226,7 @@ internal class MddInvariant(
             val end = layerStarts[i + 1]
             while (p < end) {
                 val sym = transitions[p + 1]
-                val sameCost = recordStride < 4 || transitions[p + 3].toInt() == curWeight
+                val sameCost = recordStride < 4 || transitions[p + 3] == curWeight
                 if (transitions[p].toInt() == from && transitions[p + 2].toInt() == to && sameCost &&
                     sym != cur && sym in d
                 ) {
@@ -270,7 +270,7 @@ internal class MddInvariant(
         for (i in n - 1 downTo 0) {
             var fs = -1L
             var ff = -1
-            var fw = 0
+            var fw = 0L
             var p = layerStarts[i]
             val end = layerStarts[i + 1]
             while (p < end) {
@@ -285,7 +285,7 @@ internal class MddInvariant(
                 ) {
                     fs = sym
                     ff = from
-                    fw = if (recordStride == 4) transitions[p + 3].toInt() else 0
+                    fw = if (recordStride == 4) transitions[p + 3] else 0L
                     break
                 }
                 p += recordStride
@@ -372,15 +372,15 @@ internal fun mddRecordWeight(
     from: Int,
     symbol: Long,
     i: Int,
-): Int {
-    if (recordStride < 4) return 0
+): Long {
+    if (recordStride < 4) return 0L
     var p = layerStarts[i]
     val end = layerStarts[i + 1]
     while (p < end) {
-        if (transitions[p].toInt() == from && transitions[p + 1] == symbol) return transitions[p + 3].toInt()
+        if (transitions[p].toInt() == from && transitions[p + 1] == symbol) return transitions[p + 3]
         p += recordStride
     }
-    return 0
+    return 0L
 }
 
 /** Symbol [s] is usable at layer [i]. */
