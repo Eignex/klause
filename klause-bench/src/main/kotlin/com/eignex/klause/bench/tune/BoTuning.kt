@@ -26,7 +26,8 @@ import kotlin.math.max
  * re-solve avoidance (across rounds the objective moves, so configs rarely repeat). The warm-start —
  * feeding those recomputed residuals into each round's fresh study via [TuningStudy.observe] — is a
  * modest, **ablatable** aid (`warmStart`): prior configs mostly score ~0 residual, so they prune
- * explored regions more than they point at the gap. COP-only ([InProcessEval] needs an objective).
+ * explored regions more than they point at the gap. The per-instance reward branches on kind —
+ * gap-to-optimum for a COP, time-to-first-feasible for a CSP — so a selection of either works.
  * Depends only on the [Tuner] seam, so the optimizer backend (Vizier / [RandomTuner]) is swappable.
  */
 internal object BoTuning {
@@ -64,7 +65,7 @@ internal object BoTuning {
         val report: ArmCalibration.Report,
     )
 
-    /** Tune the local-search config space with [tuner] over the COP [instances]. */
+    /** Tune the local-search config space with [tuner] over the [instances] (COP or CSP). */
     fun tuneLs(
         instances: List<ResolvedProblem>,
         tuner: Tuner,
@@ -85,13 +86,14 @@ internal object BoTuning {
                     references,
                     instance,
                     InProcessEval.evalLs(instance, recipe, budgetMs, seed),
+                    budgetMs,
                 )
             },
             instances, tuner, rounds, trials, batch, warmStart, studyId,
         )
     }
 
-    /** Tune the backtrack config space with [tuner] over the COP [instances]. */
+    /** Tune the backtrack config space with [tuner] over the [instances] (COP or CSP). */
     fun tuneBt(
         instances: List<ResolvedProblem>,
         tuner: Tuner,
@@ -112,6 +114,7 @@ internal object BoTuning {
                     references,
                     instance,
                     InProcessEval.evalBt(instance, params, budgetMs, seed),
+                    budgetMs,
                 )
             },
             instances, tuner, rounds, trials, batch, warmStart, studyId,
@@ -240,7 +243,21 @@ internal object BoTuning {
         references: Map<Pair<String, String>, ReferenceEntry>,
         entry: ResolvedProblem,
         result: EvalResult,
+        budgetMs: Long,
     ): Double {
+        // CSP (no objective): time-to-first-feasible — a proven UNSAT is decisive (matches the reference
+        // oracle), a SAT witness scores by how fast it landed, an undecided timeout earns nothing.
+        if (entry.objective == null) {
+            return when {
+                result.proven -> 1.0
+
+                result.feasible ->
+                    (1.0 - (result.firstFeasibleMs ?: budgetMs).toDouble() / budgetMs).coerceIn(0.0, 1.0)
+
+                else -> 0.0
+            }
+        }
+        // COP: reference-normalised gap-to-optimum.
         if (!result.feasible || result.objective == null) return 0.0
         val found = result.objective
         val reference = references[ReferenceStore.suiteOf(entry.ref) to entry.name]
