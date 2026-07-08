@@ -127,6 +127,76 @@ internal object BoTuning {
     }
 
     /**
+     * The MIXED campaign outcome: [configs]/[rewards] as in [Result], plus three greedy set-cover
+     * projections over the one campaign's cache — [mixed] (all configs; its LS/BT split is the emergent
+     * lsShare, for `-e mixed`), [ls] (engine=ls configs only, full-depth for `-e ls`), [bt] (for `-e cp`).
+     * Because every evaluated config of an engine contends in its projection, a BT-dominated *mixed*
+     * palette never starves the pure LS order.
+     */
+    data class MixedResult(
+        val configs: Map<String, Map<String, Any>>,
+        val rewards: Map<String, Map<String, Double>>,
+        val mixed: ArmCalibration.Report,
+        val ls: ArmCalibration.Report,
+        val bt: ArmCalibration.Report,
+    )
+
+    /**
+     * Tune the unified engine-gated space (#34): one residual-round campaign searches LS and BT configs
+     * together over [pool], routing each config's evaluation to the right engine. The reward branches by
+     * kind as elsewhere. An exploration floor ([floorFraction]) forces the lagging engine so both
+     * per-engine projections stay deep even if one engine dominates coverage. Returns the three set-cover
+     * projections of the shared cache.
+     */
+    @Suppress("LongParameterList")
+    fun tuneMixed(
+        pool: SamplingPool,
+        tuner: Tuner,
+        rounds: Int,
+        trials: Int,
+        batch: Int,
+        budgetMs: Long,
+        seed: Long,
+        warmStart: Boolean = true,
+        sampleSize: Int = DEFAULT_SAMPLE_SIZE,
+        floorFraction: Double = 0.3,
+        studyId: String = "mixed-bo",
+    ): MixedResult {
+        val references = ReferenceStore.load()
+        val result = tune(
+            UnifiedConfigSpace,
+            UnifiedConfigSpace::decode,
+            { instance, cfg ->
+                val eval = when (cfg) {
+                    is EngineConfig.Ls -> InProcessEval.evalLs(instance, cfg.recipe, budgetMs, seed)
+                    is EngineConfig.Bt -> InProcessEval.evalBt(instance, cfg.params, budgetMs, seed)
+                }
+                reward(references, instance, eval, budgetMs)
+            },
+            pool, tuner, rounds, trials, batch, warmStart, studyId, sampleSize, seed,
+            forced = engineFloor(floorFraction),
+        )
+        val lsRewards = result.rewards.filterKeys { result.configs.getValue(it)["engine"] != "bt" }
+        val btRewards = result.rewards.filterKeys { result.configs.getValue(it)["engine"] == "bt" }
+        return MixedResult(result.configs, result.rewards, result.report, report(lsRewards), report(btRewards))
+    }
+
+    /** Exploration floor for [tuneMixed]: force the lagging engine (a fresh pinned sample) until each
+     *  engine holds at least [floorFraction] of the evaluated configs, so a dominant engine can't starve
+     *  the other's per-engine projection. Returns null once both engines clear the floor. */
+    private fun engineFloor(floorFraction: Double): (Random, Map<String, Map<String, Any>>) -> Map<String, Any>? =
+        { rng, evaluated ->
+            val total = evaluated.size
+            val ls = evaluated.values.count { it["engine"] != "bt" }
+            val bt = total - ls
+            when {
+                total == 0 || ls.toDouble() / total < floorFraction -> UnifiedConfigSpace.samplePinned("ls", rng)
+                bt.toDouble() / total < floorFraction -> UnifiedConfigSpace.samplePinned("bt", rng)
+                else -> null
+            }
+        }
+
+    /**
      * The engine-agnostic residual-round loop. [decode] turns a coerced assignment into the engine's
      * config [T] (once per config); [reward] scores it on one instance in `[0, 1]` (higher better). Runs
      * [rounds] rounds, each a fresh **noisy** study asking up to [trials] points ([batch] at a time);
@@ -148,6 +218,7 @@ internal object BoTuning {
         studyId: String,
         sampleSize: Int = DEFAULT_SAMPLE_SIZE,
         sampleSeed: Long = 0L,
+        forced: ((Random, Map<String, Map<String, Any>>) -> Map<String, Any>?)? = null,
     ): Result {
         require(pool.isNotEmpty()) { "tune needs a non-empty pool" }
         require(rounds >= 1 && trials >= 1 && batch >= 1 && sampleSize >= 1) {
@@ -204,13 +275,24 @@ internal object BoTuning {
                 }
                 var evaluated = 0
                 while (evaluated < trials) {
-                    val ask = minOf(batch, trials - evaluated)
-                    for (suggestion in study.suggest(ask)) {
-                        val assignment = space.coerce(suggestion.values)
+                    // Exploration floor: when `forced` returns a pinned config, evaluate it and tell the
+                    // study via observe (not a suggestion) — so the lagging engine keeps getting sampled
+                    // regardless of what the tuner favours, keeping the per-engine projections deep.
+                    val forcedAssignment = forced?.invoke(rng, configs)
+                    if (forcedAssignment != null) {
+                        val assignment = space.coerce(forcedAssignment)
                         evaluateOn(assignment, pool.sample(sampleSize, rng))
-                        study.complete(suggestion, gainOf(labelOf(assignment)))
+                        study.observe(assignment, gainOf(labelOf(assignment)))
+                        evaluated++
+                    } else {
+                        val ask = minOf(batch, trials - evaluated)
+                        for (suggestion in study.suggest(ask)) {
+                            val assignment = space.coerce(suggestion.values)
+                            evaluateOn(assignment, pool.sample(sampleSize, rng))
+                            study.complete(suggestion, gainOf(labelOf(assignment)))
+                        }
+                        evaluated += ask
                     }
-                    evaluated += ask
                 }
             }
 
@@ -284,5 +366,5 @@ internal object BoTuning {
     }
 }
 
-/** The engine axis for the `bench tune` command. */
-internal enum class TuneEngine { LS, BT }
+/** The engine axis for the `bench tune` command. MIXED searches LS and BT jointly (#34). */
+internal enum class TuneEngine { LS, BT, MIXED }
