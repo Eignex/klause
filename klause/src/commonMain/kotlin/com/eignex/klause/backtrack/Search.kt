@@ -1,23 +1,16 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.lp.LpNogoodPool
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VarRef
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.kumulant.math.splitmix64
-import kotlin.random.Random
 
 // ---------------------------------------------------------------------------------------
 // Engine.
@@ -136,384 +129,43 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
 }
 
 /**
- * Lazy stream of search outcomes. Each call resumes the DFS from where it last yielded.
- * Engine invariant: `trail` lists nodes whose currently-active value is reflected in
- * `session`'s pushed pins. On Unsat, `session` self-reverts — the engine doesn't
- * popLast in that case.
+ * The satisfaction [SearchPolicy]: pure complete DFS with no LP bounding and no incumbent. Every
+ * feasible leaf is surfaced; the selectors' `onSolution` hooks fire in [DfsEngine] before the leaf is
+ * surfaced, so this only returns the sample. On a budget exit the trailing glue clauses are published
+ * for cross-arm import (#381).
+ */
+private class SatPolicy(private val params: BacktrackParams) : SearchPolicy<Sample> {
+    override fun cancelled(): Boolean = params.cancellation()
+
+    override fun onLeaf(snap: Sample): Sample = snap
+
+    override fun onBudgetExit(session: PropagationSession) {
+        params.clauseExchange?.onSearchEnd(session)
+    }
+}
+
+/**
+ * Lazy stream of search outcomes for the satisfaction path (solve / enumerate / samples). A thin
+ * adapter over the shared [DfsEngine]: each call resumes the DFS from where it last yielded, mapping the
+ * engine's [EngineEvent]s to [SearchOutcome]s.
  */
 internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
-    pruneIf: ((PropagationSession) -> Boolean)? = null,
-    // Immediate LP backjump (#280): after [pruneIf] prunes a node, this returns the asserting
-    // 1UIP clause derived from the node's LP infeasibility (or null). When present, [advance]
-    // backjumps and learns instead of popping one level chronologically.
-    pruneLearned: (() -> Learned?)? = null,
     sink: SolveStatsSink? = null,
-    // Objective-bound propagation (single-variable objectives only). When [objectiveVar]
-    // is set, the engine pushes each incumbent's bound onto that variable at the root —
-    // `objVar ≤ best-1` for minimise ([objectiveAscending]) or `objVar ≥ best+1` for
-    // maximise — as a permanent unit that propagates through the constraint defining the
-    // objective. [objectiveBest] returns the objective variable's value in the current
-    // incumbent, or null before one is found. Strictly stronger than the passive
-    // [pruneIf] lower-bound check, and it bounds non-linear-defined objectives too.
-    objectiveVar: Int = -1,
-    objectiveAscending: Boolean = true,
-    objectiveBest: () -> Long? = { null },
-    // LP-learned Farkas nogoods (#247) pending registration; drained at each restart while the
-    // trail is at root, so their bound atoms are no longer all-false. Null when learning is off.
-    lpNogoods: LpNogoodPool? = null,
 ): Sequence<SearchOutcome> = sequence {
-    val baked = problem.baked
-    if (baked is PropagationResult.Unsat) {
-        yield(SearchOutcome.Exhausted(coreOf(baked)))
-        return@sequence
-    }
-    val session = PropagationSession(problem)
-    // Builder helpers below capture the mutable search state. They never `yield`
-    // themselves — a `yield` needs the `sequence { }` builder's `SequenceScope`
-    // receiver, which a plain local function does not have — so each exhaustion site
-    // keeps its own `yield(exhausted())` while the [SearchOutcome] construction and the
-    // shared bookkeeping move here.
-    // Bridge backtrack-time unassigns to a heuristic that removes assigned vars from its
-    // order structure on pick (VSIDS): decode the combined index and re-offer the var.
-    // Only wired when the heuristic opts in, so other heuristics pay no per-revert cost.
-    if (params.variableSelector.tracksUnassign) {
-        val heuristic = params.variableSelector
-        val numBool = problem.numBoolVars
-        session.unassignListener = { enc ->
-            heuristic.onUnassign(if (enc < numBool) VarRef.Bool(enc) else VarRef.IntVar(enc - numBool))
-        }
-    }
-    // Number of decision levels seed pushes uses — bool pins first then int pins.
-    // Decision levels 1..numSeed correspond to assumptions; levels > numSeed are
-    // post-seed DFS decisions.
-    val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
-    val touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
+    val engine = DfsEngine(this@driveSearch, params, sink, SatPolicy(params))
+    while (true) {
+        when (val e = engine.runUntilEvent()) {
+            is EngineEvent.Solution -> yield(SearchOutcome.Found(e.payload))
 
-    // Union the seed-level decision levels referenced by a conflict into the touched set.
-    fun recordTouchedSeedLevels(levels: IntArray) {
-        if (touchedSeedLevels == null) return
-        for (l in levels) if (l in 1..numSeed) touchedSeedLevels.add(l)
-    }
-
-    // The DFS-walk exhaustion outcome (no root core; only the touched seed levels carry over).
-    fun exhausted(): SearchOutcome.Exhausted =
-        SearchOutcome.Exhausted(touchedAssumptionLevels = touchedToArray(touchedSeedLevels))
-    val seedResult = session.seed(params.assumptions)
-    if (seedResult is PropagationResult.Unsat) {
-        recordTouchedSeedLevels(seedResult.conflictLevels)
-        yield(SearchOutcome.Exhausted(coreOf(seedResult), touchedToArray(touchedSeedLevels)))
-        return@sequence
-    }
-    // Phase-saving + target-phasing (#204): saved polarities, the deepest conflict-free target phase,
-    // and the rephase schedule — all persisting across restarts. See [PhaseSaving].
-    val phase = PhaseSaving(problem.numBoolVars, problem.numIntVars, params)
-    val onConflictTick: () -> Unit = phase::onConflictTick
-
-    // Pop every decision frame, reverting the session in lockstep, back to the post-seed root.
-    fun popTrailToRoot(trail: MutableList<TrailNode>) {
-        while (trail.isNotEmpty()) {
-            session.popLast()
-            trail.removeAt(trail.size - 1)
-        }
-    }
-
-    val baseSeed: Long = params.randomSeed ?: Random.Default.nextLong()
-    val rng = Random(baseSeed)
-    // The effective budget tightens the two limits — whichever is smaller wins. This
-    // lets a uniform `maxInstructions` work across backends without removing the
-    // backend-specific `maxDecisions` knob.
-    var decisionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
-
-    // Failsafe against repeat-learning livelock: count identical re-derivations per
-    // clause (order-free literal-set hash). Healthy re-learning happens after
-    // forgetting or restarts, but an unbounded streak means the backjump + assert
-    // cycle is not progressing — past the threshold those conflicts are handled
-    // chronologically. The count surfaces as the `relearned` solve stat under -s.
-    val relearnCounts = MutableLongIntMap()
-    val relearnTripped: (Learned) -> Boolean = { learned ->
-        var h = 0L
-        for (lit in learned.literals) h += splitmix64(lit.toLong())
-        val n = relearnCounts.addTo(h, 1)
-        if (n > 1) sink?.search?.observeRelearn()
-        n > RELEARN_FALLBACK_THRESHOLD
-    }
-
-    // One pin attempt against [session], wiring the budget probe/decrement and the conflict
-    // callbacks. The caller folds `decisionsLeft`'s drop into its per-run decision count.
-    fun runAdvance(node: TrailNode): AdvanceOutcome = advance(
-        node,
-        session,
-        params,
-        pruneIf,
-        { decisionsLeft },
-        { decisionsLeft-- },
-        sink,
-        relearnTripped,
-        onConflictTick,
-        pruneLearned,
-    )
-
-    // Outer restart loop. Each iteration is one Luby-bounded DFS run from the root.
-    // When `lubyRestartBase` is null the loop runs exactly once with infinite per-run
-    // budget — same as the pre-restart behaviour.
-    // Assignment of the most recently yielded leaf, pending a blocking nogood. Without it
-    // the DFS only steps past a found solution chronologically, and a later backjump that
-    // pops those frames re-opens the leaf — the search can then revisit and re-yield it,
-    // potentially forever. The nogood spans the full assignment (not the decisions) so the
-    // same solution reached through a different decision order is excluded too. It is
-    // registered at the root on the next backtrack (or restart) and kept permanently.
-    var pendingBlock: Sample? = null
-    // Objective-bound propagation: assert the incumbent bound on the objective variable
-    // at the root, once per improving value. Returns true iff that makes the root
-    // infeasible — the remaining objective space is empty, so the search is exhausted
-    // (optimum proven). Must be called only when the session is at the root.
-    var lastObjBoundAsserted: Long? = null
-    fun assertObjectiveBoundAtRoot(): Boolean {
-        if (objectiveVar < 0) return false
-        val best = objectiveBest() ?: return false
-        val threshold = if (objectiveAscending) best - 1 else best + 1
-        if (threshold == lastObjBoundAsserted) return false
-        lastObjBoundAsserted = threshold
-        return session.assertObjectiveBound(objectiveVar, threshold, atMost = objectiveAscending) is
-            PropagationResult.Unsat
-    }
-    // Restart policy — adaptive (Glucose LBD, #198) or Luby budget; see [RestartController].
-    val restart = RestartController(params)
-    // Vivification (#203) walks the learned DB round-robin across restarts; the cursor
-    // persists between restart passes so successive passes cover the whole database.
-    val vivifyEnabled = params.vivification && params.assumptions.isEmpty
-    var vivifyCursor = 0
-    // Cross-arm clause exchange (portfolio): import nogoods learned by prior segments/arms before
-    // the first DFS run, so a re-scheduled backtrack arm starts warm instead of cold-relearning
-    // every slice (#381). The session sits at the post-seed root here — the same state a restart
-    // pops back to — so imported literals are free and register without an immediate unit/conflict.
-    params.clauseExchange?.onSearchStart(session)
-    outer@ while (true) {
-        restart.beginRun()
-        var decisionsThisRun = 0L
-
-        val trail: MutableList<TrailNode> = ArrayList()
-        var descend = true
-        // Time-adaptive deadline polling (mirrors ResumableMinimize); see [DeadlinePoller].
-        val poller = DeadlinePoller()
-
-        inner@ while (true) {
-            if (poller.due()) {
-                if (params.cancellation()) {
-                    // Slice truncated: publish this segment's trailing glue clauses so the next
-                    // segment (this arm or a sibling) imports them at its start (#381).
-                    params.clauseExchange?.onSearchEnd(session)
-                    yield(SearchOutcome.BudgetCapped)
-                    return@sequence
-                }
-                poller.rearm()
+            is EngineEvent.Exhausted -> {
+                yield(SearchOutcome.Exhausted(e.core, e.touched))
+                return@sequence
             }
-            // Restart trigger: Luby budget hit, or the adaptive policy asked to re-pick.
-            // Either way pop back to root and restart.
-            if (restart.shouldRestart(decisionsThisRun)) {
-                popTrailToRoot(trail)
-                val restartBlock = pendingBlock
-                if (restartBlock != null) {
-                    pendingBlock = null
-                    if (restartBlock.bools.isNotEmpty() || restartBlock.ints.isNotEmpty()) {
-                        // All decisions are popped; register the nogood so the restarted run
-                        // cannot re-yield the same leaf. A root-level contradiction here
-                        // proves the remaining space empty.
-                        val nogood = session.assignmentNogood(restartBlock.bools, restartBlock.ints)
-                        val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
-                        if (res is PropagationResult.Unsat) {
-                            yield(exhausted())
-                            return@sequence
-                        }
-                    }
-                }
-                // LP-learned Farkas nogoods (#247): the trail is at root, so each clause's bound
-                // atoms are free again. Register them permanently; a root contradiction proves the
-                // whole space empty. Globally valid (implied by the original constraints).
-                if (lpNogoods != null) {
-                    val drained = lpNogoods.drain()
-                    for (nogood in drained) {
-                        val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
-                        if (res is PropagationResult.Unsat) {
-                            yield(exhausted())
-                            return@sequence
-                        }
-                    }
-                }
-                // Cross-arm clause exchange (portfolio): at root, import nogoods other arms
-                // learned and export this arm's new glue clauses. Imports register without
-                // immediate propagation (their literals are free at root) — a root contradiction
-                // surfaces on the next fixpoint, not here. No-op when not in a sharing portfolio.
-                params.clauseExchange?.onRestart(session)
-                if (assertObjectiveBoundAtRoot()) {
-                    yield(exhausted())
-                    return@sequence
-                }
-                params.variableSelector.onRestart()
-                params.valueSelector.onRestart()
-                // LCG learned-clause forgetting: at each restart, prune the database
-                // when over [maxLearnedClauses]. Glue clauses (LBD ≤ glueThreshold)
-                // are always retained; among the rest, the lowest-LBD entries are
-                // kept up to the cap.
-                forgetIfOverCap(session, params)
-                // Vivification inprocessing: the trail is at root here, so a bounded slice
-                // of the learned DB can be strengthened against clean assumptions (#203).
-                if (vivifyEnabled) vivifyCursor = vivify(session, params, vivifyCursor)
-                val restartIndex = restart.onRestart()
-                sink?.search?.observeRestart()
-                params.onEvent?.invoke(SearchEvent.Restart(restartIndex, decisionsThisRun))
-                continue@outer
-            }
-            if (descend) {
-                val varRef = params.variableSelector.pick(session, rng)
-                if (varRef == null) {
-                    val snap = snapshotAssignment(session)
-                    // Notify heuristics first so solution-guided variants can snapshot
-                    // the incumbent before the engine continues with the next yield.
-                    params.variableSelector.onSolution(snap)
-                    params.valueSelector.onSolution(snap)
-                    pendingBlock = snap
-                    yield(SearchOutcome.Found(snap))
-                    descend = false
-                    continue@inner
-                }
-                val values = params.valueSelector.values(session, varRef, rng)
-                val phased = phase.applyPhase(varRef, values, rng)
-                val node = makeNode(varRef, phased)
-                val decsBefore = decisionsLeft
-                val out = runAdvance(node)
-                decisionsThisRun += decsBefore - decisionsLeft
-                when (out) {
-                    AdvanceOutcome.Success -> {
-                        phase.capture(varRef, session)
-                        trail.add(node)
-                        sink?.search?.observeNode(trail.size)
-                        phase.captureTargetIfDeeper(session, trail.size)
-                    }
 
-                    AdvanceOutcome.Exhausted -> {
-                        descend = false
-                        continue@inner
-                    }
-
-                    AdvanceOutcome.BudgetCapped -> {
-                        params.clauseExchange?.onSearchEnd(session)
-                        yield(SearchOutcome.BudgetCapped)
-                        return@sequence
-                    }
-
-                    is AdvanceOutcome.Backjump -> {
-                        recordTouchedSeedLevels(out.learned.decisionLevels)
-                        // Feed the learned clause's LBD and the current depth to the
-                        // adaptive restart policy (trail size == decision level here; the
-                        // failed pin was self-reverted by the session).
-                        restart.recordConflict(out.learned.lbd, trail.size)
-                        // Execute the backjump + learn sequence. On cascading conflict
-                        // during assertion, recurse.
-                        val term = backjumpAndLearn(
-                            out.learned,
-                            trail,
-                            session,
-                            params,
-                            alignFirst = false,
-                        )
-                        when (term) {
-                            BackjumpTerm.Resume -> {
-                                descend = true
-                                continue@inner
-                            }
-
-                            BackjumpTerm.Exhausted -> {
-                                yield(exhausted())
-                                return@sequence
-                            }
-
-                            BackjumpTerm.Stuck -> {
-                                descend = false
-                                continue@inner
-                            }
-                        }
-                    }
-                }
-            } else {
-                val rootBlock = pendingBlock
-                if (rootBlock != null) {
-                    // Apply the pending blocking nogood at the root, where it can neither
-                    // conflict nor assert mid-trail; a root contradiction proves the
-                    // remaining space empty.
-                    pendingBlock = null
-                    popTrailToRoot(trail)
-                    val nogood = session.assignmentNogood(rootBlock.bools, rootBlock.ints)
-                    if (nogood.isNotEmpty()) {
-                        val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
-                        if (res is PropagationResult.Unsat) {
-                            yield(exhausted())
-                            return@sequence
-                        }
-                    }
-                    if (assertObjectiveBoundAtRoot()) {
-                        yield(exhausted())
-                        return@sequence
-                    }
-                    descend = true
-                    continue@inner
-                }
-                if (trail.isEmpty()) {
-                    yield(exhausted())
-                    return@sequence
-                }
-                val top = trail.last()
-                session.popLast()
-                val decsBefore = decisionsLeft
-                val out = runAdvance(top)
-                decisionsThisRun += decsBefore - decisionsLeft
-                when (out) {
-                    AdvanceOutcome.Success -> {
-                        phase.capture(top.varRef, session)
-                        descend = true
-                    }
-
-                    AdvanceOutcome.Exhausted -> {
-                        trail.removeAt(trail.size - 1)
-                    }
-
-                    AdvanceOutcome.BudgetCapped -> {
-                        params.clauseExchange?.onSearchEnd(session)
-                        yield(SearchOutcome.BudgetCapped)
-                        return@sequence
-                    }
-
-                    is AdvanceOutcome.Backjump -> {
-                        recordTouchedSeedLevels(out.learned.decisionLevels)
-                        restart.recordConflict(out.learned.lbd, trail.size)
-                        // Else-path: session has been popped below trail.last; align
-                        // first (trail.removeAt) then proceed to backjump + learn.
-                        val term = backjumpAndLearn(
-                            out.learned,
-                            trail,
-                            session,
-                            params,
-                            alignFirst = true,
-                        )
-                        when (term) {
-                            BackjumpTerm.Resume -> {
-                                descend = true
-                                continue@inner
-                            }
-
-                            BackjumpTerm.Exhausted -> {
-                                yield(exhausted())
-                                return@sequence
-                            }
-
-                            BackjumpTerm.Stuck -> {
-                                descend = false
-                                continue@inner
-                            }
-                        }
-                    }
-                }
+            EngineEvent.BudgetCapped, EngineEvent.Cancelled -> {
+                yield(SearchOutcome.BudgetCapped)
+                return@sequence
             }
         }
     }
