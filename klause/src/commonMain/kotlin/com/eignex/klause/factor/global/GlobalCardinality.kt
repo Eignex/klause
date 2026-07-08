@@ -19,7 +19,6 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
 
 /**
@@ -161,8 +160,6 @@ class GlobalCardinality(
         { state, idx -> present(state, idx) },
     )
 
-    // The LP relaxation's presence column is Int-typed; a cover value beyond Int range would truncate
-    // there and yield an unsound bound, so skip the relaxation for wide cover (the propagator enforces it).
     override val hullFamily: HullFamily = HullFamily.GCC_COUNT
 
     /**
@@ -170,19 +167,18 @@ class GlobalCardinality(
      * selector `z_iv ∈ [0,1]` per variable/value over `xs[i]`'s declared domain with `Σ_v z_iv = 1` and the
      * channel `Σ_v v·z_iv = xs(i)`, and per cover value the exact count linkage `Σ_i z_{i,cover(k)} =
      * counts(k)` — so a count variable in the objective reads a true LP bound. Gated by [MAX_GCC_CELLS]; the
-     * constant-bound and optional-presence forms are skipped, as is a cover that overflows [Int]. HULL.
+     * constant-bound and optional-presence forms are skipped. HULL.
      */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
-        if (!fitsInt32(cover)) return
         if (presents.isNotEmpty()) return // count is over present vars only — defer
         val counts = countVars ?: return // constant-bound form has no count var to bound
         var cells = 0L
         for (x in xs) cells += builder.declaredDomain(x).size.toLong()
         if (cells == 0L || cells > MAX_GCC_CELLS) return
-        // Selector columns contributing to each cover value's count, accumulated across all xs.
-        val selByCover = MutableIntObjectMap<IntArrayList>()
-        for (v in cover) selByCover.put(v.toInt(), IntArrayList())
+        // Selector columns per cover value, indexed by cover position via [coverIndexByValue], whose
+        // Long keys address cover values across the full value range.
+        val selByCover = Array(cover.size) { IntArrayList() }
         for (x in xs) {
             val declared = builder.declaredDomain(x)
             val live = builder.liveDomain(x)
@@ -193,7 +189,8 @@ class GlobalCardinality(
                 val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
                 sel.add(z)
                 selVal.add(v)
-                selByCover[v.toInt()]?.add(z) // only cover values carry a count row
+                val ci = coverIndexByValue.getOrDefault(v, -1) // only cover values carry a count row
+                if (ci >= 0) selByCover[ci].add(z)
             }
             val k = sel.size
             if (k == 0) return // a variable with no declared values — leave it to propagation
@@ -211,7 +208,7 @@ class GlobalCardinality(
         }
         // Σ_i z_{i,cover(k)} − counts(k) = 0 per cover value (a cover value in no domain forces 0).
         for (k in cover.indices) {
-            val sel = selByCover[cover[k].toInt()] ?: continue
+            val sel = selByCover[k]
             val cols = IntArray(sel.size + 1)
             val vals = LongArray(sel.size + 1)
             for (i in 0 until sel.size) {
@@ -225,7 +222,6 @@ class GlobalCardinality(
     }
 
     override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
-        if (!fitsInt32(cover)) return null
         if (countVars == null || presents.isNotEmpty()) return null
         var cells = 0L
         for (x in xs) cells += domains[x].size.toLong()

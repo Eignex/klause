@@ -219,6 +219,34 @@ class CpToLpRelaxationReboundTest {
     }
 
     @Test
+    fun `rebound reproduces a gcc count hull over cover values beyond Int range`() {
+        // Cover values past 2^31: the count-linkage rows key selectors by cover position and the
+        // selector presence carries the full Long value, so the hull emits its columns and re-binds
+        // bit-identically when a wide value is pruned.
+        val b = 4_000_000_000L
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(b + 1, b + 2), IntDomain(b + 1, b + 2), IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf<Factor>(
+                GlobalCardinality(
+                    xs = intArrayOf(0, 1),
+                    cover = longArrayOf(b + 1, b + 2),
+                    countVars = intArrayOf(2, 3),
+                ),
+            ),
+        )
+        val relaxer =
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)), gccCountHull = true)
+        val base = relaxer.build(PropagationSession(problem))
+        assertTrue(base.model.n > 4, "wide-cover gcc must emit its selector hull columns")
+
+        val node = PropagationSession(problem)
+        node.implyIntAtMost(0, b + 1) // value b+2 leaves x0 — drops that selector
+        assertSameModel(relaxer.build(node).model, base.rebound(node).model)
+    }
+
+    @Test
     fun `rebound reproduces an element hull when an index value is pruned`() {
         // result = arr[idx], arr = [7,3,9,5]; pruning index 3 drops the p=3 selector.
         val problem = Problem(

@@ -136,12 +136,12 @@ class Mdd(
      * (pinned to 0 when `value` left the live domain of `seq[layer]`). Rows: a source row, flow conservation
      * at every interior `(layer, state)`, an acceptance row, a value channel `Σ value·y = seq[layer]` per
      * layer, and — for a cost-MDD (stride 4) — a cost channel `Σ weight·y = cost`. The flow polytope is
-     * integral, so the LP optimum is exact. Skipped unless the transition table fits [Int] range.
+     * integral, so the LP optimum is exact. Symbols and weights are carried as [Long], so a wide
+     * transition table relaxes soundly; `src`/`dst` are per-layer state ids, always in [Int] range.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
-        if (!fitsInt32(transitions)) return
         val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val n = seq.size
         val stride = recordStride
@@ -158,7 +158,7 @@ class Mdd(
         val acceptingSet = IntHashSet(accepting.size).apply { for (a in accepting) add(a) }
         val acceptCols = IntArrayList()
         val costArcs = IntArrayList()
-        val costWeight = IntArrayList()
+        val costWeight = LongArrayList()
         for (layer in 0 until n) {
             val declared = builder.declaredDomain(seq[layer])
             val live = builder.liveDomain(seq[layer])
@@ -182,7 +182,7 @@ class Mdd(
                     if (layer == n - 1 && dst in acceptingSet) acceptCols.add(col)
                     if (stride == 4) {
                         costArcs.add(col)
-                        costWeight.add(trans[p + 3].toInt())
+                        costWeight.add(trans[p + 3])
                     }
                 }
                 p += stride
@@ -234,7 +234,7 @@ class Mdd(
             val vals = LongArray(k + 1)
             for (i in 0 until k) {
                 cols[i] = costArcs[i]
-                vals[i] = costWeight[i].toLong()
+                vals[i] = costWeight[i]
             }
             cols[k] = builder.intColumn(cost)
             vals[k] = -1L
@@ -243,7 +243,6 @@ class Mdd(
     }
 
     override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
-        if (!fitsInt32(transitions)) return null
         val reach = forwardReach { domains[it] } ?: return null
         // arc columns + conservation (≤ arcs) + value channel (n) + source + acceptance + cost.
         return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 3L)

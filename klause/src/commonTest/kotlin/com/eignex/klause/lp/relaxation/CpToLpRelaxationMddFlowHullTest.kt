@@ -56,6 +56,40 @@ class CpToLpRelaxationMddFlowHullTest {
     }
 
     @Test
+    fun `cost-MDD flow hull is exact with symbols and weights beyond Int range`() {
+        // Symbols b+1/b+2 and weights past 2^31: value b+1 costs 5e9, b+2 costs 1e9. The cost channel
+        // carries weights as Long and the arc presence carries the full Long symbol, so the minimum
+        // accepted-path cost (b+2 twice -> 2e9) is exact.
+        val b = 4_000_000_000L
+        val transitions = longArrayOf(
+            0, b + 1, 0, 5_000_000_000L, 0, b + 2, 0, 1_000_000_000L, // layer 0 (src,value,dst,weight)
+            0, b + 1, 0, 5_000_000_000L, 0, b + 2, 0, 1_000_000_000L, // layer 1
+        )
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(b + 1, b + 2), IntDomain(b + 1, b + 2), IntDomain(0, 20_000_000_000L)),
+            factors = arrayOf<Factor>(
+                Mdd(
+                    seq = intArrayOf(0, 1),
+                    numStatesPerLayer = intArrayOf(1, 1, 1),
+                    layerStarts = intArrayOf(0, 8, 16),
+                    transitions = transitions,
+                    initial = 0,
+                    accepting = intArrayOf(0),
+                    recordStride = 4,
+                    cost = 2,
+                ),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)) // minimize the cost var
+        val r = CpToLpRelaxation(p, obj, mddHull = true).build(PropagationSession(p))
+        val sol = solveLp(r.model)
+        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(2_000_000_000.0, sol.objectiveValue, 1.0, "minimum accepted-path cost is 2e9")
+    }
+
+    @Test
     fun `randomized plain MDD flow hull matches the brute-force optimum`() {
         val rng = Random(20260616)
         var checked = 0
