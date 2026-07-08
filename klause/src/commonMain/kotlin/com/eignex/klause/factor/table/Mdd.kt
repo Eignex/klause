@@ -6,7 +6,7 @@ import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
-import com.eignex.klause.lp.LinearizerEstimate
+import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -242,11 +242,11 @@ class Mdd(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
         if (!fitsInt32(transitions)) return null
         val reach = forwardReach { domains[it] } ?: return null
         // arc columns + conservation (≤ arcs) + value channel (n) + source + acceptance + cost.
-        return LinearizerEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 3L)
+        return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 3L)
     }
 
     private class Reach(val states: Array<IntHashSet>, val arcCount: Long)

@@ -9,7 +9,7 @@ import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
-import com.eignex.klause.lp.LinearizerEstimate
+import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -224,14 +224,14 @@ class GlobalCardinality(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
         if (!fitsInt32(cover)) return null
         if (countVars == null || presents.isNotEmpty()) return null
         var cells = 0L
         for (x in xs) cells += domains[x].size.toLong()
         if (cells == 0L || cells > MAX_GCC_CELLS) return null
         // One z selector per var×declared-value; (Σz=1, channel) per var + one count row per cover value.
-        return LinearizerEstimate(cols = cells, rows = 2L * xs.size + cover.size)
+        return LpSizeEstimate(cols = cells, rows = 2L * xs.size + cover.size)
     }
 
     private companion object {

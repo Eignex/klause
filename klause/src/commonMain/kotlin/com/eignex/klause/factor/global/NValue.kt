@@ -8,7 +8,7 @@ import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
-import com.eignex.klause.lp.LinearizerEstimate
+import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.Propagator
@@ -193,14 +193,14 @@ class NValue(
         builder.row(cols, vals, op, 0L, Contribution.HULL)
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LinearizerEstimate? {
+    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
         if (presents.isNotEmpty()) return null
         var cells = 0L
         for (x in xs) cells += domains[x].size.toLong()
         if (cells == 0L || cells > MAX_NVALUE_CELLS) return null
         // z (per var×value) + y (≤ distinct values ≤ cells) columns; y≥z rows + (Σz=1, channel) per
         // var + the count row.
-        return LinearizerEstimate(cols = 2L * cells, rows = cells + 2L * xs.size + 1L)
+        return LpSizeEstimate(cols = 2L * cells, rows = cells + 2L * xs.size + 1L)
     }
 
     private companion object {
