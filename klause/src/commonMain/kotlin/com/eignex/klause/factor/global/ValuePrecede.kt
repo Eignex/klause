@@ -29,21 +29,21 @@ import com.eignex.klause.util.EmptyIntArray
  * never forbidden and other values are never touched, which is exactly GAC for this constraint.
  * Value precedence is pure symmetry breaking, so there is no LP relaxation — propagation only.
  */
-class ValuePrecede(val s: Int, val t: Int, val xs: IntArray) : Factor {
+class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ValuePrecede(s, t, xs.remapVars(intMap))
 
     // Positional: the sequence order decides "before", so xs is not sorted. Encodes the values and
     // the full var sequence — collision-free up to variable identity (sound for symmetry checks).
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.VALUE_PRECEDE) {
-        int(s)
-        int(t)
+        long(s)
+        long(t)
         ints(xs)
     }
 
     /** Relabel the two named values (#374 value-symmetry verification): `value_precede(s,t)` maps to
      *  `value_precede(π(s), π(t))` under a value permutation π. */
-    override fun remapValues(valueMap: (Int) -> Int): Factor = ValuePrecede(valueMap(s), valueMap(t), xs)
+    override fun remapValues(valueMap: (Long) -> Long): Factor = ValuePrecede(valueMap(s), valueMap(t), xs)
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs

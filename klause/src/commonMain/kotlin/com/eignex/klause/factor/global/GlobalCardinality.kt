@@ -106,14 +106,11 @@ class GlobalCardinality(
      *  *variables* the counts live in a second value universe that one map can't relabel, so that form
      *  blocks value symmetry (returns `null`). A value transposition is a bijection, so the relabeled
      *  cover stays distinct. */
-    override fun remapValues(valueMap: (Int) -> Int): Factor? {
+    override fun remapValues(valueMap: (Long) -> Long): Factor? {
         if (countVars != null) return null
-        // A cover value beyond Int range can't pass through the `(Int)->Int` value map without truncating
-        // (which would alias two cover values); decline value symmetry instead — sound, no relabel.
-        if (!fitsInt32(cover)) return null
         return GlobalCardinality(
             xs,
-            LongArray(cover.size) { valueMap(cover[it].toInt()).toLong() },
+            LongArray(cover.size) { valueMap(cover[it]) },
             null,
             countLow,
             countHigh,

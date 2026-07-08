@@ -4,7 +4,6 @@ import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
@@ -101,21 +100,15 @@ class AllDifferent(
 
     /** Plain all-different names no value, so any relabeling leaves it unchanged; with an
      *  excepted-value set the excepted values are named and must be relabeled too (#374). */
-    override fun remapValues(valueMap: (Int) -> Int): Factor? = if (exceptSet.isEmpty()) {
+    override fun remapValues(valueMap: (Long) -> Long): Factor? = if (exceptSet.isEmpty()) {
         this
-    } else if (!fitsInt32(exceptSet)) {
-        // An excepted value beyond Int range can't ride the `(Int)->Int` relabeling without truncating;
-        // decline value symmetry (sound — plain all-different with wide except stays as-is, unrelabeled).
-        null
     } else {
         AllDifferent(
             vars,
             domainMin,
             domainSize,
             presents,
-            // valueMap is the engine's (Int) -> Int relabeling; excepted values ride through it
-            // via the Int bridge (relabeling is only defined over the compact Int value space).
-            LongArray(exceptSet.size) { valueMap(exceptSet[it].toInt()).toLong() },
+            LongArray(exceptSet.size) { valueMap(exceptSet[it]) },
             boundsConsistent,
         )
     }

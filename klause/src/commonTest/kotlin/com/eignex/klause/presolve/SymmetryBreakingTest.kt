@@ -100,7 +100,7 @@ class SymmetryBreakingTest {
     private fun pos(v: Int) = Lit.make(v, true)
 
     /** The value transposition `(v w)` as a relabel map. */
-    private fun swap(v: Int, w: Int): (Int) -> Int = { x ->
+    private fun swap(v: Long, w: Long): (Long) -> Long = { x ->
         when (x) {
             v -> w
             w -> v
@@ -222,6 +222,22 @@ class SymmetryBreakingTest {
             countFeasible(precedence(problem)),
             "coloring value symmetry should collapse to one labeling",
         )
+    }
+
+    @Test
+    fun `value precedence fires on colors beyond Int range`() {
+        // The same triangle coloring but over colors b, b+1, b+2 past 2^31: the value-symmetry orbit is
+        // built and ordered over the full Long value space, collapsing the 6 labelings to one.
+        val b = 5_000_000_000L
+        val edges = listOf(0 to 1, 0 to 2, 1 to 2)
+        val problem = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(b, b + 2) },
+            edges.map { (a, c) -> Linear(intArrayOf(1, -1), intArrayOf(a, c), LinearOp.NE, 0) },
+        )
+        assertEquals(6, countFeasible(problem))
+        assertEquals(1, countFeasible(precedence(problem)), "wide-color value symmetry should collapse to one labeling")
     }
 
     @Test
@@ -775,7 +791,7 @@ class SymmetryBreakingTest {
         val swapped = r.remapValues(swap(1, 2)) as Regular
         assertEquals(listOf(1L, 2L, 0L, 0L), swapped.transitions.toList())
         // A non-permutation of 1..alphabetSize can't relabel the columns ⇒ null.
-        assertNull(r.remapValues { 1 })
+        assertNull(r.remapValues { 1L })
     }
 
     @Test

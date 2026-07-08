@@ -49,7 +49,7 @@ class ValuePrecedePropagatorTest {
             numBoolVars = 0,
             numIntVars = domains.size,
             intDomains = Array(domains.size) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
-            factors = listOf(ValuePrecede(s, t, IntArray(domains.size) { it })),
+            factors = listOf(ValuePrecede(s.toLong(), t.toLong(), IntArray(domains.size) { it })),
         )
         return BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
             .map { sample -> sample.ints.map { it.toInt() } }.toSet()
