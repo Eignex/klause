@@ -11,7 +11,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.IntLongMap
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap

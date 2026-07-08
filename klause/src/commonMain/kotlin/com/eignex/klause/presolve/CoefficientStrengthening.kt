@@ -2,7 +2,6 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
@@ -64,18 +63,14 @@ internal object CoefficientStrengthening {
      *  regardless of which constraint witnesses the conflict. */
     private fun equalityContradiction(factor: Factor, domains: Array<IntDomain>): List<Factor>? = when (factor) {
         is Linear ->
-            if (factor.op == LinearOp.EQ && fitsInt32(factor.coeffs, factor.bound) &&
-                indivisible(IntArray(factor.coeffs.size) { factor.coeffs[it].toInt() }, factor.bound.toInt())
-            ) {
+            if (factor.op == LinearOp.EQ && indivisible(factor.coeffs, factor.bound)) {
                 intContradiction(factor.vars[0], domains)
             } else {
                 null
             }
 
         is PseudoBoolean ->
-            if (factor.op == PbOp.EQ && fitsInt32(factor.weights, factor.bound) &&
-                indivisible(IntArray(factor.weights.size) { factor.weights[it].toInt() }, factor.bound.toInt())
-            ) {
+            if (factor.op == PbOp.EQ && indivisible(factor.weights, factor.bound)) {
                 boolContradiction(factor.literals[0])
             } else {
                 null
@@ -86,9 +81,9 @@ internal object CoefficientStrengthening {
 
     /** Whether `gcd(|coeffs|) > 1` fails to divide [bound] — the modular obstruction that makes an
      *  equality `Σ coeffs·x = bound` unsatisfiable over the integers. */
-    private fun indivisible(coeffs: IntArray, bound: Int): Boolean {
+    private fun indivisible(coeffs: LongArray, bound: Long): Boolean {
         val g = PresolveShared.gcdOf(coeffs)
-        return g > 1 && bound.mod(g) != 0
+        return g > 1L && bound.mod(g) != 0L
     }
 
     /** Two equalities pinning integer variable [v] to consecutive values — jointly unsatisfiable, so
@@ -112,7 +107,7 @@ internal object CoefficientStrengthening {
 
     private sealed interface Reduced {
         /** Divide through; the rewritten bound. */
-        data class Bound(val bound: Int) : Reduced
+        data class Bound(val bound: Long) : Reduced
 
         /** Constraint is always satisfied — drop it. */
         object Drop : Reduced
@@ -121,25 +116,21 @@ internal object CoefficientStrengthening {
         object Unchanged : Reduced
     }
 
-    private fun reduceBound(rel: Rel, bound: Int, g: Int): Reduced = when (rel) {
+    private fun reduceBound(rel: Rel, bound: Long, g: Long): Reduced = when (rel) {
         Rel.LE -> Reduced.Bound(bound.floorDiv(g))
         Rel.GE -> Reduced.Bound(-((-bound).floorDiv(g)))
-        Rel.EQ -> if (bound.mod(g) == 0) Reduced.Bound(bound / g) else Reduced.Unchanged
-        Rel.NE -> if (bound.mod(g) == 0) Reduced.Bound(bound / g) else Reduced.Drop
+        Rel.EQ -> if (bound.mod(g) == 0L) Reduced.Bound(bound / g) else Reduced.Unchanged
+        Rel.NE -> if (bound.mod(g) == 0L) Reduced.Bound(bound / g) else Reduced.Drop
     }
 
     private fun strengthenLinear(factor: Linear, domains: Array<IntDomain>): Factor? {
-        // Coefficient strengthening is Int-arithmetic (gcd, knapsack lifting); a wide-coefficient row
-        // is left unchanged (same reference ⇒ no delta). Sound — strengthening is optional.
-        if (!fitsInt32(factor.coeffs, factor.bound)) return factor
-        val intCoeffs = IntArray(factor.coeffs.size) { factor.coeffs[it].toInt() }
-        val g = PresolveShared.gcdOf(intCoeffs)
-        val gcdReduced: Linear = if (g <= 1) {
+        val g = PresolveShared.gcdOf(factor.coeffs)
+        val gcdReduced: Linear = if (g <= 1L) {
             factor
         } else {
-            when (val reduced = reduceBound(toRel(factor.op), factor.bound.toInt(), g)) {
+            when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
                 is Reduced.Bound -> Linear(
-                    PresolveShared.divAll(intCoeffs, g),
+                    PresolveShared.divAll(factor.coeffs, g),
                     factor.vars.copyOf(),
                     factor.op,
                     reduced.bound,
@@ -175,16 +166,16 @@ internal object CoefficientStrengthening {
      */
     private fun liftLinear(l: Linear, domains: Array<IntDomain>): Factor? {
         // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound (#365).
-        val coeffs: IntArray
+        val coeffs: LongArray
         val bound: Long
         when (l.op) {
             LinearOp.LE -> {
-                coeffs = IntArray(l.coeffs.size) { l.coeffs[it].toInt() }
+                coeffs = l.coeffs.copyOf()
                 bound = l.bound
             }
 
             LinearOp.GE -> {
-                coeffs = IntArray(l.coeffs.size) { -l.coeffs[it].toInt() }
+                coeffs = LongArray(l.coeffs.size) { -l.coeffs[it] }
                 bound = -l.bound
             }
 
@@ -192,28 +183,28 @@ internal object CoefficientStrengthening {
         }
         val n = coeffs.size
         // Normalise to a positive-coefficient bounded knapsack Σ a̅ⱼzⱼ ≤ B, zⱼ ∈ [0, cⱼ].
-        val absA = IntArray(n)
+        val absA = LongArray(n)
         val cap = LongArray(n)
         var b = bound
         for (i in 0 until n) {
             val a = coeffs[i]
             val dom = domains[l.vars[i]]
-            cap[i] = dom.max.toLong() - dom.min.toLong()
+            cap[i] = dom.max - dom.min
             absA[i] = if (a < 0) -a else a
             // Fold the variable's contribution at its zero-of-zⱼ end into the bound:
             // aⱼ>0 shifts by aⱼ·lⱼ, aⱼ<0 (complemented) shifts by aⱼ·uⱼ.
             val zeroEnd = if (a >= 0) dom.min else dom.max
-            b -= a.toLong() * zeroEnd
+            b -= a * zeroEnd
         }
         var amax = 0L
-        for (i in 0 until n) amax += absA[i].toLong() * cap[i]
+        for (i in 0 until n) amax += absA[i] * cap[i]
         val d = amax - b
         if (d <= 0L) return null // maximal activity within bound ⇒ always satisfied
         var changed = false
-        val lifted = IntArray(n) { i ->
-            if (cap[i] > 0L && absA[i].toLong() > d) {
+        val lifted = LongArray(n) { i ->
+            if (cap[i] > 0L && absA[i] > d) {
                 changed = true
-                d.toInt() // d < absA[i] ≤ Int.MAX here, so the narrowing is safe
+                d
             } else {
                 absA[i]
             }
@@ -221,37 +212,32 @@ internal object CoefficientStrengthening {
         if (!changed) return l
         // New bound in z-space: Σ a̅'ⱼcⱼ − d, then de-shift each variable back to xⱼ.
         var newBound = -d
-        for (i in 0 until n) newBound += lifted[i].toLong() * cap[i]
-        val newCoeffs = IntArray(n)
+        for (i in 0 until n) newBound += lifted[i] * cap[i]
+        val newCoeffs = LongArray(n)
         for (i in 0 until n) {
             val dom = domains[l.vars[i]]
             if (coeffs[i] >= 0) {
                 newCoeffs[i] = lifted[i]
-                newBound += lifted[i].toLong() * dom.min
+                newBound += lifted[i] * dom.min
             } else {
                 newCoeffs[i] = -lifted[i]
-                newBound -= lifted[i].toLong() * dom.max
+                newBound -= lifted[i] * dom.max
             }
         }
-        if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return l
-        return Linear(newCoeffs, l.vars.copyOf(), LinearOp.LE, newBound.toInt())
+        return Linear(newCoeffs, l.vars.copyOf(), LinearOp.LE, newBound)
     }
 
     private fun strengthenPb(factor: PseudoBoolean): Factor? {
-        // GCD reduction and knapsack lifting reason in Int; a pseudo-Boolean whose weights or bound
-        // exceed Int range is left unstrengthened (still enforced by its propagator).
-        if (!fitsInt32(factor.weights, factor.bound)) return null
-        val intWeights = IntArray(factor.weights.size) { factor.weights[it].toInt() }
-        val g = PresolveShared.gcdOf(intWeights)
-        val gcdReduced: PseudoBoolean = if (g <= 1) {
+        val g = PresolveShared.gcdOf(factor.weights)
+        val gcdReduced: PseudoBoolean = if (g <= 1L) {
             factor
         } else {
-            when (val reduced = reduceBound(toRel(factor.op), factor.bound.toInt(), g)) {
+            when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
                 is Reduced.Bound -> PseudoBoolean(
-                    PresolveShared.divAll(intWeights, g).let { a -> LongArray(a.size) { a[it].toLong() } },
+                    PresolveShared.divAll(factor.weights, g),
                     factor.literals.copyOf(),
                     factor.op,
-                    reduced.bound.toLong(),
+                    reduced.bound,
                 )
 
                 Reduced.Drop -> return null
@@ -285,7 +271,6 @@ internal object CoefficientStrengthening {
                 var s = 0L
                 for (w in input.weights) s += w
                 val nb = s - input.bound
-                if (nb !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return input
                 PseudoBoolean(
                     input.weights.copyOf(),
                     IntArray(input.literals.size) { Lit.negate(input.literals[it]) },
@@ -295,11 +280,11 @@ internal object CoefficientStrengthening {
             }
         }
         val n = pb.literals.size
-        val weights = IntArray(n)
+        val weights = LongArray(n)
         val lits = IntArray(n)
         var bound = pb.bound
         for (i in 0 until n) {
-            val wi = pb.weights[i].toInt()
+            val wi = pb.weights[i]
             if (wi < 0) {
                 weights[i] = -wi
                 lits[i] = Lit.negate(pb.literals[i])
@@ -313,21 +298,20 @@ internal object CoefficientStrengthening {
         for (w in weights) sum += w
         val d = sum - bound
         if (d <= 0L) return null // always satisfied
-        if (d >= sum || d > Int.MAX_VALUE) return input // no weight exceeds d, or slack out of range — leave original
+        if (d >= sum) return input // no weight exceeds d — leave original
         var changed = false
         var newSum = 0L
-        val lifted = IntArray(n) { i ->
+        val lifted = LongArray(n) { i ->
             if (weights[i] > d) {
                 changed = true
-                d.toInt()
+                d
             } else {
                 weights[i]
             }.also { newSum += it }
         }
         if (!changed) return input
         val newBound = newSum - d
-        if (newBound !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) return input
-        return PseudoBoolean(LongArray(lifted.size) { lifted[it].toLong() }, lits, PbOp.LE, newBound)
+        return PseudoBoolean(lifted, lits, PbOp.LE, newBound)
     }
 
     private fun toRel(op: LinearOp): Rel = when (op) {

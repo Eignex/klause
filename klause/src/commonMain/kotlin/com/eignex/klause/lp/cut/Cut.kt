@@ -3,7 +3,6 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -495,10 +494,6 @@ internal class KnapsackCoverSeparator : CutSeparator {
         for (factor in ctx.problem.factors) {
             if (factor !is PseudoBoolean || factor.op != PbOp.LE) continue
             if (factor.weights.any { it <= 0 } || factor.literals.any { !Lit.isPositive(it) }) continue
-            // The cover/lifting DP is indexed by weight in Int space; a weight or bound beyond Int range
-            // is left without a cover cut (the pseudo-Boolean is still enforced by its propagator).
-            if (!fitsInt32(factor.weights, factor.bound)) continue
-            val intWeights = IntArray(factor.weights.size) { factor.weights[it].toInt() }
             val k = factor.literals.size
             if (k < 2) continue
             val b = factor.bound
@@ -564,7 +559,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
                         gubKnapsackMax(
                             liftedPos,
                             liftedCoeff,
-                            intWeights,
+                            factor.weights,
                             groupOf,
                             cap.toInt(),
                         )
@@ -618,7 +613,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
     private fun gubKnapsackMax(
         lifted: IntArrayList,
         coeff: LongArrayList,
-        weights: IntArray,
+        weights: LongArray,
         groupOf: IntArray,
         cap: Int,
     ): Long {
@@ -629,11 +624,12 @@ internal class KnapsackCoverSeparator : CutSeparator {
             val next = dp.copyOf() // "take none from this group"
             idxs.forEach { t ->
                 val w = weights[lifted[t]]
-                if (w > cap) return@forEach
+                if (w > cap) return@forEach // an item heavier than the capacity is never taken
+                val wi = w.toInt() // w <= cap here, so the DP index stays in range
                 val v = coeff[t]
                 // dp[c - w] is the pre-group value, so at most one item from the group is taken.
-                for (c in cap downTo w) {
-                    val cand = dp[c - w] + v
+                for (c in cap downTo wi) {
+                    val cand = dp[c - wi] + v
                     if (cand > next[c]) next[c] = cand
                 }
             }

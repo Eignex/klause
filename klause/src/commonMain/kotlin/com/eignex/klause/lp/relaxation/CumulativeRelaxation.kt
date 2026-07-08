@@ -3,7 +3,6 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.scheduling.Disjunctive
@@ -337,13 +336,12 @@ internal class CumulativeRelaxation(
 
         /** Record every `w ≥ v + c` implied by a two-variable [Linear] `coeffA·a + coeffB·b op bound`. */
         private fun addLinearLinks(f: Linear) {
-            // Only ±1-coefficient rows produce a link; a wide coefficient can't be one, and narrowing it
-            // to Int could spuriously look like ±1. Skip wide rows — sound (the link is just not added).
-            if (!fitsInt32(f.coeffs, f.bound)) return
+            // Only ±1-coefficient rows produce a link; a coefficient outside ±1 (including any beyond
+            // Int range) matches neither pattern below and adds nothing.
             val a = f.vars[0]
             val b = f.vars[1]
-            val ca = f.coeffs[0].toInt()
-            val cb = f.coeffs[1].toInt()
+            val ca = f.coeffs[0]
+            val cb = f.coeffs[1]
             val bound = f.bound
             // "≥ bound" holds for GE/EQ; "≤ bound" (⇔ "≥ −bound" after negating) holds for LE/EQ.
             if (f.op == LinearOp.GE || f.op == LinearOp.EQ) addGeForm(a, ca, b, cb, bound)
@@ -351,9 +349,9 @@ internal class CumulativeRelaxation(
         }
 
         /** From `ca·a + cb·b ≥ rhs`, record `w ≥ s + rhs` when the coefficients are a `(+1, −1)` pair. */
-        private fun addGeForm(a: Int, ca: Int, b: Int, cb: Int, rhs: Long) {
-            if (ca == 1 && cb == -1) add(w = a, v = b, c = rhs)
-            if (ca == -1 && cb == 1) add(w = b, v = a, c = rhs)
+        private fun addGeForm(a: Int, ca: Long, b: Int, cb: Long, rhs: Long) {
+            if (ca == 1L && cb == -1L) add(w = a, v = b, c = rhs)
+            if (ca == -1L && cb == 1L) add(w = b, v = a, c = rhs)
         }
 
         private fun add(w: Int, v: Int, c: Long) {

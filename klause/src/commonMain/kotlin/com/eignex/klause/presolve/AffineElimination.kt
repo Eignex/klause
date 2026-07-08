@@ -2,7 +2,10 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
+import com.eignex.klause.lp.LpOverflowException
+import com.eignex.klause.lp.addExact
+import com.eignex.klause.lp.mulExact
+import com.eignex.klause.lp.subExact
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -129,7 +132,7 @@ internal object AffineSingletons {
             ws.drop(r.defIdx)
             domains[r.y] = r.restrictedY
             eliminated[r.x] = true
-            subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), intArrayOf(r.coeffY), divisor = r.divisor))
+            subs.add(AffineSub(r.x, r.constTerm, intArrayOf(r.y), longArrayOf(r.coeffY), divisor = r.divisor))
         }
         if (subs.isEmpty()) return PassDelta()
         // The eliminations rebuilt the factor list in place; recover the delta against the input by
@@ -142,6 +145,10 @@ internal object AffineSingletons {
             AffineElimination(subs)::reconstruct,
         )
     }
+
+    /** The `Int` value window; a single-partner global's affine view (an index/position shift) is only
+     *  representable when the fold's scale and offset land in it. */
+    private val INT_RANGE = Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()
 
     /** Cap on a residue partner's domain span: scanning each value to build the restricted domain is
      *  O(span), and a residue class on a very wide domain would flood it with holes, so skip above it. */
@@ -181,9 +188,9 @@ internal object AffineSingletons {
         val defIdx: Int,
         val x: Int,
         val y: Int,
-        val constTerm: Int,
-        val coeffY: Int,
-        val divisor: Int,
+        val constTerm: Long,
+        val coeffY: Long,
+        val divisor: Long,
         val restrictedY: IntDomain,
     )
 
@@ -216,20 +223,17 @@ internal object AffineSingletons {
     ): ResidueCandidate? {
         val f = ws.factorAt(di) ?: return null
         if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) return null
-        // This pass folds in Int arithmetic (and guards Int-overflowing folds via foldOverflowsInt); a
-        // wide-coefficient row is left for propagation rather than folded. Sound to skip.
-        if (!fitsInt32(f.coeffs, f.bound)) return null
-        val fBound = f.bound.toInt()
+        val fBound = f.bound
         for (xi in 0..1) {
             val x = f.vars[xi]
             val y = f.vars[1 - xi]
-            val a = f.coeffs[xi].toInt()
-            val b = f.coeffs[1 - xi].toInt()
+            val a = f.coeffs[xi]
+            val b = f.coeffs[1 - xi]
             // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
             // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
             // `y`'s domain is restricted below, so it too must stay clear of the objective — the
             // pass leaves every objective variable untouched.
-            if (a == 0 || a == 1 || a == -1 || eliminated[x] || eliminated[y] || x == y) continue
+            if (a == 0L || a == 1L || a == -1L || eliminated[x] || eliminated[y] || x == y) continue
             if (x in objectiveIntVars || y in objectiveIntVars) continue
             if (!ws.isContained(di, x)) continue
             val domY = domains[y]
@@ -250,11 +254,17 @@ internal object AffineSingletons {
 
     /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
      *  inside [domX], or `null` if no such `y` exists (leave the constraint for propagation to fail). */
-    private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Int, b: Int, c: Int): IntDomain? {
+    private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Long, b: Long, c: Long): IntDomain? {
         val valid = LongArrayList()
         for (y in domY.min..domY.max) {
             if (y !in domY) continue
-            val num = c - b * y
+            // `c − b·y` can exceed 64 bits for a wide partner coefficient and a high-magnitude `y`; such a
+            // `y` admits no representable `x`, so drop it from the restricted partner domain.
+            val num = try {
+                subExact(c, mulExact(b, y))
+            } catch (_: LpOverflowException) {
+                continue
+            }
             if (num % a != 0L) continue
             val x = num / a
             if (x in domX) valid.add(y)
@@ -273,9 +283,9 @@ internal object AffineSingletons {
     private class AffineCandidate(
         val defIdx: Int,
         val x: Int,
-        val constTerm: Int,
+        val constTerm: Long,
         val termVars: IntArray,
-        val termCoeffs: IntArray,
+        val termCoeffs: LongArray,
         val isAlias: Boolean,
     )
 
@@ -314,11 +324,9 @@ internal object AffineSingletons {
     ): AffineCandidate? {
         val f = ws.factorAt(di) ?: return null
         if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) return null
-        // Int-arithmetic fold; wide-coefficient rows are left for propagation (sound skip).
-        if (!fitsInt32(f.coeffs, f.bound)) return null
         for (xi in f.vars.indices) {
             val x = f.vars[xi]
-            val cx = f.coeffs[xi].toInt()
+            val cx = f.coeffs[xi]
             if (eliminated[x] || x in objectiveIntVars) continue
             // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
             // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
@@ -326,28 +334,28 @@ internal object AffineSingletons {
             // (contained in this equality alone) and `c_x | gcd(c_j, bound)` (#445/#601). A
             // non-unit pivot that fails the divisibility test would fold non-integral coefficients,
             // so it is left for the residue-class doubleton pass or for propagation.
-            val isUnit = cx == 1 || cx == -1
+            val isUnit = cx == 1L || cx == -1L
             if (!isUnit && !dividesAllPartnersAndBound(f, xi)) continue
             if (!isUnit && !ws.isContained(di, x)) continue
             // x = B + Σ A_j·y_j, with B = bound / c_x and A_j = −c_j / c_x for the other terms y_j;
             // for a unit pivot the divisions are exact by definition.
             val termVars = IntArray(f.vars.size - 1)
-            val termCoeffs = IntArray(f.vars.size - 1)
+            val termCoeffs = LongArray(f.vars.size - 1)
             var w = 0
             var partnerEliminated = false
             for (j in f.vars.indices) {
                 if (j == xi) continue
                 if (eliminated[f.vars[j]]) partnerEliminated = true
                 termVars[w] = f.vars[j]
-                termCoeffs[w] = -f.coeffs[j].toInt() / cx
+                termCoeffs[w] = -f.coeffs[j] / cx
                 w++
             }
             if (partnerEliminated) continue
-            val constTerm = f.bound.toInt() / cx
+            val constTerm = f.bound / cx
             // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
             // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
             // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
-            val isAlias = termVars.size == 1 && termCoeffs[0] == 1 && constTerm == 0
+            val isAlias = termVars.size == 1 && termCoeffs[0] == 1L && constTerm == 0L
             // Defer a fold that would inflate rather than simplify (leave the variable). Aliases are pure
             // renames that never inflate, so they always proceed. Otherwise skip a pivot whose fold would
             // rewrite a row that has already absorbed [FOLD_ABSORB_CAP] folds (bounding the accumulating-row
@@ -356,15 +364,17 @@ internal object AffineSingletons {
             if (!isAlias) {
                 if (ws.anyOtherLinearAtAbsorbCap(di, x)) continue
                 if (capWide && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
-                // Leave x un-eliminated if folding it would push a coefficient past the Int range the
-                // Linear coalescer rejects — sound (x stays, solved directly) and avoids a hard crash.
-                if (ws.foldOverflowsInt(di, x, termVars, termCoeffs, constTerm)) continue
+                // Leave x un-eliminated if folding it would overflow 64-bit arithmetic in some row it
+                // rewrites — sound (x stays, solved directly) and avoids a wrong wrapped coefficient.
+                if (ws.foldOverflowsLong(di, x, termVars, termCoeffs, constTerm)) continue
             }
             // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
             // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
-            // only folds into Linear factors.
+            // only folds into Linear factors. The global's affine view is an index/position shift in
+            // Int space, so a scale or offset beyond Int range takes the Linear-fold path instead.
             val singlePartnerSubstitutable = termVars.size == 1 &&
-                ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0], constTerm, termVars[0])
+                termCoeffs[0] in INT_RANGE && constTerm in INT_RANGE &&
+                ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(), termVars[0])
             if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
                 return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
             }
@@ -429,9 +439,9 @@ internal object AffineSingletons {
         fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean
 
         /** Whether folding the pivot `x = constTerm + Σ termCoeffs·termVars` into any Linear row that
-         *  mentions [x] (other than [defIdx]) would overflow the `Int` coefficient range. When it would,
-         *  the candidate is skipped and `x` is left un-eliminated (sound) rather than crashing the fold. */
-        fun foldOverflowsInt(defIdx: Int, x: Int, termVars: IntArray, termCoeffs: IntArray, constTerm: Int): Boolean
+         *  mentions [x] (other than [defIdx]) would overflow 64-bit arithmetic. When it would, the
+         *  candidate is skipped and `x` is left un-eliminated (sound) rather than wrapping a coefficient. */
+        fun foldOverflowsLong(defIdx: Int, x: Int, termVars: IntArray, termCoeffs: LongArray, constTerm: Long): Boolean
     }
 
     /**
@@ -462,17 +472,17 @@ internal object AffineSingletons {
             return true
         }
 
-        override fun foldOverflowsInt(
+        override fun foldOverflowsLong(
             defIdx: Int,
             x: Int,
             termVars: IntArray,
-            termCoeffs: IntArray,
-            constTerm: Int,
+            termCoeffs: LongArray,
+            constTerm: Long,
         ): Boolean {
             for (k in occ.offsets[x] until occ.offsets[x + 1]) {
                 val id = occ.flat[k]
                 val f = factors[id]
-                if (id != defIdx && f is Linear && foldRowOverflowsInt(
+                if (id != defIdx && f is Linear && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -594,18 +604,18 @@ internal object AffineSingletons {
             return true
         }
 
-        override fun foldOverflowsInt(
+        override fun foldOverflowsLong(
             defIdx: Int,
             x: Int,
             termVars: IntArray,
-            termCoeffs: IntArray,
-            constTerm: Int,
+            termCoeffs: LongArray,
+            constTerm: Long,
         ): Boolean {
             val occ = intOcc[x]
             for (k in 0 until occ.size) {
                 val id = occ[k]
                 val f = slots[id]
-                if (id != defIdx && f is Linear && foldRowOverflowsInt(
+                if (id != defIdx && f is Linear && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -669,9 +679,12 @@ internal object AffineSingletons {
                 val next = when {
                     f is Linear && c.x in f.vars -> foldAffineIntoLinear(f, c)
 
-                    // Single-partner affine into a global the gate accepted (non-null substitute).
+                    // Single-partner affine into a global the gate accepted (non-null substitute). The
+                    // gate only admits this path for an Int-range scale/offset, so the narrowing is safe.
                     singlePartner ->
-                        requireNotNull(f.substituteAffine(c.x, c.termCoeffs[0], c.constTerm, c.termVars[0])) {
+                        requireNotNull(
+                            f.substituteAffine(c.x, c.termCoeffs[0].toInt(), c.constTerm.toInt(), c.termVars[0]),
+                        ) {
                             "substituteAffine returned null for a factor accepted by the candidate gate"
                         }
 
@@ -737,8 +750,8 @@ internal object AffineSingletons {
         val ix = l.vars.indexOf(c.x)
         val cX = l.coeffs[ix]
         val newVars = IntArray(l.vars.size - 1 + c.termVars.size)
-        // Long throughout: [l] may itself carry wide coefficients, and the wide [Linear] constructor
-        // re-coalesces without truncation (the fold candidate's own coeffs are Int, but l's need not be).
+        // Long throughout: both [l]'s coefficients and the fold candidate's are wide-capable, and the
+        // candidate gate declined any pivot whose fold would overflow, so the products below are safe.
         val newCoeffs = LongArray(newVars.size)
         var w = 0
         for (j in l.vars.indices) {
@@ -758,7 +771,7 @@ internal object AffineSingletons {
     /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within
      *  `x`'s domain [domX]. */
     private fun domainBoundsOnTerms(domX: IntDomain, c: AffineCandidate): List<Factor> {
-        val coeffs = LongArray(c.termCoeffs.size) { c.termCoeffs[it].toLong() }
+        val coeffs = c.termCoeffs.copyOf()
         return listOf(
             Linear(coeffs, c.termVars.copyOf(), LinearOp.LE, domX.max - c.constTerm),
             Linear(coeffs, c.termVars.copyOf(), LinearOp.GE, domX.min - c.constTerm),
@@ -772,10 +785,10 @@ internal object AffineSingletons {
  *  values the partner's restricted domain admits. */
 internal class AffineSub(
     val x: Int,
-    val constTerm: Int,
+    val constTerm: Long,
     val termVars: IntArray,
-    val termCoeffs: IntArray,
-    val divisor: Int = 1,
+    val termCoeffs: LongArray,
+    val divisor: Long = 1,
 )
 
 /**
@@ -792,30 +805,37 @@ internal class AffineElimination(private val subs: List<AffineSub>) {
         if (subs.isEmpty()) return sample
         val ints = sample.ints.copyOf()
         for (s in subs.asReversed()) {
-            var v = s.constTerm.toLong()
+            var v = s.constTerm
             for (k in s.termVars.indices) v += s.termCoeffs[k] * ints[s.termVars[k]]
-            ints[s.x] = if (s.divisor == 1) v else v / s.divisor
+            ints[s.x] = if (s.divisor == 1L) v else v / s.divisor
         }
         return Sample(sample.bools, ints)
     }
 }
 
-private fun Long.overflowsInt(): Boolean = this < Int.MIN_VALUE || this > Int.MAX_VALUE
-
-/** Whether folding `x = constTerm + Σ termCoeffs·termVars` into the Linear row [f] would produce a
- *  coefficient or bound outside the `Int` range that [Linear]'s coalescing rejects. Computed in `Long`
- *  so the check itself never overflows. A `true` result lets the caller leave `x` un-eliminated (sound)
- *  rather than crash on an over-wide fold (e.g. DeBruijn-sequence instances). */
-private fun foldRowOverflowsInt(f: Linear, x: Int, termVars: IntArray, termCoeffs: IntArray, constTerm: Int): Boolean {
+/** Whether folding `x = constTerm + Σ termCoeffs·termVars` into the Linear row [f] would overflow
+ *  64-bit arithmetic in the shifted bound or any folded coefficient. Each product/sum runs through the
+ *  checked helpers, so an overflow surfaces as [LpOverflowException]; a `true` result lets the caller
+ *  leave `x` un-eliminated (sound) rather than wrap a coefficient (e.g. DeBruijn-sequence instances). */
+private fun foldRowOverflowsLong(
+    f: Linear,
+    x: Int,
+    termVars: IntArray,
+    termCoeffs: LongArray,
+    constTerm: Long,
+): Boolean {
     val xi = f.vars.indexOf(x)
     if (xi < 0) return false
     val cX = f.coeffs[xi]
-    if ((f.bound - cX * constTerm).overflowsInt()) return true
-    for (k in termVars.indices) {
-        val prod = cX * termCoeffs[k]
-        if (prod.overflowsInt()) return true
-        val yi = f.vars.indexOf(termVars[k])
-        if (yi >= 0 && (f.coeffs[yi] + prod).overflowsInt()) return true
+    return try {
+        subExact(f.bound, mulExact(cX, constTerm))
+        for (k in termVars.indices) {
+            val prod = mulExact(cX, termCoeffs[k])
+            val yi = f.vars.indexOf(termVars[k])
+            if (yi >= 0) addExact(f.coeffs[yi], prod)
+        }
+        false
+    } catch (_: LpOverflowException) {
+        true
     }
-    return false
 }

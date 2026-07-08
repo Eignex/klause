@@ -2,7 +2,6 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -15,7 +14,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
@@ -414,29 +412,25 @@ internal object RedundantConstraints {
     /** A `Σ coeffs·x ≤ bound` row as a reduced per-variable coefficient map (GCD-normalised), or `null`
      *  for non-(`≤`/`≥`) Linear factors. The map keys are variable ids; the value is the reduced
      *  coefficient. */
-    private class LeRow(val factorIndex: Int, val coeffByVar: MutableIntIntMap, val bound: Long)
+    private class LeRow(val factorIndex: Int, val coeffByVar: MutableIntLongMap, val bound: Long)
 
     /** A `≤`-normalised, GCD-reduced [LeRow] for an exact [LinearRow] (from any factor's
      *  [Factor.linearRows]); `null` for a non-(`≤`/`≥`) row. Coalesced terms have distinct vars, so a
      *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
      *  the dominance ratio check), so skip them. */
     private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
-        // The subsumption index (GCD reduction, coefficient map) reasons in Int; a row whose
-        // coefficients exceed Int range is left out of it — the row is still enforced elsewhere.
-        if (!fitsInt32(row.coeffs, row.bound)) return null
-        val intCoeffs = IntArray(row.coeffs.size) { row.coeffs[it].toInt() }
         val (coeffs, bound) = when (row.op) {
-            LinearOp.LE -> intCoeffs to row.bound
-            LinearOp.GE -> negated(intCoeffs) to -row.bound
+            LinearOp.LE -> row.coeffs to row.bound
+            LinearOp.GE -> negated(row.coeffs) to -row.bound
             else -> return null
         }
         val g = PresolveShared.gcdOf(coeffs)
-        val map = MutableIntIntMap(row.vars.size)
+        val map = MutableIntLongMap(row.vars.size)
         for (i in row.vars.indices) {
-            if (coeffs[i] == 0) continue
-            map.put(row.vars[i], if (g <= 1) coeffs[i] else coeffs[i] / g)
+            if (coeffs[i] == 0L) continue
+            map.put(row.vars[i], if (g <= 1L) coeffs[i] else coeffs[i] / g)
         }
-        return LeRow(factorIndex, map, if (g <= 1) bound else bound.floorDiv(g.toLong()))
+        return LeRow(factorIndex, map, if (g <= 1L) bound else bound.floorDiv(g))
     }
 
     /**
@@ -488,10 +482,10 @@ internal object RedundantConstraints {
         var k = 0L
         a.coeffByVar.forEach { v, ca ->
             if (!b.coeffByVar.containsKey(v)) return false // a's support must be ⊆ b's
-            val cb = b.coeffByVar.getOrDefault(v, 0)
-            if (cb % ca != 0) return false
-            val ratio = (cb / ca).toLong()
-            if (ratio <= 0) return false // k must be a single positive multiple
+            val cb = b.coeffByVar.getOrDefault(v, 0L)
+            if (cb % ca != 0L) return false
+            val ratio = cb / ca
+            if (ratio <= 0L) return false // k must be a single positive multiple
             if (k == 0L) {
                 k = ratio
             } else if (k != ratio) {
@@ -503,7 +497,7 @@ internal object RedundantConstraints {
         b.coeffByVar.forEach { v, cb ->
             if (!a.coeffByVar.containsKey(v)) {
                 val d = problem.intDomains[v]
-                maxExtra += if (cb >= 0) cb.toLong() * d.max else cb.toLong() * d.min
+                maxExtra += if (cb >= 0) cb * d.max else cb * d.min
                 // Conservative overflow guard: an extra activity this large can't be dominated by a
                 // small-bound row anyway, so bail rather than risk a wrapped Long comparison.
                 if (maxExtra > OVERFLOW_GUARD || maxExtra < -OVERFLOW_GUARD) return false
@@ -545,7 +539,7 @@ internal object RedundantConstraints {
     private fun cliqueImpliesKnapsack(knapsack: PseudoBoolean, cliques: List<Set<Int>>): Boolean {
         if (knapsack.weights.any { it <= 0 }) return false
         // Every weight is > 0 (guarded above), so 0 doubles as the "literal not in the knapsack"
-        // sentinel for [MutableIntIntMap.getOrDefault].
+        // sentinel for [MutableIntLongMap.getOrDefault].
         val weightByLit = MutableIntLongMap(knapsack.literals.size)
         for (i in knapsack.literals.indices) weightByLit.put(knapsack.literals[i], knapsack.weights[i])
         val assigned = IntHashSet()
@@ -577,65 +571,45 @@ internal object RedundantConstraints {
 
     /** A single exact [LinearRow] as its `≤`-normalised [IneqForm] (an `=` row carries its opposite
      *  direction and is never dropped); `null` for a `≠` row. */
-    private fun rowForm(row: LinearRow): IneqForm? {
-        // The normalised-form key reasons in Int; a row whose coefficients exceed Int range is not
-        // keyed for redundancy (it is still enforced by its originating factor).
-        if (!fitsInt32(row.coeffs, row.bound)) return null
-        val coeffs = IntArray(row.coeffs.size) { row.coeffs[it].toInt() }
-        return when (row.op) {
-            LinearOp.LE -> reducedIneq(row.vars, coeffs, row.bound, ::leKey, fromEq = false)
+    private fun rowForm(row: LinearRow): IneqForm? = when (row.op) {
+        LinearOp.LE -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = false)
 
-            LinearOp.GE -> reducedIneq(row.vars, negated(coeffs), -row.bound, ::leKey, fromEq = false)
+        LinearOp.GE -> reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = false)
 
-            LinearOp.EQ -> reducedIneq(row.vars, coeffs, row.bound, ::leKey, fromEq = true).copyWithOpposite(
-                reducedIneq(row.vars, negated(coeffs), -row.bound, ::leKey, fromEq = true),
+        LinearOp.EQ -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = true).copyWithOpposite(
+            reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = true),
+        )
+
+        LinearOp.NE -> null
+    }
+
+    private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {
+        is Linear -> when (f.op) {
+            LinearOp.LE -> reducedIneq(f.vars, f.coeffs, f.bound, ::leKey, fromEq = false)
+
+            LinearOp.GE -> reducedIneq(f.vars, negated(f.coeffs), -f.bound, ::leKey, fromEq = false)
+
+            LinearOp.EQ -> reducedIneq(f.vars, f.coeffs, f.bound, ::leKey, fromEq = true).copyWithOpposite(
+                reducedIneq(f.vars, negated(f.coeffs), -f.bound, ::leKey, fromEq = true),
             )
 
             LinearOp.NE -> null
         }
-    }
 
-    private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {
-        is Linear -> if (!fitsInt32(f.coeffs, f.bound)) {
-            // Redundancy detection compares Int-coefficient normal forms; a wide-coefficient row is
-            // simply not indexed (never claimed redundant). Sound.
-            null
-        } else {
-            val c = IntArray(f.coeffs.size) { f.coeffs[it].toInt() }
-            val b = f.bound
-            when (f.op) {
-                LinearOp.LE -> reducedIneq(f.vars, c, b, ::leKey, fromEq = false)
+        is PseudoBoolean -> when (f.op) {
+            PbOp.LE -> reducedIneq(f.literals, f.weights, f.bound, ::pbKey, fromEq = false)
 
-                LinearOp.GE -> reducedIneq(f.vars, negated(c), -b, ::leKey, fromEq = false)
+            PbOp.GE -> reducedIneq(f.literals, negated(f.weights), -f.bound, ::pbKey, fromEq = false)
 
-                LinearOp.EQ -> reducedIneq(f.vars, c, b, ::leKey, fromEq = true).copyWithOpposite(
-                    reducedIneq(f.vars, negated(c), -b, ::leKey, fromEq = true),
-                )
-
-                LinearOp.NE -> null
-            }
-        }
-
-        is PseudoBoolean -> if (!fitsInt32(f.weights, f.bound)) {
-            null
-        } else {
-            val w = IntArray(f.weights.size) { f.weights[it].toInt() }
-            val b = f.bound
-            when (f.op) {
-                PbOp.LE -> reducedIneq(f.literals, w, b, ::pbKey, fromEq = false)
-
-                PbOp.GE -> reducedIneq(f.literals, negated(w), -b, ::pbKey, fromEq = false)
-
-                PbOp.EQ -> reducedIneq(f.literals, w, b, ::pbKey, fromEq = true).copyWithOpposite(
-                    reducedIneq(f.literals, negated(w), -b, ::pbKey, fromEq = true),
-                )
-            }
+            PbOp.EQ -> reducedIneq(f.literals, f.weights, f.bound, ::pbKey, fromEq = true).copyWithOpposite(
+                reducedIneq(f.literals, negated(f.weights), -f.bound, ::pbKey, fromEq = true),
+            )
         }
 
         else -> null
     }
 
-    private fun negated(xs: IntArray): IntArray = IntArray(xs.size) { -xs[it] }
+    private fun negated(xs: LongArray): LongArray = LongArray(xs.size) { -xs[it] }
 
     /** A `≤`-form `Σ coeffs·terms ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and
      *  `2x+2y ≤ 4`) share a bucket even when [CoefficientStrengthening.strengthenCoefficients]
@@ -644,16 +618,16 @@ internal object RedundantConstraints {
      *  builds the (linear / pb) key. */
     private fun reducedIneq(
         terms: IntArray,
-        coeffs: IntArray,
+        coeffs: LongArray,
         bound: Long,
-        keyOf: (IntArray, IntArray, Boolean) -> TermKey,
+        keyOf: (IntArray, LongArray, Boolean) -> TermKey,
         fromEq: Boolean,
     ): IneqForm {
         val g = PresolveShared.gcdOf(coeffs)
-        return if (g <= 1) {
+        return if (g <= 1L) {
             IneqForm(keyOf(terms, coeffs, false), bound, fromEq)
         } else {
-            IneqForm(keyOf(terms, IntArray(coeffs.size) { coeffs[it] / g }, false), bound.floorDiv(g.toLong()), fromEq)
+            IneqForm(keyOf(terms, LongArray(coeffs.size) { coeffs[it] / g }, false), bound.floorDiv(g), fromEq)
         }
     }
 
@@ -664,12 +638,12 @@ internal object RedundantConstraints {
     /** Build a [TermKey] over `(ids, coeffs)`: pairs sorted by id, each coefficient negated when [negate]
      *  (folding `≥` into `≤`). For pseudo-Boolean keys distinct literal ids for opposite polarities keep
      *  `x` and `¬x` apart (#465). */
-    private fun termKey(isPb: Boolean, ids: IntArray, coeffs: IntArray, negate: Boolean): TermKey {
-        val sign = if (negate) -1 else 1
+    private fun termKey(isPb: Boolean, ids: IntArray, coeffs: LongArray, negate: Boolean): TermKey {
+        val sign = if (negate) -1L else 1L
         val terms = ArrayList<Long>(ids.size * 2)
         for (i in ids.indices.sortedBy { ids[it] }) {
             terms.add(ids[i].toLong())
-            terms.add((sign * coeffs[i]).toLong())
+            terms.add(sign * coeffs[i])
         }
         return TermKey(isPb, terms)
     }
@@ -688,9 +662,9 @@ internal object RedundantConstraints {
         return vsum * 31 + f.structuralKeyWeight
     }
 
-    private fun leKey(vars: IntArray, coeffs: IntArray, negate: Boolean): TermKey =
+    private fun leKey(vars: IntArray, coeffs: LongArray, negate: Boolean): TermKey =
         termKey(isPb = false, ids = vars, coeffs = coeffs, negate = negate)
 
-    private fun pbKey(literals: IntArray, weights: IntArray, negate: Boolean): TermKey =
+    private fun pbKey(literals: IntArray, weights: LongArray, negate: Boolean): TermKey =
         termKey(isPb = true, ids = literals, coeffs = weights, negate = negate)
 }

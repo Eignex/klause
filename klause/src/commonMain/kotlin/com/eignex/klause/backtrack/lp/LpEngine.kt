@@ -3,7 +3,6 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.lp.Basis
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.bound.CumulativeFlowBound
@@ -184,35 +183,32 @@ internal class LpEngine(
      *  `a·v + Σ cⱼ·xⱼ = b` with `|a| = 1` and `g = gcd(cⱼ) > 1`: then `v ≡ r (mod g)` in every solution
      *  (`r = (a·b) mod g`), recorded as `(v, g, r)`. An LP lower bound on `v` can be rounded up to the
      *  next value congruent to `r` — a tighter sound cutoff. `null` when no defining equality gives one. */
-    internal val objectiveModulus: Triple<Int, Int, Int>? by lazy { computeObjectiveModulus() }
+    internal val objectiveModulus: Triple<Int, Long, Long>? by lazy { computeObjectiveModulus() }
 
-    private fun computeObjectiveModulus(): Triple<Int, Int, Int>? {
+    private fun computeObjectiveModulus(): Triple<Int, Long, Long>? {
         val v = objective.singleIntObjective()?.varId ?: return null
-        var best: Triple<Int, Int, Int>? = null
+        var best: Triple<Int, Long, Long>? = null
         for (f in problem.factors) {
             if (f !is Linear || f.op != LinearOp.EQ) continue
-            // Modular reasoning is Int-arithmetic (gcd); a wide-coefficient row is skipped rather than
-            // truncated (which would deduce a wrong congruence). Sound — the row just yields no modulus.
-            if (!fitsInt32(f.coeffs, f.bound)) continue
             val vi = f.vars.indexOf(v)
             if (vi < 0) continue
-            val a = f.coeffs[vi].toInt()
-            if (a != 1 && a != -1) continue
-            var g = 0
-            for (j in f.vars.indices) if (j != vi) g = gcdOfInt(g, f.coeffs[j].toInt())
-            if (g <= 1) continue
+            val a = f.coeffs[vi]
+            if (a != 1L && a != -1L) continue
+            var g = 0L
+            for (j in f.vars.indices) if (j != vi) g = gcdOfLong(g, f.coeffs[j])
+            if (g <= 1L) continue
             // a·v ≡ b (mod g); a = ±1 ⇒ v ≡ a·b (mod g). Keep the largest modulus (tightest rounding).
             if (best != null && g <= best.second) continue
-            val residue = (a.toLong() * f.bound).mod(g.toLong()).toInt()
+            val residue = (a * f.bound).mod(g)
             best = Triple(v, g, residue)
         }
         return best
     }
 
-    private fun gcdOfInt(a: Int, b: Int): Int {
+    private fun gcdOfLong(a: Long, b: Long): Long {
         var x = if (a < 0) -a else a
         var y = if (b < 0) -b else b
-        while (y != 0) {
+        while (y != 0L) {
             val t = x % y
             x = y
             y = t

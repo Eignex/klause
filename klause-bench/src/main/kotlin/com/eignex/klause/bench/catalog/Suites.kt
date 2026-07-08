@@ -194,7 +194,7 @@ internal object Suites {
                 intDomains = emptyArray(),
                 factors = arrayOf<Factor>(
                     PseudoBoolean(
-                        weights = intArrayOf(2, 3, 1, 1),
+                        weights = longArrayOf(2, 3, 1, 1),
                         literals = intArrayOf(
                             Lit.make(0, true),
                             Lit.make(1, true),
@@ -285,7 +285,7 @@ internal object Suites {
                         max = 2,
                     ),
                     PseudoBoolean(
-                        weights = intArrayOf(1, 2, 3, 4),
+                        weights = longArrayOf(1, 2, 3, 4),
                         literals = intArrayOf(
                             Lit.make(0, true),
                             Lit.make(1, true),

@@ -1,13 +1,13 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntLongMap
 
 internal object DuplicateColumns {
 
@@ -114,16 +114,14 @@ internal object DuplicateColumns {
         if (factor !is Linear) return factor
         if (factor.vars.none { keepOf[it] != it }) return factor
         val keptVars = IntArrayList(factor.vars.size)
-        val keptCoeffs = IntArrayList(factor.vars.size)
+        val keptCoeffs = LongArrayList(factor.vars.size)
         for (i in factor.vars.indices) {
             val v = factor.vars[i]
             if (keepOf[v] != v) continue // a dropped duplicate: its term is absorbed by the representative's
             keptVars.add(v)
-            keptCoeffs.add(factor.coeffs[i].toInt())
+            keptCoeffs.add(factor.coeffs[i])
         }
-        // Reached only for a row mentioning a dropped duplicate; such rows are Int-fitting because
-        // eligibleColumns excludes any variable occurring in a wide-coefficient row.
-        return Linear(keptCoeffs.toIntArray(), keptVars.toIntArray(), factor.op, factor.bound.toInt())
+        return Linear(keptCoeffs.toLongArray(), keptVars.toIntArray(), factor.op, factor.bound)
     }
 
     /** Per-variable eligibility: every occurrence is a [Linear] factor (a global / reified row reads a
@@ -140,9 +138,8 @@ internal object DuplicateColumns {
             v !in objectiveIntVars && domains[v].isContiguous()
         }
         for (f in factors) {
-            // A wide-coefficient/bound row can't be safely rewritten with Int columns, and its
-            // coefficients must not be truncated into a column signature; exclude its variables.
-            if (f is Linear && fitsInt32(f.coeffs, f.bound)) continue
+            // Only [Linear] columns are aggregatable; a variable in any other factor is ineligible.
+            if (f is Linear) continue
             for (v in f.intVars) eligible[v] = false
         }
         return eligible
@@ -156,12 +153,12 @@ internal object DuplicateColumns {
         val entries = Array(numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
         factors.forEachIndexed { fid, f ->
             if (f !is Linear) return@forEachIndexed
-            val coeffByVar = MutableIntIntMap(f.vars.size)
-            for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i].toInt())
+            val coeffByVar = MutableIntLongMap(f.vars.size)
+            for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i])
             for (v in f.intVars) {
                 entries[v]?.apply {
                     add(fid.toLong())
-                    add(coeffByVar.getOrDefault(v, 0).toLong())
+                    add(coeffByVar.getOrDefault(v, 0L))
                 }
             }
         }

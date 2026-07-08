@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
