@@ -6,6 +6,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.metric.ArmCalibration
 import com.eignex.klause.bench.metric.BenchCache
+import com.eignex.klause.bench.metric.InstanceClassifier
+import com.eignex.klause.bench.metric.InstanceFeatures
 import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.ReferenceEntry
 import com.eignex.klause.bench.metric.ReferenceStore
@@ -71,13 +73,51 @@ object BenchCli {
     fun main(args: Array<String>) {
         when (val cmd = args.firstOrNull() ?: "list") {
             "list", "--list", "help", "--help" -> if (args.size > 1) listProblems(args[1]) else printListing()
+
             "solve" -> run(args.drop(1), preview = false)
+
             "preview" -> run(args.drop(1), preview = true)
+
             "calibrate" -> calibrate(args.drop(1))
+
             "reference" -> reference(args.drop(1))
+
+            "classify" -> classify(args.drop(1))
+
             "tune" -> tune(args.drop(1))
-            else -> error("unknown command '$cmd' (commands: solve, preview, calibrate, reference, tune, list)")
+
+            else ->
+                error("unknown command '$cmd' (commands: solve, preview, calibrate, reference, classify, tune, list)")
         }
+    }
+
+    /** Populate the source-text feature columns (format / structure / global+linear counts / bool-heavy)
+     *  of `references.csv` for the selected instances — the substrate for the stratified pool and for
+     *  data analysis. Streams one source file at a time (no klause compile), so a whole-corpus pass stays
+     *  flat in memory; an unreadable/unsupported source is skipped (blank features, counted). */
+    private fun classify(filterArgs: List<String>) {
+        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val refs = select(f)
+        if (refs.isEmpty()) {
+            println("(no problems matched the selection)")
+            return
+        }
+        println("=== classify: ${refs.size} instance(s) ===")
+        var skipped = 0
+        val features = HashMap<Pair<String, String>, InstanceFeatures>(refs.size)
+        for (ref in refs) {
+            val feat = InstanceClassifier.classify(ref)
+            if (feat == null) {
+                skipped++
+                continue
+            }
+            features[ReferenceStore.suiteOf(ref) to ref.name] = feat
+        }
+        val (updated, unmatched) = ReferenceStore.mergeFeatures(features)
+        println(
+            "classified ${features.size} (skipped $skipped unreadable); references.csv: " +
+                "$updated rows updated, $unmatched with no table row",
+        )
     }
 
     /** Run `solve` over the [filterArgs] selection (or just print it when [preview]). `solve` is the
