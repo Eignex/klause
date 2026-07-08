@@ -340,8 +340,8 @@ class Problem(
             }
             // Non-singleton: emit bound tightenings relative to the effective seed bounds.
             val orig = intDomains[v]
-            val seedMin = maxOf(orig.min, assumptions.intMinOrNull(v) ?: Long.MIN_VALUE)
-            val seedMax = minOf(orig.max, assumptions.intMaxOrNull(v) ?: Long.MAX_VALUE)
+            val seedMin = maxOf(orig.min, assumptions.deductions.intMinOrNull(v) ?: Long.MIN_VALUE)
+            val seedMax = minOf(orig.max, assumptions.deductions.intMaxOrNull(v) ?: Long.MAX_VALUE)
             if (d.min > seedMin) {
                 iMinKeys.add(v)
                 iMinVals.add(d.min)
@@ -358,9 +358,9 @@ class Problem(
             d.forEachHole { value ->
                 if (value in orig) {
                     var preExisting = false
-                    for (i in 0 until assumptions.intHoleVarIds.size) {
-                        if (assumptions.intHoleVarIds[i] == v &&
-                            assumptions.intHoleValues[i] == value
+                    for (i in 0 until assumptions.deductions.intHoleVarIds.size) {
+                        if (assumptions.deductions.intHoleVarIds[i] == v &&
+                            assumptions.deductions.intHoleValues[i] == value
                         ) {
                             preExisting = true
                             break
