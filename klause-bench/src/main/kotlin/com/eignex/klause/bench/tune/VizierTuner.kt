@@ -11,6 +11,7 @@ import vizier.VizierServiceGrpc
 import vizier.VizierServiceOuterClass.AddTrialMeasurementRequest
 import vizier.VizierServiceOuterClass.CompleteTrialRequest
 import vizier.VizierServiceOuterClass.CreateStudyRequest
+import vizier.VizierServiceOuterClass.CreateTrialRequest
 import vizier.VizierServiceOuterClass.DeleteStudyRequest
 import vizier.VizierServiceOuterClass.SuggestTrialsRequest
 import vizier.VizierServiceOuterClass.SuggestTrialsResponse
@@ -90,14 +91,28 @@ internal class VizierTuner(
             )
         }
 
-        /** Warm-start is not wired for Vizier (yet). The OSS server's `CreateTrial` yields a REQUESTED
-         *  trial, and `AddTrialMeasurement` / `CompleteTrial` reject any state but ACTIVE/STOPPING — so a
-         *  pre-evaluated config can't be injected as a completed trial without the server's (undocumented)
-         *  trial-activation flow. The residual rounds don't rely on it: the per-config reward cache still
-         *  avoids re-solving and cached configs stay round candidates, and the warm-start is ablatable
-         *  (`BoTuning.tune(warmStart=…)`) — so it drops out cleanly. A later change can activate the
-         *  created trial before measuring it. */
-        override fun observe(values: Map<String, Any>, objective: Double) = Unit
+        /** Inject a pre-evaluated config as a prior so the GP-bandit fits on it. `AddTrialMeasurement` /
+         *  `CompleteTrial` reject a non-ACTIVE trial (measurements model an in-progress evaluation), so a
+         *  known result can't go through the suggest→complete path. Instead `CreateTrial` accepts a trial
+         *  already in state `SUCCEEDED` with a `final_measurement` verbatim — the server only forces
+         *  non-succeeded trials to `REQUESTED` — so one call adds the completed prior. */
+        override fun observe(values: Map<String, Any>, objective: Double) {
+            val measurement = Measurement.newBuilder()
+                .addMetrics(Measurement.Metric.newBuilder().setMetricId(REWARD).setValue(objective))
+                .build()
+            val trial = Trial.newBuilder()
+                .setState(Trial.State.SUCCEEDED)
+                .setFinalMeasurement(measurement)
+            for ((id, v) in values) {
+                val value = if (v is Number) {
+                    Value.newBuilder().setNumberValue(v.toDouble())
+                } else {
+                    Value.newBuilder().setStringValue(v.toString())
+                }
+                trial.addParameters(Trial.Parameter.newBuilder().setParameterId(id).setValue(value))
+            }
+            stub.createTrial(CreateTrialRequest.newBuilder().setParent(studyName).setTrial(trial).build())
+        }
 
         override fun close() {
             stub.deleteStudy(DeleteStudyRequest.newBuilder().setName(studyName).build())

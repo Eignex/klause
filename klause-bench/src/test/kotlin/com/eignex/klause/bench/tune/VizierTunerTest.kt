@@ -41,4 +41,29 @@ class VizierTunerTest {
             }
         }
     }
+
+    @Test
+    fun `observe injects a pre-evaluated prior without the requested-trial rejection`() {
+        if (!VizierTuner.reachable()) {
+            println("[skip] vizier service not reachable at localhost:6789")
+            return
+        }
+        val space = ConfigSpace(
+            listOf(
+                CategoricalParam("family", listOf("cbls", "probsat", "walksat")),
+                DoubleParam("noise", 0.0, 1.0),
+            ),
+        )
+        val tuner: Tuner = VizierTuner()
+        tuner.use {
+            it.openStudy(space, maximize = true, studyId = "klause-warmstart-test").use { study ->
+                // The warm-start path: a known result goes in as a SUCCEEDED trial via CreateTrial, not
+                // through suggest→complete (which rejects a non-ACTIVE trial). Must not throw.
+                study.observe(mapOf("family" to "cbls", "noise" to 0.3), objective = 0.9)
+                study.observe(mapOf("family" to "walksat", "noise" to 0.7), objective = 0.4)
+                val suggested = study.suggest(3)
+                assertTrue(suggested.isNotEmpty(), "the bandit keeps suggesting after priors are injected")
+            }
+        }
+    }
 }
