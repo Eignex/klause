@@ -7,6 +7,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.opb.Opb
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -72,7 +73,7 @@ class BoTuningTest {
             space = space,
             decode = { it.getValue("arm") as String },
             reward = { instance, arm -> rewards.getValue(arm)[instances.indexOf(instance)] },
-            instances = instances,
+            pool = UniformPool(instances),
             tuner = tuner,
             rounds = 4,
             trials = 3,
@@ -107,7 +108,7 @@ class BoTuningTest {
         )
         val result =
             BoTuning.tuneBt(
-                instances,
+                UniformPool(instances),
                 RandomTuner(seed = 1),
                 rounds = 3,
                 trials = 4,
@@ -132,7 +133,7 @@ class BoTuningTest {
         )
         val result =
             BoTuning.tuneBt(
-                instances,
+                UniformPool(instances),
                 RandomTuner(seed = 1),
                 rounds = 2,
                 trials = 4,
@@ -168,7 +169,7 @@ class BoTuningTest {
                 evalCalls++
                 0.5
             },
-            instances = pool,
+            pool = UniformPool(pool),
             tuner = RandomTuner(seed = 3),
             rounds = 2,
             trials = 3,
@@ -208,7 +209,7 @@ class BoTuningTest {
             space = ConfigSpace(listOf(CategoricalParam("arm", listOf("A")))),
             decode = { it.getValue("arm") as String },
             reward = { _, _ -> 0.5 },
-            instances = listOf(cop("i0", "min: 1 x1 ;\n+1 x1 >= 0 ;\n")),
+            pool = UniformPool(listOf(cop("i0", "min: 1 x1 ;\n+1 x1 >= 0 ;\n"))),
             tuner = recording,
             rounds = 1,
             trials = 1,
@@ -217,5 +218,35 @@ class BoTuningTest {
             studyId = "noisy",
         )
         assertEquals(true, sawNoisy, "mini-batch evaluation opens noisy studies")
+    }
+
+    @Test
+    fun `a stratum frontier keeps a rare-stratum specialist despite few instances`() {
+        // 22 instances in two strata: 20 "common", 2 "rare". C is the all-rounder; S wins only the rare
+        // stratum. A stratum frontier surfaces S even though rare is <10% of the pool — the signal a
+        // per-instance frontier would dilute to mean-reward (rare instances rarely sampled) on a big pool.
+        val common = List(20) { cop("c$it", "min: 1 x1 ;\n+1 x1 >= 0 ;\n") }
+        val rare = List(2) { cop("r$it", "min: 1 x1 ;\n+1 x1 >= 0 ;\n") }
+        val batch = listOf(common[0], common[1], rare[0], rare[1]) // a stratified draw always covers rare
+        val pool = object : SamplingPool {
+            override fun sample(size: Int, rng: Random) = batch
+            override fun stratumOf(p: ResolvedProblem) = if (p in rare) "rare" else "common"
+            override fun isNotEmpty() = true
+        }
+        val result = BoTuning.tune(
+            space = ConfigSpace(listOf(CategoricalParam("arm", listOf("C", "S")))),
+            decode = { it.getValue("arm") as String },
+            reward = { p, arm -> if (arm == "S") (if (p in rare) 1.0 else 0.1) else 0.6 },
+            pool = pool,
+            tuner = CyclingTuner(listOf(mapOf("arm" to "C"), mapOf("arm" to "S"))),
+            rounds = 2,
+            trials = 2,
+            batch = 2,
+            warmStart = true,
+            studyId = "strata",
+            sampleSize = 4,
+        )
+        assertEquals("arm=C", result.palette[0].label, "round 1 anchors the all-rounder")
+        assertTrue(result.palette.any { it.label == "arm=S" }, "the rare-stratum specialist still gets kept")
     }
 }
