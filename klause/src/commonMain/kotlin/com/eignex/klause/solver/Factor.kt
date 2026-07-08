@@ -138,7 +138,7 @@ interface Factor {
      * value symmetry for the whole problem. A [isValueAnonymous] factor returns `this` (no constant
      * names a value).
      */
-    fun remapValues(valueMap: (Int) -> Int): Factor? = null
+    fun remapValues(valueMap: (Long) -> Long): Factor? = null
 
     /**
      * A structural self-reduction of this factor under the current integer [domains]: a rewrite into

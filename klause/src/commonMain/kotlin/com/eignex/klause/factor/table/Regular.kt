@@ -73,14 +73,14 @@ class Regular(
      *  Regular has no positional-variable/constant coupling (unlike Element): swapping symbol values in
      *  a sequence and the matching columns preserves acceptance exactly. Returns `null` if [valueMap]
      *  is not a permutation of `1..alphabetSize` (then it can't relabel this automaton's columns). */
-    override fun remapValues(valueMap: (Int) -> Int): Factor? {
+    override fun remapValues(valueMap: (Long) -> Long): Factor? {
         val target = IntArray(alphabetSize + 1) // 1-based symbols
         val seen = BooleanArray(alphabetSize + 1)
         for (s in 1..alphabetSize) {
-            val t = valueMap(s)
-            if (t < 1 || t > alphabetSize || seen[t]) return null
-            seen[t] = true
-            target[s] = t
+            val t = valueMap(s.toLong())
+            if (t < 1 || t > alphabetSize || seen[t.toInt()]) return null
+            seen[t.toInt()] = true
+            target[s] = t.toInt()
         }
         val newTransitions = LongArray(transitions.size)
         for (q in 1..numStates) {

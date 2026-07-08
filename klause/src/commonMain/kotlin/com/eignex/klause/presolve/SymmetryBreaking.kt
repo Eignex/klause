@@ -13,8 +13,8 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
 
@@ -109,7 +109,7 @@ internal object SymmetryBreaking {
         val orbits = verifiedValueOrbits(problem, cancellation) ?: return emptyList()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
-            val orbitSet = IntHashSet()
+            val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val internal = (0 until problem.numIntVars)
                 .filter { it !in objectiveIntVars && domainWithin(problem.intDomains[it], orbitSet) }
@@ -127,7 +127,7 @@ internal object SymmetryBreaking {
                 }
 
                 internal.size == 1 -> extra.add(
-                    Linear(intArrayOf(1), intArrayOf(internal[0]), LinearOp.EQ, orbit.min()),
+                    Linear(longArrayOf(1), intArrayOf(internal[0]), LinearOp.EQ, orbit.min()),
                 )
             }
         }
@@ -146,7 +146,7 @@ internal object SymmetryBreaking {
     private fun verifiedValueOrbits(
         problem: Problem,
         cancellation: Cancellation = Cancellation.Never,
-    ): List<List<Int>>? {
+    ): List<List<Long>>? {
         if (problem.numIntVars == 0 || cancellation()) return null
         val allAnonymous = problem.factors.all { it.isValueAnonymous() }
         // Verifying value swaps re-keys the whole factor set, so on a model whose factors carry large
@@ -170,25 +170,24 @@ internal object SymmetryBreaking {
             if (d.max > hi) hi = d.max
         }
         if (lo > hi) return null
-        // The value pins ([ValuePrecede], value-swap relabeling) reason in Int value space, so skip the
-        // whole phase when the domain values fall outside Int range — sound, it only forgoes value pins.
-        if (lo < Int.MIN_VALUE || hi > Int.MAX_VALUE) return null
         // Size skip: the incidence scan below visits every value in [lo, hi] against every int
         // variable, so a wide span across many variables is too costly to be worth the value pins.
-        if ((hi - lo + 1) * problem.numIntVars > VALUE_ORBIT_SCAN_BUDGET) return null
+        // Written as `hi > lo + perVarSpan` to stay overflow-safe when the bounds straddle Long extremes.
+        val perVarSpan = VALUE_ORBIT_SCAN_BUDGET / problem.numIntVars.coerceAtLeast(1)
+        if (hi > lo + perVarSpan) return null
         // Group values by domain-incidence signature: same set of containing variables ⇒ a candidate
         // orbit (a swap within it maps every domain to itself). The incident variable ids, in
         // ascending order, are the signature words.
-        val incidence = HashMap<RefineKey, MutableList<Int>>()
+        val incidence = HashMap<RefineKey, MutableList<Long>>()
         for (value in lo..hi) {
             // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
             // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
             val sig = LongArrayList()
             for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.add(x.toLong())
-            if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value.toInt())
+            if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }
-        val orbits = ArrayList<List<Int>>()
+        val orbits = ArrayList<List<Long>>()
         for (candidate in incidence.values) {
             if (cancellation()) break
             if (candidate.size < 2) continue
@@ -229,7 +228,7 @@ internal object SymmetryBreaking {
         val orbits = verifiedValueOrbits(problem) ?: return PassDelta()
         val extra = ArrayList<Factor>()
         for (orbit in orbits) {
-            val orbitSet = IntHashSet()
+            val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val seq = IntArrayList()
             for (x in 0 until n) {
@@ -253,9 +252,9 @@ internal object SymmetryBreaking {
     private fun verifyValueOrbits(
         problem: Problem,
         base: Map<StructuralKey, Int>,
-        values: List<Int>,
+        values: List<Long>,
         cancellation: Cancellation = Cancellation.Never,
-    ): List<List<Int>> {
+    ): List<List<Long>> {
         val n = values.size
         if (n > MAX_VERIFIED_GROUP) return emptyList()
         val ds = IntDisjointSet(n)
@@ -269,8 +268,8 @@ internal object SymmetryBreaking {
      *  factor via [Factor.remapValues] and compare [Factor.structuralKey] counts against [base].
      *  `false` if any factor is not value-relabelable (returns `null`). The value analog of
      *  [isAutomorphism]. */
-    private fun verifyValueSwap(problem: Problem, base: Map<StructuralKey, Int>, v: Int, w: Int): Boolean {
-        val swap = { x: Int ->
+    private fun verifyValueSwap(problem: Problem, base: Map<StructuralKey, Int>, v: Long, w: Long): Boolean {
+        val swap = { x: Long ->
             if (x == v) {
                 w
             } else if (x == w) {
@@ -282,12 +281,11 @@ internal object SymmetryBreaking {
         return PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remapValues(swap) }
     }
 
-    /** Whether every value in [d] lies in [values]. The orbit [values] are Int-range (the caller skips
-     *  value symmetry otherwise), so any out-of-Int-range domain value is trivially not a member. */
-    private fun domainWithin(d: IntDomain, values: IntHashSet): Boolean {
+    /** Whether every value in [d] lies in [values]. */
+    private fun domainWithin(d: IntDomain, values: LongHashSet): Boolean {
         for (v in d.min..d.max) {
             if (v !in d) continue
-            if (v < Int.MIN_VALUE || v > Int.MAX_VALUE || v.toInt() !in values) return false
+            if (v !in values) return false
         }
         return true
     }

@@ -95,14 +95,11 @@ class Mdd(
      *  symbols and there is no positional-variable/constant coupling (unlike Element). No bijection
      *  check is needed: records carry the symbol explicitly, so any map yields a valid diagram and the
      *  verification's key comparison decides whether the relabeling is actually a symmetry. */
-    override fun remapValues(valueMap: (Int) -> Int): Factor? {
-        // Symbols beyond Int range can't pass through the `(Int)->Int` value map without truncating;
-        // decline value symmetry rather than relabel a wrong symbol (sound — no relabel).
-        if (!fitsInt32(transitions)) return null
+    override fun remapValues(valueMap: (Long) -> Long): Factor {
         val newTransitions = transitions.copyOf()
         var p = 0
         while (p < newTransitions.size) {
-            newTransitions[p + 1] = valueMap(newTransitions[p + 1].toInt()).toLong()
+            newTransitions[p + 1] = valueMap(newTransitions[p + 1])
             p += recordStride
         }
         return Mdd(seq, numStatesPerLayer, layerStarts, newTransitions, initial, accepting, recordStride, cost)

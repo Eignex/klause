@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.arithmetic.fitsInt32
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
@@ -136,8 +135,8 @@ class Table private constructor(
 
     /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the
      *  one value universe, so a single map relabels the whole table. */
-    override fun remapValues(valueMap: (Int) -> Int): Factor? =
-        if (fitsInt32(tuples)) Table(xs, LongArray(tuples.size) { valueMap(tuples[it].toInt()).toLong() }) else null
+    override fun remapValues(valueMap: (Long) -> Long): Factor =
+        Table(xs, LongArray(tuples.size) { valueMap(tuples[it]) })
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = xs

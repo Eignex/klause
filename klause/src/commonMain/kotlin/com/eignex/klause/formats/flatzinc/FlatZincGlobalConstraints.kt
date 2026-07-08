@@ -225,15 +225,15 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
 
 internal fun FlatZincCompiler.emitValuePrecede(c: FznConstraint) {
     require(c.args.size == 3)
-    val s = evalIntConst(c.args[0]).toInt()
-    val t = evalIntConst(c.args[1]).toInt()
+    val s = evalIntConst(c.args[0])
+    val t = evalIntConst(c.args[1])
     val xs = evalIntVarArray(c.args[2])
     if (xs.isNotEmpty()) factors.add(ValuePrecede(s, t, xs))
 }
 
 internal fun FlatZincCompiler.emitValuePrecedeChain(c: FznConstraint) {
     require(c.args.size == 2)
-    val values = evalIntConstArray(c.args[0])
+    val values = evalIntConstArrayLong(c.args[0])
     val xs = evalIntVarArray(c.args[1])
     if (xs.isEmpty()) return
     for (i in 0 until values.size - 1) factors.add(ValuePrecede(values[i], values[i + 1], xs))
