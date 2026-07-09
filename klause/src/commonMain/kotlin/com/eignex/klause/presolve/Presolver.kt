@@ -372,26 +372,20 @@ enum class PresolvePass(
     },
 
     /** Construction-time failed-literal SAC (#146): folded into `Problem.baked` at build, read via
-     *  [PresolveConfig.resolved] — the [Presolver] engine never runs it (so [apply] is a no-op). */
+     *  [PresolveConfig.resolved] — a [Stage.CONSTRUCTION] pass with no engine [apply]. */
     PROBE_FAILED_LITERALS(
         "probe-failed-literals",
         Stage.CONSTRUCTION,
         PresolveTiming.EXHAUSTIVE,
         true,
         autoEligible = true,
-    ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
-    },
+    ),
 
     /** Construction-time bound SAC. */
-    PROBE_INT_BOUNDS("probe-int-bounds", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
-    },
+    PROBE_INT_BOUNDS("probe-int-bounds", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true),
 
     /** Construction-time interior-hole SAC; implies [PROBE_INT_BOUNDS]. */
-    PROBE_INT_HOLES("probe-int-holes", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
-    },
+    PROBE_INT_HOLES("probe-int-holes", Stage.CONSTRUCTION, PresolveTiming.EXHAUSTIVE, true, autoEligible = true),
 
     /** Probing to fixpoint: tentatively pin each free Boolean, propagate, and keep only the
      *  deductions that hold in every solution — failed literals (emitted as unit clauses) and
@@ -423,8 +417,8 @@ enum class PresolvePass(
 
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
-     *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so its [apply] is
-     *  a no-op marker and the work lives in the CLI's presolve↔harvest fixpoint, gated on this entry.
+     *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so it has no
+     *  engine [apply] and the work lives in the CLI's presolve↔harvest fixpoint, gated on this entry.
      *  `EXHAUSTIVE` (it does an LP solve per shave/redundancy probe), so the aggressive level turns it on.
      *  The harvest itself then self-limits on the *built relaxation's* size (cols/rows/nnz): on a large
      *  relaxation, where the per-candidate cost would lose instances the search would otherwise solve, it
@@ -435,14 +429,16 @@ enum class PresolvePass(
         PresolveTiming.EXHAUSTIVE,
         preservesSolutionSet = true,
         autoEligible = true,
-    ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = PassDelta()
-    },
+    ),
     ;
 
     /** Transform [problem] under [ctx], returning the change as a [PassDelta] against [problem]'s factor
-     *  list. An empty delta ([PassDelta.isEmpty]) signals the pass found nothing to do this round. */
-    abstract fun apply(problem: Problem, ctx: PresolveContext): PassDelta
+     *  list. An empty delta ([PassDelta.isEmpty]) signals the pass found nothing to do this round. Defined
+     *  only for [Stage.PROBLEM] passes — the round engine runs no other stage. [Stage.CONSTRUCTION]
+     *  (bake-time SAC) and [Stage.EXTERNAL] (LP harvest) passes are eligibility markers whose work runs
+     *  elsewhere, so calling this on one is a programming error. */
+    open fun apply(problem: Problem, ctx: PresolveContext): PassDelta =
+        error("PresolvePass.apply is defined only for Stage.PROBLEM passes; $name is a $stage pass")
 
     /** Where a pass runs. */
     enum class Stage {
