@@ -6,7 +6,6 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
@@ -75,16 +74,7 @@ class Portfolio(
             },
         )
 
-        // Fold every worker's counters into the verdict — the pool's cost, not the winner's.
-        val stats = results.fold(SolveStats.EMPTY) { acc, r -> acc.mergedWith(r.stats) }
-        return when (
-            val winner = results.firstOrNull { it is SolveResult.Sat }
-                ?: results.firstOrNull { it is SolveResult.Unsat }
-        ) {
-            is SolveResult.Sat -> winner.copy(stats = stats)
-            is SolveResult.Unsat -> winner.copy(stats = stats)
-            else -> SolveResult.Unknown(TerminationReason.Cancelled, stats)
-        }
+        return PortfolioReduction.verdict(results)
     }
 
     /**
@@ -142,7 +132,7 @@ class Portfolio(
                 }
             },
         )
-        val stats = results.fold(SolveStats.EMPTY) { acc, r -> acc.mergedWith(r.stats) }
+        val stats = PortfolioReduction.foldStats(results) { it.stats }
 
         // A direct Optimal claim is only produced by a worker not running under shared bounds
         // (single-worker / unshared); the engine downgrades to BestFound when a bound is shared.
@@ -151,26 +141,9 @@ class Portfolio(
 
         // The pool proves optimality only when EVERY worker exhausted its space; a worker that timed
         // out or was cancelled mid-search is dirty regardless of verdict shape.
-        val anyDirty = results.any { r ->
-            when (r) {
-                is MinimizeResult.BestFound -> r.reason != TerminationReason.SearchExhausted
-                is MinimizeResult.Unknown -> r.reason != TerminationReason.SearchExhausted
-                is MinimizeResult.Optimal, is MinimizeResult.Infeasible -> false
-            }
-        }
+        val anyDirty = results.any { !PortfolioReduction.isExhausted(it) }
         val snapshot = incumbent.load()
-        val sample = snapshot.sample
-        val finalBound = snapshot.bound
-        return when {
-            sample != null && anyDirty ->
-                MinimizeResult.BestFound(sample, finalBound, TerminationReason.BudgetExhausted, stats)
-
-            sample != null -> MinimizeResult.Optimal(sample, finalBound, stats)
-
-            anyDirty -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
-
-            else -> MinimizeResult.Infeasible(stats = stats)
-        }
+        return PortfolioReduction.terminal(snapshot.sample, snapshot.bound, anyDirty, stats)
     }
 
     /** CAS the (bound, sample) cell to [objective] when strictly better. Returns true iff *this* call
