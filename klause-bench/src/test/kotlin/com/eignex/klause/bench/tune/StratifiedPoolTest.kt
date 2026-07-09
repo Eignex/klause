@@ -7,6 +7,9 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.ReferenceEntry
 import com.eignex.klause.bench.metric.ReferenceStore
+import com.eignex.klause.bench.runner.ResolvedProblem
+import com.eignex.klause.bench.runner.Runners
+import com.eignex.klause.solver.Problem
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,14 +35,14 @@ class StratifiedPoolTest {
 
     /** Six refs whose cp-sat elapsedMs [1,2,3,4,100,200] put the quartile cuts at [2,3,4], so the tiers
      *  are S(≤2) / M(≤3) / L(≤4) / XL(>4), crossed with the structure column. */
-    private fun pool(): StratifiedPool {
+    private fun pool(resolve: (ProblemRef) -> ResolvedProblem = Runners::resolve): StratifiedPool {
         val refs = listOf("a", "b", "c", "d", "e", "f").map { ref(it) }
         val times = listOf(1L, 2L, 3L, 4L, 100L, 200L)
         val structures = listOf("global", "global", "linear", "linear", "global", "linear")
         val references = refs.indices.associate { i ->
             (ReferenceStore.suiteOf(refs[i]) to refs[i].name) to entry(refs[i], times[i], structures[i])
         }
-        return StratifiedPool(refs, references)
+        return StratifiedPool(refs, references, resolve)
     }
 
     @Test
@@ -58,5 +61,17 @@ class StratifiedPoolTest {
         assertEquals(4, drawn.size, "draws four distinct refs")
         val strata = drawn.mapNotNull { pool.stratumFor(it) }.toSet()
         assertTrue(strata.size >= 2, "a batch spans multiple strata (round-robin), got $strata")
+    }
+
+    @Test
+    fun `sample skips a ref whose resolution throws and never redraws it`() {
+        val pool = pool { r ->
+            if (r.name == "c") error("unsupported construct")
+            ResolvedProblem(r, Problem(1, 0, emptyArray(), emptyList()))
+        }
+        val drawn = pool.sample(6, Random(0))
+        assertEquals(5, drawn.size, "the one throwing ref is skipped; the other five resolve")
+        assertTrue(drawn.none { it.ref.name == "c" }, "the throwing ref is not in the sample")
+        assertTrue(pool.sampleRefs(6, Random(1)).none { it.name == "c" }, "a poisoned ref is never redrawn")
     }
 }

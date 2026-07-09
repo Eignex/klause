@@ -20,9 +20,14 @@ import kotlin.random.Random
 internal class StratifiedPool(
     candidates: List<ProblemRef>,
     references: Map<Pair<String, String>, ReferenceEntry> = ReferenceStore.load(),
+    private val resolve: (ProblemRef) -> ResolvedProblem = Runners::resolve,
 ) : SamplingPool {
     private val stratumByRef: Map<ProblemRef, String>
     private val byStratum: Map<String, List<ProblemRef>>
+
+    // Refs that threw while resolving (a corpus instance with a missing include, an unsupported
+    // construct): dropped so a single un-parseable instance can't abort the sweep, and never redrawn.
+    private val poisoned = HashSet<ProblemRef>()
 
     init {
         val rows = candidates.mapNotNull { ref ->
@@ -40,11 +45,29 @@ internal class StratifiedPool(
 
     override fun isNotEmpty(): Boolean = byStratum.isNotEmpty()
 
-    override fun sample(size: Int, rng: Random): List<ResolvedProblem> =
-        sampleRefs(size, rng).map { Runners.resolve(it) }
+    override fun sample(size: Int, rng: Random): List<ResolvedProblem> {
+        // Draw, resolve, and skip refs whose problem setup throws — one un-resolvable instance must not
+        // abort the campaign. A failing ref is poisoned (never redrawn) and the batch is topped up from
+        // resolvable refs, so a sample degrades to fewer instances only once the pool is exhausted.
+        val resolved = ArrayList<ResolvedProblem>(size)
+        val tried = HashSet<ProblemRef>()
+        while (resolved.size < size) {
+            val batch = sampleRefs(size - resolved.size, rng, tried)
+            if (batch.isEmpty()) break
+            for (ref in batch) {
+                tried += ref
+                runCatching { resolve(ref) }
+                    .onSuccess { resolved += it }
+                    .onFailure { poison(ref, it) }
+                if (resolved.size >= size) break
+            }
+        }
+        return resolved
+    }
 
-    /** The refs a [sample] would draw (round-robin across strata), before resolving — the testable core. */
-    fun sampleRefs(size: Int, rng: Random): List<ProblemRef> {
+    /** The refs a [sample] would draw (round-robin across strata), skipping [exclude] and any poisoned
+     *  ref, before resolving — the testable core. */
+    fun sampleRefs(size: Int, rng: Random, exclude: Set<ProblemRef> = emptySet()): List<ProblemRef> {
         val picked = LinkedHashSet<ProblemRef>()
         val strata = byStratum.keys.shuffled(rng)
         // Round-robin: one still-unpicked ref from each stratum per pass, until `size` distinct refs.
@@ -52,11 +75,18 @@ internal class StratifiedPool(
             val before = picked.size
             for (stratum in strata) {
                 if (picked.size >= size) break
-                byStratum.getValue(stratum).filter { it !in picked }.randomOrNull(rng)?.let { picked += it }
+                byStratum.getValue(stratum)
+                    .filter { it !in picked && it !in poisoned && it !in exclude }
+                    .randomOrNull(rng)?.let { picked += it }
             }
             if (picked.size == before) break // every stratum exhausted
         }
         return picked.toList()
+    }
+
+    private fun poison(ref: ProblemRef, cause: Throwable) {
+        poisoned += ref
+        println("[pool] skipping ${ref.name}: ${cause.message ?: cause::class.simpleName}")
     }
 
     /** The stratum label assigned to [ref] (test/analysis visibility). */
