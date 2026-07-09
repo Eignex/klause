@@ -40,17 +40,29 @@ object PortfolioBuilder {
         lsObjective: IncrementalObjective? = null,
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
-    ): List<PortfolioWorker> = materialize(
-        problem,
-        PortfolioComposition.compose(scenario),
-        scenario.seed,
-        scenario.lsLambda,
-        objective,
-        lsObjective,
-        definitionalSweep,
-        onEvent,
-        pools = poolsFor(scenario, problem),
-    )
+    ): List<PortfolioWorker> {
+        val composed = PortfolioComposition.compose(scenario)
+        // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
+        // wants one per core, the sequential track one per arm — so laneCount is maxOf(arms, cores).
+        // When arms >= cores (every existing scenario) this is a no-op cycle that returns the composed
+        // list verbatim, so the built workers are byte-identical. Only arms < cores grows the list,
+        // cycling the composed arms so the extra lanes are seed-diversified replicas: materialize feeds
+        // each lane's index as its per-worker seed offset, exactly as diverse() wraps past the pool onto
+        // fresh seeds, so a replica of a config gets a distinct seed.
+        val laneCount = maxOf(scenario.arms, scenario.cores)
+        val lanes = List(laneCount) { composed[it % composed.size] }
+        return materialize(
+            problem,
+            lanes,
+            scenario.seed,
+            scenario.lsLambda,
+            objective,
+            lsObjective,
+            definitionalSweep,
+            onEvent,
+            pools = poolsFor(scenario, problem),
+        )
+    }
 
     /**
      * Override entry for the per-worker credit campaign (#9): materialise an **explicit** arm mix —

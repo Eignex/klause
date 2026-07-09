@@ -43,14 +43,17 @@ enum class EngineMix {
  *
  * [cores] selects the executor: `cores == 1` ⇒ a single-core [SequentialPortfolio] that bandit-
  * schedules the [arms] arms one time-slice at a time; `cores > 1` ⇒ a parallel `Portfolio` running the
- * [arms] arms on real threads. [arms] is independent of [cores] (≥ it): the single-core sequential
- * track still draws on a multi-arm pool, and a parallel track may carry more arms than cores.
+ * composed arms on real threads. [arms] and [cores] are fully independent: the single-core sequential
+ * track still draws on a multi-arm pool, a parallel track may carry more arms than cores, and — when
+ * `arms < cores` — [PortfolioBuilder.build] replicates the composed arms across the extra lanes with
+ * distinct seeds, so a parallel run can be wider than its pool of distinct configs.
  */
 data class PortfolioScenario(
     /** Compute width. `1` selects the single-core sequential executor; `> 1` the parallel one. */
     val cores: Int,
-    /** Pool size — how many arms [PortfolioComposition.compose] produces. Independent of [cores], but
-     *  never fewer (a parallel track needs at least one arm per core). */
+    /** Pool size — how many distinct arms [PortfolioComposition.compose] produces. Independent of
+     *  [cores]: when `arms < cores` a parallel track replicates the composed arms across the extra
+     *  lanes (with distinct seeds); when `arms >= cores` every lane is a distinct composed arm. */
     val arms: Int,
     /** Whether the problem optimizes (COP) or only satisfies (CSP). */
     val kind: Kind,
@@ -85,7 +88,7 @@ data class PortfolioScenario(
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
-        require(arms >= cores) { "arms must be ≥ cores (got arms=$arms, cores=$cores)" }
+        require(arms >= 1) { "arms must be ≥ 1" }
     }
 
     /** Factories for the two execution shapes a scenario can take. */
