@@ -70,7 +70,7 @@ class LocalSearchSolver(
      *  active as the full (re)initializer. */
     val perMoveInvariants: Boolean = false,
     /** Implicit-solving feasible init (opt-in): after each restart's randomization the engine seeds
-     *  elected structural globals (see [LocalSearchState.electedImplicit]) into a feasible
+     *  elected structural globals (see [ImplicitSeeding.electedImplicit]) into a feasible
      *  configuration via [com.eignex.klause.localsearch.Invariant.seedFeasible] — an all-different becomes a
      *  partial permutation, a circuit a single tour — so the search starts inside those constraints'
      *  feasible region and their structure-preserving moves are productive from the first step. */
@@ -284,21 +284,7 @@ class LocalSearchSolver(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         return sequence {
-            val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
-            state.violationSoftCap = params.violationSoftCap
-            state.normalizeWeightsByClass = params.normalizeWeightsByClass
-            installInvariants(state)
-            warm?.applyTo(state)
-            // A restart policy instance can be reused across solves (a tuning campaign runs one
-            // recipe over many problems); clear its per-solve state so a stale incumbent — possibly
-            // of a different variable arity — can't leak in and be indexed against this problem.
-            // ScheduleBundle leaves restart reset to the engine; reset the underlying policy, not
-            // the `restarts` wrapper (whose reset is the interface no-op).
-            configuredRestart.reset()
-            // Streaming has no notion of "best so far" to anchor an adaptive restart
-            // around — pass null so policies that need a sample fall back to a fresh
-            // random restart.
-            restarts.restart(state, bestSoFar = null)
+            val state = newSatisfyState(params, effectiveAssumptions, warm, seed)
             var flipsSinceRestart = 0
             // Best-cost-so-far snapshot (even while infeasible): an IteratedLocalSearchRestart
             // perturbs from this instead of full-randomising, accumulating progress across restarts.
@@ -404,41 +390,7 @@ class LocalSearchSolver(
         warm: WarmState?,
         sink: SolveStatsSink,
     ) {
-        val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
-        state.violationSoftCap = params.violationSoftCap
-        state.normalizeWeightsByClass = params.normalizeWeightsByClass
-        installInvariants(state)
-        warm?.applyTo(state)
-        // Plumb shaping into the state so strategies consulting shapedBreakScore see the objective
-        // during pre-feasibility moves. Only CostShaping.Linear contributes a non-zero lambda;
-        // FeasibilityFirst leaves it at 0.0, identical to the no-shaping path.
-        state.objective = objective
-        state.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
-        // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
-        // restart; null by default. See [LocalSearchParams.initialAssignment].
-        val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
-        if (seeded) {
-            // Reconcile the warm-loaded assignment exactly as the restart path does: the seed sets only
-            // the variables its producing engine emitted, so any *defined* variable must be re-derived
-            // from the seeded decision variables — otherwise a definitional constraint reads as violated
-            // and the engine fights up from a spuriously-infeasible state, discarding the warm start.
-            definitionalSweep?.let { sweep ->
-                sweep.sweep(state.assignment, problem.intDomains, problem.factors) {
-                    state.assumptions.isFrozenBool(it)
-                }
-                state.recompute()
-            }
-        } else {
-            restarts.restart(state, bestSoFar = null)
-        }
-        // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
-        // microseconds and the repair pass is pure overhead. Skip it on a warm start: the seed is
-        // already feasible, and the repair sweep is objective-blind (it accepts any flip that doesn't
-        // raise cost), so on a cost-0 seed it would wander across equal-cost feasibles and discard the
-        // seed's objective — defeating the warm start.
-        val largeEnoughForGreedy = (problem.numBoolVars + problem.numIntVars) >= 32
-        if (greedyRepairOnRestart && largeEnoughForGreedy && !seeded) greedyRepairPass(state)
+        val state = newMinimizeState(objective, params, effectiveAssumptions, warm)
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
@@ -480,14 +432,6 @@ class LocalSearchSolver(
         val roundFeedback = RoundFeedback.of(satisfyStrategy, configuredRestart)
         var cancelCountdown = 0
         var lastCheckMs = 0L
-
-        // Restart from [anchor] and re-run the greedy repair sweep under the same gate as the
-        // initial restart above — the pairing every restart site must preserve. Counters and
-        // round bookkeeping stay at the call sites so the hot-loop locals aren't captured.
-        fun restartAndRepair(anchor: Sample?) {
-            restarts.restart(state, anchor)
-            if (greedyRepairOnRestart && largeEnoughForGreedy) greedyRepairPass(state)
-        }
 
         while (totalFlips < maxFlips) {
             if (cancelCountdown-- <= 0) {
@@ -541,7 +485,7 @@ class LocalSearchSolver(
                             continue
                         }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(bestSample)
+                        restartAndRepair(state, bestSample)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -577,7 +521,7 @@ class LocalSearchSolver(
                         }
                         feasibleMisses = 0
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(bestSample)
+                        restartAndRepair(state, bestSample)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -587,7 +531,7 @@ class LocalSearchSolver(
                 }
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
-                restartAndRepair(bestSample ?: bestCostSnap)
+                restartAndRepair(state, bestSample ?: bestCostSnap)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -599,7 +543,7 @@ class LocalSearchSolver(
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restartAndRepair(bestSample ?: bestCostSnap)
+                restartAndRepair(state, bestSample ?: bestCostSnap)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -639,6 +583,92 @@ class LocalSearchSolver(
             },
         )
     }
+
+    /** Build and prime the per-call [LocalSearchState] for a [runMinimizeStream] draw: config the
+     *  violation cap / weight normalisation, install invariants and warm state, plumb the objective and
+     *  its shaping lambda, then reach a start pose — warm-seed (with a definitional reconcile) when the
+     *  caller supplied [LocalSearchParams.initialAssignment], else a random restart followed by the
+     *  size-gated greedy repair. Ends where the loop's own bookkeeping begins. */
+    private fun newMinimizeState(
+        objective: Objective,
+        params: LocalSearchParams,
+        effectiveAssumptions: Assumptions,
+        warm: WarmState?,
+    ): LocalSearchState {
+        val seed = params.randomSeed ?: Random.Default.nextLong()
+        val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
+        state.violationSoftCap = params.violationSoftCap
+        state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
+        installInvariants(state)
+        warm?.applyTo(state)
+        // Plumb shaping into the state so strategies consulting shapedBreakScore see the objective
+        // during pre-feasibility moves. Only CostShaping.Linear contributes a non-zero lambda;
+        // FeasibilityFirst leaves it at 0.0, identical to the no-shaping path.
+        state.shaping.objective = objective
+        state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
+        // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
+        // restart; null by default. See [LocalSearchParams.initialAssignment].
+        val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
+        if (seeded) {
+            // Reconcile the warm-loaded assignment exactly as the restart path does: the seed sets only
+            // the variables its producing engine emitted, so any *defined* variable must be re-derived
+            // from the seeded decision variables — otherwise a definitional constraint reads as violated
+            // and the engine fights up from a spuriously-infeasible state, discarding the warm start.
+            definitionalSweep?.let { sweep ->
+                sweep.sweep(state.assignment, problem.intDomains, problem.factors) {
+                    state.assumptions.isFrozenBool(it)
+                }
+                state.recompute()
+            }
+        } else {
+            restarts.restart(state, bestSoFar = null)
+        }
+        // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
+        // microseconds and the repair pass is pure overhead. Skip it on a warm start: the seed is
+        // already feasible, and the repair sweep is objective-blind (it accepts any flip that doesn't
+        // raise cost), so on a cost-0 seed it would wander across equal-cost feasibles and discard the
+        // seed's objective — defeating the warm start.
+        if (greedyRepairOnRestart && isLargeEnoughForGreedy() && !seeded) greedyRepairPass(state)
+        return state
+    }
+
+    /** Build and prime the per-call [LocalSearchState] for a [streamImpl] satisfy draw: config the
+     *  violation cap / weight normalisation, install invariants and warm state, reset the (possibly
+     *  reused) restart policy's per-solve state, then take the first random restart. */
+    private fun newSatisfyState(
+        params: LocalSearchParams,
+        effectiveAssumptions: Assumptions,
+        warm: WarmState?,
+        seed: Long,
+    ): LocalSearchState {
+        val state = LocalSearchState(problem, Random(seed), effectiveAssumptions)
+        state.violationSoftCap = params.violationSoftCap
+        state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
+        installInvariants(state)
+        warm?.applyTo(state)
+        // A restart policy instance can be reused across solves (a tuning campaign runs one
+        // recipe over many problems); clear its per-solve state so a stale incumbent — possibly
+        // of a different variable arity — can't leak in and be indexed against this problem.
+        // ScheduleBundle leaves restart reset to the engine; reset the underlying policy, not
+        // the `restarts` wrapper (whose reset is the interface no-op).
+        configuredRestart.reset()
+        // Streaming has no notion of "best so far" to anchor an adaptive restart
+        // around — pass null so policies that need a sample fall back to a fresh
+        // random restart.
+        restarts.restart(state, bestSoFar = null)
+        return state
+    }
+
+    /** Restart [state] from [anchor] and re-run the greedy repair sweep under the same size gate as
+     *  the initial restart — the pairing every minimize restart site must preserve. */
+    private fun restartAndRepair(state: LocalSearchState, anchor: Sample?) {
+        restarts.restart(state, anchor)
+        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state)
+    }
+
+    /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
+     *  itself; tiny problems reach feasibility in microseconds and the sweep is pure overhead. */
+    private fun isLargeEnoughForGreedy(): Boolean = (problem.numBoolVars + problem.numIntVars) >= 32
 
     /** Load [sample] into [state]'s assignment (re-pinning assumed slots), reset the tabu/CC
      *  epoch, and recompute cost/degrees — the warm-start seed path for

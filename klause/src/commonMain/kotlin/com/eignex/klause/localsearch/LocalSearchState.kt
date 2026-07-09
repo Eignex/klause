@@ -6,12 +6,9 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
-import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
@@ -20,7 +17,6 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
-import kotlin.reflect.KClass
 
 /** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
  *  order of magnitude below the 1.0 structural default: a model padded with hundreds of redundant
@@ -70,107 +66,26 @@ class LocalSearchState(
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */
     val factors: Array<out Invariant> = problem.invariants
 
-    /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals whose
-     *  [Invariant.proposeStructuredMoves] preserves their own feasibility (see
-     *  [Invariant.providesImplicitNeighbourhood]). The engine draws their feasibility-preserving moves
-     *  even during infeasibility, and seeds them feasible at search start. Built once on first
-     *  access. */
-    val electedImplicit: IntArray by lazy { electImplicitFactors() }
+    /** DDFW-style per-invariant dynamic weights and their class-normalised baseline. */
+    val weights: FactorWeightBook = FactorWeightBook(problem)
 
-    /** Scope-disjoint subset of [electedImplicit] for feasible-init seeding: greedily chosen
-     *  largest-scope-first so no two seed factors share an int variable. Disjointness guarantees one
-     *  factor's [Invariant.seedFeasible] never overwrites another's seeded vars, so the post-seed
-     *  assignment satisfies every seeded global simultaneously. */
-    val implicitSeedFactors: IntArray by lazy { electImplicitSeedSet() }
+    /** Optimize-phase objective view: the injected objective, shaping lambda, and objective-hot-spot
+     *  int-var bias. */
+    val shaping: ObjectiveShaping = ObjectiveShaping()
 
-    /** Implicit-solving owner map over int vars: `ownerInt[v]` is the factor id that owns int var
-     *  `v`, or `-1` if `v` is searched freely. A variable is owned once [seedImplicitFeasible] seeds
-     *  its [implicitSeedFactors] global feasibly; from then on only that global's structure-preserving
-     *  [Invariant.proposeStructuredMoves] may change it, so the generic neighbourhood can never break
-     *  the implicitly-solved constraint. `null` until the first seeding pass, and only ever populated
-     *  when implicit feasible-init is enabled — so a search that does not seed implicitly is
-     *  unaffected. The [MoveSink] enforces the filter via [MoveSink.setOwners]. */
-    var ownerInt: IntArray? = null
-        private set
+    /** Tabu / activity bookkeeping: the accepted-move clock, last-touched stamps, and touch counts. */
+    val tabu: TabuBook = TabuBook(problem)
 
-    /** Binary-implication graph of [problem], literal-indexed at `2·numBoolVars`: `graph[Lit.make(v,
-     *  value)]` lists every literal that pinning `v = value` forces (sound, from probing-style
-     *  propagation). Built once on first access — the implication-aware move sources
-     *  ([com.eignex.klause.localsearch.movesource.FlipAndPropagate]) bundle a flip's forced
-     *  literals into one atomic move. The candidate cap mirrors probing's free-Boolean bound, so the
-     *  build cost is paid once per solve rather than per move. */
-    val implicationGraph: Array<IntArray> by lazy {
-        Presolve.implicationGraph(problem, problem.numBoolVars, Cancellation.Never)
-    }
+    /** Implicit-solving setup: elected globals, disjoint seed set, owner map, implication graph. */
+    val seeding: ImplicitSeeding = ImplicitSeeding(problem)
 
-    private fun electImplicitFactors(): IntArray {
-        val out = IntArrayList()
-        for (id in 0 until problem.numFactors) {
-            if (factors[id].providesImplicitNeighbourhood) out.add(id)
-        }
-        return IntArray(out.size) { out[it] }
-    }
-
-    private fun electImplicitSeedSet(): IntArray {
-        // Largest scope first to seed the most variables; ties broken by factor id for determinism
-        // (election must be reproducible, so the RNG never enters it).
-        val candidates = electedImplicit.sortedWith(
-            compareByDescending<Int> { problem.factors[it].intVars.size }.thenBy { it },
-        )
-        val owned = BooleanArray(problem.numIntVars)
-        val seeds = IntArrayList()
-        for (id in candidates) {
-            val scope = problem.factors[id].intVars
-            var disjoint = true
-            for (v in scope) {
-                if (owned[v]) {
-                    disjoint = false
-                    break
-                }
-            }
-            if (!disjoint) continue
-            for (v in scope) owned[v] = true
-            seeds.add(id)
-        }
-        return IntArray(seeds.size) { seeds[it] }
-    }
-
-    /** Implicit-solving feasible init: seed every [implicitSeedFactors] global into a satisfying
-     *  configuration (skipping vars frozen by [assumptions]). Caller is responsible for the
+    /** Implicit-solving feasible init: seed every [ImplicitSeeding.implicitSeedFactors] global into a
+     *  satisfying configuration (skipping vars frozen by [assumptions]). Caller is responsible for the
      *  subsequent [recompute]. */
-    fun seedImplicitFeasible() {
-        val seeds = implicitSeedFactors
-        if (seeds.isEmpty()) return
-        val owners = ownerInt ?: IntArray(problem.numIntVars) { -1 }
-        owners.fill(-1)
-        for (i in seeds.indices) {
-            val fid = seeds[i]
-            // Own a global's variables only when it actually seeded feasible: a failed seed (e.g. an
-            // all-different with no perfect matching) leaves its vars infeasible, so they must stay in
-            // the generic neighbourhood to be repaired rather than be frozen out as "implicitly solved".
-            if (factors[fid].seedFeasible(this, fid)) {
-                for (v in problem.factors[fid].intVars) owners[v] = fid
-            }
-        }
-        ownerInt = owners
-        moveSink.setOwners(owners)
-    }
+    fun seedImplicitFeasible() = seeding.seedImplicitFeasible(this)
 
-    /** Step counter incremented on every accepted move. Strategies use this together with
-     *  [lastTouched] to enforce a tabu list. */
-    var step: Long = 0L
-        internal set
-
-    /** Step at which each variable was last flipped or set. Bool var ids in `[0, numBoolVars)`; int
-     *  var ids offset by `numBoolVars`. Reset to zero on [restart] — used only for tabu / CCA-window
-     *  decisions within a single restart epoch. For cross-epoch activity, see [touchCount]. */
-    val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars)
-
-    /** Cumulative count of moves applied to each variable, same indexing as [lastTouched]. Survives
-     *  [restart] so it measures activity across the whole search run. Captured by
-     *  [com.eignex.klause.localsearch.WarmState] for ALNS's `activityBiased` destroy
-     *  operator. */
-    val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars)
+    /** Accepted-move step counter (the search clock); see [TabuBook.step]. */
+    val step: Long get() = tabu.step
 
     /** Eagerly-maintained make/break vectors for `Move.BoolFlip`. `boolBreakCount[v]` counts
      *  currently-satisfied invariants that would become violated if `v` is flipped; `boolMakeCount[v]`
@@ -194,144 +109,12 @@ class LocalSearchState(
     var bestCostSeen: Long = Long.MAX_VALUE
         internal set
 
-    /** Objective injected by the engine during a `minimize` call; `null` otherwise — strategies
-     *  consulting [shapedBreakScore] fall back to the unshaped break score. */
-    var objective: Objective? = null
-        internal set
-
-    private var objIntVarsCache: IntArray? = null
-    private var objIntVarsFor: Objective? = null
-
-    /**
-     * Int decision variables the current [objective] depends on — nonzero-coefficient vars of a
-     * [LinearObjective], leaf vars of a [FunctionalObjective], empty for any other shape or a
-     * satisfiability problem. Recomputed only when [objective] changes. This is the *objective*
-     * hot-spot set: the feasible-phase analogue of the violated-factor bias the infeasibility-phase
-     * sources already use, so an objective-descent structural move can concentrate on variables that
-     * actually move the objective rather than swapping objective-irrelevant pairs.
-     */
-    val objectiveIntVars: IntArray
-        get() {
-            val obj = objective ?: return EmptyIntArray
-            val cached = objIntVarsCache
-            if (cached != null && objIntVarsFor === obj) return cached
-            val computed = computeObjectiveIntVars(obj)
-            objIntVarsCache = computed
-            objIntVarsFor = obj
-            return computed
-        }
-
-    private fun computeObjectiveIntVars(obj: Objective): IntArray = when (obj) {
-        is LinearObjective -> {
-            val out = IntArrayList()
-            for (v in obj.intCoefficients.indices) if (obj.intCoefficients[v] != 0L) out.add(v)
-            IntArray(out.size) { out[it] }
-        }
-
-        is FunctionalObjective -> obj.leafVars.copyOf()
-
-        else -> EmptyIntArray
-    }
-
-    /** Sample an int decision variable biased toward the objective gradient ([objectiveIntVars]),
-     *  consuming one RNG int, or `-1` when the objective exposes no per-var int direction. The shared
-     *  hot-spot variable-selection primitive for feasible-phase structured sources. */
-    fun objectiveHotSpotIntVar(rng: Random): Int {
-        val vs = objectiveIntVars
-        return if (vs.isEmpty()) -1 else vs[rng.nextInt(vs.size)]
-    }
-
-    /** Lambda coefficient from `params.costShaping` for pre-feasibility shaping. Set by the engine
-     *  on entering `minimize`; 0.0 (no shaping) otherwise or under
-     *  [com.eignex.klause.localsearch.CostShaping.FeasibilityFirst]. */
-    var shapingLambda: Double = 0.0
-        internal set
-
     /** Soft cap for `compressViolation`: residuals at or below it
      *  keep exact unit resolution, above it a log tail bounds how much one large-magnitude factor
      *  dominates the cost sum. Set by the engine from [LocalSearchParams.violationSoftCap] once per
      *  solve, before the first [recompute]; every graded factor shares this one cap. */
     var violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP
         internal set
-
-    /** Per-invariant weight, default 1.0. Not read by the engine itself; strategies that bias toward
-     *  repairing persistently-violated invariants (DDFW, SAPS) read and mutate this between picks.
-     *
-     *  Lazily allocated on first access. Weight-blind strategies (WalkSat / ProbSat / SA) never
-     *  touch it and pay no allocation; only CBLS triggers the `DoubleArray(numFactors)`.
-     *  [WarmState.captureFrom] probes [factorWeightsAllocated] first to avoid forcing the allocation
-     *  to capture all-1.0 defaults. */
-    private var _factorWeights: DoubleArray? = null
-
-    /** Seed [factorWeights] by per-class population so no constraint kind dominates by count. Set by
-     *  the engine from [LocalSearchParams.normalizeWeightsByClass] before the first weight access. */
-    var normalizeWeightsByClass: Boolean = false
-        internal set
-
-    /** Per-invariant dynamic weights for weighted-violation strategies. Invariants the model declared
-     *  implied ([Problem.impliedFactorMask]) start at [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than
-     *  1.0, so the implied bulk can't dominate the initial descent before structural constraints are
-     *  met; SAPS-style bumping still raises an implied invariant's weight if it persistently blocks
-     *  progress.
-     *
-     *  When [normalizeWeightsByClass] is set, non-implied invariants are additionally damped by class
-     *  population — see [initialFactorWeights]. */
-    val factorWeights: DoubleArray
-        get() {
-            var w = _factorWeights
-            if (w == null) {
-                w = initialFactorWeights()
-                _factorWeights = w
-                _baseFactorWeights = w.copyOf()
-            }
-            return w
-        }
-
-    private var _baseFactorWeights: DoubleArray? = null
-
-    /** The initial seeded per-factor weights ([initialFactorWeights]), snapshotted once when
-     *  [factorWeights] is first allocated and never mutated. SAPS-style smoothing pulls the live
-     *  weights back toward this baseline rather than a flat constant, so the per-class / implied
-     *  seeding survives the reactive bumping. */
-    val baseFactorWeights: DoubleArray
-        get() {
-            _baseFactorWeights?.let { return it }
-            factorWeights // forces allocation, which also assigns _baseFactorWeights
-            return _baseFactorWeights ?: error("baseFactorWeights is assigned when factorWeights is allocated")
-        }
-
-    /** Build the initial per-factor weight vector. Non-implied factors start at 1.0, optionally
-     *  class-normalised ([normalizeWeightsByClass]): an over-represented factor class (population
-     *  above the mean over non-implied classes) is scaled so its aggregate weight is capped at that
-     *  mean, never amplifying a smaller class above 1.0. Implied factors are pinned to
-     *  [IMPLIED_FACTOR_INITIAL_WEIGHT] and excluded from the class tally. */
-    private fun initialFactorWeights(): DoubleArray {
-        val n = problem.numFactors
-        val implied = problem.impliedFactorMask
-        val w = DoubleArray(n) { 1.0 }
-        if (normalizeWeightsByClass) {
-            val counts = HashMap<KClass<*>, Int>()
-            for (i in 0 until n) {
-                if (implied != null && implied[i]) continue
-                val k = problem.factors[i]::class
-                counts[k] = (counts[k] ?: 0) + 1
-            }
-            if (counts.isNotEmpty()) {
-                val meanClassSize = counts.values.sum().toDouble() / counts.size
-                for (i in 0 until n) {
-                    if (implied != null && implied[i]) continue
-                    val c = counts.getValue(problem.factors[i]::class)
-                    if (c > meanClassSize) w[i] = meanClassSize / c
-                }
-            }
-        }
-        if (implied != null) for (i in 0 until n) if (implied[i]) w[i] = IMPLIED_FACTOR_INITIAL_WEIGHT
-        return w
-    }
-
-    /** True iff [factorWeights] has been touched (allocated) on this state. Reading is
-     *  free; allows callers to probe without forcing the lazy allocation. */
-    internal val factorWeightsAllocated: Boolean get() = _factorWeights != null
 
     /** Configuration-Checking flag per Boolean variable. `true` means a neighboring variable has
      *  been touched since this var was last flipped (or since restart), so CCASat-style strategies
@@ -383,10 +166,9 @@ class LocalSearchState(
      *  optimization-side warm-up passes (e.g. greedy-repair) that mutate the assignment
      *  via [apply] but should leave the LS engine a fresh tabu epoch afterwards. */
     fun resetStepCounters() {
-        for (i in lastTouched.indices) lastTouched[i] = 0L
+        tabu.reset()
         for (i in boolConfChange.indices) boolConfChange[i] = true
         for (i in intConfChange.indices) intConfChange[i] = true
-        step = 0L
     }
 
     /** Recompute cost and per-factor degrees from scratch. */
@@ -503,8 +285,9 @@ class LocalSearchState(
     /**
      * Break score fused with the per-move objective delta:
      *   `breakScore(move).toDouble() + shapingLambda * objectiveDelta(move)`
-     * Reduces to `breakScore(move).toDouble()` when [shapingLambda] is zero, [objective] is null,
-     * or the objective isn't a [LinearObjective], so non-shaping callers see identical behavior.
+     * Reduces to `breakScore(move).toDouble()` when [ObjectiveShaping.shapingLambda] is zero,
+     * [ObjectiveShaping.objective] is null, or the objective isn't a [LinearObjective], so non-shaping
+     * callers see identical behavior.
      *
      * Two fast paths are recognised: [LinearObjective] (O(1) coefficient lookup per move) and
      * [IncrementalObjective] (caller-supplied `deltaIfApplied`). Anything else returns `0.0`, since
@@ -519,14 +302,15 @@ class LocalSearchState(
      * weighted break, ProbSat's exponent input) add this to their base metric.
      */
     fun shapedObjectiveDelta(move: Move): Double {
-        val obj = objective ?: return 0.0
-        if (shapingLambda == 0.0) return 0.0
+        val obj = shaping.objective ?: return 0.0
+        val lambda = shaping.shapingLambda
+        if (lambda == 0.0) return 0.0
         val delta = when (obj) {
             is LinearObjective -> linearObjectiveDelta(move, obj)
             is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
             else -> return 0.0
         }
-        return shapingLambda * delta
+        return lambda * delta
     }
 
     /**
@@ -615,11 +399,11 @@ class LocalSearchState(
     /**
      * Weighted net change in violated-factor count for [move]: `Σ factorWeights[f] · Δviolated[f]`.
      * Companion to [netDelta] for CBLS strategies that score against the per-factor weight vector.
-     * Reads from [factorWeights], lazily-allocating if untouched — check [factorWeightsAllocated]
-     * first to avoid forcing the allocation on a probe.
+     * Reads from [FactorWeightBook.factorWeights], lazily-allocating if untouched — check
+     * [FactorWeightBook.allocated] first to avoid forcing the allocation on a probe.
      */
     fun weightedNetDelta(move: Move): Double {
-        val w = factorWeights
+        val w = weights.factorWeights
         return when (move) {
             is Move.BoolFlip -> {
                 var sum = 0.0
@@ -703,9 +487,9 @@ class LocalSearchState(
             markNeighborConfChange(touchedFactors)
             markMovedVar()
         }
-        step++
-        lastTouched[slot] = step
-        if (touchCount[slot] < Int.MAX_VALUE) touchCount[slot]++
+        tabu.step++
+        tabu.lastTouched[slot] = tabu.step
+        if (tabu.touchCount[slot] < Int.MAX_VALUE) tabu.touchCount[slot]++
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 
@@ -789,34 +573,17 @@ class LocalSearchState(
         return pick
     }
 
-    /** True iff [move]'s var was touched within the last [tenure] accepted moves. For
-     *  a [Move.Compound], conservative: true if *any* part is tabu. */
-    fun isTaboo(move: Move, tenure: Int): Boolean {
-        if (tenure <= 0) return false
-        return when (move) {
-            is Move.BoolFlip -> isTabooSlot(move.varId, tenure)
-            is Move.IntSet -> isTabooSlot(problem.numBoolVars + move.varId, tenure)
-            is Move.Compound -> move.parts.any { isTaboo(it, tenure) }
-        }
-    }
-
-    private fun isTabooSlot(slot: Int, tenure: Int): Boolean {
-        val touched = lastTouched[slot]
-        if (touched == 0L) return false
-        return step - touched < tenure
-    }
-
     /**
      * Apply [move] forward, observe (newly-violated, net-cost-diff), revert via inverse primitives,
      * and restore step / lastTouched / conf-change so the state is exactly as it was before.
      */
     private fun evaluateCompound(move: Move.Compound): CompoundEval {
-        val oldStep = step
+        val oldStep = tabu.step
         val oldCost = cost
         val oldBestCost = bestCostSeen
         // Degree snapshot for the exact weighted delta. Skipped when no strategy touched the weights
         // (all 1.0 ⇒ weighted == raw netDelta).
-        val degBefore = if (factorWeightsAllocated) {
+        val degBefore = if (weights.allocated) {
             (degScratch ?: IntArray(factorDegree.size)).also { degScratch = it }.also { factorDegree.copyInto(it) }
         } else {
             null
@@ -840,8 +607,8 @@ class LocalSearchState(
         for (i in 0 until n) {
             val slot = slotOf(move.parts[i])
             touchedSlots[i] = slot
-            savedTouched[i] = lastTouched[slot]
-            savedTouchCount[i] = touchCount[slot]
+            savedTouched[i] = tabu.lastTouched[slot]
+            savedTouchCount[i] = tabu.touchCount[slot]
         }
 
         probeTouchedList.clear()
@@ -859,7 +626,7 @@ class LocalSearchState(
         val netDelta: Long = cost - oldCost
         var weightedNetDelta = netDelta.toDouble()
         if (degBefore != null) {
-            val w = factorWeights
+            val w = weights.factorWeights
             weightedNetDelta = 0.0
             for (i in degBefore.indices) {
                 val d = factorDegree[i] - degBefore[i]
@@ -871,9 +638,9 @@ class LocalSearchState(
         probeActive = false
 
         // Conf-change needs no restore — it was left untouched for the whole probe (see probeActive).
-        step = oldStep
-        for (i in 0 until n) lastTouched[touchedSlots[i]] = savedTouched[i]
-        for (i in 0 until n) touchCount[touchedSlots[i]] = savedTouchCount[i]
+        tabu.step = oldStep
+        for (i in 0 until n) tabu.lastTouched[touchedSlots[i]] = savedTouched[i]
+        for (i in 0 until n) tabu.touchCount[touchedSlots[i]] = savedTouchCount[i]
         bestCostSeen = oldBestCost
 
         return CompoundEval(breakScore = breakCount, netDelta = netDelta, weightedNetDelta = weightedNetDelta)

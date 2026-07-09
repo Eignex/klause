@@ -48,13 +48,13 @@ internal class WarmState {
      *  aspiration see the full-history low. */
     internal fun applyTo(state: LocalSearchState) {
         factorWeights?.let { w ->
-            if (w.size == state.factorWeights.size) {
-                for (i in w.indices) state.factorWeights[i] = w[i]
+            if (w.size == state.weights.factorWeights.size) {
+                for (i in w.indices) state.weights.factorWeights[i] = w[i]
             }
         }
         activityTouches?.let { t ->
-            if (t.size == state.touchCount.size) {
-                for (i in t.indices) state.touchCount[i] = t[i]
+            if (t.size == state.tabu.touchCount.size) {
+                for (i in t.indices) state.tabu.touchCount[i] = t[i]
             }
         }
         if (bestCostSeen < state.bestCostSeen) state.bestCostSeen = bestCostSeen
@@ -64,15 +64,15 @@ internal class WarmState {
      *  watermark at the end of a search session. Touch counts and the watermark survive
      *  restart, so they reflect the whole call regardless of restart cadence.
      *
-     *  Skips the weight copy when the state never allocated [LocalSearchState.factorWeights]
+     *  Skips the weight copy when the state never allocated [FactorWeightBook.factorWeights]
      *  — happens whenever the strategy was weight-blind (WalkSat, ProbSat, etc.).
      *  Capturing a freshly-allocated all-1.0 default would force the allocation we just
      *  avoided. */
     internal fun captureFrom(state: LocalSearchState) {
-        if (state.factorWeightsAllocated) {
-            factorWeights = state.factorWeights.copyOf()
+        if (state.weights.allocated) {
+            factorWeights = state.weights.factorWeights.copyOf()
         }
-        activityTouches = state.touchCount.copyOf()
+        activityTouches = state.tabu.touchCount.copyOf()
         // Monotone-decreasing: never let the warm watermark go up between calls.
         if (state.bestCostSeen < bestCostSeen) bestCostSeen = state.bestCostSeen
     }

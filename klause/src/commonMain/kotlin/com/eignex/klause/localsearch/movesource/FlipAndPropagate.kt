@@ -10,7 +10,8 @@ import com.eignex.klause.util.MutableIntIntMap
 /**
  * Implication-aware flip proposals. Seeds from Boolean variables of sampled violated factors; for
  * each it builds one atomic [Move.Compound] of the seed flip plus the literals that flip transitively
- * follows through the binary-implication graph ([LocalSearchState.implicationGraph]), to a bounded
+ * follows through the binary-implication graph
+ * ([com.eignex.klause.localsearch.ImplicitSeeding.implicationGraph]), to a bounded
  * depth. Pinning `v = value` forces every literal in `graph[Lit.make(v, value)]`, so emitting the
  * forced flips together lands the move in an implication-consistent region instead of leaving a
  * cascade of single-variable violations the search must repair one flip at a time.
@@ -41,7 +42,7 @@ class FlipAndPropagate(
 
     override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (cap <= 0 || state.violated.isEmpty()) return
-        val graph = state.implicationGraph
+        val graph = state.seeding.implicationGraph
         var budget = cap
         repeat(minOf(cap, state.violated.size)) {
             if (budget <= 0) return

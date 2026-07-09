@@ -41,7 +41,7 @@ internal fun LocalSearchState.proposeRepairChains(
 ): Int {
     val propose = MoveSink(assumptions).also {
         it.setInvariants(invariants)
-        it.setOwners(ownerInt)
+        it.setOwners(seeding.ownerInt)
     }
     factors[seedFactor].proposeRepairMoves(this, seedFactor, propose)
     var emitted = sampleChainFirsts(propose.list, firstMoveCap, maxDepth, propose, sink)
@@ -117,7 +117,7 @@ internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFacto
  *  watermark). */
 internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propose: MoveSink): List<Move>? {
     val startCost = cost
-    val oldStep = step
+    val oldStep = tabu.step
     val oldBest = bestCostSeen
     val oldBoolConf = boolConfChange.copyOf()
     val oldIntConf = intConfChange.copyOf()
@@ -135,8 +135,8 @@ internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propo
         val slot = slotOf(p)
         if (pinnedSlots.add(slot)) {
             savedSlots.add(slot)
-            savedTouched.add(lastTouched[slot])
-            savedCounts.add(touchCount[slot])
+            savedTouched.add(tabu.lastTouched[slot])
+            savedCounts.add(tabu.touchCount[slot])
         }
         recordBaseDegrees(p, baseDegree)
         inverses.add(inverseOf(p))
@@ -168,10 +168,10 @@ internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propo
     val keep = bestPrefixLen >= 2
 
     for (i in inverses.indices.reversed()) apply(inverses[i])
-    step = oldStep
+    tabu.step = oldStep
     for (i in 0 until savedSlots.size) {
-        lastTouched[savedSlots[i]] = savedTouched[i]
-        touchCount[savedSlots[i]] = savedCounts[i]
+        tabu.lastTouched[savedSlots[i]] = savedTouched[i]
+        tabu.touchCount[savedSlots[i]] = savedCounts[i]
     }
     for (i in oldBoolConf.indices) boolConfChange[i] = oldBoolConf[i]
     for (i in oldIntConf.indices) intConfChange[i] = oldIntConf[i]
@@ -217,7 +217,7 @@ internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: I
 /** The factor with the largest weighted degree increase over its chain-start baseline,
  *  or -1 when nothing regressed (the chain caused no new damage). */
 internal fun LocalSearchState.worstRegressedFactor(base: MutableIntIntMap): Int {
-    val w = factorWeights
+    val w = weights.factorWeights
     var worst = -1
     var worstScore = 0.0
     base.forEach { fid, deg0 ->

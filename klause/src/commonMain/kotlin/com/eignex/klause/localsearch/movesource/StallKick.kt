@@ -45,7 +45,7 @@ class StallKick(
         scratch.clear()
         scratch.setAssumptions(state.assumptions)
         scratch.setInvariants(state.invariants)
-        scratch.setOwners(state.ownerInt)
+        scratch.setOwners(state.seeding.ownerInt)
         val size = kickSize?.nextSize(state.rng) ?: kickVars
         var budget = size
         var attempts = size * ATTEMPTS_PER_KICK

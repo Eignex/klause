@@ -80,10 +80,10 @@ class CompoundMoveTest {
         val (_, state) = setupAllDifferentConflict()
         state.apply(Move.IntSet(0, 9))
         val compound = Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(2, 7)))
-        assertTrue(state.isTaboo(compound, tenure = 10), "x0 was just touched; compound must be tabu")
+        assertTrue(state.tabu.isTaboo(compound, tenure = 10), "x0 was just touched; compound must be tabu")
 
         val safe = Move.Compound(listOf(Move.IntSet(1, 4), Move.IntSet(2, 7)))
-        assertTrue(!state.isTaboo(safe, tenure = 10), "x1/x2 untouched; compound must not be tabu")
+        assertTrue(!state.tabu.isTaboo(safe, tenure = 10), "x1/x2 untouched; compound must not be tabu")
     }
 
     @Test

@@ -22,7 +22,7 @@ import com.eignex.klause.solver.result.MinimizeResult
  *
  * Sync points:
  *  - Sync-in: at the start of each call, the warm state is copied into the new
- *    [LocalSearchState.factorWeights] (only if size matches `problem.numFactors`).
+ *    [FactorWeightBook.factorWeights] (only if size matches `problem.numFactors`).
  *  - Sync-out: at the end of the search loop, or when a streaming sequence completes / is
  *    cancelled. Sequences abandoned mid-iteration may not sync (accepted loss); the next call
  *    still starts from the previous capture.

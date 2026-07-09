@@ -48,8 +48,8 @@ class ImplicitNeighbourhoodTest {
     fun `every all-different is elected for implicit neighbourhoods`() {
         val state = LocalSearchState(latinSquare(), Random(1))
         assertTrue(
-            state.electedImplicit.toList().sorted() == listOf(0, 1, 2, 3),
-            "all four all-differents must be elected, got ${state.electedImplicit.toList()}",
+            state.seeding.electedImplicit.toList().sorted() == listOf(0, 1, 2, 3),
+            "all four all-differents must be elected, got ${state.seeding.electedImplicit.toList()}",
         )
     }
 
@@ -82,12 +82,12 @@ class ImplicitNeighbourhoodTest {
         val problem = latinSquare()
         val state = LocalSearchState(problem, Random(1))
         val owned = HashSet<Int>()
-        for (fid in state.implicitSeedFactors) {
+        for (fid in state.seeding.implicitSeedFactors) {
             for (v in problem.factors[fid].intVars) {
                 assertTrue(owned.add(v), "seed factors must not share var $v")
             }
         }
-        assertTrue(state.implicitSeedFactors.isNotEmpty(), "at least one all-different must be seeded")
+        assertTrue(state.seeding.implicitSeedFactors.isNotEmpty(), "at least one all-different must be seeded")
     }
 
     @Test
@@ -144,7 +144,7 @@ class ImplicitNeighbourhoodTest {
         state.assignment.setInt(2, 0)
         state.recompute()
         state.seedImplicitFeasible()
-        val owners = assertNotNull(state.ownerInt, "seeding must populate the owner map")
+        val owners = assertNotNull(state.seeding.ownerInt, "seeding must populate the owner map")
         assertTrue(
             owners.toList() == listOf(0, 0, 0),
             "the all-different (factor 0) owns its three vars, got ${owners.toList()}",
@@ -170,13 +170,13 @@ class ImplicitNeighbourhoodTest {
 
         // A generic add (no proposing factor) on an owned var is filtered out of the neighbourhood.
         val generic = MoveSink()
-        generic.setOwners(state.ownerInt)
+        generic.setOwners(state.seeding.ownerInt)
         generic.addIntSet(0, 2)
         assertTrue(generic.list.isEmpty(), "the generic pool must not touch an owned var")
 
         // The owner's own structure-preserving moves on the same vars survive the filter.
         val owned = MoveSink()
-        owned.setOwners(state.ownerInt)
+        owned.setOwners(state.seeding.ownerInt)
         owned.proposer = 0
         state.factors[0].proposeStructuredMoves(state, 0, owned)
         assertTrue(owned.list.isNotEmpty(), "the owner must still be able to move the vars it owns")

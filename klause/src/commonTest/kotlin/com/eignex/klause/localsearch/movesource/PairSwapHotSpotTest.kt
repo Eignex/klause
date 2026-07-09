@@ -31,7 +31,7 @@ class PairSwapHotSpotTest {
 
     private fun prepared(seed: Long): LocalSearchState {
         val state = LocalSearchState(problem(), Random(seed))
-        state.objective = LinearObjective(intCoefficients = longArrayOf(0, 1, 0, 1))
+        state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(0, 1, 0, 1))
         // Distinct values so int swaps are always legal.
         state.assignment.setInt(0, 2)
         state.assignment.setInt(1, 4)
@@ -43,14 +43,14 @@ class PairSwapHotSpotTest {
 
     @Test
     fun `objective int vars are the nonzero-coefficient variables`() {
-        assertEquals(listOf(1, 3), prepared(1).objectiveIntVars.toList())
+        assertEquals(listOf(1, 3), prepared(1).shaping.objectiveIntVars.toList())
     }
 
     @Test
     fun `objective hot-spot var sampling stays within the objective vars`() {
         val state = prepared(1)
         repeat(100) {
-            assertTrue(state.objectiveHotSpotIntVar(state.rng) in intArrayOf(1, 3))
+            assertTrue(state.shaping.objectiveHotSpotIntVar(state.rng) in intArrayOf(1, 3))
         }
     }
 
@@ -58,7 +58,7 @@ class PairSwapHotSpotTest {
     fun `objective hot-spot var is -1 when the objective exposes no int gradient`() {
         val state = LocalSearchState(problem(), Random(1))
         // No objective set.
-        assertEquals(-1, state.objectiveHotSpotIntVar(state.rng))
+        assertEquals(-1, state.shaping.objectiveHotSpotIntVar(state.rng))
     }
 
     @Test

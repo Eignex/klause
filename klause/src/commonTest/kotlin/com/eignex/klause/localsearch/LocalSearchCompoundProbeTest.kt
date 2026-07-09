@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 
 /**
  * A `netDelta`/`breakScore` probe of a [Move.Compound] uses apply-then-revert internally, but must
- * leave the state *exactly* as it was — including the cross-epoch [LocalSearchState.touchCount]
+ * leave the state *exactly* as it was — including the cross-epoch [TabuBook.touchCount]
  * activity counters that drive ALNS / WarmState. After a mix of real applies and Compound probes:
  *  - touchCount equals the count of *real* applies only (probes contribute nothing), and
  *  - the break/make vectors and cost match a fresh recompute (probes leave no residue).
@@ -65,7 +65,7 @@ class LocalSearchCompoundProbeTest {
                 for (slot in 0 until totalSlots) {
                     assertEquals(
                         expectedTouch[slot],
-                        state.touchCount[slot],
+                        state.tabu.touchCount[slot],
                         "${case.name} seed=$seed: touchCount[$slot] inflated by probes " +
                             "(expected real-apply count ${expectedTouch[slot]})",
                     )

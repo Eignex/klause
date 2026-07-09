@@ -78,7 +78,7 @@ data class LocalSearchParams(
      */
     val violationSoftCap: Int = DEFAULT_VIOLATION_SOFT_CAP,
     /**
-     * Seed the weighted-violation strategies' initial [LocalSearchState.factorWeights] so no single
+     * Seed the weighted-violation strategies' initial [FactorWeightBook.factorWeights] so no single
      * constraint *kind* dominates the landscape by population. When set, an over-represented factor
      * class (count above the mean class size) is damped so its aggregate initial weight is capped at
      * that mean — purely monotone (it only lowers weights). Weight-blind strategies (WalkSat /

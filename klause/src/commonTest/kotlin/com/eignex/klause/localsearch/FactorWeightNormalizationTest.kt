@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Initial [LocalSearchState.factorWeights] seeding: with [LocalSearchParams.normalizeWeightsByClass]
+ * Initial [FactorWeightBook.factorWeights] seeding: with [LocalSearchParams.normalizeWeightsByClass]
  * on, an over-populated factor *kind* is damped so it can't steer the descent by sheer count, while
  * smaller kinds keep weight 1.0.
  */
@@ -34,7 +34,7 @@ class FactorWeightNormalizationTest {
     fun `off by default leaves every factor at weight 1`() {
         val factors = List(8) { linear() } + List(2) { clause() }
         val state = LocalSearchState(problem(factors), Random(0))
-        assertTrue(state.factorWeights.all { it == 1.0 })
+        assertTrue(state.weights.factorWeights.all { it == 1.0 })
     }
 
     @Test
@@ -43,8 +43,8 @@ class FactorWeightNormalizationTest {
         // Clause (2 <= 5) stays at 1.0.
         val factors = List(8) { linear() } + List(2) { clause() }
         val state = LocalSearchState(problem(factors), Random(0))
-        state.normalizeWeightsByClass = true
-        val w = state.factorWeights
+        state.weights.normalizeWeightsByClass = true
+        val w = state.weights.factorWeights
         for (i in 0 until 8) assertEquals(5.0 / 8.0, w[i], 1e-9)
         for (i in 8 until 10) assertEquals(1.0, w[i], 1e-9)
     }
@@ -54,8 +54,8 @@ class FactorWeightNormalizationTest {
         // 3 Linear + 3 Clause: mean = 3, neither class exceeds it, so nothing is damped.
         val factors = List(3) { linear() } + List(3) { clause() }
         val state = LocalSearchState(problem(factors), Random(0))
-        state.normalizeWeightsByClass = true
-        assertTrue(state.factorWeights.all { it == 1.0 })
+        state.weights.normalizeWeightsByClass = true
+        assertTrue(state.weights.factorWeights.all { it == 1.0 })
     }
 
     @Test
@@ -65,13 +65,13 @@ class FactorWeightNormalizationTest {
         val factors = List(8) { linear() } + List(2) { clause() }
         val implied = BooleanArray(10).also { for (i in 0 until 6) it[i] = true }
         val state = LocalSearchState(problem(factors, implied), Random(0))
-        val base = state.baseFactorWeights
+        val base = state.weights.baseFactorWeights
         for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, base[i], 1e-9)
         for (i in 6 until 10) assertEquals(1.0, base[i], 1e-9)
         // Bumping the live weights leaves the baseline untouched.
-        for (i in state.factorWeights.indices) state.factorWeights[i] += 5.0
-        for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, state.baseFactorWeights[i], 1e-9)
-        for (i in 6 until 10) assertEquals(1.0, state.baseFactorWeights[i], 1e-9)
+        for (i in state.weights.factorWeights.indices) state.weights.factorWeights[i] += 5.0
+        for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, state.weights.baseFactorWeights[i], 1e-9)
+        for (i in 6 until 10) assertEquals(1.0, state.weights.baseFactorWeights[i], 1e-9)
     }
 
     @Test
@@ -83,8 +83,8 @@ class FactorWeightNormalizationTest {
         val factors = List(8) { linear() } + List(2) { clause() }
         val implied = BooleanArray(10).also { for (i in 0 until 6) it[i] = true }
         val state = LocalSearchState(problem(factors, implied), Random(0))
-        state.normalizeWeightsByClass = true
-        val w = state.factorWeights
+        state.weights.normalizeWeightsByClass = true
+        val w = state.weights.factorWeights
         for (i in 0 until 6) assertEquals(IMPLIED_FACTOR_INITIAL_WEIGHT, w[i], 1e-9)
         for (i in 6 until 10) assertEquals(1.0, w[i], 1e-9)
     }
