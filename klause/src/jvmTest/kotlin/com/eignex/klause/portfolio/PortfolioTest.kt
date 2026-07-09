@@ -464,6 +464,48 @@ class PortfolioTest {
         }
     }
 
+    @Test
+    fun `a parallel scenario with fewer arms than cores replicates the arms across lanes`() {
+        // arms=2, cores=6: compose yields 2 distinct LS arms, then the build cycles them across all
+        // 6 lanes as seed-diversified replicas. LS worker labels are ls/<recipe> (no index), so the
+        // replication is visible as a period-2 cycle of the two composed labels.
+        val workers = PortfolioBuilder.build(
+            exactlyOneOver(5),
+            PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
+        )
+        assertEquals(6, workers.size, "arms<cores must still fill every core lane")
+        val labels = workers.map { it.label }
+        assertEquals(2, labels.toSet().size, "the 6 lanes replicate the 2 composed arms")
+        assertEquals(labels[0], labels[2], "lane 2 replicates composed arm 0")
+        assertEquals(labels[1], labels[3], "lane 3 replicates composed arm 1")
+        assertTrue(labels[0] != labels[1], "the two composed arms are distinct")
+    }
+
+    @Test
+    fun `a parallel scenario with arms equal to cores builds one worker per arm`() {
+        val workers = PortfolioBuilder.build(
+            exactlyOneOver(5),
+            PortfolioScenario.parallel(cores = 4, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
+        )
+        assertEquals(4, workers.size, "arms==cores is one distinct worker per lane")
+    }
+
+    @Test
+    fun `a sequential scenario builds one worker per arm`() {
+        val workers = PortfolioBuilder.build(
+            exactlyOneOver(5),
+            PortfolioScenario.sequential(kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH, arms = 5),
+        )
+        assertEquals(5, workers.size, "the single-core sequential track keeps its full arm pool")
+    }
+
+    @Test
+    fun `a scenario with fewer arms than cores no longer throws`() {
+        val scenario = PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH)
+        assertEquals(2, scenario.arms)
+        assertEquals(6, scenario.cores)
+    }
+
     private fun exactlyOneOver(n: Int): Problem {
         val factor = Cardinality.exactlyOne(IntArray(n) { Lit.make(it, true) })
         return Problem(n, 0, emptyArray(), listOf(factor))
