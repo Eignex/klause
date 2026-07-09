@@ -32,6 +32,13 @@ internal interface TuningStudy : AutoCloseable {
     /** Report [suggestion]'s measured [objective] (in the study's orientation). */
     fun complete(suggestion: Suggestion, objective: Double)
 
+    /** Report that [suggestion] could not be evaluated at all — the config threw ([reason] carries the
+     *  cause) rather than merely scoring poorly. The optimizer records it as an infeasible trial (no
+     *  objective) so it learns to avoid the region *without* a fake reward skewing the response surface;
+     *  a config that runs but performs badly is [complete]d with its genuine low reward instead. A
+     *  learning-free backend may ignore it. */
+    fun markInfeasible(suggestion: Suggestion, reason: String)
+
     /** Warm-start: inject a config already evaluated *outside* this study (its [values] and measured
      *  [objective]) as a known completed trial, so the optimizer starts already informed. The residual
      *  rounds ([BoTuning]) use this to seed each round's fresh study with every config the earlier

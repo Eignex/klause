@@ -231,21 +231,41 @@ internal object BoTuning {
         val frontier = HashMap<String, Double>() // stratum -> best reward across kept configs; only rises
         val palette = ArrayList<PaletteEntry>()
         val kept = HashSet<String>()
+        val crashed = HashSet<String>() // config labels whose decode/eval threw — logged once, dropped
+
+        // A config that throws (decode or solver) is a crasher, not a merely-bad config: drop it from the
+        // cache/candidates entirely so no cached reward can make it a palette arm, and log its cause once.
+        // Returns the reason so the caller can report the trial *infeasible* to the tuner — steering the
+        // optimizer away from the region without a fake reward that would distort its response surface.
+        fun crash(label: String, t: Throwable): String {
+            rewards.remove(label)
+            configs.remove(label)
+            val reason = "${t::class.simpleName}: ${t.message?.take(140)}"
+            if (crashed.add(label)) {
+                println("[bo] config $label failed to evaluate ($reason); dropped, continuing")
+            }
+            return reason
+        }
 
         // Solve a config on a mini-batch, caching each (config, instance) reward so a re-sampled pair is
-        // free. Decoded once; only the batch's uncached instances are actually solved.
-        fun evaluateOn(assignment: Map<String, Any>, samples: List<ResolvedProblem>) {
+        // free. Decoded once; only the batch's uncached instances are actually solved. Returns null on
+        // success, or the crash reason if decode/the solver threw (the config is dropped — see [crash]). A
+        // config that runs but scores poorly is NOT a crash: it keeps its genuine low reward.
+        fun evaluateOn(assignment: Map<String, Any>, samples: List<ResolvedProblem>): String? {
             val label = labelOf(assignment)
+            val decoded = runCatching { decode(assignment) }.getOrElse { return crash(label, it) }
             val vector = rewards.getOrPut(label) {
                 configs[label] = assignment
                 HashMap()
             }
-            val decoded = decode(assignment)
             for (p in samples) {
                 val key = instanceKey(p)
+                if (key in vector) continue
+                val r = runCatching { reward(p, decoded) }.getOrElse { return crash(label, it) }
                 stratumByKey.getOrPut(key) { pool.stratumOf(p) }
-                vector.getOrPut(key) { reward(p, decoded) }
+                vector[key] = r
             }
+            return null
         }
 
         // A config's mean reward per stratum, over the instances it has been sampled on.
@@ -281,15 +301,22 @@ internal object BoTuning {
                     val forcedAssignment = forced?.invoke(rng, configs)
                     if (forcedAssignment != null) {
                         val assignment = space.coerce(forcedAssignment)
-                        evaluateOn(assignment, pool.sample(sampleSize, rng))
-                        study.observe(assignment, gainOf(labelOf(assignment)))
+                        // A forced config is told to the study via observe (no server-side trial to mark
+                        // infeasible); on a crash it is simply dropped and not observed.
+                        if (evaluateOn(assignment, pool.sample(sampleSize, rng)) == null) {
+                            study.observe(assignment, gainOf(labelOf(assignment)))
+                        }
                         evaluated++
                     } else {
                         val ask = minOf(batch, trials - evaluated)
                         for (suggestion in study.suggest(ask)) {
                             val assignment = space.coerce(suggestion.values)
-                            evaluateOn(assignment, pool.sample(sampleSize, rng))
-                            study.complete(suggestion, gainOf(labelOf(assignment)))
+                            val reason = evaluateOn(assignment, pool.sample(sampleSize, rng))
+                            if (reason != null) {
+                                study.markInfeasible(suggestion, reason)
+                            } else {
+                                study.complete(suggestion, gainOf(labelOf(assignment)))
+                            }
                         }
                         evaluated += ask
                     }

@@ -23,6 +23,9 @@ internal class RandomTuner(seed: Long = 0L) : Tuner {
             /** Random search does not learn, so a reported objective is ignored. */
             override fun complete(suggestion: Suggestion, objective: Double) = Unit
 
+            /** Random search does not learn, so an infeasible trial is ignored. */
+            override fun markInfeasible(suggestion: Suggestion, reason: String) = Unit
+
             /** Random search does not learn, so a warm-start observation is ignored. */
             override fun observe(values: Map<String, Any>, objective: Double) = Unit
 

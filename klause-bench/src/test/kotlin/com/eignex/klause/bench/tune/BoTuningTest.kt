@@ -51,6 +51,7 @@ class BoTuningTest {
                 override fun suggest(count: Int): List<Suggestion> =
                     List(count) { Suggestion("t$next", points[next++ % points.size]) }
                 override fun complete(suggestion: Suggestion, objective: Double) = Unit
+                override fun markInfeasible(suggestion: Suggestion, reason: String) = Unit
                 override fun observe(values: Map<String, Any>, objective: Double) = Unit
                 override fun close() = Unit
             }
@@ -196,6 +197,57 @@ class BoTuningTest {
     }
 
     @Test
+    fun `a config that throws is reported infeasible, dropped, and does not abort the campaign`() {
+        // The BO search proposes pathological configs; one that crashes the solver must not take the whole
+        // campaign down. Arm "X" throws on every instance; "A" is a clean all-rounder. A crasher is
+        // reported to the tuner as INFEASIBLE (not a fake reward) and dropped as a palette candidate.
+        val infeasible = mutableListOf<Pair<String, String>>() // suggestion handle -> reason
+        val recording = object : Tuner {
+            override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String, noisy: Boolean) =
+                object : TuningStudy {
+                    private var n = 0
+                    override fun suggest(count: Int) = List(count) {
+                        val arm = if (n++ % 2 == 0) "A" else "X"
+                        Suggestion("t$n-$arm", mapOf("arm" to arm))
+                    }
+                    override fun complete(suggestion: Suggestion, objective: Double) = Unit
+                    override fun markInfeasible(suggestion: Suggestion, reason: String) {
+                        infeasible += suggestion.handle to reason
+                    }
+                    override fun observe(values: Map<String, Any>, objective: Double) = Unit
+                    override fun close() = Unit
+                }
+            override fun close() = Unit
+        }
+        val instances = List(4) { cop("i$it", "min: 1 x1 ;\n+1 x1 >= 0 ;\n") }
+        val result = BoTuning.tune(
+            space = ConfigSpace(listOf(CategoricalParam("arm", listOf("A", "X")))),
+            decode = { it.getValue("arm") as String },
+            reward = { _, arm -> if (arm == "X") error("solver blew up on X") else 1.0 },
+            pool = UniformPool(instances),
+            tuner = recording,
+            rounds = 2,
+            trials = 2,
+            batch = 1,
+            warmStart = true,
+            studyId = "crash",
+            sampleSize = 4,
+        )
+
+        // The campaign completed (no throw escaped `tune`) and still produced a palette anchored by "A".
+        assertTrue(result.palette.isNotEmpty(), "the campaign survived the crashing config and kept a palette")
+        assertEquals("arm=A", result.palette.first().label, "the clean arm anchors the palette")
+        // The crasher was reported infeasible with its cause, dropped from the cache, and never kept.
+        assertTrue(infeasible.isNotEmpty(), "the crashing config was reported infeasible to the tuner")
+        assertTrue(
+            infeasible.all { it.second.contains("solver blew up on X") },
+            "the infeasible reason carries the cause",
+        )
+        assertTrue("arm=X" !in result.configs.keys, "a crashing config is dropped, not a candidate")
+        assertTrue(result.palette.none { it.label == "arm=X" }, "a crashing config never joins the palette")
+    }
+
+    @Test
     fun `coerce rounds a Double integer param and clamps to the declared domain`() {
         // A tuner may hand cbls.tabu (an IntParam in [0,20]) back as a Double; the loop must round it.
         val coerced = LocalSearchConfigSpace.coerce(
@@ -247,6 +299,7 @@ class BoTuningTest {
                 return object : TuningStudy {
                     override fun suggest(count: Int) = List(count) { Suggestion("t", mapOf("arm" to "A")) }
                     override fun complete(suggestion: Suggestion, objective: Double) = Unit
+                    override fun markInfeasible(suggestion: Suggestion, reason: String) = Unit
                     override fun observe(values: Map<String, Any>, objective: Double) = Unit
                     override fun close() = Unit
                 }
