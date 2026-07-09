@@ -146,7 +146,7 @@ class PortfolioTest {
     fun `portfolio solve on satisfiable problem returns sat`() {
         val problem = exactlyOneOver(4)
         val workers = List(4) { i ->
-            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = i.toLong()))
+            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem).session(), BacktrackParams(randomSeed = i.toLong()))
         }
         Portfolio(workers).use { p ->
             val r = p.solve()
@@ -167,7 +167,7 @@ class PortfolioTest {
             ),
         )
         val workers = List(2) { i ->
-            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
+            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
         }
         Portfolio(workers).use { p ->
             val r = p.solve()
@@ -182,6 +182,7 @@ class PortfolioTest {
         val workers = List(4) { i ->
             PortfolioWorker.of(
                 "ls#$i",
+                i,
                 LocalSearchSolver(problem).session(),
                 LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = i.toLong()),
             )
@@ -208,6 +209,7 @@ class PortfolioTest {
         val problem = exactlyOneOver(3)
         val solo = PortfolioWorker.of(
             "ls",
+            0,
             LocalSearchSolver(problem).session(),
             LocalSearchParams(maxFlips = 5_000, randomSeed = 0L),
         )
@@ -244,6 +246,7 @@ class PortfolioTest {
         val workers = List(3) { i ->
             PortfolioWorker.of(
                 "bt#$i",
+                i,
                 BacktrackSolver(problem).session(),
                 BacktrackParams(randomSeed = 0L),
                 objective = obj,
@@ -275,6 +278,7 @@ class PortfolioTest {
         val workers = List(2) { i ->
             PortfolioWorker.of(
                 "bt#$i",
+                i,
                 BacktrackSolver(problem).session(),
                 // Worker 0 walks down from 1000, worker 1 from the domain middle, so both hold real
                 // incumbents when the tiny decision cap lands — but neither can bisect all the way
@@ -320,6 +324,7 @@ class PortfolioTest {
         val workers = List(6) { i ->
             PortfolioWorker.of(
                 "bt#$i",
+                i,
                 BacktrackSolver(problem).session(),
                 BacktrackParams(randomSeed = i.toLong()),
                 objective = obj,
@@ -422,7 +427,7 @@ class PortfolioTest {
     fun `exhaustive strategy runs every worker to budget`() {
         val problem = exactlyOneOver(3)
         val workers = List(2) { i ->
-            PortfolioWorker.of("bt#$i", BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
+            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
         }
         Portfolio(workers, strategy = PortfolioStrategy.Exhaustive).use { p ->
             val r = p.solve()
@@ -482,12 +487,24 @@ class PortfolioTest {
     }
 
     @Test
+    fun `replica lanes share an arm id per composed config`() {
+        // arms=2, cores=6: the 6 lanes cycle the 2 composed arms, so their arm ids cycle 0,1,0,1,0,1
+        // — every replica of a config shares one identity while distinct configs stay distinct.
+        val workers = PortfolioBuilder.build(
+            exactlyOneOver(5),
+            PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
+        )
+        assertEquals(listOf(0, 1, 0, 1, 0, 1), workers.map { it.armId }, "replicas of each arm share its id")
+    }
+
+    @Test
     fun `a parallel scenario with arms equal to cores builds one worker per arm`() {
         val workers = PortfolioBuilder.build(
             exactlyOneOver(5),
             PortfolioScenario.parallel(cores = 4, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
         )
         assertEquals(4, workers.size, "arms==cores is one distinct worker per lane")
+        assertEquals(listOf(0, 1, 2, 3), workers.map { it.armId }, "arms==cores maps each lane to its own arm id")
     }
 
     @Test
@@ -497,6 +514,36 @@ class PortfolioTest {
             PortfolioScenario.sequential(kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH, arms = 5),
         )
         assertEquals(5, workers.size, "the single-core sequential track keeps its full arm pool")
+        assertEquals(listOf(0, 1, 2, 3, 4), workers.map { it.armId }, "the sequential track never replicates: 1:1")
+    }
+
+    @Test
+    fun `an attributed improvement carries the producing worker's arm id`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
+            ),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
+        val workers = List(3) { i ->
+            PortfolioWorker.of(
+                "bt#$i",
+                i,
+                BacktrackSolver(problem).session(),
+                BacktrackParams(randomSeed = 0L),
+                objective = obj,
+            ) { params, supplier ->
+                params.copy(objectiveBoundSupplier = supplier)
+            }
+        }
+        val byLabel = workers.associate { it.label to it.armId }
+        val seen = mutableListOf<AttributedImprovement>()
+        Portfolio(workers).use { p -> p.minimize(onImprovement = { seen += it }) }
+        assertTrue(seen.isNotEmpty(), "minimize should stream at least one improvement")
+        assertTrue(seen.all { it.armId == byLabel[it.workerLabel] }, "arm id must match the producing worker")
     }
 
     @Test

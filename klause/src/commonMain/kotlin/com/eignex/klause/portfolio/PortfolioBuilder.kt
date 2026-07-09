@@ -51,9 +51,13 @@ object PortfolioBuilder {
         // fresh seeds, so a replica of a config gets a distinct seed.
         val laneCount = maxOf(scenario.arms, scenario.cores)
         val lanes = List(laneCount) { composed[it % composed.size] }
+        // Lane i is a replica of composed arm i % composed.size, so that is its stable arm identity:
+        // replicas of one config share an armId, distinct composed arms get distinct ones.
+        val armIds = List(laneCount) { it % composed.size }
         return materialize(
             problem,
             lanes,
+            armIds,
             scenario.seed,
             scenario.lsLambda,
             objective,
@@ -93,19 +97,22 @@ object PortfolioBuilder {
             if (backtrackWorkers > 0) addAll(BacktrackWorkerConfig.diverse(kind, backtrackWorkers))
         }
         // The credit campaign measures per-worker attribution, which cross-arm sharing would confound,
-        // so the explicit path never shares.
+        // so the explicit path never shares. Every arm here is distinct, so armId == its position.
         return materialize(
-            problem, arms, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent,
-            pools = null,
+            problem, arms, List(arms.size) { it }, seed, lsLambda, objective, lsObjective, definitionalSweep,
+            onEvent, pools = null,
         )
     }
 
     /** Materialise each composed arm via its own [WorkerConfig.materialize] — the shared body of
      *  [build] and [buildExplicit]. The arm index offsets the seed (and numbers backtrack labels);
-     *  [pools], when non-null, is shared by every backtrack arm for clause and cut exchange. */
+     *  [armIds] carries each lane's composed-arm identity (replicas share one, see [build]) purely as
+     *  attribution metadata; [pools], when non-null, is shared by every backtrack arm for clause and
+     *  cut exchange. */
     private fun materialize(
         problem: Problem,
         arms: List<WorkerConfig>,
+        armIds: List<Int>,
         seed: Long,
         lsLambda: Double,
         objective: LinearObjective?,
@@ -116,7 +123,7 @@ object PortfolioBuilder {
     ): List<PortfolioWorker> {
         val workers = arms.mapIndexed { i, config ->
             config.materialize(
-                problem, i, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
+                problem, i, armIds[i], seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
             )
         }
         check(workers.isNotEmpty()) { "portfolio produced no workers" }

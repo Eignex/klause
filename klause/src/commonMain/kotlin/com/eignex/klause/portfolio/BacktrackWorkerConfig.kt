@@ -31,6 +31,7 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
     override fun materialize(
         problem: Problem,
         index: Int,
+        armId: Int,
         seed: Long,
         lsLambda: Double,
         objective: LinearObjective?,
@@ -66,6 +67,7 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
             if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
         return PortfolioWorker.of(
             workerLabel,
+            armId,
             BacktrackSolver(problem).session(),
             params,
             objective = objective,
