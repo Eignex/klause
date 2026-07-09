@@ -216,6 +216,53 @@ class IteratedLocalSearchTest {
     }
 
     @Test
+    fun `reset clears incumbents and restores perturbation strength`() {
+        val factor = Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
+
+        val policy = IteratedLocalSearchRestart(populationSize = 3, initialPerturbationStrength = 3)
+        repeat(6) { policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), longArrayOf()), 10.0) }
+        assertTrue(policy.incumbents.isNotEmpty(), "population should have filled")
+        assertTrue(policy.perturbationStrength > 3, "expected an adaptive bump before reset")
+
+        policy.reset()
+        assertEquals(0, policy.incumbents.size, "reset clears the population")
+        assertEquals(3, policy.perturbationStrength, "reset restores the initial perturbation strength")
+    }
+
+    @Test
+    fun `engine resets a reused policy so a stale incumbent cannot leak across solves`() {
+        // Mimic a prior integer-only solve (numBoolVars == 0) that left zero-bool incumbents in a
+        // policy instance the tuning harness then reuses on a Boolean problem.
+        val policy = IteratedLocalSearchRestart(populationSize = 2, crossoverRate = 1.0, maxFlipsBeforeRestart = 5)
+        val seedProblem = Problem(
+            4,
+            0,
+            emptyArray(),
+            listOf(Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })),
+        )
+        val seedState = LocalSearchState(seedProblem, Random(0))
+        for (i in 0 until seedProblem.numFactors) seedState.factors[i].initialize(seedState, i)
+        policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(0)), 10.0)
+        policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(0)), 12.0)
+        assertEquals(2, policy.incumbents.size, "seeded stale incumbents")
+
+        // Reusing the same policy on an 8-bool problem: before the fix, the first restart's crossover
+        // sizes the child from a zero-length stale parent and indexes it against 8 bool vars → AIOOBE.
+        val problem = Problem(
+            8,
+            0,
+            emptyArray(),
+            listOf(Cardinality.atLeastOne(IntArray(8) { Lit.make(it, true) })),
+        )
+        val solver = LocalSearchSolver(problem, restartPolicy = policy)
+        val result = solver.solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        assertTrue(result is SolveResult.Sat, "solve completes without indexing a stale incumbent")
+    }
+
+    @Test
     fun `ils restart solves exact one cardinality`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(
