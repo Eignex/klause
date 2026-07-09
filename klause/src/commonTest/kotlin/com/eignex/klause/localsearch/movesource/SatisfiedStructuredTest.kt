@@ -72,7 +72,7 @@ class SatisfiedStructuredTest {
 
     /** The expected elected construction: sample the elected implicit factors, propose from the satisfied ones. */
     private fun expectedElected(state: LocalSearchState, sink: MoveSink) {
-        val elected = state.electedImplicit
+        val elected = state.seeding.electedImplicit
         if (elected.isEmpty()) return
         repeat(minOf(sampleCount, elected.size)) {
             val fid = elected[state.rng.nextInt(elected.size)]

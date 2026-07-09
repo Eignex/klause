@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 
 /**
  * Behaviour tests for [FlipAndPropagate]: a seed flip is emitted together with the literals it forces
- * through [LocalSearchState.implicationGraph], the bundle is one atomic [Move.Compound] that applies
+ * through [ImplicitSeeding.implicationGraph], the bundle is one atomic [Move.Compound] that applies
  * and reverts cleanly, no-op forced parts are dropped, and the implication-following depth is bounded.
  * Implication directions are read off the graph the problem actually builds, never assumed.
  */
@@ -71,7 +71,7 @@ class FlipAndPropagateTest {
     fun `flipping a seed also flips the literal it forces`() {
         val state = freshState(impliesProblem(), seed = 1L)
         // Read the implication direction off the graph rather than assuming it.
-        val forced = state.implicationGraph[Lit.make(0, true)].toList()
+        val forced = state.seeding.implicationGraph[Lit.make(0, true)].toList()
         assertTrue(Lit.make(1, true) in forced, "pinning x0=true must force x1=true")
 
         val parts = emittedParts(state)

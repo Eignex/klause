@@ -72,7 +72,7 @@ class SourceDrivenStrategyTest {
         )
         // A feasible state (the EQ is satisfied at (1,1)) with an objective so ObjectiveSeed fires.
         val state = LocalSearchState(satisfiableProblem(), Random(7))
-        state.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
         state.recompute()
@@ -95,10 +95,10 @@ class SourceDrivenStrategyTest {
             feasibleAcceptance = AcceptanceRule.GreedyDescent,
         )
         val state = LocalSearchState(satisfiableProblem(), Random(7))
-        state.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
+        state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         state.assignment.setInt(0, 1)
         state.assignment.setInt(1, 1)
-        state.shapingLambda = 10.0 // a strong objective pull, as an aggressive linear shaping would supply
+        state.shaping.shapingLambda = 10.0 // a strong objective pull, as an aggressive linear shaping would supply
         state.recompute()
         assertEquals(0L, state.cost, "fixture must start feasible")
         assertNull(

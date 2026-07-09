@@ -82,8 +82,8 @@ class CostShapingTest {
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
-        state.objective = LinearObjective(boolWeights = longArrayOf(100L, 1L))
-        state.shapingLambda = 1.0
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(100L, 1L))
+        state.shaping.shapingLambda = 1.0
         val score0 = state.shapedBreakScore(BoolFlip(0))
         val score1 = state.shapedBreakScore(BoolFlip(1))
         assertEquals(99.0, score0 - score1, "shaped break gap must equal objective gap")
@@ -96,8 +96,8 @@ class CostShapingTest {
         val state = LocalSearchState(problem, Random(0))
         state.recompute()
         assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
-        state.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
-        state.shapingLambda = 0.0
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
+        state.shaping.shapingLambda = 0.0
         assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
     }
 
@@ -109,8 +109,8 @@ class CostShapingTest {
         state.assignment.setBool(0, false)
         state.assignment.setBool(1, false)
         state.recompute()
-        state.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
-        state.shapingLambda = 0.5
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
+        state.shaping.shapingLambda = 0.5
         // Flipping bool 0 adds 10 to the objective; lambda 0.5 scales it to 5.
         assertEquals(5.0, state.shapedObjectiveDelta(BoolFlip(0)))
         assertEquals(0.5, state.shapedObjectiveDelta(BoolFlip(1)))
@@ -151,8 +151,8 @@ class CostShapingTest {
                 return abs(2.0 * x - y - 1.0)
             }
         }
-        state.objective = abs
-        state.shapingLambda = 1.0
+        state.shaping.objective = abs
+        state.shaping.shapingLambda = 1.0
         // Current (b0=F, b1=F): |0 - 0 - 1| = 1.
         // Flip b0 → T: |2 - 0 - 1| = 1, delta = 0.
         // Flip b1 → T: |0 - 1 - 1| = 2, delta = +1.
@@ -167,10 +167,10 @@ class CostShapingTest {
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
         state.recompute()
-        state.objective = object : Objective {
+        state.shaping.objective = object : Objective {
             override fun evaluate(sample: Sample): Double = 42.0
         }
-        state.shapingLambda = 1.0
+        state.shaping.shapingLambda = 1.0
         assertEquals(0.0, state.shapedObjectiveDelta(Move.BoolFlip(0)))
     }
 

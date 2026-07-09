@@ -86,7 +86,7 @@ class SourceDrivenStrategyAxisInputsTest {
         state.recompute()
         repeat(30) { strategy.pickMove(state)?.let { move -> state.apply(move) } }
         assertTrue(
-            state.factorWeights.max() > state.baseFactorWeights.max(),
+            state.weights.factorWeights.max() > state.weights.baseFactorWeights.max(),
             "a permanently-stalled search must bump some weight above its seed",
         )
     }

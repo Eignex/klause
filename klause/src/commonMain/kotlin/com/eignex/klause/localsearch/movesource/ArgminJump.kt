@@ -17,7 +17,8 @@ import com.eignex.klause.localsearch.MoveSink
  *    candidate (Δ = 0), so the emitted jump never increases weighted violation.
  *  - bool var: the flip, emitted only when its weighted violation delta is strictly negative.
  *
- * The jump is scored against the adaptive per-constraint weights in [LocalSearchState.factorWeights];
+ * The jump is scored against the adaptive per-constraint weights in
+ * [com.eignex.klause.localsearch.FactorWeightBook.factorWeights];
  * reading it forces the lazy allocation, which is intended for a weighted-violation method.
  */
 class ArgminJump(
@@ -37,7 +38,7 @@ class ArgminJump(
 
     override fun generate(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
-        val weights = state.factorWeights
+        val weights = state.weights.factorWeights
         repeat(candidateVars) {
             val fid = state.violated.random(state.rng)
             val scope = state.problem.factors[fid]

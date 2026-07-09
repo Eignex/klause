@@ -34,7 +34,7 @@ data class TabuFilter(
         // Pass 1: detect whether any move is tabu (skips allocation when nothing is).
         var anyTabu = false
         for (m in raw) {
-            if (state.isTaboo(m, effective)) {
+            if (state.tabu.isTaboo(m, effective)) {
                 anyTabu = true
                 break
             }
@@ -44,7 +44,7 @@ data class TabuFilter(
         // Pass 2: collect the admitted set under the configured aspiration rule.
         val admitted = ArrayList<Move>(raw.size)
         for (m in raw) {
-            val tabu = state.isTaboo(m, effective)
+            val tabu = state.tabu.isTaboo(m, effective)
             if (!tabu || aspiration.admitsTabu(state, m)) admitted.add(m)
         }
         return when {

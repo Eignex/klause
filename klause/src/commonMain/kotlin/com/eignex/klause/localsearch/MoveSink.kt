@@ -57,7 +57,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      * Install the implicit-solving owner map: `owners[v]` is the factor id that owns int var `v`
      * (`-1` = unowned). An owned variable is a decision variable of an implicit-solving global that
      * was seeded feasible and is kept feasible only by that global's own structure-preserving moves
-     * (see [com.eignex.klause.localsearch.LocalSearchState.ownerInt]). The sink drops any int
+     * (see [com.eignex.klause.localsearch.ImplicitSeeding.ownerInt]). The sink drops any int
      * move on an owned variable unless [proposer] is its owner, so the generic repair/jump/swap
      * sources never break an implicitly-solved constraint — the search treats those variables as
      * removed from its neighbourhood, exactly as a defined var is. `null` disables ownership.

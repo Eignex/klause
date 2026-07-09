@@ -16,7 +16,7 @@ import com.eignex.klause.localsearch.MoveSink
  *  - [Scope.All]: walk every factor and consult the ones not violated (queried directly via
  *    [com.eignex.klause.localsearch.Invariant.isViolated]).
  *  - [Scope.Elected]: draw [sampleCount] random factors from the state's elected implicit set
- *    ([com.eignex.klause.localsearch.LocalSearchState.electedImplicit]) and keep the ones not
+ *    ([com.eignex.klause.localsearch.ImplicitSeeding.electedImplicit]) and keep the ones not
  *    in the maintained violated set. Iterates only the small elected set, so it stays cheap while
  *    the search is still closing violations.
  *
@@ -62,7 +62,7 @@ class SatisfiedStructured private constructor(
             }
 
             Scope.Elected -> {
-                val elected = state.electedImplicit
+                val elected = state.seeding.electedImplicit
                 val n = elected.size
                 if (n == 0) return
                 repeat(minOf(sampleCount, n)) {

@@ -25,7 +25,7 @@ class ObjectiveSeed : MoveSource {
     override val pool: Pool = Pool.NoiseEligible
 
     override fun generate(state: LocalSearchState, sink: MoveSink) {
-        when (val obj = state.objective ?: return) {
+        when (val obj = state.shaping.objective ?: return) {
             is LinearObjective -> {
                 for (v in obj.boolWeights.indices) {
                     if (obj.boolWeights[v] == 0L) continue

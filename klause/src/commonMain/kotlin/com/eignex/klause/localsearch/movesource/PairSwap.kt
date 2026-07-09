@@ -22,7 +22,8 @@ class PairSwap(
     /** Candidates of each kind (bool, int) drawn per [generate] call. */
     private val cap: Int,
     /** When true, the first endpoint of each int swap is drawn from the objective hot-spot
-     *  ([LocalSearchState.objectiveHotSpotIntVar]) so swaps concentrate on objective-relevant
+     *  ([com.eignex.klause.localsearch.ObjectiveShaping.objectiveHotSpotIntVar]) so swaps concentrate on
+     *  objective-relevant
      *  variables; false keeps the uniform-random draw. No effect once the objective exposes no int
      *  gradient (the draw falls back to uniform). */
     private val hotSpot: Boolean = false,
@@ -80,7 +81,7 @@ class PairSwap(
             val nInt = state.problem.numIntVars
             if (nInt < 2) return null
             val rng = state.rng
-            val hot = if (hotSpot) state.objectiveHotSpotIntVar(rng) else -1
+            val hot = if (hotSpot) state.shaping.objectiveHotSpotIntVar(rng) else -1
             val a = if (hot >= 0) hot else rng.nextInt(nInt)
             val b = rng.nextInt(nInt)
             return intSwapMove(state, a, b, sameShape = false, checkOwner = true)
@@ -107,7 +108,7 @@ class PairSwap(
             if (checkOwner) {
                 // Owned by an implicitly-solved global: only that global may move it (a blind swap
                 // would break the constraint it was seeded feasible into).
-                val owners = state.ownerInt
+                val owners = state.seeding.ownerInt
                 if (owners != null && (owners[u] >= 0 || owners[w] >= 0)) return null
             }
             val du = state.problem.intDomains[u]

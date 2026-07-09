@@ -135,8 +135,8 @@ class SourceDrivenStrategy(
         schedule.weights?.maintain(
             state.step,
             state.cost,
-            state.factorWeights,
-            state.baseFactorWeights,
+            state.weights.factorWeights,
+            state.weights.baseFactorWeights,
             state.violated.toIntArray(),
             state.rng,
         )
@@ -154,8 +154,8 @@ class SourceDrivenStrategy(
         scoreSink.setAssumptions(state.assumptions)
         noiseSink.setInvariants(state.invariants)
         scoreSink.setInvariants(state.invariants)
-        noiseSink.setOwners(state.ownerInt)
-        scoreSink.setOwners(state.ownerInt)
+        noiseSink.setOwners(state.seeding.ownerInt)
+        scoreSink.setOwners(state.seeding.ownerInt)
         for (cs in sources) {
             if (!cs.enabled) continue
             if (cs.stallGated && !stalled) continue
@@ -222,7 +222,7 @@ class SourceDrivenStrategy(
         // reverted every step; trading feasibility for objective is the ratchet arm's job, not this one.
         if (state.cost == 0L && feasibleAcceptance != null) {
             if (state.netDelta(move) > 0L) return Double.POSITIVE_INFINITY
-            val objective = state.objective ?: return 0.0
+            val objective = state.shaping.objective ?: return 0.0
             return state.objectiveDelta(objective, move) ?: 0.0
         }
         return when (scoring) {

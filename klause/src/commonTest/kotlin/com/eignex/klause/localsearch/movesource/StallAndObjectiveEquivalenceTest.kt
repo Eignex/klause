@@ -53,7 +53,7 @@ class StallAndObjectiveEquivalenceTest {
     /** The reference `Cbls.seedObjectiveMoves` body (sans the cost gate, which stays in the
      *  strategy). */
     private fun oldSeedObjective(state: LocalSearchState, sink: MoveSink) {
-        val obj = state.objective ?: return
+        val obj = state.shaping.objective ?: return
         if (obj is LinearObjective) {
             for (v in obj.boolWeights.indices) {
                 if (obj.boolWeights[v] == 0L) continue
@@ -122,14 +122,14 @@ class StallAndObjectiveEquivalenceTest {
                 ::objectiveProblem,
                 seed,
                 ObjectiveSeed(),
-                prepare = { it.objective = objective },
+                prepare = { it.shaping.objective = objective },
             ) { state, sink -> oldSeedObjective(state, sink) }
         }
     }
 
     @Test
     fun `ObjectiveSeed yields both step directions on an interior assignment`() {
-        val state = freshState(objectiveProblem(), 7L).also { it.objective = objective }
+        val state = freshState(objectiveProblem(), 7L).also { it.shaping.objective = objective }
         val captured = captureFromSink(state) { sink -> ObjectiveSeed().generate(state, sink) }
         assertFalse(captured.isEmpty, "a nonzero-coefficient interior objective must seed moves")
     }
