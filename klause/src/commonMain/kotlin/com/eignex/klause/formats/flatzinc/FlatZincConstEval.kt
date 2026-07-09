@@ -92,7 +92,7 @@ internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
     is FznExpr.ArrayAccess -> {
         val arr = arrays[e.name] as? FlatZincArray.IntParam
             ?: failHere("`${e.name}` is not an int parameter array")
-        arr.values[e.index - 1].toLong()
+        arr.values[e.index - 1]
     }
 
     else -> failHere("expected int constant, got ${e::class.simpleName}")
@@ -110,7 +110,7 @@ internal fun FlatZincCompiler.evalIntConstOrNull(e: FznExpr): Long? = when (e) {
         else -> null
     }
 
-    is FznExpr.ArrayAccess -> (arrays[e.name] as? FlatZincArray.IntParam)?.values?.get(e.index - 1)?.toLong()
+    is FznExpr.ArrayAccess -> (arrays[e.name] as? FlatZincArray.IntParam)?.values?.get(e.index - 1)
 
     else -> null
 }

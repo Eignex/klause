@@ -120,8 +120,6 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
                 val mx = safeMax(others, a, token)
                 mx != null && mx <= b && (safeMin(others, a, token)?.let { it >= b } ?: false)
             }
-
-            else -> false
         }
         if (redundant) removed.add(i)
     }

@@ -30,7 +30,7 @@ internal class ReifiedPseudoBooleanPropagator(
         val range = pbSumRange(state, weights, literals)
         val sumLo = range[0]
         val sumHi = range[1]
-        val bnd = bound.toLong()
+        val bnd = bound
         val alwaysHolds = when (op) {
             PbOp.LE -> sumHi <= bnd
             PbOp.GE -> sumLo >= bnd

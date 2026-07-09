@@ -56,12 +56,12 @@ class CoefficientStrengtheningTest {
 
     private fun evalLinear(f: Linear, assign: IntArray): Boolean {
         var sum = 0L
-        for (i in f.vars.indices) sum += f.coeffs[i].toLong() * assign[f.vars[i]]
+        for (i in f.vars.indices) sum += f.coeffs[i] * assign[f.vars[i]]
         return when (f.op) {
             LinearOp.LE -> sum <= f.bound
             LinearOp.GE -> sum >= f.bound
-            LinearOp.EQ -> sum == f.bound.toLong()
-            LinearOp.NE -> sum != f.bound.toLong()
+            LinearOp.EQ -> sum == f.bound
+            LinearOp.NE -> sum != f.bound
         }
     }
 
@@ -73,7 +73,7 @@ class CoefficientStrengtheningTest {
         return when (f.op) {
             PbOp.LE -> sum <= f.bound
             PbOp.GE -> sum >= f.bound
-            PbOp.EQ -> sum == f.bound.toLong()
+            PbOp.EQ -> sum == f.bound
         }
     }
 

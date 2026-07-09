@@ -110,11 +110,11 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             val kW = LongArrayList()
             for (k in subProblem.literals.indices) {
                 kIdx.add(index.getOrDefault(Lit.variable(subProblem.literals[k]), -1))
-                kW.add(subProblem.weights[k].toLong())
+                kW.add(subProblem.weights[k])
             }
             kItems = kIdx.toIntArray()
             kWeights = LongArray(kW.size) { kW[it] }
-            kCap = subProblem.bound.toLong()
+            kCap = subProblem.bound
 
             val rv = ArrayList<IntArray>()
             val rc = ArrayList<LongArray>()
@@ -128,11 +128,11 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
                 }
                 val cols = IntArray(f.literals.size)
                 val vals = LongArray(f.literals.size)
-                var rhs = f.bound.toLong()
+                var rhs = f.bound
                 for (k in f.literals.indices) {
                     val lit = f.literals[k]
                     cols[k] = index.getOrDefault(Lit.variable(lit), -1)
-                    val w = f.weights[k].toLong()
+                    val w = f.weights[k]
                     if (Lit.isPositive(lit)) {
                         vals[k] = w
                     } else {

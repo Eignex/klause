@@ -22,11 +22,11 @@ class FeasibilityPumpTest {
 
     private fun satisfies(f: Linear, x: LongArray): Boolean {
         var s = 0L
-        for (i in f.vars.indices) s += f.coeffs[i].toLong() * x[f.vars[i]]
+        for (i in f.vars.indices) s += f.coeffs[i] * x[f.vars[i]]
         return when (f.op) {
             LinearOp.LE -> s <= f.bound
             LinearOp.GE -> s >= f.bound
-            LinearOp.EQ -> s == f.bound.toLong()
+            LinearOp.EQ -> s == f.bound
             else -> true
         }
     }

@@ -248,7 +248,7 @@ internal object SolveCore {
     /** Total integer-domain span `Σ (max − min)` — the coarse problem-size measure presolve shrinks. */
     private fun domainSpan(problem: Problem): Long {
         var span = 0L
-        for (d in problem.intDomains) span += d.max.toLong() - d.min.toLong()
+        for (d in problem.intDomains) span += d.max - d.min
         return span
     }
 

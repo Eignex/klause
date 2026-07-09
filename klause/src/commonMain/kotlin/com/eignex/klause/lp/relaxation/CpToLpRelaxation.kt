@@ -500,14 +500,14 @@ internal class CpToLpRelaxation(
             if (sec) circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
-        /** Column for integer variable `i`, created on first use with its live domain bounds. */
-        override fun intColumn(i: Int): Int {
-            var c = intCol[i]
+        /** Column for integer variable `intVar`, created on first use with its live domain bounds. */
+        override fun intColumn(intVar: Int): Int {
+            var c = intCol[intVar]
             if (c == -1) {
-                val dom = session.intDomain(i)
-                c = builder.addVar(dom.min, dom.max, intCost(i), tag = i)
-                intCol[i] = c
-                colVarId.add(i)
+                val dom = session.intDomain(intVar)
+                c = builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
+                intCol[intVar] = c
+                colVarId.add(intVar)
                 colIsBool.add(0)
                 colReq.add(null)
                 colPresentUpper.add(0L)
@@ -515,16 +515,16 @@ internal class CpToLpRelaxation(
             return c
         }
 
-        /** Column for Boolean variable `b`; bounds collapse to a point if it is pinned this node. */
-        override fun boolColumn(b: Int): Int {
-            var c = boolCol[b]
+        /** Column for Boolean variable `boolVar`; bounds collapse to a point if it is pinned this node. */
+        override fun boolColumn(boolVar: Int): Int {
+            var c = boolCol[boolVar]
             if (c == -1) {
-                val pinned = session.boolValue(b)
+                val pinned = session.boolValue(boolVar)
                 val lo = if (pinned == true) 1L else 0L
                 val hi = if (pinned == false) 0L else 1L
-                c = builder.addVar(lo, hi, boolCost(b), tag = b)
-                boolCol[b] = c
-                colVarId.add(b)
+                c = builder.addVar(lo, hi, boolCost(boolVar), tag = boolVar)
+                boolCol[boolVar] = c
+                colVarId.add(boolVar)
                 colIsBool.add(1)
                 colReq.add(null)
                 colPresentUpper.add(0L)

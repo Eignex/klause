@@ -177,6 +177,7 @@ internal fun PropagationState.tightenIntMaxImpl(v: Int, hi: Long, antecedents: I
  * `v.max` to `bound`. `inline` so each caller expands a side-specialised copy with the `isMin`
  * branches folded away — the propagation hot loop pays no extra dispatch or allocation.
  */
+@Suppress("NOTHING_TO_INLINE")
 private inline fun PropagationState.tightenBoundImpl(
     v: Int,
     bound: Long,

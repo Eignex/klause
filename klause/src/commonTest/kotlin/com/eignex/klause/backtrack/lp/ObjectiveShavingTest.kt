@@ -126,7 +126,7 @@ class ObjectiveShavingTest {
                 for (i in 0 until n) if ((mask shr i) and 1 == 1) sum++
                 for (f in covering) {
                     var s = 0L
-                    for (idx in f.vars.indices) s += f.coeffs[idx].toLong() * ((mask shr f.vars[idx]) and 1)
+                    for (idx in f.vars.indices) s += f.coeffs[idx] * ((mask shr f.vars[idx]) and 1)
                     if (s < f.bound) {
                         ok = false
                         break
@@ -166,7 +166,7 @@ class ObjectiveShavingTest {
             val point = IntArray(n)
             fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
-                for (i in f.vars.indices) s += f.coeffs[i].toLong() * point[f.vars[i]]
+                for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]
                 when (f.op) {
                     LinearOp.LE -> s <= f.bound
                     LinearOp.GE -> s >= f.bound

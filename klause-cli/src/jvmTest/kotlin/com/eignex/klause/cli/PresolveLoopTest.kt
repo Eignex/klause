@@ -46,7 +46,7 @@ class PresolveLoopTest {
             arrayOf(IntDomain(0, 3), IntDomain(0, 10)), // y = var 0, x = var 1
             arrayOf<Factor>(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
-        val solvable = solvableOf(problem, probe = { it.ints[1].toLong() })
+        val solvable = solvableOf(problem, probe = { it.ints[1] })
         val presolved = solvable.presolved(PresolveConfig.DEFAULT, false)
         assertTrue(presolved !== solvable, "affine elimination should have transformed the problem")
         assertTrue(presolved.problem.factors.isEmpty(), "the lone defining equality should be eliminated")

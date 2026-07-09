@@ -17,7 +17,7 @@ internal class PseudoBooleanPropagator(
 ) : Propagator {
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
-        propagatePbBounds(state, weights, literals, op, bound.toLong())
+        propagatePbBounds(state, weights, literals, op, bound)
 
     /** Clause-form nogood when propagation fails: the disjunction of each pinned
      *  literal's false-form. */

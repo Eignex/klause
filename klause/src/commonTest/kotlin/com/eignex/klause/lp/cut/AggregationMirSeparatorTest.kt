@@ -37,11 +37,11 @@ class AggregationMirSeparatorTest {
     /** Σ coeffs·x ⟨op⟩ bound holds for the integer assignment [x]. */
     private fun satisfies(f: Linear, x: IntArray): Boolean {
         var s = 0L
-        for (i in f.vars.indices) s += f.coeffs[i].toLong() * x[f.vars[i]]
+        for (i in f.vars.indices) s += f.coeffs[i] * x[f.vars[i]]
         return when (f.op) {
             LinearOp.LE -> s <= f.bound
             LinearOp.GE -> s >= f.bound
-            LinearOp.EQ -> s == f.bound.toLong()
+            LinearOp.EQ -> s == f.bound
             else -> true
         }
     }
@@ -134,7 +134,7 @@ class AggregationMirSeparatorTest {
         return when (f.op) {
             PbOp.LE -> s <= f.bound
             PbOp.GE -> s >= f.bound
-            PbOp.EQ -> s == f.bound.toLong()
+            PbOp.EQ -> s == f.bound
         }
     }
 
