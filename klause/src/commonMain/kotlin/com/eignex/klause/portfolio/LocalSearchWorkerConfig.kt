@@ -29,6 +29,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
     override fun materialize(
         problem: Problem,
         index: Int,
+        armId: Int,
         seed: Long,
         lsLambda: Double,
         objective: LinearObjective?,
@@ -69,6 +70,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
         )
         return PortfolioWorker.of(
             workerLabel,
+            armId,
             session,
             params,
             objective = objective,

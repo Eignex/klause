@@ -34,6 +34,9 @@ interface PortfolioExecutor : AutoCloseable {
 data class AttributedImprovement(
     /** [PortfolioWorker.label] of the worker that produced this incumbent. */
     val workerLabel: String,
+    /** [PortfolioWorker.armId] of the producing worker — its composed-arm identity; replicas of the
+     *  same arm share it, so a credit consumer pools their rewards. */
+    val armId: Int,
     /** Time since the minimisation started. */
     val elapsed: Duration,
     /** The strict global improvement itself (always a [MinimizeResult.WithSample]). */

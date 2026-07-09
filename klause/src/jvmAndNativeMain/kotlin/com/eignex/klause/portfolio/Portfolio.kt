@@ -102,7 +102,7 @@ class Portfolio(
             if (!updateSharedBound(incumbent, r.objectiveValue, r.sample)) return
             val cb = onImprovement ?: return
             val lock = emitLock ?: return
-            lock.withLock { cb(AttributedImprovement(worker.label, start.elapsedNow(), r)) }
+            lock.withLock { cb(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r)) }
         }
 
         val results = parallelRun(
@@ -176,7 +176,7 @@ class Portfolio(
                     for (r in worker.improvements(::readBound, token)) {
                         if (r is MinimizeResult.WithSample && r.objectiveValue < readBound()) {
                             updateSharedBound(incumbent, r.objectiveValue, r.sample)
-                            emit(AttributedImprovement(worker.label, start.elapsedNow(), r))
+                            emit(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
                         }
                     }
                 }

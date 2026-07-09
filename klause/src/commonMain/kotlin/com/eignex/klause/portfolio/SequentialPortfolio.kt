@@ -146,6 +146,9 @@ class SequentialPortfolio(
         // The label of the arm running the current segment — single-threaded, so it is unambiguous
         // for every improvement [accept] folds while that segment is active.
         var armLabel = workers.first().label
+        // The arm identity of the active segment, tracked alongside [armLabel] for attribution. The
+        // sequential track never replicates, so armId == the worker's position here — nothing pools.
+        var armId = workers.first().armId
         val readBound = { bound }
         // One resumable handle per backtrack arm, opened lazily on the arm's first segment and resumed
         // on every later one (#381). LS arms stay null and run a fresh warm-started slice each time.
@@ -159,7 +162,7 @@ class SequentialPortfolio(
             if (r.objectiveValue < bound) {
                 bound = r.objectiveValue
                 best = r.sample
-                onImprovement?.invoke(AttributedImprovement(armLabel, start.elapsedNow(), r))
+                onImprovement?.invoke(AttributedImprovement(armLabel, armId, start.elapsedNow(), r))
             }
         }
 
@@ -173,6 +176,7 @@ class SequentialPortfolio(
             val before = bound
             val worker = workers[arm]
             armLabel = worker.label
+            armId = worker.armId
             val handle = handles[arm] ?: worker.newResumableSearch(readBound)?.also { handles[arm] = it }
             var terminal: MinimizeResult? = null
             if (handle != null) {

@@ -120,7 +120,9 @@ internal sealed interface WorkerConfig {
 
     /**
      * Build the runnable worker. [index] is the arm's position in the pool (offsets the seed and,
-     * for backtrack, numbers the label). [objective] is the canonical [LinearObjective] every
+     * for backtrack, numbers the label). [armId] is the composed-arm identity (replicas of one arm
+     * share it while their [index] differs); it is pure attribution metadata, never scheduling or
+     * seed input. [objective] is the canonical [LinearObjective] every
      * optimising worker minimises; [lsObjective] is the optional LS gradient view of the same
      * objective (backtrack ignores it). [lsLambda]/[definitionalSweep] are LS-only (backtrack
      * ignores them). [onEvent] is the shared [SearchEvent] sink, tagged here with the worker's
@@ -130,6 +132,7 @@ internal sealed interface WorkerConfig {
     fun materialize(
         problem: Problem,
         index: Int,
+        armId: Int,
         seed: Long,
         lsLambda: Double,
         objective: LinearObjective?,

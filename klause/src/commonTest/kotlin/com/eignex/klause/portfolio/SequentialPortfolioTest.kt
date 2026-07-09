@@ -32,6 +32,7 @@ class SequentialPortfolioTest {
         List(n) { i ->
             PortfolioWorker.of(
                 "bt#$i",
+                i,
                 BacktrackSolver(problem).session(),
                 BacktrackParams(randomSeed = i.toLong()),
                 objective = objective,

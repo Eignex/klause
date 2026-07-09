@@ -23,6 +23,10 @@ import com.eignex.klause.solver.result.MinimizeResult
 class PortfolioWorker private constructor(
     /** Human-readable id for progress / telemetry (e.g. "cbls/fixed", "backtrack#2"). */
     val label: String,
+    /** Index of this worker's arm in the composed pool; replicas of the same arm — extra lanes when
+     *  arms < cores — share it, so per-arm credit pools across them. Distinct from [label], which a
+     *  backtrack replica index-numbers. */
+    val armId: Int,
     private val solveFn: (Cancellation) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, Cancellation) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
@@ -84,6 +88,7 @@ class PortfolioWorker private constructor(
          */
         fun <P : SolverParams> of(
             label: String,
+            armId: Int,
             session: Session<P>,
             params: P,
             objective: LinearObjective? = null,
@@ -109,6 +114,7 @@ class PortfolioWorker private constructor(
                 }
             return PortfolioWorker(
                 label = label,
+                armId = armId,
                 solveFn = { c -> session.solve(withCancel(c)) },
                 improvementsFn = { readBound, warmStart, c ->
                     val obj = requireNotNull(objective) {
