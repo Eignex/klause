@@ -214,34 +214,15 @@ class SequentialPortfolio(
                 }
             }
 
-            if (isExhausted(terminal)) {
-                val exhaustedBest = best
-                return if (exhaustedBest != null) {
-                    MinimizeResult.Optimal(exhaustedBest, bound, stats)
-                } else {
-                    MinimizeResult.Infeasible(stats = stats)
-                }
+            // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
+            if (PortfolioReduction.isExhausted(terminal)) {
+                return PortfolioReduction.terminal(best, bound, dirty = false, stats)
             }
             if (!warming) slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
             segment++
         }
-        val b = best
-        return if (b != null) {
-            MinimizeResult.BestFound(b, bound, TerminationReason.BudgetExhausted, stats)
-        } else {
-            MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
-        }
-    }
-
-    /** A segment terminal that proves the arm covered its whole space (so the incumbent is optimal,
-     *  or there is no solution). A slice-truncated run reports Cancelled/BudgetExhausted instead, so
-     *  `SearchExhausted` reliably distinguishes a genuine exhaustion from a timed-out segment. */
-    private fun isExhausted(terminal: MinimizeResult?): Boolean = when (terminal) {
-        is MinimizeResult.Optimal -> true
-        is MinimizeResult.Infeasible -> true
-        is MinimizeResult.BestFound -> terminal.reason == TerminationReason.SearchExhausted
-        is MinimizeResult.Unknown -> terminal.reason == TerminationReason.SearchExhausted
-        null -> false
+        // Cancellation stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
+        return PortfolioReduction.terminal(best, bound, dirty = true, stats)
     }
 
     override fun close() {
