@@ -8,7 +8,10 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -31,10 +34,15 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
 
     /** [max] (min vs max) and the output [result] are positional; the operands [xs] are a set
      *  (min/max is symmetric in them), so they are sorted. */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ARRAY_MIN_MAX) {
-        bool(max)
-        int(result)
-        sortedInts(xs)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.ARRAY_MIN_MAX, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.ARRAY_MIN_MAX, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.bool(max)
+        sink.intVar(result)
+        sink.sortedIntVars(xs)
     }
 
     override val boolVars: IntArray = EmptyIntArray

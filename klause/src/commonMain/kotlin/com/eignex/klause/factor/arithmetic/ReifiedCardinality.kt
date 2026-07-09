@@ -12,7 +12,10 @@ import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -36,11 +39,16 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
 
     /** `Cardinality.structuralKey` plus the reifying [auxBoolVar]; the distinct factor kind keeps it
      *  disjoint from a bare cardinality's key (#443). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_CARDINALITY) {
-        int(auxBoolVar)
-        int(min)
-        int(max)
-        sortedInts(literals)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_CARDINALITY, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.REIFIED_CARDINALITY, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.boolVar(auxBoolVar)
+        sink.int(min)
+        sink.int(max)
+        sink.sortedBoolLits(literals)
     }
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)

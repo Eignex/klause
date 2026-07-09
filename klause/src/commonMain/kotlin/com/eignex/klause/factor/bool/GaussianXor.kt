@@ -43,6 +43,8 @@ class GaussianXor(
 
     /** A system of parity equations is order-insensitive, so the constraints are encoded as a sorted
      *  multiset — each as its target parity and its literal set. */
+    // Not migrated to the KeySink allocation-free hash: the key sorts nested sub-constraints by their
+    // own (remapped) structuralKey, which the linear sink walk can't reproduce.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GAUSSIAN_XOR) {
         int(constraints.size)
         for (c in constraints.sortedBy { it.structuralKey() }) {

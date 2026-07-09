@@ -98,6 +98,8 @@ class Element private constructor(
     // rather than sorting. Encodes every distinguishing field — array kind, offset, idx, result,
     // and the ordered array (var ids when [arrIsVars], else constant values) — so two non-equivalent
     // Elements never collide (a coarser key would let symmetry verification accept a false swap).
+    // Not migrated to the KeySink allocation-free hash: when arrIsVars the array's variable ids live
+    // inside the cached [arrKey] fragment, which the sink can't remap without rebuilding it.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ELEMENT) {
         bool(arrIsVars)
         int(indexOffset)

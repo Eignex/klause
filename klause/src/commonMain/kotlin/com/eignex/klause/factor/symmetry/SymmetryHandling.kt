@@ -143,6 +143,8 @@ class SymmetryHandling(
         return out
     }
 
+    // Not migrated to the KeySink allocation-free hash: the key encodes generator permutation arrays,
+    // not plain variable references, so the sink's var/const split doesn't model it.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SYMMETRY_HANDLING) {
         int(generators.size)
         for (g in generators) {

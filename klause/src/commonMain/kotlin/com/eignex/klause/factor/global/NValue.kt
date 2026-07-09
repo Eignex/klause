@@ -70,6 +70,8 @@ class NValue(
     /** The distinct-value count ignores the order of [xs], so the counted vars are sorted (paired with
      *  their presence literal to keep an opt position with its presence); [n] (the count var) and
      *  [mode] are positional constants (#443). */
+    // Not migrated to the KeySink allocation-free hash: the `pairsByKey(xs){ presents… }` value is a
+    // Boolean literal (remappable), which the sink's constant-value pair methods can't remap.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.NVALUE) {
         enum(mode)
         int(n)

@@ -9,7 +9,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -21,10 +24,15 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
 
     override val intVars: IntArray = EmptyIntArray
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.PSEUDO_BOOLEAN) {
-        enum(op)
-        long(bound)
-        pairsByKey(literals) { weights[it] }
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PSEUDO_BOOLEAN, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.PSEUDO_BOOLEAN, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.enum(op)
+        sink.long(bound)
+        sink.pairsByLitKey(literals) { weights[it] }
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =

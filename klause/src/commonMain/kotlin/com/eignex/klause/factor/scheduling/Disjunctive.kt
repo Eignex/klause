@@ -7,7 +7,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -76,11 +79,17 @@ class Disjunctive(
 
     /** Position-faithful: keeps the task arrays in order and folds in the constant durations and the
      *  var/const split (#531). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DISJUNCTIVE) {
-        longs(durations)
-        ints(starts)
-        ints(presents)
-        ints(durationVars)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.DISJUNCTIVE, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.DISJUNCTIVE, boolMap, intMap, ::buildKey)
+
+    // durations are constant; starts/durationVars are int-var ids; presents are Boolean literals.
+    private fun buildKey(sink: KeySink) {
+        sink.constLongs(durations)
+        sink.intVars(starts)
+        sink.boolLits(presents)
+        sink.intVars(durationVars)
     }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)

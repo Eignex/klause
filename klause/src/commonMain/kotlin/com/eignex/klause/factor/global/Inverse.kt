@@ -5,7 +5,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntIntMap
 
@@ -42,11 +45,16 @@ class Inverse(
     // offsets and the ordered f / g var sequences — fine enough that two non-equivalent Inverses
     // never share a key (required for sound symmetry verification). The f/g sides are kept distinct
     // (not canonicalised against each other); at worst this misses an f↔g symmetry, never unsound.
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.INVERSE) {
-        int(fOffset)
-        int(gOffset)
-        ints(f)
-        ints(g)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.INVERSE, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.INVERSE, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.int(fOffset)
+        sink.int(gOffset)
+        sink.intVars(f)
+        sink.intVars(g)
     }
 
     override val boolVars: IntArray = EmptyIntArray

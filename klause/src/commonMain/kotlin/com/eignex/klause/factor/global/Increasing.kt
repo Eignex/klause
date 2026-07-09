@@ -7,7 +7,10 @@ import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -40,9 +43,14 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Increasing(xs.remapVars(intMap), strict)
 
     /** The chain is position-faithful — its order *is* the constraint — so [xs] is keyed positionally. */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.INCREASING) {
-        bool(strict)
-        ints(xs)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.INCREASING, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.INCREASING, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.bool(strict)
+        sink.intVars(xs)
     }
 
     override fun asPropagator(): Propagator = IncreasingPropagator(xs, gap)

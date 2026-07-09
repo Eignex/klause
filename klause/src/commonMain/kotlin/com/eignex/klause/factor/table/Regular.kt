@@ -11,7 +11,10 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -59,13 +62,18 @@ class Regular(
     /** Position-faithful (seq position i matters): keeps the sequence vars in order and folds in the
      *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting states
      *  (#531). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REGULAR) {
-        int(numStates)
-        int(alphabetSize)
-        int(q0)
-        longs(transitions)
-        ints(accepting)
-        ints(seq)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REGULAR, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.REGULAR, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.int(numStates)
+        sink.int(alphabetSize)
+        sink.int(q0)
+        sink.constLongs(transitions)
+        sink.constInts(accepting)
+        sink.intVars(seq)
     }
 
     /** Symbol-alphabet relabeling (#536): the `seq` values *are* the symbols, so a value permutation

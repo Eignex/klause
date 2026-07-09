@@ -14,7 +14,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -37,11 +40,16 @@ class ReifiedPseudoBoolean(
 
     /** `PseudoBoolean.structuralKey` plus the reifying [auxBoolVar]; the distinct factor kind keeps it
      *  disjoint from a bare pseudo-Boolean's key (#443). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_PSEUDO_BOOLEAN) {
-        int(auxBoolVar)
-        enum(op)
-        long(bound)
-        pairsByKey(literals) { weights[it] }
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.boolVar(auxBoolVar)
+        sink.enum(op)
+        sink.long(bound)
+        sink.pairsByLitKey(literals) { weights[it] }
     }
 
     override val boolVars: IntArray = literals.litVars(auxBoolVar)

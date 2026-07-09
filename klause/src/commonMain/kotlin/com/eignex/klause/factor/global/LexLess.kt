@@ -5,7 +5,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -35,10 +38,15 @@ class LexLess(
 
     /** Lexicographic order is position-faithful and asymmetric, so [xs] and [ys] are both positional
      *  and kept in their roles; [strict] distinguishes `<` from `≤`. */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LEX_LESS) {
-        bool(strict)
-        ints(xs)
-        ints(ys)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.LEX_LESS, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.LEX_LESS, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.bool(strict)
+        sink.intVars(xs)
+        sink.intVars(ys)
     }
 
     override val boolVars: IntArray = EmptyIntArray

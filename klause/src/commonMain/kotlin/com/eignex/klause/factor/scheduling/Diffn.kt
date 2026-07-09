@@ -5,7 +5,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
@@ -60,14 +63,20 @@ class Diffn(
 
     /** Position-faithful (rectangle i is fixed by index): keeps the coordinate arrays in order and
      *  folds in the constant sizes, the var-size split, and the [nonStrict] flag (#531). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DIFFN) {
-        bool(nonStrict)
-        longs(widths)
-        longs(heights)
-        ints(xs)
-        ints(ys)
-        ints(widthVars ?: EmptyIntArray)
-        ints(heightVars ?: EmptyIntArray)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.DIFFN, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.DIFFN, boolMap, intMap, ::buildKey)
+
+    // widths/heights are constant sizes; xs/ys and the optional width/height var arrays are int-var ids.
+    private fun buildKey(sink: KeySink) {
+        sink.bool(nonStrict)
+        sink.constLongs(widths)
+        sink.constLongs(heights)
+        sink.intVars(xs)
+        sink.intVars(ys)
+        sink.intVars(widthVars ?: EmptyIntArray)
+        sink.intVars(heightVars ?: EmptyIntArray)
     }
 
     override val boolVars: IntArray = EmptyIntArray

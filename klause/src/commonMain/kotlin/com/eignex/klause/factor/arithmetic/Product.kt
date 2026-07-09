@@ -7,7 +7,10 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -29,9 +32,14 @@ class Product(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Product(intMap[a], intMap[b], intMap[result])
 
     /** Multiplication is commutative, so the operands [a] and [b] are a set; [result] is positional. */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.PRODUCT) {
-        int(result)
-        sortedInts(intArrayOf(a, b))
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PRODUCT, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.PRODUCT, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.intVar(result)
+        sink.sortedIntVars(intArrayOf(a, b))
     }
 
     override val boolVars: IntArray = EmptyIntArray

@@ -6,7 +6,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -27,9 +30,14 @@ class Xor(
         require(targetParity == 0 || targetParity == 1) { "targetParity must be 0 or 1" }
     }
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.XOR) {
-        int(targetParity)
-        sortedInts(literals)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.XOR, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.XOR, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.int(targetParity)
+        sink.sortedBoolLits(literals)
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Xor(literals.remapLits(boolMap), targetParity)

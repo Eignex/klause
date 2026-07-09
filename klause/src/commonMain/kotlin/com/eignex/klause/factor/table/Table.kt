@@ -11,7 +11,10 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
@@ -128,9 +131,14 @@ class Table private constructor(
     // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so rows are sorted. Encodes
     // the full var sequence and tuple set — collision-free up to variable identity. Only `ints(xs)`
     // varies under a remap; the tuple part is the cached [tupleKey] fragment.
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.TABLE) {
-        ints(xs)
-        words(tupleKey())
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.TABLE, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.TABLE, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.intVars(xs)
+        sink.constWords(tupleKey())
     }
 
     /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the

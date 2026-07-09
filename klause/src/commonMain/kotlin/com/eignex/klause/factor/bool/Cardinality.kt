@@ -10,7 +10,10 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -26,10 +29,15 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
 
     override val intVars: IntArray = EmptyIntArray
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CARDINALITY) {
-        int(min)
-        int(max)
-        sortedInts(literals)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CARDINALITY, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.CARDINALITY, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.int(min)
+        sink.int(max)
+        sink.sortedBoolLits(literals)
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cardinality(literals.remapLits(boolMap), min, max)
