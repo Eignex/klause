@@ -159,12 +159,14 @@ internal object BoTuning {
         seed: Long,
         warmStart: Boolean = true,
         sampleSize: Int = DEFAULT_SAMPLE_SIZE,
+        engines: Set<String> = setOf("ls", "bt"),
         floorFraction: Double = 0.3,
         studyId: String = "mixed-bo",
     ): MixedResult {
         val references = ReferenceStore.load()
+        val space = if (engines == setOf("ls", "bt")) UnifiedConfigSpace else UnifiedConfigSpace.restricted(engines)
         val result = tune(
-            UnifiedConfigSpace,
+            space,
             UnifiedConfigSpace::decode,
             { instance, cfg ->
                 val eval = when (cfg) {
@@ -174,7 +176,7 @@ internal object BoTuning {
                 reward(references, instance, eval, budgetMs)
             },
             pool, tuner, rounds, trials, batch, warmStart, studyId, sampleSize, seed,
-            forced = engineFloor(floorFraction),
+            forced = engineFloor(floorFraction, engines),
         )
         val lsRewards = result.rewards.filterKeys { result.configs.getValue(it)["engine"] != "bt" }
         val btRewards = result.rewards.filterKeys { result.configs.getValue(it)["engine"] == "bt" }
@@ -183,9 +185,14 @@ internal object BoTuning {
 
     /** Exploration floor for [tuneMixed]: force the lagging engine (a fresh pinned sample) until each
      *  engine holds at least [floorFraction] of the evaluated configs, so a dominant engine can't starve
-     *  the other's per-engine projection. Returns null once both engines clear the floor. */
-    private fun engineFloor(floorFraction: Double): (Random, Map<String, Map<String, Any>>) -> Map<String, Any>? =
-        { rng, evaluated ->
+     *  the other's per-engine projection. Returns null once both engines clear the floor. With a single
+     *  [engines] entry there is nothing to balance, so the floor is a no-op. */
+    private fun engineFloor(
+        floorFraction: Double,
+        engines: Set<String>,
+    ): (Random, Map<String, Map<String, Any>>) -> Map<String, Any>? {
+        if (engines.size < 2) return { _, _ -> null }
+        return { rng, evaluated ->
             val total = evaluated.size
             val ls = evaluated.values.count { it["engine"] != "bt" }
             val bt = total - ls
@@ -195,6 +202,7 @@ internal object BoTuning {
                 else -> null
             }
         }
+    }
 
     /**
      * The engine-agnostic residual-round loop. [decode] turns a coerced assignment into the engine's

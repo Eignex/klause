@@ -256,6 +256,13 @@ object BenchCli {
         val seed = f["seed"]?.toLongOrNull() ?: 0L
         val warmStart = f["warm-start"]?.toBoolean() ?: true
         val sample = f["sample"]?.toIntOrNull()?.coerceAtLeast(1) ?: BoTuning.DEFAULT_SAMPLE_SIZE
+        // `engines=ls,bt` restricts which engines the MIXED search explores (drop one to focus the sweep,
+        // e.g. `engines=bt` to nail the best backtrack arm first). Ignored by the single-engine paths.
+        val engines = f["engines"]?.split(",")?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
+            ?: setOf("ls", "bt")
+        require(engines.isNotEmpty() && engines.all { it == "ls" || it == "bt" }) {
+            "engines must be a comma-separated subset of ls,bt, got '${f["engines"]}'"
+        }
         val tunerId = f["tuner"]?.lowercase() ?: "random"
         val tuner: Tuner = when (tunerId) {
             "vizier" -> VizierTuner()
@@ -263,8 +270,9 @@ object BenchCli {
             else -> error("tune tuner must be random | vizier, got '${f["tuner"]}'")
         }
         val strata = pool.strata()
+        val engineTag = if (engine == TuneEngine.MIXED) "$engine[${engines.sorted().joinToString(",")}]" else "$engine"
         println(
-            "=== tune ($engine, $tunerId, warm-start=$warmStart): ${strata.values.sum()} instances over " +
+            "=== tune ($engineTag, $tunerId, warm-start=$warmStart): ${strata.values.sum()} instances over " +
                 "${strata.size} strata, $rounds rounds × $trials trials × sample $sample × ${budgetMs}ms ===",
         )
         tuner.use {
@@ -277,7 +285,9 @@ object BenchCli {
 
                 TuneEngine.MIXED ->
                     printMixed(
-                        BoTuning.tuneMixed(pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample),
+                        BoTuning.tuneMixed(
+                            pool, tuner, rounds, trials, batch, budgetMs, seed, warmStart, sample, engines = engines,
+                        ),
                     )
             }
         }
