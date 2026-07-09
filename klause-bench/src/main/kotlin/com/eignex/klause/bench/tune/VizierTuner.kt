@@ -94,6 +94,19 @@ internal class VizierTuner(
             )
         }
 
+        /** Complete the trial as INFEASIBLE (the server marks it so from `trial_infeasible`, and it needs
+         *  no final measurement) — the config threw, so the GP-bandit avoids the region without a reward
+         *  observation that would distort the response surface. */
+        override fun markInfeasible(suggestion: Suggestion, reason: String) {
+            stub.completeTrial(
+                CompleteTrialRequest.newBuilder()
+                    .setName(suggestion.handle)
+                    .setTrialInfeasible(true)
+                    .setInfeasibleReason(reason)
+                    .build(),
+            )
+        }
+
         /** Inject a pre-evaluated config as a prior so the GP-bandit fits on it. `AddTrialMeasurement` /
          *  `CompleteTrial` reject a non-ACTIVE trial (measurements model an in-progress evaluation), so a
          *  known result can't go through the suggest→complete path. Instead `CreateTrial` accepts a trial
