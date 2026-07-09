@@ -49,4 +49,10 @@ internal class LubyIterator {
             v *= 2
         }
     }
+
+    /** Return to the first term of the sequence. */
+    fun reset() {
+        u = 1
+        v = 1
+    }
 }

@@ -289,6 +289,12 @@ class LocalSearchSolver(
             state.normalizeWeightsByClass = params.normalizeWeightsByClass
             installInvariants(state)
             warm?.applyTo(state)
+            // A restart policy instance can be reused across solves (a tuning campaign runs one
+            // recipe over many problems); clear its per-solve state so a stale incumbent — possibly
+            // of a different variable arity — can't leak in and be indexed against this problem.
+            // ScheduleBundle leaves restart reset to the engine; reset the underlying policy, not
+            // the `restarts` wrapper (whose reset is the interface no-op).
+            configuredRestart.reset()
             // Streaming has no notion of "best so far" to anchor an adaptive restart
             // around — pass null so policies that need a sample fall back to a fresh
             // random restart.

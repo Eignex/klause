@@ -28,6 +28,15 @@ interface RestartPolicy {
      *  `bestSoFar`. The optimiser path supplies the running best feasible sample;
      *  streaming paths (sample / enumerate) pass null. */
     fun restart(state: LocalSearchState, bestSoFar: Sample?)
+
+    /** Clear per-solve mutable state (tracked incumbents, perturbation strength, cadence position)
+     *  so a policy instance reused across solves — e.g. a tuning campaign running one recipe over
+     *  many problems — starts each solve clean. A stale incumbent from an earlier problem can even
+     *  carry a different variable arity, which the anchor/crossover paths then index against the new
+     *  problem's dimensions. [ScheduleBundle][com.eignex.klause.localsearch.schedule.ScheduleBundle]
+     *  deliberately leaves the restart policy out of its adaptive-member reset; the engine calls
+     *  this at the start of every solve instead. Stateless policies keep the default no-op. */
+    fun reset() {}
 }
 
 /** Full random restart at a fixed flip cadence. */
@@ -202,6 +211,11 @@ class LubyRestart(val unit: Int = 100) : RestartPolicy {
     override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
         state.restart()
         luby.advance()
+        cadence = unit * luby.value
+    }
+
+    override fun reset() {
+        luby.reset()
         cadence = unit * luby.value
     }
 }

@@ -108,6 +108,20 @@ class IteratedLocalSearchRestart(
 
     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= maxFlipsBeforeRestart
 
+    /** Drop the tracked incumbents and reset perturbation/adaptation state. A reused policy instance
+     *  must not carry incumbents — or their variable arity — across independent solves, else the
+     *  anchor/crossover paths index a stale sample against a different problem's dimensions. The
+     *  learned [acceptanceBandit] weights are intentionally kept; only the pending, half-credited
+     *  decision is cleared. */
+    override fun reset() {
+        population.clear()
+        stallCount = 0
+        perturbationStrength = initialPerturbationStrength
+        pendingArm = -1
+        pendingContext = null
+        pendingBestBefore = Double.POSITIVE_INFINITY
+    }
+
     override fun onLocalOptimum(state: LocalSearchState, sample: Sample, objective: Double) {
         val worstObjective = if (population.size < populationSize) {
             Double.POSITIVE_INFINITY
