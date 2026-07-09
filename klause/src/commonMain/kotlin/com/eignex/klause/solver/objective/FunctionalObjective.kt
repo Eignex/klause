@@ -127,23 +127,22 @@ internal class FunctionalObjective internal constructor(
         }
     }
 
-    override fun evaluate(sample: Sample): Double = objValue { id -> sample.ints[id].toLong() }.toDouble()
+    override fun evaluate(sample: Sample): Double = objValue { id -> sample.ints[id] }.toDouble()
 
-    override fun evaluate(assignment: Assignment): Double =
-        objValue { id -> assignment.intValue(id).toLong() }.toDouble()
+    override fun evaluate(assignment: Assignment): Double = objValue { id -> assignment.intValue(id) }.toDouble()
 
     override fun deltaIfApplied(assignment: Assignment, move: Move): Double {
         val moved = MutableIntLongMap()
         collectIntMoves(move, moved)
         if (moved.isEmpty()) return 0.0
-        val cur = objValue { id -> assignment.intValue(id).toLong() }
-        val nxt = objValue { id -> moved.getOrDefault(id, assignment.intValue(id).toLong()) }
+        val cur = objValue { id -> assignment.intValue(id) }
+        val nxt = objValue { id -> moved.getOrDefault(id, assignment.intValue(id)) }
         return (nxt - cur).toDouble()
     }
 
     private fun collectIntMoves(move: Move, into: MutableIntLongMap) {
         when (move) {
-            is Move.IntSet -> into.put(move.varId, move.newValue.toLong())
+            is Move.IntSet -> into.put(move.varId, move.newValue)
 
             // bool moves don't change int-cone leaf values
             is Move.BoolFlip -> {}

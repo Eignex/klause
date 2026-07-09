@@ -237,7 +237,7 @@ internal object AffineSingletons {
             if (x in objectiveIntVars || y in objectiveIntVars) continue
             if (!ws.isContained(di, x)) continue
             val domY = domains[y]
-            if (domY.max.toLong() - domY.min.toLong() > RESIDUE_DOMAIN_SPAN_CAP) continue
+            if (domY.max - domY.min > RESIDUE_DOMAIN_SPAN_CAP) continue
             val restricted = restrictPartnerDomain(domY, domains[x], a, b, fBound) ?: continue
             return ResidueCandidate(
                 di,

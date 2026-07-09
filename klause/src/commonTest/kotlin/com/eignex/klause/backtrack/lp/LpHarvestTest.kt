@@ -67,7 +67,7 @@ class LpHarvestTest {
             val point = IntArray(n)
             fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
-                for (i in f.vars.indices) s += f.coeffs[i].toLong() * point[f.vars[i]]
+                for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]
                 when (f.op) {
                     LinearOp.LE -> s <= f.bound
                     LinearOp.GE -> s >= f.bound
@@ -328,11 +328,11 @@ class LpHarvestTest {
             for (v in 0 until n) if (point[v].toLong() !in p.intDomains[v]) return false
             return p.factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
-                for (i in f.vars.indices) s += f.coeffs[i].toLong() * point[f.vars[i]]
+                for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]
                 when (f.op) {
                     LinearOp.LE -> s <= f.bound
                     LinearOp.GE -> s >= f.bound
-                    LinearOp.EQ -> s == f.bound.toLong()
+                    LinearOp.EQ -> s == f.bound
                     else -> true
                 }
             }

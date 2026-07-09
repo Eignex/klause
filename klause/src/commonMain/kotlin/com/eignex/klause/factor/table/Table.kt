@@ -147,12 +147,10 @@ class Table private constructor(
 
     /** Var id → the single tuple column it occupies (the common case). Vars that appear in more than
      *  one column are absent here and listed in [multiColumnsByVar] instead. */
-    @Suppress("EXPOSED_PROPERTY_TYPE")
-    val singleColumnByVar: IntIntMap
+    internal val singleColumnByVar: IntIntMap
 
     /** Var id → all tuple columns it occupies, for vars that appear more than once in [xs]. */
-    @Suppress("EXPOSED_PROPERTY_TYPE")
-    val multiColumnsByVar: MutableIntObjectMap<IntArray>
+    internal val multiColumnsByVar: MutableIntObjectMap<IntArray>
 
     init {
         val (single, multi) = tableColumnMaps(xs, arity)

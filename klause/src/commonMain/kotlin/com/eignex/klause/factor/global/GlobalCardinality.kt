@@ -125,8 +125,7 @@ class GlobalCardinality(
 
     /** Cover value → its 0-based index in [cover]. Used for O(1) per-probe lookup during
      *  propagation and LS delta computation; `-1` for values outside the cover. */
-    @Suppress("EXPOSED_PROPERTY_TYPE")
-    val coverIndexByValue: MutableLongIntMap =
+    internal val coverIndexByValue: MutableLongIntMap =
         MutableLongIntMap().apply { for (i in cover.indices) put(cover[i], i) }
 
     override fun asPropagator(): Propagator = GlobalCardinalityPropagator(

@@ -78,8 +78,8 @@ internal class AggregationMirSeparator : CutSeparator {
 
                 is PseudoBoolean -> {
                     val lits = factor.literals
-                    val w = { k: Int -> factor.weights[k].toLong() }
-                    val b = factor.bound.toLong()
+                    val w = { k: Int -> factor.weights[k] }
+                    val b = factor.bound
                     when (factor.op) {
                         PbOp.LE -> addBoolRow(ctx, lits, w, b, flip = false, loOf, rows)
 

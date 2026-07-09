@@ -56,7 +56,7 @@ class CpToLpRelaxationRltTest {
             val x = IntArray(n)
             fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
-                for (i in f.vars.indices) s += f.coeffs[i].toLong() * x[f.vars[i]]
+                for (i in f.vars.indices) s += f.coeffs[i] * x[f.vars[i]]
                 if (f.op == LinearOp.LE) s <= f.bound else s >= f.bound
             }
             for (mask in 0 until (1 shl n)) {

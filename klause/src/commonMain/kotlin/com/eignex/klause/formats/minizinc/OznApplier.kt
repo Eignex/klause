@@ -51,7 +51,7 @@ class OznApplier(oznSource: String) {
     private fun arrayBindingFrom(arr: FlatZincArray, sample: Sample): OznValue = when (arr) {
         is FlatZincArray.BoolParam -> OznValue.ArrayV(arr.values.map { OznValue.BoolV(it) })
 
-        is FlatZincArray.IntParam -> OznValue.ArrayV(arr.values.map { OznValue.IntV(it.toLong()) })
+        is FlatZincArray.IntParam -> OznValue.ArrayV(arr.values.map { OznValue.IntV(it) })
 
         is FlatZincArray.FloatParam -> OznValue.ArrayV(arr.values.map { OznValue.FloatV(it) })
 

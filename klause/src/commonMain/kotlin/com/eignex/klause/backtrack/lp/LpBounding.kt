@@ -435,7 +435,7 @@ internal fun LpEngine.sparseSafePrune(
         // conflict-analysis leaf — while an unchanged bound keeps the certified reason.
         val mod = objectiveModulus?.takeIf { it.first == objectiveVar }
         val rounded = if (lpFloor != null && mod != null) {
-            roundUpToResidue(lpFloor, mod.second.toLong(), mod.third.toLong())
+            roundUpToResidue(lpFloor, mod.second, mod.third)
         } else {
             lpFloor
         }

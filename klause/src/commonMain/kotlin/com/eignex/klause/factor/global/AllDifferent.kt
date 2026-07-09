@@ -69,8 +69,7 @@ class AllDifferent(
         if (exceptSet.isEmpty()) EmptyLongArray else exceptSet.distinct().sorted().toLongArray()
 
     /** Membership view of [exceptSet] for the hot value checks; the shared empty set when none. */
-    @Suppress("EXPOSED_PROPERTY_TYPE")
-    val exceptValues: LongHashSet =
+    internal val exceptValues: LongHashSet =
         if (exceptSet.isEmpty()) {
             AllDifferentInvariant.NO_EXCEPT
         } else {
@@ -187,8 +186,7 @@ class AllDifferent(
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
      *  common case where each var appears exactly once this is always 1. */
-    @Suppress("EXPOSED_PROPERTY_TYPE")
-    val occurrencesByVar: IntIntMap = run {
+    internal val occurrencesByVar: IntIntMap = run {
         val counts = MutableIntIntMap()
         for (v in vars) counts.addTo(v, 1)
         val keys = IntArrayList(counts.size)

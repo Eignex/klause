@@ -57,7 +57,7 @@ class StallKickEquivalenceTest {
                 if (pick < nInts) {
                     val v = scope.intVars[pick]
                     val d = problem.intDomains[v]
-                    val span = (d.max.toLong() - d.min.toLong()).toInt()
+                    val span = (d.max - d.min).toInt()
                     if (span > 0) {
                         val nv = d.min + state.rng.nextInt(span + 1)
                         if (nv != state.assignment.intValue(v)) {

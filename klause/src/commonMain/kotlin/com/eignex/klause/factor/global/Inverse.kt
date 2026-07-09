@@ -54,12 +54,10 @@ class Inverse(
 
     /** var id → its 0-based index in [f], or `-1` when absent. Maps dirty-variable ids to
      *  channel rows during propagation and LS delta computation without an O(n) scan. */
-    @Suppress("EXPOSED_PROPERTY_TYPE")
-    val fIndexOf: IntIntMap = IntIntMap.build(f, IntArray(f.size) { it }, absent = -1)
+    internal val fIndexOf: IntIntMap = IntIntMap.build(f, IntArray(f.size) { it }, absent = -1)
 
     /** var id → its 0-based index in [g], or `-1` when absent. Symmetric to [fIndexOf]. */
-    @Suppress("EXPOSED_PROPERTY_TYPE")
-    val gIndexOf: IntIntMap = IntIntMap.build(g, IntArray(g.size) { it }, absent = -1)
+    internal val gIndexOf: IntIntMap = IntIntMap.build(g, IntArray(g.size) { it }, absent = -1)
 
     /*
      * GAC for the inverse channel. Three layers:

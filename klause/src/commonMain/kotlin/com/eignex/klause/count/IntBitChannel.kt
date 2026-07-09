@@ -60,7 +60,7 @@ internal object IntBitChannel {
         for (x in intVars) {
             val dom = base.intDomains[x]
             val min = dom.min
-            val span = dom.max.toLong() - dom.min.toLong()
+            val span = dom.max - dom.min
             val width = bitWidth(span)
             require(width <= MAX_WIDTH) {
                 "IntBitChannel: int var $x spans ${span + 1} values; too wide to hash (max 2^$MAX_WIDTH)"

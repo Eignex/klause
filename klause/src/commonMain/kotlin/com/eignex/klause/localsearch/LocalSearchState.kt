@@ -648,6 +648,7 @@ class LocalSearchState(
      *  flip would break the factor (`deltaIfBoolFlipped > 0`) moves the break count, one whose flip
      *  would make it (`< 0`) moves the make count. `sign = -1` retracts the factor's pre-move
      *  contribution, `+1` re-adds it post-move. Inline so the hot apply path stays allocation-free. */
+    @Suppress("NOTHING_TO_INLINE")
     private inline fun adjustBoolBreakMake(factorId: Int, sign: Int) {
         val f = factors[factorId]
         for (w in problem.factors[factorId].boolVars) {

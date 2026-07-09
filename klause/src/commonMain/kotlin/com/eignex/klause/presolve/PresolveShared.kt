@@ -61,9 +61,9 @@ internal object PresolveShared {
         for (i in order) if (pb.weights[i] <= 0) return null
         // Ascending weights: the suffix from the first index whose pair-sum with its neighbour exceeds
         // the bound is a clique (its two smallest members already exceed b, so every pair does too).
-        val b = pb.bound.toLong()
+        val b = pb.bound
         for (start in 0 until order.size - 1) {
-            if (pb.weights[order[start]].toLong() + pb.weights[order[start + 1]].toLong() > b) {
+            if (pb.weights[order[start]] + pb.weights[order[start + 1]] > b) {
                 val clique = HashSet<Int>(order.size - start)
                 for (k in start until order.size) clique.add(pb.literals[order[k]])
                 return if (clique.size >= 2) clique else null
