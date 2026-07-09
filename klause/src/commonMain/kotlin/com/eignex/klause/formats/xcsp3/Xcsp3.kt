@@ -7,7 +7,9 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.constRelationHolds
+import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
@@ -199,7 +201,7 @@ object Xcsp3 {
         }
 
         /** Min/max of a linear expression over its variables' domains. */
-        internal fun linBounds(lin: Lin): Pair<Long, Long> {
+        internal fun linBounds(lin: LinComb): Pair<Long, Long> {
             var lo = lin.constant.toLong()
             var hi = lin.constant.toLong()
             for ((v, c) in lin.coeffs) {
@@ -243,7 +245,7 @@ object Xcsp3 {
                     vars[0]
                 } else {
                     materializeVar(
-                        Lin(linMap(coeffs, vars), 0),
+                        LinComb(linMap(coeffs, vars), 0),
                     )
                 }
                 val members = parseSetMembers(set.groupValues[1])
@@ -347,14 +349,8 @@ object Xcsp3 {
          *  variable terms they cancel to an empty var list, leaving the constant relation `0 op bound`. */
         internal fun relationParts(node: FExpr.Call): RelParts {
             val (op, delta) = relOp(node.fn) ?: throw UnsupportedXcsp3Exception("relation '${node.fn}'")
-            val lhs = linear(node.args[0])
-            val rhs = linear(node.args[1])
-            val combined = HashMap(lhs.coeffs)
-            for ((v, c) in rhs.coeffs) combined[v] = (combined[v] ?: 0) - c
-            combined.entries.removeAll { it.value == 0 }
-            val bound = rhs.constant - lhs.constant + delta
-            val vars = combined.keys.toIntArray()
-            return RelParts(IntArray(vars.size) { combined.getValue(vars[it]) }, vars, op, bound)
+            val (vars, coeffs, bound) = linCombDiff(linear(node.args[0]), linear(node.args[1]), delta)
+            return RelParts(coeffs, vars, op, bound)
         }
 
         fun objective(e: XmlElement) {
@@ -394,25 +390,24 @@ object Xcsp3 {
             return LinearObjective(intCoefficients = arr)
         }
 
-        internal data class Lin(val coeffs: Map<Int, Int>, val constant: Int)
 
-        internal fun linear(e: FExpr): Lin = when (e) {
-            is FExpr.Num -> Lin(emptyMap(), e.value)
+        internal fun linear(e: FExpr): LinComb = when (e) {
+            is FExpr.Num -> LinComb(emptyMap(), e.value)
 
-            is FExpr.Ref -> Lin(mapOf(ref(e.name) to 1), 0)
+            is FExpr.Ref -> LinComb(mapOf(ref(e.name) to 1), 0)
 
             is FExpr.SetLit -> throw UnsupportedXcsp3Exception("set literal used arithmetically")
 
             is FExpr.Call -> when (e.fn) {
-                "add" -> e.args.map { linear(it) }.reduce(::addLin)
+                "add" -> e.args.map { linear(it) }.reduce { a, b -> a.plus(b) }
 
-                "sub" -> e.args.drop(1).fold(linear(e.args[0])) { a, x -> addLin(a, scaleLin(linear(x), -1)) }
+                "sub" -> e.args.drop(1).fold(linear(e.args[0])) { a, x -> a.plus(linear(x).scaled(-1)) }
 
-                "neg" -> scaleLin(linear(e.args[0]), -1)
+                "neg" -> linear(e.args[0]).scaled(-1)
 
                 "abs" -> absOf(linear(e.args[0]))
 
-                "dist" -> absOf(addLin(linear(e.args[0]), scaleLin(linear(e.args[1]), -1)))
+                "dist" -> absOf(linear(e.args[0]).plus(linear(e.args[1]).scaled(-1)))
 
                 "min" -> minMaxTerm(e.args, max = false)
 
@@ -429,11 +424,11 @@ object Xcsp3 {
                     val nonConst = parts.filter { it.coeffs.isNotEmpty() }
                     val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
                     when {
-                        k == 0 -> Lin(emptyMap(), 0)
+                        k == 0 -> LinComb(emptyMap(), 0)
 
-                        nonConst.isEmpty() -> Lin(emptyMap(), k)
+                        nonConst.isEmpty() -> LinComb(emptyMap(), k)
 
-                        nonConst.size == 1 -> scaleLin(nonConst[0], k)
+                        nonConst.size == 1 -> nonConst[0].scaled(k)
 
                         // A genuine variable product: materialise each factor and chain `Product`s.
                         else -> {
@@ -445,13 +440,13 @@ object Xcsp3 {
                                 factors.add(Product(acc, next, p))
                                 acc = p
                             }
-                            scaleLin(Lin(mapOf(acc to 1), 0), k)
+                            LinComb(mapOf(acc to 1), 0).scaled(k)
                         }
                     }
                 }
 
                 // A boolean-valued subexpression used arithmetically is its 0/1 truth value.
-                "in", in REL, in BOOL_FNS -> Lin(mapOf(litTo01(compileBool(e)) to 1), 0)
+                "in", in REL, in BOOL_FNS -> LinComb(mapOf(litTo01(compileBool(e)) to 1), 0)
 
                 else -> throw UnsupportedXcsp3Exception("arithmetic fn '${e.fn}'")
             }
@@ -467,15 +462,15 @@ object Xcsp3 {
         }
 
         /** `min`/`max` of expressions as a linear term, via [ArrayMinMax] over the materialised args. */
-        internal fun minMaxTerm(args: List<FExpr>, max: Boolean): Lin {
+        internal fun minMaxTerm(args: List<FExpr>, max: Boolean): LinComb {
             val vs = args.map { materializeVar(linear(it)) }.toIntArray()
             val m = newAuxVar(vs.minOf { domains[it].min }, vs.maxOf { domains[it].max })
             factors.add(ArrayMinMax(result = m, xs = vs, max = max))
-            return Lin(mapOf(m to 1), 0)
+            return LinComb(mapOf(m to 1), 0)
         }
 
         /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
-        internal fun ifTerm(args: List<FExpr>): Lin {
+        internal fun ifTerm(args: List<FExpr>): LinComb {
             val cond = compileBool(args[0])
             val a = materializeVar(linear(args[1]))
             val b = materializeVar(linear(args[2]))
@@ -484,13 +479,13 @@ object Xcsp3 {
             val eb = reifyLinear(intArrayOf(1, -1), intArrayOf(v, b), LinearOp.EQ, 0)
             factors.add(Clause(intArrayOf(Lit.negate(cond), ea))) // cond ⇒ v = a
             factors.add(Clause(intArrayOf(cond, eb))) // ¬cond ⇒ v = b
-            return Lin(mapOf(v to 1), 0)
+            return LinComb(mapOf(v to 1), 0)
         }
 
         /** Integer `div`/`mod` by a positive constant with a non-negative dividend (where floored and
          *  truncated division agree): `a = k·q + r, 0 ≤ r < k`. Other shapes stay unsupported to avoid
          *  a division-semantics mismatch. */
-        internal fun divModTerm(args: List<FExpr>, mod: Boolean): Lin {
+        internal fun divModTerm(args: List<FExpr>, mod: Boolean): LinComb {
             val a = materializeVar(linear(args[0]))
             val bLin = linear(args[1])
             val k = bLin.constant
@@ -504,11 +499,11 @@ object Xcsp3 {
             val q = newAuxVar(da.min / k, da.max / k)
             val r = newAuxVar(0L, (k - 1).toLong())
             factors.add(Linear(intArrayOf(1, -k, -1), intArrayOf(a, q, r), LinearOp.EQ, 0)) // a = k·q + r
-            return Lin(mapOf((if (mod) r else q) to 1), 0)
+            return LinComb(mapOf((if (mod) r else q) to 1), 0)
         }
 
         /** `|expr|` as a linear term: `|v| = max(v, -v)` via [ArrayMinMax] over `v` and its negation. */
-        internal fun absOf(lin: Lin): Lin {
+        internal fun absOf(lin: LinComb): LinComb {
             val v = materializeVar(lin)
             val d = domains[v]
             val neg = newAuxVar(-d.max, -d.min)
@@ -521,12 +516,12 @@ object Xcsp3 {
             }
             val a = newAuxVar(lo, hi)
             factors.add(ArrayMinMax(result = a, xs = intArrayOf(v, neg), max = true))
-            return Lin(mapOf(a to 1), 0)
+            return LinComb(mapOf(a to 1), 0)
         }
 
         /** Materialise a linear expression as a single int var (returning it directly when it already
          *  is one), posting `v = expr` otherwise. */
-        internal fun materializeVar(lin: Lin): Int {
+        internal fun materializeVar(lin: LinComb): Int {
             if (lin.constant == 0 && lin.coeffs.size == 1 && lin.coeffs.values.first() == 1) {
                 return lin.coeffs.keys.first()
             }
@@ -552,12 +547,6 @@ object Xcsp3 {
             return corners.min() to corners.max()
         }
 
-        internal fun addLin(a: Lin, b: Lin): Lin {
-            val m = HashMap(a.coeffs)
-            for ((v, c) in b.coeffs) m[v] = (m[v] ?: 0) + c
-            return Lin(m, a.constant + b.constant)
-        }
-        internal fun scaleLin(a: Lin, k: Int) = Lin(a.coeffs.mapValues { it.value * k }, a.constant * k)
 
         /** Resolve one variable/constant term to a var id. */
         internal fun singleTermVar(text: String): Int {
