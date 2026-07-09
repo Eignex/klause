@@ -8,8 +8,11 @@ import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.objective.LinearObjective
 
 /**
@@ -91,9 +94,14 @@ internal class ObjectiveBoundFactor(
         bound,
     )
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.OBJECTIVE_BOUND) {
-        sortedInts(boolVars)
-        sortedInts(intVars)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.OBJECTIVE_BOUND, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.OBJECTIVE_BOUND, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.sortedBoolVars(boolVars)
+        sink.sortedIntVars(intVars)
     }
 
     override fun asPropagator(): Propagator = NoPropagator

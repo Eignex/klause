@@ -5,7 +5,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -27,9 +30,14 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
 
     /** `ys` is the sorted permutation of `xs`: the input multiset ignores order (so `xs` is sorted in
      *  the key), while `ys` is position-faithful (`ys(0) <= ys(1) <= ...`) and kept in order (#443). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SORT) {
-        sortedInts(xs)
-        ints(ys)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SORT, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.SORT, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.sortedIntVars(xs)
+        sink.intVars(ys)
     }
 
     override val boolVars: IntArray = EmptyIntArray

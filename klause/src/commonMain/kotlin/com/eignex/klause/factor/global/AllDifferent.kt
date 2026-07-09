@@ -12,7 +12,10 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -85,13 +88,18 @@ class AllDifferent(
     // positions are skipped entirely; unpinned-presence positions are skipped too, so any
     // filtering remains sound under "this position might still go absent".
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ALL_DIFFERENT) {
-        long(domainMin)
-        int(domainSize)
-        sortedInts(vars)
-        sortedInts(presents)
-        longs(exceptSorted)
-        bool(boundsConsistent)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.ALL_DIFFERENT, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.ALL_DIFFERENT, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.long(domainMin)
+        sink.int(domainSize)
+        sink.sortedIntVars(vars)
+        sink.sortedBoolLits(presents)
+        sink.constLongs(exceptSorted)
+        sink.bool(boundsConsistent)
     }
 
     /** Plain distinctness ignores which values are used — invariant under any value relabeling

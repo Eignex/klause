@@ -7,7 +7,10 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import kotlin.math.abs
 
 /**
@@ -56,7 +59,12 @@ class Circuit(
 
     /** Position-faithful: `succ(i)` is node i's successor, so the array order is meaningful — the key
      *  keeps the variables in order rather than sorting them (#443). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CIRCUIT) { ints(succ) }
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CIRCUIT, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.CIRCUIT, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) = sink.intVars(succ)
 
     /**
      * Graded cost: `|numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`.

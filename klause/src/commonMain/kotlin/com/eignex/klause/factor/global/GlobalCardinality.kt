@@ -83,6 +83,8 @@ class GlobalCardinality(
     // xs is a set (counts are per cover value, order-independent) so xs/presents pairs are sorted by
     // var id; cover triples are sorted by value. Encodes every distinguishing field — fine enough
     // that two non-equivalent GCCs never collide (a coarser key would let a symmetry swap through).
+    // Not migrated to the KeySink allocation-free hash: the `pairsByKey(xs){ presents[it] }` value is a
+    // Boolean literal (remappable), which the sink's constant-value pair methods can't remap.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.GLOBAL_CARDINALITY) {
         bool(closed)
         bool(presents.isEmpty())

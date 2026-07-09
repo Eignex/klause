@@ -10,7 +10,10 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntIntMap
 
@@ -140,15 +143,22 @@ class Cumulative(
     /** Position-faithful (task i is fixed by index): keeps every array in order and folds in all
      *  constants — durations/resources/capacity and the var/const split — so two non-equivalent
      *  cumulatives never collide (#531). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.CUMULATIVE) {
-        long(capacity)
-        int(capacityVar)
-        longs(durations)
-        longs(resources)
-        ints(starts)
-        ints(presents)
-        ints(durationVars)
-        ints(resourceVars)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CUMULATIVE, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.CUMULATIVE, boolMap, intMap, ::buildKey)
+
+    // durations/resources/capacity are constant magnitudes; starts/durationVars/resourceVars are int-var
+    // ids; capacityVar is an int var or a negative sentinel; presents are Boolean literals.
+    private fun buildKey(sink: KeySink) {
+        sink.long(capacity)
+        sink.intVarOrSelf(capacityVar)
+        sink.constLongs(durations)
+        sink.constLongs(resources)
+        sink.intVars(starts)
+        sink.boolLits(presents)
+        sink.intVars(durationVars)
+        sink.intVars(resourceVars)
     }
 
     override val boolVars: IntArray = OptPresence.presenceVarIds(presents)

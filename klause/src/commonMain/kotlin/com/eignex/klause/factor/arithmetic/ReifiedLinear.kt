@@ -16,7 +16,10 @@ import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 
 /**
  * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
@@ -58,11 +61,16 @@ class ReifiedLinear private constructor(
 
     /** [Linear.structuralKey] plus the reifying [auxBoolVar]; the distinct factor kind keeps it disjoint
      *  from a bare linear's key, so a reified row and an asserted one never share a bucket (#443). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.REIFIED_LINEAR) {
-        int(auxBoolVar)
-        enum(op)
-        long(bound)
-        pairsByKey(vars) { coeffs[it] }
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_LINEAR, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.REIFIED_LINEAR, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.boolVar(auxBoolVar)
+        sink.enum(op)
+        sink.long(bound)
+        sink.pairsByVarKey(vars) { coeffs[it] }
     }
 
     override val boolVars: IntArray = intArrayOf(auxBoolVar)

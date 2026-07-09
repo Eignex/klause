@@ -11,7 +11,10 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -78,15 +81,22 @@ class Mdd(
     /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
      *  diagram — per-layer state counts, layer offsets, the transition records, the initial and
      *  accepting states, the record stride, and the cost var (#531). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.MDD) {
-        int(initial)
-        int(recordStride)
-        int(cost)
-        ints(numStatesPerLayer)
-        ints(layerStarts)
-        longs(transitions)
-        ints(accepting)
-        ints(seq)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.MDD, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.MDD, boolMap, intMap, ::buildKey)
+
+    // The diagram (states, layer offsets, transition records, accepting set) is constant structure;
+    // seq are the sequence's int-var ids; cost is an int var or a negative sentinel.
+    private fun buildKey(sink: KeySink) {
+        sink.int(initial)
+        sink.int(recordStride)
+        sink.intVarOrSelf(cost)
+        sink.constInts(numStatesPerLayer)
+        sink.constInts(layerStarts)
+        sink.constLongs(transitions)
+        sink.constInts(accepting)
+        sink.intVars(seq)
     }
 
     /** Symbol relabeling (#536): each transition record is `(fromState, symbol, toState[, cost])`, so a

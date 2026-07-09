@@ -7,7 +7,10 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import kotlin.math.abs
 
 /**
@@ -48,7 +51,12 @@ class Subcircuit(
 
     /** Position-faithful: `succ(i)` is node i's successor (`succ(i) = i` excludes node i), so the
      *  array order is meaningful — the key keeps the variables in order, not sorted (#443). */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SUBCIRCUIT) { ints(succ) }
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SUBCIRCUIT, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.SUBCIRCUIT, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) = sink.intVars(succ)
 
     /**
      * Graded cost for the subcircuit. 0 iff included set forms a single cycle (or is empty).

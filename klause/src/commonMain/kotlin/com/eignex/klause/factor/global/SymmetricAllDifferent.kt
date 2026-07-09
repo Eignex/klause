@@ -5,7 +5,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -35,9 +38,14 @@ class SymmetricAllDifferent(
 
     /** A self-inverse permutation references positions (`xs(xs(i)) = i`), so [xs] is positional;
      *  [indexOffset] names the value of index 0. */
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.SYMMETRIC_ALL_DIFFERENT) {
-        int(indexOffset)
-        ints(xs)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SYMMETRIC_ALL_DIFFERENT, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.SYMMETRIC_ALL_DIFFERENT, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.int(indexOffset)
+        sink.intVars(xs)
     }
 
     override val boolVars: IntArray = EmptyIntArray

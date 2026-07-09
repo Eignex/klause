@@ -8,7 +8,10 @@ import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -40,55 +43,22 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     constructor(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) :
         this(coalesceLinearTerms(vars, coeffs), op, bound)
 
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) {
-        enum(op)
-        long(bound)
-        pairsByKey(vars) { coeffs[it] }
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.LINEAR, ::buildKey)
+
+    // Allocation-free per-incidence key hash via the two-mode [KeySink] — symmetry refinement rebuilds
+    // this once per incident variable each round. `pairsByVarKeyCoalescing` reproduces `remap()` (whose
+    // constructor coalesces same-image terms) followed by the key sort, so the port hash stays equal to
+    // `remap().structuralKey().hashCode()` even when the colouring map collapses two variables.
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.LINEAR, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.enum(op)
+        sink.long(bound)
+        sink.pairsByVarKeyCoalescing(vars) { coeffs[it] }
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Linear(coeffs, vars.remapVars(intMap), op, bound)
-
-    // Folds `Linear(coeffs, vars.remapVars(intMap), op, bound).structuralKey().hashCode()` without
-    // allocating the remapped Linear or its key. The key coalesces coefficients of variables sharing
-    // an image (matching `coalesceLinearTerms`) and sorts the (image, coeff) pairs, so pack each pair
-    // into a `Long` (image high, coeff low), sort, and fold the key's `LongArray` content-hash over the
-    // merged runs. Symmetry refinement runs this once per incident variable each round.
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int {
-        val n = vars.size
-        val packed = LongArray(n)
-        for (k in 0 until n) {
-            packed[k] = (intMap[vars[k]].toLong() shl Int.SIZE_BITS) or (coeffs[k] and LOW_WORD)
-        }
-        packed.sort()
-        var distinct = 0
-        var i = 0
-        while (i < n) {
-            val img = packed[i] ushr Int.SIZE_BITS
-            var j = i + 1
-            while (j < n && packed[j] ushr Int.SIZE_BITS == img) j++
-            distinct++
-            i = j
-        }
-        // Payload order: op.ordinal, bound, pair count, then each (image, summed coeff) ascending.
-        var h = 1
-        h = 31 * h + longHashWord(op.ordinal.toLong())
-        h = 31 * h + longHashWord(bound)
-        h = 31 * h + longHashWord(distinct.toLong())
-        i = 0
-        while (i < n) {
-            val img = (packed[i] ushr Int.SIZE_BITS).toInt()
-            var sum = 0L
-            var j = i
-            while (j < n && (packed[j] ushr Int.SIZE_BITS).toInt() == img) {
-                sum += (packed[j] and LOW_WORD).toInt().toLong()
-                j++
-            }
-            h = 31 * h + longHashWord(img.toLong())
-            h = 31 * h + longHashWord(sum.toInt().toLong())
-            i = j
-        }
-        return 31 * FactorKind.LINEAR.ordinal + h
-    }
 
     /**
      * A pure binary value relation `c·x ⟨=|≠⟩ c·y` — two terms with opposite-equal coefficients and a
@@ -116,9 +86,13 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
     override fun linearRows(): List<LinearRow> = listOf(LinearRow(coeffs, vars, op, bound))
 }
 
-/** Low 32 bits mask for packing/unpacking a `(image, coeff)` pair in [Linear.remapStructuralHash]. */
-private const val LOW_WORD = 0xFFFFFFFFL
+/** True when every coefficient and the bound fit 32-bit range — the precondition for the Int-coefficient
+ *  reasoning a consumer keeps (ReifiedLinear's big-M rows, GCD modulus fixing, coefficient strengthening). */
+internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
+    bound in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() &&
+        coeffs.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
-/** `Long.hashCode()` (the per-word step of `LongArray.contentHashCode`), so the folded hash matches
- *  the one [StructuralKey] computes from its payload. */
-private fun longHashWord(w: Long): Int = (w xor (w ushr Int.SIZE_BITS)).toInt()
+/** True when every value in [values] fits 32-bit range. The value-symmetry relabel (`remapValues`) is
+ *  `(Int)`-typed, so a value-carrying global (GCC cover, Table tuples, Mdd symbols, AllDifferent
+ *  except-set) declines value symmetry (`null`) when wide, to avoid truncating two values into one. */
+internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }

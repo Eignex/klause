@@ -5,7 +5,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
@@ -35,10 +38,15 @@ class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
 
     // Positional: the sequence order decides "before", so xs is not sorted. Encodes the values and
     // the full var sequence — collision-free up to variable identity (sound for symmetry checks).
-    override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.VALUE_PRECEDE) {
-        long(s)
-        long(t)
-        ints(xs)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.VALUE_PRECEDE, ::buildKey)
+
+    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
+        hashRemappedKey(FactorKind.VALUE_PRECEDE, boolMap, intMap, ::buildKey)
+
+    private fun buildKey(sink: KeySink) {
+        sink.long(s)
+        sink.long(t)
+        sink.intVars(xs)
     }
 
     /** Relabel the two named values (#374 value-symmetry verification): `value_precede(s,t)` maps to
