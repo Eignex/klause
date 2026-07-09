@@ -8,6 +8,10 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.formats.tseitinIff
+import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.model.AllDifferent
 import com.eignex.klause.model.AllDifferentOpt
 import com.eignex.klause.model.And
@@ -75,8 +79,8 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
     fun compile(def: SchemaDef<SchemaEntry>): CompiledProblem = Lowering(config).run(def)
 }
 
-internal class Lowering(val config: KlauseConfig) {
-    val factors = mutableListOf<Factor>()
+internal class Lowering(val config: KlauseConfig) : CnfLowering {
+    override val factors = mutableListOf<Factor>()
     val boolVarIdByName = mutableMapOf<String, Int>()
     val intVarIdByName = mutableMapOf<String, Int>()
 
@@ -115,6 +119,12 @@ internal class Lowering(val config: KlauseConfig) {
     internal var auxIntCounter = 0
 
     fun newBoolVar(): Int = numBoolVars++
+
+    // CnfLowering hooks: share the Tseitin gates ([tseitinAnd]/[tseitinOr]/[tseitinIff]) with the format
+    // front-ends instead of re-implementing them here. [trueLitCache] is unused — this class keeps its own
+    // [trueLit] (a fresh forced literal per call) rather than CnfLowering's cached one.
+    override fun newBool(): Int = newBoolVar()
+    override var trueLitCache: Int = -1
 
     fun newIntVar(domain: IntDomain): Int {
         val id = numIntVars++
@@ -367,39 +377,12 @@ internal class Lowering(val config: KlauseConfig) {
         return Lit.make(aux, positive = true)
     }
 
-    fun tseitinAnd(children: List<BoolExpr>): Int {
-        val aux = newBoolVar()
-        val auxLit = Lit.make(aux, true)
-        val childLits = lowerAllBool(children)
-        for (cl in childLits) factors += Clause(intArrayOf(Lit.negate(auxLit), cl))
-        val big = IntArray(childLits.size + 1)
-        big[0] = auxLit
-        for (i in childLits.indices) big[i + 1] = Lit.negate(childLits[i])
-        factors += Clause(big)
-        return auxLit
-    }
+    // Lower the children to literals, then emit the shared [CnfLowering] Tseitin gate — the gate itself
+    // is defined once in `formats/CnfLowering.kt` and reused by every front-end. `tseitinIff(l, r)` is
+    // the shared gate directly (same `(Int, Int)` signature), so it needs no wrapper here.
+    fun tseitinAnd(children: List<BoolExpr>): Int = tseitinAnd(lowerAllBool(children).asList())
 
-    fun tseitinOr(children: List<BoolExpr>): Int {
-        val aux = newBoolVar()
-        val auxLit = Lit.make(aux, true)
-        val childLits = lowerAllBool(children)
-        for (cl in childLits) factors += Clause(intArrayOf(Lit.negate(cl), auxLit))
-        val big = IntArray(childLits.size + 1)
-        big[0] = Lit.negate(auxLit)
-        for (i in childLits.indices) big[i + 1] = childLits[i]
-        factors += Clause(big)
-        return auxLit
-    }
-
-    fun tseitinIff(l: Int, r: Int): Int {
-        val aux = newBoolVar()
-        val auxLit = Lit.make(aux, true)
-        factors += Clause(intArrayOf(Lit.negate(auxLit), Lit.negate(l), r))
-        factors += Clause(intArrayOf(Lit.negate(auxLit), Lit.negate(r), l))
-        factors += Clause(intArrayOf(auxLit, l, r))
-        factors += Clause(intArrayOf(auxLit, Lit.negate(l), Lit.negate(r)))
-        return auxLit
-    }
+    fun tseitinOr(children: List<BoolExpr>): Int = tseitinOr(lowerAllBool(children).asList())
 
     fun negate(expr: BoolExpr): BoolExpr = when (expr) {
         is BoolRef -> expr.copy(negated = !expr.negated)
