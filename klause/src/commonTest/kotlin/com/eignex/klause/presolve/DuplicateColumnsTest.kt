@@ -225,6 +225,70 @@ class DuplicateColumnsTest {
         checkAllReconstructionsFeasible("chain-of-three", problem)
     }
 
+    /** The int-variable occurrence CSR the incremental session hands a pass: for each variable, the
+     *  ascending factor indices mentioning it — matching what a fresh scan over `problem.factors` builds. */
+    private fun sharedOcc(problem: Problem): SharedIntOccurrence {
+        val n = problem.numIntVars
+        val offsets = IntArray(n + 1)
+        for (f in problem.factors) for (v in f.intVars) offsets[v + 1]++
+        for (v in 0 until n) offsets[v + 1] += offsets[v]
+        val cursor = offsets.copyOf()
+        val flat = IntArray(offsets[n])
+        problem.factors.forEachIndexed { fid, f -> for (v in f.intVars) flat[cursor[v]++] = fid }
+        return SharedIntOccurrence(offsets, flat)
+    }
+
+    @Test
+    fun `bails on a re-run when no touched column is eligible`() {
+        // x (0) and y (1) are duplicate columns a full scan would merge. On a re-run whose only touched
+        // variable is z (2) — read value-wise by an AllDifferent, so column-ineligible — the fast-bail
+        // returns empty: an already-collapsed class only re-forms on a touched eligible column.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                AllDifferent(intArrayOf(2, 3), domainMin = 0, domainSize = 4),
+            ),
+        )
+        assertTrue(!Presolve.mergeDuplicateColumns(problem).isEmpty, "a full scan merges the duplicate columns")
+        val delta = DuplicateColumns.mergeDuplicateColumns(
+            problem,
+            sharedIntOcc = sharedOcc(problem),
+            incrementalTouchedVars = intArrayOf(2),
+        )
+        assertTrue(delta.isEmpty, "no touched eligible column: the re-run bails")
+    }
+
+    @Test
+    fun `re-runs the full merge when a touched column is eligible`() {
+        // Same duplicate columns; the re-run's touched set includes the eligible column x (0), so the
+        // fast-bail falls through to the full scan and produces the identical merge (same dropped rows).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ),
+        )
+        val full = Presolve.mergeDuplicateColumns(problem)
+        val incremental = DuplicateColumns.mergeDuplicateColumns(
+            problem,
+            sharedIntOcc = sharedOcc(problem),
+            incrementalTouchedVars = intArrayOf(0),
+        )
+        assertTrue(!incremental.isEmpty, "a touched eligible column falls through to the merge")
+        assertEquals(
+            full.droppedIndices.toList(),
+            incremental.droppedIndices.toList(),
+            "the incremental re-run drops the same rows as the full scan",
+        )
+    }
+
     @Test
     fun `preserves an unsat verdict`() {
         // x + y + z >= 7 with all domains [0,2]: x and y are duplicate columns of the single row, so

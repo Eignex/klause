@@ -55,7 +55,9 @@ object Presolve {
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
         sharedIntOcc: SharedIntOccurrence? = null,
-    ): PassDelta = DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars, sharedIntOcc)
+        incrementalTouchedVars: IntArray? = null,
+    ): PassDelta =
+        DuplicateColumns.mergeDuplicateColumns(problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars)
 
     /** Symmetry breaking by detecting interchangeable variables. See [SymmetryBreaking]. */
     fun breakSymmetries(

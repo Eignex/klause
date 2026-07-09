@@ -78,6 +78,10 @@ data class PresolveContext(
      *  they appear in. `null` on the fresh path and on affine's first firing (a full scan); a non-null
      *  (possibly empty) array marks a re-run, where an empty array means nothing changed → skip. */
     val affineTouchedVars: IntArray? = null,
+    /** The integer variables changed since duplicate-column merging last ran, so a re-run's fast-bail scans
+     *  only the columns they touch. `null` on the fresh path and on dup-columns' first firing (a full scan);
+     *  a non-null (possibly empty) array marks a re-run, where no touched eligible column means skip. */
+    val dupColumnsTouchedVars: IntArray? = null,
 ) {
     /** Integer variables the objective reads — the nonzero-coefficient indices. */
     val objectiveIntVars: Set<Int> get() = objectiveIntCoeffs.keys
@@ -109,6 +113,10 @@ data class PresolveContext(
     /** This context carrying the variables changed since affine elimination last ran (`null` = full scan). */
     fun withAffineTouchedVars(affineTouchedVars: IntArray?): PresolveContext =
         copy(affineTouchedVars = affineTouchedVars)
+
+    /** This context carrying the variables changed since dup-columns last ran (`null` = full scan). */
+    fun withDupColumnsTouchedVars(dupColumnsTouchedVars: IntArray?): PresolveContext =
+        copy(dupColumnsTouchedVars = dupColumnsTouchedVars)
 
     /** Factories for the common contexts. */
     companion object {
@@ -329,7 +337,7 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.sharedIntOcc)
+            Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.sharedIntOcc, ctx.dupColumnsTouchedVars)
     },
 
     /** Interchangeable-variable / block / value symmetry breaking (#317 / #367 / #373 / #366). */
@@ -729,6 +737,10 @@ object Presolver {
             // Affine's change-mark at its last firing; a re-run rescans only the variables touched since.
             var affineMark: PresolveSession.ChangeMark? = null
 
+            // Dup-columns' change-mark at its last firing; a re-run's fast-bail tests only the variables
+            // touched since instead of re-signing every column.
+            var dupMark: PresolveSession.ChangeMark? = null
+
             override fun passInput(): Problem = session.passInput()
 
             // Hand the session's incrementally-maintained occurrence index to the pass so the affine
@@ -740,13 +752,10 @@ object Presolver {
                     passCtx = passCtx.withSubsumeIncremental(subsumeIncremental(session, subsumeMark, subsumeMemo))
                 }
                 if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) {
-                    val mark = affineMark
-                    val touched = if (mark == null || session.markStale(mark)) {
-                        null
-                    } else {
-                        session.touchedIntVarsSince(mark)
-                    }
-                    passCtx = passCtx.withAffineTouchedVars(touched)
+                    passCtx = passCtx.withAffineTouchedVars(touchedSince(affineMark))
+                }
+                if (pass == PresolvePass.MERGE_DUPLICATE_COLUMNS) {
+                    passCtx = passCtx.withDupColumnsTouchedVars(touchedSince(dupMark))
                 }
                 return passCtx
             }
@@ -760,7 +769,13 @@ object Presolver {
             override fun afterPass(pass: PresolvePass) {
                 if (pass == PresolvePass.REMOVE_REDUNDANT) subsumeMark = session.changeMark()
                 if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) affineMark = session.changeMark()
+                if (pass == PresolvePass.MERGE_DUPLICATE_COLUMNS) dupMark = session.changeMark()
             }
+
+            // The variables changed since [mark], or `null` when there is no replayable mark (first firing
+            // or a reseed invalidated it) so the pass falls back to a full scan.
+            fun touchedSince(mark: PresolveSession.ChangeMark?): IntArray? =
+                if (mark == null || session.markStale(mark)) null else session.touchedIntVarsSince(mark)
 
             override fun complexity(): Long = session.complexity()
         }

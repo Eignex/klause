@@ -50,10 +50,23 @@ internal object DuplicateColumns {
     fun mergeDuplicateColumns(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
-        @Suppress("UNUSED_PARAMETER") sharedIntOcc: SharedIntOccurrence? = null,
+        sharedIntOcc: SharedIntOccurrence? = null,
+        incrementalTouchedVars: IntArray? = null,
     ): PassDelta {
         if (problem.numIntVars < 2) return PassDelta()
         val n = problem.numIntVars
+        // Inter-round fast-bail. On a re-run the engine supplies the variables whose factors changed since
+        // dup-columns last ran. A duplicate-column class collapses fully when the pass fires (every member
+        // but the representative is folded away, leaving pairwise-distinct signatures), so a *new* class can
+        // only form on a column whose factor membership or a coefficient changed — i.e. a touched variable.
+        // If no touched variable is column-eligible the pass is fruitless this firing, byte-identical to the
+        // full scan below (which would re-derive the same all-singleton classes). Only a re-run passes a
+        // non-null [incrementalTouchedVars]; the first firing (and the fresh path) scans in full.
+        if (incrementalTouchedVars != null && sharedIntOcc != null &&
+            !anyTouchedColumnEligible(incrementalTouchedVars, sharedIntOcc, problem, objectiveIntVars)
+        ) {
+            return PassDelta()
+        }
         // Column duplication is a structural (row-support + coefficient) property, and folding one duplicate
         // into its representative removes only the dropped column's own term — every surviving column stays
         // in the same factors with the same coefficient, so no column's signature or eligibility changes.
@@ -122,6 +135,34 @@ internal object DuplicateColumns {
             keptCoeffs.add(factor.coeffs[i])
         }
         return Linear(keptCoeffs.toLongArray(), keptVars.toIntArray(), factor.op, factor.bound)
+    }
+
+    /** Whether any variable in [touched] is column-eligible with at least one [Linear] occurrence — the
+     *  cheap re-run gate. Eligibility is the same local test [eligibleColumns] applies (not an objective
+     *  variable, a contiguous domain, and no non-[Linear] occurrence), read here per variable off the
+     *  session's occurrence index so a barren re-run costs O(occurrences of touched) rather than the
+     *  O(all occurrences) full signature build. A variable in no [Linear] factor gets a `null` signature
+     *  in the full scan and can never match, so it is not counted here. */
+    private fun anyTouchedColumnEligible(
+        touched: IntArray,
+        occ: SharedIntOccurrence,
+        problem: Problem,
+        objectiveIntVars: Set<Int>,
+    ): Boolean {
+        for (v in touched) {
+            if (v in objectiveIntVars || !problem.intDomains[v].isContiguous()) continue
+            val start = occ.offsets[v]
+            val end = occ.offsets[v + 1]
+            var onlyLinear = true
+            for (k in start until end) {
+                if (problem.factors[occ.flat[k]] !is Linear) {
+                    onlyLinear = false
+                    break
+                }
+            }
+            if (onlyLinear && end > start) return true
+        }
+        return false
     }
 
     /** Per-variable eligibility: every occurrence is a [Linear] factor (a global / reified row reads a
