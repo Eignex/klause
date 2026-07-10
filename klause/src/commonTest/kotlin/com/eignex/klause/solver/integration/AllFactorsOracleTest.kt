@@ -3,7 +3,6 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.factor.DegreeConsistencyOracle
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.MoveSetOracle
-import com.eignex.klause.factor.reifiedIntCompare
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
@@ -24,6 +23,7 @@ import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.global.Sort
 import com.eignex.klause.factor.global.SymmetricAllDifferent
+import com.eignex.klause.factor.reifiedIntCompare
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.scheduling.Disjunctive

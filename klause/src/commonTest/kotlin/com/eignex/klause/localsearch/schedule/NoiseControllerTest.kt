@@ -4,7 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-
 private fun costRound(cost: Long) = RoundLog(
     proposed = 1,
     accepted = 0,
