@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  * on, an over-populated factor *kind* is damped so it can't steer the descent by sheer count, while
  * smaller kinds keep weight 1.0.
  */
-class FactorWeightNormalizationTest {
+class FactorWeightBookNormalizationTest {
 
     private fun linear(): Factor = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)
     private fun clause(): Factor = Clause(intArrayOf(Lit.make(0, true)))
