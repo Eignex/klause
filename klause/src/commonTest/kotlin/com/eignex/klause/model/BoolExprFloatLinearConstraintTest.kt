@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNotEquals
 
-class FloatLinearConstraintTest {
+class BoolExprFloatLinearConstraintTest {
 
     private fun flc(coeffs: DoubleArray, names: List<String>, op: IntCmpOp = IntCmpOp.LE, bound: Double = 1.0) =
         FloatLinearConstraint(coeffs, names, op, bound)
