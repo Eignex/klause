@@ -18,7 +18,7 @@ import kotlin.test.assertFalse
  * closures hold the `Cbls.seedObjectiveMoves`, `sampleStallSwaps`, and `sampleStallChains` bodies,
  * and the test asserts the sources emit identical multisets for a fixed seed and state.
  */
-class StallAndObjectiveEquivalenceTest {
+class ObjectiveSeedStallEquivalenceTest {
 
     private val swapCap = 16
     private val chainCap = 4
