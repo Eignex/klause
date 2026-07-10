@@ -46,7 +46,7 @@ internal data class KlauseSearch(
     /** Repeatable klause-cli `--param key=value` engine knobs (e.g. `var-selector=vsids`); the way
      *  to A/B a heuristic — run `solve` twice with different params and diff the two config dirs. */
     val params: List<String> = emptyList(),
-    /** klause-cli `--lp CEILING`: the LP-relaxation emphasis (`off`|`conservative`|`balanced`|
+    /** klause-cli `--lp CEILING`: the LP-relaxation emphasis (`off`|`conservative`|`default`|
      *  `aggressive`, plus `+id`/`-id` per-technique deltas). null = unset (cli's own default). */
     val lp: String? = null,
     /** klause-cli `--presolve`: the presolve emphasis plus `+id`/`-id` per-pass deltas (e.g.
