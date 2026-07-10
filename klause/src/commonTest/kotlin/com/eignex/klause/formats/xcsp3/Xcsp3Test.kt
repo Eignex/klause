@@ -14,6 +14,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -67,18 +68,18 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `negative conflicts table lowers to a positive Table over the complement`() {
-        val xml = """
-            <instance type="CSP">
-              <variables><var id="a"> 1..2 </var><var id="b"> 1..2 </var></variables>
-              <constraints>
-                <extension><list> a b </list><conflicts> (1,1)(2,2) </conflicts></extension>
-              </constraints>
-            </instance>
-        """.trimIndent()
-        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Table })
-        val v = sat(xml)
+    fun `negative conflicts table forbids the listed tuples`() {
+        val decl = "<instance type=\"CSP\"><variables><var id=\"a\"> 1..2 </var><var id=\"b\"> 1..2 </var></variables>"
+        val cons = "<extension><list> a b </list><conflicts> (1,1)(2,2) </conflicts></extension>"
+        val v = sat("$decl<constraints>$cons</constraints></instance>")
         assertTrue(v[0] != v[1], "conflicts forbid equal pairs: a=${v[0]} b=${v[1]}")
+        // Pinning a forbidden tuple (1,1) must be rejected.
+        val bad = "$decl<constraints>$cons" +
+            "<instantiation><list> a b </list><values> 1 1 </values></instantiation></constraints></instance>"
+        assertTrue(
+            BacktrackSolver(Xcsp3.parse(bad).problem).solve(BacktrackParams()) is SolveResult.Unsat,
+            "the forbidden tuple (1,1) must be unsatisfiable",
+        )
     }
 
     @Test
@@ -104,6 +105,49 @@ class Xcsp3Test {
             """.trimIndent(),
         )
         assertEquals(0, v[0]) // every (1,*) tuple is forbidden
+    }
+
+    @Test
+    fun `conflict tables enumerate exactly the complement of the forbidden set`() {
+        // Soundness gate for the nogood-clause lowering of <conflicts>: klause must accept exactly the
+        // assignments NOT listed as forbidden. Compared against a brute-force complement.
+        val rng = Random(0xC0FFEE)
+        repeat(40) { trial ->
+            val arity = rng.nextInt(2, 4)
+            val hi = rng.nextInt(1, 3)
+            val forbidden = HashSet<List<Int>>()
+            repeat(rng.nextInt(0, 6)) { forbidden.add(List(arity) { rng.nextInt(0, hi + 1) }) }
+            val varsDecl = (0 until arity).joinToString("") { "<var id=\"v$it\"> 0..$hi </var>" }
+            val listRef = (0 until arity).joinToString(" ") { "v$it" }
+            val confBody = forbidden.joinToString("") { t -> "(" + t.joinToString(",") + ")" }
+            val cons = if (confBody.isEmpty()) {
+                ""
+            } else {
+                "<extension><list> $listRef </list><conflicts> $confBody </conflicts></extension>"
+            }
+            val xml = "<instance type=\"CSP\"><variables>$varsDecl</variables>" +
+                "<constraints>$cons</constraints></instance>"
+            val found = BacktrackSolver(Xcsp3.parse(xml).problem)
+                .enumerate(BacktrackParams(randomSeed = trial.toLong()))
+                .map { s -> (0 until arity).map { s.ints[it].toInt() } }.toHashSet()
+            var all = listOf(emptyList<Int>())
+            repeat(arity) { all = all.flatMap { p -> (0..hi).map { p + it } } }
+            val allowed = all.filterNot { it in forbidden }.toHashSet()
+            assertEquals(allowed, found, "trial #$trial (arity=$arity hi=$hi forbidden=$forbidden)")
+        }
+    }
+
+    @Test
+    fun `a star column over a wide domain is a short support and does not hit the cap`() {
+        // The only allowed tuple is (any a, b=1). Expanding the '*' over a's 1.5M-value domain would
+        // exceed the 1M cap; as a short support it is a single wildcard row, so it parses and pins b.
+        val xml = """
+            <instance type="CSP">
+              <variables><var id="a"> 0..1500000 </var><var id="b"> 0..3 </var></variables>
+              <constraints><extension><list> a b </list><supports> (*,1) </supports></extension></constraints>
+            </instance>
+        """.trimIndent()
+        assertEquals(1, sat(xml)[Xcsp3.parse(xml).intVarNames.getValue("b")], "b pinned to 1 by the only support")
     }
 
     @Test

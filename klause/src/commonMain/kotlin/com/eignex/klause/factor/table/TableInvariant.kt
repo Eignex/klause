@@ -17,6 +17,8 @@ internal class TableInvariant(
     private val numTuples: Int,
     private val singleColumnByVar: IntIntMap,
     private val multiColumnsByVar: MutableIntObjectMap<IntArray>,
+    /** Short-support mask (see [com.eignex.klause.factor.table.Table.wildcards]); null when ground. */
+    private val wildcards: LongArray?,
 ) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
@@ -32,6 +34,7 @@ internal class TableInvariant(
             val base = row * arity
             var d = 0
             for (col in 0 until arity) {
+                if (tableCellIsWild(wildcards, arity, row, col)) continue
                 if (state.assignment.intValue(xs[col]) != tuples[base + col]) d++
             }
             dist[row] = d
@@ -51,6 +54,7 @@ internal class TableInvariant(
         for (k in 0 until topK) {
             val row = scored[k].row
             for (col in 0 until arity) {
+                if (tableCellIsWild(wildcards, arity, row, col)) continue
                 val target = tuples[row * arity + col]
                 val cur = state.assignment.intValue(xs[col])
                 if (target != cur && target in state.problem.intDomains[xs[col]]) {
@@ -75,7 +79,7 @@ internal class TableInvariant(
         ) {
             attempts++
             val row = state.rng.nextInt(numTuples)
-            val parts = tableBuildTupleMove(state, xs, tuples, arity, row) ?: continue
+            val parts = tableBuildTupleMove(state, xs, tuples, arity, wildcards, row) ?: continue
             if (parts.isEmpty()) continue
             sink.addCompound(parts)
             emitted++
@@ -87,6 +91,8 @@ internal class TableInvariant(
             val base = row * arity
             var usable = true
             for (col in 0 until arity) {
+                // A wildcard column imposes no value: it neither restricts the domain nor conflicts.
+                if (tableCellIsWild(wildcards, arity, row, col)) continue
                 val v = xs[col]
                 val target = tuples[base + col]
                 if (target !in state.problem.intDomains[v]) {
@@ -102,6 +108,7 @@ internal class TableInvariant(
                 }
                 var conflict = false
                 for (prev in 0 until col) {
+                    if (tableCellIsWild(wildcards, arity, row, prev)) continue
                     if (xs[prev] == v && tuples[base + prev] != target) {
                         conflict = true
                         break
@@ -114,6 +121,7 @@ internal class TableInvariant(
             }
             if (!usable) continue
             for (col in 0 until arity) {
+                if (tableCellIsWild(wildcards, arity, row, col)) continue
                 val v = xs[col]
                 if (!state.assumptions.isFrozenInt(v)) state.assignment.setInt(v, tuples[base + col])
             }
@@ -127,7 +135,7 @@ internal class TableInvariant(
         val old = state.assignment.intValue(intVar)
         if (old == newValue) return 0
         return tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, old, newValue,
+            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, wildcards, intVar, old, newValue,
             commit = false,
         ) - s.minDist
     }
@@ -138,7 +146,7 @@ internal class TableInvariant(
         if (newVal == oldValue) return 0
         val before = s.minDist
         val minD = tableRescanForChange(
-            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, intVar, oldValue, newVal,
+            s, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, wildcards, intVar, oldValue, newVal,
             commit = true,
         )
         s.minDist = minD
@@ -151,6 +159,7 @@ private const val TABLE_JUMP_ATTEMPT_STRIDE: Int = 4
 
 /** Recompute the minimum Hamming distance after changing [intVar] from [oldV] to [newV].
  *  If [commit] is true the per-row distances in [s] are updated in place. */
+@Suppress("LongParameterList") // per-column rescan needs the full table view plus the wildcard mask
 internal fun tableRescanForChange(
     s: TableLsState,
     tuples: LongArray,
@@ -158,6 +167,7 @@ internal fun tableRescanForChange(
     numTuples: Int,
     singleColumnByVar: IntIntMap,
     multiColumnsByVar: MutableIntObjectMap<IntArray>,
+    wildcards: LongArray?,
     intVar: Int,
     oldV: Long,
     newV: Long,
@@ -167,6 +177,11 @@ internal fun tableRescanForChange(
     val col = singleColumnByVar[intVar]
     if (col >= 0) {
         for (row in 0 until numTuples) {
+            // A wildcard cell contributes nothing to the distance, so a change in its column is a no-op.
+            if (tableCellIsWild(wildcards, arity, row, col)) {
+                if (s.dist[row] < minD) minD = s.dist[row]
+                continue
+            }
             val t = tuples[row * arity + col]
             val d = s.dist[row] + (if (newV != t) 1 else 0) - (if (oldV != t) 1 else 0)
             if (commit) s.dist[row] = d
@@ -178,6 +193,7 @@ internal fun tableRescanForChange(
             val base = row * arity
             var d = s.dist[row]
             for (c in cols) {
+                if (tableCellIsWild(wildcards, arity, row, c)) continue
                 val t = tuples[base + c]
                 d += (if (newV != t) 1 else 0) - (if (oldV != t) 1 else 0)
             }
@@ -194,22 +210,28 @@ internal fun tableBuildTupleMove(
     xs: IntArray,
     tuples: LongArray,
     arity: Int,
+    wildcards: LongArray?,
     row: Int,
 ): List<Move>? {
     val base = row * arity
     for (col in 0 until arity) {
+        // A wildcard column is free: no domain requirement, no cross-column value agreement.
+        if (tableCellIsWild(wildcards, arity, row, col)) continue
         val v = xs[col]
         val target = tuples[base + col]
         if (target !in state.problem.intDomains[v]) return null
         for (prev in 0 until col) {
+            if (tableCellIsWild(wildcards, arity, row, prev)) continue
             if (xs[prev] == v && tuples[base + prev] != target) return null
         }
     }
     val parts = ArrayList<Move>(arity)
     for (col in 0 until arity) {
+        if (tableCellIsWild(wildcards, arity, row, col)) continue
         val v = xs[col]
         var dup = false
         for (prev in 0 until col) {
+            if (tableCellIsWild(wildcards, arity, row, prev)) continue
             if (xs[prev] == v) {
                 dup = true
                 break
@@ -220,6 +242,14 @@ internal fun tableBuildTupleMove(
         if (state.assignment.intValue(v) != target) parts.add(Move.IntSet(v, target))
     }
     return parts
+}
+
+/** Whether column [col] of tuple [row] is a wildcard in a short-support table (see
+ *  [com.eignex.klause.factor.table.Table.wildcards]); always false for a ground table. */
+internal fun tableCellIsWild(wildcards: LongArray?, arity: Int, row: Int, col: Int): Boolean {
+    val w = wildcards ?: return false
+    val idx = row * arity + col
+    return (w[idx ushr 6] ushr (idx and 63)) and 1L != 0L
 }
 
 /** Build the var→column lookup structures. */

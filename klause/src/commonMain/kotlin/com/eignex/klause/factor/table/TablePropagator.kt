@@ -16,7 +16,17 @@ internal class TablePropagator(
     private val tuples: LongArray,
     private val arity: Int,
     private val numTuples: Int,
+    /** Short-support mask (see [com.eignex.klause.factor.table.Table.wildcards]); null when ground. */
+    private val wildcards: LongArray?,
 ) : Propagator {
+
+    /** Column [col] of tuple [row] is a wildcard — always feasible, and provides support for every
+     *  live value of its variable (STR2 short supports). */
+    private fun isWild(row: Int, col: Int): Boolean {
+        val w = wildcards ?: return false
+        val idx = row * arity + col
+        return (w[idx ushr 6] ushr (idx and 63)) and 1L != 0L
+    }
 
     /** Advisor subscription (#623): STR2 is hole-aware GAC (tuple feasibility tests membership, the
      *  prune drops interior values), so subscribe to every kind on every column variable and consume
@@ -62,6 +72,9 @@ internal class TablePropagator(
         val lo = LongArray(arity)
         val hi = LongArray(arity)
         val supportBits = arrayOfNulls<LongArray>(arity)
+        // A wildcard in a still-live tuple's column supports every value of that column, so the column
+        // is fully supported and skips both bit-gathering and pruning (STR2 short supports).
+        val fullySupported = BooleanArray(arity)
         for (col in 0 until arity) {
             val d = state.intDomains[xs[col]]
             lo[col] = d.min
@@ -74,6 +87,7 @@ internal class TablePropagator(
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
+                if (isWild(row, col)) continue
                 val v = tuples[row * arity + col]
                 if (v !in state.intDomains[xs[col]]) {
                     feasible = false
@@ -89,6 +103,10 @@ internal class TablePropagator(
                 s.numValid = last
             } else {
                 for (col in 0 until arity) {
+                    if (isWild(row, col)) {
+                        fullySupported[col] = true
+                        continue
+                    }
                     val v = tuples[row * arity + col]
                     val off = (v - lo[col]).toInt()
                     val bits = requireNotNull(supportBits[col])
@@ -100,6 +118,7 @@ internal class TablePropagator(
         if (s.numValid == 0) return false
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
+            if (fullySupported[col]) continue
             val bits = requireNotNull(supportBits[col])
             var firstSet = -1
             for (w in bits.indices) {
@@ -149,11 +168,13 @@ internal class TablePropagator(
         val supported = Array(arity) { LongHashSet(numTuples) }
         val minSup = LongArray(arity) { Long.MAX_VALUE }
         val maxSup = LongArray(arity) { Long.MIN_VALUE }
+        val fullySupported = BooleanArray(arity)
         var i = 0
         while (i < s.numValid) {
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
+                if (isWild(row, col)) continue
                 val v = tuples[row * arity + col]
                 if (v !in state.intDomains[xs[col]]) {
                     feasible = false
@@ -169,6 +190,10 @@ internal class TablePropagator(
                 s.numValid = last
             } else {
                 for (col in 0 until arity) {
+                    if (isWild(row, col)) {
+                        fullySupported[col] = true
+                        continue
+                    }
                     val v = tuples[row * arity + col]
                     supported[col].add(v)
                     if (v < minSup[col]) minSup[col] = v
@@ -180,6 +205,7 @@ internal class TablePropagator(
         if (s.numValid == 0) return false
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
+            if (fullySupported[col]) continue
             // Every surviving tuple contributed to every column, so numValid > 0 leaves each column with
             // at least one supported value (minSup/maxSup are set).
             if (!state.tightenIntMin(xs[col], minSup[col], ant)) return false
