@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * must report equality for the faithful copy and inequality for a source that draws differently. If
  * it can't tell those apart, no extraction is actually gated.
  */
-class MoveEquivalenceTest {
+class MoveSourceEquivalenceTest {
 
     /** Infeasible-by-construction linear ring (mirrors the stall fixtures): `violated` is always
      *  non-empty so the violated-repair draw has something to repair, and there is exactly one
