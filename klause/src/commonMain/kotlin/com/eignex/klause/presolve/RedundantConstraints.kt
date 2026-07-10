@@ -324,13 +324,20 @@ internal object RedundantConstraints {
                 dups.add(f)
                 return
             }
-            val touched = HashSet<TermKey>()
+            // A factor with no linear/PB row (every Clause, Xor, plain global) offers nothing to the
+            // phase-2 dominator buckets, so allocate the touched-key set — and re-derive the row form —
+            // only once it actually offers. On a clause-heavy SAT model phase 2 is entirely no-op, so this
+            // drops one HashSet allocation and one [ineqNormalForm] call per factor. Byte-identical: an
+            // offer-free factor runs the same (empty) phase-2 path either way.
+            @Suppress("DoubleMutabilityForCollection") // deliberately lazily created on the first offer
+            var touched: HashSet<TermKey>? = null
             forEachOffer(f) { key, bound, eq ->
                 bucketFor(key).addBound(bound, eq)
-                touched.add(key)
+                (touched ?: HashSet<TermKey>().also { touched = it }).add(key)
             }
+            val keys = touched ?: return
             val member = ineqNormalForm(f)?.takeIf { !it.fromEq }
-            for (key in touched) {
+            for (key in keys) {
                 val cand = if (member != null && member.key == key) f else null
                 resolve(buckets.getValue(key), cand, member?.bound ?: 0L, drops)
             }
