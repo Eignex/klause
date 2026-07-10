@@ -8,7 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class TabuTest {
+class TabuBookTest {
 
     @Test
     fun `fresh move is not taboo`() {
