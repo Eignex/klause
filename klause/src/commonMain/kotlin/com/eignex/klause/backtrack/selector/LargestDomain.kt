@@ -5,6 +5,8 @@ import kotlin.random.Random
 
 /** Largest current domain. Useful as a contrast / for `solve` annotations that ask for it. */
 object LargestDomain : VariableSelector {
+    override fun fresh() = this
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? =
         pickByDomainMetric(session, maximize = true, boolScore = 2L) { it.size.toLong() }
 }

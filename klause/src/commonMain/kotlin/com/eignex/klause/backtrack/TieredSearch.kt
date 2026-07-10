@@ -74,6 +74,9 @@ class TieredVariableSelector(
     val fallback: VariableSelector,
 ) : VariableSelector {
 
+    // Built per problem from its int_search annotation, then used for one search; not reused.
+    override fun fresh() = this
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         for (tier in tiers) {
             pickInTier(tier, session, rng)?.let { return it }
@@ -180,6 +183,9 @@ class TieredValueSelector(
     numBoolVars: Int,
     numIntVars: Int,
 ) : ValueSelector {
+
+    // Built per problem (its ownership arrays are sized to the model) and used for one search; not reused.
+    override fun fresh() = this
 
     // var id → owning tier index + 1; 0 = unowned (fallback). First-listed tier wins
     // when arrays overlap.

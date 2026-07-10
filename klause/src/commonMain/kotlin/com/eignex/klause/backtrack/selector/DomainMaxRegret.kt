@@ -13,6 +13,8 @@ import kotlin.random.Random
  * `max_regret` search annotation maps to, since the annotation applies to satisfaction too.
  */
 object DomainMaxRegret : VariableSelector {
+    override fun fresh() = this
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         var best: VarRef? = null
         var bestRegret = Long.MIN_VALUE

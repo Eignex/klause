@@ -8,6 +8,8 @@ import kotlin.random.Random
  * candidates are broken by variable id (bools precede ints). The classic CSP default.
  */
 object SmallestDomain : VariableSelector {
+    override fun fresh() = this
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? =
         pickByDomainMetric(session, maximize = false, boolScore = 2L) { it.size.toLong() }
 }

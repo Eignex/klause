@@ -21,6 +21,8 @@ import kotlin.random.Random
  */
 class LastConflict(private val base: VariableSelector) : VariableSelector {
 
+    override fun fresh() = LastConflict(base.fresh())
+
     private var pending: VarRef? = null
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {

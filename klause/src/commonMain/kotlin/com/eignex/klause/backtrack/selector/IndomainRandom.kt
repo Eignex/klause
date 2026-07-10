@@ -10,6 +10,8 @@ private const val INDOMAIN_EAGER_MAX = 32
 
 /** Uniformly random shuffle of the domain (`indomain_random`). */
 object IndomainRandom : ValueSelector {
+    override fun fresh() = this
+
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> if (rng.nextBoolean()) sequenceOf(1L, 0L) else sequenceOf(0L, 1L)
 

@@ -32,6 +32,8 @@ class SelectorCallbackTest {
         val committedVars: MutableList<Int> = ArrayList()
         val conflictVars: MutableList<Int> = ArrayList()
 
+        override fun fresh() = this
+
         override fun pick(session: PropagationSession, rng: Random): VarRef? = InputOrder.pick(session, rng)
 
         override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =

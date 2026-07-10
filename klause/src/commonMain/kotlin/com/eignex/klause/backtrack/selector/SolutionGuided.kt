@@ -26,6 +26,8 @@ import kotlin.random.Random
  */
 class SolutionGuided(private val base: ValueSelector) : ValueSelector {
 
+    override fun fresh() = SolutionGuided(base.fresh())
+
     private var bools: BooleanArray? = null
     private var ints: LongArray? = null
 

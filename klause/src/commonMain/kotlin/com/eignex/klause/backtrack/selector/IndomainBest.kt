@@ -17,6 +17,8 @@ import kotlin.random.Random
  * is zero so ascending order is preserved).
  */
 internal class IndomainBest(private val objective: LinearObjective) : ValueSelector {
+
+    override fun fresh() = this
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> {
             val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0L

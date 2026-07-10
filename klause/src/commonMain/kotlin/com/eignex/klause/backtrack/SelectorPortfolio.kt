@@ -88,6 +88,8 @@ internal class SelectorPortfolio(
 
     /** Drop-in [VariableSelector] slot for [BacktrackParams.variableSelector]. */
     val variableSelector: VariableSelector = object : VariableSelector {
+        // The portfolio drives arm switching across a single search; not reused across solves.
+        override fun fresh() = this
         override fun pick(session: PropagationSession, rng: Random) = current.variableSelector.pick(session, rng)
         override fun onConflict(varRef: VarRef) {
             conflicts++
@@ -113,6 +115,7 @@ internal class SelectorPortfolio(
 
     /** Drop-in [ValueSelector] slot for [BacktrackParams.valueSelector]. */
     val valueSelector: ValueSelector = object : ValueSelector {
+        override fun fresh() = this
         override fun values(session: PropagationSession, varRef: VarRef, rng: Random) =
             current.valueSelector.values(session, varRef, rng)
         override fun onConflict(varRef: VarRef, value: Long) = current.valueSelector.onConflict(varRef, value)

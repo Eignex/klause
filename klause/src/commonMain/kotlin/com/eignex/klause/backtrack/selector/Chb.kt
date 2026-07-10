@@ -48,6 +48,8 @@ class Chb(
     private val assignReward: Double = 0.9,
 ) : VariableSelector {
 
+    override fun fresh() = Chb(alphaStart, alphaFloor, alphaStep, conflictReward, assignReward)
+
     init {
         require(alphaStart in alphaFloor..1.0) { "CHB alphaStart must be in alphaFloor..1.0, got $alphaStart" }
         require(alphaFloor in 0.0..1.0) { "CHB alphaFloor must be in 0.0..1.0, got $alphaFloor" }
