@@ -16,6 +16,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.klause.util.MutableLongObjectMap
 import com.eignex.kumulant.math.splitmix64
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
@@ -205,8 +206,10 @@ internal object RedundantConstraints {
      * the next change-mark and are carried over to the next firing internally.
      */
     internal class SubsumeMemo {
-        private val shallowSingle = HashMap<Long, Factor>()
-        private val shallowMulti = HashMap<Long, HashMap<StructuralKey, Factor>>()
+        // Long-keyed to avoid boxing the shallow key on every factor: a clause-heavy model registers
+        // hundreds of thousands of factors, and a `HashMap<Long, …>` would box the key on each lookup.
+        private val shallowSingle = MutableLongObjectMap<Factor>()
+        private val shallowMulti = MutableLongObjectMap<HashMap<StructuralKey, Factor>>()
         private val buckets = HashMap<TermKey, Bucket>()
 
         // Subsume's own drops from the last firing, retracted before this one (see class doc). Includes
@@ -291,13 +294,13 @@ internal object RedundantConstraints {
             }
             val single = shallowSingle[sk]
             if (single == null) {
-                shallowSingle[sk] = f
+                shallowSingle.put(sk, f)
                 return true
             }
             val singleKey = single.structuralKey()
             val fKey = f.structuralKey()
             if (singleKey == fKey) return false
-            shallowMulti[sk] = hashMapOf(singleKey to single, fKey to f)
+            shallowMulti.put(sk, hashMapOf(singleKey to single, fKey to f))
             shallowSingle.remove(sk)
             return true
         }
@@ -308,7 +311,7 @@ internal object RedundantConstraints {
             if (multi != null) {
                 multi.remove(f.structuralKey())
                 if (multi.size == 1) {
-                    shallowSingle[sk] = multi.values.first()
+                    shallowSingle.put(sk, multi.values.first())
                     shallowMulti.remove(sk)
                 }
             } else if (shallowSingle[sk] === f) {
