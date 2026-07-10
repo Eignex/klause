@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import kotlin.random.Random
 
@@ -23,7 +24,16 @@ class LastConflict(private val base: VariableSelector) : VariableSelector {
 
     private var pending: VarRef? = null
 
+    // The problem the pending variable belongs to. A selector may be reused across solves (a shared
+    // BacktrackParams carries it into every BacktrackSolver), so a stale pending from a prior — and
+    // possibly larger — problem must be dropped, else its id can index the new problem out of bounds.
+    private var lastProblem: Problem? = null
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        if (session.problem !== lastProblem) {
+            lastProblem = session.problem
+            pending = null
+        }
         val candidate = pending
         if (candidate != null) {
             val stillFree = when (candidate) {

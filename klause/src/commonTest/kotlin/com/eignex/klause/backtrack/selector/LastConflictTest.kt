@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -13,6 +14,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class LastConflictTest {
 
@@ -57,6 +59,33 @@ class LastConflictTest {
             VarRef.Bool(0),
             picked,
             "last-conflict should defer to base after the prioritised var commits",
+        )
+    }
+
+    @Test
+    fun `a reused selector drops a stale pending var from a prior larger problem`() {
+        // A shared BacktrackParams reuses one selector across solves; a pending var recorded on a
+        // large problem must not be probed against a smaller one (its id may be out of range).
+        val lc = LastConflict(RandomVariable)
+        val large = Problem(
+            numBoolVars = 0,
+            numIntVars = 100,
+            intDomains = Array(100) { IntDomain(0, 1) },
+            factors = emptyArray(),
+        )
+        lc.pick(PropagationSession(large), Random(0L))
+        lc.onConflict(VarRef.IntVar(94)) // valid for `large`, out of range for the smaller problem below
+
+        val small = Problem(
+            numBoolVars = 0,
+            numIntVars = 11,
+            intDomains = Array(11) { IntDomain(0, 1) },
+            factors = emptyArray(),
+        )
+        val picked = lc.pick(PropagationSession(small), Random(0L))
+        assertTrue(
+            picked == null || (picked as VarRef.IntVar).varId < 11,
+            "a stale pending var from the prior problem must be dropped, not probed on the new one",
         )
     }
 
