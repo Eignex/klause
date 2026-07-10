@@ -180,6 +180,16 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `an extension table exceeding the row cap is rejected cleanly instead of exhausting the heap`() {
+        // Six rows against a cap of 3 must throw a clean UnsupportedXcsp3Exception, not build the arrays.
+        val xml = """
+            <instance type="CSP"><variables><var id="a"> 0..9 </var></variables>
+            <constraints><extension><list> a </list><supports> 0 1 2 3 4 5 </supports></extension></constraints></instance>
+        """.trimIndent()
+        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse(xml, negTableCap = 3) }
+    }
+
+    @Test
     fun `boolean intension or of relations is reified and solved`() {
         val xml = """
             <instance type="CSP">

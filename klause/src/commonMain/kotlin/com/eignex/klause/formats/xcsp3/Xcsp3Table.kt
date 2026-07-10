@@ -121,13 +121,24 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
             }
         }
     }
+
+    // Bound the row count so a pathologically large table (millions of tuples) fails cleanly here
+    // rather than exhausting the heap while building the row arrays. Interval/`*` cells do not expand,
+    // so this counts written tuples directly.
+    fun capRows() {
+        if (lo.size / arity > negTableCap) throw UnsupportedXcsp3Exception("table exceeds cap ($negTableCap rows)")
+    }
     if (arity == 1 && '(' !in t) {
-        for (tok in t.split(Regex("\\s+")).filter { it.isNotBlank() }) addCell(tok)
+        for (tok in t.split(Regex("\\s+")).filter { it.isNotBlank() }) {
+            addCell(tok)
+            capRows()
+        }
     } else {
         for (m in Regex("""\(([^)]*)\)""").findAll(t)) {
             val row = m.groupValues[1].split(",").map { it.trim() }
             if (row.size != arity) throw UnsupportedXcsp3Exception("tuple arity ${row.size} != $arity")
             for (tok in row) addCell(tok)
+            capRows()
         }
     }
     return ShortRows(lo.toLongArray(), hi.toLongArray())
