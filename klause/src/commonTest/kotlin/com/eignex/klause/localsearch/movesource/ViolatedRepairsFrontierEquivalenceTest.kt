@@ -15,7 +15,7 @@ import kotlin.test.Test
  * the sources emit the identical candidate multiset for a fixed seed and state. If a later edit
  * drifts a source away from the behaviour it replaced, this fails.
  */
-class RepairFrontierEquivalenceTest {
+class ViolatedRepairsFrontierEquivalenceTest {
 
     private val sampleCount = 4
     private val frontierCap = 32
