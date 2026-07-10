@@ -13,7 +13,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class DecisionLevelTest {
+class PropagationSessionDecisionLevelTest {
 
     @Test
     fun `conflict levels identify the responsible decisions`() {

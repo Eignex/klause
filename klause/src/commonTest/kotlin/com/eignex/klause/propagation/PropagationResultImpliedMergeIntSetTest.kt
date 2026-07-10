@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
  * single-set builders — previously build() dropped the intSet CSR, silently discarding the wide-sparse
  * survivor-set reduction whenever root-bake probing seeded a merge.
  */
-class ImpliedMergeIntSetTest {
+class PropagationResultImpliedMergeIntSetTest {
 
     private fun setOf(v: Int, survivors: LongArray): PropagationResult.Implied = PropagationResult.Implied(
         intSetKeys = intArrayOf(v),

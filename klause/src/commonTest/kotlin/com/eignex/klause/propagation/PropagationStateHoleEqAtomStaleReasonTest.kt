@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
  * atoms that are currently determined — never one whose truth is undetermined — for every determined
  * atom, after any push/pop sequence.
  */
-class HoleEqAtomStaleReasonTest {
+class PropagationStateHoleEqAtomStaleReasonTest {
 
     private fun freshState(numVars: Int, hi: Int): PropagationState {
         val problem = Problem(

@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-class IncrementalSessionTest {
+class PropagationSessionIncrementalTest {
 
     @Test
     fun `push-pop equals fresh state`() {

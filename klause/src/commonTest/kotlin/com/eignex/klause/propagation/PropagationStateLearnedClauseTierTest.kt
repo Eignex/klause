@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * default correctly, be mutable, respond to [PropagationState.noteLearnedUse], and survive the
  * compaction performed by [PropagationState.forgetLearnedClauses] in lockstep with the clauses.
  */
-class LearnedClauseTierTest {
+class PropagationStateLearnedClauseTierTest {
 
     // One static factor so learned-clause factor ids start above 0 — lets the tests probe the
     // "fid below numFactors is not a learned clause" guard in noteLearnedUse.
