@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class CliTest {
+class CliModeTest {
 
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()
