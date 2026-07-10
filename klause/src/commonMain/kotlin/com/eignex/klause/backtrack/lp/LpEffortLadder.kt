@@ -59,7 +59,7 @@ internal enum class LpEffort {
  */
 internal class LpEffortLadder(
     private val top: LpEffort,
-    private val warmup: Int = 64,
+    private val warmup: Int = DEFAULT_WARMUP,
     private val window: Int = 64,
     private val minWindowPrunes: Int = 1,
     private val cutCostWeight: Int = DEFAULT_CUT_COST_WEIGHT,
@@ -67,6 +67,10 @@ internal class LpEffortLadder(
     private val reprobeMax: Int = 8192,
 ) {
     companion object {
+        /** Default solves before the first demotion — the ladder's judging window. Shared with the
+         *  [LpWallBreaker] so its "the ladder has had its chance" guard uses the same threshold. */
+        const val DEFAULT_WARMUP: Int = 64
+
         /** Default first backoff interval; `Int.MAX_VALUE` instead makes a demotion irreversible (#562). */
         const val DEFAULT_REPROBE_BASE: Int = 64
 

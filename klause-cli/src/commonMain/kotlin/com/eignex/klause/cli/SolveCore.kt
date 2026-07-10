@@ -157,6 +157,9 @@ internal object SolveCore {
             base.copy(
                 randomSeed = common.randomSeed ?: base.randomSeed,
                 cancellation = cancel,
+                // Advisory total budget so the LP subsystem sizes its wall-clock caps against the real
+                // `-t` deadline on the FD track, not the absolute root-LP ceiling.
+                solveBudgetMillis = common.timeLimitMs,
                 onEvent = verboseListener(common.verbose),
                 lpConfig = lpConfig,
             ),

@@ -218,6 +218,14 @@ data class BacktrackParams(
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**
+     * Total wall-clock solve budget in milliseconds, when the caller knows it (the `-t` deadline).
+     * Advisory only — the hard stop remains [cancellation]; this just lets the LP subsystem size its
+     * wall-clock sub-budgets as a fraction of the whole (the one-shot root-LP cap and the per-node LP
+     * circuit breaker). `null` (default, no deadline) leaves those caps off, so a solve with no
+     * budget behaves exactly as before.
+     */
+    val solveBudgetMillis: Long? = null,
+    /**
      * Optional live-event listener; see [SearchEvent]. Called
      * inline on the search thread at coarse points only (restarts, learned-DB sweeps,
      * incumbents). `null` (default) disables observation entirely.

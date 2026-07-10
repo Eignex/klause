@@ -34,6 +34,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import kotlin.time.TimeSource
 
 /**
  * Per-node relaxation-bounding runtime for branch-and-bound. Owns the whole LP-relaxation family
@@ -217,6 +218,30 @@ internal class LpEngine(
     }
     private var lpCheckCounter = 0
 
+    // Wall-clock LP circuit breaker: the count-based [lpLadder] below needs a warmup window of
+    // solves to demote, so it can never shed an LP whose single solve is seconds — that LP just burns the
+    // whole budget bounding nothing (elitserien/cyclic-rcpsp: lpMs≈budget, prunes=0, too few solves to
+    // warm up). When the total solve budget is known, the LP (one-shot root work charged via
+    // [chargeRootLpWall] + the per-node solves timed in the bound) may spend at most
+    // `min(fraction × budget, cap)` of it before search; if it hits that while still under the ladder's
+    // warmup and not having pruned, per-node LP is disabled and the arm runs as a bare combinatorial
+    // search. A cheap LP reaches the warmup first and is left to the ladder. See [LpWallBreaker].
+    private val lpWallBreaker = LpWallBreaker(
+        budgetMillis = params.solveBudgetMillis?.takeIf { params.lpPlan.lpWallBudgetFraction > 0.0 }
+            ?.let { minOf((it * params.lpPlan.lpWallBudgetFraction).toLong(), params.lpPlan.lpWallBudgetMillis) } ?: 0L,
+        warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
+    )
+
+    /** Milliseconds of LP wall budget left, or `null` when no budget is set (breaker off). The
+     *  one-shot root work is time-boxed to this so it competes with the per-node solves for one budget,
+     *  rather than the looser [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
+    fun lpWallRemainingMillis(): Long? = lpWallBreaker.remainingMillis()
+
+    /** Charge the one-shot pre-search root LP work's wall time against the shared LP wall budget,
+     *  so root and per-node solves compete for the same fraction of the deadline. Called once, after the
+     *  root work, by [com.eignex.klause.backtrack.ResumableMinimize]. Root work never counts as a prune. */
+    fun chargeRootLpWall(millis: Long) = lpWallBreaker.charge(millis, pruned = false)
+
     // Adaptive LP effort ladder (#32, generalizing the #614 auto-off): the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
     // at a time — shedding during-search cuts before the bound — re-probing upward on backoff. Sound:
@@ -354,6 +379,9 @@ internal class LpEngine(
             objectiveAscending: Boolean,
         ): Boolean {
             val lpRelaxerL = lpRelaxer ?: return false
+            // Wall-clock breaker: an expensive LP the ladder can't shed in time is shut off here,
+            // before the ladder, so the search runs as a bare combinatorial arm.
+            if (lpWallBreaker.isTripped) return false
             if (session.decisionLevel > params.lpPlan.boundMaxDepth ||
                 ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
                 !lpLadder.shouldRun()
@@ -370,6 +398,7 @@ internal class LpEngine(
             } else {
                 null
             }
+            val solveStart = if (lpWallBreaker.remainingMillis() != null) TimeSource.Monotonic.markNow() else null
             val outcome = lpBoundAndFix(
                 lpRelaxerL,
                 session,
@@ -383,6 +412,8 @@ internal class LpEngine(
                 warm = warm,
                 cutsAllowed = cutsAllowed,
             )
+            // Charge this solve's wall time; a prune (or reaching the ladder's warmup) spares the LP.
+            solveStart?.let { lpWallBreaker.charge(it.elapsedNow().inWholeMilliseconds, outcome.prune) }
             if (outcome.basis != null) {
                 while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                 lpBasisByDepth[depth] = outcome.basis
