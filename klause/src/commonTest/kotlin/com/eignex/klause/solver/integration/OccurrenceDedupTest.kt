@@ -1,4 +1,4 @@
-package com.eignex.klause.factor.bool
+package com.eignex.klause.solver.integration
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
