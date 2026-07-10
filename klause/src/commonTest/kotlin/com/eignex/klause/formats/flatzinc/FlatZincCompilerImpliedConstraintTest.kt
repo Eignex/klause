@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * pin the parser→compiler path that lifts those tags onto [com.eignex.klause.solver.Problem]:
  * `impliedFactorMask` for the local-search weight seed, `hasSymmetryBreaking` for the presolve gate.
  */
-class FznImpliedConstraintTest {
+class FlatZincCompilerImpliedConstraintTest {
 
     @Test
     fun `unannotated model has no implied mask and no symmetry flag`() {
