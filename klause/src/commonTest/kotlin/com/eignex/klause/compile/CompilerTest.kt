@@ -8,12 +8,19 @@ import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.abs
+import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.ge
 import com.eignex.klause.schema.implies
 import com.eignex.klause.schema.le
+import com.eignex.klause.schema.minus
 import com.eignex.klause.schema.not
+import com.eignex.klause.schema.plus
+import com.eignex.klause.schema.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -29,7 +36,7 @@ private class IntCampaign : VariableSchema() {
     val capWhenA by constraint { (type eq "a") implies (budget le 2000) }
 }
 
-class CompileTest {
+class CompilerTest {
 
     @Test
     fun `nominal produces exactly one factor and indicators`() {
@@ -133,5 +140,54 @@ class CompileTest {
             assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
             assertTrue(rate <= 1.0 + 1e-9 && rate >= 0.0 - 1e-9, "rate=$rate out of [0,1]")
         }
+    }
+
+    @Test
+    fun `constant false equality fails at compile time`() {
+        class S : VariableSchema() {
+            val x by intVar(min = 0, max = 5)
+            val cap by constraint { (x - x) eq 5 }
+        }
+        assertFails { S().compile() }
+    }
+
+    @Test
+    fun `constant false inequality fails at compile time`() {
+        class S : VariableSchema() {
+            val x by intVar(min = 0, max = 5)
+            val cap by constraint { (x - x + 5) le 1 }
+        }
+        assertFails { S().compile() }
+    }
+
+    @Test
+    fun `large-coefficient scale domain overflow is a clean error`() {
+        // domainOf(IntScale): 1_000_000 · [0, 100_000] = [0, 1e11], past Int. abs() forces the
+        // scaled expression to be materialized, which computes its domain.
+        class S : VariableSchema() {
+            val x by intVar(min = 0, max = 100_000)
+            val c by constraint { abs(1_000_000 * x) le 5 }
+        }
+        assertFailsWith<IllegalArgumentException> { S().compile() }
+    }
+
+    @Test
+    fun `large-literal affine sum overflow is a clean error`() {
+        // affine(IntSum): the running constant 2e9 + 2e9 = 4e9 overflows a 32-bit accumulator.
+        class S : VariableSchema() {
+            val x by intVar(min = 0, max = 10)
+            val c by constraint { (x + 2_000_000_000 + 2_000_000_000) le 0 }
+        }
+        assertFailsWith<IllegalArgumentException> { S().compile() }
+    }
+
+    @Test
+    fun `nested scale coefficient fold overflow is a clean error`() {
+        // IntOperators.scale constant fold: 100_000 · 100_000 = 1e10 overflows Int.
+        class S : VariableSchema() {
+            val x by intVar(min = 0, max = 10)
+            val c by constraint { (100_000 * (100_000 * x)) le 0 }
+        }
+        assertFailsWith<IllegalArgumentException> { S().compile() }
     }
 }

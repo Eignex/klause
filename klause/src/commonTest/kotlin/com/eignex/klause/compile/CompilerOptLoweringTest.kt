@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * is fixed to a canonical in-domain default — `0` coerced into `[min, max]` for ints, `false`
  * for bools. Gated by [KlauseConfig.pinAbsentOptVars].
  */
-class OptPinTest {
+class CompilerOptLoweringTest {
 
     private class AbsentIntZero : VariableSchema() {
         val x by optIntVar(min = 0, max = 5)

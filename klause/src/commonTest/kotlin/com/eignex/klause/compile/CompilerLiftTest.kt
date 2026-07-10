@@ -6,7 +6,7 @@ import com.eignex.klause.schema.times
 import kotlin.test.Test
 import kotlin.test.assertFails
 
-class LiftOverflowTest {
+class CompilerLiftTest {
 
     @Test
     fun `mul product domain overflow fails at compile time`() {
