@@ -1,8 +1,12 @@
-package com.eignex.klause.backtrack.selector
+package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.SelectorPortfolio
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.IndomainRandom
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.RandomVariable
+import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
