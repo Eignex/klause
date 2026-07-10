@@ -57,13 +57,13 @@ object Xcsp3 {
 
         fun declareVar(e: XmlElement) {
             when (e.tag) {
-                "var" -> addVar(e.attr("id"), parseDomain(e.textContent.trim()))
+                "var" -> addVar(e.attr("id"), domainFor(e))
 
                 "array" -> {
                     val id = e.attr("id")
                     val dims = Regex("""\[(\d+)]""").findAll(e.attr("size")).map { it.groupValues[1].toInt() }.toList()
                     if (dims.isEmpty()) throw UnsupportedXcsp3Exception("array size '${e.attr("size")}'")
-                    val dom = parseDomain(e.textContent.trim())
+                    val dom = domainFor(e)
 
                     // Declare one variable per cell of the (possibly multi-dimensional) array,
                     // naming cells x[i], x[i][j], … so index refs and `x[…][]` wildcards resolve.
@@ -87,6 +87,21 @@ object Xcsp3 {
             return domains.size - 1
         }
         override fun newBool(): Int = nextBool++
+
+        /** The domain of a `<var>`/`<array>`: its inline domain text, or — when that is empty and an
+         *  `as="ref"` attribute is present — the domain reused from a previously declared variable or
+         *  array (XCSP3 domain aliasing). */
+        internal fun domainFor(e: XmlElement): IntDomain {
+            val text = e.textContent.trim()
+            if (text.isNotEmpty()) return parseDomain(text)
+            val alias = e.attr("as")
+            if (alias.isBlank()) throw UnsupportedXcsp3Exception("empty domain")
+            varIds[alias]?.let { return domains[it] }
+            // An array alias reuses the referenced array's (uniform) cell domain.
+            val cell = varIds.keys.firstOrNull { it.startsWith("$alias[") }
+                ?: throw UnsupportedXcsp3Exception("unknown domain alias '$alias'")
+            return domains[varIds.getValue(cell)]
+        }
 
         internal fun parseDomain(text: String): IntDomain {
             val values = HashSet<Long>()
@@ -305,6 +320,7 @@ object Xcsp3 {
                 "iff" -> e.args.map { compileBool(it) }.reduce { a, b -> tseitinIff(a, b) }
                 "xor" -> e.args.map { compileBool(it) }.reduce { a, b -> Lit.negate(tseitinIff(a, b)) }
                 "in" -> memberLit(e)
+                "notin" -> Lit.negate(memberLit(e))
                 in REL -> reifyRel(e)
                 else -> throw UnsupportedXcsp3Exception("non-boolean intension op '${e.fn}'")
             }
@@ -390,7 +406,6 @@ object Xcsp3 {
             return LinearObjective(intCoefficients = arr)
         }
 
-
         internal fun linear(e: FExpr): LinComb = when (e) {
             is FExpr.Num -> LinComb(emptyMap(), e.value)
 
@@ -446,7 +461,7 @@ object Xcsp3 {
                 }
 
                 // A boolean-valued subexpression used arithmetically is its 0/1 truth value.
-                "in", in REL, in BOOL_FNS -> LinComb(mapOf(litTo01(compileBool(e)) to 1), 0)
+                "in", "notin", in REL, in BOOL_FNS -> LinComb(mapOf(litTo01(compileBool(e)) to 1), 0)
 
                 else -> throw UnsupportedXcsp3Exception("arithmetic fn '${e.fn}'")
             }
@@ -482,23 +497,61 @@ object Xcsp3 {
             return LinComb(mapOf(v to 1), 0)
         }
 
-        /** Integer `div`/`mod` by a positive constant with a non-negative dividend (where floored and
-         *  truncated division agree): `a = k·q + r, 0 ≤ r < k`. Other shapes stay unsupported to avoid
-         *  a division-semantics mismatch. */
+        /** Integer `div`/`mod` by a nonzero constant, matching XCSP3's truncated-toward-zero semantics:
+         *  the reference evaluator computes `a / k` and `a % k` with Java's operators, so the quotient
+         *  truncates toward zero and the remainder takes the dividend's sign. Encoded as `a = k·q + r`
+         *  with `|r| < |k|` and `r` sharing `a`'s sign. A variable or zero divisor stays unsupported —
+         *  a nonlinear/division-by-zero shape we cannot soundly linearize. */
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): LinComb {
             val a = materializeVar(linear(args[0]))
             val bLin = linear(args[1])
+            if (bLin.coeffs.isNotEmpty()) return divModVar(a, materializeVar(bLin), mod)
             val k = bLin.constant
-            if (bLin.coeffs.isNotEmpty() || k <= 0) {
-                throw UnsupportedXcsp3Exception(
-                    "div/mod by non-constant/non-positive",
-                )
-            }
+            if (k == 0) throw UnsupportedXcsp3Exception("div/mod by zero divisor")
             val da = domains[a]
-            if (da.min < 0L) throw UnsupportedXcsp3Exception("div/mod with a possibly-negative dividend")
-            val q = newAuxVar(da.min / k, da.max / k)
-            val r = newAuxVar(0L, (k - 1).toLong())
+            val absK = if (k < 0) -k else k
+            // trunc(a / k) is monotonic in `a` for a fixed-sign `k`, so the domain endpoints bound `q`
+            // (Kotlin's Long `/` already truncates toward zero, matching the required convention).
+            val qa = da.min / k
+            val qb = da.max / k
+            val q = newAuxVar(minOf(qa, qb), maxOf(qa, qb))
+            val r = newAuxVar(-(absK - 1).toLong(), (absK - 1).toLong())
             factors.add(Linear(intArrayOf(1, -k, -1), intArrayOf(a, q, r), LinearOp.EQ, 0)) // a = k·q + r
+            // Truncation ⇒ r shares the dividend's sign (or is 0). Pin it: trivially when `a` is
+            // single-signed, else gate on the reified sign of `a`.
+            when {
+                da.min >= 0L -> factors.add(Linear(intArrayOf(1), intArrayOf(r), LinearOp.GE, 0))
+
+                da.max <= 0L -> factors.add(Linear(intArrayOf(1), intArrayOf(r), LinearOp.LE, 0))
+
+                else -> {
+                    val aNonNeg = reifyLinear(intArrayOf(1), intArrayOf(a), LinearOp.GE, 0)
+                    val rNonNeg = reifyLinear(intArrayOf(1), intArrayOf(r), LinearOp.GE, 0)
+                    val rNonPos = reifyLinear(intArrayOf(1), intArrayOf(r), LinearOp.LE, 0)
+                    factors.add(Clause(intArrayOf(Lit.negate(aNonNeg), rNonNeg))) // a ≥ 0 ⟹ r ≥ 0
+                    factors.add(Clause(intArrayOf(aNonNeg, rNonPos))) // a < 0 ⟹ r ≤ 0
+                }
+            }
+            return LinComb(mapOf((if (mod) r else q) to 1), 0)
+        }
+
+        /** Integer `div`/`mod` by a *variable* divisor, supported only when the divisor is provably
+         *  positive (`b ≥ 1`, so no division by zero) and the dividend provably non-negative
+         *  (`a ≥ 0`) — the range where truncated and floored division coincide: `a = b·q + r`
+         *  with `0 ≤ r < b`. Other shapes stay unsupported (sign-dependent truncation / zero divisor). */
+        internal fun divModVar(a: Int, b: Int, mod: Boolean): LinComb {
+            val da = domains[a]
+            val db = domains[b]
+            if (da.min < 0L || db.min < 1L) {
+                throw UnsupportedXcsp3Exception("div/mod by variable divisor requires b >= 1 and a >= 0")
+            }
+            val q = newAuxVar(0L, da.max / db.min)
+            val r = newAuxVar(0L, db.max - 1)
+            val (plo, phi) = productBounds(b, q)
+            val p = newAuxVar(plo, phi)
+            factors.add(Product(b, q, p)) // p = b·q
+            factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(a, p, r), LinearOp.EQ, 0)) // a = b·q + r
+            factors.add(Linear(intArrayOf(1, -1), intArrayOf(r, b), LinearOp.LE, -1)) // r < b
             return LinComb(mapOf((if (mod) r else q) to 1), 0)
         }
 
@@ -546,7 +599,6 @@ object Xcsp3 {
             )
             return corners.min() to corners.max()
         }
-
 
         /** Resolve one variable/constant term to a var id. */
         internal fun singleTermVar(text: String): Int {

@@ -991,4 +991,123 @@ class Xcsp3Test {
         assertEquals(listOf(2L, 2L, 2L, 2L), cumulative.durations.toList())
         sat(xml)
     }
+
+    @Test
+    fun `intension notin forbids the listed values`() {
+        val xml = """
+            <instance type="CSP">
+              <variables><var id="x"> 0..3 </var></variables>
+              <constraints>
+                <intension> notin(x,{1,2}) </intension>
+                <intension> ge(x,1) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        // x >= 1 and x notin {1,2} forces x = 3.
+        assertEquals(3, sat(xml)[0])
+    }
+
+    @Test
+    fun `div and mod are truncated toward zero for negative operands`() {
+        fun eval(fn: String, x: Int, k: Int): Int {
+            val xml = """
+                <instance type="CSP">
+                  <variables><var id="x"> $x..$x </var><var id="res"> -1000..1000 </var></variables>
+                  <constraints><intension> eq(res,$fn(x,$k)) </intension></constraints>
+                </instance>
+            """.trimIndent()
+            return sat(xml)[Xcsp3.parse(xml).intVarNames.getValue("res")]
+        }
+        // Reference XCSP3 semantics: Java `/` and `%` — quotient truncates toward zero, the
+        // remainder takes the dividend's sign.
+        assertEquals(-2, eval("div", -7, 3))
+        assertEquals(-1, eval("mod", -7, 3))
+        assertEquals(-3, eval("div", 7, -2))
+        assertEquals(1, eval("mod", 7, -2))
+        assertEquals(3, eval("div", -7, -2))
+        assertEquals(-1, eval("mod", -7, -2))
+        assertEquals(2, eval("div", 7, 3))
+        assertEquals(1, eval("mod", 7, 3))
+    }
+
+    @Test
+    fun `div and mod by a positive variable divisor with non-negative dividend`() {
+        val xml = """
+            <instance type="CSP">
+              <variables>
+                <var id="a"> 6..6 </var><var id="b"> 4..4 </var>
+                <var id="q"> -9..9 </var><var id="r"> -9..9 </var>
+              </variables>
+              <constraints>
+                <intension> eq(q,div(a,b)) </intension>
+                <intension> eq(r,mod(a,b)) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val names = Xcsp3.parse(xml).intVarNames
+        val v = sat(xml)
+        // 6 div 4 = 1, 6 mod 4 = 2.
+        assertEquals(1, v[names.getValue("q")])
+        assertEquals(2, v[names.getValue("r")])
+    }
+
+    @Test
+    fun `allDifferent with except lets the exempt value repeat but not others`() {
+        val decl = "<instance type=\"CSP\"><variables><array id=\"x\" size=\"[3]\"> 0..2 </array></variables>"
+        val cons = "<allDifferent><list> x[] </list><except> 0 </except></allDifferent>"
+        fun solve(vals: String) = BacktrackSolver(
+            Xcsp3.parse(
+                "$decl<constraints>$cons<instantiation><list> x[] </list>" +
+                    "<values> $vals </values></instantiation></constraints></instance>",
+            ).problem,
+        ).solve(BacktrackParams())
+        assertTrue(solve("0 0 1") is SolveResult.Sat, "two exempt 0s may repeat")
+        assertTrue(solve("1 1 2") is SolveResult.Unsat, "non-exempt 1s may not repeat")
+    }
+
+    @Test
+    fun `ordered with lengths enforces the gap between consecutive entries`() {
+        val decl = "<instance type=\"CSP\"><variables><array id=\"s\" size=\"[3]\"> 0..20 </array></variables>"
+        val cons = "<ordered><list> s[] </list><lengths> 3 5 </lengths><operator> le </operator></ordered>"
+        fun solve(vals: String) = BacktrackSolver(
+            Xcsp3.parse(
+                "$decl<constraints>$cons<instantiation><list> s[] </list>" +
+                    "<values> $vals </values></instantiation></constraints></instance>",
+            ).problem,
+        ).solve(BacktrackParams())
+        assertTrue(solve("0 3 8") is SolveResult.Sat, "gaps 3 and 5 satisfied")
+        assertTrue(solve("0 3 7") is SolveResult.Unsat, "s[1] + 5 <= s[2] violated at 7")
+    }
+
+    @Test
+    fun `array domain aliasing via as reuses the referenced domain`() {
+        val decl = "<instance type=\"CSP\"><variables>" +
+            "<array id=\"d\" size=\"[2]\"> 5..9 </array><array id=\"e\" size=\"[2]\" as=\"d\"/></variables>"
+        fun solve(vals: String) = BacktrackSolver(
+            Xcsp3.parse(
+                "$decl<constraints><instantiation><list> e[] </list>" +
+                    "<values> $vals </values></instantiation></constraints></instance>",
+            ).problem,
+        ).solve(BacktrackParams())
+        assertTrue(solve("5 9") is SolveResult.Sat, "e reuses d's 5..9 domain")
+        assertTrue(solve("5 10") is SolveResult.Unsat, "a value outside the aliased domain is rejected")
+    }
+
+    @Test
+    fun `element over a variable matrix selects the indexed cell`() {
+        val xml = """
+            <instance type="CSP">
+              <variables>
+                <array id="m" size="[2][2]"> 0..9 </array>
+                <var id="i"> 0..1 </var><var id="j"> 0..1 </var><var id="v"> 0..9 </var>
+              </variables>
+              <constraints>
+                <element><matrix> m[][] </matrix><index> i j </index><value> v </value></element>
+                <instantiation><list> m[][] i j </list><values> 1 2 3 4 1 0 </values></instantiation>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        // m = [[1,2],[3,4]], i=1, j=0 -> v = m[1][0] = 3.
+        assertEquals(3, sat(xml)[Xcsp3.parse(xml).intVarNames.getValue("v")])
+    }
 }
