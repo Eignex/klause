@@ -601,6 +601,10 @@ class LocalSearchSolver(
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
         warm?.applyTo(state)
+        // Mirror newSatisfyState: a restart policy instance can be reused across solves (one tuning
+        // recipe over many problems), so clear its per-solve state before any restart here — else a
+        // stale incumbent of a different variable arity is anchored/perturbed against this problem.
+        configuredRestart.reset()
         // Plumb shaping into the state so strategies consulting shapedBreakScore see the objective
         // during pre-feasibility moves. Only CostShaping.Linear contributes a non-zero lambda;
         // FeasibilityFirst leaves it at 0.0, identical to the no-shaping path.

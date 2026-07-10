@@ -103,10 +103,17 @@ internal interface SearchPolicy<L> {
  */
 internal class DfsEngine<L>(
     private val solver: BacktrackSolver,
-    private val params: BacktrackParams,
+    params0: BacktrackParams,
     private val sink: SolveStatsSink?,
     private val policy: SearchPolicy<L>,
 ) {
+    // One search owns unshared selectors. A BacktrackParams (and its stateful selectors) can be reused
+    // across solves — every solve and minimize funnels through a DfsEngine, so copy here, the one place
+    // both drivers build the search, rather than let a prior problem's per-search state leak in.
+    private val params: BacktrackParams = params0.copy(
+        variableSelector = params0.variableSelector.fresh(),
+        valueSelector = params0.valueSelector.fresh(),
+    )
     private val problem = solver.problem
     private val session = PropagationSession(problem)
 
