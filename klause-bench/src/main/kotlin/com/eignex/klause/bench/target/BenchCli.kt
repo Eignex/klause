@@ -19,6 +19,7 @@ import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.ProblemKind
@@ -84,6 +85,8 @@ object BenchCli {
 
             "preview" -> run(args.drop(1), preview = true)
 
+            "dryrun" -> dryrun(args.drop(1))
+
             "calibrate" -> calibrate(args.drop(1))
 
             "reference" -> reference(args.drop(1))
@@ -97,7 +100,7 @@ object BenchCli {
             else ->
                 error(
                     "unknown command '$cmd' " +
-                        "(commands: solve, preview, calibrate, reference, classify, tune, credit, list)",
+                        "(commands: solve, preview, dryrun, calibrate, reference, classify, tune, credit, list)",
                 )
         }
     }
@@ -180,6 +183,42 @@ object BenchCli {
             profile,
             label = f["label"],
         )
+    }
+
+    /** `dryrun [filters…]` — resolve (parse + build the klause `Problem`) every selected instance
+     *  in-process, running no solve and no presolve, to surface representation failures (parse errors,
+     *  unsupported constructs, OOM blow-ups) across the corpus. Failures are grouped by a normalized
+     *  error signature so distinct root causes stand out from per-instance noise. With `progress=true`
+     *  each instance name is logged to stderr *before* resolving, so a hard OOM that kills the JVM still
+     *  names the culprit. Use `-Dklause.bench.shard=i/n` to split a large corpus across ≤4 workers. */
+    @Suppress("TooGenericExceptionCaught") // an audit must record every failure kind, OOM included
+    private fun dryrun(filterArgs: List<String>) {
+        val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+        val refs = select(f)
+        if (refs.isEmpty()) {
+            println("(no problems matched the selection)")
+            return
+        }
+        val progress = f["progress"] == "true"
+        println("=== dryrun (resolve/load only, no solve, no presolve): ${refs.size} instance(s) ===")
+        var ok = 0
+        val failures = LinkedHashMap<String, MutableList<String>>()
+        for (ref in refs) {
+            if (progress) System.err.println("resolving ${ref.name} [${ref.format}]")
+            try {
+                Runners.resolve(ref)
+                ok++
+            } catch (t: Throwable) {
+                val msg = (t.message ?: "").replace(Regex("-?\\d+"), "N").trim().take(140)
+                val sig = "${t::class.simpleName}: $msg"
+                failures.getOrPut(sig) { ArrayList() }.add(ref.name)
+            }
+        }
+        println("resolved $ok/${refs.size}; ${refs.size - ok} failed")
+        for ((sig, names) in failures.entries.sortedByDescending { it.value.size }) {
+            println("[${names.size}] $sig")
+            names.take(3).forEach { println("    e.g. $it") }
+        }
     }
 
     /** The fair arm tester: run the pool **once** as a live portfolio and rank arms by their real
