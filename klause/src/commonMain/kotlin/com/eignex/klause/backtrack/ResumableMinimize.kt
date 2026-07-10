@@ -75,6 +75,11 @@ internal class ResumableMinimize(
     // --- Slice control (no coroutine): a re-armable deadline + the current global token. ---
     private var globalToken: Cancellation = Cancellation.Never
     private var sliceEnd: TimeSource.Monotonic.ValueTimeMark? = null
+
+    // Wall-clock anchor for sizing the LP sub-budgets against [BacktrackParams.solveBudgetMillis] on the
+    // non-pausable one-shot path, where no slice deadline is armed. Captured at construction,
+    // which is the solve start for that path.
+    private val startMark = TimeSource.Monotonic.markNow()
     private fun sliceCancelled(): Boolean = if (pausable) {
         globalToken() || (sliceEnd?.hasPassedNow() ?: false)
     } else {
@@ -218,6 +223,17 @@ internal class ResumableMinimize(
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
         sink.start()
+        // Charge the one-shot root LP work's wall time against the shared LP wall budget on every
+        // exit path, so it competes with the per-node solves for the same fraction of the deadline.
+        val rootWorkStart = TimeSource.Monotonic.markNow()
+        try {
+            return firstRunWorkBody()
+        } finally {
+            lpEngine.chargeRootLpWall(rootWorkStart.elapsedNow().inWholeMilliseconds)
+        }
+    }
+
+    private fun firstRunWorkBody(): MinimizeResult.WithSample? {
         val rootToken = rootLpBudget()
         initRootLp(rootToken)
         // Objective shaving: raise the objective's proven lower bound before search when the LP +
@@ -298,22 +314,32 @@ internal class ResumableMinimize(
     /**
      * The shared cooperative-cancellation budget for the pre-search root LP work (#31): the
      * slice/global [BacktrackParams.cancellation] OR-ed with a wall-clock deadline of
-     * `LpPlan.rootBudgetFraction` of the time remaining in the current slice (capped at
-     * `LpPlan.rootBudgetMillis`). When the slice end is unknown (the non-pausable one-shot path) only
-     * the absolute cap applies. A non-positive fraction disables the cap — the prior behaviour.
+     * `LpPlan.rootBudgetFraction` of the time remaining (capped at `LpPlan.rootBudgetMillis`). The time
+     * remaining is read from the current slice deadline when one is armed, else from
+     * [BacktrackParams.solveBudgetMillis] and [startMark] on the non-pausable one-shot path — so
+     * the cap tracks the real deadline on the FD track too instead of degrading to the absolute ceiling,
+     * which exceeds a short budget and let root work consume the whole solve. Only the absolute cap
+     * applies when neither the slice end nor the budget is known. A non-positive fraction disables the
+     * cap — the prior behaviour.
      */
     private fun rootLpBudget(): Cancellation {
         val fraction = params.lpPlan.rootBudgetFraction
         if (fraction <= 0.0) return params.cancellation
         val cap = params.lpPlan.rootBudgetMillis
-        val end = sliceEnd
-        val budgetMillis = if (end != null) {
-            val remaining = (end - TimeSource.Monotonic.markNow()).inWholeMilliseconds
-            minOf((remaining * fraction).toLong(), cap)
-        } else {
-            cap
-        }
+        val remaining = remainingBudgetMillis()
+        var budgetMillis = if (remaining != null) minOf((remaining * fraction).toLong(), cap) else cap
+        // Also cap the one-shot root work by the shared LP wall budget, so an expensive-but-useless
+        // root relaxation cannot spend more than the whole LP subsystem is allotted before search starts.
+        lpEngine.lpWallRemainingMillis()?.let { budgetMillis = minOf(budgetMillis, it) }
         return params.cancellation or Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
+    }
+
+    /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),
+     *  else [BacktrackParams.solveBudgetMillis] minus the elapsed since [startMark] (the one-shot path),
+     *  else null when no budget is known. */
+    private fun remainingBudgetMillis(): Long? {
+        sliceEnd?.let { return (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
+        return params.solveBudgetMillis?.let { it - startMark.elapsedNow().inWholeMilliseconds }
     }
 
     /** Drains the LP-learned Farkas nogoods at a restart, registering them permanently and sharing each

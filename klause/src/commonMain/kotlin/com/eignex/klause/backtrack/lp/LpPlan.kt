@@ -172,6 +172,30 @@ data class LpPlan(
      *  sole cap when the time remaining is unknown (the non-pausable one-shot path). */
     val rootBudgetMillis: Long = 30_000,
     /**
+     * Wall-clock circuit breaker for an unproductive per-node LP, the backstop for what the
+     * count-based [bounding] effort ladder cannot reach: an LP whose single solve costs seconds never
+     * accumulates the ladder's warmup window of solves, so the ladder never demotes it and it burns the
+     * whole budget bounding nothing (elitserien/cyclic-rcpsp: lpMs≈budget, prunes=0). When the total
+     * solve budget is known ([com.eignex.klause.backtrack.BacktrackParams.solveBudgetMillis]), the LP
+     * (one-shot root work + per-node solves) may spend at most `min(this × budget, [lpWallBudgetMillis])`;
+     * if it hits that while still under the ladder's warmup and not having pruned, per-node LP bounding is
+     * disabled for the rest of the search and the arm runs as a bare combinatorial search. Sound (LP off
+     * is a valid relaxation), and inert — byte-identical — when the LP ever prunes, stays cheap enough to
+     * reach the ladder's warmup first (the ladder then judges it), or stays under the budget. `0.0`
+     * disables the breaker (the prior unbounded behaviour); no effect when the budget is unknown.
+     */
+    val lpWallBudgetFraction: Double = 0.25,
+    /**
+     * Absolute ceiling in milliseconds on the [lpWallBudgetFraction] LP wall budget. The
+     * effective budget is `min(fraction × totalBudget, this)`, so on a large deadline an unproductive
+     * relaxation's tax does not scale with it — a 300s budget must not let a useless LP grind for 75s
+     * before the breaker disables it. On the short budgets where the fraction is the smaller term this
+     * ceiling never binds, so it leaves the fraction in charge there. Set above the wall time a cheap,
+     * ladder-managed LP takes to reach its warmup, so the [LpWallBreaker]'s warmup guard — not this cap —
+     * is what spares such an LP; it keeps the tax a few seconds regardless of budget for the rest.
+     */
+    val lpWallBudgetMillis: Long = 5_000,
+    /**
      * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
      * [bounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
      * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
