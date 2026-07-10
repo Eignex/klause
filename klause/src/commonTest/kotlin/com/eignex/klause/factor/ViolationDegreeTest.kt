@@ -1,6 +1,5 @@
-package com.eignex.klause.factor.bool
+package com.eignex.klause.factor
 
-import com.eignex.klause.factor.compressViolation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
