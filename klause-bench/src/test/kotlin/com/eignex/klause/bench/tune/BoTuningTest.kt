@@ -248,6 +248,51 @@ class BoTuningTest {
     }
 
     @Test
+    fun `a config that fails to create is reported infeasible, dropped, and does not abort the campaign`() {
+        // A create failure — the decoder throwing while building the engine config from the assignment —
+        // must be handled like a solver crash: reported infeasible with its cause, dropped, campaign lives.
+        val infeasible = mutableListOf<Pair<String, String>>()
+        val recording = object : Tuner {
+            override fun openStudy(space: ConfigSpace, maximize: Boolean, studyId: String, noisy: Boolean) =
+                object : TuningStudy {
+                    private var n = 0
+                    override fun suggest(count: Int) = List(count) {
+                        val arm = if (n++ % 2 == 0) "A" else "X"
+                        Suggestion("t$n-$arm", mapOf("arm" to arm))
+                    }
+                    override fun complete(suggestion: Suggestion, objective: Double) = Unit
+                    override fun markInfeasible(suggestion: Suggestion, reason: String) {
+                        infeasible += suggestion.handle to reason
+                    }
+                    override fun observe(values: Map<String, Any>, objective: Double) = Unit
+                    override fun close() = Unit
+                }
+            override fun close() = Unit
+        }
+        val instances = List(4) { cop("i$it", "min: 1 x1 ;\n+1 x1 >= 0 ;\n") }
+        val result = BoTuning.tune(
+            space = ConfigSpace(listOf(CategoricalParam("arm", listOf("A", "X")))),
+            decode = { if (it.getValue("arm") == "X") error("cannot build X") else it.getValue("arm") as String },
+            reward = { _, arm -> if (arm == "A") 1.0 else 0.0 },
+            pool = UniformPool(instances),
+            tuner = recording,
+            rounds = 2,
+            trials = 2,
+            batch = 1,
+            warmStart = true,
+            studyId = "create-crash",
+            sampleSize = 4,
+        )
+
+        assertTrue(result.palette.isNotEmpty(), "the campaign survived the un-creatable config and kept a palette")
+        assertEquals("arm=A", result.palette.first().label, "the clean arm anchors the palette")
+        assertTrue(infeasible.isNotEmpty(), "the un-creatable config was reported infeasible to the tuner")
+        assertTrue(infeasible.all { it.second.contains("cannot build X") }, "the infeasible reason carries the cause")
+        assertTrue("arm=X" !in result.configs.keys, "an un-creatable config is dropped, not a candidate")
+        assertTrue(result.palette.none { it.label == "arm=X" }, "an un-creatable config never joins the palette")
+    }
+
+    @Test
     fun `coerce rounds a Double integer param and clamps to the declared domain`() {
         // A tuner may hand cbls.tabu (an IntParam in [0,20]) back as a Double; the loop must round it.
         val coerced = LocalSearchConfigSpace.coerce(

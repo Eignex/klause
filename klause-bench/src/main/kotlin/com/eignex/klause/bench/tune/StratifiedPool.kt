@@ -86,7 +86,7 @@ internal class StratifiedPool(
 
     private fun poison(ref: ProblemRef, cause: Throwable) {
         poisoned += ref
-        println("[pool] skipping ${ref.name}: ${cause.message ?: cause::class.simpleName}")
+        println("[pool] failed to compile ${ref.name}: ${cause.message ?: cause::class.simpleName} (skipped)")
     }
 
     /** The stratum label assigned to [ref] (test/analysis visibility). */
