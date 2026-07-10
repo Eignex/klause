@@ -285,7 +285,6 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             }
         }
         liveIds = ids.toIntArray()
-        rebuildOccViewIfDirty()
         val input = Problem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
@@ -304,9 +303,14 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     }
 
     /** The int-variable occurrence index over the factor list [passInput] last returned — the dense CSR
-     *  the affine / dup-columns candidate search would otherwise rebuild itself. Kept in sync with the
-     *  live factors by [passInput]; call it only after [passInput]. */
-    fun passOccurrence(): SharedIntOccurrence = requireNotNull(occView) { "passOccurrence before passInput" }
+     *  the affine / dup-columns candidate search would otherwise rebuild itself. Derived lazily here: only
+     *  the passes that read it ask, so a firing pass that changes the factor set does not force an
+     *  O(occurrences) rebuild the non-consuming passes between it and the next consumer would waste. Call
+     *  only after [passInput] (it fixes the [liveIds] the dense view is keyed against). */
+    fun passOccurrence(): SharedIntOccurrence {
+        rebuildOccViewIfDirty()
+        return requireNotNull(occView)
+    }
 
     /** Derive the dense [SharedIntOccurrence] over the current [liveIds] from the stable-id [intOcc]
      *  lists, but only when the factor set changed since the last build. Ascending stable id maps to

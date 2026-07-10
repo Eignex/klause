@@ -743,19 +743,22 @@ object Presolver {
 
             override fun passInput(): Problem = session.passInput()
 
-            // Hand the session's incrementally-maintained occurrence index to the pass so the affine
-            // / dup-columns candidate search reads it instead of rebuilding an O(factors) index; the
-            // view matches the pass input's factor order exactly, so decisions are unchanged.
+            // Hand the session's incrementally-maintained occurrence index only to the passes that read it
+            // (affine / dup-columns), so a firing pass that changes the factor set does not force the
+            // O(occurrences) dense-view rebuild for the non-consuming passes between it and the next
+            // consumer. The view matches the pass input's factor order exactly, so decisions are unchanged.
             override fun passContext(pass: PresolvePass): PresolveContext {
-                var passCtx = ctx.withSharedIntOcc(session.passOccurrence())
+                var passCtx = ctx
                 if (pass == PresolvePass.REMOVE_REDUNDANT) {
                     passCtx = passCtx.withSubsumeIncremental(subsumeIncremental(session, subsumeMark, subsumeMemo))
                 }
                 if (pass == PresolvePass.ELIMINATE_AFFINE_SINGLETONS) {
-                    passCtx = passCtx.withAffineTouchedVars(touchedSince(affineMark))
+                    passCtx = passCtx.withSharedIntOcc(session.passOccurrence())
+                        .withAffineTouchedVars(touchedSince(affineMark))
                 }
                 if (pass == PresolvePass.MERGE_DUPLICATE_COLUMNS) {
-                    passCtx = passCtx.withDupColumnsTouchedVars(touchedSince(dupMark))
+                    passCtx = passCtx.withSharedIntOcc(session.passOccurrence())
+                        .withDupColumnsTouchedVars(touchedSince(dupMark))
                 }
                 return passCtx
             }
