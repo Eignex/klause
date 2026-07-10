@@ -5,6 +5,7 @@ import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 
@@ -16,17 +17,14 @@ internal class TablePropagator(
     private val tuples: LongArray,
     private val arity: Int,
     private val numTuples: Int,
-    /** Short-support mask (see [com.eignex.klause.factor.table.Table.wildcards]); null when ground. */
-    private val wildcards: LongArray?,
+    /** Per-cell upper bound for a short-support table (see [com.eignex.klause.factor.table.Table.hi]);
+     *  null when every cell is a point (a ground table). */
+    private val hi: LongArray?,
 ) : Propagator {
 
-    /** Column [col] of tuple [row] is a wildcard — always feasible, and provides support for every
-     *  live value of its variable (STR2 short supports). */
-    private fun isWild(row: Int, col: Int): Boolean {
-        val w = wildcards ?: return false
-        val idx = row * arity + col
-        return (w[idx ushr 6] ushr (idx and 63)) and 1L != 0L
-    }
+    /** Lower/upper bound the cell at (row, col) accepts; equal for a point, `[MIN, MAX]` for a `*`. */
+    private fun cellLo(row: Int, col: Int): Long = tuples[row * arity + col]
+    private fun cellHi(row: Int, col: Int): Long = hi?.get(row * arity + col) ?: tuples[row * arity + col]
 
     /** Advisor subscription (#623): STR2 is hole-aware GAC (tuple feasibility tests membership, the
      *  prune drops interior values), so subscribe to every kind on every column variable and consume
@@ -45,6 +43,10 @@ internal class TablePropagator(
      * the live prefix to drop newly-infeasible tuples and gather column supports.
      * Backtrack correctness comes from [TableStr2State.numValid] being a reversible cell on the engine's
      * undo trail: a pop restores the live-set size (hence the live set) in O(1).
+     *
+     * Short-support cells (`[Table.hi]`) generalize a column entry from a single value to an interval
+     * `[lo, hi]`: a point is `lo == hi`, a `*` wildcard is `[MIN, MAX]`. A cell is feasible when the
+     * interval intersects the live domain (hole-aware), and supports every live domain value it covers.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val s = (state.refPayload[factorId] as? TableStr2State) ?: run {
@@ -66,20 +68,27 @@ internal class TablePropagator(
         return ok
     }
 
+    /** Whether the cell at (row, col) — the interval `[cellLo, cellHi]` — has support in domain [d]. */
+    private fun cellFeasible(row: Int, col: Int, d: IntDomain): Boolean {
+        val lo = cellLo(row, col)
+        val hiC = cellHi(row, col)
+        return if (lo == hiC) lo in d else domainOverlapsRange(d, lo, hiC)
+    }
+
     /** STR2 sweep + support filtering with a per-column span-sized bitset — the fast path for columns
      *  whose domain is within Int range and narrow ([MAX_BITSET_SPAN]). */
     private fun propagateBitset(state: PropagationState, s: TableStr2State): Boolean {
-        val lo = LongArray(arity)
-        val hi = LongArray(arity)
+        val domLo = LongArray(arity)
+        val domHi = LongArray(arity)
         val supportBits = arrayOfNulls<LongArray>(arity)
-        // A wildcard in a still-live tuple's column supports every value of that column, so the column
-        // is fully supported and skips both bit-gathering and pruning (STR2 short supports).
+        // A cell whose interval covers the whole domain (a `*`, or a range spanning it) supports every
+        // value of that column, so the column is fully supported and skips gathering and pruning.
         val fullySupported = BooleanArray(arity)
         for (col in 0 until arity) {
             val d = state.intDomains[xs[col]]
-            lo[col] = d.min
-            hi[col] = d.max
-            val span = hi[col] - lo[col] + 1
+            domLo[col] = d.min
+            domHi[col] = d.max
+            val span = domHi[col] - domLo[col] + 1
             supportBits[col] = LongArray(((span + 63) ushr 6).toInt())
         }
         var i = 0
@@ -87,9 +96,7 @@ internal class TablePropagator(
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
-                if (isWild(row, col)) continue
-                val v = tuples[row * arity + col]
-                if (v !in state.intDomains[xs[col]]) {
+                if (!cellFeasible(row, col, state.intDomains[xs[col]])) {
                     feasible = false
                     break
                 }
@@ -103,14 +110,21 @@ internal class TablePropagator(
                 s.numValid = last
             } else {
                 for (col in 0 until arity) {
-                    if (isWild(row, col)) {
+                    val lo = cellLo(row, col)
+                    val hiC = cellHi(row, col)
+                    if (lo <= domLo[col] && hiC >= domHi[col]) {
                         fullySupported[col] = true
                         continue
                     }
-                    val v = tuples[row * arity + col]
-                    val off = (v - lo[col]).toInt()
+                    // Every domain value the interval covers is supported; setting bits over the
+                    // (in-range) offsets is safe — the prune only ever consults in-domain positions.
                     val bits = requireNotNull(supportBits[col])
-                    bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
+                    var off = (maxOf(lo, domLo[col]) - domLo[col]).toInt()
+                    val offEnd = (minOf(hiC, domHi[col]) - domLo[col]).toInt()
+                    while (off <= offEnd) {
+                        bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
+                        off++
+                    }
                 }
                 i++
             }
@@ -135,13 +149,13 @@ internal class TablePropagator(
                     break
                 }
             }
-            val minSup = lo[col] + firstSet
-            val maxSup = lo[col] + lastSet
+            val minSup = domLo[col] + firstSet
+            val maxSup = domLo[col] + lastSet
             if (!state.tightenIntMin(xs[col], minSup, ant)) return false
             if (!state.tightenIntMax(xs[col], maxSup, ant)) return false
             val d = state.intDomains[xs[col]]
-            val colLo = lo[col]
-            val colHi = hi[col]
+            val colLo = domLo[col]
+            val colHi = domHi[col]
             var toRemoveCount = 0
             val toRemove = LongArray(d.size)
             d.forEach { value ->
@@ -174,9 +188,7 @@ internal class TablePropagator(
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
-                if (isWild(row, col)) continue
-                val v = tuples[row * arity + col]
-                if (v !in state.intDomains[xs[col]]) {
+                if (!cellFeasible(row, col, state.intDomains[xs[col]])) {
                     feasible = false
                     break
                 }
@@ -190,14 +202,21 @@ internal class TablePropagator(
                 s.numValid = last
             } else {
                 for (col in 0 until arity) {
-                    if (isWild(row, col)) {
+                    val d = state.intDomains[xs[col]]
+                    val lo = cellLo(row, col)
+                    val hiC = cellHi(row, col)
+                    if (lo <= d.min && hiC >= d.max) {
                         fullySupported[col] = true
                         continue
                     }
-                    val v = tuples[row * arity + col]
-                    supported[col].add(v)
-                    if (v < minSup[col]) minSup[col] = v
-                    if (v > maxSup[col]) maxSup[col] = v
+                    var v = maxOf(lo, d.min)
+                    val vEnd = minOf(hiC, d.max)
+                    while (v <= vEnd) {
+                        supported[col].add(v)
+                        if (v < minSup[col]) minSup[col] = v
+                        if (v > maxSup[col]) maxSup[col] = v
+                        v++
+                    }
                 }
                 i++
             }
@@ -226,5 +245,17 @@ internal class TablePropagator(
         /** Columns whose domain is within Int range and narrower than this take the span-sized bitset
          *  support path; wider columns take the value-keyed set path (sound for any magnitude). */
         const val MAX_BITSET_SPAN: Long = 1L shl 24
+
+        /** Whether domain [d] holds a value in `[lo, hi]` (hole-aware): the clamped range is non-empty
+         *  and, when the domain has holes, not entirely holes. */
+        private fun domainOverlapsRange(d: IntDomain, lo: Long, hi: Long): Boolean {
+            val a = maxOf(lo, d.min)
+            val b = minOf(hi, d.max)
+            if (a > b) return false
+            if (d.holeCount == 0L) return true
+            var holes = 0L
+            d.forEachHoleInRange(a, b) { holes++ }
+            return b - a + 1 > holes
+        }
     }
 }

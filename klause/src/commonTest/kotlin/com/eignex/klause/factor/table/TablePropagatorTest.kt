@@ -69,8 +69,8 @@ class TablePropagatorTest {
             factors = arrayOf<Factor>(
                 Table(
                     xs = intArrayOf(0, 1),
-                    tuples = longArrayOf(0, 0, 2, 3),
-                    wildcards = longArrayOf(0b10L), // bit (row 0, col 1) set ⇒ that cell is '*'
+                    tuples = longArrayOf(0, Long.MIN_VALUE, 2, 3), // per-cell lower bound
+                    hi = longArrayOf(0, Long.MAX_VALUE, 2, 3), // (0,1) is the unbounded interval = '*'
                 ),
             ),
         )
@@ -80,6 +80,42 @@ class TablePropagatorTest {
             setOf(listOf(0, 0), listOf(0, 1), listOf(0, 2), listOf(0, 3), listOf(2, 3)),
             results,
         )
+    }
+
+    @Test
+    fun `an interval column matches every value in its range`() {
+        // Rows (0, [1..2]) and (3, 3) over vars in [0..3]: the interval lets b be 1 or 2 when a = 0.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 3) },
+            factors = arrayOf<Factor>(
+                Table(
+                    xs = intArrayOf(0, 1),
+                    tuples = longArrayOf(0, 1, 3, 3), // lower bounds
+                    hi = longArrayOf(0, 2, 3, 3), // (0,1) covers [1, 2]
+                ),
+            ),
+        )
+        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+            .map { it.ints.map { v -> v.toInt() } }.toList().toSet()
+        assertEquals(setOf(listOf(0, 1), listOf(0, 2), listOf(3, 3)), results)
+    }
+
+    @Test
+    fun `an interval column prunes to only values within the range and domain`() {
+        // Single row (a, [2..5]) with b ∈ [0..3]: b must land in [2..5] ∩ [0..3] = {2, 3}.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 2), hi = longArrayOf(0, 5)),
+            ),
+        )
+        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+            .map { it.ints.map { v -> v.toInt() } }.toList().toSet()
+        assertEquals(setOf(listOf(0, 2), listOf(0, 3)), results)
     }
 
     @Test

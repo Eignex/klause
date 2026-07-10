@@ -36,10 +36,11 @@ class Table private constructor(
     val xs: IntArray,
     /** Allowed tuples, row-major; length is a multiple of `xs.size`. */
     val tuples: LongArray,
-    /** Short-support mask: bit `row * arity + col` set ⟺ that column of that tuple is a wildcard
-     *  (`*`, matching any value); the corresponding [tuples] entry is a canonical `0` placeholder
-     *  that is never read. `null` for a fully-ground table (the common case). */
-    val wildcards: LongArray?,
+    /** Per-cell upper bound for a short-support table: cell `row * arity + col` accepts any value in
+     *  `[tuples(cell), hi(cell)]`, intersected with the variable's domain. A point cell has
+     *  `hi(cell) == tuples(cell)`; a `*` wildcard is the unbounded interval `[Long.MIN, Long.MAX]`.
+     *  `null` for a fully-ground table (every cell a point — the common case). */
+    val hi: LongArray?,
     /** The cached tuple-derived key fragment when copying from a factor over the *same* [tuples]
      *  (a pure variable [remap]); `null` forces a fresh computation when the tuples differ. */
     cachedTupleKey: LongArray?,
@@ -47,7 +48,7 @@ class Table private constructor(
 
     constructor(xs: IntArray, tuples: LongArray) : this(xs, tuples, null, null)
 
-    constructor(xs: IntArray, tuples: LongArray, wildcards: LongArray?) : this(xs, tuples, wildcards, null)
+    constructor(xs: IntArray, tuples: LongArray, hi: LongArray?) : this(xs, tuples, hi, null)
 
     /** Number of variables per tuple. */
     val arity: Int = xs.size
@@ -59,14 +60,11 @@ class Table private constructor(
         require(xs.isNotEmpty()) { "table: empty xs" }
         require(tuples.size % arity == 0) { "table: tuples length must be a multiple of xs.size" }
         require(numTuples > 0) { "table: at least one tuple required" }
+        require(hi == null || hi.size == tuples.size) { "table: hi bounds must align with tuples" }
     }
 
-    /** Whether column [col] of tuple [row] is a wildcard (matches any value). */
-    internal fun isWildcard(row: Int, col: Int): Boolean {
-        val w = wildcards ?: return false
-        val idx = row * arity + col
-        return (w[idx ushr 6] ushr (idx and 63)) and 1L != 0L
-    }
+    /** Upper bound of the interval cell (row, col); equals its lower bound [tuples] for a point. */
+    internal fun cellHi(row: Int, col: Int): Long = hi?.get(row * arity + col) ?: tuples[row * arity + col]
 
     // The tuple-derived part of the key (arity, count, sorted tuple set) is invariant under a variable
     // remap, so it is computed once and carried across remaps — keeping the expensive row sort out of
@@ -74,17 +72,17 @@ class Table private constructor(
     private var cachedTupleKey: LongArray? = cachedTupleKey
 
     private fun tupleKey(): LongArray = cachedTupleKey ?: run {
-        // Rows are a set, so order-independence comes from sorting rows into a canonical order. Wildcard
-        // tables tie-break equal-valued rows by their wildcard pattern so the key stays canonical, and
-        // interleave a wild-flag word after each value so a wildcard cell can never collide with a real
-        // domain value (which may be any Long). A ground table keeps the compact one-word-per-cell form,
-        // so its key is byte-identical to before wildcards existed.
+        // Rows are a set, so order-independence comes from sorting rows into a canonical order. Short
+        // tables tie-break equal-lower-bound rows by their upper bound so the key stays canonical, and
+        // interleave the upper-bound word after each lower bound so an interval cell can never collide
+        // with a point (a point has hi == lo). A ground table keeps the compact one-word-per-cell form,
+        // so its key is byte-identical to before short supports existed.
         val order = argsortBy(numTuples) { r1, r2 ->
             var c = 0
             var d = 0
             while (c < arity && d == 0) {
                 d = tuples[r1 * arity + c].compareTo(tuples[r2 * arity + c])
-                if (d == 0 && wildcards != null) d = isWildcard(r1, c).compareTo(isWildcard(r2, c))
+                if (d == 0 && hi != null) d = cellHi(r1, c).compareTo(cellHi(r2, c))
                 c++
             }
             d
@@ -93,7 +91,7 @@ class Table private constructor(
         // array. The equivalent StructuralKeyBuilder form appends one element at a time, each with a
         // capacity/grow check; a wide table's key is the dominant cost when presolve keys a table-heavy
         // model, so the inner loop stays a flat array write.
-        val perCell = if (wildcards == null) 1 else 2
+        val perCell = if (hi == null) 1 else 2
         val words = LongArray(2 + numTuples * arity * perCell)
         words[0] = arity.toLong()
         words[1] = numTuples.toLong()
@@ -102,7 +100,7 @@ class Table private constructor(
             val base = r * arity
             for (c in 0 until arity) {
                 words[w++] = tuples[base + c]
-                if (wildcards != null) words[w++] = if (isWildcard(r, c)) 1L else 0L
+                if (hi != null) words[w++] = cellHi(r, c)
             }
         }
         words
@@ -116,7 +114,7 @@ class Table private constructor(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(
         xs.remapVars(intMap),
         tuples,
-        wildcards,
+        hi,
         cachedTupleKey,
     )
 
@@ -126,10 +124,10 @@ class Table private constructor(
     // Representable for any non-zero scale (a shift, negation, or stride). Declines (null) only when no
     // row survives — leaving the original table for propagation to refute.
     override fun substituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Factor? {
-        // A short table's wildcard columns don't participate in the divisibility filter and would need
-        // the mask rebuilt over surviving rows; decline (the affine fold just skips it) rather than
-        // carry that complexity into a rarely-hit presolve path.
-        if (wildcards != null) return null
+        // A short table's interval/wildcard cells don't participate in the divisibility filter and
+        // would need bounds rewritten over surviving rows; decline (the affine fold just skips it)
+        // rather than carry that complexity into a rarely-hit presolve path.
+        if (hi != null) return null
         if (scale == 0 || x !in xs) return null
         val cols = xs.indices.filter { xs[it] == x }
         val kept = (0 until numTuples).filter { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0L } }
@@ -151,7 +149,7 @@ class Table private constructor(
     // row survives. `any` early-exits on the first survivor and allocates nothing — the affine scan calls
     // this per candidate check on a wide float-derived bucket table, where the full rewrite is O(tuples).
     override fun canSubstituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Boolean {
-        if (wildcards != null) return false
+        if (hi != null) return false
         if (scale == 0 || x !in xs) return false
         val cols = xs.indices.filter { xs[it] == x }
         return (0 until numTuples).any { r -> cols.all { c -> (tuples[r * arity + c] - offset) % scale == 0L } }
@@ -173,14 +171,15 @@ class Table private constructor(
     /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the
      *  one value universe, so a single map relabels the whole table. */
     override fun remapValues(valueMap: (Long) -> Long): Factor {
-        val w = wildcards ?: return Table(xs, LongArray(tuples.size) { valueMap(tuples[it]) })
-        // Wildcard cells hold the canonical `0` placeholder, which must not be relabelled.
+        val h = hi ?: return Table(xs, LongArray(tuples.size) { valueMap(tuples[it]) })
+
+        // Interval bounds are real domain values and are relabelled; the unbounded wildcard sentinels
+        // (a `[MIN, MAX]` cell) are not domain values and pass through unchanged.
+        fun wild(i: Int) = tuples[i] == Long.MIN_VALUE && h[i] == Long.MAX_VALUE
         return Table(
             xs,
-            LongArray(
-                tuples.size,
-            ) { idx -> if (w[idx ushr 6] ushr (idx and 63) and 1L != 0L) 0L else valueMap(tuples[idx]) },
-            w,
+            LongArray(tuples.size) { if (wild(it)) tuples[it] else valueMap(tuples[it]) },
+            LongArray(h.size) { if (wild(it)) h[it] else valueMap(h[it]) },
         )
     }
 
@@ -204,11 +203,10 @@ class Table private constructor(
         multiColumnsByVar = multi
     }
 
-    override fun asPropagator(): Propagator =
-        TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, wildcards)
+    override fun asPropagator(): Propagator = TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi)
 
     override fun asInvariant(): Invariant =
-        TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, wildcards)
+        TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi)
 
     override val hullFamily: HullFamily = HullFamily.TABLE
 
@@ -221,9 +219,9 @@ class Table private constructor(
      */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
-        // A wildcard column doesn't pin its variable for that tuple, so the per-tuple channel would be
-        // ill-defined; short tables skip the hull relaxation (propagation still enforces the constraint).
-        if (wildcards != null) return
+        // An interval/wildcard cell doesn't pin its variable for that tuple, so the per-tuple channel
+        // would be ill-defined; short tables skip the hull relaxation (propagation still enforces it).
+        if (hi != null) return
         if (numTuples > MAX_TUPLES) return
         val declared = Array(arity) { c -> builder.declaredDomain(xs[c]) }
         val live = Array(arity) { c -> builder.liveDomain(xs[c]) }
@@ -269,7 +267,7 @@ class Table private constructor(
     }
 
     override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
-        if (wildcards != null) return null
+        if (hi != null) return null
         if (numTuples > MAX_TUPLES) return null
         // One selector per tuple (upper bound on the declared-feasible ones) + Σ y = 1 + one channel
         // per column.
