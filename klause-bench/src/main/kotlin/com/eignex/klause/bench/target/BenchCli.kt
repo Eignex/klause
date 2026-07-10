@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * `category=SAT,OPT` `tag=…` `name=<glob>[,…]` (comma = OR) `per-family=N` `max=N` `seed=N`
  * `backend=choco|gecode|yuck` (the solver; default klause) `timeout=<ms>`
  * `engine=fixed|cp|mixed|ls` `processors=N` `fixed=true` (references) `param=key=value`
- * `lp=off|conservative|balanced|aggressive[±id…]` (klause-cli `--lp` LP-relaxation emphasis)
+ * `lp=off|conservative|default|aggressive[±id…]` (klause-cli `--lp` LP-relaxation emphasis)
  * `presolve=off|conservative|default|aggressive[,±pass…]` (klause-cli `--presolve` presolve emphasis + deltas)
  * `label=<name>` (tag the run — e.g. a klause version — so re-runs coexist instead of overwriting)
  * `profile=cpu|wall|alloc` `profile-scope=solve|all` `profile-top=N`.
@@ -631,7 +631,7 @@ object BenchCli {
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
             |         engine=fixed|cp|mixed|ls processors=N (klause search for solve)
-            |         lp=off|conservative|balanced|aggressive[±id] (klause-cli --lp LP emphasis)
+            |         lp=off|conservative|default|aggressive[±id] (klause-cli --lp LP emphasis)
             |         presolve=off|conservative|default|aggressive[,±pass] (klause-cli --presolve)
             |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; var-/val-selector edit the cp pool)
             |         label=<name> (tag the run, e.g. a klause version, so re-runs coexist as distinct dirs)
