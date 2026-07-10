@@ -41,7 +41,7 @@ import kotlin.test.assertEquals
  * A non-monotonic permutation is used so `sortedIntVars` / `pairsByVarKey` sort-by-image genuinely
  * differs from sort-by-original.
  */
-class KeySinkInvariantTest {
+class FactorRemapKeySinkInvariantTest {
 
     // A bijection on 0..63 (45 is coprime to 64), so images are a non-monotonic permutation — no id
     // collisions (remap stays injective) yet image order ≠ original order.
