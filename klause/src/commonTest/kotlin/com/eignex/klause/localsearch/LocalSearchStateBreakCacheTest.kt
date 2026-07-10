@@ -11,7 +11,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class BreakCacheTest {
+class LocalSearchStateBreakCacheTest {
 
     private fun naiveBreakScore(state: LocalSearchState, boolVar: Int): Int {
         var count = 0
