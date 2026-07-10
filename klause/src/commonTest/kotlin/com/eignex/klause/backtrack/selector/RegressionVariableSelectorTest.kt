@@ -61,6 +61,32 @@ class RegressionVariableSelectorTest {
     }
 
     @Test
+    fun `a reused selector is copied on the minimize path too`() {
+        // The COP path (minimize) builds its own DfsEngine separately from solve; the selector copy
+        // must cover it, else the small solve's activity arrays are indexed against the larger one.
+        val selector = RegressionVariableSelector.linUcb(seed = 1L)
+        val small = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 1) },
+            factors = arrayOf<Factor>(AllDifferent(IntArray(2) { it }, domainMin = 0, domainSize = 2)),
+        )
+        BacktrackSolver(small).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
+
+        val n = 6
+        val large = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
+            factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L, 6L))
+        val params = BacktrackParams(variableSelector = selector, randomSeed = 0L)
+        val r = BacktrackSolver(large).minimize(objective, params)
+        assertIs<MinimizeResult.Optimal>(r)
+    }
+
+    @Test
     fun `proves the optimum under bandit branching`() {
         // minimize x + 2y subject to x + y >= 3, x,y in [0..5]. Optimum = 3.
         val problem = Problem(
