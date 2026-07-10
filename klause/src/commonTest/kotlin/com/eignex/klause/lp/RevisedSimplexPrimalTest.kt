@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
  * as the dual [RevisedSimplex.solve] (both confirmed by the integer-multiplier bound), and its
  * bound-flipping ratio test must take the long step when an entering variable hits its own bound first.
  */
-class PrimalSimplexTest {
+class RevisedSimplexPrimalTest {
 
     /** `≤`-rows with nonnegative rhs over a bounded box: feasible at the all-lower start the primal
      *  pass begins from, and bounded since every variable has a finite upper bound. */
