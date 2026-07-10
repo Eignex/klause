@@ -16,6 +16,14 @@ import com.eignex.klause.propagation.Propagator
  * `xy`-intersection graph into strongly connected components and tightens each `xs` bound to the
  * range its component's `ys` can take. Steps (a)/(b) alone subsume the previous endpoint-only
  * reasoning; the SCC step (c) is what lets a middle `xs` learn bounds from its sorted position.
+ *
+ * The propagator itself holds only the immutable constraint scope. All per-search working state —
+ * the matchings, the SCC scratch, the priority queue and the two stacks — lives in a [SortWork]
+ * held in `state.refPayload[factorId]`, because a [Propagator] instance is cached once per
+ * [com.eignex.klause.solver.Problem] and shared across every [PropagationState], including the
+ * concurrently-running arms of a parallel portfolio. Scratch as propagator fields would race across
+ * those arms; keyed off `refPayload` each search owns its own copy (mirrors
+ * [com.eignex.klause.factor.table.internals.ElementConstState] and `VpState`).
  */
 internal class SortPropagator(
     val boolVars: IntArray,
@@ -23,8 +31,6 @@ internal class SortPropagator(
     private val xs: IntArray,
     private val ys: IntArray,
 ) : Propagator {
-
-    private val n = xs.size
 
     /**
      * Advisor subscription (#623): the sort propagator reads only each variable's `min`/`max` and
@@ -45,7 +51,24 @@ internal class SortPropagator(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
-    // Scratch state, allocated once and reused across fires (single-threaded propagation).
+    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val work = (state.refPayload[factorId] as? SortWork)
+            ?: SortWork(xs, ys, intVars).also { state.refPayload[factorId] = it }
+        return work.propagate(state)
+    }
+}
+
+/**
+ * Per-search working state and filtering loop for one [SortPropagator]. Allocated lazily on the first
+ * fire and reused across fires of the same [PropagationState] — the scratch is fully reset at the top
+ * of each pass, so nothing survives between fires and no trail participation is needed. Held in
+ * `refPayload` (never as propagator fields) so parallel portfolio arms don't share it.
+ */
+internal class SortWork(private val xs: IntArray, private val ys: IntArray, private val intVars: IntArray) {
+
+    private val n = xs.size
+
+    // Scratch state, allocated once and reused across fires of the owning search.
     private val f = IntArray(n)
     private val fPrime = IntArray(n)
     private val xyGraph = Array(n) { IntArray(n) }
@@ -70,7 +93,7 @@ internal class SortPropagator(
     // The active state, set per propagate() so the bound accessors above stay terse.
     private lateinit var state: PropagationState
 
-    override fun propagate(state: PropagationState, factorId: Int): Boolean {
+    fun propagate(state: PropagationState): Boolean {
         this.state = state
         // A single coarse-but-sound antecedent for every narrowing this pass emits: the whole pass
         // is a deterministic consequence of the pre-pass domains, so citing their tightened bounds
