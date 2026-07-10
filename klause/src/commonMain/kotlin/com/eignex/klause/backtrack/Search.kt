@@ -153,7 +153,14 @@ internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
 ): Sequence<SearchOutcome> = sequence {
-    val engine = DfsEngine(this@driveSearch, params, sink, SatPolicy(params))
+    // Each search gets unshared selectors: a BacktrackParams (with its stateful selectors) can be
+    // reused across solves, so copy them here — the one point every solve/enumerate/minimize/samples
+    // run funnels through — rather than let a prior problem's per-search state leak into this one.
+    val searchParams = params.copy(
+        variableSelector = params.variableSelector.fresh(),
+        valueSelector = params.valueSelector.fresh(),
+    )
+    val engine = DfsEngine(this@driveSearch, searchParams, sink, SatPolicy(searchParams))
     while (true) {
         when (val e = engine.runUntilEvent()) {
             is EngineEvent.Solution -> yield(SearchOutcome.Found(e.payload))

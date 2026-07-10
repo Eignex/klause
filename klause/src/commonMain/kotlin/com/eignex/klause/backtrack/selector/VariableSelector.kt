@@ -19,6 +19,10 @@ interface VariableSelector {
     /** Pick the next variable to branch on, or null when all are determined. */
     fun pick(session: PropagationSession, rng: Random): VarRef?
 
+    /** A fresh, unshared instance for one solve: stateless selectors return this, stateful ones
+     *  rebuild from their config so no per-search state leaks across reuse. */
+    fun fresh(): VariableSelector
+
     /** Called once per propagation conflict at `varRef`; bump activity / failure weight. */
     fun onConflict(varRef: VarRef) {}
 

@@ -25,6 +25,8 @@ import kotlin.random.Random
 internal class MaxRegret(private val objective: LinearObjective, private val base: VariableSelector = SmallestDomain) :
     VariableSelector {
 
+    override fun fresh() = MaxRegret(objective, base.fresh())
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         var best: VarRef? = null

@@ -31,6 +31,8 @@ import kotlin.random.Random
  */
 internal class ConflictOrdering(private val base: VariableSelector) : VariableSelector {
 
+    override fun fresh() = ConflictOrdering(base.fresh())
+
     private var counter: Long = 0
     private var boolStamp: LongArray = EmptyLongArray
     private var intStamp: LongArray = EmptyLongArray

@@ -24,6 +24,10 @@ interface ValueSelector {
     /** Candidate values for `varRef`, yielded in trial order. */
     fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long>
 
+    /** A fresh, unshared instance for one solve: stateless selectors return this, stateful ones
+     *  rebuild from their config so no per-search state leaks across reuse. */
+    fun fresh(): ValueSelector
+
     /** Hook: a conflict involved `varRef` taking [value]. */
     fun onConflict(varRef: VarRef, value: Long) {}
 

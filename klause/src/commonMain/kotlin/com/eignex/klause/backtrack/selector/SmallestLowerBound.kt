@@ -9,6 +9,8 @@ import kotlin.random.Random
  * before ints. The scheduling staple — branching on the task that can start earliest.
  */
 object SmallestLowerBound : VariableSelector {
+    override fun fresh() = this
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? =
         pickByDomainMetric(session, maximize = false, boolScore = 0L) { it.min }
 }

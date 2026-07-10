@@ -10,6 +10,8 @@ import kotlin.random.Random
  * from [IndomainMedian] (middle *by position*) on skewed or holey domains.
  */
 object IndomainMiddle : ValueSelector {
+    override fun fresh() = this
+
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> sequenceOf(0L, 1L)
 

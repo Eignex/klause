@@ -37,9 +37,15 @@ import kotlin.random.Random
  * carries the shared regression; the per-candidate feature vector is the context.
  */
 class RegressionVariableSelector private constructor(
-    private val bandit: RegressionContextualBandit<*>,
+    private val newBandit: () -> RegressionContextualBandit<*>,
     private val scoreCap: Int,
 ) : VariableSelector {
+
+    private val bandit: RegressionContextualBandit<*> = newBandit()
+
+    /** A fresh selector with the same config and a new, unlearned bandit — so reuse across solves
+     *  starts each search from the documented per-session state, never a prior problem's model. */
+    override fun fresh() = RegressionVariableSelector(newBandit, scoreCap)
 
     // Pending attribution for the previous decision (rewarded at the next pick, once its outcome
     // is observable). Null between runs / before the first decision.
@@ -229,9 +235,12 @@ class RegressionVariableSelector private constructor(
             priorVariance: Double = 1.0,
             scoreCap: Int = 64,
         ): RegressionVariableSelector {
-            val regression = LinearRegressionSpec.Bayesian(FEATURE_SIZE, priorVariance)
-            val spec = RegressionContextualSpec(1, regression, LinUcb, exploration, regression)
-            return RegressionVariableSelector(spec.materialize(Random(seed), Concurrency.None), scoreCap)
+            val newBandit = {
+                val regression = LinearRegressionSpec.Bayesian(FEATURE_SIZE, priorVariance)
+                val spec = RegressionContextualSpec(1, regression, LinUcb, exploration, regression)
+                spec.materialize(Random(seed), Concurrency.None)
+            }
+            return RegressionVariableSelector(newBandit, scoreCap)
         }
     }
 }

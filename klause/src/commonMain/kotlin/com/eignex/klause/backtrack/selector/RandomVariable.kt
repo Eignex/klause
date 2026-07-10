@@ -5,6 +5,8 @@ import kotlin.random.Random
 
 /** Uniformly random among undetermined variables. */
 object RandomVariable : VariableSelector {
+    override fun fresh() = this
+
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val problem = session.problem
         val candidates = ArrayList<VarRef>()

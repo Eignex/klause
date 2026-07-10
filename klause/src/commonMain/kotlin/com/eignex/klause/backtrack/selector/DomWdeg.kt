@@ -28,6 +28,8 @@ import kotlin.random.Random
  */
 internal class DomWdeg : VariableSelector {
 
+    override fun fresh() = DomWdeg()
+
     private var factorWeights: DoubleArray = DoubleArray(0)
 
     // Combined bool+int heap keyed on `wdeg(v) = Σ factorWeights[f]`; the dom(v) divider

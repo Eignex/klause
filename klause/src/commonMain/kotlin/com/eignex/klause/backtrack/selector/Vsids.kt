@@ -30,6 +30,8 @@ import kotlin.random.Random
  */
 class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Double = 1e100) : VariableSelector {
 
+    override fun fresh() = Vsids(decay, rescaleThreshold)
+
     init {
         require(decay in 0.5..0.999) { "VSIDS decay must be in 0.5..0.999, got $decay" }
     }

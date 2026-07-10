@@ -8,6 +8,8 @@ import kotlin.random.Random
  * current domain. Sparse-aware via the `in d` membership check.
  */
 internal class IndomainSet(private val allowedValues: LongArray) : ValueSelector {
+
+    override fun fresh() = this
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> allowedValues.asSequence().filter { it == 0L || it == 1L }
 

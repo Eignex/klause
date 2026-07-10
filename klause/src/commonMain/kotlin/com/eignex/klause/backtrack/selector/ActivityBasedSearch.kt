@@ -41,6 +41,8 @@ internal class ActivityBasedSearch(
         require(decay in 0.5..0.9999) { "ABS decay must be in 0.5..0.9999, got $decay" }
     }
 
+    override fun fresh() = ActivityBasedSearch(decay, resetOnRestart, rescaleThreshold)
+
     private var increment: Double = 1.0
 
     // Combined bool+int heap keyed on raw activity; dom(v) divider applied at pick time.

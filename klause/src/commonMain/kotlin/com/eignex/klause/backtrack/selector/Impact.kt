@@ -26,6 +26,8 @@ import kotlin.random.Random
  * with strong global propagators.
  */
 internal class Impact(private val maxProbes: Int = 32) : ValueSelector {
+
+    override fun fresh() = Impact(maxProbes)
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =
         probeAndOrder(session, varRef, rng, maxProbes, ascending = true)
 }
