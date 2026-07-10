@@ -4,7 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 
-class FloatSpecTest {
+class SchemaEntryFloatSpecTest {
 
     @Test
     fun `scale and realValue decode buckets linearly`() {
