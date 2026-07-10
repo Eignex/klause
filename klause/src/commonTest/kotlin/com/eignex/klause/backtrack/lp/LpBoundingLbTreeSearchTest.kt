@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
  * fully-pinned, propagation-feasible incumbents (the caller records them without re-checking), and on a
  * small problem its best-first dive should reach an optimal one. Checked by brute force.
  */
-class LbTreeSearchTest {
+class LpBoundingLbTreeSearchTest {
 
     private fun satisfies(f: Linear, x: LongArray): Boolean {
         var s = 0L
