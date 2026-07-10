@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
  * (`v2 ↔ v3`) keeps that row distinct and simultaneously fixes both columns — exactly the
  * structure-preserving move only an implicit neighbourhood produces.
  */
-class ImplicitNeighbourhoodTest {
+class CblsImplicitNeighbourhoodTest {
 
     private fun row(a: Int, b: Int) = AllDifferent(vars = intArrayOf(a, b), domainMin = 0, domainSize = 2)
 
