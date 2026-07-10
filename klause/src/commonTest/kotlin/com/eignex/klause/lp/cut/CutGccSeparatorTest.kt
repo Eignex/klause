@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** #248↔#22: GlobalCardinality sum cuts — value-multiplicity generalization of the AllDifferent Hall cut. */
-class GccSeparatorTest {
+class CutGccSeparatorTest {
 
     /**
      * Separate the GCC cut at the LP vertex chosen by [coef]: with no GCC rows in the relaxation each
