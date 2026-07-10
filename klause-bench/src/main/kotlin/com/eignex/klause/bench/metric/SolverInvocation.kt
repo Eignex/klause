@@ -97,7 +97,7 @@ internal object SolverInvocation {
         // Hard wall-clock ceiling: a solve that ignores its `-t` deadline (e.g. an expensive move source
         // that polls cancellation too rarely) must not hang the harness. Generous over the budget so it
         // only ever kills a genuine runaway, never a solve that's merely flushing at the deadline.
-        return invoke(cmd, hardTimeoutMs = budget.timeoutMillis * 2 + 20_000)
+        return invoke(cmd, dialectFor(solverId, entry.ref.format), hardTimeoutMs = budget.timeoutMillis * 2 + 20_000)
     }
 
     /** Run a registered MiniZinc [solverId] reference directly on [ref] — no klause `Problem` is
@@ -106,6 +106,7 @@ internal object SolverInvocation {
     fun runReference(ref: ProblemRef, solverId: String, settings: Settings, budget: Budget, optimize: Boolean): Result =
         invoke(
             minizincCommand(ref, solverId, settings, budget, optimize),
+            Dialect.MINIZINC,
             hardTimeoutMs = budget.timeoutMillis * 2 + 20_000,
         )
 
@@ -216,7 +217,15 @@ internal object SolverInvocation {
         }
     }
 
-    private fun invoke(cmd: List<String>, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
+    /** Which output stream a subprocess emits, so the read loop parses the right markers. References
+     *  always speak MiniZinc; klause-cli speaks the front-end bound to the *input* format — MiniZinc
+     *  for `.mzn`/`.fzn`, the XCSP3 competition stream (`s`/`o`/`c key=value`) for `.xml`. */
+    private enum class Dialect { MINIZINC, XCSP3 }
+
+    private fun dialectFor(solverId: String, format: Format): Dialect =
+        if (solverId == KLAUSE && format == Format.XCSP3) Dialect.XCSP3 else Dialect.MINIZINC
+
+    private fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
         val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
         // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
         // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
@@ -242,31 +251,75 @@ internal object SolverInvocation {
         var unsat = false
         var anySolution = false
         val startNanos = System.nanoTime()
+
+        // An improving incumbent (a new solution / better objective): stamp time-to-best afresh.
+        fun markIncumbent() {
+            anySolution = true
+            val elapsed = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
+            timeToBestMs = elapsed
+            if (timeToFirstFeasibleMs == null) timeToFirstFeasibleMs = elapsed
+        }
+
+        // A terminal status proving a solution exists but without its own timestamp: don't clobber the
+        // incumbent time already stamped by an `o`/`----------` line; only stamp if none was seen.
+        fun markFeasible() {
+            anySolution = true
+            if (timeToBestMs == null) markIncumbent()
+        }
+        fun recordStat(kv: String) = kv.split('=', limit = 2)
+            .takeIf { it.size == 2 }?.let { stats[it[0].trim()] = it[1].trim() }
         process.inputStream.bufferedReader().forEachLine { rawLine ->
             raw.appendLine(rawLine)
-            when (val line = rawLine.trim()) {
-                SOLUTION_SEPARATOR -> {
-                    anySolution = true
-                    val elapsed = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
-                    timeToBestMs = elapsed
-                    if (timeToFirstFeasibleMs == null) timeToFirstFeasibleMs = elapsed
+            val line = rawLine.trim()
+            when (dialect) {
+                Dialect.MINIZINC -> when (line) {
+                    SOLUTION_SEPARATOR -> markIncumbent()
+
+                    SEARCH_COMPLETE -> proven = true
+
+                    UNSATISFIABLE -> unsat = true
+
+                    UNKNOWN, ERROR -> Unit
+
+                    else -> when {
+                        line.startsWith(
+                            ARM_PREFIX,
+                        ) -> parseArm(line.removePrefix(ARM_PREFIX))?.let { attribution.add(it) }
+
+                        line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
+
+                        line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->
+                            line.substringAfter('=').trim().removeSuffix(";").trim().toDoubleOrNull()
+                                ?.let { objective = it }
+                    }
                 }
 
-                SEARCH_COMPLETE -> proven = true
+                Dialect.XCSP3 -> when {
+                    line == XCSP_SATISFIABLE -> markFeasible()
 
-                UNSATISFIABLE -> unsat = true
+                    line == XCSP_OPTIMUM -> {
+                        markFeasible()
+                        proven = true
+                    }
 
-                UNKNOWN, ERROR -> Unit
+                    line == XCSP_UNSATISFIABLE -> {
+                        unsat = true
+                        proven = true
+                    }
 
-                else -> when {
+                    line == XCSP_UNKNOWN -> Unit
+
+                    // `o <cost>`: one line per improving incumbent (model-oriented objective).
+                    line.startsWith(XCSP_OBJECTIVE_PREFIX) ->
+                        line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim().toDoubleOrNull()?.let {
+                            objective = it
+                            markIncumbent()
+                        }
+
                     line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let { attribution.add(it) }
 
-                    line.startsWith(STAT_PREFIX) -> line.removePrefix(STAT_PREFIX).trim().split('=', limit = 2)
-                        .takeIf { it.size == 2 }?.let { stats[it[0].trim()] = it[1].trim() }
-
-                    line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->
-                        line.substringAfter('=').trim().removeSuffix(";").trim().toDoubleOrNull()
-                            ?.let { objective = it }
+                    // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
+                    line.startsWith(XCSP_COMMENT_PREFIX) -> recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
                 }
             }
         }
@@ -318,6 +371,14 @@ internal object SolverInvocation {
     private const val MODEL_OBJECTIVE_KEY = "_objective"
     private const val STAT_PREFIX = "%%%mzn-stat:"
     private const val ARM_PREFIX = "%%%klause-arm:"
+
+    // XCSP3 competition output stream (klause-cli's `.xml` front-end).
+    private const val XCSP_SATISFIABLE = "s SATISFIABLE"
+    private const val XCSP_OPTIMUM = "s OPTIMUM FOUND"
+    private const val XCSP_UNSATISFIABLE = "s UNSATISFIABLE"
+    private const val XCSP_UNKNOWN = "s UNKNOWN"
+    private const val XCSP_OBJECTIVE_PREFIX = "o "
+    private const val XCSP_COMMENT_PREFIX = "c "
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000

@@ -26,9 +26,16 @@ import kotlin.random.Random
 internal object CorpusSelection {
 
     /** A discovered instance: paths are relative to the corpus root. */
-    data class Discovered(val name: String, val mznRelPath: String, val dznRelPath: String? = null) {
-        /** Family key: the leading path component of [name]. */
-        val family: String get() = name.substringBefore('/')
+    data class Discovered(
+        val name: String,
+        val mznRelPath: String,
+        val dznRelPath: String? = null,
+        /** Explicit family key; when null, falls back to the leading path component of [name]. Set
+         *  for flat corpora (e.g. XCSP3) whose family lives in the name rather than a directory. */
+        val familyKey: String? = null,
+    ) {
+        /** Family key: [familyKey] when set, else the leading path component of [name]. */
+        val family: String get() = familyKey ?: name.substringBefore('/')
     }
 
     /** Knobs controlling how many instances a selection yields. */
@@ -111,16 +118,26 @@ internal object CorpusSelection {
         }
 
         /** Flat layout for single-file instances of one [ext] (no data-file pairing): walk
-         *  [subDir] for `*.ext`; family = first path component under [subDir]. Used for the
-         *  SMT-LIB (`.smt2`) and DIMACS (`.cnf`) corpora. */
-        data class Flat(val subDir: String, val ext: String) : Layout {
+         *  [subDir] for `*.ext`. Family defaults to the first path component (SMT-LIB `.smt2`,
+         *  DIMACS `.cnf`), but a flat corpus whose family lives in the filename passes [familyOf] —
+         *  e.g. XCSP3, where `AircraftAssemblyLine-1-178-00-0_c23` groups under `AircraftAssemblyLine`
+         *  via the series prefix, so `per-family` samples across series instead of near-identical
+         *  parameterizations. */
+        data class Flat(
+            val subDir: String,
+            val ext: String,
+            val familyOf: (String) -> String = { it.substringBefore('/') },
+        ) : Layout {
             override fun discover(root: File): List<Discovered> {
                 val base = File(root, subDir)
                 if (!base.isDirectory) return emptyList()
                 return base.walkTopDown()
                     .filter { it.isFile && it.extension == ext }
                     .sortedBy { it.relativeTo(base).path }
-                    .map { Discovered(it.relativeTo(base).path.removeSuffix(".$ext"), it.relativeTo(root).path) }
+                    .map {
+                        val name = it.relativeTo(base).path.removeSuffix(".$ext")
+                        Discovered(name, it.relativeTo(root).path, familyKey = familyOf(name))
+                    }
                     .toList()
             }
         }

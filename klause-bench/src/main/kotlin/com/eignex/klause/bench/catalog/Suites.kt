@@ -89,7 +89,7 @@ internal object Suites {
             DynamicSuite("xcsp3-cop", "XCSP3 competition COP aggregate 2022-25 (fetched, 1000; cap with max=)") {
                 CorpusSelection.select(
                     ExternalCollections.xcsp3Cop,
-                    CorpusSelection.Layout.Flat("COP22to25", "xml"),
+                    CorpusSelection.Layout.Flat("COP22to25", "xml", familyOf = ::xcspSeries),
                     CorpusSelection.Selection.fromProps(),
                     Category.OPTIMIZATION,
                     format = Format.XCSP3,
@@ -98,7 +98,7 @@ internal object Suites {
             DynamicSuite("xcsp3-csp", "XCSP3 competition CSP aggregate 2022-25 (fetched, 800; cap with max=)") {
                 CorpusSelection.select(
                     ExternalCollections.xcsp3Csp,
-                    CorpusSelection.Layout.Flat("CSP22to25", "xml"),
+                    CorpusSelection.Layout.Flat("CSP22to25", "xml", familyOf = ::xcspSeries),
                     CorpusSelection.Selection.fromProps(),
                     Category.CSP,
                     format = Format.XCSP3,
@@ -436,6 +436,12 @@ internal object Suites {
         vendored("lia-unsat", Category.UNSAT, Expected.Unsat)
         vendored("lia-disjunction", Category.CSP, Expected.Sat)
     }
+
+    /** XCSP3 family key: the series prefix before the first `-`. Competition instance names encode
+     *  the series then a `-`-joined parameter tail (`AircraftAssemblyLine-1-178-00-0_c23`), so this
+     *  groups the ~76 COP / CSP series for `per-family` sampling instead of treating every
+     *  parameterization as its own singleton family. */
+    private fun xcspSeries(name: String): String = name.substringBefore('-')
 
     private val xcsp3Core = suite("xcsp3-core", "Curated XCSP3 integer CSP/COP instances") {
         format = Format.XCSP3
