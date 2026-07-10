@@ -59,6 +59,30 @@ class TablePropagatorTest {
     }
 
     @Test
+    fun `a wildcard column matches every value of its variable`() {
+        // Rows (0, *) and (2, 3) over vars in [0..3]: the wildcard lets b be anything when a = 0,
+        // so a = 0 pairs with all four b values, plus the ground row (2, 3).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 3) },
+            factors = arrayOf<Factor>(
+                Table(
+                    xs = intArrayOf(0, 1),
+                    tuples = longArrayOf(0, 0, 2, 3),
+                    wildcards = longArrayOf(0b10L), // bit (row 0, col 1) set ⇒ that cell is '*'
+                ),
+            ),
+        )
+        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+            .map { it.ints.map { v -> v.toInt() } }.toList().toSet()
+        assertEquals(
+            setOf(listOf(0, 0), listOf(0, 1), listOf(0, 2), listOf(0, 3), listOf(2, 3)),
+            results,
+        )
+    }
+
+    @Test
     fun `infeasible when domain excludes every row`() {
         // Two vars pinned to (1, 1). Allowed: (0,1), (2,3). Neither matches → Unsat.
         val problem = Problem(
