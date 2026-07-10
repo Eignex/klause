@@ -26,7 +26,7 @@ import kotlin.test.assertEquals
  *  - touchCount equals the count of *real* applies only (probes contribute nothing), and
  *  - the break/make vectors and cost match a fresh recompute (probes leave no residue).
  */
-class LocalSearchCompoundProbeTest {
+class LocalSearchStateCompoundProbeTest {
 
     private data class Case(val name: String, val problem: Problem)
 
