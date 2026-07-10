@@ -11,9 +11,9 @@ import com.eignex.klause.util.LongArrayList
 
 // `<extension>` (positive/negative table) lowering for the XCSP3 front-end — split out of Xcsp3.kt.
 //
-// A `*` column is carried as a short-support wildcard rather than expanded to the variable's whole
-// domain, and a `<conflicts>` table is lowered to one nogood clause per forbidden tuple rather than
-// complemented to its allowed set. Both avoid the Cartesian blow-up that the old expansion capped.
+// A tuple column may be a value, a `*` wildcard, or a `lo..hi` range. Positive tables carry these as
+// short-support cells (each written tuple is one row — no Cartesian expansion), and negative tables
+// lower to one nogood clause per forbidden tuple. Both avoid the blow-up the old expansion capped.
 
 internal fun Xcsp3.Builder.extension(e: XmlElement) {
     val vars = listVars(e)
@@ -34,50 +34,56 @@ internal fun Xcsp3.Builder.extension(e: XmlElement) {
     }
 }
 
-/** Post a positive `<supports>` table as a [Table] factor, carrying `*` columns as short-support
- *  wildcards (a `*` matches any value, so it costs one row, not one per domain value). A fully
- *  wildcard row matches every assignment, so the whole constraint is trivially satisfied. */
+/** Post a positive `<supports>` table as a [Table] factor. `*`/range columns become short-support
+ *  cells (an interval `[lo, hi]`; a `*` is `[MIN, MAX]`), so each written tuple is exactly one row.
+ *  A fully unbounded row matches every assignment, so the whole constraint is trivially satisfied. */
 internal fun Xcsp3.Builder.postSupportTable(vars: IntArray, text: String) {
     val arity = vars.size
     val rows = parseShortRows(text, arity)
-    val n = rows.vals.size / arity
+    val n = rows.lo.size / arity
     for (r in 0 until n) {
-        var allWild = true
+        var allFree = true
         for (c in 0 until arity) {
-            if (!rows.wild[r * arity + c]) {
-                allWild = false
+            if (!(rows.lo[r * arity + c] == Long.MIN_VALUE && rows.hi[r * arity + c] == Long.MAX_VALUE)) {
+                allFree = false
                 break
             }
         }
-        if (allWild) return
+        if (allFree) return
     }
-    val hasWild = rows.wild.any { it }
-    val mask = if (!hasWild) {
-        null
-    } else {
-        LongArray(((n.toLong() * arity + 63) ushr 6).toInt()).also { m ->
-            for (i in rows.wild.indices) if (rows.wild[i]) m[i ushr 6] = m[i ushr 6] or (1L shl (i and 63))
-        }
-    }
-    factors.add(Table(xs = vars, tuples = rows.vals, wildcards = mask))
+    // Ground (all points) ⇒ no upper-bound array, keeping the fast path byte-identical.
+    val short = rows.lo.indices.any { rows.lo[it] != rows.hi[it] }
+    factors.add(Table(xs = vars, tuples = rows.lo, hi = if (short) rows.hi else null))
 }
 
-/** Post a negative `<conflicts>` table as one nogood clause per forbidden tuple — `x0 ≠ v0 ∨ … ∨
- *  xk ≠ vk` — omitting any `*` column (it forbids regardless of that variable). This lowers each
- *  tuple directly, never materializing the allowed complement. */
+/** Post a negative `<conflicts>` table as one nogood clause per forbidden tuple — the disjunction of
+ *  each column "differing" from its cell: `x ≠ v` for a point, `x < lo ∨ x > hi` for a range, and
+ *  nothing for a `*` (it forbids regardless of that variable). Never materializes the complement. */
 internal fun Xcsp3.Builder.postConflictClauses(vars: IntArray, text: String) {
     val arity = vars.size
     val rows = parseShortRows(text, arity)
-    val n = rows.vals.size / arity
+    val n = rows.lo.size / arity
     for (r in 0 until n) {
         val lits = IntArrayList()
         for (c in 0 until arity) {
-            if (rows.wild[r * arity + c]) continue
-            val eq = reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.EQ, rows.vals[r * arity + c].toInt())
-            lits.add(Lit.negate(eq)) // vars[c] ≠ value
+            val lo = rows.lo[r * arity + c]
+            val hiC = rows.hi[r * arity + c]
+            when {
+                lo == Long.MIN_VALUE && hiC == Long.MAX_VALUE -> Unit
+
+                // `*`: forbids regardless — omit
+                lo == hiC -> lits.add(
+                    Lit.negate(reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.EQ, lo.toInt())),
+                )
+
+                else -> {
+                    lits.add(reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.LE, (lo - 1).toInt())) // x < lo
+                    lits.add(reifyLinear(intArrayOf(1), intArrayOf(vars[c]), LinearOp.GE, (hiC + 1).toInt())) // x > hi
+                }
+            }
         }
         if (lits.isEmpty()) {
-            // An all-wildcard forbidden tuple rules out every assignment ⇒ unsatisfiable.
+            // A fully unbounded forbidden tuple rules out every assignment ⇒ unsatisfiable.
             factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
             return
         }
@@ -85,65 +91,44 @@ internal fun Xcsp3.Builder.postConflictClauses(vars: IntArray, text: String) {
     }
 }
 
-/** Flat short-tuple rows: [vals] holds values row-major (a `0` placeholder in wildcard cells) and
- *  [wild] flags which cells are wildcards. */
-internal class ShortRows(val vals: LongArray, val wild: BooleanArray)
+/** Flat short-tuple rows: [lo]/[hi] hold each cell's inclusive interval bounds row-major (equal for a
+ *  point value; `[MIN, MAX]` for a `*` wildcard). */
+internal class ShortRows(val lo: LongArray, val hi: LongArray)
 
-/** Parse `<supports>`/`<conflicts>` tuple text into short rows. A `*` column becomes a wildcard
- *  cell; a `lo..hi` column expands to its values (a Cartesian product over the range columns only,
- *  so `*` never multiplies the row count); everything else is a single value. Unary tables use the
- *  bare-value form (`0 1 2`, no parentheses). */
+/** Parse `<supports>`/`<conflicts>` tuple text into short rows, one row per written tuple: a `*`
+ *  column is `[MIN, MAX]`, a `lo..hi` column is that interval, everything else is a point `[v, v]`.
+ *  Unary tables use the bare-value form (`0 1 2`, no parentheses). */
 internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     val t = text.trim()
-    val vals = LongArrayList()
-    val wild = IntArrayList()
+    val lo = LongArrayList()
+    val hi = LongArrayList()
+    fun addCell(tok: String) {
+        when {
+            tok == "*" -> {
+                lo.add(Long.MIN_VALUE)
+                hi.add(Long.MAX_VALUE)
+            }
+
+            ".." in tok -> tok.split("..").let {
+                lo.add(it[0].toLong())
+                hi.add(it[1].toLong())
+            }
+
+            else -> {
+                val v = tok.toLong()
+                lo.add(v)
+                hi.add(v)
+            }
+        }
+    }
     if (arity == 1 && '(' !in t) {
-        for (tok in t.split(Regex("\\s+")).filter { it.isNotBlank() }) appendShortRow(listOf(tok), arity, vals, wild)
+        for (tok in t.split(Regex("\\s+")).filter { it.isNotBlank() }) addCell(tok)
     } else {
         for (m in Regex("""\(([^)]*)\)""").findAll(t)) {
             val row = m.groupValues[1].split(",").map { it.trim() }
             if (row.size != arity) throw UnsupportedXcsp3Exception("tuple arity ${row.size} != $arity")
-            appendShortRow(row, arity, vals, wild)
+            for (tok in row) addCell(tok)
         }
     }
-    return ShortRows(vals.toLongArray(), BooleanArray(wild.size) { wild[it] == 1 })
-}
-
-/** Expand one written tuple into short rows: `*` is a single wildcard option, `lo..hi` enumerates
- *  the range, everything else is a fixed value — appending the Cartesian product to [vals]/[wild].
- *  The range-expansion product is capped by `negTableCap`; `*` contributes a single option, so it
- *  never triggers the cap. */
-internal fun Xcsp3.Builder.appendShortRow(
-    colTokens: List<String>,
-    arity: Int,
-    vals: LongArrayList,
-    wild: IntArrayList,
-) {
-    val options = colTokens.map { tok ->
-        when {
-            tok == "*" -> listOf(0L to true)
-            ".." in tok -> tok.split("..").let { (it[0].toInt()..it[1].toInt()).map { v -> v.toLong() to false } }
-            else -> listOf(tok.toLong() to false)
-        }
-    }
-    val curV = LongArray(arity)
-    val curW = IntArray(arity)
-    fun rec(p: Int) {
-        if (p == arity) {
-            for (c in 0 until arity) {
-                vals.add(curV[c])
-                wild.add(curW[c])
-            }
-            if (vals.size / arity > negTableCap) {
-                throw UnsupportedXcsp3Exception("table range expansion exceeds cap ($negTableCap)")
-            }
-            return
-        }
-        for ((v, w) in options[p]) {
-            curV[p] = v
-            curW[p] = if (w) 1 else 0
-            rec(p + 1)
-        }
-    }
-    rec(0)
+    return ShortRows(lo.toLongArray(), hi.toLongArray())
 }

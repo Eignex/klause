@@ -151,6 +151,35 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `a range column in a support tuple restricts to the interval`() {
+        val xml = """
+            <instance type="CSP">
+              <variables><var id="a"> 0..1 </var><var id="b"> 0..5 </var></variables>
+              <constraints><extension><list> a b </list><supports> (1,2..3) </supports></extension></constraints>
+            </instance>
+        """.trimIndent()
+        val names = Xcsp3.parse(xml).intVarNames
+        val v = sat(xml)
+        assertEquals(1, v[names.getValue("a")])
+        assertTrue(v[names.getValue("b")] in 2..3, "b must lie in the support interval 2..3")
+    }
+
+    @Test
+    fun `a range column over a wide domain is a short interval and does not hit the cap`() {
+        // Expanding (1, 0..1000000) would exceed the 1M cap; as an interval it is a single row.
+        val xml = """
+            <instance type="CSP">
+              <variables><var id="a"> 0..1 </var><var id="b"> 0..1000000 </var></variables>
+              <constraints>
+                <extension><list> a b </list><supports> (1,0..1000000) </supports></extension>
+                <intension> eq(a,1) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        assertEquals(1, sat(xml)[Xcsp3.parse(xml).intVarNames.getValue("a")], "the only support pins a to 1")
+    }
+
+    @Test
     fun `boolean intension or of relations is reified and solved`() {
         val xml = """
             <instance type="CSP">
