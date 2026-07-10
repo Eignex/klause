@@ -16,7 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** #22: the AllDifferent Hall-set cut separator. */
-class AllDifferentSeparatorTest {
+class CutAllDifferentSeparatorTest {
 
     private fun setup(domainMin: Int, domainMax: Int, n: Int): Triple<Problem, LpRelaxation, FloatLpResult> {
         val p = Problem(
