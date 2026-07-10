@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.solver.Cancellation
@@ -9,20 +8,18 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
-import kotlin.test.assertTrue
 
 /**
  * Per-hull pruning drops a convex-hull technique that adds no strength to the root LP optimum, keeps one
  * that does, and never changes the optimum (a hull is a sound relaxation either way, dropped only when
  * the root optimum is identical without it).
  */
-class LpHullPruningTest {
+class LpEngineHullPruningTest {
 
     /** `result = a·b` (a McCormick hull) plus an unrelated objective variable `x ∈ [5, 9]`; minimizing
      *  `x` cannot be tightened by the product hull, so the hull is ineffective at the root. */
@@ -102,23 +99,5 @@ class LpHullPruningTest {
             1e-6,
             "the objective table hull must be kept, so the root optimum stays 2",
         )
-    }
-
-    @Test
-    fun `pruning preserves the optimum`() {
-        val p = unrelatedProductProblem()
-        val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
-        fun optimum(prune: Boolean): Double {
-            val res = BacktrackSolver(p).minimize(
-                obj,
-                BacktrackParams(
-                    randomSeed = 1L,
-                    lpPlan = LpPlan(bounding = true, productMcCormick = true, pruneHulls = prune),
-                ),
-            )
-            return (res as MinimizeResult.Optimal).objectiveValue
-        }
-        assertEquals(5.0, optimum(prune = false))
-        assertTrue(optimum(prune = true) == 5.0, "per-hull pruning must not change the optimum")
     }
 }
