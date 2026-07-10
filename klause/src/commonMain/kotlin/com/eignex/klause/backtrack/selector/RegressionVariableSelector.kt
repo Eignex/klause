@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.kumulant.bandit.contextual.LinearRegressionSpec
 import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
@@ -37,9 +38,16 @@ import kotlin.random.Random
  * carries the shared regression; the per-candidate feature vector is the context.
  */
 class RegressionVariableSelector private constructor(
-    private val bandit: RegressionContextualBandit<*>,
+    private val newBandit: () -> RegressionContextualBandit<*>,
     private val scoreCap: Int,
 ) : VariableSelector {
+
+    // The per-session bandit and the problem its state was sized for. A selector may be reused
+    // across solves (a shared BacktrackParams carries it into every BacktrackSolver), so all
+    // per-session state below is (re)built in ensureState whenever the problem changes — sizing
+    // once and never again would index a smaller problem's activity arrays against a larger one.
+    private var bandit: RegressionContextualBandit<*> = newBandit()
+    private var sizedProblem: Problem? = null
 
     // Pending attribution for the previous decision (rewarded at the next pick, once its outcome
     // is observable). Null between runs / before the first decision.
@@ -147,12 +155,22 @@ class RegressionVariableSelector private constructor(
         )
     }
 
-    /** Lazily size the activity/last-conflict arrays and compute the instance-relative feature
-     *  scales (max degree, max domain, variable count) on the first pick — problem size isn't known
-     *  at construction. */
+    /** Size the activity/last-conflict arrays and compute the instance-relative feature scales (max
+     *  degree, max domain, variable count) for [session]'s problem — problem size isn't known at
+     *  construction. Re-runs (with a fresh bandit and cleared attribution) whenever the problem
+     *  changes, so a reused selector never carries a prior solve's state or array sizes into a new
+     *  one. */
     private fun ensureState(session: PropagationSession) {
-        if (activity != null) return
         val problem = session.problem
+        if (activity != null && sizedProblem === problem) return
+        sizedProblem = problem
+        bandit = newBandit()
+        pendingFeatures = null
+        pendingPropCount = 0L
+        conflictSincePick = false
+        conflicts = 0L
+        bumpInc = 1.0
+        maxActivity = 1.0
         numBoolVars = problem.numBoolVars
         val n = numBoolVars + problem.numIntVars
         activity = DoubleArray(n)
@@ -185,6 +203,10 @@ class RegressionVariableSelector private constructor(
     }
 
     private fun bump(act: DoubleArray, lc: LongArray, slot: Int) {
+        // A conflict can fire during root propagation before the first pick of a reused solve, while
+        // the arrays are still sized for the previous problem; ignore an out-of-range bump (the next
+        // pick re-sizes via ensureState). Only branching efficiency depends on activity, never soundness.
+        if (slot >= act.size) return
         act[slot] += bumpInc
         if (act[slot] > maxActivity) maxActivity = act[slot]
         lc[slot] = conflicts
@@ -229,9 +251,12 @@ class RegressionVariableSelector private constructor(
             priorVariance: Double = 1.0,
             scoreCap: Int = 64,
         ): RegressionVariableSelector {
-            val regression = LinearRegressionSpec.Bayesian(FEATURE_SIZE, priorVariance)
-            val spec = RegressionContextualSpec(1, regression, LinUcb, exploration, regression)
-            return RegressionVariableSelector(spec.materialize(Random(seed), Concurrency.None), scoreCap)
+            val newBandit = {
+                val regression = LinearRegressionSpec.Bayesian(FEATURE_SIZE, priorVariance)
+                val spec = RegressionContextualSpec(1, regression, LinUcb, exploration, regression)
+                spec.materialize(Random(seed), Concurrency.None)
+            }
+            return RegressionVariableSelector(newBandit, scoreCap)
         }
     }
 }

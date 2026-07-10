@@ -36,6 +36,32 @@ class RegressionVariableSelectorTest {
     }
 
     @Test
+    fun `a selector reused on a larger problem re-sizes instead of overflowing`() {
+        // A shared BacktrackParams carries one selector into every solve; a mini-batch mixes sizes.
+        // Sizing the per-session arrays once (on the small problem) would index them out of bounds
+        // on the larger one — the selector must re-size for the new problem.
+        val selector = RegressionVariableSelector.linUcb(seed = 1L)
+        val small = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 1) },
+            factors = arrayOf<Factor>(AllDifferent(IntArray(2) { it }, domainMin = 0, domainSize = 2)),
+        )
+        BacktrackSolver(small).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
+
+        val n = 8
+        val large = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
+            factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
+        )
+        val r = BacktrackSolver(large).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
+        val sat = assertIs<SolveResult.Sat>(r)
+        assertEquals((0L until n.toLong()).toSet(), sat.assignment.ints.toSet(), "not a permutation")
+    }
+
+    @Test
     fun `proves the optimum under bandit branching`() {
         // minimize x + 2y subject to x + y >= 3, x,y in [0..5]. Optimum = 3.
         val problem = Problem(
