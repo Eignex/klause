@@ -2,7 +2,7 @@ package com.eignex.klause.cli
 
 /*
  * Unified klause CLI entry point. The CLI is a registry of CliMode front-ends
- * (MiniZinc / XCSP3 / SMT-LIB / DIMACS); adding a competition front-end is a new CliMode + its
+ * (MiniZinc / XCSP3 / SMT-LIB / DIMACS / OPB); adding a competition front-end is a new CliMode + its
  * OutputProtocol, nothing here.
  *
  * Flow: parse the whole argument vector once against the common solver-control flags plus
@@ -17,7 +17,7 @@ package com.eignex.klause.cli
 
 /** Front-end registry. Order matters only for the default fallback (MiniZinc is the default
  *  because MiniZinc invokes this binary with `.fzn` files and standard flags). */
-internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode)
+internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode, OpbMode)
 
 /** Parse args once, select the front-end mode, load the instance and run the shared driver.
  *  See the file header for the full flow. */
