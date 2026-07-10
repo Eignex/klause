@@ -10,7 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class SharedClauseTest {
+class SharedClausePoolTest {
 
     private fun twoIntVars(): Problem = Problem(
         numBoolVars = 0,
