@@ -15,6 +15,8 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
     // so callers that read size on it want "very large", not an exact (unrepresentable) count.
     override val size: Int get() = (max - min + 1).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
+    override val holeCount: Long get() = 0
+
     override fun contains(value: Long): Boolean = value in min..max
 
     override fun valueAt(i: Int): Long = min + i

@@ -5,6 +5,14 @@ import com.eignex.klause.util.LongArrayList
 
 internal abstract class AbstractIntDomain : IntDomain {
 
+    // Holes = span − present. Exact for the reps whose `size` is an exact present count (bitset,
+    // survivors); ContiguousDomain (no holes) and RunsDomain (whose `size` saturates) override.
+    override val holeCount: Long
+        get() {
+            val span = max - min
+            return if (span < 0) Long.MAX_VALUE else span + 1 - size
+        }
+
     override fun excludeValues(values: LongArray): IntDomain? {
         if (values.isEmpty()) return this
         // Grow from a small default rather than preallocating [size]: when a wide domain is carved to a

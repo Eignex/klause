@@ -154,14 +154,27 @@ internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, bas
 internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange, base: IntArray?): IntArray? {
     var out: IntArrayList? = null
     val orig = problem.intDomains[v]
-    for (value in crossed) {
-        if (value in orig) {
-            val o = out ?: IntArrayList().also { fresh ->
-                out = fresh
-                base?.forEach { fresh.add(it) }
-            }
-            o.add(Lit.make(atomVarEq(v, value), true))
+    fun cite(value: Long) {
+        val o = out ?: IntArrayList().also { fresh ->
+            out = fresh
+            base?.forEach { fresh.add(it) }
         }
+        o.add(Lit.make(atomVarEq(v, value), true))
+    }
+    // Cite the search-carved values the bound snapped past — those in [crossed] still in the root
+    // domain. Enumerate the smaller side: over a wide sparse domain [crossed] can span billions while
+    // the root holds a handful of values, so iterate the root's members rather than every integer
+    // crossed. Both visit the same values ascending, so the cited literal set is identical.
+    val crossedLen = if (crossed.isEmpty()) {
+        0L
+    } else {
+        val d = crossed.last - crossed.first
+        if (d < 0) Long.MAX_VALUE else d + 1
+    }
+    if (orig.size.toLong() <= crossedLen) {
+        orig.forEach { value -> if (value in crossed) cite(value) }
+    } else {
+        for (value in crossed) if (value in orig) cite(value)
     }
     return out?.toIntArray() ?: base
 }
@@ -362,17 +375,26 @@ internal fun PropagationState.citeCrossedSearchHoles(
 ): IntArray? {
     var out: IntArrayList? = null
     val root = problem.intDomains[v]
-    // Walk only the holes [prior] already carries in the range (values absent from [prior] but
-    // inside its bounds), not every integer — over a wide result-prune the crossed span is
-    // thousands wide while the holes in it are few. A value still present in [prior] is one this
-    // batch excludes, covered by [base], and is never reported as a hole here. (#612)
-    prior.forEachHoleInRange(from, until - 1) { value ->
-        if (value in root) {
-            val o = out ?: IntArrayList().also { fresh ->
-                out = fresh
-                base?.forEach { fresh.add(it) }
-            }
-            o.add(Lit.make(atomVarEq(v, value), true))
+    fun cite(value: Long) {
+        val o = out ?: IntArrayList().also { fresh ->
+            out = fresh
+            base?.forEach { fresh.add(it) }
+        }
+        o.add(Lit.make(atomVarEq(v, value), true))
+    }
+    // Cite the search-carved holes crossed in the range: values absent from [prior] but inside the
+    // root domain (a value still present in [prior] is one this batch excludes, covered by [base]).
+    // Enumerate the smaller side — a survivor set over a wide span has span-many holes but few members,
+    // so walking holes would be O(span); iterate the root's members instead. Identical cited set. (#612)
+    val lo = maxOf(from, prior.min)
+    val hi = minOf(until - 1, prior.max)
+    if (root.size.toLong() <= prior.holeCount) {
+        root.forEach { value ->
+            if (value in lo..hi && value !in prior) cite(value)
+        }
+    } else {
+        prior.forEachHoleInRange(from, until - 1) { value ->
+            if (value in root) cite(value)
         }
     }
     return out?.toIntArray() ?: base

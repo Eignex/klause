@@ -24,6 +24,17 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
         s.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
+    // Summed from the gaps between consecutive runs, so it stays exact even when `size` saturates.
+    override val holeCount: Long = run {
+        var holes = 0L
+        var k = 2
+        while (k < runs.size) {
+            holes += runs[k] - runs[k - 1] - 1
+            k += 2
+        }
+        holes
+    }
+
     /** Index of the run containing [value], or `-1`. Assumes `value in min..max`. */
     private fun runIndexContaining(value: Long): Int {
         var lo = 0

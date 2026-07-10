@@ -19,6 +19,14 @@ class RunsDomainTest {
     }
 
     @Test
+    fun `holeCount stays exact when size saturates on a wide span`() {
+        val d = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
+        assertTrue(d is RunsDomain)
+        assertEquals(Int.MAX_VALUE, d.size)
+        assertEquals(1L, d.holeCount)
+    }
+
+    @Test
     fun `interval-run rep stacks excludes and includes`() {
         var d = ContiguousDomain(0, 100_000).excludeValue(50_000).excludeValue(25_000).excludeValue(75_000)
         assertTrue(d is RunsDomain)
