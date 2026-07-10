@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class XmlTest {
+class XmlElementTest {
 
     @Test
     fun `parses nested elements and attributes and text content`() {
