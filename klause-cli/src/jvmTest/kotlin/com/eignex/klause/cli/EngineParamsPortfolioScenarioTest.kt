@@ -11,7 +11,7 @@ import kotlin.test.assertNull
  * Core/arm decoupling (#406): `-p N` is the core count (drives sequential-vs-parallel), the arm pool
  * auto-tunes from it, and `--param arms=N` overrides — distinct from the engine mix.
  */
-class PortfolioScenarioCliTest {
+class EngineParamsPortfolioScenarioTest {
 
     private fun scenario(cores: Int, params: List<String> = emptyList(), mix: EngineMix = EngineMix.MIXED) =
         buildPortfolioScenario(

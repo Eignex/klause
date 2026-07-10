@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 /** The presolve↔LP-harvest fixpoint loop in [Solvable.presolved]: reconstruct composition across the
  *  loop, the no-op short-circuit, and that the harvested result is left at a joint fixpoint. */
-class PresolveLoopTest {
+class SolveCorePresolveLoopTest {
 
     private fun solvableOf(
         problem: Problem,
