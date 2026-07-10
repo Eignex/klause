@@ -176,6 +176,20 @@ class IteratedLocalSearchTest {
     }
 
     @Test
+    fun `crossover survives incumbents whose arrays differ in length`() {
+        val factor = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val state = LocalSearchState(problem, Random(0))
+        for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
+
+        val policy = IteratedLocalSearchRestart(populationSize = 2, crossoverRate = 1.0)
+        policy.onLocalOptimum(state, Sample(BooleanArray(4), LongArray(3)), 10.0)
+        policy.onLocalOptimum(state, Sample(BooleanArray(4), LongArray(2)), 12.0)
+
+        repeat(20) { policy.restart(state, bestSoFar = null) }
+    }
+
+    @Test
     fun `BetterBiased crossover skews toward the better parent`() {
         val bias = BetterBiased(rate = 0.5)
         assertEquals(

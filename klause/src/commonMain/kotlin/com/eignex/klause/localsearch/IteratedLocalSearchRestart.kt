@@ -211,9 +211,35 @@ class IteratedLocalSearchRestart(
 
     private fun biasedCrossover(state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: Random): Sample {
         if (linkageAware) return linkageAwareCrossover(state, a, b, probA, rng)
-        val bools = BooleanArray(a.bools.size) { if (rng.nextDouble() < probA) a.bools[it] else b.bools[it] }
-        val ints = LongArray(a.ints.size) { if (rng.nextDouble() < probA) a.ints[it] else b.ints[it] }
+        val bools = BooleanArray(state.problem.numBoolVars) { pickBool(a.bools, b.bools, it, probA, rng) }
+        val ints = LongArray(state.problem.numIntVars) { pickLong(a.ints, b.ints, it, probA, rng) }
         return Sample(bools, ints)
+    }
+
+    /** Pick parent A's value at index [i] with probability [probA], falling back to the
+     *  other parent when the chosen one is too short. Incumbents captured at different
+     *  arities within one solve can differ in array length, so neither parent is a safe
+     *  bound for the child (sized from the problem). */
+    private fun pickBool(a: BooleanArray, b: BooleanArray, i: Int, probA: Double, rng: Random): Boolean {
+        val preferA = rng.nextDouble() < probA
+        return when {
+            preferA && i < a.size -> a[i]
+            !preferA && i < b.size -> b[i]
+            i < a.size -> a[i]
+            i < b.size -> b[i]
+            else -> false
+        }
+    }
+
+    private fun pickLong(a: LongArray, b: LongArray, i: Int, probA: Double, rng: Random): Long {
+        val preferA = rng.nextDouble() < probA
+        return when {
+            preferA && i < a.size -> a[i]
+            !preferA && i < b.size -> b[i]
+            i < a.size -> a[i]
+            i < b.size -> b[i]
+            else -> 0L
+        }
     }
 
     /** Linkage-aware crossover: copy entire factor scopes from one parent at a time.
@@ -229,10 +255,10 @@ class IteratedLocalSearchRestart(
         probA: Double,
         rng: Random,
     ): Sample {
-        val bools = BooleanArray(a.bools.size)
-        val ints = LongArray(a.ints.size)
-        val boolSet = BooleanArray(a.bools.size)
-        val intSet = BooleanArray(a.ints.size)
+        val bools = BooleanArray(state.problem.numBoolVars)
+        val ints = LongArray(state.problem.numIntVars)
+        val boolSet = BooleanArray(bools.size)
+        val intSet = BooleanArray(ints.size)
         for ((fid, _) in state.factors.withIndex()) {
             val pickA = rng.nextDouble() < probA
             val source = if (pickA) a else b
@@ -252,12 +278,12 @@ class IteratedLocalSearchRestart(
         }
         for (i in bools.indices) {
             if (!boolSet[i]) {
-                bools[i] = if (rng.nextDouble() < probA) a.bools[i] else b.bools[i]
+                bools[i] = pickBool(a.bools, b.bools, i, probA, rng)
             }
         }
         for (i in ints.indices) {
             if (!intSet[i]) {
-                ints[i] = if (rng.nextDouble() < probA) a.ints[i] else b.ints[i]
+                ints[i] = pickLong(a.ints, b.ints, i, probA, rng)
             }
         }
         return Sample(bools, ints)
