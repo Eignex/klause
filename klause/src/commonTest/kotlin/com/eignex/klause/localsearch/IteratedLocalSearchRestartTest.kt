@@ -7,11 +7,9 @@ import com.eignex.klause.localsearch.CrossoverBias.BetterBiased
 import com.eignex.klause.localsearch.IteratedLocalSearchRestart
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class IteratedLocalSearchRestartTest {
