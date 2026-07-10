@@ -85,6 +85,27 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `Flat layout groups by familyOf so per-family samples across series`() {
+        val root = Files.createTempDirectory("xcspsel").toFile()
+        try {
+            File(root, "COP").mkdirs()
+            listOf(
+                "AircraftAssemblyLine-1-178-00-0_c23",
+                "AircraftAssemblyLine-2-178-20-0_c23",
+                "BinPacking-n1c1w1a_c24",
+                "CVRP-A-n32-k5_c22",
+            ).forEach { File(root, "COP/$it.xml").writeText("<instance/>") }
+            val found = Layout.Flat("COP", "xml", familyOf = { it.substringBefore('-') }).discover(root)
+            // Every parameterization keeps its full name, but families collapse to the series prefix.
+            assertEquals("AircraftAssemblyLine", found.first { it.name.startsWith("Aircraft") }.family)
+            val sampled = CorpusSelection.applySelection(found, Selection(perFamily = 1))
+            assertEquals(listOf("AircraftAssemblyLine", "BinPacking", "CVRP"), sampled.map { it.family })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `FlatMzn layout discovers self-contained models with family from first path component`() {
         val root = Files.createTempDirectory("flatsel").toFile()
         try {
