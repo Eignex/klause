@@ -12,7 +12,7 @@ import kotlin.test.assertNull
  * it down so a future tweak to the underlying packed storage can't silently break the
  * null-tracking invariant.
  */
-class BoolViewTest {
+class PropagationStateBoolViewTest {
 
     private fun newState(numBoolVars: Int): PropagationState {
         val problem = Problem(

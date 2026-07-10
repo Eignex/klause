@@ -26,7 +26,7 @@ import kotlin.test.assertEquals
  * the invariant after every operation across the full atom space. The same stale-truth class is what
  * surfaced (via the brute-force enumeration suites) as the eq-at-hole bug during development.
  */
-class TrailResidentAtomSoundnessTest {
+class PropagationStateTrailResidentAtomSoundnessTest {
 
     private fun freshState(numVars: Int, hi: Int): PropagationState {
         val problem = Problem(

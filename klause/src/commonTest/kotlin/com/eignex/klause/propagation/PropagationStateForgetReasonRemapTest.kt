@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
  * dereferences a stale learned id through [PropagationState.factorAt] and indexes past the
  * compacted clause array (`IndexOutOfBoundsException: Index … out of bounds for length …`).
  */
-class ForgetReasonRemapTest {
+class PropagationStateForgetReasonRemapTest {
 
     private fun state(): PropagationState {
         val p = Problem(

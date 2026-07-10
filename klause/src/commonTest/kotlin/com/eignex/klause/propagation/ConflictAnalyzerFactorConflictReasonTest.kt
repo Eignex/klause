@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
  * factor; the analyzer then walks antecedents back to the decision and learns a
  * clause containing that decision's literal.
  */
-class FactorConflictReasonTest {
+class ConflictAnalyzerFactorConflictReasonTest {
 
     /** Wire a Clause `¬trigger ∨ ¬target`. When `trigger` becomes true, propagation
      *  unit-pins `target` to false. Used to force several constraint literals false in
