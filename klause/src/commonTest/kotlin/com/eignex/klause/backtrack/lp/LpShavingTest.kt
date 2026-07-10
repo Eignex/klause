@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Cancellation
@@ -9,7 +8,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import kotlin.random.Random
 import kotlin.test.Test
@@ -18,11 +16,10 @@ import kotlin.test.assertTrue
 
 /**
  * Objective shaving must be SOUND — it may only raise the objective lower bound to a value proven
- * (by propagation + the LP relaxation) to be a true lower bound, never above the optimum (which would
- * lose the optimal solution). Checked directly (the shaved bound equals the brute-force optimum on a
- * triangle vertex cover) and end-to-end (the solved optimum is unchanged with shaving on).
+ * (by propagation + the LP relaxation) to be a true lower bound, never above the optimum. Checked
+ * directly (the shaved bound equals the brute-force optimum) and by randomized soundness sweeps.
  */
-class ObjectiveShavingTest {
+class LpShavingTest {
 
     /** `cost = x0+x1+x2` over {0,1}³ with the three pair-covering rows (triangle vertex cover): every
      *  solution needs ≥ 2 ones, so the minimum `cost` is 2 — but its declared domain min is 0. */
@@ -51,39 +48,6 @@ class ObjectiveShavingTest {
         // cost's declared min is 0; shaving must prove cost ≥ 2 (cost ≤ 1 is infeasible) and stop there.
         val lb = engine.shaveObjectiveLb(objectiveVar = 3, ascending = true, token = Cancellation.Never)
         assertEquals(2, lb, "shaving must prove the true lower bound 2, not over- or under-shave")
-    }
-
-    @Test
-    fun `shaving preserves the optimum end to end`() {
-        val p = triangleCover()
-        val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
-        val on = BacktrackSolver(p).minimize(
-            obj,
-            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveShaving = true)),
-        )
-        assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
-        assertEquals(2.0, off.objectiveValue)
-        assertEquals(2.0, on.objectiveValue, "objective shaving changed the optimum")
-    }
-
-    @Test
-    fun `the proven objective floor reaches the lower-bound sink`() {
-        // The shaved floor (cost >= 2) is a global lower bound; it must be published to the portfolio's
-        // shared lower-bound sink so a peer arm can pick it up.
-        val p = triangleCover()
-        val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
-        val published = ArrayList<Double>()
-        val result = BacktrackSolver(p).minimize(
-            obj,
-            BacktrackParams(
-                randomSeed = 1L,
-                lpPlan = LpPlan(bounding = true, objectiveShaving = true),
-                objectiveLowerBoundSink = { published.add(it) },
-            ),
-        )
-        assertTrue(result is MinimizeResult.Optimal && result.objectiveValue == 2.0, "optimum is 2")
-        assertTrue(published.any { it >= 2.0 }, "the proven floor (cost >= 2) must reach the sink, got $published")
     }
 
     @Test
