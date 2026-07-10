@@ -78,30 +78,77 @@ internal fun Xcsp3.Builder.element(e: XmlElement) {
     )
 }
 
-/** `element` over a constant matrix `M`: `M[i][j] = v` with `<index> i j </index>`, encoded
- *  as a 3-column [Table] over `(i, j, v)` — one tuple per cell. */
+/** `element` over a matrix `M`: `M[i][j] = v` with `<index> i j </index>`. A constant matrix
+ *  is a 3-column [Table] over `(i, j, v)` — one tuple per cell; a matrix of variables (e.g. an
+ *  `x[][]` array reference, which the constant path reads as empty) is decomposed cell-by-cell. */
+@Suppress("ThrowsCount") // one guard per unsupported shape (bad index, empty constant/variable matrix)
 internal fun Xcsp3.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
     // Matrix element uses per-axis start indices (defaulting to 0), not a single startIndex.
     val rowOffset = e.attr("startRowIndex").ifBlank { "0" }.toInt()
     val colOffset = e.attr("startColIndex").ifBlank { "0" }.toInt()
-    val rows = Regex("""\(([^)]*)\)""").findAll(matrix.textContent)
-        .map { m -> m.groupValues[1].split(",").map { it.trim().toInt() } }.toList()
-    if (rows.isEmpty()) throw UnsupportedXcsp3Exception("element: empty <matrix>")
     val idxTokens = requireNotNull(e.child("index")).textContent.trim()
         .split(Regex("\\s+")).filter { it.isNotBlank() }
     if (idxTokens.size != 2) throw UnsupportedXcsp3Exception("element: matrix needs a 2-D <index>")
     val i = singleTermVar(idxTokens[0])
     val j = singleTermVar(idxTokens[1])
     val v = singleTermVar(requireNotNull(e.child("value")).textContent)
-    val tuples = ArrayList<Int>(rows.sumOf { it.size } * 3)
+
+    val constRows = constMatrixRows(matrix.textContent)
+    if (constRows != null) {
+        if (constRows.isEmpty()) throw UnsupportedXcsp3Exception("element: empty <matrix>")
+        val tuples = ArrayList<Int>(constRows.sumOf { it.size } * 3)
+        for (r in constRows.indices) {
+            for (c in constRows[r].indices) {
+                tuples.add(r + rowOffset)
+                tuples.add(c + colOffset)
+                tuples.add(constRows[r][c])
+            }
+        }
+        factors.add(Table(xs = intArrayOf(i, j, v), tuples = tuples.toIntArray().widenToLong()))
+        return
+    }
+    val rows = matrixRows(matrix.textContent)
+    if (rows.isEmpty()) throw UnsupportedXcsp3Exception("element: empty <matrix>")
+    elementVarMatrix(rows, i, j, v, rowOffset, colOffset)
+}
+
+/** The rows of a constant integer `<matrix>` (`(1,2)(3,4)`), or null when it is not an all-constant
+ *  parenthesised matrix (an array reference, or one with variable entries — handled elsewhere). */
+internal fun Xcsp3.Builder.constMatrixRows(text: String): List<IntArray>? {
+    val t = text.trim()
+    if ('(' !in t) return null
+    val rows = ArrayList<IntArray>()
+    for (m in Regex("""\(([^)]*)\)""").findAll(t)) {
+        val cells = m.groupValues[1].split(",")
+        val ints = IntArray(cells.size)
+        for (k in cells.indices) ints[k] = cells[k].trim().toIntOrNull() ?: return null
+        rows.add(ints)
+    }
+    return rows
+}
+
+/** `element` over a matrix of variables: `M[i][j] = v`, decomposed as `(i=r) ∧ (j=c) ⟹ v = M[r][c]`
+ *  per cell, with the index pinned into the matrix's range so an out-of-range selection cannot
+ *  leave `v` unconstrained. */
+internal fun Xcsp3.Builder.elementVarMatrix(rows: List<IntArray>, i: Int, j: Int, v: Int, rowOff: Int, colOff: Int) {
+    val nCols = rows[0].size
+    require(rows.all { it.size == nCols }) { "element: ragged <matrix>" }
+    if (rows.size.toLong() * nCols > negTableCap) {
+        throw UnsupportedXcsp3Exception("element: matrix decomposition exceeds cap")
+    }
+    // The index must select a real cell (Element semantics require a valid index).
+    factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, rowOff))
+    factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.LE, rowOff + rows.size - 1))
+    factors.add(Linear(intArrayOf(1), intArrayOf(j), LinearOp.GE, colOff))
+    factors.add(Linear(intArrayOf(1), intArrayOf(j), LinearOp.LE, colOff + nCols - 1))
     for (r in rows.indices) {
+        val iEq = reifyLinear(intArrayOf(1), intArrayOf(i), LinearOp.EQ, r + rowOff)
         for (c in rows[r].indices) {
-            tuples.add(r + rowOffset)
-            tuples.add(c + colOffset)
-            tuples.add(rows[r][c])
+            val jEq = reifyLinear(intArrayOf(1), intArrayOf(j), LinearOp.EQ, c + colOff)
+            val vEq = reifyLinear(intArrayOf(1, -1), intArrayOf(v, rows[r][c]), LinearOp.EQ, 0)
+            factors.add(Clause(intArrayOf(Lit.negate(iEq), Lit.negate(jEq), vEq))) // (i=r)∧(j=c) ⟹ v=M[r][c]
         }
     }
-    factors.add(Table(xs = intArrayOf(i, j, v), tuples = tuples.toIntArray().widenToLong()))
 }
 
 internal fun Xcsp3.Builder.channel(e: XmlElement) {
@@ -367,14 +414,33 @@ internal fun Xcsp3.Builder.instantiation(e: XmlElement) {
     vars.forEachIndexed { i, v -> factors.add(Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, vals[i])) }
 }
 
-/** Chain relation over consecutive list entries: `vars[i] ⟨op⟩ vars[i+1]`. */
+/** Chain relation over consecutive list entries: `vars[i] ⟨op⟩ vars[i+1]`, or with `<lengths>`,
+ *  `vars[i] + length[i] ⟨op⟩ vars[i+1]` (one length per gap; constants or variables). */
 internal fun Xcsp3.Builder.ordered(e: XmlElement) {
-    if (e.child("lengths") != null) throw UnsupportedXcsp3Exception("ordered with <lengths>")
     val vars = listVars(e)
     val opText = (e.child("operator")?.textContent?.trim() ?: e.attr("operator")).ifBlank { "le" }
     val (op, delta) = relOp(opText) ?: throw UnsupportedXcsp3Exception("ordered operator '$opText'")
-    for (i in 0 until vars.size - 1) {
-        factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[i + 1]), op, delta))
+    val lengthsEl = e.child("lengths")
+    if (lengthsEl == null) {
+        for (i in 0 until vars.size - 1) {
+            factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[i + 1]), op, delta))
+        }
+        return
+    }
+    val constLens = parseInts(lengthsEl.textContent)
+    if (constLens != null) {
+        require(constLens.size == vars.size - 1) { "ordered: <lengths> size != list size - 1" }
+        for (i in 0 until vars.size - 1) {
+            // vars[i] + length[i] ⟨op⟩ vars[i+1] ≡ vars[i] − vars[i+1] ⟨op⟩ delta − length[i]
+            factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[i + 1]), op, delta - constLens[i]))
+        }
+    } else {
+        val lenVars = refList(lengthsEl.textContent).toIntArray()
+        require(lenVars.size == vars.size - 1) { "ordered: <lengths> size != list size - 1" }
+        for (i in 0 until vars.size - 1) {
+            // vars[i] + length[i] − vars[i+1] ⟨op⟩ delta
+            factors.add(Linear(intArrayOf(1, 1, -1), intArrayOf(vars[i], lenVars[i], vars[i + 1]), op, delta))
+        }
     }
 }
 
@@ -666,10 +732,14 @@ internal fun Xcsp3.Builder.tupleRows(text: String, resolve: (String) -> Int): Li
         .toList()
 
 internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
-    // <except> weakens the constraint (listed values may repeat); dropping it would be unsound.
-    if (e.child("except") != null) throw UnsupportedXcsp3Exception("allDifferent with <except>")
     val vars = refList(listText(e)).toIntArray()
     if (vars.isEmpty()) throw UnsupportedXcsp3Exception("allDifferent: empty list")
+    // <except> weakens the constraint: variables taking an exempt value may repeat.
+    e.child("except")?.let { exceptEl ->
+        val except = parseInts(exceptEl.textContent)
+            ?: throw UnsupportedXcsp3Exception("allDifferent: non-constant <except>")
+        if (except.isNotEmpty()) return allDifferentExcept(vars, except)
+    }
     // A value span beyond Int range would truncate AllDifferent's Int-sized value-indexed
     // scratch; decompose to pairwise != (sound at any magnitude — <except> was rejected above).
     if (domainSpan(vars) > Int.MAX_VALUE.toLong()) {
@@ -687,4 +757,23 @@ internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
             domainSize = domainSpan(vars).toInt(),
         ),
     )
+}
+
+/** `allDifferent` with `<except>`: variables must be pairwise distinct unless they take an exempt
+ *  value. Decomposed as `x[i] = x[j] ⟹ x[i] ∈ except` per pair — two equal variables share a value,
+ *  so it suffices to require that common value be exempt (one membership guard, symmetric). */
+internal fun Xcsp3.Builder.allDifferentExcept(vars: IntArray, except: IntArray) {
+    if (vars.size.toLong() * vars.size * except.size > negTableCap) {
+        throw UnsupportedXcsp3Exception("allDifferent: except decomposition exceeds cap")
+    }
+    // x[i] ∈ except, reused across every pair sharing i.
+    val inExcept = IntArray(vars.size) { i ->
+        tseitinOr(except.map { reifyLinear(intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, it) })
+    }
+    for (a in vars.indices) {
+        for (b in a + 1 until vars.size) {
+            val eq = reifyLinear(intArrayOf(1, -1), intArrayOf(vars[a], vars[b]), LinearOp.EQ, 0)
+            factors.add(Clause(intArrayOf(Lit.negate(eq), inExcept[a]))) // x[a]=x[b] ⟹ x[a] ∈ except
+        }
+    }
 }
