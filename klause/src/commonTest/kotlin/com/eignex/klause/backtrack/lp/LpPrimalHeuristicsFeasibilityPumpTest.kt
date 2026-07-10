@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * Linear factors — since the caller records it without re-checking feasibility. Checked by brute force
  * over random 0/1 covering/packing problems.
  */
-class FeasibilityPumpTest {
+class LpPrimalHeuristicsFeasibilityPumpTest {
 
     private fun satisfies(f: Linear, x: LongArray): Boolean {
         var s = 0L
