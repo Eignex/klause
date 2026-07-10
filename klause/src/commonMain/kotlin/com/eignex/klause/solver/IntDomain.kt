@@ -55,6 +55,12 @@ interface IntDomain {
      *  (a wide [ContiguousDomain] reports [Int.MAX_VALUE] — its values are never enumerated). */
     val size: Int
 
+    /** Number of interior holes: values strictly between [min] and [max] that are absent. O(1) or
+     *  O(runs) and span-independent — it never walks the gap value by value. Zero for a contiguous
+     *  domain; may exceed [Int] range for a sparse domain over a wide span. The dual of [size], for
+     *  callers deciding whether iterating holes or members is cheaper. */
+    val holeCount: Long
+
     /** True iff [value] lies in the domain. */
     operator fun contains(value: Long): Boolean
 

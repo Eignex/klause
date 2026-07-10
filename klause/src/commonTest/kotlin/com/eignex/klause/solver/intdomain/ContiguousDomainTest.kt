@@ -24,6 +24,12 @@ class ContiguousDomainTest {
     }
 
     @Test
+    fun `holeCount is zero even for a span wider than Int`() {
+        assertEquals(0L, ContiguousDomain(1, 10).holeCount)
+        assertEquals(0L, ContiguousDomain(0, 5_000_000_000L).holeCount)
+    }
+
+    @Test
     fun `excludeValue absent is identity`() {
         val d = ContiguousDomain(1, 5)
         val e = d.excludeValue(99)

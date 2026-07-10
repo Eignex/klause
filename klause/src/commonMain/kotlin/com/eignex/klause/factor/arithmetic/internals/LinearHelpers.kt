@@ -69,10 +69,23 @@ internal fun collectHoleAndBoundAntecedents(
         }
         val lo = maxOf(d.min, orig.min)
         val hi = minOf(d.max, orig.max)
-        d.forEachHoleInRange(lo, hi) { value ->
-            if (value in orig) {
-                val lit = Lit.make(state.atomVarEq(v, value), true)
-                if (seen.add(lit)) out.add(lit)
+        // Cite [v == value] for each originally-present value now carved out of the live domain within
+        // its bounds. Enumerate whichever side is smaller: a survivor set over a wide span has span-many
+        // holes but few members, so walking holes would be O(span) — iterate the original's members
+        // instead. Both paths visit the same values ascending, so the cited literal set is identical.
+        if (orig.size.toLong() <= d.holeCount) {
+            orig.forEach { value ->
+                if (value in lo..hi && value !in d) {
+                    val lit = Lit.make(state.atomVarEq(v, value), true)
+                    if (seen.add(lit)) out.add(lit)
+                }
+            }
+        } else {
+            d.forEachHoleInRange(lo, hi) { value ->
+                if (value in orig) {
+                    val lit = Lit.make(state.atomVarEq(v, value), true)
+                    if (seen.add(lit)) out.add(lit)
+                }
             }
         }
     }

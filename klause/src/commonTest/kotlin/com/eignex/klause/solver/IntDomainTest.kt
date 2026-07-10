@@ -98,6 +98,7 @@ class IntDomainTest {
             val holes = mutableListOf<Long>()
             d.forEachHole { hole -> holes.add(hole) }
             assertEquals((d.min + 1 until d.max).filter { value -> value.toInt() !in present }, holes, "forEachHole")
+            assertEquals(holes.size.toLong(), d.holeCount, "holeCount")
 
             val tMin = rng.nextInt(lo, hi + 1)
             val expectMin = present.filter { value -> value >= tMin }
