@@ -45,7 +45,7 @@ class IntSetSchema : VariableSchema() {
     val setEq by constraint { s eq (t union setOfInts(1, 2)) }
 }
 
-class SchemaTest {
+class VariableSchemaTest {
 
     @Test
     fun `delegate registers vars and constraints`() {
