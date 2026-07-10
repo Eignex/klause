@@ -1,5 +1,6 @@
-package com.eignex.klause.factor
+package com.eignex.klause.solver.integration
 
+import com.eignex.klause.factor.MoveSetOracle
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.Factor
