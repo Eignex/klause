@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
-class CompoundMoveTest {
+class MoveCompoundMoveTest {
 
     /** Build a 3-var AllDifferent state where x0=x1=5, x2=0. */
     private fun setupAllDifferentConflict(): Pair<Problem, LocalSearchState> {
