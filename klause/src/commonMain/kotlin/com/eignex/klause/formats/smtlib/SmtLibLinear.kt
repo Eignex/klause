@@ -64,6 +64,12 @@ internal fun SmtLibQfLia.Builder.linearTerm(t: SExpr): LinComb = unwindingLets(t
             when {
                 n != null -> LinComb(emptyMap(), n)
 
+                // A large integer literal (SMT integers are arbitrary precision) is not a real; report it
+                // honestly as out of the 32-bit range the lowering carries, rather than as a real literal.
+                isIntegerLiteral(node.text) -> throw UnsupportedSmtException(
+                    "integer literal '${node.text}' exceeds the 32-bit range of the QF_LIA lowering",
+                )
+
                 isRealLiteral(
                     node.text,
                 ) -> throw UnsupportedSmtException("real literal '${node.text}' (QF_LIA is integer-only)")
@@ -127,8 +133,14 @@ internal fun SmtLibQfLia.Builder.intBinding(name: String, b: SmtLibQfLia.Builder
     return b.lin ?: throw UnsupportedSmtException("'$name' has no compiled Int value")
 }
 
-internal fun SmtLibQfLia.Builder.isRealLiteral(s: String): Boolean =
-    s.isNotEmpty() && s.toDoubleOrNull() != null && s.toIntOrNull() == null
+/** An integer literal — an optionally-signed run of digits, of any magnitude (SMT integers are
+ *  arbitrary precision, so this includes values beyond `Int`/`Long`). */
+internal fun SmtLibQfLia.Builder.isIntegerLiteral(s: String): Boolean = INTEGER_LITERAL.matches(s)
+
+/** A real literal — a decimal with a fractional point (e.g. `2.6`), which QF_LIA does not permit. */
+internal fun SmtLibQfLia.Builder.isRealLiteral(s: String): Boolean = '.' in s && s.toDoubleOrNull() != null
+
+private val INTEGER_LITERAL = Regex("-?\\d+")
 
 internal fun SmtLibQfLia.Builder.add(a: LinComb, b: LinComb): LinComb = a.plus(b)
 
