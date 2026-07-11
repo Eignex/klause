@@ -297,8 +297,12 @@ internal object AffineSingletons {
         capWide: Boolean,
     ): AffineCandidate? {
         // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
-        // present — so it picks candidates in the identical sequence a full rebuild would.
-        for (di in start until ws.size) {
+        // present — so it picks candidates in the identical sequence a full rebuild would. Give up after
+        // [AFFINE_SCAN_ABORT] consecutive non-candidates: on a huge factor set with no exploitable affine
+        // structure here (e.g. DiamondFree's ~490k decomposed constraints, none a foldable equality — the
+        // pass folds nothing), scanning to the end is pure fruitless cost. Sound: an unfound pivot stays.
+        val limit = minOf(ws.size.toLong(), start.toLong() + AFFINE_SCAN_ABORT).toInt()
+        for (di in start until limit) {
             candidateInFactor(
                 ws,
                 di,
@@ -309,6 +313,12 @@ internal object AffineSingletons {
         }
         return null
     }
+
+    /** Consecutive non-candidate factors [findAffineCandidate] scans before giving up. Set well above the
+     *  gap between successive pivots in any model where affine is productive (which cluster near the top),
+     *  so ordinary instances scan to completion unchanged; only a fruitless walk over a giant factor set is
+     *  cut short. */
+    private const val AFFINE_SCAN_ABORT = 200_000
 
     /** The affine candidate the equality at stable id [di] defines (a pivot with unit or divisible
      *  coefficient and foldable other occurrences), or `null` if it defines none. The per-factor body of

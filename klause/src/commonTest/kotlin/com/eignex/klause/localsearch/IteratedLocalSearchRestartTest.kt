@@ -1,7 +1,6 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.CrossoverBias.BetterBiased
 import com.eignex.klause.localsearch.IteratedLocalSearchRestart
