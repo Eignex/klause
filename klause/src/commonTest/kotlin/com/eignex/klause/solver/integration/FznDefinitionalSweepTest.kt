@@ -123,6 +123,29 @@ class FznDefinitionalSweepTest {
     }
 
     @Test
+    fun `a var-array element definition with a literal element does not overflow the invariant network`() {
+        // array_var_int_element resolves its var array via evalIntVarArray, which allocates a singleton
+        // int var for the literal element (5) while building the sweep node. That var must be counted in
+        // the Problem, or the invariant network indexes it out of bounds (regression for #1130).
+        val src2 = """
+            var 1..3: idx;
+            var 0..9: x;
+            var 0..9: y;
+            var 0..9: e;
+            constraint array_var_int_element(idx, [x, 5, y], e) :: defines_var(e);
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src2)
+        val sweep = assertNotNull(program.definitionalSweep, "the element definition must yield a sweep")
+        // Threw ArrayIndexOutOfBoundsException before the fix (the literal's var id == numIntVars).
+        val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
+        assertTrue(net.isDefinedInt(program.intVarsByName.getValue("e")), "e is definitionally determined")
+        val solver = LocalSearchSolver(program.problem, definitionalSweep = sweep)
+        val r = solver.solve(LocalSearchParams(maxFlips = 20_000, randomSeed = 1L))
+        assertTrue(r is SolveResult.Sat, "the element model solves under the sweep; got $r")
+    }
+
+    @Test
     fun `model without defines_var yields no sweep`() {
         val plain = """
             var 0..3: x;
