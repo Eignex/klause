@@ -203,7 +203,8 @@ internal object AffineSingletons {
         cancellation: Cancellation = Cancellation.Never,
     ): ResidueCandidate? {
         var polled = 0
-        for (di in 0 until ws.size) {
+        var di = ws.nextEqId(0)
+        while (di < ws.size) {
             if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             residueCandidateInFactor(
                 ws,
@@ -212,6 +213,7 @@ internal object AffineSingletons {
                 objectiveIntVars,
                 domains,
             )?.let { return it }
+            di = ws.nextEqId(di + 1)
         }
         return null
     }
@@ -308,7 +310,8 @@ internal object AffineSingletons {
         // pass folds nothing), scanning to the end is pure fruitless cost. Sound: an unfound pivot stays.
         val limit = minOf(ws.size.toLong(), start.toLong() + AFFINE_SCAN_ABORT).toInt()
         var polled = 0
-        for (di in start until limit) {
+        var di = ws.nextEqId(start)
+        while (di < limit) {
             // Poll the presolve deadline inside the scan, not only between folds: a single scan over a large
             // wide-row factor set (Coprime) can run for seconds, so without this the budget cannot bound it.
             // Count iterations (a dense counter) rather than keying on [di], which a candidate index makes
@@ -322,6 +325,7 @@ internal object AffineSingletons {
                 capWide,
                 cancellation,
             )?.let { return it }
+            di = ws.nextEqId(di + 1)
         }
         return null
     }
@@ -494,6 +498,35 @@ internal object AffineSingletons {
             constTerm: Long,
             cancellation: Cancellation = Cancellation.Never,
         ): Boolean
+
+        /** The smallest stable id `>= from` that could head a pivot — a live [Linear] equality of arity
+         *  `>= 2` — or [size] if none remains, in ascending order. Lets the candidate scan skip the
+         *  inequality/global bulk (which can never be a candidate) instead of testing every id, while
+         *  still visiting the identical candidates in the identical order a walk over every id would: a
+         *  fold that promotes a row into the candidate class is tracked, and a dropped or degraded id may
+         *  still be returned and is re-rejected by the candidate gate. */
+        fun nextEqId(from: Int): Int
+    }
+
+    /** Whether [f] could head an affine or residue pivot: a [Linear] equality of arity >= 2. */
+    private fun isEqCand(f: Factor?): Boolean = f is Linear && f.op == LinearOp.EQ && f.vars.size >= 2
+
+    /** Stable ids (ascending) of the pristine [factors] that could ever head an affine/residue pivot. */
+    private fun eqPivotIds(factors: Array<Factor>): IntArray {
+        val ids = IntArrayList(0)
+        for (id in factors.indices) if (isEqCand(factors[id])) ids.add(id)
+        return ids.toIntArray()
+    }
+
+    /** Index of the first entry of the ascending [eqIds] that is `>= from` (`eqIds.size` if none). */
+    private fun lowerBound(eqIds: IntArray, from: Int): Int {
+        var lo = 0
+        var hi = eqIds.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (eqIds[mid] < from) lo = mid + 1 else hi = mid
+        }
+        return lo
     }
 
     /**
@@ -506,6 +539,14 @@ internal object AffineSingletons {
         override val size: Int get() = factors.size
         override fun factorAt(id: Int): Factor = factors[id]
         override fun degreeOf(x: Int): Int = occ.offsets[x + 1] - occ.offsets[x]
+
+        // Built lazily: the incremental touched-variable path never scans by id, so a fruitless re-run
+        // that returns early over the seed pays nothing for it.
+        private val eqIds by lazy { eqPivotIds(factors) }
+        override fun nextEqId(from: Int): Int {
+            val p = lowerBound(eqIds, from)
+            return if (p < eqIds.size) eqIds[p] else factors.size
+        }
 
         /** The stable id of the [k]-th factor mentioning [x] (`0 until degreeOf(x)`) — lets the
          *  touched-variable re-scan visit only the factors a changed variable appears in. */
@@ -591,6 +632,33 @@ internal object AffineSingletons {
         private val slots = ArrayList<Factor?>(base.size + 1).apply { addAll(base) }
         private val intOcc = Array(nVars) { IntArrayList(0) }
 
+        // The pivot-candidate ids (a live [Linear] equality of arity >= 2) the scan may visit, letting it
+        // skip the inequality/global bulk. [baseEqIds] is the pristine set, ascending. A fold does not only
+        // shrink the set: [foldAffineIntoLinear] substitutes a pivot's multi-term definition into a shorter
+        // equality that mentions it (e.g. `c·x = b` becomes an equality over the definition's partners),
+        // *promoting* an id that was not a candidate into one. Those promoted ids are tracked separately
+        // (there are only ever a handful — bounded by the folds' fan-out); dropped or degraded ids are left
+        // in place and re-rejected by the candidate gate. Appended rows are inequalities and can only be
+        // rewritten into inequalities, so no appended id is ever a candidate.
+        private val baseEqIds = eqPivotIds(base)
+        private val promoted = IntArrayList(0)
+        private val promotedSet = IntHashSet()
+
+        private fun inBaseEq(id: Int): Boolean {
+            val p = lowerBound(baseEqIds, id)
+            return p < baseEqIds.size && baseEqIds[p] == id
+        }
+
+        override fun nextEqId(from: Int): Int {
+            val p = lowerBound(baseEqIds, from)
+            var best = if (p < baseEqIds.size) baseEqIds[p] else slots.size
+            for (k in 0 until promoted.size) {
+                val id = promoted[k]
+                if (id in from until best) best = id
+            }
+            return best
+        }
+
         // Folds absorbed by each stable id (parallel to [slots]): incremented whenever [replace] rewrites it,
         // read by [anyOtherLinearAtAbsorbCap] to cap a row that has become a fold sink. Appended rows start at 0.
         private val absorbed = IntArrayList(base.size + 1).apply { repeat(base.size) { add(0) } }
@@ -631,6 +699,9 @@ internal object AffineSingletons {
             for (v in prev.intVars) intOcc[v].removeValue(id)
             slots[id] = next
             for (v in next.intVars) intOcc[v].add(id)
+            // A rewrite that turns a non-candidate row into a candidate equality promotes it into the scan;
+            // record it (unless the pristine set already lists it, or it is already tracked).
+            if (isEqCand(next) && !isEqCand(prev) && !inBaseEq(id) && promotedSet.add(id)) promoted.add(id)
         }
 
         /** Append [next] as a fresh stable id and record its occurrences. */
@@ -778,6 +849,8 @@ internal object AffineSingletons {
             // both `x` and `y` coalesces to a single `y`, matching what a fresh CSR rebuild would list).
             val occX = intOcc[c.x]
             val touched = IntArray(occX.size) { occX[it] }
+            var minTouched = c.defIdx
+            for (id in touched) if (id < minTouched) minTouched = id
             // Remap only the factors that mention `x`: the rename map is identity except `x → y`, so a
             // factor without `x` remaps to an equal object — leaving it untouched is content-identical and
             // keeps the pass O(occurrences of `x`) instead of O(live factors) per alias (the KMedian /
@@ -792,8 +865,11 @@ internal object AffineSingletons {
             intOcc[c.x].clear()
             drop(c.defIdx)
             for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
-            // A rename rewrites every live factor, so any factor's candidacy can change: rescan from 0.
-            return 0
+            // Only the rewritten factors (`x`'s occurrences, now renamed to `y`) change content, so — as in
+            // [fold] — no factor below their minimum can newly become a candidate; the scan resumes from
+            // here instead of restarting at 0. (The occurrence-scoped remap above is what makes this valid:
+            // when the rename touched every live factor, any factor's candidacy could change.)
+            return minTouched
         }
     }
 
@@ -897,16 +973,16 @@ private fun foldRowOverflowsLong(
         var big = false
         for (c in termCoeffs) {
             if (!fitsHalfLong(c)) {
-            big = true
-            break
-        }
+                big = true
+                break
+            }
         }
         if (!big) {
             for (c in f.coeffs) {
                 if (!fitsHalfLong(c)) {
-            big = true
-            break
-        }
+                    big = true
+                    break
+                }
             }
         }
         if (!big) return false
