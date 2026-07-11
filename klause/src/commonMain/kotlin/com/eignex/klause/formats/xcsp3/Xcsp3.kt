@@ -260,7 +260,7 @@ object Xcsp3 {
                     vars[0]
                 } else {
                     materializeVar(
-                        LinComb(linMap(coeffs, vars), 0),
+                        LinComb(linMap(coeffs, vars), 0L),
                     )
                 }
                 val members = parseSetMembers(set.groupValues[1])
@@ -286,9 +286,9 @@ object Xcsp3 {
             }
 
         /** Coalesce parallel `coeffs`/`vars` arrays into a single variable-keyed linear map. */
-        internal fun linMap(coeffs: IntArray, vars: IntArray): Map<Int, Int> {
-            val m = HashMap<Int, Int>()
-            for (i in vars.indices) m[vars[i]] = (m[vars[i]] ?: 0) + coeffs[i]
+        internal fun linMap(coeffs: IntArray, vars: IntArray): Map<Int, Long> {
+            val m = HashMap<Int, Long>()
+            for (i in vars.indices) m[vars[i]] = (m[vars[i]] ?: 0L) + coeffs[i]
             return m
         }
 
@@ -365,8 +365,9 @@ object Xcsp3 {
          *  variable terms they cancel to an empty var list, leaving the constant relation `0 op bound`. */
         internal fun relationParts(node: FExpr.Call): RelParts {
             val (op, delta) = relOp(node.fn) ?: throw UnsupportedXcsp3Exception("relation '${node.fn}'")
-            val (vars, coeffs, bound) = linCombDiff(linear(node.args[0]), linear(node.args[1]), delta)
-            return RelParts(coeffs, vars, op, bound)
+            val (vars, coeffs, bound) = linCombDiff(linear(node.args[0]), linear(node.args[1]), delta.toLong())
+            // XCSP3 coefficients/bounds originate from Int-valued FExpr numerals, so they fit Int.
+            return RelParts(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound.toInt())
         }
 
         fun objective(e: XmlElement) {
@@ -407,9 +408,9 @@ object Xcsp3 {
         }
 
         internal fun linear(e: FExpr): LinComb = when (e) {
-            is FExpr.Num -> LinComb(emptyMap(), e.value)
+            is FExpr.Num -> LinComb(emptyMap(), e.value.toLong())
 
-            is FExpr.Ref -> LinComb(mapOf(ref(e.name) to 1), 0)
+            is FExpr.Ref -> LinComb(mapOf(ref(e.name) to 1L), 0L)
 
             is FExpr.SetLit -> throw UnsupportedXcsp3Exception("set literal used arithmetically")
 
@@ -437,9 +438,9 @@ object Xcsp3 {
                 "mul" -> {
                     val parts = e.args.map { linear(it) }
                     val nonConst = parts.filter { it.coeffs.isNotEmpty() }
-                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
+                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> a * c.constant }
                     when {
-                        k == 0 -> LinComb(emptyMap(), 0)
+                        k == 0L -> LinComb(emptyMap(), 0L)
 
                         nonConst.isEmpty() -> LinComb(emptyMap(), k)
 
@@ -455,13 +456,13 @@ object Xcsp3 {
                                 factors.add(Product(acc, next, p))
                                 acc = p
                             }
-                            LinComb(mapOf(acc to 1), 0).scaled(k)
+                            LinComb(mapOf(acc to 1L), 0L).scaled(k)
                         }
                     }
                 }
 
                 // A boolean-valued subexpression used arithmetically is its 0/1 truth value.
-                "in", "notin", in REL, in BOOL_FNS -> LinComb(mapOf(litTo01(compileBool(e)) to 1), 0)
+                "in", "notin", in REL, in BOOL_FNS -> LinComb(mapOf(litTo01(compileBool(e)) to 1L), 0L)
 
                 else -> throw UnsupportedXcsp3Exception("arithmetic fn '${e.fn}'")
             }
@@ -481,7 +482,7 @@ object Xcsp3 {
             val vs = args.map { materializeVar(linear(it)) }.toIntArray()
             val m = newAuxVar(vs.minOf { domains[it].min }, vs.maxOf { domains[it].max })
             factors.add(ArrayMinMax(result = m, xs = vs, max = max))
-            return LinComb(mapOf(m to 1), 0)
+            return LinComb(mapOf(m to 1L), 0L)
         }
 
         /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
@@ -494,7 +495,7 @@ object Xcsp3 {
             val eb = reifyLinear(intArrayOf(1, -1), intArrayOf(v, b), LinearOp.EQ, 0)
             factors.add(Clause(intArrayOf(Lit.negate(cond), ea))) // cond ⇒ v = a
             factors.add(Clause(intArrayOf(cond, eb))) // ¬cond ⇒ v = b
-            return LinComb(mapOf(v to 1), 0)
+            return LinComb(mapOf(v to 1L), 0L)
         }
 
         /** Integer `div`/`mod` by a nonzero constant, matching XCSP3's truncated-toward-zero semantics:
@@ -507,7 +508,7 @@ object Xcsp3 {
             val bLin = linear(args[1])
             if (bLin.coeffs.isNotEmpty()) return divModVar(a, materializeVar(bLin), mod)
             val k = bLin.constant
-            if (k == 0) throw UnsupportedXcsp3Exception("div/mod by zero divisor")
+            if (k == 0L) throw UnsupportedXcsp3Exception("div/mod by zero divisor")
             val da = domains[a]
             val absK = if (k < 0) -k else k
             // trunc(a / k) is monotonic in `a` for a fixed-sign `k`, so the domain endpoints bound `q`
@@ -516,7 +517,7 @@ object Xcsp3 {
             val qb = da.max / k
             val q = newAuxVar(minOf(qa, qb), maxOf(qa, qb))
             val r = newAuxVar(-(absK - 1).toLong(), (absK - 1).toLong())
-            factors.add(Linear(intArrayOf(1, -k, -1), intArrayOf(a, q, r), LinearOp.EQ, 0)) // a = k·q + r
+            factors.add(Linear(longArrayOf(1, -k, -1), intArrayOf(a, q, r), LinearOp.EQ, 0L)) // a = k·q + r
             // Truncation ⇒ r shares the dividend's sign (or is 0). Pin it: trivially when `a` is
             // single-signed, else gate on the reified sign of `a`.
             when {
@@ -532,7 +533,7 @@ object Xcsp3 {
                     factors.add(Clause(intArrayOf(aNonNeg, rNonPos))) // a < 0 ⟹ r ≤ 0
                 }
             }
-            return LinComb(mapOf((if (mod) r else q) to 1), 0)
+            return LinComb(mapOf((if (mod) r else q) to 1L), 0L)
         }
 
         /** Integer `div`/`mod` by a *variable* divisor, supported only when the divisor is provably
@@ -552,7 +553,7 @@ object Xcsp3 {
             factors.add(Product(b, q, p)) // p = b·q
             factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(a, p, r), LinearOp.EQ, 0)) // a = b·q + r
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(r, b), LinearOp.LE, -1)) // r < b
-            return LinComb(mapOf((if (mod) r else q) to 1), 0)
+            return LinComb(mapOf((if (mod) r else q) to 1L), 0L)
         }
 
         /** `|expr|` as a linear term: `|v| = max(v, -v)` via [ArrayMinMax] over `v` and its negation. */
@@ -569,19 +570,19 @@ object Xcsp3 {
             }
             val a = newAuxVar(lo, hi)
             factors.add(ArrayMinMax(result = a, xs = intArrayOf(v, neg), max = true))
-            return LinComb(mapOf(a to 1), 0)
+            return LinComb(mapOf(a to 1L), 0L)
         }
 
         /** Materialise a linear expression as a single int var (returning it directly when it already
          *  is one), posting `v = expr` otherwise. */
         internal fun materializeVar(lin: LinComb): Int {
-            if (lin.constant == 0 && lin.coeffs.size == 1 && lin.coeffs.values.first() == 1) {
+            if (lin.constant == 0L && lin.coeffs.size == 1 && lin.coeffs.values.first() == 1L) {
                 return lin.coeffs.keys.first()
             }
             val (lo, hi) = linBounds(lin)
             val v = newAuxVar(lo, hi)
             val vars = lin.coeffs.keys.toList()
-            val cs = IntArray(vars.size + 1) { if (it < vars.size) -lin.coeffs.getValue(vars[it]) else 1 }
+            val cs = LongArray(vars.size + 1) { if (it < vars.size) -lin.coeffs.getValue(vars[it]) else 1L }
             val ids = IntArray(vars.size + 1) { if (it < vars.size) vars[it] else v }
             factors.add(Linear(cs, ids, LinearOp.EQ, lin.constant)) // v − expr = 0
             return v
