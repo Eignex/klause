@@ -62,6 +62,15 @@ internal fun CnfLowering.reifyLinear(coeffs: IntArray, vars: IntArray, op: Linea
     return Lit.make(aux, true)
 }
 
+/** [reifyLinear] over 64-bit coefficients/bound — the SMT-LIB front-end carries arbitrary-precision
+ *  integer literals as [Long], which may exceed the 32-bit range. */
+internal fun CnfLowering.reifyLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long): Int {
+    if (vars.isEmpty()) return if (constRelationHolds(op, bound)) trueLit() else Lit.negate(trueLit())
+    val aux = newBool()
+    factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = coeffs, vars = vars, op = op, bound = bound))
+    return Lit.make(aux, true)
+}
+
 /**
  * Channel Boolean [auxBoolVar]'s truth onto the 0/1 integer [intVar]: posts `x_intVar = 1` iff
  * [auxBoolVar] holds (or `= 0` when [whenTrue] is false, for a negated-literal channel). The single
@@ -88,4 +97,12 @@ internal fun constRelationHolds(op: LinearOp, bound: Int): Boolean = when (op) {
     LinearOp.GE -> 0 >= bound
     LinearOp.EQ -> 0 == bound
     LinearOp.NE -> 0 != bound
+}
+
+/** [constRelationHolds] over a 64-bit bound (SMT-LIB carries arbitrary-precision integer bounds). */
+internal fun constRelationHolds(op: LinearOp, bound: Long): Boolean = when (op) {
+    LinearOp.LE -> 0L <= bound
+    LinearOp.GE -> 0L >= bound
+    LinearOp.EQ -> 0L == bound
+    LinearOp.NE -> 0L != bound
 }

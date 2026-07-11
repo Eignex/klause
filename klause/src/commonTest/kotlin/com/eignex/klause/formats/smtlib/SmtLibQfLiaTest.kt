@@ -33,12 +33,24 @@ class SmtLibQfLiaTest {
     }
 
     @Test
-    fun `an integer literal beyond 32 bits is reported as integer, not real`() {
-        // 2^31 is a valid (arbitrary-precision) QF_LIA integer; the rejection must name it an integer
-        // out of range, not misclassify it as a real literal.
-        val text = "(set-logic QF_LIA)(declare-const x Int)(assert (<= x 2147483648))(check-sat)"
+    fun `an integer literal beyond 32 bits parses as a 64-bit value`() {
+        // 2^31 and 2^32 exceed Int but are valid arbitrary-precision QF_LIA integers; they must parse
+        // (carried as Long), not be misclassified as reals and rejected.
+        val p = SmtLibQfLia.parse(
+            "(declare-const x Int) (assert (<= x 2147483648)) (assert (>= x 4294967296)) (check-sat)",
+            unboundedIntLo = 0,
+            unboundedIntHi = Int.MAX_VALUE,
+        ).problem
+        // The relation bounds carry the >32-bit literals; the lower bound 2^32 exceeds the +2^31 domain
+        // cap so it clamps, but parsing succeeds with no exception.
+        assertEquals(1, p.numIntVars)
+    }
+
+    @Test
+    fun `an integer literal beyond 64 bits is rejected as an integer, not a real`() {
+        val text = "(declare-const x Int) (assert (<= x 170141183460469231731687303715884105728))"
         val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
-        assertTrue("integer literal" in e.message.orEmpty(), "expected an integer-literal message, got: ${e.message}")
+        assertTrue("integer literal" in e.message.orEmpty() && "64-bit" in e.message.orEmpty(), e.message.orEmpty())
     }
 
     @Test

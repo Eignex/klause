@@ -60,14 +60,14 @@ internal fun SmtLibQfLia.Builder.relationToLinear(t: SExpr.SList): Rel {
 internal fun SmtLibQfLia.Builder.linearTerm(t: SExpr): LinComb = unwindingLets(t) { node ->
     when (node) {
         is SExpr.Atom -> {
-            val n = node.text.toIntOrNull()
+            val n = node.text.toLongOrNull()
             when {
                 n != null -> LinComb(emptyMap(), n)
 
-                // A large integer literal (SMT integers are arbitrary precision) is not a real; report it
-                // honestly as out of the 32-bit range the lowering carries, rather than as a real literal.
+                // An integer literal beyond 64 bits (SMT integers are arbitrary precision) is not a real;
+                // report it honestly as out of the lowering's range rather than as a real literal.
                 isIntegerLiteral(node.text) -> throw UnsupportedSmtException(
-                    "integer literal '${node.text}' exceeds the 32-bit range of the QF_LIA lowering",
+                    "integer literal '${node.text}' exceeds the 64-bit range of the QF_LIA lowering",
                 )
 
                 isRealLiteral(
@@ -94,16 +94,16 @@ internal fun SmtLibQfLia.Builder.linearTerm(t: SExpr): LinComb = unwindingLets(t
                 "+" -> args.map { linearTerm(it) }.reduce(::add)
 
                 "-" -> if (args.size == 1) {
-                    scale(linearTerm(args[0]), -1)
+                    scale(linearTerm(args[0]), -1L)
                 } else {
-                    args.drop(1).fold(linearTerm(args[0])) { acc, e -> add(acc, scale(linearTerm(e), -1)) }
+                    args.drop(1).fold(linearTerm(args[0])) { acc, e -> add(acc, scale(linearTerm(e), -1L)) }
                 }
 
                 "*" -> {
                     val parts = args.map { linearTerm(it) }
                     val nonConst = parts.filter { it.coeffs.isNotEmpty() }
                     if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
-                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1) { a, c -> a * c.constant }
+                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> a * c.constant }
                     if (nonConst.isEmpty()) LinComb(emptyMap(), k) else scale(nonConst[0], k)
                 }
 
@@ -144,10 +144,10 @@ private val INTEGER_LITERAL = Regex("-?\\d+")
 
 internal fun SmtLibQfLia.Builder.add(a: LinComb, b: LinComb): LinComb = a.plus(b)
 
-internal fun SmtLibQfLia.Builder.scale(a: LinComb, k: Int): LinComb = a.scaled(k)
+internal fun SmtLibQfLia.Builder.scale(a: LinComb, k: Long): LinComb = a.scaled(k)
 
 /** Build linear coefficients for `a - b op 0`. */
-internal fun SmtLibQfLia.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, IntArray, Int> = linCombDiff(a, b)
+internal fun SmtLibQfLia.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, LongArray, Long> = linCombDiff(a, b)
 
 internal fun SmtLibQfLia.Builder.linearObjective(t: SExpr, negate: Boolean): LinearObjective {
     val lt = linearTerm(t)

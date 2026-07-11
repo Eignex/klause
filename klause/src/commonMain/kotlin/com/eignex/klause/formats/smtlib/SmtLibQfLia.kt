@@ -14,7 +14,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 class UnsupportedSmtException(msg: String) : RuntimeException("klause SMT-LIB QF_LIA: $msg")
 
 /** One lowered linear relation `Σ coeffs·vars ⟨op⟩ bound` (shared by bound inference and lowering). */
-internal data class Rel(val vars: IntArray, val coeffs: IntArray, val op: LinearOp, val bound: Int)
+internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: LinearOp, val bound: Long)
 
 /** A parsed SMT-LIB instance lifted into klause's representation. */
 data class SmtLibProblem(
