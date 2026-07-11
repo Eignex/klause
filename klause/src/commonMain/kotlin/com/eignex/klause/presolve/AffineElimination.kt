@@ -837,6 +837,28 @@ private fun foldRowOverflowsLong(
     val xi = f.vars.indexOf(x)
     if (xi < 0) return false
     val cX = f.coeffs[xi]
+    // Fast path: if every magnitude the fold combines is below 2^31, no product `cX·c` reaches 2^62 and no
+    // sum reaches 2^63, so the fold cannot overflow — skip the per-term `indexOf` + exact arithmetic below,
+    // which is O(arity · row-arity) and dominates the pass on dense wide rows (DiamondFree/SMPT). The two
+    // scans here are O(arity + row-arity); the exact path only runs when some coefficient is genuinely huge.
+    if (fitsHalfLong(cX) && fitsHalfLong(constTerm) && fitsHalfLong(f.bound)) {
+        var big = false
+        for (c in termCoeffs) {
+            if (!fitsHalfLong(c)) {
+            big = true
+            break
+        }
+        }
+        if (!big) {
+            for (c in f.coeffs) {
+                if (!fitsHalfLong(c)) {
+            big = true
+            break
+        }
+            }
+        }
+        if (!big) return false
+    }
     return try {
         subExact(f.bound, mulExact(cX, constTerm))
         for (k in termVars.indices) {
@@ -849,3 +871,7 @@ private fun foldRowOverflowsLong(
         true
     }
 }
+
+/** True when `|v| < 2^31`, so a product of two such values stays below 2^62 and a sum below 2^63 — the
+ *  bound the overflow fast-path in [foldRowOverflowsLong] relies on. */
+private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
