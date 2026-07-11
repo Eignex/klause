@@ -191,12 +191,39 @@ internal fun Xcsp3.Builder.channelPartial(x: IntArray, y: IntArray) {
     }
 }
 
+/** One `(src, sym, dst)` transition of a regular/mdd automaton. */
+internal class Xcsp3Transition(val src: String, val sym: Int, val dst: String)
+
+/** Parse the `(src,sym,dst)(...)…` transition list. A single linear scan over the (multi-megabyte on a
+ *  large MDD) text, replacing a `Regex.findAll` that allocated a match and a group list per transition —
+ *  the parse dominated ingestion of the WordDesign2 MDDs. Whitespace around the fields is tolerated as
+ *  the grammar allows; the fields themselves carry no separators. */
+internal fun parseTransitions(text: String): List<Xcsp3Transition> {
+    val out = ArrayList<Xcsp3Transition>()
+    val n = text.length
+    var i = 0
+    while (true) {
+        while (i < n && text[i] != '(') i++
+        if (i >= n) break
+        i++
+        val srcEnd = text.indexOf(',', i)
+        val symEnd = text.indexOf(',', srcEnd + 1)
+        val dstEnd = text.indexOf(')', symEnd + 1)
+        val src = text.substring(i, srcEnd).trim()
+        val sym = text.substring(srcEnd + 1, symEnd).trim().toInt()
+        val dst = text.substring(symEnd + 1, dstEnd).trim()
+        out.add(Xcsp3Transition(src, sym, dst))
+        i = dstEnd + 1
+    }
+    return out
+}
+
 internal fun Xcsp3.Builder.regular(e: XmlElement) {
     val finals = requireNotNull(e.child("final")).textContent.trim()
         .split(Regex("\\s+")).filter { it.isNotBlank() }
     buildRegular(
         listVars(e),
-        requireNotNull(e.child("transitions")).textContent,
+        parseTransitions(requireNotNull(e.child("transitions")).textContent),
         requireNotNull(e.child("start")).textContent.trim(),
         finals,
     )
@@ -205,12 +232,12 @@ internal fun Xcsp3.Builder.regular(e: XmlElement) {
 /** A multi-valued decision diagram is a layered automaton: the root is the node that is never a
  *  transition destination; the accepting nodes are the sinks (never a source). */
 internal fun Xcsp3.Builder.mdd(e: XmlElement) {
-    val transitions = requireNotNull(e.child("transitions")).textContent
+    val trs = parseTransitions(requireNotNull(e.child("transitions")).textContent)
     val srcs = HashSet<String>()
     val dsts = HashSet<String>()
-    for (m in Xcsp3.Builder.TRANSITION.findAll(transitions)) {
-        srcs.add(m.groupValues[1])
-        dsts.add(m.groupValues[3])
+    for (t in trs) {
+        srcs.add(t.src)
+        dsts.add(t.dst)
     }
     val start = if ("root" in srcs) {
         "root"
@@ -218,14 +245,16 @@ internal fun Xcsp3.Builder.mdd(e: XmlElement) {
         (srcs - dsts).firstOrNull()
             ?: throw UnsupportedXcsp3Exception("mdd: no root node")
     }
-    buildRegular(listVars(e), transitions, start, (dsts - srcs).toList())
+    buildRegular(listVars(e), trs, start, (dsts - srcs).toList())
 }
 
-internal fun Xcsp3.Builder.buildRegular(seqVars: IntArray, transitions: String, start: String, finals: List<String>) {
+internal fun Xcsp3.Builder.buildRegular(
+    seqVars: IntArray,
+    trs: List<Xcsp3Transition>,
+    start: String,
+    finals: List<String>,
+) {
     if (seqVars.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: empty sequence list")
-    data class Tr(val src: String, val sym: Int, val dst: String)
-    val trs = Xcsp3.Builder.TRANSITION.findAll(transitions)
-        .map { Tr(it.groupValues[1], it.groupValues[2].toInt(), it.groupValues[3]) }.toList()
     if (trs.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
 
     val stateIdx = LinkedHashMap<String, Int>()

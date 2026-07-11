@@ -740,7 +740,6 @@ object Xcsp3 {
         companion object {
             internal val REL = setOf("eq", "ne", "le", "lt", "ge", "gt")
             internal val BOOL_FNS = setOf("and", "or", "not", "imp", "iff", "xor")
-            internal val TRANSITION = Regex("""\(\s*(\w+)\s*,\s*(-?\d+)\s*,\s*(\w+)\s*\)""")
             internal val ARRAY_REF = Regex("""^([^\[]+)((?:\[[^\]]*])+)$""")
             internal val BRACKET = Regex("""\[([^\]]*)]""")
             internal val RLE = Regex("""(-?\d+)x(\d+)""")
