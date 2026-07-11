@@ -726,14 +726,14 @@ internal object AffineSingletons {
             // both `x` and `y` coalesces to a single `y`, matching what a fresh CSR rebuild would list).
             val occX = intOcc[c.x]
             val touched = IntArray(occX.size) { occX[it] }
-            for (id in slots.indices) {
-                if (id == c.defIdx) continue
-                val f = slots[id] ?: continue
-                slots[id] = f.remap(boolMap, intMap)
-            }
+            // Remap only the factors that mention `x`: the rename map is identity except `x → y`, so a
+            // factor without `x` remaps to an equal object — leaving it untouched is content-identical and
+            // keeps the pass O(occurrences of `x`) instead of O(live factors) per alias (the KMedian /
+            // DiamondFree alias-remap hotspot).
             for (id in touched) {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
+                slots[id] = f.remap(boolMap, intMap)
                 intOcc[y].removeValue(id)
                 for (v in f.intVars) if (v == y) intOcc[y].add(id)
             }
