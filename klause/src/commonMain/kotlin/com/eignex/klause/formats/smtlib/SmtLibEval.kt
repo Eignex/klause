@@ -1,0 +1,265 @@
+package com.eignex.klause.formats.smtlib
+
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.reifyLinear
+import com.eignex.klause.formats.trueLit
+import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.formats.tseitinIff
+import com.eignex.klause.formats.tseitinOr
+import com.eignex.klause.solver.Lit
+
+/**
+ * Iterative evaluator for SMT-LIB terms: folds an [SExpr] tree into either a boolean literal or an
+ * integer [LinComb], driven by an explicit heap work-stack rather than the call stack. SMT-LIB
+ * formulas nest thousands of operators deep, so a recursive `compileBool`/`linearTerm` overflows the
+ * JVM stack on degenerate input; this keeps the whole descent on the heap. `let` scoping is handled
+ * inline via [Frame.MakeScope]/[Frame.PopScope] frames (never a nested [evalTerm] call), so even a
+ * deeply nested chain of `let`-bound values stays off the stack.
+ */
+internal enum class Sort { BOOL, INT }
+
+/** A folded term result: a boolean literal ([B]) or an integer linear combination ([I]). */
+internal sealed interface Res {
+    class B(val lit: Int) : Res
+    class I(val lin: LinComb) : Res
+}
+
+private fun Res.asLit(): Int = (this as Res.B).lit
+private fun Res.asLin(): LinComb = (this as Res.I).lin
+
+private sealed interface Frame {
+    class Eval(val node: SExpr, val sort: Sort) : Frame
+    class Combine(val node: SExpr.SList, val sort: Sort, val argc: Int) : Frame
+    class MakeScope(val names: List<String>, val bools: BooleanArray) : Frame
+    object PopScope : Frame
+}
+
+/** Fold [root] to a [Res] of the requested [sort] with no unbounded call-stack recursion. */
+internal fun SmtLibQfLia.Builder.evalTerm(root: SExpr, sort: Sort): Res {
+    val work = ArrayDeque<Frame>()
+    val vals = ArrayDeque<Res>()
+    work.addLast(Frame.Eval(root, sort))
+
+    while (work.isNotEmpty()) {
+        when (val fr = work.removeLast()) {
+            is Frame.PopScope -> popLetScope()
+
+            is Frame.MakeScope -> {
+                val k = fr.names.size
+                // Values were pushed in binding order, so the top-of-stack is the last binding.
+                val popped = ArrayList<Res>(k)
+                repeat(k) { popped.add(vals.removeLast()) }
+                val bound = ArrayList<Pair<String, SmtLibQfLia.Builder.Binding>>(k)
+                for (i in 0 until k) {
+                    val res = popped[k - 1 - i]
+                    val b = SmtLibQfLia.Builder.Binding(isBool = fr.bools[i])
+                    if (fr.bools[i]) b.lit = res.asLit() else b.lin = res.asLin()
+                    bound.add(fr.names[i] to b)
+                }
+                pushScopeBindings(bound)
+            }
+
+            is Frame.Combine -> {
+                val args = ArrayList<Res>(fr.argc)
+                repeat(fr.argc) { args.add(vals.removeLast()) }
+                args.reverse()
+                vals.addLast(combine(fr.node, fr.sort, args))
+            }
+
+            is Frame.Eval -> {
+                when (val node = fr.node) {
+                    is SExpr.Atom -> vals.addLast(evalAtom(node, fr.sort))
+
+                    is SExpr.SList -> {
+                        if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "let") {
+                            scheduleLet(node, fr.sort, work)
+                        } else {
+                            val kids = childTasks(node, fr.sort)
+                            work.addLast(Frame.Combine(node, fr.sort, kids.size))
+                            for (i in kids.indices.reversed()) work.addLast(Frame.Eval(kids[i].first, kids[i].second))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return vals.removeLast()
+}
+
+/** Push the frames for `(let (bindings) body)`: evaluate each binding value, build the scope, run the
+ *  body, then pop — all in-stack, so nested lets never recurse through [evalTerm]. */
+private fun SmtLibQfLia.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: ArrayDeque<Frame>) {
+    val bindingList = node.items[1] as? SExpr.SList ?: throw UnsupportedSmtException("malformed let bindings")
+    val pairs = bindingList.items.map { it as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding") }
+    val names = pairs.map { (it.items[0] as SExpr.Atom).text }
+    val valueExprs = pairs.map { it.items[1] }
+    val bools = BooleanArray(pairs.size) { isBoolExpr(valueExprs[it]) }
+    // LIFO: values first, then build the scope, then the body, then pop.
+    work.addLast(Frame.PopScope)
+    work.addLast(Frame.Eval(node.items[2], sort))
+    work.addLast(Frame.MakeScope(names, bools))
+    for (i in valueExprs.indices.reversed()) {
+        work.addLast(Frame.Eval(valueExprs[i], if (bools[i]) Sort.BOOL else Sort.INT))
+    }
+}
+
+/** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
+private fun SmtLibQfLia.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
+    val head = (node.items[0] as? SExpr.Atom)?.text
+    val args = node.items.drop(1)
+    val kids = if (sort == Sort.BOOL) {
+        when (head) {
+            "not", "and", "or", "xor", "=>" -> args.map { it to Sort.BOOL }
+            "<=", "<", ">=", ">" -> args.map { it to Sort.INT }
+            "ite" -> args.map { it to Sort.BOOL }
+            "distinct" -> args.map { it to (if (isBoolExpr(it)) Sort.BOOL else Sort.INT) }
+            "=" -> if (isArithmeticRelation(node)) args.map { it to Sort.INT } else args.map { it to Sort.BOOL }
+            else -> null
+        }
+    } else {
+        when (head) {
+            "+", "-", "*" -> args.map { it to Sort.INT }
+            "to_real", "to_int" -> args.map { it to Sort.INT }
+            "ite" -> listOf(args[0] to Sort.BOOL, args[1] to Sort.INT, args[2] to Sort.INT)
+            "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$head'")
+            else -> null
+        }
+    }
+    return kids ?: throw UnsupportedSmtException(
+        "unsupported ${if (sort == Sort.BOOL) "boolean" else "int"} op '$head'",
+    )
+}
+
+/** Combine a list node's already-folded child results [args] into this node's [Res]. */
+private fun SmtLibQfLia.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res>): Res {
+    val head = (node.items[0] as SExpr.Atom).text
+    return if (sort == Sort.BOOL) combineBool(node, head, args) else combineInt(head, args)
+}
+
+private fun SmtLibQfLia.Builder.combineBool(node: SExpr.SList, head: String, args: List<Res>): Res = when (head) {
+    "not" -> Res.B(Lit.negate(args[0].asLit()))
+
+    "and" -> Res.B(tseitinAnd(args.map { it.asLit() }))
+
+    "or" -> Res.B(tseitinOr(args.map { it.asLit() }))
+
+    "xor" -> Res.B(args.map { it.asLit() }.reduce { a, b -> Lit.negate(tseitinIff(a, b)) })
+
+    "=>" -> {
+        val lits = args.map { it.asLit() }
+        Res.B(lits.dropLast(1).foldRight(lits.last()) { a, acc -> tseitinOr(listOf(Lit.negate(a), acc)) })
+    }
+
+    "<=", "<", ">=", ">" -> Res.B(reifyRelArgs(node, head, args))
+
+    "distinct" -> Res.B(distinctFromArgs(args))
+
+    "ite" -> Res.B(tseitinIte(args[0].asLit(), args[1].asLit(), args[2].asLit()))
+
+    "=" -> if (isArithmeticRelation(node)) {
+        if (args.size == 2) {
+            Res.B(reifyRelArgs(node, head, args))
+        } else {
+            Res.B(chainEqToFirst(args.map { it.asLin() }, ::reifyEq))
+        }
+    } else {
+        Res.B(chainEqToFirst(args.map { it.asLit() }, ::tseitinIff))
+    }
+
+    else -> throw UnsupportedSmtException("unsupported boolean op '$head'")
+}
+
+private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res = when (head) {
+    "+" -> Res.I(args.map { it.asLin() }.reduce(::add))
+
+    "-" -> if (args.size == 1) {
+        Res.I(scale(args[0].asLin(), -1L))
+    } else {
+        Res.I(args.drop(1).fold(args[0].asLin()) { acc, e -> add(acc, scale(e.asLin(), -1L)) })
+    }
+
+    "*" -> {
+        val parts = args.map { it.asLin() }
+        val nonConst = parts.filter { it.coeffs.isNotEmpty() }
+        if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
+        val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> a * c.constant }
+        if (nonConst.isEmpty()) Res.I(LinComb(emptyMap(), k)) else Res.I(scale(nonConst[0], k))
+    }
+
+    "to_real", "to_int" -> Res.I(args[0].asLin())
+
+    "ite" -> {
+        // v = if cond then a else b: a fresh int pinned to each branch by the condition.
+        val cond = args[0].asLit()
+        val a = args[1].asLin()
+        val b = args[2].asLin()
+        val self = LinComb(mapOf(newInt() to 1), 0)
+        factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
+        factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
+        Res.I(self)
+    }
+
+    else -> throw UnsupportedSmtException("unsupported int op '$head'")
+}
+
+/** Reify a two-operand arithmetic relation from its folded operands. */
+private fun SmtLibQfLia.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
+    if (node.items.size != 3) {
+        throw UnsupportedSmtException(
+            "$op with ${node.items.size - 1} operands not supported as a single linear relation",
+        )
+    }
+    val rel = relFromOperands(op, args[0].asLin(), args[1].asLin())
+    return reifyLinear(rel.coeffs, rel.vars, rel.op, rel.bound)
+}
+
+/** Pairwise `!=` over folded distinct operands (bool operands channelled to a 0/1 int term). */
+private fun SmtLibQfLia.Builder.distinctFromArgs(args: List<Res>): Int {
+    if (args.size < 2) return trueLit()
+    val terms = args.map { if (it is Res.B) litToIntTerm(it.lit) else it.asLin() }
+    return tseitinAnd(pairs(terms.size).map { (i, j) -> reifyNe(terms[i], terms[j]) })
+}
+
+/** Fold an atom to a boolean literal or integer term. */
+private fun SmtLibQfLia.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.BOOL) {
+    when (node.text) {
+        "true" -> Res.B(trueLit())
+
+        "false" -> Res.B(Lit.negate(trueLit()))
+
+        else -> lookup(node.text)?.let { Res.B(boolBinding(node.text, it)) }
+            ?: Res.B(
+                Lit.make(
+                    boolNames[node.text] ?: throw UnsupportedSmtException("unknown bool '${node.text}'"),
+                    true,
+                ),
+            )
+    }
+} else {
+    val n = node.text.toLongOrNull()
+    when {
+        n != null -> Res.I(LinComb(emptyMap(), n))
+
+        isIntegerLiteral(node.text) -> throw UnsupportedSmtException(
+            "integer literal '${node.text}' exceeds the 64-bit range of the QF_LIA lowering",
+        )
+
+        isRealLiteral(node.text) ->
+            throw UnsupportedSmtException("real literal '${node.text}' (QF_LIA is integer-only)")
+
+        else -> lookup(node.text)?.let { Res.I(intBinding(node.text, it)) }
+            ?: Res.I(
+                LinComb(
+                    mapOf(
+                        (
+                            intNames[node.text] ?: throw UnsupportedSmtException(
+                                "unknown int var '${node.text}'",
+                            )
+                            ) to 1,
+                    ),
+                    0,
+                ),
+            )
+    }
+}

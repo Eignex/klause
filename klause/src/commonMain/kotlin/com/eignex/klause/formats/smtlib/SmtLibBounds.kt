@@ -130,24 +130,41 @@ internal fun SmtLibQfLia.Builder.applyCtBound(
 
 internal fun SmtLibQfLia.Builder.safe(x: Long): Long = x.coerceIn(NEG_INF, POS_INF)
 
-internal fun SmtLibQfLia.Builder.collectConjunctiveRelations(t: SExpr, out: ArrayList<Rel>) {
-    if (t !is SExpr.SList || t.items.isEmpty()) return
-    val h = (t.items[0] as? SExpr.Atom)?.text ?: return
-    when (h) {
-        "and" -> t.items.drop(1).forEach { collectConjunctiveRelations(it, out) }
+internal fun SmtLibQfLia.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
+    // Walk the `and` conjunction with an explicit worklist (not recursion), so a degenerate
+    // conjunction can't overflow the stack during bound inference.
+    val work = ArrayDeque<SExpr>()
+    work.addLast(top)
+    while (work.isNotEmpty()) {
+        val t = work.removeLast()
+        if (t !is SExpr.SList || t.items.isEmpty()) continue
+        when ((t.items[0] as? SExpr.Atom)?.text) {
+            "and" -> for (i in 1 until t.items.size) work.addLast(t.items[i])
 
-        "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t) && !containsIte(t)) {
-            try {
-                out.add(relationToLinear(t))
-            } catch (_: UnsupportedSmtException) { }
+            "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t) && !containsIte(t)) {
+                try {
+                    out.add(relationToLinear(t))
+                } catch (_: UnsupportedSmtException) { }
+            }
         }
     }
 }
 
 /** Whether [t] contains an `(ite …)` subterm — lowering it has side effects (fresh vars and
- *  clauses), so the read-only bound-inference pass must not descend into it. */
-internal fun SmtLibQfLia.Builder.containsIte(t: SExpr): Boolean = t is SExpr.SList &&
-    ((t.items.firstOrNull() as? SExpr.Atom)?.text == "ite" || t.items.any { containsIte(it) })
+ *  clauses), so the read-only bound-inference pass must not descend into it. The scan is iterative
+ *  (explicit stack) so a deep term can't overflow the call stack. */
+internal fun SmtLibQfLia.Builder.containsIte(t: SExpr): Boolean {
+    val work = ArrayDeque<SExpr>()
+    work.addLast(t)
+    while (work.isNotEmpty()) {
+        val n = work.removeLast()
+        if (n is SExpr.SList) {
+            if ((n.items.firstOrNull() as? SExpr.Atom)?.text == "ite") return true
+            for (c in n.items) work.addLast(c)
+        }
+    }
+    return false
+}
 
 internal const val NEG_INF = Long.MIN_VALUE / 4
 internal const val POS_INF = Long.MAX_VALUE / 4

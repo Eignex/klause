@@ -214,4 +214,31 @@ class SmtLibQfLiaTest {
         }
         assertTrue(ex.message!!.contains("y") || ex.message!!.contains("bound"), ex.message!!)
     }
+
+    @Test
+    fun `deeply nested terms parse without overflowing the stack`() {
+        // A depth that overflows a recursive-descent fold but is cheap iteratively. Exercises all
+        // three tree-walkers: boolean nesting (compileBool), arithmetic nesting (linearTerm), and
+        // let-scope nesting (the evaluator's scope frames).
+        val depth = 20_000
+        val notChain = "(not ".repeat(depth) + "p" + ")".repeat(depth)
+        val plusChain = "(+ 1 ".repeat(depth) + "x" + ")".repeat(depth)
+        val letOpen = StringBuilder()
+        val letClose = StringBuilder()
+        for (i in 0 until depth) {
+            letOpen.append("(let ((y$i ${if (i == 0) "x" else "y${i - 1}"})) ")
+            letClose.append(")")
+        }
+        val letChain = "$letOpen y${depth - 1} $letClose"
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int) (declare-const p Bool)
+            (assert $notChain)
+            (assert (<= $plusChain 1000000))
+            (assert (>= $letChain 0))
+            (check-sat)
+        """.trimIndent()
+        val problem = SmtLibQfLia.parse(text).problem
+        assertTrue(problem.numIntVars >= 1)
+    }
 }
