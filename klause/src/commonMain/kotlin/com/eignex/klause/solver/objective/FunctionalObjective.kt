@@ -29,7 +29,11 @@ import kotlin.math.abs
  * "Lower is better": for minimization the objective is `V`; for maximization it is `−V`.
  */
 internal class FunctionalObjective internal constructor(
-    private val objectiveVar: Int,
+    /** Objective terms `Σ termCoeffs[k]·terms[k] + constant`, "lower is better": each term is a cone
+     *  var (evaluated through [nodes]) or a bare leaf var. A single-variable objective is one term. */
+    private val terms: IntArray,
+    private val termCoeffs: LongArray,
+    private val constant: Long,
     private val minimize: Boolean,
     /** Defining nodes in topological order — every node's inputs are leaves or earlier nodes. */
     private val nodes: List<Node>,
@@ -37,6 +41,10 @@ internal class FunctionalObjective internal constructor(
      *  candidate moves on to descend this objective. Empty when the cone has no var leaves. */
     val leafVars: IntArray,
 ) : IncrementalObjective {
+
+    /** Single-variable objective (the FlatZinc `defines_var` cone rooted at one variable). */
+    internal constructor(objectiveVar: Int, minimize: Boolean, nodes: List<Node>, leafVars: IntArray) :
+        this(intArrayOf(objectiveVar), longArrayOf(1L), 0L, minimize, nodes, leafVars)
 
     /** A var reference (`varId ≥ 0`) or a literal constant (`varId < 0`, value in [const]). */
     class Operand internal constructor(val varId: Int, val const: Long) {
@@ -84,7 +92,7 @@ internal class FunctionalObjective internal constructor(
     }
 
     /** Reusable dense evaluator for the defining cone; the slot index is built once here. */
-    private val coneMemo = ConeMemo(nodes, objectiveVar)
+    private val coneMemo = ConeMemo(nodes, terms, termCoeffs, constant)
 
     /** Evaluate the cone over a base value-getter and return the "lower is better" objective. */
     private fun objValue(base: (Int) -> Long): Long {
@@ -101,7 +109,12 @@ internal class FunctionalObjective internal constructor(
      * is allocated per [evaluate], so a single instance stays safe to share across concurrent
      * local-search workers (the objective is held in [com.eignex.klause.localsearch.LocalSearchParams]).
      */
-    private class ConeMemo(private val nodes: List<Node>, private val objectiveVar: Int) {
+    private class ConeMemo(
+        private val nodes: List<Node>,
+        private val terms: IntArray,
+        private val termCoeffs: LongArray,
+        private val constant: Long,
+    ) {
         /** Node-output varId → its value-array slot; an id with no defining node (a leaf) maps to `-1`.
          *  [IntIntMap.build] picks a dense array backing for klause's dense aux-var ids. */
         private val slotOf: IntIntMap = IntIntMap.build(
@@ -110,10 +123,8 @@ internal class FunctionalObjective internal constructor(
             absent = -1,
         )
 
-        /** Slot of the objective variable, or `-1` when it is itself a leaf with no defining node. */
-        private val objectiveSlot: Int = slotOf[objectiveVar]
-
-        /** Evaluate the cone bottom-up, reading leaf (decision) values from [base]. */
+        /** Evaluate the cone bottom-up, reading leaf (decision) values from [base], then combine the
+         *  objective terms `Σ termCoeffs·terms + constant`. */
         fun evaluate(base: (Int) -> Long): Long {
             val vals = LongArray(nodes.size)
             // A node's inputs are leaves or earlier nodes (topological order), so its slot is filled
@@ -123,7 +134,9 @@ internal class FunctionalObjective internal constructor(
                 if (s >= 0) vals[s] else base(id)
             }
             for (i in nodes.indices) vals[i] = nodes[i].compute(valOf)
-            return if (objectiveSlot >= 0) vals[objectiveSlot] else base(objectiveVar)
+            var total = constant
+            for (k in terms.indices) total += termCoeffs[k] * valOf(terms[k])
+            return total
         }
     }
 

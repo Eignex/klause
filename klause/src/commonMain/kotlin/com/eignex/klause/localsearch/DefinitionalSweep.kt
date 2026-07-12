@@ -9,10 +9,12 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.FunctionalObjective
+import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedIntArray
 
 /**
@@ -69,13 +71,38 @@ class DefinitionalSweep internal constructor(
                     defOut[v] = outIdx
                 }
             }
-            for (f in factors) if (f is Product) claim(f.result, f, -1)
+            val isProductResult = BooleanArray(numIntVars)
+            for (f in factors) {
+                if (f is Product) {
+                    claim(f.result, f, -1)
+                    if (f.result in 0 until numIntVars) isProductResult[f.result] = true
+                }
+            }
             if (definedHints.isNotEmpty()) {
                 val hinted = BooleanArray(numIntVars)
                 for (v in definedHints) if (v in 0 until numIntVars) hinted[v] = true
+                // Deriving a hinted sum var is always sound but only pays off when it sits atop a functional
+                // cone that bottoms out at lightly-constrained decision vars — the objective-decomposition
+                // shape (e.g. `c = Σ x_i·x_j`, then `c²` in the objective). Two guards keep it there:
+                //  - its sole non-`Product` occurrence is its own definer (it feeds nothing but the objective's
+                //    product terms), and
+                //  - every summand is itself a `Product` result (the sum caps a product cone, not a layer of
+                //    feasibility-critical decision variables whose exclusion from search stalls repair).
+                val nonProductOcc = IntArray(numIntVars)
+                for (f in factors) {
+                    if (f !is Product) {
+                        for (v in f.intVars) {
+                            if (v in 0 until numIntVars) nonProductOcc[v]++
+                        }
+                    }
+                }
                 for (f in factors) {
                     if (f !is Linear || f.op != LinearOp.EQ) continue
-                    val j = f.vars.indices.firstOrNull { hinted[f.vars[it]] && (f.coeffs[it] == 1L || f.coeffs[it] == -1L) }
+                    val j = f.vars.indices.firstOrNull {
+                        hinted[f.vars[it]] && (f.coeffs[it] == 1L || f.coeffs[it] == -1L) &&
+                            nonProductOcc[f.vars[it]] == 1 &&
+                            f.vars.indices.all { k -> k == it || isProductResult[f.vars[k]] }
+                    }
                     if (j != null) claim(f.vars[j], f, j)
                 }
             }
@@ -95,17 +122,23 @@ class DefinitionalSweep internal constructor(
                 if (f is Product) {
                     visit(f.a)
                     visit(f.b)
-                    node = FunctionalObjective.Times(v, FunctionalObjective.Operand.v(f.a), FunctionalObjective.Operand.v(f.b))
+                    node = FunctionalObjective.Times(
+                        v,
+                        FunctionalObjective.Operand.v(f.a),
+                        FunctionalObjective.Operand.v(f.b),
+                    )
                     inputs = intArrayOf(f.a, f.b)
                 } else {
                     val lin = f as Linear
                     val j = defOut[v]
                     val ins = ArrayList<FunctionalObjective.Operand>(lin.vars.size - 1)
                     val inc = ArrayList<Long>(lin.vars.size - 1)
-                    for (k in lin.vars.indices) if (k != j) {
-                        visit(lin.vars[k])
-                        ins.add(FunctionalObjective.Operand.v(lin.vars[k]))
-                        inc.add(lin.coeffs[k])
+                    for (k in lin.vars.indices) {
+                        if (k != j) {
+                            visit(lin.vars[k])
+                            ins.add(FunctionalObjective.Operand.v(lin.vars[k]))
+                            inc.add(lin.coeffs[k])
+                        }
                     }
                     node = FunctionalObjective.Lin(v, lin.coeffs[j], inc.toLongArray(), ins.toTypedArray(), lin.bound)
                     inputs = IntArray(ins.size) { lin.vars[if (it < j) it else it + 1] }
@@ -116,6 +149,40 @@ class DefinitionalSweep internal constructor(
             for (v in 0 until numIntVars) visit(v)
             return if (nodes.isEmpty()) null else DefinitionalSweep(nodes)
         }
+    }
+
+    /**
+     * Build a [FunctionalObjective] `Σ termCoeffs·terms + constant` (already "lower is better") over
+     * this sweep's int cone, so local search descends the objective on the decision (leaf) vars
+     * rather than the functionally-defined ones. Returns null when no term is defined here (a bare
+     * linear objective — a [com.eignex.klause.solver.objective.LinearObjective] already suffices).
+     */
+    fun functionalObjective(
+        terms: IntArray,
+        termCoeffs: LongArray,
+        constant: Long,
+        minimize: Boolean,
+    ): IncrementalObjective? {
+        val defByOut = MutableIntObjectMap<SweepNode.IntDef>()
+        for (n in nodes) if (n is SweepNode.IntDef) defByOut.put(n.out, n)
+        if (terms.none { defByOut.containsKey(it) }) return null
+        val reachable = IntHashSet()
+        fun mark(id: Int) {
+            val d = defByOut[id] ?: return
+            if (id in reachable) return
+            reachable.add(id)
+            for (inId in d.intInputs) mark(inId)
+        }
+        for (t in terms) mark(t)
+        // `nodes` is topological, so filtering preserves the inputs-before-outputs order the cone eval needs.
+        val coneNodes = ArrayList<FunctionalObjective.Node>(reachable.size)
+        val leaves = LinkedHashSet<Int>()
+        for (n in nodes) {
+            if (n !is SweepNode.IntDef || n.out !in reachable) continue
+            coneNodes.add(n.node)
+            for (inId in n.intInputs) if (inId !in reachable) leaves.add(inId)
+        }
+        return FunctionalObjective(terms, termCoeffs, constant, minimize, coneNodes, leaves.toIntArray())
     }
 
     /** One evaluable definition `out = f(inputs)` with its read-set exposed for cone indexing. */
@@ -153,7 +220,7 @@ class DefinitionalSweep internal constructor(
         /** An int definition from the functional-objective node algebra (abs / min / max /
          *  times / plus / lin_eq), domain-clamped. */
         class IntDef internal constructor(
-            private val node: FunctionalObjective.Node,
+            internal val node: FunctionalObjective.Node,
             override val intInputs: IntArray,
         ) : SweepNode {
             override val out: Int get() = node.out
