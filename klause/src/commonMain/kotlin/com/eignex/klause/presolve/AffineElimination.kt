@@ -85,8 +85,8 @@ internal object AffineSingletons {
                     problem.intDomains,
                 )
             } else {
-                findAffineCandidate(seed, 0, eliminated, objectiveIntVars, capWide) != null ||
-                    findResidueCandidate(seed, eliminated, objectiveIntVars, problem.intDomains) != null
+                findAffineCandidate(seed, 0, eliminated, objectiveIntVars, capWide, cancellation) != null ||
+                    findResidueCandidate(seed, eliminated, objectiveIntVars, problem.intDomains, cancellation) != null
             }
             if (!hasCandidate) return PassDelta()
         }
@@ -114,7 +114,7 @@ internal object AffineSingletons {
         // solved directly (sound). The budget is far above what productive models spend.
         var fillIn = 0L
         while (!cancellation()) {
-            val cand = findAffineCandidate(ws, scanFrom, eliminated, objectiveIntVars, capWide) ?: break
+            val cand = findAffineCandidate(ws, scanFrom, eliminated, objectiveIntVars, capWide, cancellation) ?: break
             fillIn += ws.degreeOf(cand.x).toLong() * cand.termVars.size
             scanFrom = foldOutVariable(problem, ws, cand)
             eliminated[cand.x] = true
@@ -128,7 +128,7 @@ internal object AffineSingletons {
         // is always a surviving variable.
         val domains = problem.intDomains.copyOf()
         while (!cancellation()) {
-            val r = findResidueCandidate(ws, eliminated, objectiveIntVars, domains) ?: break
+            val r = findResidueCandidate(ws, eliminated, objectiveIntVars, domains, cancellation) ?: break
             ws.drop(r.defIdx)
             domains[r.y] = r.restrictedY
             eliminated[r.x] = true
@@ -199,8 +199,10 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
         domains: Array<IntDomain>,
+        cancellation: Cancellation = Cancellation.Never,
     ): ResidueCandidate? {
         for (di in 0 until ws.size) {
+            if ((di and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             residueCandidateInFactor(
                 ws,
                 di,
@@ -295,6 +297,7 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
         capWide: Boolean,
+        cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
         // present — so it picks candidates in the identical sequence a full rebuild would. Give up after
@@ -303,6 +306,10 @@ internal object AffineSingletons {
         // pass folds nothing), scanning to the end is pure fruitless cost. Sound: an unfound pivot stays.
         val limit = minOf(ws.size.toLong(), start.toLong() + AFFINE_SCAN_ABORT).toInt()
         for (di in start until limit) {
+            // Poll the presolve deadline inside the scan, not only between folds: a single scan over a large
+            // wide-row factor set (Coprime) can run for seconds, so without this the budget cannot bound it.
+            // Giving up returns the folds made so far — sound (an unfound pivot simply stays).
+            if ((di and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             candidateInFactor(
                 ws,
                 di,
@@ -313,6 +320,9 @@ internal object AffineSingletons {
         }
         return null
     }
+
+    /** Poll the cancellation once per this many scanned factors (a power-of-two mask for a cheap check). */
+    private const val CANCEL_POLL_MASK = 0x3FF
 
     /** Consecutive non-candidate factors [findAffineCandidate] scans before giving up. Set well above the
      *  gap between successive pivots in any model where affine is productive (which cluster near the top),

@@ -266,7 +266,8 @@ enum class PresolvePass(
 ) {
     /** GCD + bounded-integer coefficient strengthening (#319 / #372). */
     STRENGTHEN_COEFFICIENTS("strengthen", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.strengthenCoefficients(problem)
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            Presolve.strengthenCoefficients(problem, ctx.cancellation)
     },
 
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
@@ -308,7 +309,11 @@ enum class PresolvePass(
      *  already GCD-normalised. */
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
-            RedundantConstraints.removeRedundantConstraints(problem, ctx.subsumeIncremental as? SubsumeIncremental)
+            RedundantConstraints.removeRedundantConstraints(
+                problem,
+                ctx.subsumeIncremental as? SubsumeIncremental,
+                ctx.cancellation,
+            )
     },
 
     /** Per-factor structural self-reduction — each factor rewrites itself into simpler / lower-arity

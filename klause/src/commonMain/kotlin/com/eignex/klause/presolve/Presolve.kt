@@ -14,7 +14,8 @@ object Presolve {
 
     /** GCD coefficient strengthening for [com.eignex.klause.factor.arithmetic.Linear] and
      *  pseudo-Boolean constraints. See [CoefficientStrengthening]. */
-    fun strengthenCoefficients(problem: Problem): PassDelta = CoefficientStrengthening.strengthenCoefficients(problem)
+    fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        CoefficientStrengthening.strengthenCoefficients(problem, cancellation)
 
     /** One-shot GF(2) elimination over all xor factors. See [XorUnits]. */
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
