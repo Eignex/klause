@@ -94,7 +94,10 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     // appended to its vars' lists; a tombstoned factor's id stays (filtered on read, its slot is null).
     // The affine / dup-columns per-round candidate search reads the dense view derived in [passInput],
     // never rebuilding an occurrence index of its own.
-    private val intOcc: Array<IntArrayList> = Array(base.numIntVars) { IntArrayList(0) }
+    // Allocated lazily per variable: a model can declare millions of integer variables while only a few
+    // thousand ever occur in a factor (WordGolf-scale word-grid instances), so allocating a list for every
+    // declared variable up front is the dominant construction cost there. A `null` slot is an empty list.
+    private val intOcc: Array<IntArrayList?> = arrayOfNulls(base.numIntVars)
 
     // The dense [SharedIntOccurrence] view [passInput] last handed out, and whether the factor set has
     // changed since it was built. Rebuilt (O(occurrences)) only once per firing; a non-firing stretch of
@@ -128,7 +131,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     /** Append stable factor id [id] to the occurrence list of each int var factor [f] mentions, so the
      *  index carries [f] once per occurrence in its [Factor.intVars] (mirroring a fresh CSR rebuild). */
     private fun recordOccurrences(id: Int, f: Factor) {
-        for (v in f.intVars) intOcc[v].add(id)
+        for (v in f.intVars) (intOcc[v] ?: IntArrayList(0).also { intOcc[v] = it }).add(id)
     }
 
     // Append-only logs of every factor add / drop, in application order, so a pass that reads them at a
@@ -325,13 +328,13 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         for (v in 0 until base.numIntVars) {
             var live = 0
             val list = intOcc[v]
-            for (k in 0 until list.size) if (denseOf[list[k]] >= 0) live++
+            if (list != null) for (k in 0 until list.size) if (denseOf[list[k]] >= 0) live++
             offsets[v + 1] = offsets[v] + live
         }
         val flat = IntArray(offsets[base.numIntVars])
         val cursor = offsets.copyOf()
         for (v in 0 until base.numIntVars) {
-            val list = intOcc[v]
+            val list = intOcc[v] ?: continue
             for (k in 0 until list.size) {
                 val dense = denseOf[list[k]]
                 if (dense >= 0) flat[cursor[v]++] = dense
@@ -398,7 +401,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         factors.addAll(eager.factors)
         // The stable-id space was rebuilt from scratch, so the occurrence lists — and any pass's replayable
         // change history — must be too; bumping the epoch forces a stale-marked pass to rescan.
-        for (v in 0 until base.numIntVars) intOcc[v].clear()
+        for (v in 0 until base.numIntVars) intOcc[v]?.clear()
         for (id in eager.factors.indices) recordOccurrences(id, eager.factors[id])
         addedLog.clear()
         droppedFactorLog.clear()
