@@ -23,8 +23,6 @@ Vendored directories and their provenance:
   `queens4-soft.wbo` (a WBO soft-constraint instance).
 - `schema/` (klause JSON): self-authored, internal (campaign, roster);
   regenerate the campaign sample via `:klause-bench:dumpSchema`.
-- `flatzinc/` (FlatZinc): self-authored, internal — cardinality, permutation,
-  linear, 3x3 magic square, 4-cycle graph colouring, element channeling.
 - `smtlib/` (SMT-LIB QF_LIA): self-authored, internal — basic, optimization,
   infeasible, and a disjunction.
 - `xcsp3/` (XCSP3): self-authored, internal — magic series, sum COP, 3x3 magic

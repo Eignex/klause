@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  * Uniform subprocess solving: every solver is run as an external process emitting MiniZinc-format
  * output, then parsed identically. Two backends:
  *  - **klause** → the `klause-cli` binary on the model (the compiled `.fzn` for a MiniZinc instance,
- *    or the original file for FlatZinc / XCSP3 / SMT-LIB). klause-cli renders the model's objective,
+ *    or the original file for XCSP3 / SMT-LIB). klause-cli renders the model's objective,
  *    so a maximize objective is reported in the model's orientation (not klause's internal minimised
  *    form) — the comparison is sign-correct by construction.
  *  - **a reference** (`choco` / `gecode` / `yuck` / …) → `minizinc --solver <id>` end-to-end on the

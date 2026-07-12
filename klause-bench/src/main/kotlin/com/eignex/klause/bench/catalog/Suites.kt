@@ -22,7 +22,7 @@ import com.eignex.klause.solver.Problem
  * from.
  *
  *  - [handwrittenCore] — small SAT/CSP instances built directly in Kotlin (`InCode`).
- *  - [dimacsCore]/[opbCore]/[schemaCore]/[flatzincCore] — vendored under `klause-bench/smoke-corpus/`.
+ *  - [dimacsCore]/[opbCore]/[schemaCore] — vendored under `klause-bench/smoke-corpus/`.
  *  - [mznSmoke] — the in-tree `klause-mzn-lib/test-models/` smoke set (referenced, not copied).
  *  - external MiniZinc/SAT collections (fetched on demand) are declared in [ExternalCollections].
  */
@@ -30,7 +30,7 @@ internal object Suites {
 
     val all: List<Suite> by lazy {
         listOf(
-            handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore, flatzincCore,
+            handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
             smtlibCore, xcsp3Core, mznSmoke, satlibUf20, satLadder, satCrafted,
         )
     }
@@ -472,17 +472,6 @@ internal object Suites {
         license = "internal"
         vendored("campaign", Category.ASSIGNMENT, Expected.Sat)
         vendored("roster", Category.ASSIGNMENT, Expected.Sat)
-    }
-
-    private val flatzincCore = suite("flatzinc-core", "Curated small FlatZinc (satisfaction)") {
-        format = Format.FLATZINC
-        license = "internal"
-        vendored("cardinality", Category.CSP, Expected.Sat)
-        vendored("permutation4", Category.CSP, Expected.Sat)
-        vendored("small-linear", Category.CSP, Expected.Sat)
-        vendored("magic-square-3", Category.CSP, Expected.Sat)
-        vendored("graph-coloring-4cycle", Category.CSP, Expected.Sat)
-        vendored("element-channel", Category.CSP, Expected.Sat)
     }
 
     private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA instances") {

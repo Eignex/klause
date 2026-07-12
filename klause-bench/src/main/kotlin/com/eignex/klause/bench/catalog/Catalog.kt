@@ -27,9 +27,6 @@ enum class Format {
     /** klause JSON `SchemaDef`. In-process via `JsonSchema.parseProblem`. */
     JSON_SCHEMA,
 
-    /** FlatZinc. In-process via `parseFlatZinc`. */
-    FLATZINC,
-
     /** MiniZinc model (+ optional `.dzn`). Compiled to FlatZinc by the `minizinc` CLI, then
      *  parsed in-process. See `runner.MiniZincRunner`. */
     MINIZINC,

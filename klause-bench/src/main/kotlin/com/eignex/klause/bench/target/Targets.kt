@@ -8,6 +8,5 @@ internal object Targets {
         "dimacs-core",
         "opb-core",
         "schema-core",
-        "flatzinc-core",
     )
 }

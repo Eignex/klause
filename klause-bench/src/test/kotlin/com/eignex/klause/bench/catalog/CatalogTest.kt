@@ -84,14 +84,6 @@ class CatalogTest {
     }
 
     @Test
-    fun `flatzinc-core resolves all bundled instances`() {
-        for (name in listOf("cardinality", "permutation4", "small-linear")) {
-            val p = InProcessRunner.resolve(ref("flatzinc-core", name)).problem
-            assertTrue(p.factors.isNotEmpty(), "$name should have factors")
-        }
-    }
-
-    @Test
     fun `handwritten-core problems all build in-code`() {
         val hw = Catalog.suite("handwritten-core").problems
         assertTrue(hw.size >= 13)

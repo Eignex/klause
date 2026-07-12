@@ -49,7 +49,7 @@ internal interface Runner {
     fun resolve(ref: ProblemRef): ResolvedProblem
 }
 
-/** Resolves in-process formats (DIMACS / OPB / JSON-Schema / FlatZinc) and `InCode` builders. */
+/** Resolves in-process formats (DIMACS / OPB / JSON-Schema / XCSP3 / SMT-LIB) and `InCode` builders. */
 internal object InProcessRunner : Runner {
     override val id = "in-process"
 
