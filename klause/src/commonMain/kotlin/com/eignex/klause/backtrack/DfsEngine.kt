@@ -140,6 +140,10 @@ internal class DfsEngine<L>(
 
     private val restart = RestartSchedule.from(params)
     private var restartCount = 0L
+
+    // Only schedules that couple the phase regime to their mode report a non-UNMANAGED phase; capture
+    // it once so the common path pays nothing and its phasing stays byte-identical.
+    private val phaseManaged = restart.phaseMode() != PhaseMode.UNMANAGED
     private val vivifyEnabled = params.vivification && params.assumptions.isEmpty
     private var vivifyCursor = 0
     private val poller = DeadlinePoller()
@@ -249,6 +253,7 @@ internal class DfsEngine<L>(
             return policy.onLeaf(snap)?.let { EngineEvent.Solution(it) }
         }
         val values = params.valueSelector.values(session, varRef, rng)
+        if (phaseManaged) phase.setManagedMode(restart.phaseMode())
         val phased = phase.applyPhase(varRef, values, rng)
         val ordered = policy.orderValues(varRef, phased)
         val node = solver.makeNode(varRef, ordered)

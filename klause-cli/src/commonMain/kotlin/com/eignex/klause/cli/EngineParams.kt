@@ -131,9 +131,10 @@ internal class EngineParams(pairs: List<String>) {
 /** The backtrack override keys consumed by [backtrackOverride], excluding `seed` (owned by the naked
  *  engine / the portfolio scenario) — the set that, when present, edits the `cp` arm pool. */
 internal val BACKTRACK_OVERRIDE_KEYS = listOf(
-    "max-decisions", "luby", "adaptive-restart", "phase-saving", "target-phasing", "rephase-interval",
-    "max-learned", "lbd-glue", "tiered-db", "mid-lbd", "vivification", "vivify-batch",
-    "lp-objective-cone", "lp-auto-off-reprobe", "lp-knapsack-lagrangian", "var-selector", "val-selector",
+    "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
+    "target-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db", "mid-lbd", "vivification",
+    "vivify-batch", "lp-objective-cone", "lp-auto-off-reprobe", "lp-knapsack-lagrangian", "var-selector",
+    "val-selector",
 )
 
 /** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
@@ -148,6 +149,8 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val maxDecisions = p.long("max-decisions")
     val luby = p.long("luby")
     val adaptiveRestart = p.bool("adaptive-restart")
+    val emaRestart = p.bool("ema-restart")
+    val modeSwitchingRestart = p.bool("mode-switching-restart")
     val phaseSaving = p.bool("phase-saving")
     val targetPhasing = p.bool("target-phasing")
     val rephaseInterval = p.long("rephase-interval")
@@ -163,8 +166,9 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val varKind = if (allowSelectors) p.varSelectorKind("var-selector") else null
     val valKind = if (allowSelectors) p.valSelectorKind("val-selector") else null
     val scalars = listOf(
-        maxDecisions, luby, adaptiveRestart, phaseSaving, targetPhasing, rephaseInterval, maxLearned,
-        lbdGlue, tieredDb, midLbd, vivification, vivifyBatch, lpCone, lpAutoOff, lpKnapsack,
+        maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
+        rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch, lpCone, lpAutoOff,
+        lpKnapsack,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -172,6 +176,8 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         maxDecisions?.let { out = out.copy(maxDecisions = it) }
         luby?.let { out = out.copy(lubyRestartBase = it) }
         adaptiveRestart?.let { out = out.copy(adaptiveRestart = it) }
+        emaRestart?.let { out = out.copy(emaRestart = it) }
+        modeSwitchingRestart?.let { out = out.copy(modeSwitchingRestart = it) }
         phaseSaving?.let { out = out.copy(phaseSaving = it) }
         targetPhasing?.let { out = out.copy(targetPhasing = it) }
         rephaseInterval?.let { out = out.copy(rephaseInterval = it) }

@@ -30,6 +30,16 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
     private var rephaseMode = RephaseMode.TARGET
     private var conflictsSinceRephase = 0L
 
+    // When a restart schedule manages the phase regime ([PhaseMode.STABLE] / [PhaseMode.FOCUSED]) the
+    // polarity source is pinned to it and the autonomous rephase rotation is suspended; [UNMANAGED]
+    // (the default) leaves the rotation in charge.
+    private var managedMode = PhaseMode.UNMANAGED
+
+    /** Set the externally-managed phase regime (see [RestartSchedule.phaseMode]). */
+    fun setManagedMode(mode: PhaseMode) {
+        managedMode = mode
+    }
+
     /**
      * If a value is cached for [varRef], prepend it to the heuristic's [values] order (dropping it
      * from the rest so it isn't tried twice); otherwise pass [values] through unchanged. For a Boolean
@@ -48,7 +58,14 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
             // saved value. The chosen value (if any) is tried first, with the heuristic's
             // order filling the rest.
             val preferred: Long? = if (boolTarget != null && boolTargetSet != null) {
-                when (rephaseMode) {
+                // A managing schedule pins the source (stable → dive on target, focused → plain saved);
+                // otherwise the autonomous rephase rotation chooses.
+                val source = when (managedMode) {
+                    PhaseMode.STABLE -> RephaseMode.TARGET
+                    PhaseMode.FOCUSED -> RephaseMode.SAVED
+                    PhaseMode.UNMANAGED -> rephaseMode
+                }
+                when (source) {
                     // Target: the deepest conflict-free phase, falling back to saved.
                     RephaseMode.TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1L else 0L) else savedFirst
 
@@ -123,7 +140,7 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
      * tries first. A no-op when target phasing is off.
      */
     fun onConflictTick() {
-        if (boolTarget == null) return
+        if (boolTarget == null || managedMode != PhaseMode.UNMANAGED) return
         conflictsSinceRephase++
         if (conflictsSinceRephase >= params.rephaseInterval) {
             conflictsSinceRephase = 0

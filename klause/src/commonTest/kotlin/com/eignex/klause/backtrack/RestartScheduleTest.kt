@@ -1,8 +1,10 @@
 package com.eignex.klause.backtrack
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class RestartScheduleTest {
@@ -69,6 +71,18 @@ class RestartScheduleTest {
     fun `mode-switching wins over ema`() {
         assertIs<ModeSwitchingRestartSchedule>(
             RestartSchedule.from(BacktrackParams(modeSwitchingRestart = true, emaRestart = true)),
+        )
+    }
+
+    @Test
+    fun `only the mode-switching schedule manages the phase regime`() {
+        assertEquals(PhaseMode.UNMANAGED, RestartSchedule.from(BacktrackParams(lubyRestartBase = 256L)).phaseMode())
+        assertEquals(PhaseMode.UNMANAGED, RestartSchedule.from(BacktrackParams(adaptiveRestart = true)).phaseMode())
+        assertEquals(PhaseMode.UNMANAGED, RestartSchedule.from(BacktrackParams(emaRestart = true)).phaseMode())
+        assertEquals(PhaseMode.UNMANAGED, RestartSchedule.from(BacktrackParams()).phaseMode())
+        assertNotEquals(
+            PhaseMode.UNMANAGED,
+            RestartSchedule.from(BacktrackParams(modeSwitchingRestart = true)).phaseMode(),
         )
     }
 }

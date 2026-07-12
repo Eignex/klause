@@ -58,6 +58,32 @@ class PhaseSavingTest {
     }
 
     @Test
+    fun `managed STABLE mode keeps diving on the target phase despite the rephase clock`() {
+        val session = boolSession(1)
+        session.pinBool(0, true)
+        val phase = PhaseSaving(1, 0, BacktrackParams(targetPhasing = true, rephaseInterval = 2))
+        phase.captureTargetIfDeeper(session, trailSize = 1)
+        phase.setManagedMode(PhaseMode.STABLE)
+        // Unmanaged, two ticks would rotate TARGET -> SAVED and drop the target bias; under STABLE the
+        // rotation is suspended and the target stays preferred.
+        phase.onConflictTick()
+        phase.onConflictTick()
+        assertEquals(listOf(1L, 0L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
+    }
+
+    @Test
+    fun `managed FOCUSED mode ignores the target phase`() {
+        val session = boolSession(1)
+        session.pinBool(0, true)
+        val phase = PhaseSaving(1, 0, BacktrackParams(targetPhasing = true))
+        phase.captureTargetIfDeeper(session, trailSize = 1)
+        // The default TARGET source would prefer 1L; FOCUSED uses plain saved phase, and with none
+        // captured it falls through to the heuristic order.
+        phase.setManagedMode(PhaseMode.FOCUSED)
+        assertEquals(listOf(0L, 1L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
+    }
+
+    @Test
     fun `onConflictTick rotates the polarity source off TARGET after the rephase interval`() {
         val session = boolSession(1)
         session.pinBool(0, true)
