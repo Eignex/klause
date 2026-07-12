@@ -20,6 +20,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
@@ -654,9 +655,7 @@ object Xcsp3 {
         internal fun listText(e: XmlElement): String = e.child("list")?.textContent ?: e.textContent
 
         /** Resolve vars from a constraint `<list>` child. */
-        internal fun listVars(e: XmlElement): IntArray = refList(
-            requireNotNull(e.child("list")).textContent,
-        ).toIntArray()
+        internal fun listVars(e: XmlElement): IntArray = refList(requireNotNull(e.child("list")).textContent)
 
         internal fun IntArray.widenToLong(): LongArray = LongArray(size) { this[it].toLong() }
 
@@ -685,12 +684,15 @@ object Xcsp3 {
             else -> parseInts(text) ?: throw UnsupportedXcsp3Exception("non-constant <coeffs>")
         }
 
-        internal fun refList(text: String): List<Int> = text.splitWs().flatMap { expandRef(it) }
-
-        // A `<list>` entry may be a declared variable (possibly a wildcard/range over cells), a
-        // constant, a reified relation, or an arithmetic expression; [termVar] resolves each to an
-        // int var (fast-pathing declared variables) so lists of expressions/constants are supported.
-        internal fun expandRef(tok: String): List<Int> = expandNames(tok).map { termVar(it) }
+        // A `<list>` entry may be a declared variable (possibly a wildcard/range over cells), a constant,
+        // a reified relation, or an arithmetic expression; [termVar] resolves each to an int var
+        // (fast-pathing declared variables). Builds an [IntArray] directly — a large `<list>` (WordSquare's
+        // thousands-entry element lists) would otherwise box every resolved id into a `List<Int>`.
+        internal fun refList(text: String): IntArray {
+            val out = IntArrayList()
+            for (tok in text.splitWs()) for (name in expandNames(tok)) out.add(termVar(name))
+            return out.toIntArray()
+        }
 
         /** Expand an array reference token into the declared cell names it denotes. Each `[...]`
          *  group is a fixed index `[i]`, a range `[lo..hi]`, or a wildcard `[]` (any index), in
