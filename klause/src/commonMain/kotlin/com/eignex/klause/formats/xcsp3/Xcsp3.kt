@@ -334,6 +334,12 @@ object Xcsp3 {
 
         internal fun intension(expr: String) {
             val node = FExpr.parse(expr)
+            if (node is FExpr.Call && node.fn == "eq" && node.args.size == 2) {
+                // `eq(v, mul(a,b))` with v, a, b plain variables is one Product (v = a·b), skipping the aux
+                // var and equality the generic term path emits — the bulk of an O(n²) product model.
+                (directProduct(node.args[0], node.args[1]) ?: directProduct(node.args[1], node.args[0]))
+                    ?.let { factors.add(it); return }
+            }
             if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
                 val r = relationParts(node)
                 when {
@@ -343,6 +349,19 @@ object Xcsp3 {
             } else {
                 factors.add(Clause(intArrayOf(compileBool(node))))
             }
+        }
+
+        /** The var id when [e] is a plain variable reference, else null. Emits no factors either way. */
+        private fun plainVar(e: FExpr): Int? = if (e is FExpr.Ref) ref(e.name) else null
+
+        /** `Product(a, b, v)` (`v = a·b`) when [vSide] is a plain var and [mulSide] is `mul` of two plain
+         *  vars; null otherwise (the caller then takes the generic aux-var + equality path). */
+        private fun directProduct(vSide: FExpr, mulSide: FExpr): Product? {
+            if (mulSide !is FExpr.Call || mulSide.fn != "mul" || mulSide.args.size != 2) return null
+            val v = plainVar(vSide) ?: return null
+            val a = plainVar(mulSide.args[0]) ?: return null
+            val b = plainVar(mulSide.args[1]) ?: return null
+            return Product(a, b, v)
         }
 
         internal fun compileBool(e: FExpr): Int = when (e) {
