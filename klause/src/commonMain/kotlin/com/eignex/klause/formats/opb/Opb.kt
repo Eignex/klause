@@ -30,6 +30,9 @@ data class OpbProblem(
  */
 object Opb {
 
+    /** A signed integer literal, used to tell an out-of-64-bit-range value from a non-numeric token. */
+    private val INTEGER = Regex("[+-]?\\d+")
+
     /** A parsed term: [coef] times the conjunction of [lits] (a single literal when linear). */
     private class Term(val coef: Long, val lits: IntArrayList)
 
@@ -103,9 +106,7 @@ object Opb {
 
             if (stmt[0] == "soft:") {
                 // `soft: top` bounds total violated cost strictly below top; the top is optional.
-                softTop = stmt.getOrNull(1)?.let {
-                    it.toLongOrNull() ?: error("WBO soft top not an integer: '$it'")
-                }
+                softTop = stmt.getOrNull(1)?.let { parseLong(it, "soft top") }
                 continue
             }
 
@@ -176,8 +177,7 @@ object Opb {
         require(opIdx + 1 < tokens.size) {
             "OPB constraint missing right-hand side: ${tokens.joinToString(" ")}"
         }
-        val rhs = tokens[opIdx + 1].toLongOrNull()
-            ?: error("OPB constraint rhs not an integer: '${tokens[opIdx + 1]}'")
+        val rhs = parseLong(tokens[opIdx + 1], "constraint rhs")
         val op = when (tokens[opIdx]) {
             ">=" -> PbOp.GE
             "<=" -> PbOp.LE
@@ -196,8 +196,18 @@ object Opb {
     /** The cost of a WBO soft constraint whose statement opens with a `[cost]` token, else null (hard). */
     private fun parseSoftCost(token: String): Long? {
         if (!(token.startsWith("[") && token.endsWith("]"))) return null
-        val inner = token.substring(1, token.length - 1)
-        return inner.toLongOrNull() ?: error("WBO soft cost not an integer: '$token'")
+        return parseLong(token.substring(1, token.length - 1), "soft cost")
+    }
+
+    /**
+     * Parse an OPB integer [token] naming a [role], rejecting a value that overflows the 64-bit range
+     * with a distinct message: klause weights and domains are [Long], so a coefficient beyond that can
+     * neither be represented nor solved, and treating it as "not an integer" would be misleading.
+     */
+    private fun parseLong(token: String, role: String): Long = token.toLongOrNull() ?: if (INTEGER.matches(token)) {
+        error("OPB $role exceeds the supported 64-bit range: '$token'")
+    } else {
+        error("OPB $role not an integer: '$token'")
     }
 
     /** Parse a term sequence: each term is a coefficient followed by one or more literals. */
@@ -205,8 +215,7 @@ object Opb {
         val terms = mutableListOf<Term>()
         var idx = 0
         while (idx < tokens.size) {
-            val coef = tokens[idx].toLongOrNull()
-                ?: error("OPB coefficient not an integer: '${tokens[idx]}'")
+            val coef = parseLong(tokens[idx], "coefficient")
             idx++
             val lits = IntArrayList()
             while (idx < tokens.size && isVarToken(tokens[idx])) {
