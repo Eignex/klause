@@ -20,7 +20,7 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
             if (r.op == LinearOp.NE) continue
             for (ti in r.vars.indices) {
                 val tv = r.vars[ti]
-                val ct = r.coeffs[ti].toLong()
+                val ct = r.coeffs[ti]
                 if (ct == 0L) continue
                 var sLo = 0L
                 var sHi = 0L
@@ -28,7 +28,7 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
                 var sHiInf = false
                 for (oi in r.vars.indices) {
                     if (oi == ti) continue
-                    val c = r.coeffs[oi].toLong()
+                    val c = r.coeffs[oi]
                     val v = r.vars[oi]
                     val vlo = lo[v]
                     val vhi = hi[v]
@@ -47,7 +47,7 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
                     sLo += clo
                     sHi += chi
                 }
-                val bnd = r.bound.toLong()
+                val bnd = r.bound
                 if ((r.op == LinearOp.LE || r.op == LinearOp.EQ) && !sLoInf) {
                     changed = applyCtBound(lo, hi, tv, ct, bnd - sLo, upper = true) || changed
                 }

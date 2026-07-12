@@ -47,7 +47,7 @@ class SmtLibQfLiaTest {
     }
 
     @Test
-    fun `an integer literal beyond 64 bits is rejected as an integer, not a real`() {
+    fun `an integer literal beyond 64 bits is rejected as an over-range integer`() {
         val text = "(declare-const x Int) (assert (<= x 170141183460469231731687303715884105728))"
         val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
         assertTrue("integer literal" in e.message.orEmpty() && "64-bit" in e.message.orEmpty(), e.message.orEmpty())

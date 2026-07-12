@@ -207,7 +207,7 @@ object Xcsp3 {
                 else -> {
                     val lin = linear(node)
                     if (lin.coeffs.isEmpty()) {
-                        newAuxVar(lin.constant.toLong(), lin.constant.toLong())
+                        newAuxVar(lin.constant, lin.constant)
                     } else {
                         materializeVar(lin)
                     }
@@ -217,8 +217,8 @@ object Xcsp3 {
 
         /** Min/max of a linear expression over its variables' domains. */
         internal fun linBounds(lin: LinComb): Pair<Long, Long> {
-            var lo = lin.constant.toLong()
-            var hi = lin.constant.toLong()
+            var lo = lin.constant
+            var hi = lin.constant
             for ((v, c) in lin.coeffs) {
                 val d = domains[v]
                 if (c >= 0) {
@@ -516,7 +516,7 @@ object Xcsp3 {
             val qa = da.min / k
             val qb = da.max / k
             val q = newAuxVar(minOf(qa, qb), maxOf(qa, qb))
-            val r = newAuxVar(-(absK - 1).toLong(), (absK - 1).toLong())
+            val r = newAuxVar(-(absK - 1), (absK - 1))
             factors.add(Linear(longArrayOf(1, -k, -1), intArrayOf(a, q, r), LinearOp.EQ, 0L)) // a = k·q + r
             // Truncation ⇒ r shares the dividend's sign (or is 0). Pin it: trivially when `a` is
             // single-signed, else gate on the reified sign of `a`.
