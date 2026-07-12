@@ -34,6 +34,15 @@ internal object DimacsFormat : ProblemFormat {
     override fun ingest(file: File) = Ingested(Dimacs.parse(file.readText()))
 }
 
+internal object WcnfFormat : ProblemFormat {
+    override val format = Format.WCNF
+    override val inProcess = true
+    override fun ingest(file: File): Ingested {
+        val wcnf = Dimacs.parseWcnf(file.readText())
+        return Ingested(wcnf.problem, wcnf.objective)
+    }
+}
+
 internal object OpbFormat : ProblemFormat {
     override val format = Format.OPB
     override val inProcess = true
@@ -92,6 +101,7 @@ internal object SmtLibFormat : ProblemFormat {
 internal object Formats {
     private val byFormat: Map<Format, ProblemFormat> = listOf(
         DimacsFormat,
+        WcnfFormat,
         OpbFormat,
         JsonSchemaFormat,
         FlatZincFormat,

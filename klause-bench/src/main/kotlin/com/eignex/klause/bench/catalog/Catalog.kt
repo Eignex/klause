@@ -18,6 +18,9 @@ enum class Format {
     /** DIMACS CNF (SAT). In-process via `Dimacs.parse`. */
     DIMACS,
 
+    /** DIMACS WCNF (MaxSAT). In-process via `Dimacs.parseWcnf`. */
+    WCNF,
+
     /** Pseudo-Boolean OPB. In-process via `Opb.parse`. */
     OPB,
 

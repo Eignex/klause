@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.bench.OpbFormat
+import com.eignex.klause.bench.WcnfFormat
 import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -44,6 +45,16 @@ class CatalogTest {
         val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "setcover-tiny").source))
         val obj = assertNotNull(opb.objective)
         assertTrue(obj.toString().isNotEmpty())
+    }
+
+    @Test
+    fun `wcnf-core resolves the maxsat instance with a soft-clause objective`() {
+        val ingested = WcnfFormat.ingest(CorpusFetcher.resolve(ref("wcnf-core", "maxsat-tiny").source))
+        // 2 original variables plus one relaxation variable per soft clause.
+        assertEquals(4, ingested.problem.numBoolVars)
+        val obj = assertNotNull(ingested.objective)
+        // The relaxation variables carry the soft-clause costs 3 and 1.
+        assertEquals(listOf(3L, 1L), obj.boolWeights.toList().takeLast(2))
     }
 
     @Test
