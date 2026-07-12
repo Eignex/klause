@@ -111,8 +111,11 @@ interface IntDomain {
      *  closest present value (ties toward the smaller). Identity on the contiguous fast path. */
     fun clamp(value: Long): Long = when {
         value <= min -> min
+
         value >= max -> max
+
         value in this -> value
+
         else -> {
             val lo = lower(value)
             val hi = higher(value)

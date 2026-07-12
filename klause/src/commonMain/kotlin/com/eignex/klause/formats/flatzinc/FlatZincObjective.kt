@@ -5,13 +5,88 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
-/** Build an exact [FunctionalObjective] from `defines_var` annotations when possible. */
-internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? {
+/** Build an exact [FunctionalObjective] from `defines_var` annotations when possible: a bool-count
+ *  objective `Σ w_i·bool2int(and_i)` (`array_bool_and` / `_or` indicators, whose defining sweep already
+ *  excludes them from search) when it matches, else the general int cone. */
+internal fun FlatZincCompiler.buildFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? =
+    buildBoolCountObjective(objName, minimize) ?: buildIntFunctionalObjective(objName, minimize)
+
+/**
+ * Recognize `objective = Σ w_i·bool2int(b_i)` where each `b_i` is an `array_bool_and` / `array_bool_or`
+ * indicator, and mirror it as a bool-term [FunctionalObjective] over those indicators' literals. The
+ * indicators are functionally defined (their sweep excludes them from search), so a plain
+ * [com.eignex.klause.solver.objective.LinearObjective] gives moves on the literals a zero gradient; this
+ * evaluates each `and_i` from its literals so a literal flip yields the true objective delta. Returns
+ * null on any shape it can't mirror exactly, falling back to [buildIntFunctionalObjective].
+ */
+internal fun FlatZincCompiler.buildBoolCountObjective(objName: String, minimize: Boolean): FunctionalObjective? {
+    val objId = intVars[objName] ?: return null
+    val byInt = MutableIntObjectMap<FznConstraint>()
+    val byBool = MutableIntObjectMap<FznConstraint>()
+    for (c in model.constraints) {
+        val ann = c.annotations.firstOrNull { it.name == "defines_var" } ?: continue
+        val arg = ann.args.firstOrNull() ?: continue
+        val iv = varIdOrNull(arg)
+        if (iv != null) {
+            if (!byInt.containsKey(iv)) byInt.put(iv, c)
+        } else {
+            val bv = boolIdOrNull(arg) ?: continue
+            if (!byBool.containsKey(bv)) byBool.put(bv, c)
+        }
+    }
+    val objDef = byInt[objId] ?: return null
+    if (objDef.name != "int_lin_eq") return null
+    val coeffs = runCatching { evalIntConstArray(objDef.args[0]) }.getOrNull() ?: return null
+    val opnds = arrayOperands(objDef.args[1]) ?: return null
+    val cval = runCatching { evalIntConst(objDef.args[2]) }.getOrNull() ?: return null
+    if (coeffs.size != opnds.size) return null
+    val slot = opnds.indexOfFirst { it.varId == objId }
+    if (slot < 0) return null
+    val outCoeff = coeffs[slot].toLong()
+    if (outCoeff != 1L && outCoeff != -1L) return null
+
+    val boolTerms = IntArrayList()
+    val boolCoeffs = LongArrayList()
+    val boolNodes = ArrayList<FunctionalObjective.BoolFold>()
+    val boolLeaves = LinkedHashSet<Int>()
+    val nodeAdded = IntHashSet()
+    for (k in opnds.indices) {
+        if (k == slot) continue
+        val termVar = opnds[k].varId
+        if (termVar < 0) return null
+        // obj = (c − Σ coeffs·term)/outCoeff, so term's weight in the objective is −coeffs[k]/outCoeff.
+        val termDef = byInt[termVar] ?: return null
+        if (termDef.name != "bool2int") return null
+        val b = boolIdOrNull(termDef.args[0]) ?: return null
+        val bDef = byBool[b] ?: return null
+        if (bDef.name != "array_bool_and" && bDef.name != "array_bool_or") return null
+        val lits = runCatching { evalBoolVarArray(bDef.args[0]) }.getOrNull() ?: return null
+        val weight = -coeffs[k].toLong() / outCoeff
+        boolTerms.add(b)
+        boolCoeffs.add(if (minimize) weight else -weight)
+        if (nodeAdded.add(b)) {
+            boolNodes.add(FunctionalObjective.BoolFold(b, lits, bDef.name == "array_bool_and"))
+            for (lit in lits) boolLeaves.add(Lit.variable(lit))
+        }
+    }
+    if (boolTerms.isEmpty()) return null
+    val constant = cval / outCoeff
+    return FunctionalObjective(
+        EmptyIntArray, EmptyLongArray, if (minimize) constant else -constant, minimize = true,
+        emptyList(), EmptyIntArray,
+        boolTerms.toIntArray(), boolCoeffs.toLongArray(), boolNodes, boolLeaves.toIntArray(),
+    )
+}
+
+/** Build an exact int-cone [FunctionalObjective] from `defines_var` annotations when possible. */
+internal fun FlatZincCompiler.buildIntFunctionalObjective(objName: String, minimize: Boolean): FunctionalObjective? {
     val objId = intVars[objName] ?: return null
     val byDef = MutableIntObjectMap<FznConstraint>()
     for (c in model.constraints) {

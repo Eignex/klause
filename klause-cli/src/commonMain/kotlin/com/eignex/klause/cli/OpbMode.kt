@@ -26,7 +26,13 @@ internal object OpbMode : CliMode {
             }
             val render: (Sample) -> String = { s -> renderPbModel(parsed.problem.numBoolVars, s) }
             // OPB objectives are minimisations; there is no maximisation form.
-            return linearSolvable(parsed.problem, parsed.objective, maximize = false, render)
+            return linearSolvable(
+                parsed.problem,
+                parsed.objective,
+                maximize = false,
+                render,
+                boolFolds = parsed.boolFolds,
+            )
         }
 
         override fun output(common: CommonOptions): OutputProtocol = OpbOutput()
