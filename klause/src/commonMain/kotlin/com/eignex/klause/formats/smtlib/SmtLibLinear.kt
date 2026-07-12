@@ -152,9 +152,9 @@ internal fun SmtLibQfLia.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, 
 internal fun SmtLibQfLia.Builder.linearObjective(t: SExpr, negate: Boolean): LinearObjective {
     val lt = linearTerm(t)
     val coeffs = LongArray(nextInt)
-    for ((v, c) in lt.coeffs) coeffs[v] = (if (negate) -c else c).toLong()
+    for ((v, c) in lt.coeffs) coeffs[v] = if (negate) -c else c
     return LinearObjective(
         intCoefficients = coeffs,
-        constant = (if (negate) -lt.constant else lt.constant).toLong(),
+        constant = if (negate) -lt.constant else lt.constant,
     )
 }
