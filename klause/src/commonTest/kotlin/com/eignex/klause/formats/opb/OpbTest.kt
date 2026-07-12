@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.opb
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
@@ -57,6 +58,48 @@ class OpbTest {
         assertEquals(-3L, obj.boolWeights[1])
         assertEquals(3L, obj.constant)
         assertEquals(0, obj.intCoefficients.size)
+    }
+
+    @Test
+    fun `reifies a product term to an and indicator`() {
+        val text = "+1 x1 x2 >= 1 ;"
+        val out = Opb.parse(text)
+        // x1, x2, plus a fresh indicator for the product.
+        assertEquals(3, out.problem.numBoolVars)
+        val pb = out.problem.factors.filterIsInstance<PseudoBoolean>().single()
+        assertEquals(listOf(Lit.make(2, true)), pb.literals.toList())
+        assertEquals(listOf(1L), pb.weights.toList())
+        // AND of two literals lowers to three Tseitin clauses.
+        assertEquals(3, out.problem.factors.filterIsInstance<Clause>().size)
+    }
+
+    @Test
+    fun `reifies products over negated literals`() {
+        val text = "+1 ~x1 x2 >= 1 ;"
+        val out = Opb.parse(text)
+        assertEquals(3, out.problem.numBoolVars)
+        val pb = out.problem.factors.filterIsInstance<PseudoBoolean>().single()
+        assertEquals(listOf(Lit.make(2, true)), pb.literals.toList())
+    }
+
+    @Test
+    fun `shares one indicator across equal products`() {
+        val text = "+1 x1 x2 +1 x2 x1 >= 1 ;"
+        val out = Opb.parse(text)
+        // A single shared indicator, not one per occurrence.
+        assertEquals(3, out.problem.numBoolVars)
+        assertEquals(3, out.problem.factors.filterIsInstance<Clause>().size)
+        val pb = out.problem.factors.filterIsInstance<PseudoBoolean>().single()
+        assertEquals(listOf(Lit.make(2, true), Lit.make(2, true)), pb.literals.toList())
+    }
+
+    @Test
+    fun `reifies a product term in the objective`() {
+        val text = "min: 3 x1 x2 ;"
+        val out = Opb.parse(text)
+        val obj = assertNotNull(out.objective)
+        assertEquals(3, out.problem.numBoolVars)
+        assertEquals(3L, obj.boolWeights[2])
     }
 
     @Test
