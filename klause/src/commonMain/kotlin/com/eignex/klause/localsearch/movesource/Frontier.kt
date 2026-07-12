@@ -63,12 +63,12 @@ class Frontier(
             val cur = state.assignment.intValue(u)
             val d = state.problem.intDomains[u]
             if (cur < d.max) {
-                sink.addChannelingIntSet(state, u, cur + 1)
+                sink.addChannelingIntSet(state, u, d.higher(cur))
                 b--
             }
             if (b <= 0) return b
             if (cur > d.min) {
-                sink.addChannelingIntSet(state, u, cur - 1)
+                sink.addChannelingIntSet(state, u, d.lower(cur))
                 b--
             }
         }
