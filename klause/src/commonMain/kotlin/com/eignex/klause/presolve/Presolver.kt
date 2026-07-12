@@ -308,12 +308,11 @@ enum class PresolvePass(
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
-        override fun apply(problem: Problem, ctx: PresolveContext) =
-            RedundantConstraints.removeRedundantConstraints(
-                problem,
-                ctx.subsumeIncremental as? SubsumeIncremental,
-                ctx.cancellation,
-            )
+        override fun apply(problem: Problem, ctx: PresolveContext) = RedundantConstraints.removeRedundantConstraints(
+            problem,
+            ctx.subsumeIncremental as? SubsumeIncremental,
+            ctx.cancellation,
+        )
     },
 
     /** Per-factor structural self-reduction — each factor rewrites itself into simpler / lower-arity
