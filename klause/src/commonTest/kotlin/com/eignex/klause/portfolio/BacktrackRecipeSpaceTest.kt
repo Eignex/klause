@@ -4,7 +4,9 @@ import com.eignex.klause.backtrack.lp.LpEmphasis
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Tests for the backtrack recipe cross-product generator (the backtrack analogue of [RecipeSpaceTest]):
@@ -53,5 +55,21 @@ class BacktrackRecipeSpaceTest {
     fun `an lp-aggressive recipe carries the aggressive emphasis`() {
         val recipe = BacktrackRecipeSpace().all().first { it.label.endsWith("/lp-aggressive") }
         assertEquals(LpEmphasis.AGGRESSIVE, recipe.build(1L).lpConfig?.emphasis)
+    }
+
+    @Test
+    fun `the restart axis selects each pluggable schedule`() {
+        val recipes = BacktrackRecipeSpace().all()
+        val adaptive = recipes.first { it.label.contains("/adaptive/") }.build(1L)
+        assertTrue(adaptive.adaptiveRestart, "the adaptive option enables the Glucose schedule")
+        assertNull(adaptive.lubyRestartBase, "the adaptive option leaves no Luby base")
+
+        val noRestart = recipes.first { it.label.contains("/no-restart/") }.build(1L)
+        assertFalse(noRestart.adaptiveRestart, "the no-restart option leaves adaptive off")
+        assertNull(noRestart.lubyRestartBase, "the no-restart option leaves no Luby base")
+
+        val luby = recipes.first { it.label.contains("/luby-256/") }.build(1L)
+        assertEquals(256L, luby.lubyRestartBase, "the luby option carries its base")
+        assertFalse(luby.adaptiveRestart, "the luby option leaves adaptive off")
     }
 }

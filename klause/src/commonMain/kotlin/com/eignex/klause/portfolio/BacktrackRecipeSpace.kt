@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.RestartSchedule
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.backtrack.lp.LpEmphasis
 import com.eignex.klause.backtrack.selector.ActivityBasedSearch
@@ -27,8 +28,12 @@ internal class BtVarOption(val label: String, val make: () -> VariableSelector)
 /** A named value-order axis option. */
 internal class BtValOption(val label: String, val make: () -> ValueSelector)
 
-/** A named restart-cadence axis option (the Luby base unit). */
-internal class BtRestartOption(val label: String, val lubyBase: Long)
+/**
+ * A named restart-schedule axis option — the sweep counterpart of a [RestartSchedule] choice, applied
+ * through [BacktrackParams]. A [lubyBase] selects the Luby schedule at that base; [adaptive] selects the
+ * Glucose adaptive schedule; both left unset is the single-unbounded-run (no-restart) schedule.
+ */
+internal class BtRestartOption(val label: String, val lubyBase: Long? = null, val adaptive: Boolean = false)
 
 /** A named LP-emphasis axis option; [emphasis] `OFF` leaves the recipe with no LP relaxation. */
 internal class BtLpOption(val label: String, val emphasis: LpEmphasis)
@@ -83,6 +88,7 @@ internal class BacktrackRecipeSpace(
                 variableSelector = v.make(),
                 valueSelector = va.make(),
                 lubyRestartBase = r.lubyBase,
+                adaptiveRestart = r.adaptive,
                 lpConfig = if (l.emphasis == LpEmphasis.OFF) null else LpConfig(l.emphasis),
             )
         }
@@ -105,6 +111,8 @@ internal class BacktrackRecipeSpace(
         val DEFAULT_RESTARTS: List<BtRestartOption> = listOf(
             BtRestartOption("luby-100", lubyBase = 100L),
             BtRestartOption("luby-256", lubyBase = 256L),
+            BtRestartOption("adaptive", adaptive = true),
+            BtRestartOption("no-restart"),
         )
 
         val DEFAULT_LP: List<BtLpOption> = listOf(
