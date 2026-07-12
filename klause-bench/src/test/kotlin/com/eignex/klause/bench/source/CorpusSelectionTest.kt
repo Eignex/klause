@@ -105,6 +105,35 @@ class CorpusSelectionTest {
         }
     }
 
+    // Balanced selection: (format, name) items; family = name prefix, group = format.
+    private fun items(format: String, count: Int) = (1..count).map { format to "$format$it/x" }
+    private val family = { item: Pair<String, String> -> item.second.substringBefore('/') }
+    private val byFormat = { item: Pair<String, String> -> item.first as Any }
+
+    @Test
+    fun `balance splits the cap evenly across the groups present`() {
+        // The 'mzn' format has far more families, so a family-global cap would crowd the others out.
+        val all = items("mzn", 10) + items("xcsp", 3) + items("sat", 3)
+        val out = CorpusSelection.applyBalancedBy(all, Selection(maxInstances = 6), family, byFormat)
+        assertEquals(mapOf("mzn" to 2, "xcsp" to 2, "sat" to 2), out.groupingBy { it.first }.eachCount())
+    }
+
+    @Test
+    fun `balance water-fills a short group's surplus into groups with room`() {
+        val all = items("big", 10) + items("small", 1)
+        val out = CorpusSelection.applyBalancedBy(all, Selection(maxInstances = 6), family, byFormat)
+        // Even share is 3/3, but 'small' can only supply 1, so 'big' absorbs the surplus to 5.
+        assertEquals(6, out.size)
+        assertEquals(mapOf("big" to 5, "small" to 1), out.groupingBy { it.first }.eachCount())
+    }
+
+    @Test
+    fun `balance without a cap keeps every group in full`() {
+        val all = items("big", 10) + items("small", 1)
+        val out = CorpusSelection.applyBalancedBy(all, Selection(), family, byFormat)
+        assertEquals(11, out.size)
+    }
+
     @Test
     fun `FlatMzn layout discovers self-contained models with family from first path component`() {
         val root = Files.createTempDirectory("flatsel").toFile()

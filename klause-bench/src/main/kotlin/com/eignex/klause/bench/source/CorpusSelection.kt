@@ -186,6 +186,43 @@ internal object CorpusSelection {
         return sel.maxInstances?.let { interleaved.take(it) } ?: interleaved
     }
 
+    /** Format-balanced (or any-[group]-balanced) selection: partition [all] by [group], apply the
+     *  family-aware cap/sample/interleave within each group, then spread [Selection.maxInstances]
+     *  *evenly across the groups present* rather than across families globally — so a corpus with
+     *  many families in one format can't crowd the other formats out of a capped run. The split
+     *  water-fills: a group with fewer instances than its even share yields the surplus to groups
+     *  that can still absorb it, keeping the total at the cap when the corpus can supply it. Groups
+     *  are round-robin [interleave]d so a further downstream `take` still spans every group. With no
+     *  [Selection.maxInstances] every group is kept in full. */
+    fun <T> applyBalancedBy(all: List<T>, sel: Selection, family: (T) -> String, group: (T) -> Any): List<T> {
+        val groups = LinkedHashMap<Any, MutableList<T>>()
+        for (d in all) groups.getOrPut(group(d)) { mutableListOf() }.add(d)
+        val perGroup = groups.values.map { applySelectionBy(it, sel.copy(maxInstances = null), family) }
+        val total = sel.maxInstances ?: return interleave(perGroup)
+        val quota = waterFill(perGroup.map { it.size }, total)
+        return interleave(perGroup.mapIndexed { i, g -> g.take(quota[i]) })
+    }
+
+    /** Spread [total] across bins of the given [sizes] as evenly as possible, never exceeding a
+     *  bin's size: hand every not-yet-full bin an equal share of what remains, repeating until the
+     *  budget is spent or every bin is full, so surplus from small bins flows to bins with room. */
+    private fun waterFill(sizes: List<Int>, total: Int): IntArray {
+        val quota = IntArray(sizes.size)
+        var remaining = total.coerceAtMost(sizes.sum())
+        while (remaining > 0) {
+            val hungry = sizes.indices.filter { quota[it] < sizes[it] }
+            if (hungry.isEmpty()) break
+            val share = (remaining / hungry.size).coerceAtLeast(1)
+            for (i in hungry) {
+                if (remaining == 0) break
+                val give = minOf(share, sizes[i] - quota[i], remaining)
+                quota[i] += give
+                remaining -= give
+            }
+        }
+        return quota
+    }
+
     /** Pick the canonical `.mzn` for [familyName] from [candidates]: exact basename, then
      *  `<family>_model` / `model` / `main`, then a family-prefixed non-`mznc` name, else
      *  sorted-first. */
