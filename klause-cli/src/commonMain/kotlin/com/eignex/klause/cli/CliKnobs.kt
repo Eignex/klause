@@ -24,9 +24,11 @@ internal object CliKnobs {
      *  in presolve. `0` or negative disables the cap. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
     val presolveBudgetMs by propertyKnob()
 
-    /** Default presolve wall-clock budget: bounds presolve on pathological models while leaving ordinary
-     *  instances untouched. Set well above the corpus's normal presolve times so the cap only ever fires
-     *  as a runaway backstop — the long-running passes (affine, symmetry) still bail promptly via
-     *  cooperative cancellation once it trips. */
-    const val DEFAULT_PRESOLVE_BUDGET_MS = 5000L
+    /** Default presolve wall-clock budget, sized so the presolve phase stays under ~2s on every corpus
+     *  instance: the long-running passes bail via cooperative cancellation with the reductions made so far
+     *  (each pass is sound, so a partial run only forgoes further reduction). Set below the ~1.5s where
+     *  every ordinary instance's productive presolve is already front-loaded (a large model keeps
+     *  >99.9% of its reduction at this cap) and above it plus the reduced-problem delta-application
+     *  (~0.4s on a multi-million-factor model) so the total presolve phase lands under 2s. */
+    const val DEFAULT_PRESOLVE_BUDGET_MS = 1400L
 }
