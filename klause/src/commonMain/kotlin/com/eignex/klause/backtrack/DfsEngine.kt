@@ -115,7 +115,7 @@ internal class DfsEngine<L>(
         valueSelector = params0.valueSelector.fresh(),
     )
     private val problem = solver.problem
-    private val session = PropagationSession(problem)
+    private val session = PropagationSession(problem, params.cancellation, params.propagationCancelFloor)
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are
     // assumptions, levels > numSeed are post-seed DFS decisions.
@@ -194,6 +194,9 @@ internal class DfsEngine<L>(
     /** Advance the search to the next [EngineEvent], retaining all state so the next call resumes. */
     fun runUntilEvent(): EngineEvent<L> {
         rootExhausted?.let { return it }
+        // The bake / seed fixpoint (run at construction) can itself be cut short by the deadline on
+        // a slow propagator over wide domains; surface that as a budget cap before any descent.
+        if (session.fixpointCancelled) return EngineEvent.BudgetCapped
         if (!started) {
             started = true
             policy.onFirstRun()?.let { return EngineEvent.Solution(it) }
@@ -231,6 +234,13 @@ internal class DfsEngine<L>(
     private fun descendStep(): EngineEvent<L>? {
         val varRef = policy.branchPick(session) ?: params.variableSelector.pick(session, rng)
         if (varRef == null) {
+            // A seed fixpoint the deadline cut short can leave a full assignment with a pending,
+            // unpropagated (possibly violated) factor. Never emit that as a solution.
+            if (session.fixpointCancelled) {
+                policy.onBudgetExit(session)
+                descend = false
+                return EngineEvent.BudgetCapped
+            }
             val snap = snapshotAssignment(session)
             params.variableSelector.onSolution(snap)
             params.valueSelector.onSolution(snap)

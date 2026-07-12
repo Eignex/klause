@@ -17,6 +17,7 @@ import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolverParams
@@ -225,6 +226,9 @@ data class BacktrackParams(
     val lpPlan: LpPlan = LpPlan(),
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
+    /** Per-call fire floor before propagation polls [cancellation]; see [PROPAGATION_CANCEL_FLOOR].
+     *  Overridable so a test can force the runaway-fixpoint deadline path deterministically. */
+    val propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
     /**
      * Total wall-clock solve budget in milliseconds, when the caller knows it (the `-t` deadline).
      * Advisory only — the hard stop remains [cancellation]; this just lets the LP subsystem size its

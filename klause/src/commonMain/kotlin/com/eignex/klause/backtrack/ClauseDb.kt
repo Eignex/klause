@@ -56,6 +56,11 @@ internal fun BacktrackSolver.advance(
         // Count every factor-forced assignment this pin triggered — including the
         // propagation done on the way to a conflict (Unsat returns below).
         sink?.search?.observePropagation(session.propagationCount - propsBefore)
+        // A fixpoint the deadline cut short returns `null` (no conflict), so its state is
+        // under-propagated: a pending, unpropagated factor may be violated. Abort rather than let
+        // the search commit to a leaf on it (which would report an unsound SAT). See
+        // [PropagationSession.fixpointCancelled].
+        if (session.fixpointCancelled) return AdvanceOutcome.BudgetCapped
         val r = outcome.result
         if (r is PropagationResult.Unsat) {
             // Every conflict is a failed node — count it here, the one point all

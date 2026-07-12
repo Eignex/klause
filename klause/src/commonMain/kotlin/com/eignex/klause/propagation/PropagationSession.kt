@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -36,8 +37,14 @@ enum class VarKind {
 class PropagationSession(
     /** The problem being propagated. */
     val problem: Problem,
+    /** Deadline token polled by every fixpoint (bake, seed, and per-node pushes) so a slow
+     *  propagator over wide domains can't wedge past the solve budget. Defaults to never. */
+    private val cancellation: Cancellation = Cancellation.Never,
+    /** Per-call fire floor before the deadline poll engages; see [PROPAGATION_CANCEL_FLOOR]. */
+    propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
 ) {
-    private val state: PropagationState = PropagationState(problem, Assumptions.None)
+    private val state: PropagationState =
+        PropagationState(problem, Assumptions.None).also { it.cancelFloor = propagationCancelFloor }
 
     /** Subscribe to per-variable unassign events fired by every backtrack/undo; see
      *  [PropagationState.undoTo]. Combined-index encoding: bool id `v`, int id `numBoolVars + v`. */
@@ -99,12 +106,16 @@ class PropagationSession(
     /** Literal `x_v ≤ threshold` ([positive]) or its negation. See [boundGeLit]. */
     fun boundLeLit(v: Int, threshold: Long, positive: Boolean): Int = Lit.make(state.atomVarLe(v, threshold), positive)
 
+    /** True once a fixpoint was cut short by the [cancellation] deadline (sticky). The engine must
+     *  then abort to `BudgetCapped` rather than read the partial state as a solved leaf. */
+    val fixpointCancelled: Boolean get() = state.runCancelled
+
     /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
      *  All session operations short-circuit to this result. */
     private var bakedUnsat: PropagationResult.Unsat? = null
 
     init {
-        val conflict = state.runToFixpoint(allFactors = true)
+        val conflict = state.runToFixpoint(allFactors = true, cancellation = cancellation)
         if (conflict != null) {
             bakedUnsat = PropagationResult.Unsat(
                 state.extractConflictBools(conflict),
@@ -202,7 +213,7 @@ class PropagationSession(
         bakedUnsat?.let { return it }
         val base = state.undoTop
         if (!state.setIntMaxAsDecision(v, hi)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false)
+        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         trail.add(encInt(v))
         levelPush(state.mark())
@@ -214,7 +225,7 @@ class PropagationSession(
         bakedUnsat?.let { return it }
         val base = state.undoTop
         if (!state.setIntMinAsDecision(v, lo)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false)
+        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         trail.add(encInt(v))
         levelPush(state.mark())
@@ -238,7 +249,7 @@ class PropagationSession(
         bakedUnsat?.let { return it }
         val base = state.undoTop
         val newFid = state.addLearnedClause(clause, lbd, permanent)
-        val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid)
+        val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         // The asserted facts are implied by the decisions up to the current level, so they
         // join the level's baseline: re-snapshot the top mark. Otherwise the next failed
@@ -305,7 +316,7 @@ class PropagationSession(
         bakedUnsat?.let { return it }
         val base = state.undoTop
         if (!apply()) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false)
+        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         // Fold into the current level's baseline so a later same-level revert keeps it, and so
         // popLast of this level — and only this level — discards it. Mirrors addLearnedClause.
@@ -434,7 +445,7 @@ class PropagationSession(
         if (boolPinned[v] == want) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         if (!state.pinBoolAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false)
+        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         boolPinned[v] = want
         trail.add(encBool(v))
@@ -446,7 +457,7 @@ class PropagationSession(
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = state.runToFixpoint(allFactors = false)
+        val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
         intPinnedSet[v] = true
         intPinnedVal[v] = value

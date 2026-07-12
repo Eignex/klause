@@ -24,9 +24,15 @@ internal const val NO_CARVE: Long = Long.MIN_VALUE
  *  non-negative ([Lit.make] = `var shl 1 | sign`), so −1 is a safe sentinel. */
 internal const val NO_BLOCKER: Int = -1
 
-/** Poll the cancellation token once every `CANCEL_POLL_MASK + 1` factor fires on the
- *  full-propagation path (power-of-two minus one so the gate is a single `and`). */
+/** Poll the cancellation token once every `CANCEL_POLL_MASK + 1` factor fires when a real token
+ *  is supplied (power-of-two minus one so the gate is a single `and`). */
 private const val CANCEL_POLL_MASK: Int = 1023
+
+/** Fires a single [PropagationState.runToFixpoint] must exceed before its cancellation poll engages.
+ *  Below it the deadline is left to the engine's between-decision poll — only a runaway fixpoint (an
+ *  O(span) bound crawl) does this many fires in one call, so normal propagation and resumable slicing
+ *  stay untouched. A multiple of `CANCEL_POLL_MASK + 1` so the aligned poll lands exactly on it. */
+internal const val PROPAGATION_CANCEL_FLOOR: Int = 1 shl 20
 
 /**
  * Mutable working state passed to [Propagator.propagate]. Tracks the currently-known pinned bool
@@ -256,6 +262,18 @@ class PropagationState(
      *  pins don't count. Read via [PropagationSession.propagationCount] for the
      *  `propagations` stat; monotonic for the life of the state. */
     internal var propagations: Long = 0L
+
+    /** Set once [runToFixpoint]'s cancellation poll fires — the deadline passed mid-fixpoint, so the
+     *  state is at a partial (only-tightened, never over-pruned) fixpoint. Sticky: the deadline is
+     *  monotone, so once tripped the whole solve is aborting. The engine reads it through
+     *  [PropagationSession.fixpointCancelled] and returns `BudgetCapped` rather than treating the
+     *  under-propagated state as a solved leaf (which would be an unsound SAT). */
+    internal var runCancelled: Boolean = false
+
+    /** Per-call fire floor before [runToFixpoint]'s cancellation poll engages; see
+     *  [PROPAGATION_CANCEL_FLOOR]. Overridable so a test can force the runaway-fixpoint path
+     *  deterministically instead of having to drive a million-fire propagation. */
+    internal var cancelFloor: Int = PROPAGATION_CANCEL_FLOOR
 
     /**
      * Seed set of factors directly implicated in a contradiction. Populated by [runToFixpoint]
@@ -722,11 +740,12 @@ class PropagationState(
      *
      * Returns `null` on success (state is at fixpoint); otherwise the conflict-levels set.
      *
-     * [cancellation] is polled only on the full-propagation ([allFactors]) path — the one-time
-     * bake / session-init fixpoint, the one place an uncancellable run can wedge on a slow
-     * propagator over wide domains. The per-node search path always passes
-     * `allFactors == false`, so the counter and the token call below are never reached there:
-     * the BCP hot loop pays nothing beyond a dead, perfectly-predicted branch. When the token
+     * [cancellation] is polled whenever a real token is supplied (i.e. not [Cancellation.Never]),
+     * on both the full-propagation ([allFactors]) and the incremental per-node path. A targeted
+     * fixpoint can itself wedge on a slow propagator over wide domains (a reified-linear bound
+     * crawl tightens one step at a time across a Long-wide span), so the search path must poll too
+     * to honour the deadline. When no token is supplied the gate below is a dead, perfectly-
+     * predicted branch, so the BCP hot loop pays nothing on deadline-free solves. When the token
      * fires the drain stops early and returns `null`; the partial fixpoint is sound (it only
      * ever tightens), and the deadline that fired it makes the caller abort promptly anyway.
      */
@@ -741,6 +760,12 @@ class PropagationState(
         conflictSeedFactors.clear()
         val factorCount = totalFactorCount
         propBegin(factorCount)
+        val pollable = cancellation !== Cancellation.Never
+        // Full propagation (bakes) is one-shot, not in the per-node BCP loop or a resumable slice, so
+        // it polls from the first fire like the original design. Only the incremental per-node path
+        // defers the poll past the fire floor, so a normal small fixpoint — and resumable slicing,
+        // which pauses at decision granularity — is never cut mid-propagation.
+        val floor = if (allFactors) 0 else cancelFloor
         var fireCount = 0
         if (allFactors) {
             for (fid in 0 until factorCount) propEnq(fid)
@@ -758,7 +783,18 @@ class PropagationState(
             for (fid in initialFactors) if (fid in 0 until factorCount) propEnq(fid)
         }
         while (propQueue.isNotEmpty()) {
-            if (allFactors && (fireCount++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
+            // Only a single fixpoint that itself runs away — an O(span) reified-linear bound crawl
+            // over a Long-wide domain, millions of fires deep — needs the deadline *inside*
+            // propagation. A normal per-node fixpoint is tiny and pauses cleanly at the engine's
+            // between-decision poll, so the fire floor leaves that path (and resumable slicing, which
+            // pauses at decision granularity) byte-identical: the poll is never even consulted there.
+            if (pollable) {
+                if (fireCount >= floor && (fireCount and CANCEL_POLL_MASK) == 0 && cancellation()) {
+                    runCancelled = true
+                    return null
+                }
+                fireCount++
+            }
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
