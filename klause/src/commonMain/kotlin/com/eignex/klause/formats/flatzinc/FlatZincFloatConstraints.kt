@@ -100,7 +100,9 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
     }
     val step = if (varSide.buckets > 1) (varSide.hi - varSide.lo) / (varSide.buckets - 1) else 0.0
     val coefVar = (sign * step * floatScale).roundToLong()
-    var scaledBound = (-sign * constPart * floatScale).roundToLong() -
+    // value(var) = lo + step·bucket, so `a OP b` with one constant is coefVar·bucket OP
+    // sign·(const − lo)·scale (the var-var branch below overrides this bound).
+    var scaledBound = (sign * constPart * floatScale).roundToLong() -
         (sign * varSide.lo * floatScale).roundToLong()
     val coeffs: IntArray
     val vars: IntArray
