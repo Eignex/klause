@@ -31,18 +31,25 @@ class XmlElement(
         tag,
         attributes,
         children.map { it.substituteParams(tokens, usedIndices) },
-        PARAM.replace(directText) { m ->
-            when {
-                m.groupValues[1].isNotEmpty() -> { // %i..%j
-                    val lo = m.groupValues[1].toInt()
-                    val hi = m.groupValues[2].toInt()
-                    (lo..hi).mapNotNull { tokens.getOrNull(it) }.joinToString(" ")
+        // A `%`-free text carries no placeholder, so reuse it verbatim rather than scanning it with the
+        // parameter regex once per `<args>` row — a group whose template holds a large literal (e.g. an
+        // mdd `<transitions>` blob) would otherwise re-match megabytes of text on every instantiation.
+        if ('%' !in directText) {
+            directText
+        } else {
+            PARAM.replace(directText) { m ->
+                when {
+                    m.groupValues[1].isNotEmpty() -> { // %i..%j
+                        val lo = m.groupValues[1].toInt()
+                        val hi = m.groupValues[2].toInt()
+                        (lo..hi).mapNotNull { tokens.getOrNull(it) }.joinToString(" ")
+                    }
+
+                    m.groupValues[3] == "..." ->
+                        tokens.filterIndexed { i, _ -> i !in usedIndices }.joinToString(" ")
+
+                    else -> tokens.getOrNull(m.groupValues[3].toInt()) ?: m.value
                 }
-
-                m.groupValues[3] == "..." ->
-                    tokens.filterIndexed { i, _ -> i !in usedIndices }.joinToString(" ")
-
-                else -> tokens.getOrNull(m.groupValues[3].toInt()) ?: m.value
             }
         },
     )
