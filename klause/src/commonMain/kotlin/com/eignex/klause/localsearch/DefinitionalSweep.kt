@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -45,27 +46,37 @@ class DefinitionalSweep internal constructor(
 ) {
     /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
     companion object {
-        /** Infer a sweep from the factor IR alone (front-end-agnostic — the XCSP3/SMT front-ends carry
-         *  no `defines_var` annotations): each `Product(a, b, out)` functionally defines `out = a·b`, so
-         *  local search can derive `out` from the decision vars rather than searching it. A var defined by
-         *  more than one product, or transitively by itself, is left searched (excluded). Nodes come out in
-         *  topological order; returns null when nothing is definable. */
-        fun infer(factors: Array<Factor>, numIntVars: Int): DefinitionalSweep? {
-            // Only `Product` results are inferred as definitional: a Product genuinely determines its
-            // output (out = a·b), so deriving it and excluding it from search is always sound. Orienting a
-            // `Linear` equality would need to know which var is the output — the `defines_var` info XCSP3
-            // lacks — and a wrong guess "defines" a decision var, producing an infeasible assignment.
-            val def = arrayOfNulls<Product>(numIntVars)
+        /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
+         *  decision vars instead of searching them. Two sound sources:
+         *  - every `Product(a, b, out)` defines `out = a·b` (a product always determines its output);
+         *  - a `Linear` equality is oriented to define var v ONLY when v is in [definedHints] — the
+         *    front-end's `defines_var` info (e.g. a `(eq, v)` sum). Orienting a bare equality without that
+         *    hint could pick a decision var as the output and derive it to an infeasible value, so it is
+         *    never done unhinted.
+         *  A var claimed by more than one definition, or transitively by itself, is left searched. Nodes
+         *  come out in topological order; returns null when nothing is definable. */
+        fun infer(factors: Array<Factor>, numIntVars: Int, definedHints: IntArray = IntArray(0)): DefinitionalSweep? {
+            val def = arrayOfNulls<Factor>(numIntVars)
+            val defOut = IntArray(numIntVars) { -1 } // for a Linear definer, the output var's index
             val overDefined = BooleanArray(numIntVars)
-            for (f in factors) {
-                if (f !is Product) continue
-                val o = f.result
-                if (o !in 0 until numIntVars) continue
-                if (def[o] != null || overDefined[o]) {
-                    def[o] = null
-                    overDefined[o] = true
+            fun claim(v: Int, f: Factor, outIdx: Int) {
+                if (v !in 0 until numIntVars) return
+                if (def[v] != null || overDefined[v]) {
+                    def[v] = null
+                    overDefined[v] = true
                 } else {
-                    def[o] = f
+                    def[v] = f
+                    defOut[v] = outIdx
+                }
+            }
+            for (f in factors) if (f is Product) claim(f.result, f, -1)
+            if (definedHints.isNotEmpty()) {
+                val hinted = BooleanArray(numIntVars)
+                for (v in definedHints) if (v in 0 until numIntVars) hinted[v] = true
+                for (f in factors) {
+                    if (f !is Linear || f.op != LinearOp.EQ) continue
+                    val j = f.vars.indices.firstOrNull { hinted[f.vars[it]] && (f.coeffs[it] == 1L || f.coeffs[it] == -1L) }
+                    if (j != null) claim(f.vars[j], f, j)
                 }
             }
             val nodes = ArrayList<SweepNode>()
@@ -77,15 +88,29 @@ class DefinitionalSweep internal constructor(
                     cyclic[v] = true
                     return
                 }
-                val p = def[v] ?: return
+                val f = def[v] ?: return
                 state[v] = 1
-                visit(p.a)
-                visit(p.b)
-                if (!cyclic[v]) {
-                    val a = FunctionalObjective.Operand.v(p.a)
-                    val b = FunctionalObjective.Operand.v(p.b)
-                    nodes.add(SweepNode.IntDef(FunctionalObjective.Times(v, a, b), intArrayOf(p.a, p.b)))
+                val node: FunctionalObjective.Node
+                val inputs: IntArray
+                if (f is Product) {
+                    visit(f.a)
+                    visit(f.b)
+                    node = FunctionalObjective.Times(v, FunctionalObjective.Operand.v(f.a), FunctionalObjective.Operand.v(f.b))
+                    inputs = intArrayOf(f.a, f.b)
+                } else {
+                    val lin = f as Linear
+                    val j = defOut[v]
+                    val ins = ArrayList<FunctionalObjective.Operand>(lin.vars.size - 1)
+                    val inc = ArrayList<Long>(lin.vars.size - 1)
+                    for (k in lin.vars.indices) if (k != j) {
+                        visit(lin.vars[k])
+                        ins.add(FunctionalObjective.Operand.v(lin.vars[k]))
+                        inc.add(lin.coeffs[k])
+                    }
+                    node = FunctionalObjective.Lin(v, lin.coeffs[j], inc.toLongArray(), ins.toTypedArray(), lin.bound)
+                    inputs = IntArray(ins.size) { lin.vars[if (it < j) it else it + 1] }
                 }
+                if (!cyclic[v]) nodes.add(SweepNode.IntDef(node, inputs))
                 state[v] = 2
             }
             for (v in 0 until numIntVars) visit(v)

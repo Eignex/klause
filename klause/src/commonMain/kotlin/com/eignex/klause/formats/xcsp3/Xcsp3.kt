@@ -36,6 +36,8 @@ data class Xcsp3Problem(
     val intVarNames: Map<String, Int> = emptyMap(),
     /** True when the parsed objective was maximize. */
     val maximize: Boolean = false,
+    /** Int vars the front-end knows are functionally defined (sound local-search `defines_var` hints). */
+    val definedVars: IntArray = IntArray(0),
 )
 
 /** Split on runs of whitespace into non-blank tokens. A manual scan replacing an inline
@@ -78,6 +80,11 @@ object Xcsp3 {
         // can repeat a constant tens of thousands of times (WordSquare), and a fresh `{c}` var each time
         // bloated the problem to millions of vars. A constant var is single-valued (never branched), so
         // sharing it is solve-neutral.
+        // Vars the front-end knows are functionally defined by a constraint it emitted (e.g. a `(eq, v)`
+        // sum makes v its value). These are the sound `defines_var` hints local search uses to derive
+        // them instead of searching them; the factor IR alone cannot tell an equality's output apart.
+        internal val definedVars = IntArrayList()
+
         private val constVars = MutableLongIntMap()
         internal fun constVar(value: Long): Int {
             val existing = constVars.getOrDefault(value, -1)
@@ -314,6 +321,11 @@ object Xcsp3 {
                 factors.add(Linear(coeffs, vars, op, k))
             } else {
                 factors.add(Linear(coeffs + -1, vars + rhsVar, op, k))
+                // `(eq, v)` makes v the sum's value: v = Σ coeffs·vars. Record it as a functional
+                // definition so local search derives v from the sum rather than searching it (the sound
+                // `defines_var` hint the factor IR alone can't recover — orienting a bare equality could
+                // pick a decision var as the output).
+                if (op == LinearOp.EQ) definedVars.add(rhsVar)
             }
         }
 
@@ -813,6 +825,7 @@ object Xcsp3 {
             objective,
             intVarNames = LinkedHashMap(varIds),
             maximize = objectiveMaximize,
+            definedVars = definedVars.toIntArray(),
         )
 
         companion object {

@@ -25,7 +25,7 @@ internal object Xcsp3Mode : CliMode {
             }
             val names = parsed.intVarNames
             val render: (Sample) -> String = { s -> renderInstantiation(names, s) }
-            return linearSolvable(parsed.problem, parsed.objective, parsed.maximize, render)
+            return linearSolvable(parsed.problem, parsed.objective, parsed.maximize, render, parsed.definedVars)
         }
 
         override fun output(common: CommonOptions): OutputProtocol = XcspOutput()
